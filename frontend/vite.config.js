@@ -3,7 +3,8 @@ import vue from "@vitejs/plugin-vue";
 import path from "path";
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue()], // ✅ ONLY ONCE
+
   server: {
     port: 5173,
     proxy: {
@@ -13,17 +14,16 @@ export default defineConfig({
         secure: false,
       },
       "/storage": {
-        // ← this is the only addition needed
         target: "http://localhost:8000",
         changeOrigin: true,
         secure: false,
       },
     },
-    plugins: [vue()],
-    resolve: {
-      alias: {
-        "@": path.resolve(__dirname, "./src"),
-      },
+  },
+
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
     },
   },
 });

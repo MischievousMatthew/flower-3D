@@ -16,7 +16,7 @@ backend/.env              # Environment file
 
 /frontend/node_modules/    # Vue/NPM dependencies
 /frontend/dist/            # Built frontend assets (optional if you want to build on server)
-
+/frontend/vendor
 # ========================
 # Logs & OS files
 # ========================

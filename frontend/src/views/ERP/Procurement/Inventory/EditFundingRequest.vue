@@ -1,6 +1,5 @@
 <template>
   <div class="edit-funding-request">
-    
     <div class="form-content">
       <div class="form-header">
         <div>
@@ -507,7 +506,7 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import api from "@/plugins/axios";
+import api from "../../../../plugins/axios";
 import { toast } from "vue3-toastify";
 
 const router = useRouter();
