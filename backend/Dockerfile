@@ -4,15 +4,23 @@ FROM php:8.2-cli
 # Set working directory
 WORKDIR /var/www/html
 
-# Install system dependencies
+# Install system dependencies and PHP extensions
 RUN apt-get update && apt-get install -y \
-    git unzip libzip-dev default-mysql-client libonig-dev \
-    && docker-php-ext-install zip pdo_mysql
+    git \
+    unzip \
+    libzip-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    default-mysql-client \
+    libonig-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install zip pdo_mysql gd
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Copy backend contents into container
+# Copy backend folder contents
 COPY . .
 
 # Install PHP dependencies
