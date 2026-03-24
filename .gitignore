@@ -1,0 +1,39 @@
+# ========================
+# Laravel Backend
+# ========================
+
+/backend/vendor/          # PHP dependencies
+/backend/node_modules/    # NPM dependencies for backend (if any)
+backend/.env              # Environment file
+/backend/.idea/           # IDE settings
+/backend/.vscode/         # VSCode settings
+/backend/storage/*.key
+/backend/storage/framework/cache/data/*
+
+# ========================
+# Frontend Vue
+# ========================
+
+/frontend/node_modules/    # Vue/NPM dependencies
+/frontend/dist/            # Built frontend assets (optional if you want to build on server)
+
+# ========================
+# Logs & OS files
+# ========================
+
+*.log
+*.cache
+*.DS_Store
+
+# ========================
+# Git Warnings & Misc
+# ========================
+
+*.bak
+*.tmp
+
+# ========================
+# Optional: Laravel IDE helper files
+# ========================
+/backend/_ide_helper.php
+/backend/_ide_helper_models.php
