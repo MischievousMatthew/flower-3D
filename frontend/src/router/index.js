@@ -270,7 +270,7 @@ const routes = [
                     path: "inventory",
                     name: "WarehouseInventory",
                     component: () =>
-                      import("../views/ERP/procurement/SupplyChain/warehouse/WarehouseInventory.vue"),
+                      import("../views/ERP/Procurement/SupplyChain/Warehouse/WarehouseInventory.vue"),
                   },
                   {
                     path: "add-item",
@@ -313,13 +313,13 @@ const routes = [
                     path: "",
                     name: "OrderList",
                     component: () =>
-                      import("../views/ERP/procurement/SupplyChain/Orders/OrderList.vue"),
+                      import("../views/ERP/Procurement/SupplyChain/Orders/OrderList.vue"),
                   },
                   {
                     path: "detail",
                     name: "OrderDetail",
                     component: () =>
-                      import("../views/ERP/procurement/SupplyChain/Orders/OrderDetails.vue"),
+                      import("../views/ERP/Procurement/SupplyChain/Orders/OrderDetails.vue"),
                   },
                 ],
               },
@@ -332,14 +332,14 @@ const routes = [
                     path: "",
                     name: "ShipmentList",
                     component: () =>
-                      import("../views/ERP/procurement/SupplyChain/Logistics/ShipmentList.vue"),
+                      import("../views/ERP/Procurement/SupplyChain/Logistics/ShipmentList.vue"),
                   },
                   {
                     path: ":id",
                     name: "ShipmentTracking",
                     props: true,
                     component: () =>
-                      import("../views/ERP/procurement/SupplyChain/Logistics/ShipmentTracking.vue"),
+                      import("../views/ERP/Procurement/SupplyChain/Logistics/ShipmentTracking.vue"),
                   },
                 ],
               },
@@ -372,25 +372,25 @@ const routes = [
                     path: "process",
                     name: "ScanToProcess",
                     component: () =>
-                      import("../views/ERP/procurement/SupplyChain/Scanner/ToProcess.vue"),
+                      import("../views/ERP/Procurement/SupplyChain/Scanner/ToProcess.vue"),
                   },
                   {
                     path: "ship",
                     name: "ScanToShip",
                     component: () =>
-                      import("../views/ERP/procurement/SupplyChain/Scanner/ToShip.vue"),
+                      import("../views/ERP/Procurement/SupplyChain/Scanner/ToShip.vue"),
                   },
                   {
                     path: "receive",
                     name: "ScanToReceive",
                     component: () =>
-                      import("../views/ERP/procurement/SupplyChain/Scanner/ToReceive.vue"),
+                      import("../views/ERP/Procurement/SupplyChain/Scanner/ToReceive.vue"),
                   },
                   {
                     path: "completed",
                     name: "ScanCompleted",
                     component: () =>
-                      import("../views/ERP/procurement/SupplyChain/Scanner/Completed.vue"),
+                      import("../views/ERP/Procurement/SupplyChain/Scanner/Completed.vue"),
                   },
                 ],
               },
@@ -649,14 +649,19 @@ router.beforeEach(async (to, from, next) => {
   // Handle vendor forced password change
   const needsPasswordChange = user?.vendor_data?.needs_password_change === true;
   if (role === "vendor" && needsPasswordChange) {
-    if (to.path !== "/vendor/force-change-password" && to.path !== "/guest/login") {
+    if (
+      to.path !== "/vendor/force-change-password" &&
+      to.path !== "/guest/login"
+    ) {
       return next("/vendor/force-change-password");
     }
   }
 
   if (to.meta.requiresAdmin && role !== "admin") {
     if (role === "vendor") {
-      return needsPasswordChange ? next("/vendor/force-change-password") : next("/vendor/products");
+      return needsPasswordChange
+        ? next("/vendor/force-change-password")
+        : next("/vendor/products");
     }
     if (role === "customer") return next("/shop");
     return next("/guest/login");
