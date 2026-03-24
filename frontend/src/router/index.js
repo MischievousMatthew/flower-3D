@@ -1,0 +1,684 @@
+import { createRouter, createWebHistory } from "vue-router";
+import { useAuth } from "../composables/useAuth";
+import { useAssignment } from "../composables/useAssignment";
+
+const routes = [
+  // ===== PUBLIC =====
+  {
+    path: "/",
+    meta: { public: true },
+    children: [
+      {
+        path: "",
+        name: "Home",
+        component: () => import("../views/guest/LandingPage.vue"),
+      },
+      {
+        path: "shop",
+        name: "Shop",
+        component: () => import("../views/authenticated/Shop.vue"),
+        meta: { public: true, onlyCustomerOrGuest: true },
+      },
+      {
+        path: "store/:id",
+        name: "VendorStorefront",
+        component: () => import("../views/authenticated/VendorStoreFront.vue"),
+        meta: { public: true },
+      },
+      {
+        path: "guest/login",
+        name: "Login",
+        component: () => import("../views/guest/Login.vue"),
+      },
+      {
+        path: "guest/register",
+        name: "Register",
+        component: () => import("../views/guest/Register.vue"),
+      },
+      {
+        path: "guest/vendor_register",
+        name: "Vendor_Register",
+        component: () => import("../views/guest/VendorRegistration.vue"),
+      },
+    ],
+  },
+
+  // ===== CUSTOMER =====
+  {
+    path: "/customer",
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: "profile",
+        name: "Profile",
+        component: () => import("../views/authenticated/Profile.vue"),
+      },
+      {
+        path: "cart",
+        name: "Cart",
+        component: () => import("../views/authenticated/Cart.vue"),
+      },
+      {
+        path: "checkout",
+        name: "Checkout",
+        component: () => import("../views/authenticated/Checkout.vue"),
+      },
+      {
+        path: "chat",
+        name: "Chat",
+        component: () => import("../views/authenticated/CustomerChat.vue"),
+      },
+      {
+        path: "orders",
+        name: "OrderTracking",
+        component: () => import("../views/authenticated/OrderTracking.vue"),
+      },
+    ],
+  },
+
+  // ===== VENDOR =====
+  {
+    path: "/vendor",
+    meta: { requiresAuth: true, requiresVendor: true },
+    redirect: "/vendor/products",
+    children: [
+      {
+        path: "products",
+        name: "VendorProducts",
+        component: () => import("../views/vendor/ViewProduct.vue"),
+      },
+      {
+        path: "reservation",
+        name: "VendorReservation",
+        component: () => import("../views/vendor/AllOrders.vue"),
+      },
+      {
+        path: "add-product",
+        name: "VendorAddProduct",
+        component: () => import("../views/vendor/AddProduct.vue"),
+      },
+      {
+        path: "chat",
+        name: "VendorChat",
+        component: () => import("../views/vendor/VendorChat.vue"),
+      },
+      {
+        path: "profile",
+        name: "VendorProfile",
+        component: () => import("../views/vendor/VendorProfile.vue"),
+      },
+      {
+        path: "staff-list",
+        name: "VendorStaffList",
+        component: () => import("../views/vendor/StaffList.vue"),
+      },
+      {
+        path: "force-change-password",
+        name: "VendorForceChangePassword",
+        component: () => import("../views/vendor/ForceChangePassword.vue"),
+      },
+    ],
+  },
+
+  // ===== ERP =====
+  {
+    path: "/erp",
+    meta: { requiresAuth: true },
+    children: [
+      // ================= FINANCE =================
+      {
+        path: "finance",
+        meta: { requiresDepartment: ["Finance"] },
+        component: () => import("../views/ERP/Finance/FinanceLayout.vue"),
+        children: [
+          {
+            path: "dashboard",
+            name: "FinanceDashboard",
+            component: () => import("../views/ERP/Finance/Dashboard.vue"),
+          },
+          {
+            path: "funding-requests",
+            name: "FinanceFundingRequests",
+            component: () => import("../views/ERP/Finance/FundingRequest.vue"),
+          },
+          {
+            path: "funding-request/:id",
+            name: "FinanceFundingRequestDetails",
+            props: (route) => ({ id: route.params.id, context: "finance" }),
+            component: () =>
+              import("../views/ERP/Procurement/Inventory/FundingRequestDetails.vue"),
+          },
+          {
+            path: "payroll-requests",
+            name: "FinancePayrollRequests",
+            component: () => import("../views/ERP/Finance/PayrollRequest.vue"),
+          },
+        ],
+      },
+
+      // ================= PROCUREMENT =================
+      {
+        path: "procurement",
+        meta: { requiresDepartment: ["Procurement", "Purchasing"] },
+        component: () =>
+          import("../views/ERP/Procurement/ProcurementLayout.vue"),
+        children: [
+          // ───────── INVENTORY MANAGER ─────────
+          {
+            path: "inventory",
+            meta: { requiresInventoryManager: true },
+            children: [
+              {
+                path: "funding-request",
+                name: "FundingRequest",
+                meta: { requiresInventoryManager: true },
+                component: () =>
+                  import("../views/ERP/Procurement/Inventory/FundingRequest.vue"),
+              },
+              {
+                path: "funding-request/create",
+                name: "CreateFundingRequest",
+                meta: { requiresInventoryManager: true },
+                component: () =>
+                  import("../views/ERP/Procurement/Inventory/CreateFundingRequest.vue"),
+              },
+              {
+                path: "funding-request/edit",
+                name: "EditFundingRequest",
+                meta: { requiresInventoryManager: true },
+                props: () => ({}),
+                component: () =>
+                  import("../views/ERP/Procurement/Inventory/EditFundingRequest.vue"),
+              },
+              {
+                path: "funding-request/details",
+                name: "FundingRequestDetails",
+                meta: { requiresInventoryManager: true },
+                props: () => ({ context: "inventory" }),
+                component: () =>
+                  import("../views/ERP/Procurement/Inventory/FundingRequestDetails.vue"),
+              },
+              {
+                path: "products",
+                name: "Products",
+                meta: { requiresInventoryManager: true },
+                props: () => ({ context: "inventory" }),
+                component: () =>
+                  import("../views/ERP/Procurement/Inventory/ViewProduct.vue"),
+              },
+              {
+                path: "add-product",
+                name: "AddProduct",
+                meta: { requiresInventoryManager: true },
+                props: () => ({ context: "inventory" }),
+                component: () =>
+                  import("../views/ERP/Procurement/Inventory/AddProduct.vue"),
+              },
+            ],
+          },
+
+          // ───────── SUPPLY CHAIN COORDINATOR ─────────
+          {
+            path: "supply-chain",
+            meta: { requiresDepartment: ["Procurement"] },
+            redirect: "/erp/procurement/supply-chain/dashboard",
+            children: [
+              {
+                path: "dashboard",
+                name: "SupplyChainDashboard",
+                component: () =>
+                  import("../views/ERP/Procurement/SupplyChain/Analytics/Dashboard.vue"),
+              },
+
+              // Suppliers
+              {
+                path: "suppliers",
+                children: [
+                  {
+                    path: "",
+                    name: "SupplierList",
+                    component: () =>
+                      import("../views/ERP/Procurement/SupplyChain/Suppliers/SupplierList.vue"),
+                  },
+                  {
+                    path: "create",
+                    name: "SupplierCreate",
+                    component: () =>
+                      import("../views/ERP/Procurement/SupplyChain/Suppliers/SupplierCreate.vue"),
+                  },
+                  {
+                    path: ":id/edit",
+                    name: "SupplierEdit",
+                    props: true,
+                    component: () =>
+                      import("../views/ERP/Procurement/SupplyChain/Suppliers/SupplierEdit.vue"),
+                  },
+                ],
+              },
+
+              // Warehouse
+              {
+                path: "warehouse",
+                children: [
+                  {
+                    path: "",
+                    name: "WarehouseList",
+                    component: () =>
+                      import("../views/ERP/Procurement/SupplyChain/Warehouse/WarehouseList.vue"),
+                  },
+                  {
+                    path: "inventory",
+                    name: "WarehouseInventory",
+                    component: () =>
+                      import("../views/ERP/procurement/SupplyChain/warehouse/WarehouseInventory.vue"),
+                  },
+                  {
+                    path: "add-item",
+                    name: "AddWarehouseItem",
+                    component: () =>
+                      import("../views/ERP/Procurement/SupplyChain/Warehouse/AddItem.vue"),
+                  },
+                  {
+                    path: "floor",
+                    name: "WarehouseFloor",
+                    component: () =>
+                      import("../views/ERP/Procurement/SupplyChain/Warehouse/FloorView.vue"),
+                  },
+                  {
+                    path: "batches-receive",
+                    name: "BatchesToReceive",
+                    component: () =>
+                      import("../views/ERP/Procurement/SupplyChain/Warehouse/ReceiveBatch.vue"),
+                  },
+                  {
+                    path: "locations",
+                    name: "WarehouseLocations",
+                    component: () =>
+                      import("../views/ERP/Procurement/SupplyChain/Warehouse/WarehouseLocation.vue"),
+                  },
+                  {
+                    path: "scanner",
+                    name: "WarehouseScanner",
+                    component: () =>
+                      import("../views/ERP/Procurement/SupplyChain/Warehouse/WarehouseScanner.vue"),
+                  },
+                ],
+              },
+
+              // Orders
+              {
+                path: "orders",
+                children: [
+                  {
+                    path: "",
+                    name: "OrderList",
+                    component: () =>
+                      import("../views/ERP/procurement/SupplyChain/Orders/OrderList.vue"),
+                  },
+                  {
+                    path: "detail",
+                    name: "OrderDetail",
+                    component: () =>
+                      import("../views/ERP/procurement/SupplyChain/Orders/OrderDetails.vue"),
+                  },
+                ],
+              },
+
+              // Logistics
+              {
+                path: "logistics",
+                children: [
+                  {
+                    path: "",
+                    name: "ShipmentList",
+                    component: () =>
+                      import("../views/ERP/procurement/SupplyChain/Logistics/ShipmentList.vue"),
+                  },
+                  {
+                    path: ":id",
+                    name: "ShipmentTracking",
+                    props: true,
+                    component: () =>
+                      import("../views/ERP/procurement/SupplyChain/Logistics/ShipmentTracking.vue"),
+                  },
+                ],
+              },
+
+              // Delivery
+              {
+                path: "deliveries",
+                children: [
+                  {
+                    path: "",
+                    name: "DeliveryList",
+                    component: () =>
+                      import("../views/ERP/Procurement/SupplyChain/Delivery/SCOrders.vue"),
+                  },
+                  {
+                    path: "vendor-orders",
+                    name: "VendorDeliveries",
+                    component: () =>
+                      import("../views/ERP/Procurement/SupplyChain/Delivery/VendorOrders.vue"),
+                  },
+                ],
+              },
+
+              // Scanner
+              {
+                path: "scan",
+                redirect: "/erp/procurement/supply-chain/scan/process",
+                children: [
+                  {
+                    path: "process",
+                    name: "ScanToProcess",
+                    component: () =>
+                      import("../views/ERP/procurement/SupplyChain/Scanner/ToProcess.vue"),
+                  },
+                  {
+                    path: "ship",
+                    name: "ScanToShip",
+                    component: () =>
+                      import("../views/ERP/procurement/SupplyChain/Scanner/ToShip.vue"),
+                  },
+                  {
+                    path: "receive",
+                    name: "ScanToReceive",
+                    component: () =>
+                      import("../views/ERP/procurement/SupplyChain/Scanner/ToReceive.vue"),
+                  },
+                  {
+                    path: "completed",
+                    name: "ScanCompleted",
+                    component: () =>
+                      import("../views/ERP/procurement/SupplyChain/Scanner/Completed.vue"),
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+
+      // ================= HR =================
+      {
+        path: "hr",
+        meta: { requiresDepartment: ["HR", "Human Resources"] },
+        name: "HR",
+        component: () => import("../views/ERP/HR/HRLayout.vue"),
+        children: [
+          {
+            path: "",
+            name: "HRDashboard",
+            component: () => import("../views/ERP/HR/HRDashboard.vue"),
+          },
+          {
+            path: "employees",
+            name: "Employees",
+            children: [
+              {
+                path: "directory",
+                name: "EmployeeDirectory",
+                component: () =>
+                  import("../views/ERP/HR/Employees/Directory.vue"),
+              },
+              {
+                path: "profiles",
+                name: "EmployeeProfiles",
+                component: () =>
+                  import("../views/ERP/HR/Employees/Profiles.vue"),
+              },
+            ],
+          },
+          {
+            path: "attendance",
+            name: "Attendance",
+            children: [
+              {
+                path: "logs",
+                name: "AttendanceLogs",
+                component: () => import("../views/ERP/HR/Attendance/Logs.vue"),
+              },
+              {
+                path: "qrscanner",
+                name: "AttendanceQRScanner",
+                component: () =>
+                  import("../views/ERP/HR/Attendance/QRScanner.vue"),
+              },
+            ],
+          },
+          {
+            path: "payroll",
+            name: "Payroll",
+            children: [
+              {
+                path: "list",
+                name: "PayrollList",
+                component: () =>
+                  import("../views/ERP/HR/Payroll/PayrollList.vue"),
+              },
+              {
+                path: "create",
+                name: "PayrollCreate",
+                component: () =>
+                  import("../views/ERP/HR/Payroll/PayrollCreate.vue"),
+              },
+            ],
+          },
+          {
+            path: "leave",
+            name: "LeaveManagement",
+            children: [
+              {
+                path: "employee-request",
+                name: "EmployeeLeaveRequest",
+                component: () =>
+                  import("../views/ERP/HR/Public/LeaveRequest.vue"),
+                meta: { requiresAuth: false, title: "Leave Request" },
+              },
+              {
+                path: "management-requests",
+                name: "LeaveRequests",
+                component: () =>
+                  import("../views/ERP/HR/Leaves/LeaveManagement.vue"),
+              },
+              {
+                path: "qr-request",
+                name: "LeaveQRRequest",
+                component: () =>
+                  import("../views/ERP/HR/Leaves/LeaveRequestScanner.vue"),
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+
+  // ===== ADMIN =====
+  {
+    path: "/admin",
+    meta: { requiresAuth: true, requiresAdmin: true },
+    redirect: "/admin/vendor-requests",
+    children: [
+      {
+        path: "vendor-requests",
+        name: "VendorRequest",
+        component: () => import("../views/admin/VendorRequest.vue"),
+      },
+      {
+        path: "reports",
+        name: "ReportedProducts",
+        component: () => import("../views/admin/ReportedProducts.vue"),
+      },
+    ],
+  },
+
+  // 404 Catch All
+  {
+    path: "/:pathMatch(.*)*",
+    name: "NotFound",
+    component: () => import("../views/guest/NotFound.vue"),
+  },
+];
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+  scrollBehavior() {
+    return { top: 0 };
+  },
+});
+
+/**
+ * Global Route Guard
+ */
+router.beforeEach(async (to, from, next) => {
+  const auth = useAuth();
+  const userType = localStorage.getItem("user_type");
+  const token =
+    userType === "employee"
+      ? localStorage.getItem("employee_token")
+      : localStorage.getItem("auth_token");
+
+  if (to.meta.public) {
+    return next();
+  }
+
+  if (!token) {
+    auth.isAuthenticated.value = false;
+    auth.user.value = null;
+
+    if (to.meta.requiresAuth) {
+      if (to.path !== "/guest/login") {
+        localStorage.setItem("redirectAfterLogin", to.fullPath);
+      }
+      return next("/guest/login");
+    }
+
+    return next();
+  }
+
+  // Load user if not in memory
+  if (!auth.user.value) {
+    try {
+      await auth.loadUser();
+
+      // Bootstrap assignments from user data if it's an employee
+      if (userType === "employee") {
+        const { loadAssignments } = useAssignment();
+        // Since loadUser populates auth.user.value:
+        await loadAssignments(auth.user.value);
+      }
+    } catch (err) {
+      console.warn("Auth load failed, forcing logout");
+      localStorage.clear();
+      auth.isAuthenticated.value = false;
+      auth.user.value = null;
+
+      if (
+        to.meta.requiresAuth ||
+        to.meta.requiresAdmin ||
+        to.meta.requiresVendor ||
+        to.meta.requiresDepartment
+      ) {
+        return next("/guest/login");
+      }
+
+      return next();
+    }
+  }
+
+  const user = auth.user.value;
+  const role = user?.role;
+
+  // ── Employee routing: use assignment context ──────────────────────────
+  if (userType === "employee") {
+    const assignment = useAssignment();
+
+    // If no active assignment (or it was cleared), redirect to login
+    if (!assignment.activeAssignment.value) {
+      return next("/guest/login");
+    }
+
+    // If employee is trying to access a non-ERP path, send them home
+    if (!to.path.startsWith("/erp") && to.path !== "/guest/login") {
+      return next(assignment.getDefaultRoute());
+    }
+
+    // Enforce role silos based on active assignment
+    if (to.path.startsWith("/erp/hr") && !assignment.isRole("hr-manager")) {
+      return next(assignment.getDefaultRoute());
+    }
+    if (
+      to.path.startsWith("/erp/finance") &&
+      !assignment.isRole("finance-manager")
+    ) {
+      return next(assignment.getDefaultRoute());
+    }
+    if (
+      to.path.startsWith("/erp/procurement/inventory") &&
+      !assignment.isRole("inventory-manager")
+    ) {
+      return next(assignment.getDefaultRoute());
+    }
+    if (
+      to.path.startsWith("/erp/procurement/supply-chain") &&
+      !assignment.isRole("supply-chain-coordinator")
+    ) {
+      return next(assignment.getDefaultRoute());
+    }
+    if (
+      to.path.startsWith("/erp/crm") &&
+      !assignment.isRole("crm-specialist")
+    ) {
+      return next(assignment.getDefaultRoute());
+    }
+
+    // Pass through if the path matches the role silo or is generic
+    return next();
+  }
+
+  // ── Non-employee routing (owner, admin, customer) ─────────────────────
+  if (to.path.startsWith("/erp")) {
+    if (role === "admin") return next("/admin/vendor-requests");
+    if (role === "vendor") return next("/vendor/products");
+    if (role === "customer") return next("/shop");
+    return next("/guest/login");
+  }
+
+  // Handle vendor forced password change
+  const needsPasswordChange = user?.vendor_data?.needs_password_change === true;
+  if (role === "vendor" && needsPasswordChange) {
+    if (to.path !== "/vendor/force-change-password" && to.path !== "/guest/login") {
+      return next("/vendor/force-change-password");
+    }
+  }
+
+  if (to.meta.requiresAdmin && role !== "admin") {
+    if (role === "vendor") {
+      return needsPasswordChange ? next("/vendor/force-change-password") : next("/vendor/products");
+    }
+    if (role === "customer") return next("/shop");
+    return next("/guest/login");
+  }
+
+  if (to.meta.requiresVendor && role !== "vendor") {
+    if (role === "admin") return next("/admin/vendor-requests");
+    if (role === "customer") return next("/shop");
+    return next("/guest/login");
+  }
+
+  if (
+    to.meta.onlyCustomerOrGuest &&
+    userType !== "customer" &&
+    !to.meta.public
+  ) {
+    if (role === "admin") return next("/admin/vendor-requests");
+    if (role === "vendor") return next("/vendor/products");
+    return next("/guest/login");
+  }
+
+  next();
+});
+
+export default router;
