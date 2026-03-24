@@ -23,6 +23,9 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Copy backend folder contents
 COPY . .
 
+RUN apt-get update && apt-get install -y libpq-dev \
+    && docker-php-ext-install pdo_pgsql
+
 # Install PHP dependencies
 RUN composer install --no-dev
 
