@@ -69,7 +69,15 @@ return new class extends Migration
                 $table->renameColumn('salary_type_temp', 'salary_type');
             });
 
-            DB::statement("ALTER TABLE employees_info MODIFY COLUMN salary_type ENUM('daily', 'weekly', 'monthly') NULL");
+            $driver = DB::getDriverName();
+            if ($driver === 'mysql') {
+                DB::statement("ALTER TABLE employees_info MODIFY COLUMN salary_type ENUM('daily', 'weekly', 'monthly') NULL");
+            } elseif ($driver === 'pgsql') {
+                DB::statement("ALTER TABLE employees_info ALTER COLUMN salary_type TYPE VARCHAR(255)");
+                DB::statement("ALTER TABLE employees_info DROP CONSTRAINT IF EXISTS employees_info_salary_type_check");
+                DB::statement("ALTER TABLE employees_info ADD CONSTRAINT employees_info_salary_type_check CHECK (salary_type IN ('daily', 'weekly', 'monthly'))");
+                DB::statement("ALTER TABLE employees_info ALTER COLUMN salary_type DROP NOT NULL");
+            }
         }
     }
 
@@ -99,7 +107,15 @@ return new class extends Migration
             $table->renameColumn('salary_type_temp', 'salary_type');
         });
 
-        DB::statement("ALTER TABLE employees_info MODIFY COLUMN salary_type ENUM('Monthly', 'Daily', 'Hourly') NULL");
+        $driver = DB::getDriverName();
+        if ($driver === 'mysql') {
+            DB::statement("ALTER TABLE employees_info MODIFY COLUMN salary_type ENUM('Monthly', 'Daily', 'Hourly') NULL");
+        } elseif ($driver === 'pgsql') {
+            DB::statement("ALTER TABLE employees_info ALTER COLUMN salary_type TYPE VARCHAR(255)");
+            DB::statement("ALTER TABLE employees_info DROP CONSTRAINT IF EXISTS employees_info_salary_type_check");
+            DB::statement("ALTER TABLE employees_info ADD CONSTRAINT employees_info_salary_type_check CHECK (salary_type IN ('Monthly', 'Daily', 'Hourly'))");
+            DB::statement("ALTER TABLE employees_info ALTER COLUMN salary_type DROP NOT NULL");
+        }
 
         // Reverse Step 1: Drop new columns
         Schema::table('employees_info', function (Blueprint $table) {
