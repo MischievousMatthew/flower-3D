@@ -1,5 +1,6 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/api/(.*)", "destination": "https://flower-3d.onrender.com/api/$1" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
