@@ -11,7 +11,7 @@ return [
 
     'allowed_origins' => [
         'http://localhost:5173',
-        env('FRONTEND_URL', 'https://bloomcraft-app.vercel.app'),
+        'https://bloomcraft-app.vercel.app',
     ],
 
     'allowed_origins_patterns' => [
