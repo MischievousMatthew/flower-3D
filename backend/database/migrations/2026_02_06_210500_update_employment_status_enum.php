@@ -17,6 +17,10 @@ return new class extends Migration
         
         if ($driver === 'mysql') {
             DB::statement("ALTER TABLE employees_info MODIFY COLUMN employment_status ENUM('Probationary', 'Regular', 'Contractual', 'Part-time', 'Active', 'Inactive')");
+        } elseif ($driver === 'pgsql') {
+            DB::statement("ALTER TABLE employees_info ALTER COLUMN employment_status TYPE VARCHAR(255)");
+            DB::statement("ALTER TABLE employees_info DROP CONSTRAINT IF EXISTS employees_info_employment_status_check");
+            DB::statement("ALTER TABLE employees_info ADD CONSTRAINT employees_info_employment_status_check CHECK (employment_status IN ('Probationary', 'Regular', 'Contractual', 'Part-time', 'Active', 'Inactive'))");
         }
         // For SQLite (common in local dev often, though user seems to be on Windows/Laravel)
         // we might not actually need to do anything as SQLite doesn't strictly enforce enums
@@ -31,6 +35,10 @@ return new class extends Migration
         
         if ($driver === 'mysql') {
             DB::statement("ALTER TABLE employees_info MODIFY COLUMN employment_status ENUM('Probationary', 'Regular', 'Contractual', 'Part-time')");
+        } elseif ($driver === 'pgsql') {
+            DB::statement("ALTER TABLE employees_info ALTER COLUMN employment_status TYPE VARCHAR(255)");
+            DB::statement("ALTER TABLE employees_info DROP CONSTRAINT IF EXISTS employees_info_employment_status_check");
+            DB::statement("ALTER TABLE employees_info ADD CONSTRAINT employees_info_employment_status_check CHECK (employment_status IN ('Probationary', 'Regular', 'Contractual', 'Part-time'))");
         }
     }
 };

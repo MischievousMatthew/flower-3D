@@ -21,14 +21,26 @@ return new class extends Migration
         }
 
         // Backfill existing rows: match product by name
-        DB::statement("
-            UPDATE purchase_order_items poi
-            INNER JOIN products p
-                ON  p.product_name = poi.product_name
-                AND p.deleted_at   IS NULL
-            SET poi.product_id = p.id
-            WHERE poi.product_id IS NULL
-        ");
+        $driver = DB::getDriverName();
+        if ($driver === 'mysql' || $driver === 'sqlite') {
+            DB::statement("
+                UPDATE purchase_order_items poi
+                INNER JOIN products p
+                    ON  p.product_name = poi.product_name
+                    AND p.deleted_at   IS NULL
+                SET poi.product_id = p.id
+                WHERE poi.product_id IS NULL
+            ");
+        } elseif ($driver === 'pgsql') {
+            DB::statement("
+                UPDATE purchase_order_items poi
+                SET product_id = p.id
+                FROM products p
+                WHERE poi.product_name = p.product_name
+                  AND p.deleted_at IS NULL
+                  AND poi.product_id IS NULL
+            ");
+        }
     }
 
     public function down(): void
