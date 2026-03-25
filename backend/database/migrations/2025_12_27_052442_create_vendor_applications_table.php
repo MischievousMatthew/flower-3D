@@ -99,8 +99,6 @@ return new class extends Migration
             $table->index('profile_fully_completed');
         });
         
-        // Add full-text search for store name and description
-        DB::statement('ALTER TABLE vendor_applications ADD FULLTEXT fulltext_store (store_name, store_description)');
     }
 
     /**
