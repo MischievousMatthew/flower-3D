@@ -13,25 +13,32 @@ return new class extends Migration
             // Add new payroll-related columns
             $table->decimal('standard_work_hours_per_day', 4, 2)
                 ->default(8.00)
-                ->after('allowance')
                 ->comment('Standard work hours per day (e.g., 8.00)');
-            
-            $table->tinyInteger('working_days_per_week')
+
+            $table->smallInteger('working_days_per_week')
                 ->default(5)
-                ->after('standard_work_hours_per_day')
                 ->comment('Working days per week (e.g., 5 for Mon-Fri)');
-            
-            $table->tinyInteger('working_days_per_month')
+
+            $table->smallInteger('working_days_per_month')
                 ->default(22)
-                ->after('working_days_per_week')
                 ->comment('Working days per month (e.g., 22)');
         });
 
-        // Update salary_type enum to match payroll requirements
+        // Update salary_type column for PostgreSQL
         $driver = DB::getDriverName();
-        
-        if ($driver === 'mysql') {
-            DB::statement("ALTER TABLE employees_info MODIFY COLUMN salary_type ENUM('daily', 'weekly', 'monthly') DEFAULT NULL");
+
+        if ($driver === 'pgsql') {
+            // Use a CHECK constraint instead of ENUM
+            DB::statement("
+                ALTER TABLE employees_info
+                DROP CONSTRAINT IF EXISTS salary_type_check;
+            ");
+
+            DB::statement("
+                ALTER TABLE employees_info
+                ADD CONSTRAINT salary_type_check
+                CHECK (salary_type IN ('daily', 'weekly', 'monthly'));
+            ");
         }
     }
 
@@ -46,9 +53,12 @@ return new class extends Migration
         });
 
         $driver = DB::getDriverName();
-        
-        if ($driver === 'mysql') {
-            DB::statement("ALTER TABLE employees_info MODIFY COLUMN salary_type ENUM('Monthly', 'Daily', 'Hourly') DEFAULT NULL");
+
+        if ($driver === 'pgsql') {
+            DB::statement("
+                ALTER TABLE employees_info
+                DROP CONSTRAINT IF EXISTS salary_type_check;
+            ");
         }
     }
 };
