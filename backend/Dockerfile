@@ -1,10 +1,14 @@
-# Use official PHP 8.2 CLI image
-FROM php:8.2-cli
+# -------------------------------
+# 1️⃣ Use official PHP 8.2 Apache image
+# -------------------------------
+FROM php:8.2-apache
 
 # Set working directory
 WORKDIR /var/www/html
 
-# Install system dependencies and PHP extensions
+# -------------------------------
+# 2️⃣ Install system dependencies & PHP extensions
+# -------------------------------
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
@@ -14,22 +18,48 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     libonig-dev \
     libpq-dev \
+    curl \
+    nodejs \
+    npm \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install zip pdo_pgsql gd
 
-# Install Composer
+# Enable Apache mod_rewrite for Laravel routes
+RUN a2enmod rewrite
+
+# -------------------------------
+# 3️⃣ Install Composer
+# -------------------------------
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Copy backend folder contents
+# -------------------------------
+# 4️⃣ Copy all project files
+# -------------------------------
 COPY . .
 
-# Install PHP dependencies
+# -------------------------------
+# 5️⃣ Install backend dependencies
+# -------------------------------
 RUN composer install --no-dev --optimize-autoloader --prefer-dist --ignore-platform-reqs
 
-# Do NOT cache config at build time — env vars are injected at runtime by Render
+# -------------------------------
+# 6️⃣ Install frontend dependencies & build assets
+# -------------------------------
+RUN npm install
+RUN npm run build
 
-# Expose port for Render
-EXPOSE 10000
+# -------------------------------
+# 7️⃣ Set permissions
+# -------------------------------
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Start Laravel server and run migrations
-CMD php artisan optimize:clear && php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=10000
+# -------------------------------
+# 8️⃣ Expose Apache port
+# -------------------------------
+EXPOSE 80
+
+# -------------------------------
+# 9️⃣ Production entrypoint
+# -------------------------------
+CMD ["apache2-foreground"]
