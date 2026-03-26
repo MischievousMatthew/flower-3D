@@ -3,21 +3,14 @@
 namespace App\Mail;
 
 use App\Models\VendorApplication;
-use Illuminate\Bus\Queueable;
-use Illuminate\Mail\Mailable;
-use Illuminate\Queue\SerializesModels;
+use App\Services\BrevoService;
 
-class VendorAccountCreated extends Mailable
+class VendorAccountCreated
 {
-    use Queueable, SerializesModels;
+    protected $application;
+    protected $password;
+    protected $isExistingUser;
 
-    public $application;
-    public $password;
-    public $isExistingUser;
-
-    /**
-     * Create a new message instance.
-     */
     public function __construct(VendorApplication $application, $password = null, $isExistingUser = false)
     {
         $this->application = $application;
@@ -25,22 +18,26 @@ class VendorAccountCreated extends Mailable
         $this->isExistingUser = $isExistingUser;
     }
 
-    /**
-     * Build the message.
-     */
-    public function build()
+    public function send()
     {
-        $subject = $this->isExistingUser 
-            ? 'Your Vendor Application Has Been Approved'
-            : 'Your Vendor Account Has Been Created';
-            
-        return $this->subject($subject)
-                    ->view('emails.vendor-account-created')
-                    ->with([
-                        'application' => $this->application,
-                        'password' => $this->password,
-                        'isExistingUser' => $this->isExistingUser,
-                        'loginUrl' => url('http://localhost:5173/guest/login'),
-                    ]);
+        $brevo = new BrevoService();
+
+        $subject = $this->isExistingUser
+            ? 'Vendor Application Approved'
+            : 'Vendor Account Created';
+
+        $html = view('emails.vendor-account-created', [
+            'application' => $this->application,
+            'password' => $this->password,
+            'isExistingUser' => $this->isExistingUser,
+            'loginUrl' => url('http://localhost:5173/guest/login'),
+        ])->render();
+
+        return $brevo->send(
+            $this->application->email,
+            $this->application->store_name ?? 'Vendor',
+            $subject,
+            $html
+        );
     }
 }

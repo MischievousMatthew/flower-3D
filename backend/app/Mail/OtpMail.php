@@ -2,37 +2,35 @@
 
 namespace App\Mail;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Mail\Mailable;
-use Illuminate\Queue\SerializesModels;
-use SendinBlue\Client\Api\TransactionalEmailsApi;
-use SendinBlue\Client\Configuration;
-use SendinBlue\Client\Model\SendSmtpEmail;
+use App\Services\BrevoService;
 
-class OtpMail extends Mailable
+class OtpMail
 {
-    use Queueable, SerializesModels;
+    protected $email;
+    protected $otp;
+    protected $expiryMinutes;
 
-    public $otp;
-
-    public function __construct($otp)
+    public function __construct($email, $otp, $expiryMinutes = 5)
     {
+        $this->email = $email;
         $this->otp = $otp;
+        $this->expiryMinutes = $expiryMinutes;
     }
 
-    public function build()
+    public function send()
     {
-        $config = Configuration::getDefaultConfiguration()->setApiKey('api-key', env('BREVO_API_KEY'));
-        $apiInstance = new TransactionalEmailsApi(null, $config);
+        $brevo = new BrevoService();
 
-        $email = new SendSmtpEmail([
-            'to' => [['email' => $this->to[0]['address'], 'name' => $this->to[0]['name'] ?? 'User']],
-            'templateId' => null,
-            'params' => ['otp' => $this->otp],
-            'sender' => ['email' => env('MAIL_FROM_ADDRESS'), 'name' => env('MAIL_FROM_NAME')],
-            'subject' => 'Your OTP Code'
-        ]);
+        $html = view('emails.otp', [
+            'otp' => $this->otp,
+            'expiryMinutes' => $this->expiryMinutes,
+        ])->render();
 
-        $apiInstance->sendTransacEmail($email);
+        return $brevo->send(
+            $this->email,
+            'User',
+            'Your verification code',
+            $html
+        );
     }
 }
