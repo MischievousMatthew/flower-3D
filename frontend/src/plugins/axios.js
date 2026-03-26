@@ -4,6 +4,13 @@ import axios from "axios";
 const baseURL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
+console.log("ENV:", import.meta.env);
+console.log("BASE URL:", baseURL);
+
+if (!import.meta.env.VITE_API_BASE_URL) {
+  throw new Error("VITE_API_BASE_URL is NOT defined!");
+}
+
 const api = axios.create({
   baseURL,
   headers: {
