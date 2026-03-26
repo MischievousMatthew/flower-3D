@@ -1,5 +1,5 @@
 //frontend\src\services\cartService.js
-import axios from "../plugins/axios";
+import api from "../plugins/axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -7,7 +7,7 @@ const cartService = {
   // Get user's cart
   async getCart() {
     try {
-      const response = await axios.get(`${API_URL}/cart`, {
+      const response = await api.get(`${API_URL}/cart`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
           Accept: "application/json",
@@ -23,7 +23,7 @@ const cartService = {
   // Add item to cart
   async addToCart(itemData) {
     try {
-      const response = await axios.post(`${API_URL}/cart/add`, itemData, {
+      const response = await api.post(`${API_URL}/cart/add`, itemData, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
           "Content-Type": "application/json",
@@ -48,7 +48,7 @@ const cartService = {
   // Update cart item quantity
   async updateCartItem(itemId, quantity) {
     try {
-      const response = await axios.put(
+      const response = await api.put(
         `${API_URL}/cart/update/${itemId}`,
         {
           quantity: quantity,
@@ -78,7 +78,7 @@ const cartService = {
   // Remove item from cart
   async removeFromCart(itemId) {
     try {
-      const response = await axios.delete(`${API_URL}/cart/remove/${itemId}`, {
+      const response = await api.delete(`${API_URL}/cart/remove/${itemId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
           Accept: "application/json",
@@ -94,7 +94,7 @@ const cartService = {
   // Clear cart
   async clearCart() {
     try {
-      const response = await axios.delete(`${API_URL}/cart/clear`, {
+      const response = await api.delete(`${API_URL}/cart/clear`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
           Accept: "application/json",
@@ -110,7 +110,7 @@ const cartService = {
   // Get cart summary
   async getCartSummary() {
     try {
-      const response = await axios.get(`${API_URL}/cart/summary`, {
+      const response = await api.get(`${API_URL}/cart/summary`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
           Accept: "application/json",
@@ -126,7 +126,7 @@ const cartService = {
   // Validate cart before checkout
   async validateCart() {
     try {
-      const response = await axios.get(`${API_URL}/cart/validate`, {
+      const response = await api.get(`${API_URL}/cart/validate`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
           Accept: "application/json",

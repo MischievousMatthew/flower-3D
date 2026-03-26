@@ -640,7 +640,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from "vue";
-import axios from "../../../plugins/axios";
+import api from "../../../plugins/axios";
 
 // ── State ──────────────────────────────────────────────────────────────────
 const vendorName = ref("Vendor");
@@ -704,7 +704,7 @@ async function loadOverview() {
   loading.overview = true;
   errors.overview = null;
   try {
-    const res = await axios.get("vendor/finance/overview");
+    const res = await api.get("vendor/finance/overview");
     if (res.data.success) {
       overview.value = res.data.data;
     }
@@ -722,7 +722,7 @@ async function loadTransactions(page = 1) {
   try {
     const type =
       transactionFilter.value === "all" ? undefined : transactionFilter.value;
-    const res = await axios.get("vendor/finance/transactions", {
+    const res = await api.get("vendor/finance/transactions", {
       params: { page, per_page: 15, type },
     });
     if (res.data.success) {
@@ -745,7 +745,7 @@ async function loadCashflow() {
   loading.cashflow = true;
   errors.cashflow = null;
   try {
-    const res = await axios.get("vendor/finance/cashflow", {
+    const res = await api.get("vendor/finance/cashflow", {
       params: { period: cashflowPeriod.value },
     });
     if (res.data.success) {

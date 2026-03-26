@@ -542,7 +542,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import LoadingOverlay from "../../../layouts/components/LoadingOverlay.vue";
-import axios from "../../../plugins/axios";
+import api from "../../../plugins/axios";
 import attendanceApi from "../../../services/attendanceApi";
 
 const router = useRouter();
@@ -767,7 +767,7 @@ const fetchDashboardData = async () => {
     const todayStr = new Date().toLocaleDateString("en-CA");
 
     // --- 1. Fetch employees ---
-    const employeesResponse = await axios.get("/employees-info", {
+    const employeesResponse = await api.get("/employees-info", {
       params: { per_page: 1000 },
     });
     if (employeesResponse.data.success) {
@@ -807,7 +807,7 @@ const fetchDashboardData = async () => {
     stats.value[2].value = absentToday.toString().padStart(2, "0");
 
     // --- 3. Fetch leave applications ---
-    const leaveResponse = await axios.get("/leaves", {
+    const leaveResponse = await api.get("/leaves", {
       params: { per_page: 1000 },
     });
     let allLeaves = [];
@@ -1077,7 +1077,7 @@ const exportData = async (category = "all") => {
         break;
 
       case "leave_records":
-        const leaveResponse = await axios.get("/leaves", {
+        const leaveResponse = await api.get("/leaves", {
           params: { start_date: startDate, end_date: endDate, per_page: 10000 },
         });
 

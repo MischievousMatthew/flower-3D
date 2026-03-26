@@ -1,6 +1,6 @@
 //frontend\src\services\checkoutService.js
 
-import axios from "../plugins/axios";
+import api from "../plugins/axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -11,17 +11,13 @@ const checkoutService = {
    */
   async initializeCheckout(data) {
     try {
-      const response = await axios.post(
-        `${API_URL}/checkout/initialize`,
-        data,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
+      const response = await api.post(`${API_URL}/checkout/initialize`, data, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
-      );
+      });
       return response.data;
     } catch (error) {
       console.error("Error initializing checkout:", error);
@@ -46,7 +42,7 @@ const checkoutService = {
    */
   async createOrder(data) {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${API_URL}/checkout/create-order`,
         data,
         {
@@ -78,15 +74,12 @@ const checkoutService = {
    */
   async getOrder(orderId) {
     try {
-      const response = await axios.get(
-        `${API_URL}/checkout/orders/${orderId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-            Accept: "application/json",
-          },
+      const response = await api.get(`${API_URL}/checkout/orders/${orderId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          Accept: "application/json",
         },
-      );
+      });
       return response.data;
     } catch (error) {
       console.error("Error fetching order:", error);

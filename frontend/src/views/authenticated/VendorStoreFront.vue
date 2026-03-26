@@ -688,7 +688,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
-import axios from "../../plugins/axios";
+import api from "../../plugins/axios";
 import NavHeader from "../../layouts/NavHeader.vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import ModelViewer3D from "../../layouts/3D/3DModelViewer.vue";
@@ -857,7 +857,7 @@ const fetchVendor = async () => {
   loading.value = true;
   error.value = null;
   try {
-    const { data } = await axios.get(`vendors/${vendorId.value}`);
+    const { data } = await api.get(`vendors/${vendorId.value}`);
     if (data.success) {
       vendor.value = data.data;
     } else {
@@ -876,7 +876,7 @@ const fetchProducts = async () => {
   loadingProducts.value = true;
   try {
     // Use the vendor's owner_id (user id) to fetch products via our storefront endpoint
-    const { data } = await axios.get(`vendors/${vendorId.value}/products`);
+    const { data } = await api.get(`vendors/${vendorId.value}/products`);
     if (data.success) {
       products.value = Array.isArray(data.data) ? data.data : [];
     } else {

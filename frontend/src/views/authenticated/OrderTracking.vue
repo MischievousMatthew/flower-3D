@@ -926,7 +926,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from "vue";
-import axios from "../../plugins/axios";
+import api from "../../plugins/axios";
 import { useAuth } from "../../composables/useAuth";
 import NavHeader from "../../layouts/NavHeader.vue";
 import ReviewModal from "../../layouts/components/ReviewModal.vue";
@@ -1029,7 +1029,7 @@ async function fetchOrders(page = 1) {
     if (activeTab.value !== "all") params.delivery_status = activeTab.value;
     if (search.value.trim()) params.search = search.value.trim();
 
-    const res = await axios.get(API_BASE, { params, headers: authHeaders() });
+    const res = await api.get(API_BASE, { params, headers: authHeaders() });
     orders.value = res.data.data ?? [];
     Object.assign(meta, res.data.meta ?? {});
   } catch (e) {
@@ -1067,7 +1067,7 @@ function doComplete(order) {
     confirmModal.loading = true;
     actionLoading.value = order.id + "_c";
     try {
-      await axios.post(
+      await api.post(
         `${API_BASE}/${order.id}/complete`,
         {},
         { headers: authHeaders() },
@@ -1175,7 +1175,7 @@ async function submitRequest() {
     const endpoint =
       reqModal.type === "return" ? "request-return" : "request-refund";
 
-    await axios.post(`${API_BASE}/${reqModal.orderId}/${endpoint}`, fd, {
+    await api.post(`${API_BASE}/${reqModal.orderId}/${endpoint}`, fd, {
       headers: {
         ...authHeaders(),
         "Content-Type": "multipart/form-data",

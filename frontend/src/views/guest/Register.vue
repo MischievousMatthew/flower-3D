@@ -226,7 +226,7 @@
 import { ref, reactive, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
-import axios from "axios";
+import api from "../../plugins/axios";
 
 const router = useRouter();
 const { register, loading } = useAuth();
@@ -283,7 +283,7 @@ async function handleSendOtp() {
 
   otpLoading.value = true;
   try {
-    await axios.post("/api/auth/send-otp", { email: form.email });
+    await api.post("/auth/send-otp", { email: form.email });
     otpSent.value = true;
     startCooldown(60);
   } catch (err) {

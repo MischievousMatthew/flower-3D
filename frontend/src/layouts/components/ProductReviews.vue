@@ -295,7 +295,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, watch } from "vue";
-import axios from "../../plugins/axios";
+import api from "../../plugins/axios";
 
 const props = defineProps({
   productId: { type: Number, required: true },
@@ -342,7 +342,7 @@ async function load(page = 1) {
       ? `vendor/products/${props.productId}/reviews`
       : `products/${props.productId}/reviews`;
 
-    const res = await axios.get(endpoint, {
+    const res = await api.get(endpoint, {
       params: { page, per_page: meta.per_page, sort: sortBy.value },
       headers: authHeaders(),
     });
@@ -361,7 +361,7 @@ async function load(page = 1) {
 async function loadSummary() {
   if (summary.value) return; // already loaded with reviews
   try {
-    const res = await axios.get(`products/${props.productId}/reviews/summary`);
+    const res = await api.get(`products/${props.productId}/reviews/summary`);
     const body = res?.data ?? res;
     if (body?.data) summary.value = body.data;
   } catch (e) {
@@ -388,7 +388,7 @@ function closeEdit() {
 async function saveEdit() {
   editModal.saving = true;
   try {
-    await axios.put(
+    await api.put(
       `reviews/${editModal.id}`,
       {
         rating: editModal.rating,
@@ -411,7 +411,7 @@ async function saveEdit() {
 async function deleteReview(review) {
   if (!confirm("Delete your review? This cannot be undone.")) return;
   try {
-    await axios.delete(`reviews/${review.id}`, { headers: authHeaders() });
+    await api.delete(`reviews/${review.id}`, { headers: authHeaders() });
     await load(meta.current_page);
     emit("updated");
   } catch (e) {

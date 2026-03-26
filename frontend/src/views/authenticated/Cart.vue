@@ -437,7 +437,7 @@ import { useAuth } from "../../composables/useAuth";
 import { usePrice } from "../../composables/usePrice";
 import NavHeader from "../../layouts/NavHeader.vue";
 import cartService from "../../services/cartService.js";
-import axios from "../../plugins/axios"; // ✅ needed to fetch profile
+import api from "../../plugins/axios"; // ✅ needed to fetch profile
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
@@ -492,7 +492,7 @@ const isProfileIncomplete = computed(
 const fetchUserProfile = async () => {
   try {
     const token = localStorage.getItem("auth_token");
-    const response = await axios.get("profile/user-profile", {
+    const response = await api.get("profile/user-profile", {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     });
     if (response.data.success) {

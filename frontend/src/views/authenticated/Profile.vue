@@ -557,7 +557,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import axios from "../../plugins/axios";
+import api from "../../plugins/axios";
 import NavHeader from "../../layouts/NavHeader.vue";
 import { useAuth } from "../../composables/useAuth";
 import { toast } from "vue3-toastify";
@@ -785,7 +785,7 @@ const fetchUserProfile = async () => {
       return;
     }
 
-    const response = await axios.get("profile/user-profile", {
+    const response = await api.get("profile/user-profile", {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
@@ -881,7 +881,7 @@ const saveProfile = async () => {
       contact_number: editData.contact_number || null, // ✅ include phone in payload
     };
 
-    const response = await axios.put("/profile/user-details", updateData, {
+    const response = await api.put("/profile/user-details", updateData, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
@@ -935,7 +935,7 @@ const handleProfilePictureUpload = async (event) => {
     const formData = new FormData();
     formData.append("profile_picture", file);
 
-    const response = await axios.post("/profile/picture", formData, {
+    const response = await api.post("/profile/picture", formData, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "multipart/form-data",

@@ -157,7 +157,7 @@
 import { ref, onMounted, onUnmounted, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../composables/useAuth";
-import axios from "../plugins/axios";
+import api from "../plugins/axios";
 import { toast } from "vue3-toastify";
 import LoadingOverlay from "../layouts/components/LoadingOverlay.vue";
 import cartService from "../services/cartService.js";
@@ -270,7 +270,7 @@ const loadUserProfile = async () => {
     const token =
       localStorage.getItem("token") || localStorage.getItem("auth_token");
     if (token) {
-      const response = await axios.get("profile/user-profile", {
+      const response = await api.get("profile/user-profile", {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
