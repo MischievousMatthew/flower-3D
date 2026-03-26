@@ -25,7 +25,7 @@ class EmailOtpService
         $otp = rand(100000, 999999);
 
         // Save OTP in DB or cache (your logic here)
-
+        
         $apiKey = config('services.brevo.key');
 
         if (!$apiKey) {
