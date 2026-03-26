@@ -24,7 +24,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY . .
 
 # Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --no-dev --optimize-autoloader --prefer-dist --ignore-platform-reqs
 
 # Do NOT cache config at build time — env vars are injected at runtime by Render
 
