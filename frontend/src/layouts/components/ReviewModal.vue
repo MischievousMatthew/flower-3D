@@ -381,7 +381,7 @@
 
 <script setup>
 import { ref, computed, watch } from "vue";
-import axios from "../../plugins/axios.js";
+import api from "../../plugins/axios.js";
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -484,7 +484,7 @@ function autoSelectIfSingle() {
 async function fetchOrderProducts() {
   loadingProducts.value = true;
   try {
-    const res = await axios.get(`customer/orders/${props.orderId}`);
+    const res = await api.get(`customer/orders/${props.orderId}`);
     const order = res.data?.data ?? res.data;
     fetchedItems.value = order?.items ?? [];
     autoSelectIfSingle();
@@ -571,15 +571,13 @@ async function submit() {
 
     if (isEditing.value) {
       fd.append("_method", "PUT");
-      await axios.post(`reviews/${activeProduct.value.existingReview.id}`, fd, {
+      await api.post(`reviews/${activeProduct.value.existingReview.id}`, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
     } else {
-      await axios.post(
-        `customer/products/${activeProduct.value.id}/review`,
-        fd,
-        { headers: { "Content-Type": "multipart/form-data" } },
-      );
+      await api.post(`customer/products/${activeProduct.value.id}/review`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
     }
 
     emit("reviewed", props.orderId);
