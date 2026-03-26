@@ -6,6 +6,7 @@ use App\Models\EmailOtp;
 use App\Mail\OtpMail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Exception;
@@ -19,53 +20,41 @@ class EmailOtpService
     private const MAX_PER_HOUR        = 3;
     private const MAX_PER_HOUR_IP     = 10;
 
-    public static function send(string $email, string $ip = null): void
+    public static function send(string $email, string $ip): void
     {
-        // 1. Per-email cooldown (60 s)
-        $cooldownKey = "otp_cooldown:email:{$email}";
-        if (Cache::has($cooldownKey)) {
-            throw new Exception('Please wait 60 seconds before requesting another OTP.');
+        $otp = rand(100000, 999999);
+
+        // Save OTP in DB or cache (your logic here)
+
+        $apiKey = config('services.brevo.key');
+
+        if (!$apiKey) {
+            throw new \Exception('Brevo API key is missing');
         }
 
-        // 2. Per-email hourly cap (3 / hr)
-        $hourlyKey = "otp_hourly:email:{$email}";
-        $hourlyCount = Cache::get($hourlyKey, 0);
-        if ($hourlyCount >= self::MAX_PER_HOUR) {
-            throw new Exception('Too many OTP requests for this email. Try again later.');
+        $response = Http::withHeaders([
+            'api-key' => $apiKey,
+            'Content-Type' => 'application/json',
+        ])->post('https://api.brevo.com/v3/smtp/email', [
+            'sender' => [
+                'name' => config('mail.from.name'),
+                'email' => config('mail.from.address'),
+            ],
+            'to' => [
+                ['email' => $email],
+            ],
+            'subject' => 'Your OTP Code',
+            'htmlContent' => "<p>Your OTP is: <strong>{$otp}</strong></p>",
+        ]);
+
+        if (!$response->successful()) {
+            Log::error('BREVO ERROR', [
+                'status' => $response->status(),
+                'body'   => $response->body(),
+            ]);
+
+            throw new \Exception('Failed to send email: ' . $response->body());
         }
-
-        // 3. Per-IP hourly cap (10 / hr across all emails)
-        if ($ip) {
-            $ipKey = "otp_hourly:ip:{$ip}";
-            $ipCount = Cache::get($ipKey, 0);
-            if ($ipCount >= self::MAX_PER_HOUR_IP) {
-                throw new Exception('Too many OTP requests from your connection. Try again later.');
-            }
-            Cache::put($ipKey, $ipCount + 1, now()->addHour());
-        }
-
-        // 4. Generate, hash, persist
-        $plain = str_pad((string) random_int(0, 10 ** self::OTP_LENGTH - 1), self::OTP_LENGTH, '0', STR_PAD_LEFT);
-
-        EmailOtp::updateOrCreate(
-            ['email' => $email],
-            [
-                'otp_hash'   => Hash::make($plain),
-                'expires_at' => now()->addMinutes(self::OTP_EXPIRY_MINUTES),
-                'attempts'   => 0,
-                'is_locked'  => false,
-                'ip_address' => $ip,
-            ]
-        );
-
-        // 5. Set cooldown + increment hourly counter
-        Cache::put($cooldownKey, true, now()->addSeconds(self::COOLDOWN_SECONDS));
-        Cache::put($hourlyKey,   $hourlyCount + 1, now()->addHour());
-
-        // 6. Send email (queued)
-        Mail::to($email)->queue(new OtpMail($plain, self::OTP_EXPIRY_MINUTES));
-
-        Log::info("Email OTP dispatched", ['email' => $email, 'ip' => $ip]);
     }
 
     public static function verify(string $email, string $plain): bool

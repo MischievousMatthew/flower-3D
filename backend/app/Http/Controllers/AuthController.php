@@ -32,10 +32,21 @@ class AuthController extends Controller
                 ip:    $request->ip(),
             );
 
-            return response()->json(['message' => 'OTP sent to your email address.']);
+            return response()->json([
+                'message' => 'OTP sent to your email address.'
+            ]);
 
-        } catch (\Exception $e) {
-            return response()->json(['message' => $e->getMessage()], 429);
+        } catch (\Throwable $e) {
+
+            Log::error('SEND OTP ERROR', [
+                'message' => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to send OTP',
+                'error'   => $e->getMessage(), // 👈 TEMP DEBUG
+            ], 500);
         }
     }
 
