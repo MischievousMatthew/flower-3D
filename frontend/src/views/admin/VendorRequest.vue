@@ -4,7 +4,16 @@
 
     <main class="main-content">
       <header class="content-header">
-        <h1 class="page-title">Vendor Registration</h1>
+        <div class="header-left">
+          <button class="mobile-toggle" @click="toggleMobile" aria-label="Toggle Menu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <h1 class="page-title">Vendor Registration</h1>
+        </div>
 
         <div class="header-actions">
           <div class="search-box">
@@ -786,10 +795,12 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue";
 import { useAuth } from "../../composables/useAuth";
+import { useSidebarState } from "../../composables/useSidebarState";
 import { toast } from "vue3-toastify";
 import api from "../../plugins/axios";
 
 const { user } = useAuth();
+const { toggleMobile } = useSidebarState();
 
 // State
 const searchQuery = ref("");
@@ -1269,6 +1280,34 @@ function debounce(func, wait) {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.mobile-toggle {
+  display: none;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.mobile-toggle:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+@media (max-width: 968px) {
+  .mobile-toggle {
+    display: flex;
+  }
 }
 
 .page-title {
@@ -2124,9 +2163,9 @@ function debounce(func, wait) {
 }
 @media (max-width: 640px) {
   .content-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
   }
   .header-actions {
     width: 100%;

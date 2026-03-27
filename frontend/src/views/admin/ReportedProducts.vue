@@ -6,8 +6,17 @@
       <!-- ── Header ─────────────────────────────────────── -->
       <header class="content-header">
         <div class="header-left">
-          <h1 class="page-title">Reported Products</h1>
-          <p class="page-subtitle">Review and action customer reports</p>
+          <button class="mobile-toggle" @click="toggleMobile" aria-label="Toggle Menu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div>
+            <h1 class="page-title">Reported Products</h1>
+            <p class="page-subtitle">Review and action customer reports</p>
+          </div>
         </div>
         <div class="header-actions">
           <div class="search-box">
@@ -598,11 +607,12 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
+import { useAuth } from "../../composables/useAuth";
+import { useSidebarState } from "../../composables/useSidebarState";
 import api from "../../plugins/axios";
 
-// const API_BASE = "http://localhost:8000/api";
-
 const { user } = useAuth();
+const { toggleMobile } = useSidebarState();
 
 // ── State ─────────────────────────────────────────────
 const reports = ref([]);
@@ -905,6 +915,34 @@ watch(activeTab, fetchReports);
   align-items: center;
   margin-bottom: 24px;
   gap: 20px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.mobile-toggle {
+  display: none;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.mobile-toggle:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+@media (max-width: 968px) {
+  .mobile-toggle {
+    display: flex;
+  }
 }
 .page-title {
   font-size: 26px;
@@ -1896,8 +1934,9 @@ watch(activeTab, fetchReports);
 }
 @media (max-width: 640px) {
   .content-header {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
   }
   .stats-row {
     grid-template-columns: 1fr 1fr;

@@ -93,6 +93,11 @@ const routes = [
         component: () => import("../views/vendor/AllOrders.vue"),
       },
       {
+        path: "calendar",
+        name: "VendorCalendar",
+        component: () => import("../views/vendor/Reservation.vue"),
+      },
+      {
         path: "add-product",
         name: "VendorAddProduct",
         component: () => import("../views/vendor/AddProduct.vue"),
@@ -504,6 +509,11 @@ const routes = [
         path: "vendor-requests",
         name: "VendorRequest",
         component: () => import("../views/admin/VendorRequest.vue"),
+      },
+      {
+        path: "product-approval",
+        name: "ProductApproval",
+        component: () => import("../views/admin/ProductApproval.vue"),
       },
       {
         path: "reports",

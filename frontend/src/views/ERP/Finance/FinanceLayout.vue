@@ -4,10 +4,18 @@
       <DynamicSidebar />
     </div>
 
-    <div class="main-content" :style="{ marginLeft: sidebarWidth }">
+    <div class="main-content" :style="{ marginLeft: isMobile ? '0' : sidebarWidth }">
       <div class="top-section">
-        <div class="breadcrumbs">
-          <router-link to="/erp/finance/dashboard">
+        <div class="header-left">
+          <button class="mobile-toggle" @click="toggleMobile" aria-label="Toggle Menu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div class="breadcrumbs">
+            <router-link to="/erp/finance/dashboard">
             <svg
               width="15"
               height="15"
@@ -20,7 +28,7 @@
             </svg>
             Finance Portal
           </router-link>
-          <span>/ {{ currentPage }}</span>
+          </div>
         </div>
       </div>
       <div class="page-container">
@@ -31,13 +39,21 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
 import DynamicSidebar from "../../../layouts/Sidebar/DynamicSidebar.vue";
 import { useSidebarState } from "../../../composables/useSidebarState";
 
 const route = useRoute();
-const { isCollapsed } = useSidebarState();
+const { isCollapsed, toggleMobile } = useSidebarState();
+
+const width = ref(window.innerWidth);
+const updateWidth = () => (width.value = window.innerWidth);
+
+onMounted(() => window.addEventListener("resize", updateWidth));
+onUnmounted(() => window.removeEventListener("resize", updateWidth));
+
+const isMobile = computed(() => width.value <= 968);
 
 const sidebarWidth = computed(() => (isCollapsed.value ? "66px" : "250px"));
 
@@ -81,6 +97,43 @@ const currentPage = computed(() => {
   border-bottom: 1px solid #e2e8f0;
   padding: 18px 32px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.mobile-toggle {
+  display: none;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.mobile-toggle:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+@media (max-width: 968px) {
+  .sidebar-container {
+    width: 0 !important;
+  }
+  .mobile-toggle {
+    display: flex;
+  }
+  .top-section {
+    padding: 14px 20px;
+  }
+  .page-container {
+    padding: 20px;
+  }
 }
 
 .breadcrumbs {

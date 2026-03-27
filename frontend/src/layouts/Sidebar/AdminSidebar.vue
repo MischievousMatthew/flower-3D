@@ -1,6 +1,14 @@
 <template>
   <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
-  <aside class="sidebar">
+  
+  <!-- Backdrop for mobile -->
+  <div 
+    v-if="isMobileOpen" 
+    class="sidebar-backdrop" 
+    @click="closeMobile"
+  ></div>
+
+  <aside class="sidebar" :class="{ 'mobile-open': isMobileOpen }">
     <div class="logo-section">
       <div class="logo">
         <span class="logo-icon"
@@ -26,7 +34,7 @@
       <p class="menu-label">MENU</p>
       <nav class="nav-menu">
         <router-link
-          to="/admin/dashboard"
+          to="/admin/vendor-requests"
           class="nav-item"
           active-class="active"
         >
@@ -41,30 +49,30 @@
           <span class="nav-icon">🏪</span>
           <span>Vendor Requests</span>
         </router-link>
-        <router-link to="/admin/vendors" class="nav-item" active-class="active">
+        <router-link
+          to="/admin/vendor-requests"
+          class="nav-item"
+          active-class="active"
+        >
           <span class="nav-icon">👥</span>
           <span>Vendors</span>
         </router-link>
-        <router-link to="/admin/orders" class="nav-item" active-class="active">
-          <span class="nav-icon">🛍️</span>
-          <span>Orders</span>
+        <router-link
+          to="/admin/product-approval"
+          class="nav-item"
+          active-class="active"
+        >
+          <span class="nav-icon">✅</span>
+          <span>Product Approval</span>
         </router-link>
         <router-link to="/admin/reports" class="nav-item" active-class="active">
           <span class="nav-icon">📦</span>
           <span>Reported Products</span>
         </router-link>
-        <router-link
-          to="/admin/customers"
-          class="nav-item"
-          active-class="active"
-        >
-          <span class="nav-icon">👤</span>
-          <span>Customers</span>
-        </router-link>
       </nav>
     </div>
 
-    <div class="menu-section">
+    <!-- <div class="menu-section">
       <p class="menu-label">REPORTS</p>
       <nav class="nav-menu">
         <router-link
@@ -84,7 +92,7 @@
           <span>Reports</span>
         </router-link>
       </nav>
-    </div>
+    </div> -->
 
     <div class="sidebar-footer">
       <button @click="handleLogout" class="logout-btn" :disabled="isLoading">
@@ -97,14 +105,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
-import { useRouter } from "vue-router";
+import { ref, onMounted, onUnmounted, watch } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
+import { useSidebarState } from "../../composables/useSidebarState";
 import { toast } from "vue3-toastify";
 import LoadingOverlay from "../components/LoadingOverlay.vue";
 
 const { logout, user } = useAuth();
 const router = useRouter();
+const route = useRoute();
+const { isMobileOpen, closeMobile } = useSidebarState();
 const isLoading = ref(false);
 const isLoadingMessage = ref("Loading...");
 
@@ -186,6 +197,11 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", handleBeforeUnload);
+});
+
+// Close sidebar on route change (mobile)
+watch(() => route.path, () => {
+  if (isMobileOpen.value) closeMobile();
 });
 </script>
 
@@ -405,8 +421,19 @@ onUnmounted(() => {
   }
 
   .sidebar.mobile-open {
-    transform: translateX(0);
+    transform: translateX(0) !important;
     z-index: 1000;
   }
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 999;
 }
 </style>

@@ -1829,6 +1829,14 @@ watch(activeTab, () => {
   margin-left: 260px;
   flex: 1;
   padding: 24px;
+  transition: margin-left 0.3s ease;
+}
+
+@media (max-width: 968px) {
+  .main-content {
+    margin-left: 0 !important;
+    padding: 16px;
+  }
 }
 
 /* ─── Header ─────────────────────────────────────────── */

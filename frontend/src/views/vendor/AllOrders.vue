@@ -1845,12 +1845,22 @@ onMounted(async () => {
   margin-left: 260px;
   min-height: 100vh;
   background: #f5f7fa;
+  transition: margin-left 0.3s ease;
 }
 
 .orders-container {
   max-width: 1400px;
   margin: 0 auto;
   padding: 40px 20px;
+}
+
+@media (max-width: 968px) {
+  .all-orders-page {
+    margin-left: 0 !important;
+  }
+  .orders-container {
+    padding: 20px 16px;
+  }
 }
 
 /* ==================== HEADER SECTION ==================== */

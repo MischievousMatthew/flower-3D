@@ -1,6 +1,13 @@
 <template>
   <!-- Outer wrapper handles overflow:visible so the toggle button isn't clipped -->
   <div class="sidebar-outer">
+    <!-- Backdrop for mobile -->
+    <div 
+      v-if="isMobileOpen" 
+      class="sidebar-backdrop" 
+      @click="closeMobile"
+    ></div>
+
     <!-- Toggle arrow — sits on the right edge of the outer wrapper -->
     <button
       class="collapse-toggle"
@@ -25,7 +32,7 @@
     </button>
 
     <!-- Inner sidebar — overflow:hidden so border stays crisp -->
-    <div class="dynamic-sidebar" :class="{ collapsed: isCollapsed }">
+    <div class="dynamic-sidebar" :class="{ collapsed: isCollapsed, 'mobile-open': isMobileOpen }">
       <LoadingOverlay :visible="isLoading" message="Logging out..." />
 
       <!-- ── User Header ──────────────────────────────── -->
@@ -201,7 +208,7 @@ const route = useRoute();
 const { logout, user } = useAuth();
 const { activeAssignment, activeRoleSlug, hasManyAssignments } =
   useAssignment();
-const { isCollapsed } = useSidebarState();
+const { isCollapsed, isMobileOpen, closeMobile } = useSidebarState();
 
 const isLoading = ref(false);
 const expandedGroups = ref([]);
@@ -409,6 +416,11 @@ watch(
   { immediate: true },
 );
 
+// Close sidebar on route change (mobile)
+watch(() => route.path, () => {
+  if (isMobileOpen.value) closeMobile();
+});
+
 function isGroupActive(item) {
   return item.children?.some((c) => route.path.startsWith(c.path)) ?? false;
 }
@@ -509,6 +521,40 @@ async function handleLogout() {
 .dynamic-sidebar.collapsed {
   width: 66px;
   min-width: 66px;
+}
+
+@media (max-width: 968px) {
+  .dynamic-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+  }
+  .dynamic-sidebar.mobile-open {
+    transform: translateX(0);
+    width: 280px;
+    min-width: 280px;
+  }
+  .collapse-toggle {
+    display: none;
+  }
+  .sidebar-outer {
+    width: 0;
+    min-width: 0;
+  }
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 999;
 }
 
 /* ── Header ───────────────────────────────────── */

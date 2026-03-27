@@ -1,7 +1,14 @@
 <template>
   <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
+  
+  <!-- Backdrop for mobile -->
+  <div 
+    v-if="isMobileOpen" 
+    class="sidebar-backdrop" 
+    @click="closeMobile"
+  ></div>
 
-  <aside class="sidebar">
+  <aside class="sidebar" :class="{ 'mobile-open': isMobileOpen }">
     <div class="logo-section">
       <div class="logo">
         <span class="logo-icon"
@@ -36,8 +43,16 @@
           class="nav-item"
           active-class="active"
         >
+          <span class="nav-icon">🛍️</span>
+          <span>Orders</span>
+        </router-link>
+        <router-link
+          to="/vendor/calendar"
+          class="nav-item"
+          active-class="active"
+        >
           <span class="nav-icon">📅</span>
-          <span>Reservations</span>
+          <span>Calendar</span>
         </router-link>
         <!-- <router-link to="/customers" class="nav-item">
           <span class="nav-icon">👥</span>
@@ -114,14 +129,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
-import { useRouter } from "vue-router";
+import { ref, onMounted, onUnmounted, watch } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
+import { useSidebarState } from "../../composables/useSidebarState";
 import { toast } from "vue3-toastify";
 import LoadingOverlay from "../components/LoadingOverlay.vue";
 
 const { logout } = useAuth();
 const router = useRouter();
+const route = useRoute();
+const { isMobileOpen, closeMobile } = useSidebarState();
 
 const isLoading = ref(null);
 const isLoadingMessage = ref("");
@@ -196,6 +214,11 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", handleBeforeUnload);
+});
+
+// Close sidebar on route change (mobile)
+watch(() => route.path, () => {
+  if (isMobileOpen.value) closeMobile();
 });
 </script>
 
@@ -392,10 +415,21 @@ onUnmounted(() => {
   }
 
   .sidebar.mobile-open {
-    transform: translateX(0);
+    transform: translateX(0) !important;
     z-index: 1000;
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
   }
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 999;
 }
 
 /* Animation for mobile menu */

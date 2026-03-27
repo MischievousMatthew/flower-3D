@@ -3,6 +3,15 @@
   <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
 
   <header class="vendor-header">
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-toggle" @click="toggleMobile" aria-label="Toggle Menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+
     <!-- Left: page title -->
     <h1 class="page-title">{{ title }}</h1>
 
@@ -208,6 +217,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../composables/useAuth";
+import { useSidebarState } from "../composables/useSidebarState";
 import api from "../plugins/axios";
 import { toast } from "vue3-toastify";
 import LoadingOverlay from "../layouts/components/LoadingOverlay.vue";
@@ -222,6 +232,7 @@ defineEmits(["update:modelValue"]);
 
 const router = useRouter();
 const { user, logout } = useAuth();
+const { toggleMobile } = useSidebarState();
 
 const showDropdown = ref(false);
 const dropdownRef = ref(null);
@@ -363,6 +374,22 @@ const handleLogout = async () => {
     0 1px 3px rgba(0, 0, 0, 0.04),
     0 4px 16px rgba(0, 0, 0, 0.06),
     0 1px 0 rgba(255, 255, 255, 0.9) inset;
+}
+
+.mobile-toggle {
+  display: none;
+  background: transparent;
+  border: none;
+  color: #4a5568;
+  cursor: pointer;
+  padding: 8px;
+  margin-right: 12px;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+.mobile-toggle:hover {
+  background-color: #f7fafc;
 }
 
 .page-title {
@@ -744,6 +771,11 @@ const handleLogout = async () => {
 @media (max-width: 768px) {
   .vendor-header {
     padding: 12px 16px;
+  }
+  .mobile-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .pill-info {
     display: none;
