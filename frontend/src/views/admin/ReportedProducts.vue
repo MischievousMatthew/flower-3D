@@ -598,11 +598,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
-import ModelViewer3D from "../../layouts/3D/3DModelViewer.vue";
-import { useAuth } from "../../composables/useAuth";
-import { toast } from "vue3-toastify";
+import api from "../../plugins/axios";
 
-const API_BASE = "http://localhost:8000/api";
+// const API_BASE = "http://localhost:8000/api";
 
 const { user } = useAuth();
 
@@ -710,20 +708,15 @@ const getStoreName = (report) => {
 const fetchReports = async () => {
   loading.value = true;
   try {
-    const params = new URLSearchParams({
-      page: pagination.value.current_page,
-      per_page: pagination.value.per_page,
+    const res = await api.get('/admin/reports', {
+      params: {
+        page: pagination.value.current_page,
+        per_page: pagination.value.per_page,
+        ...(activeTab.value !== 'all' && { status: activeTab.value }),
+        ...(searchQuery.value && { search: searchQuery.value })
+      }
     });
-    if (activeTab.value !== "all") params.append("status", activeTab.value);
-    if (searchQuery.value) params.append("search", searchQuery.value);
-
-    const res = await fetch(`${API_BASE}/admin/reports?${params}`, {
-      headers: {
-        Authorization: `Bearer ${getToken()}`,
-        Accept: "application/json",
-      },
-    });
-    const data = await res.json();
+    const data = res.data;
 
     if (data.success) {
       reports.value = data.data.data ?? data.data;
@@ -772,16 +765,8 @@ const reviewReport = async (reportId, action, fromModal = false) => {
   reviewing.value = reportId;
   reviewAction.value = action;
   try {
-    const res = await fetch(`${API_BASE}/admin/reports/${reportId}/review`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${getToken()}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ action }),
-    });
-    const data = await res.json();
+    const res = await api.post(`/admin/reports/${reportId}/review`, { action });
+    const data = res.data;
     if (data.success) {
       toast.success(
         action === "approve" ? "Product banned." : "Report dismissed.",

@@ -218,11 +218,18 @@ class VendorStorefrontController extends Controller
     /**
      * Convert slug array like ["bouquet_and_flower"] to ["Bouquet and Flower"]
      */
-    private function humanizeProductTypes(array $types): array
+    private function humanizeProductTypes(mixed $types): array
     {
-        return array_map(function (string $type) {
+        if (empty($types) || !is_array($types)) {
+            return [];
+        }
+
+        return array_map(function ($type) {
+            if (!is_string($type)) {
+                return '';
+            }
             return ucwords(str_replace(['_', '-'], ' ', $type));
-        }, $types);
+        }, array_filter($types));
     }
 
     /**

@@ -1,12 +1,10 @@
 import api from "../plugins/axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
-
 const productService = {
   // Get all approved products (for customers) - PUBLIC
   async getAllProducts(filters = {}) {
     try {
-      const response = await api.get(`${API_URL}/customer/products`, {
+      const response = await api.get('/customer/products', {
         params: filters,
       });
       return response.data;
@@ -19,7 +17,7 @@ const productService = {
   // Get filter options - PUBLIC
   async getFilterOptions() {
     try {
-      const response = await api.get(`${API_URL}/customer/products/filters`);
+      const response = await api.get('/customer/products/filters');
       return response.data;
     } catch (error) {
       console.error("Error fetching filter options:", error);
@@ -30,7 +28,7 @@ const productService = {
   // Get product by ID - PUBLIC
   async getProductById(id) {
     try {
-      const response = await api.get(`${API_URL}/customer/products/${id}`);
+      const response = await api.get(`/customer/products/${id}`);
       return response.data;
     } catch (error) {
       console.error("Error fetching product:", error);
@@ -41,7 +39,7 @@ const productService = {
   // Get featured products - PUBLIC
   async getFeaturedProducts() {
     try {
-      const response = await api.get(`${API_URL}/customer/products/featured`);
+      const response = await api.get('/customer/products/featured');
       return response.data;
     } catch (error) {
       console.error("Error fetching featured products:", error);
@@ -52,9 +50,7 @@ const productService = {
   // Get new arrivals - PUBLIC
   async getNewArrivals() {
     try {
-      const response = await api.get(
-        `${API_URL}/customer/products/new-arrivals`,
-      );
+      const response = await api.get('/customer/products/new-arrivals');
       return response.data;
     } catch (error) {
       console.error("Error fetching new arrivals:", error);
@@ -65,7 +61,7 @@ const productService = {
   // Search products - PUBLIC
   async searchProducts(query) {
     try {
-      const response = await api.get(`${API_URL}/customer/products/search`, {
+      const response = await api.get('/customer/products/search', {
         params: { query },
       });
       return response.data;
@@ -78,7 +74,7 @@ const productService = {
   // Get all categories - PUBLIC
   async getCategories() {
     try {
-      const response = await api.get(`${API_URL}/customer/products/categories`);
+      const response = await api.get('/customer/products/categories');
       return response.data;
     } catch (error) {
       console.error("Error fetching categories:", error);

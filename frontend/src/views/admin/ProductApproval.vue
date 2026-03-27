@@ -575,11 +575,9 @@
   </div>
 </template>
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
-import { toast } from "vue3-toastify";
+import api from "../../plugins/axios";
 
-const API_BASE_URL = "http://localhost:8000/api";
+// const API_BASE_URL = "http://localhost:8000/api";
 
 // State
 const searchQuery = ref("");
@@ -661,25 +659,17 @@ const fetchProducts = async () => {
   loading.value = true;
   try {
     const token = getAuthToken();
-    const params = new URLSearchParams({
-      status: activeTab.value,
-      per_page: pagination.value.per_page,
-      page: pagination.value.current_page,
-      ...filters.value,
+    const response = await api.get('/admin/products', {
+      params: {
+        status: activeTab.value,
+        per_page: pagination.value.per_page,
+        page: pagination.value.current_page,
+        ...filters.value,
+        ...(searchQuery.value && { search: searchQuery.value })
+      }
     });
 
-    if (searchQuery.value) {
-      params.append("search", searchQuery.value);
-    }
-
-    const response = await fetch(`${API_BASE_URL}/admin/products?${params}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-    });
-
-    const data = await response.json();
+    const data = response.data;
 
     if (data.success) {
       products.value = data.data.data || data.data;
@@ -700,14 +690,8 @@ const fetchProducts = async () => {
 const fetchStatistics = async () => {
   try {
     const token = getAuthToken();
-    const response = await fetch(`${API_BASE_URL}/admin/products/statistics`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-    });
-
-    const data = await response.json();
+    const response = await api.get('/admin/products/statistics');
+    const data = response.data;
     if (data.success) {
       stats.value = data.data;
     }
@@ -769,18 +753,8 @@ const toggleProductStatus = async (productId, fromModal = false) => {
 
   try {
     const token = getAuthToken();
-    const response = await fetch(
-      `${API_BASE_URL}/admin/products/${productId}/toggle-status`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      },
-    );
-
-    const data = await response.json();
+    const response = await api.post(`/admin/products/${productId}/toggle-status`);
+    const data = response.data;
 
     if (data.success) {
       toast.success(data.message);

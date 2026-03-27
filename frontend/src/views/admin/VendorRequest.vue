@@ -784,13 +784,9 @@
   </div>
 </template>
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
-import { toast } from "vue3-toastify";
-import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
-import { useAuth } from "../../composables/useAuth";
+import api from "../../plugins/axios";
 
-const API_BASE_URL = "http://localhost:8000/api";
+// const API_BASE_URL = "http://localhost:8000/api";
 const { user } = useAuth();
 
 // State
@@ -886,27 +882,17 @@ const fetchApplications = async () => {
   isLoading.value = true;
   try {
     isLoadingMessage.value = "Loading vendor applications...";
-    const params = new URLSearchParams({
-      status: activeTab.value,
-      per_page: 10,
-      page: pagination.value.current_page,
-      ...filters.value,
+    const response = await api.get('/admin/vendor-applications', {
+      params: {
+        status: activeTab.value,
+        page: pagination.value.current_page,
+        per_page: pagination.value.per_page,
+        ...filters.value,
+        ...(searchQuery.value && { search: searchQuery.value })
+      }
     });
 
-    const url = `${API_BASE_URL}/admin/vendor-applications?${params}`;
-
-    const response = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const data = response.data;
 
     if (data.data) {
       vendorApplications.value = data.data;
@@ -940,27 +926,8 @@ const fetchApplications = async () => {
 
 const fetchStatistics = async () => {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/admin/vendor-applications/statistics`,
-      {
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-      },
-    );
-
-    if (!response.ok) {
-      stats.value = {
-        pending: 0,
-        approved: 0,
-        rejected: 0,
-        under_review: 0,
-      };
-      return;
-    }
-
-    const data = await response.json();
+    const response = await api.get('/admin/vendor-applications/statistics');
+    const data = response.data;
     stats.value = data;
   } catch (error) {
     console.error("Error fetching statistics:", error);
@@ -1005,20 +972,17 @@ const onSearch = debounce(() => {
 const exportData = async () => {
   try {
     toast.info("Preparing export...");
-    const params = new URLSearchParams({
+    const params = {
       status: activeTab.value,
       ...filters.value,
+    };
+
+    const response = await api.get('/admin/vendor-applications/export', {
+      params,
+      responseType: 'blob' // Important for file downloads
     });
 
-    const response = await fetch(
-      `${API_BASE_URL}/admin/vendor-applications/export?${params}`,
-    );
-
-    if (!response.ok) {
-      throw new Error("Export failed");
-    }
-
-    const blob = await response.blob();
+    const blob = new Blob([response.data], { type: response.headers['content-type'] });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -1080,26 +1044,11 @@ const confirmApprove = async () => {
 
   isProcessingAction.value = true;
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/admin/vendor-applications/${pendingAction.value.id}/status`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ status: "approved" }),
-      },
+    const response = await api.post(
+      `/admin/vendor-applications/${pendingAction.value.id}/approve`
     );
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        errorData.message || `HTTP error! status: ${response.status}`,
-      );
-    }
-
-    const data = await response.json();
+    const data = response.data;
     toast.success(data.message || "Vendor application approved successfully!");
 
     closeApproveModal();
@@ -1152,29 +1101,11 @@ const confirmReject = async () => {
   isProcessingAction.value = true;
 
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/admin/vendor-applications/${pendingAction.value.id}/status`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          status: "rejected",
-          rejection_reason: rejectionReason.value.trim(),
-        }),
-      },
-    );
+    const response = await api.post(`/admin/vendor-applications/${pendingAction.value.id}/reject`, {
+      rejection_reason: rejectionReason.value.trim()
+    });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        errorData.message || `HTTP error! status: ${response.status}`,
-      );
-    }
-
-    const data = await response.json();
+    const data = response.data;
     toast.success(data.message || "Vendor application rejected successfully!");
 
     closeRejectModal();

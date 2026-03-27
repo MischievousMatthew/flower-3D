@@ -315,14 +315,6 @@
                   <div class="product-actions-overlay">
                     <button
                       class="icon-btn"
-                      @click="toggleWishlist(product)"
-                      title="Save to wishlist"
-                    >
-                      <span v-if="isInWishlist(product.id)">❤️</span>
-                      <span v-else>🤍</span>
-                    </button>
-                    <button
-                      class="icon-btn"
                       @click="openModal(product)"
                       title="Quick view"
                     >
@@ -738,7 +730,6 @@ const vendor = ref({
 
 const products = ref([]);
 const cartItems = ref([]);
-const wishlist = ref([]);
 
 // ── Filters ────────────────────────────────────────────────────────────────
 const filters = ref({ category: "All", flowerType: "All", occasion: "All" });
@@ -976,14 +967,7 @@ const addToCart = async (product, quantity = 1) => {
   }
 };
 
-const toggleWishlist = (p) => {
-  const idx = wishlist.value.findIndex((i) => i.id === p.id);
-  if (idx > -1) wishlist.value.splice(idx, 1);
-  else wishlist.value.push(p);
-  localStorage.setItem("wishlist", JSON.stringify(wishlist.value));
-};
 
-const isInWishlist = (id) => wishlist.value.some((i) => i.id === id);
 
 const chatVendor = () => console.log("Chat with vendor", vendorId.value);
 
@@ -1023,8 +1007,6 @@ const prevGalleryImage = () => {
 onMounted(async () => {
   await fetchVendor();
   await loadCart();
-  const saved = localStorage.getItem("wishlist");
-  if (saved) wishlist.value = JSON.parse(saved);
 });
 </script>
 

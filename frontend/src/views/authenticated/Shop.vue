@@ -955,7 +955,6 @@ function refreshProductStats() {
 watch(isAuthenticated, async (val) => {
   if (val) {
     await loadCart();
-    await loadWishlist();
     if (pendingAction.value) {
       const { action, product, qty, callback } = pendingAction.value;
       pendingAction.value = null;
@@ -1255,7 +1254,6 @@ const executePendingAction = async (action, product, qty) => {
   if (action === "addToCart") await addToCartDirect(product, qty);
   if (action === "addToCartModal") await addToCartModalAction(product, qty);
   if (action === "buyNow") await buyNowAction(product, qty);
-  if (action === "toggleWishlist") toggleWishlist(product);
 };
 const addToCartModalAction = async (product, qty) => {
   if (!product) return;
@@ -1455,7 +1453,6 @@ onMounted(async () => {
   await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors()]);
   if (isAuthenticated.value) {
     await loadCart();
-    loadWishlist();
   } else {
     await loadPendingActionFromStorage();
   }

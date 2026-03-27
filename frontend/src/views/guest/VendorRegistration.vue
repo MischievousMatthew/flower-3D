@@ -1186,7 +1186,7 @@ import {
   watchEffect,
 } from "vue";
 import { useRouter } from "vue-router";
-import { toast } from "vue3-toastify";
+import api from "../../plugins/axios";
 
 const router = useRouter();
 const currentStep = ref(1);
@@ -2157,14 +2157,15 @@ const handleSubmit = async () => {
     const today = new Date().toISOString().split("T")[0];
     submitData.append("application_date", today);
 
-    const response = await fetch("http://localhost:8000/api/vendor/register", {
-      method: "POST",
-      body: submitData,
+    const response = await api.post("/vendor/register", submitData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
     });
 
-    const data = await response.json();
+    const data = response.data;
 
-    if (response.ok && data.success) {
+    if (data.success) {
       clearProgress();
       applicationId.value = data.data.application_id || data.data.id;
       // NEW: success toast before showing modal
