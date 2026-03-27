@@ -931,7 +931,7 @@ const handleProfilePictureUpload = async (event) => {
   if (!file) return;
 
   try {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("auth_token");
     const formData = new FormData();
     formData.append("profile_picture", file);
 

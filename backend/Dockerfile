@@ -32,4 +32,4 @@ RUN composer install --no-dev --optimize-autoloader --prefer-dist --ignore-platf
 EXPOSE 10000
 
 # Start Laravel server and run migrations
-CMD php artisan optimize:clear && php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=10000
+CMD php artisan optimize:clear && php artisan migrate --force && php artisan db:seed --class=AdminSeeder --force && php artisan serve --host=0.0.0.0 --port=10000
