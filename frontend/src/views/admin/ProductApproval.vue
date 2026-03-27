@@ -587,6 +587,7 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { useAuth } from "../../composables/useAuth";
 import { useSidebarState } from "../../composables/useSidebarState";
+import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import api from "../../plugins/axios";
 import { toast } from "vue3-toastify";
 
