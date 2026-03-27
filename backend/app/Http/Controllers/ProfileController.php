@@ -18,32 +18,9 @@ class ProfileController extends Controller
     public function getProfile()
     {
         try {
-            $user = Auth::user();
-            
             return response()->json([
                 'success' => true,
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'surname' => $user->surname,
-                    'username' => $user->username,
-                    'email' => $user->email,
-                    'contact_number' => $user->contact_number,
-                    'is_verified' => $user->is_verified,
-                    'role' => $user->role,
-                    'vendor_data' => $user->vendor_data,
-                    'email_verified_at' => $user->email_verified_at,
-                    'created_at' => $user->created_at,
-                    'updated_at' => $user->updated_at,
-                    'date_of_birth' => $user->date_of_birth,
-                    'gender' => $user->gender,
-                    'nationality' => $user->nationality,
-                    'address' => $user->address,
-                    'city' => $user->city,
-                    'postal_code' => $user->postal_code,
-                    'profile_picture' => $user->profile_picture ? Storage::url($user->profile_picture) : 'https://ui-avatars.com/api/?name=' . urlencode($user->name . ' ' . $user->surname) . '&background=random',
-                    'plan' => $user->plan,
-                ]
+                'user' => $this->formatUserResponse(Auth::user())
             ]);
         } catch (\Exception $e) {
             Log::error('Profile fetch error: ' . $e->getMessage());
@@ -93,7 +70,7 @@ class ProfileController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Profile updated successfully',
-                'user' => $user->fresh()
+                'user' => $this->formatUserResponse($user->fresh())
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
@@ -129,7 +106,8 @@ class ProfileController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Profile picture updated successfully',
-                'profile_picture' => Storage::url($path)
+                'profile_picture' => Storage::url($path),
+                'user' => $this->formatUserResponse($user->fresh())
             ]);
         } catch (\Exception $e) {
             Log::error('Profile picture upload error: ' . $e->getMessage());
@@ -139,4 +117,33 @@ class ProfileController extends Controller
             ], 500);
         }
     }
+
+    private function formatUserResponse($user)
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'surname' => $user->surname,
+            'username' => $user->username,
+            'email' => $user->email,
+            'contact_number' => $user->contact_number,
+            'is_verified' => $user->is_verified,
+            'role' => $user->role,
+            'vendor_data' => $user->vendor_data,
+            'email_verified_at' => $user->email_verified_at,
+            'created_at' => $user->created_at,
+            'updated_at' => $user->updated_at,
+            'date_of_birth' => $user->date_of_birth,
+            'gender' => $user->gender,
+            'nationality' => $user->nationality,
+            'address' => $user->address,
+            'city' => $user->city,
+            'postal_code' => $user->postal_code,
+            'profile_picture' => $user->profile_picture 
+                ? Storage::url($user->profile_picture) 
+                : 'https://ui-avatars.com/api/?name=' . urlencode($user->name . ' ' . $user->surname) . '&background=7F9CF5&color=ffffff&size=128',
+            'plan' => $user->plan,
+        ];
+    }
+}
 }

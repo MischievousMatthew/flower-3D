@@ -14,10 +14,15 @@
           <div class="profile-info">
             <div class="avatar-wrapper">
               <img
+                v-if="user.profile_picture"
                 :src="user.profile_picture"
                 :alt="user.name"
                 class="avatar"
+                @error="handleImageError"
               />
+              <div v-else class="avatar-placeholder">
+                {{ getInitials(user.name, user.surname) }}
+              </div>
               <input
                 type="file"
                 ref="fileInput"
@@ -969,6 +974,20 @@ const handleProfilePictureUpload = async (event) => {
   }
 };
 
+const handleImageError = (event) => {
+  console.warn("Profile image failed to load, falling back to avatars API");
+  const name = user.name || "";
+  const surname = user.surname || "";
+  event.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    name + " " + surname,
+  )}&background=7F9CF5&color=ffffff&size=128`;
+};
+
+const getInitials = (name, surname) => {
+  if (!name && !surname) return "?";
+  return (name?.charAt(0) || "") + (surname?.charAt(0) || "");
+};
+
 const scrollToSection = (sectionId) => {
   console.log("Scroll to section:", sectionId);
 };
@@ -1078,6 +1097,21 @@ onMounted(() => {
   height: 100px;
   border-radius: 50%;
   object-fit: cover;
+  border: 4px solid white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.avatar-placeholder {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7f9cf5 0%, #a5b4fc 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 600;
   border: 4px solid white;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }

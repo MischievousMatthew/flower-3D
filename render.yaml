@@ -17,3 +17,5 @@ services:
         value: production
       - key: FRONTEND_URL
         value: https://bloomcraft-app.vercel.app
+      - key: APP_URL
+        value: https://flower-3d.onrender.com
