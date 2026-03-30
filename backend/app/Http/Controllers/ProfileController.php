@@ -102,7 +102,6 @@ class ProfileController extends Controller
         try {
             $user = Auth::user();
 
-            // 🔒 Ensure user is authenticated
             if (!$user) {
                 return response()->json([
                     'success' => false,
@@ -110,12 +109,10 @@ class ProfileController extends Controller
                 ], 401);
             }
 
-            // ✅ Validate request
             $request->validate([
                 'profile_picture' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
             ]);
 
-            // ❌ If no file actually sent
             if (!$request->hasFile('profile_picture')) {
                 return response()->json([
                     'success' => false,
@@ -125,34 +122,16 @@ class ProfileController extends Controller
 
             $file = $request->file('profile_picture');
 
-            // 🧹 Delete old Cloudinary image (if exists and is public_id)
-            if ($user->profile_picture && !str_starts_with($user->profile_picture, 'http')) {
-                try {
-                    cloudinary()->destroy($user->profile_picture);
-                } catch (\Throwable $e) {
-                    Log::warning('Cloudinary delete failed: ' . $e->getMessage());
-                }
-            }
-
-            // ☁️ Upload to Cloudinary
-            $result = cloudinary()->upload($file->getRealPath(), [
+            $result = cloudinary()->upload($file->getPathname(), [
                 'folder' => 'profile_pictures',
                 'resource_type' => 'image',
             ]);
 
-            // ❌ Handle failed upload
-            if (!$result) {
-                throw new \Exception('Cloudinary upload failed: result is null');
+            if (!$result || !$result->getPublicId()) {
+                throw new \Exception('Cloudinary upload failed');
             }
 
-            $publicId = $result->getPublicId();
-
-            if (!$publicId) {
-                throw new \Exception('Cloudinary upload failed: no public_id returned');
-            }
-
-            // 💾 Save to database
-            $user->profile_picture = $publicId;
+            $user->profile_picture = $result->getPublicId();
             $user->save();
 
             return response()->json([
@@ -161,19 +140,13 @@ class ProfileController extends Controller
                 'profile_picture' => $result->getSecurePath(),
             ]);
 
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'errors' => $e->errors(),
-            ], 422);
-
         } catch (\Throwable $e) {
             Log::error('UPLOAD ERROR: ' . $e->getMessage());
 
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to upload profile picture',
-                'error' => $e->getMessage(), // 🔥 remove after debugging
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
