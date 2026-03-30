@@ -57,12 +57,23 @@ class User extends Authenticatable
 
     protected function getAvatarUrlAttribute(): string
     {
-        if ($this->profile_picture) {
-            return asset('storage/' . $this->profile_picture);
+        if (!$this->profile_picture) {
+            return 'https://ui-avatars.com/api/?name=' . urlencode($this->full_name)
+                . '&background=7F9CF5&color=ffffff&size=128';
         }
-        
-        return 'https://ui-avatars.com/api/?name=' . urlencode($this->full_name) . 
-               '&background=7F9CF5&color=ffffff&size=128';
+
+        // Already a full URL (Cloudinary secure URL stored directly, or old http path)
+        if (str_starts_with($this->profile_picture, 'http')) {
+            return $this->profile_picture;
+        }
+
+        // Cloudinary public_id — generate URL
+        try {
+            return cloudinary()->getUrl($this->profile_picture);
+        } catch (\Throwable $e) {
+            return 'https://ui-avatars.com/api/?name=' . urlencode($this->full_name)
+                . '&background=7F9CF5&color=ffffff&size=128';
+        }
     }
 
     protected function getIsOnlineAttribute(): bool
