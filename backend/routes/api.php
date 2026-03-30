@@ -560,3 +560,19 @@ Route::get('/storage/{path}', function (string $path) {
 })
 ->where('path', '.*')
 ->name('storage.file');
+
+Route::get('/debug-cloudinary', function () {
+    try {
+        $cloudinaryUrl = env('CLOUDINARY_URL', 'NOT SET');
+        
+        return response()->json([
+            'cloudinary_url_set'    => !empty($cloudinaryUrl),
+            'has_duplicate_prefix'  => str_contains($cloudinaryUrl, 'CLOUDINARY_URL='),
+            'first_20_chars'        => substr($cloudinaryUrl, 0, 20),
+            'config_cloud_url'      => substr(config('cloudinary.cloud_url') ?? 'null', 0, 20),
+            'php_version'           => PHP_VERSION,
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json(['error' => $e->getMessage()]);
+    }
+});
