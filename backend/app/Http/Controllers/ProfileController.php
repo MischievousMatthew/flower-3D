@@ -16,14 +16,28 @@ class ProfileController extends Controller
 
     public function getProfile()
     {
+        $authUser = null;
         try {
+            $authUser = Auth::user();
+
             return response()->json([
                 'success' => true,
-                'user'    => $this->formatUserResponse(Auth::user()),
+                'user'    => $this->formatUserResponse($authUser),
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Profile fetch error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to fetch profile data'], 500);
+
+            // Debug info to allow root-cause identification from runtime.
+            // (No tokens/PII included.)
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch profile data',
+                'debug'   => [
+                    'exception_class' => get_class($e),
+                    'exception_message' => $e->getMessage(),
+                    'auth_user_null' => $authUser === null,
+                ],
+            ], 500);
         }
     }
 
