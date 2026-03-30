@@ -34,13 +34,15 @@ return [
     'cloud_url' => env('CLOUDINARY_URL'),
 
     /**
-     * Nested 'cloud' configuration required by CloudinaryLabs\CloudinaryLaravel\CloudinaryEngine
+     * Optimized 'cloud' configuration for Render.
+     * This logic will automatically parse the CLOUDINARY_URL if the individual variables are not set.
      */
     'cloud' => [
-        'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
-        'api_key'    => env('CLOUDINARY_API_KEY'),
-        'api_secret' => env('CLOUDINARY_API_SECRET'),
+        'cloud_name' => env('CLOUDINARY_CLOUD_NAME', isset(parse_url(env('CLOUDINARY_URL'))['host']) ? parse_url(env('CLOUDINARY_URL'))['host'] : null),
+        'api_key'    => env('CLOUDINARY_API_KEY',    isset(parse_url(env('CLOUDINARY_URL'))['user']) ? parse_url(env('CLOUDINARY_URL'))['user'] : null),
+        'api_secret' => env('CLOUDINARY_API_SECRET', isset(parse_url(env('CLOUDINARY_URL'))['pass']) ? parse_url(env('CLOUDINARY_URL'))['pass'] : null),
     ],
+
 
     /**
      * Upload Preset From Cloudinary Dashboard
