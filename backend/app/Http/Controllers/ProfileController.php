@@ -114,6 +114,23 @@ class ProfileController extends Controller
                 }
             }
 
+            // ── Manual config injection to bypass Cache/Loading issues on Render ──
+            try {
+                $cloudUrl = env('CLOUDINARY_URL');
+                $parsed = $cloudUrl ? parse_url($cloudUrl) : null;
+                
+                config([
+                    'cloudinary.cloud' => [
+                        'cloud_name' => env('CLOUDINARY_CLOUD_NAME', $parsed['host'] ?? null),
+                        'api_key'    => env('CLOUDINARY_API_KEY',    $parsed['user'] ?? null),
+                        'api_secret' => env('CLOUDINARY_API_SECRET', $parsed['pass'] ?? null),
+                    ],
+                    'cloudinary.cloud_url' => $cloudUrl,
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('Manual config injection failed: ' . $e->getMessage());
+            }
+
             // ── Test Cloudinary connection before uploading ────────────────
             try {
                 $filePath = $request->file('profile_picture')->getRealPath();
@@ -129,6 +146,7 @@ class ProfileController extends Controller
                     'folder'        => 'profile_pictures',
                     'resource_type' => 'image',
                 ]);
+
 
             } catch (\Throwable $e) {
                 Log::error('Cloudinary upload failed: ' . $e->getMessage());
