@@ -184,113 +184,93 @@ class VendorApplicationController extends Controller
     /**
      * Create a user account for the approved vendor
      */
-    private function createVendorAccount($application)
+    private function createVendorAccount(VendorApplication $application): User
     {
         try {
-            // Check if user already exists with this email
             $existingUser = User::where('email', $application->email)->first();
-            
-            $user = null;
-            $password = null;
-            $isExistingUser = false;
-            
+
             if ($existingUser) {
-                // Update existing user to be a vendor
                 $existingUser->role = 'vendor';
                 $existingUser->save();
-                $user = $existingUser;
-                $isExistingUser = true;
-            } else {
-                // Generate a random password
-                $password = Str::random(12);
-                
-                // Create username from email (remove @ and everything after)
-                $username = explode('@', $application->email)[0];
-                
-                // Check if username already exists, if yes append numbers
-                $originalUsername = $username;
-                $counter = 1;
-                while (User::where('username', $username)->exists()) {
-                    $username = $originalUsername . $counter;
-                    $counter++;
-                }
-                
-                // Split owner_name into name and surname if possible
-                $ownerName = $application->owner_name;
-                $nameParts = explode(' ', trim($ownerName));
-                
-                if (count($nameParts) >= 2) {
-                    $surname = array_pop($nameParts); // Last part as surname
-                    $name = implode(' ', $nameParts); // Rest as first name
-                } else {
-                    // If only one name, use it as first name and empty surname
-                    $name = $ownerName;
-                    $surname = '';
-                }
-                
-                // Create new user
-                $user = User::create([
-                    'name' => $name,
-                    'surname' => $surname,
-                    'username' => $username,
-                    'email' => $application->email,
-                    'contact_number' => $application->contact_number,
-                    'password' => Hash::make($password),
-                    'is_verified' => true,
-                    'role' => 'vendor',
-                    'vendor_data' => [ // Add this field if your users table has it
-                        'store_name' => $application->store_name,
-                        'application_id' => $application->id,
-                        'approved_at' => now()->toDateTimeString(),
-                        'needs_password_change' => true,
-                    ]
-                ]);
-                
-                // Link the user to the vendor application (if you have a user_id column)
-                $application->update(['user_id' => $user->id]);
+                $this->sendVendorWelcomeEmail($application, null, true);
+                return $existingUser;
             }
-            
-            // Send email in background (don't let email failure stop approval)
-            $this->sendVendorWelcomeEmail($application, $password, $isExistingUser);
-            
+
+            // Build unique username
+            $baseUsername = explode('@', $application->email)[0];
+            $username     = $baseUsername;
+            $counter      = 1;
+            while (User::where('username', $username)->exists()) {
+                $username = $baseUsername . $counter++;
+            }
+
+            // Split name / surname
+            $nameParts = explode(' ', trim($application->owner_name));
+            if (count($nameParts) >= 2) {
+                $surname = array_pop($nameParts);
+                $name    = implode(' ', $nameParts);
+            } else {
+                $name    = $application->owner_name;
+                $surname = '';
+            }
+
+            $temporaryPassword = Str::random(12);
+
+            // ✅ Only columns that exist in users table
+            $user = User::create([
+                'name'              => $name,
+                'surname'           => $surname,
+                'username'          => $username,
+                'email'             => $application->email,
+                'contact_number'    => $application->contact_number,
+                'password'          => Hash::make($temporaryPassword),
+                'is_verified'       => true,
+                'email_verified_at' => now(),
+                'role'              => 'vendor',
+                'vendor_data'       => [
+                    'store_name'            => $application->store_name,
+                    'application_id'        => $application->id,
+                    'approved_at'           => now()->toDateTimeString(),
+                    'needs_password_change' => true,
+                ],
+            ]);
+
+            $this->sendVendorWelcomeEmail($application, $temporaryPassword, false);
+
             return $user;
-            
+
         } catch (\Exception $e) {
             Log::error('Error creating vendor account', [
                 'application_id' => $application->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'error'          => $e->getMessage(),
             ]);
             throw $e;
         }
     }
 
-/**
- * Send welcome email to vendor (in background, don't block approval)
- */
-    private function sendVendorWelcomeEmail($application, $password = null, $isExistingUser = false)
-    {
-        try {
-            // Try to send email, but don't let failure stop the approval process
-            Mail::to($application->email)->send(new VendorAccountCreated($application, $password, $isExistingUser));
-            
-            Log::info('Vendor welcome email sent successfully', [
-                'application_id' => $application->id,
-                'email' => $application->email
-            ]);
-            
-        } catch (\Exception $e) {
-            // Log the email error but don't throw it - vendor account is already created
-            Log::warning('Failed to send vendor welcome email (but vendor account created)', [
-                'application_id' => $application->id,
-                'email' => $application->email,
-                'error' => $e->getMessage()
-            ]);
-            
-            // You can also log this to a separate email failure log
-            // Or queue it for retry later
+    /**
+     * Send welcome email to vendor (in background, don't block approval)
+     */
+        private function sendVendorWelcomeEmail(
+            VendorApplication $application,
+            ?string $password = null,
+            bool $isExistingUser = false
+        ): void {
+            try {
+                (new VendorAccountCreated($application, $password, $isExistingUser))->send();
+
+                Log::info('Vendor welcome email sent', [
+                    'application_id' => $application->id,
+                    'email'          => $application->email,
+                ]);
+            } catch (\Exception $e) {
+                Log::warning('Vendor welcome email failed (account still created)', [
+                    'application_id' => $application->id,
+                    'email'          => $application->email,
+                    'error'          => $e->getMessage(),
+                ]);
+            }
         }
-    }
 
     /**
      * Show individual application
