@@ -566,12 +566,16 @@ Route::get('/debug-cloudinary', function () {
         $cloudinaryUrl = env('CLOUDINARY_URL', 'NOT SET');
         
         return response()->json([
+            'UNIQUE_VERSION_ID'     => 'FIX_V4_NESTED_CLOUD',
             'cloudinary_url_set'    => !empty($cloudinaryUrl),
             'has_duplicate_prefix'  => str_contains($cloudinaryUrl, 'CLOUDINARY_URL='),
             'first_20_chars'        => substr($cloudinaryUrl, 0, 20),
             'config_cloud_url'      => substr(config('cloudinary.cloud_url') ?? 'null', 0, 20),
+            'has_cloud_key'         => config()->has('cloudinary.cloud'),
+            'cloud_name_set'        => !empty(config('cloudinary.cloud.cloud_name')),
             'php_version'           => PHP_VERSION,
         ]);
+
     } catch (\Throwable $e) {
         return response()->json(['error' => $e->getMessage()]);
     }

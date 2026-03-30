@@ -132,9 +132,11 @@ class ProfileController extends Controller
 
             } catch (\Throwable $e) {
                 Log::error('Cloudinary upload failed: ' . $e->getMessage());
+                Log::error($e->getTraceAsString());
                 return response()->json([
                     'success' => false,
                     'debug'   => 'Cloudinary upload error: ' . $e->getMessage(),
+                    'trace'   => substr($e->getTraceAsString(), 0, 500), // Return first 500 chars of trace
                 ], 500);
             }
 
@@ -150,11 +152,14 @@ class ProfileController extends Controller
 
         } catch (\Throwable $e) {
             Log::error('Profile picture upload error: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
             return response()->json([
                 'success' => false,
                 'debug'   => $e->getMessage(),
+                'trace'   => substr($e->getTraceAsString(), 0, 500),
             ], 500);
         }
+
     }
 
     private function resolveProfilePictureUrl(?string $profilePicture, string $fullName): string
