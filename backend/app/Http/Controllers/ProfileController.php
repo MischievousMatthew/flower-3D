@@ -100,42 +100,48 @@ class ProfileController extends Controller
     public function updateProfilePicture(Request $request)
     {
         try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized'
+                ], 401);
+            }
+
             $request->validate([
                 'profile_picture' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
             ]);
 
-            $user = Auth::user();
-
-            if ($user->profile_picture && !str_starts_with($user->profile_picture, 'http')) {
-                try {
-                    cloudinary()->destroy($user->profile_picture);
-                } catch (\Throwable $e) {
-                    Log::warning('Cloudinary delete failed: ' . $e->getMessage());
-                }
+            if (!$request->hasFile('profile_picture')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No file uploaded'
+                ], 400);
             }
 
-            $result = cloudinary()->upload($request->file('profile_picture')->getRealPath(), [
-                'folder'        => 'profile_pictures',
-                'resource_type' => 'image',
-            ]);
+            $result = cloudinary()->upload(
+                $request->file('profile_picture')->getRealPath(),
+                [
+                    'folder' => 'profile_pictures',
+                    'resource_type' => 'image',
+                ]
+            );
 
             $user->profile_picture = $result->getPublicId();
             $user->save();
 
             return response()->json([
-                'success'         => true,
-                'message'         => 'Profile picture updated successfully',
+                'success' => true,
                 'profile_picture' => $result->getSecurePath(),
-                'user'            => $this->formatUserResponse($user->fresh()),
             ]);
 
         } catch (\Throwable $e) {
-            // TEMPORARY — exposes the real error so you can diagnose
-            Log::error('Profile picture upload error: ' . $e->getMessage() . ' | ' . $e->getTraceAsString());
+            Log::error('UPLOAD ERROR: ' . $e->getMessage());
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to upload profile picture',
-                'debug'   => $e->getMessage(), // ← remove this after fixing
+                'error' => $e->getMessage(), // 🔥 shows real issue
             ], 500);
         }
     }
