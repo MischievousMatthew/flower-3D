@@ -1,12 +1,8 @@
 <template>
   <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
-  
+
   <!-- Backdrop for mobile -->
-  <div 
-    v-if="isMobileOpen" 
-    class="sidebar-backdrop" 
-    @click="closeMobile"
-  ></div>
+  <div v-if="isMobileOpen" class="sidebar-backdrop" @click="closeMobile"></div>
 
   <aside class="sidebar" :class="{ 'mobile-open': isMobileOpen }">
     <div class="logo-section">
@@ -34,7 +30,7 @@
       <p class="menu-label">MENU</p>
       <nav class="nav-menu">
         <router-link
-          to="/admin/vendor-requests"
+          to="/admin/dashboard"
           class="nav-item"
           active-class="active"
         >
@@ -200,9 +196,12 @@ onUnmounted(() => {
 });
 
 // Close sidebar on route change (mobile)
-watch(() => route.path, () => {
-  if (isMobileOpen.value) closeMobile();
-});
+watch(
+  () => route.path,
+  () => {
+    if (isMobileOpen.value) closeMobile();
+  },
+);
 </script>
 
 <style scoped>

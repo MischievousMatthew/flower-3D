@@ -506,6 +506,11 @@ const routes = [
     redirect: "/admin/vendor-requests",
     children: [
       {
+        path: "dashboard",
+        name: "AdminDashboard",
+        component: () => import("../views/admin/Dashboard.vue"),
+      },
+      {
         path: "vendor-requests",
         name: "VendorRequest",
         component: () => import("../views/admin/VendorRequest.vue"),
