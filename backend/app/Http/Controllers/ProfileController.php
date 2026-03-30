@@ -9,6 +9,22 @@ use Illuminate\Support\Facades\Log;
 
 class ProfileController extends Controller
 {
+    private function debugLog(string $hypothesisId, string $message, array $data = []): void
+    {
+        // Debug logs are NDJSON lines written to the fixed session log file.
+        $logPath = dirname(__DIR__, 4) . DIRECTORY_SEPARATOR . 'debug-0e8f77.log';
+        $payload = [
+            'sessionId' => '0e8f77',
+            'runId' => 'pre-fix',
+            'hypothesisId' => $hypothesisId,
+            'location' => 'backend/ProfileController.php:getProfile',
+            'message' => $message,
+            'data' => $data,
+            'timestamp' => (int) floor(microtime(true) * 1000),
+        ];
+        @file_put_contents($logPath, json_encode($payload) . PHP_EOL, FILE_APPEND);
+    }
+
     public function __construct()
     {
         $this->middleware('auth:sanctum');
@@ -17,11 +33,32 @@ class ProfileController extends Controller
     public function getProfile()
     {
         try {
+            $authUser = Auth::user();
+            $this->debugLog('H1_AUTH_USER_NULL', 'Auth::user() lookup', [
+                'is_null' => $authUser === null,
+                'user_id' => $authUser?->id,
+                'profile_picture_present' => $authUser?->profile_picture !== null && $authUser?->profile_picture !== '',
+                // Avoid logging the actual picture id/public id.
+                'profile_picture_length' => is_string($authUser?->profile_picture) ? strlen($authUser->profile_picture) : null,
+            ]);
+
+            $formattedUser = null;
+            try {
+                $formattedUser = $this->formatUserResponse($authUser);
+            } catch (\Throwable $e) {
+                // Likely: format/Cloudinary/attribute access crash that currently bubbles up as a 500.
+                $this->debugLog('H2_FORMAT_USER_OR_CLOUDINARY', 'formatUserResponse threw', [
+                    'exception_class' => get_class($e),
+                    'exception_message' => $e->getMessage(),
+                ]);
+                throw $e;
+            }
+
             return response()->json([
                 'success' => true,
-                'user'    => $this->formatUserResponse(Auth::user()),
+                'user'    => $formattedUser,
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Profile fetch error: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Failed to fetch profile data'], 500);
         }
@@ -130,9 +167,27 @@ class ProfileController extends Controller
     private function formatUserResponse($user)
     {
         // ── Generate profile picture URL from Cloudinary public_id ────────
-        $profilePicture = $user->profile_picture
-            ? cloudinary()->getUrl($user->profile_picture)
-            : 'https://ui-avatars.com/api/?name=' . urlencode($user->name . ' ' . $user->surname) . '&background=7F9CF5&color=ffffff&size=128';
+        $this->debugLog('H3_PROFILE_PICTURE_URL_BUILD', 'Building profile picture URL', [
+            'has_user' => $user !== null,
+            'has_profile_picture' => $user?->profile_picture !== null && $user?->profile_picture !== '',
+        ]);
+
+        $profilePicture = null;
+        if ($user->profile_picture) {
+            try {
+                $profilePicture = cloudinary()->getUrl($user->profile_picture);
+            } catch (\Throwable $e) {
+                $this->debugLog('H4_CLOUDINARY_GETURL', 'cloudinary()->getUrl threw', [
+                    'exception_class' => get_class($e),
+                    'exception_message' => $e->getMessage(),
+                    // Avoid logging the actual profile_picture id/public id.
+                    'profile_picture_length' => is_string($user?->profile_picture) ? strlen($user->profile_picture) : null,
+                ]);
+                throw $e;
+            }
+        } else {
+            $profilePicture = 'https://ui-avatars.com/api/?name=' . urlencode($user->name . ' ' . $user->surname) . '&background=7F9CF5&color=ffffff&size=128';
+        }
 
         return [
             'id'                => $user->id,

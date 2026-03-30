@@ -270,6 +270,41 @@ const loadUserProfile = async () => {
     const token =
       localStorage.getItem("token") || localStorage.getItem("auth_token");
     if (token) {
+      // #region agent log
+      fetch(
+        "http://127.0.0.1:7867/ingest/e7384a0f-ecb0-4584-9186-0923dc335670",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Session-Id": "0e8f77",
+          },
+          body: JSON.stringify({
+            sessionId: "0e8f77",
+            runId: "pre-fix",
+            hypothesisId: "H5_TOKEN_SOURCE",
+            location: "frontend/src/layouts/NavHeader.vue:loadUserProfile",
+            message: "loadUserProfile token state",
+            data: {
+              has_local_token_key: !!localStorage.getItem("token"),
+              has_auth_token_key: !!localStorage.getItem("auth_token"),
+              has_employee_token_key: !!localStorage.getItem("employee_token"),
+              token_source: localStorage.getItem("token")
+                ? "token"
+                : localStorage.getItem("auth_token")
+                  ? "auth_token"
+                  : null,
+              token_looks_like_bearer: typeof token === "string"
+                ? token.startsWith("Bearer ")
+                : null,
+              token_length: typeof token === "string" ? token.length : null,
+            },
+            timestamp: Date.now(),
+          }),
+        },
+      ).catch(() => {});
+      // #endregion
+
       const response = await api.get("profile/user-profile", {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -283,6 +318,34 @@ const loadUserProfile = async () => {
     }
   } catch (error) {
     console.error("Error loading user profile:", error);
+    // #region agent log
+    fetch(
+      "http://127.0.0.1:7867/ingest/e7384a0f-ecb0-4584-9186-0923dc335670",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "0e8f77",
+        },
+        body: JSON.stringify({
+          sessionId: "0e8f77",
+          runId: "pre-fix",
+          hypothesisId: "H6_PROFILE_500_DETAILS",
+          location: "frontend/src/layouts/NavHeader.vue:loadUserProfile",
+          message: "loadUserProfile request failed",
+          data: {
+            status: error?.response?.status ?? null,
+            backend_success_flag: error?.response?.data?.success ?? null,
+            backend_message:
+              error?.response?.data?.message ?? null,
+            backend_path: error?.response?.config?.url ?? null,
+          },
+          timestamp: Date.now(),
+        }),
+      },
+    ).catch(() => {});
+    // #endregion
+
     if (user.value) {
       userProfile.value = {
         name: user.value.name,
