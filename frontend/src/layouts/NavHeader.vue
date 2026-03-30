@@ -283,6 +283,7 @@ const loadUserProfile = async () => {
     }
   } catch (error) {
     console.error("Error loading user profile:", error);
+
     if (user.value) {
       userProfile.value = {
         name: user.value.name,
