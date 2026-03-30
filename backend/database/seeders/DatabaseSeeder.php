@@ -9,5 +9,6 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(\Database\Seeders\AdminSeeder::class);
+        $this->call(\Database\Seeders\DepartmentRoleSeeder::class);
     }
 }
