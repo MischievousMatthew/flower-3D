@@ -100,53 +100,59 @@ class ProfileController extends Controller
     public function updateProfilePicture(Request $request)
     {
         try {
-            $user = Auth::user();
-
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized',
-                ], 401);
-            }
-
             $request->validate([
                 'profile_picture' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
             ]);
 
-            if (!$request->hasFile('profile_picture')) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No file uploaded',
-                ], 400);
+            $user = Auth::user();
+
+            if ($user->profile_picture && !str_starts_with($user->profile_picture, 'http')) {
+                try {
+                    cloudinary()->destroy($user->profile_picture);
+                } catch (\Throwable $e) {
+                    Log::warning('Cloudinary delete failed: ' . $e->getMessage());
+                }
             }
 
-            $file = $request->file('profile_picture');
+            // ── Test Cloudinary connection before uploading ────────────────
+            try {
+                $filePath = $request->file('profile_picture')->getRealPath();
 
-            $result = cloudinary()->upload($file->getPathname(), [
-                'folder' => 'profile_pictures',
-                'resource_type' => 'image',
-            ]);
+                if (!file_exists($filePath)) {
+                    return response()->json([
+                        'success' => false,
+                        'debug'   => 'File does not exist at: ' . $filePath,
+                    ], 500);
+                }
 
-            if (!$result || !$result->getPublicId()) {
-                throw new \Exception('Cloudinary upload failed');
+                $result = cloudinary()->upload($filePath, [
+                    'folder'        => 'profile_pictures',
+                    'resource_type' => 'image',
+                ]);
+
+            } catch (\Throwable $e) {
+                Log::error('Cloudinary upload failed: ' . $e->getMessage());
+                return response()->json([
+                    'success' => false,
+                    'debug'   => 'Cloudinary upload error: ' . $e->getMessage(),
+                ], 500);
             }
 
             $user->profile_picture = $result->getPublicId();
             $user->save();
 
             return response()->json([
-                'success' => true,
-                'message' => 'Profile picture updated successfully',
+                'success'         => true,
+                'message'         => 'Profile picture updated successfully',
                 'profile_picture' => $result->getSecurePath(),
+                'user'            => $this->formatUserResponse($user->fresh()),
             ]);
 
         } catch (\Throwable $e) {
-            Log::error('UPLOAD ERROR: ' . $e->getMessage());
-
+            Log::error('Profile picture upload error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to upload profile picture',
-                'error' => $e->getMessage(),
+                'debug'   => $e->getMessage(),
             ], 500);
         }
     }
