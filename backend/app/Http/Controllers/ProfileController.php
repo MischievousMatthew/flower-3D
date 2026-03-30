@@ -12,7 +12,7 @@ class ProfileController extends Controller
     private function debugLog(string $hypothesisId, string $message, array $data = []): void
     {
         // Debug logs are NDJSON lines written to the fixed session log file.
-        $logPath = dirname(__DIR__, 4) . DIRECTORY_SEPARATOR . 'debug-0e8f77.log';
+        $logPath = base_path('debug-0e8f77.log');
         $payload = [
             'sessionId' => '0e8f77',
             'runId' => 'pre-fix',
@@ -22,7 +22,12 @@ class ProfileController extends Controller
             'data' => $data,
             'timestamp' => (int) floor(microtime(true) * 1000),
         ];
-        @file_put_contents($logPath, json_encode($payload) . PHP_EOL, FILE_APPEND);
+        try {
+            file_put_contents($logPath, json_encode($payload) . PHP_EOL, FILE_APPEND);
+        } catch (\Throwable $e) {
+            // Fall back to Laravel log so we can still see evidence server-side.
+            Log::warning('DebugLog write failed: ' . $e->getMessage(), ['logPath' => $logPath]);
+        }
     }
 
     public function __construct()
@@ -33,6 +38,7 @@ class ProfileController extends Controller
     public function getProfile()
     {
         try {
+            $this->debugLog('H0_ENTER_GETPROFILE', 'entered getProfile');
             $authUser = Auth::user();
             $this->debugLog('H1_AUTH_USER_NULL', 'Auth::user() lookup', [
                 'is_null' => $authUser === null,
@@ -59,8 +65,25 @@ class ProfileController extends Controller
                 'user'    => $formattedUser,
             ]);
         } catch (\Throwable $e) {
-            Log::error('Profile fetch error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to fetch profile data'], 500);
+            $this->debugLog('H99_GETPROFILE_EXCEPTION', 'getProfile exception', [
+                'exception_class' => get_class($e),
+                'exception_message' => $e->getMessage(),
+            ]);
+
+            Log::error('Profile fetch error', [
+                'exception_class' => get_class($e),
+                'exception_message' => $e->getMessage(),
+            ]);
+
+            // Debug payload to make the failing cause visible in runtime response.
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch profile data',
+                'debug'   => [
+                    'exception_class' => get_class($e),
+                    'exception_message' => $e->getMessage(),
+                ],
+            ], 500);
         }
     }
 
