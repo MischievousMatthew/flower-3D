@@ -527,6 +527,8 @@ Route::prefix('admin')->group(function () {
     Route::put('/vendor-applications/{id}/status', [VendorApplicationController::class, 'updateStatus']);
     Route::get('/vendor-applications/export',      [VendorApplicationController::class, 'export']);
     Route::get('/vendor-applications/{id}',        [VendorApplicationController::class, 'show']);
+    Route::post('/vendor-applications/{id}/approve', [VendorApplicationController::class, 'approve']);
+    Route::post('/vendor-applications/{id}/reject',  [VendorApplicationController::class, 'reject']);
     Route::get('/test',                            [VendorApplicationController::class, 'test']);
     Route::get('/reports',                   [ProductReportController::class, 'index']);   // ← NEW
     Route::post('/reports/{id}/review',      [ProductReportController::class, 'review']); // ← NEW

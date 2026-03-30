@@ -10,25 +10,16 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
     use ResolvesOwner;
 
-    // ──────────────────────────────────────────────────────────────────────
-    // LIST endpoints (unchanged — already scope by owner_id correctly)
-    // ──────────────────────────────────────────────────────────────────────
-
     public function myProducts(Request $request)
     {
         try {
-            // Works for both vendor and employee — resolveOwnerId() returns
-            // the vendor's ID in both cases so the product list is always
-            // the vendor's catalogue, not just that employee's items.
-            $ownerId = $this->resolveOwnerId($request);
-
+            $ownerId  = $this->resolveOwnerId($request);
             $products = Product::where('owner_id', $ownerId)
                 ->where('status', 'active')
                 ->with(['primaryImage', 'images', 'models'])
@@ -100,30 +91,11 @@ class ProductController extends Controller
         }
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // STORE  ← KEY FIX: owner_id is always the vendor's ID
-    // ──────────────────────────────────────────────────────────────────────
-
-    /**
-     * Create a new product.
-     *
-     * FIX: We now call $this->resolveOwnerId($request) instead of using
-     * $request->user()->id directly.  This means:
-     *   • Vendor logs in  → owner_id = vendor's own users.id  ✅
-     *   • Employee logs in → owner_id = employees.owner_id    ✅
-     *                        (the vendor who employs them)
-     *
-     * The frontend still sends its own user id as owner_id in the form
-     * payload, but we IGNORE that value and always compute it server-side.
-     */
     public function store(Request $request)
     {
         try {
-            // ── Resolve the REAL owner id ─────────────────────────────────
             $ownerId = $this->resolveOwnerId($request);
-            // ─────────────────────────────────────────────────────────────
 
-            // Normalize occasion_tags to array
             if ($request->has('occasion_tags') && !is_array($request->occasion_tags)) {
                 $tags = json_decode($request->occasion_tags, true);
                 if (is_array($tags)) {
@@ -164,7 +136,7 @@ class ProductController extends Controller
                 'model_file'             => [
                     'nullable', 'file', 'max:51200',
                     function ($attribute, $value, $fail) {
-                        if (!in_array(strtolower($value->getClientOriginalExtension()), ['glb','gltf','obj','fbx'])) {
+                        if (!in_array(strtolower($value->getClientOriginalExtension()), ['glb', 'gltf', 'obj', 'fbx'])) {
                             $fail('Invalid 3D model format. Allowed: glb, gltf, obj, fbx.');
                         }
                     },
@@ -181,13 +153,8 @@ class ProductController extends Controller
             }
 
             $data = $validator->validated();
-
-            // ── Always override owner_id with the resolved vendor id ──────
-            // This neutralises any spoofed owner_id coming from the frontend.
             $data['owner_id'] = $ownerId;
-            // ─────────────────────────────────────────────────────────────
 
-            // Handle discount
             if (empty($data['has_discount'])) {
                 $data['has_discount']   = false;
                 $data['discount_price'] = null;
@@ -195,17 +162,23 @@ class ProductController extends Controller
 
             $product = Product::create($data);
 
+            // ── 3D Model upload to Cloudinary ─────────────────────────────
             if ($request->hasFile('model_file')) {
                 $this->handle3DModel($request->file('model_file'), $product);
             }
 
+            // ── Product image uploads to Cloudinary ───────────────────────
             if ($request->hasFile('images')) {
                 foreach ($request->file('images') as $index => $imageFile) {
-                    $path = $imageFile->store('product_images', 'public');
+                    $result = cloudinary()->upload($imageFile->getRealPath(), [
+                        'folder'       => 'product_images',
+                        'resource_type' => 'image',
+                    ]);
+
                     ProductImage::create([
                         'product_id'    => $product->id,
-                        'image_url'     => asset('storage/' . $path),
-                        'image_path'    => $path,
+                        'image_url'     => $result->getSecurePath(),
+                        'image_path'    => $result->getPublicId(),
                         'is_primary'    => $index === 0,
                         'display_order' => $index,
                     ]);
@@ -233,26 +206,16 @@ class ProductController extends Controller
         }
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // UPDATE  ← Same fix: scope to resolved owner_id
-    // ──────────────────────────────────────────────────────────────────────
-
     public function update(Request $request, $id)
     {
         try {
             $ownerId = $this->resolveOwnerId($request);
-
-            // Scope the lookup to the resolved owner so an employee cannot
-            // accidentally edit products belonging to another vendor.
-            $product = Product::where('id', $id)
-                ->where('owner_id', $ownerId)
-                ->first();
+            $product = Product::where('id', $id)->where('owner_id', $ownerId)->first();
 
             if (!$product) {
                 return response()->json(['success' => false, 'message' => 'Product not found'], 404);
             }
 
-            // Normalize occasion_tags
             if ($request->has('occasion_tags') && !is_array($request->occasion_tags)) {
                 $tags = json_decode($request->occasion_tags, true);
                 if (is_array($tags)) {
@@ -294,7 +257,7 @@ class ProductController extends Controller
                 'model_file'             => [
                     'nullable', 'file', 'max:51200',
                     function ($attribute, $value, $fail) {
-                        if (!in_array(strtolower($value->getClientOriginalExtension()), ['glb','gltf','obj','fbx'])) {
+                        if (!in_array(strtolower($value->getClientOriginalExtension()), ['glb', 'gltf', 'obj', 'fbx'])) {
                             $fail('The model file must be: glb, gltf, obj, or fbx.');
                         }
                     },
@@ -307,8 +270,8 @@ class ProductController extends Controller
 
             $data = $request->all();
 
-            // Discount resolution
-            $hasDiscount = isset($data['has_discount']) && in_array($data['has_discount'], [1, '1', true, 'true'], true);
+            $hasDiscount   = isset($data['has_discount']) && in_array($data['has_discount'], [1, '1', true, 'true'], true);
+            $discountPrice = null;
 
             if ($hasDiscount) {
                 $discountPrice = $request->input('discount_price') !== null ? (float) $request->input('discount_price') : null;
@@ -320,11 +283,9 @@ class ProductController extends Controller
                 if ($discountPrice >= $sellingPrice) {
                     return response()->json(['success' => false, 'errors' => ['discount_price' => ['Discount price must be less than the selling price.']]], 422);
                 }
-            } else {
-                $discountPrice = null;
             }
 
-            unset($data['has_discount'], $data['discount_price'], $data['owner_id']); // never allow owner_id to change
+            unset($data['has_discount'], $data['discount_price'], $data['owner_id']);
 
             $product->update($data);
 
@@ -334,37 +295,49 @@ class ProductController extends Controller
                 'updated_at'     => now(),
             ]);
 
-            // Removed images
+            // ── Delete removed images from Cloudinary ─────────────────────
             if (!empty($data['removed_image_ids'])) {
                 ProductImage::where('product_id', $product->id)
                     ->whereIn('id', $data['removed_image_ids'])
                     ->get()
                     ->each(function ($img) {
-                        if ($img->image_path && Storage::disk('public')->exists($img->image_path)) {
-                            Storage::disk('public')->delete($img->image_path);
+                        if ($img->image_path) {
+                            try {
+                                cloudinary()->destroy($img->image_path);
+                            } catch (\Exception $e) {
+                                Log::warning('Cloudinary delete failed for image: ' . $img->image_path);
+                            }
                         }
                         $img->delete();
                     });
             }
 
-            // New images
+            // ── Upload new images to Cloudinary ───────────────────────────
             if ($request->hasFile('images')) {
                 foreach ($request->file('images') as $index => $imageFile) {
-                    $path = $imageFile->store('product_images', 'public');
+                    $result = cloudinary()->upload($imageFile->getRealPath(), [
+                        'folder'        => 'product_images',
+                        'resource_type' => 'image',
+                    ]);
+
                     ProductImage::create([
                         'product_id'    => $product->id,
-                        'image_url'     => asset('storage/' . $path),
-                        'image_path'    => $path,
+                        'image_url'     => $result->getSecurePath(),
+                        'image_path'    => $result->getPublicId(),
                         'is_primary'    => false,
                         'display_order' => $product->images()->count() + $index,
                     ]);
                 }
             }
 
-            // 3D model
+            // ── Replace 3D model on Cloudinary ────────────────────────────
             if ($request->hasFile('model_file')) {
                 if ($product->model) {
-                    Storage::disk('public')->delete($product->model->model_path);
+                    try {
+                        cloudinary()->destroy($product->model->model_path, ['resource_type' => 'raw']);
+                    } catch (\Exception $e) {
+                        Log::warning('Cloudinary delete failed for model: ' . $product->model->model_path);
+                    }
                     $product->model->delete();
                 }
                 $this->handle3DModel($request->file('model_file'), $product);
@@ -380,10 +353,6 @@ class ProductController extends Controller
         }
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // Remaining methods — same pattern: replace $vendor->id with resolveOwnerId
-    // ──────────────────────────────────────────────────────────────────────
-
     public function destroy(Request $request, $id)
     {
         try {
@@ -394,16 +363,31 @@ class ProductController extends Controller
                 return response()->json(['success' => false, 'message' => 'Product not found'], 404);
             }
 
-            if ($product->model) {
-                Storage::disk('public')->delete($product->model->model_path);
+            // ── Delete 3D model from Cloudinary ───────────────────────────
+            if ($product->model && $product->model->model_path) {
+                try {
+                    cloudinary()->destroy($product->model->model_path, ['resource_type' => 'raw']);
+                } catch (\Exception $e) {
+                    Log::warning('Cloudinary delete failed for model: ' . $product->model->model_path);
+                }
                 $product->model->delete();
             }
+
+            // ── Delete all product images from Cloudinary ─────────────────
             foreach ($product->images as $image) {
-                Storage::disk('public')->delete($image->image_path);
+                if ($image->image_path) {
+                    try {
+                        cloudinary()->destroy($image->image_path);
+                    } catch (\Exception $e) {
+                        Log::warning('Cloudinary delete failed for image: ' . $image->image_path);
+                    }
+                }
             }
+
             $product->delete();
 
             return response()->json(['success' => true, 'message' => 'Product deleted successfully']);
+
         } catch (\Exception $e) {
             Log::error('Error deleting product: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Failed to delete product'], 500);
@@ -492,9 +476,15 @@ class ProductController extends Controller
                 return response()->json(['success' => false, 'message' => 'Image not found'], 404);
             }
 
-            if ($image->image_path && Storage::disk('public')->exists($image->image_path)) {
-                Storage::disk('public')->delete($image->image_path);
+            // ── Delete from Cloudinary ────────────────────────────────────
+            if ($image->image_path) {
+                try {
+                    cloudinary()->destroy($image->image_path);
+                } catch (\Exception $e) {
+                    Log::warning('Cloudinary delete failed for image: ' . $image->image_path);
+                }
             }
+
             $image->delete();
 
             return response()->json(['success' => true, 'message' => 'Image deleted successfully']);
@@ -518,9 +508,15 @@ class ProductController extends Controller
                 return response()->json(['success' => false, 'message' => '3D model not found'], 404);
             }
 
-            if ($product->model->model_path && Storage::disk('public')->exists($product->model->model_path)) {
-                Storage::disk('public')->delete($product->model->model_path);
+            // ── Delete from Cloudinary ────────────────────────────────────
+            if ($product->model->model_path) {
+                try {
+                    cloudinary()->destroy($product->model->model_path, ['resource_type' => 'raw']);
+                } catch (\Exception $e) {
+                    Log::warning('Cloudinary delete failed for model: ' . $product->model->model_path);
+                }
             }
+
             $product->model->delete();
 
             return response()->json(['success' => true, 'message' => '3D model deleted successfully']);
@@ -563,20 +559,24 @@ class ProductController extends Controller
         }
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // Private helpers
-    // ──────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // Private helper — upload 3D model to Cloudinary as raw resource
+    // ─────────────────────────────────────────────────────────────────────
 
     private function handle3DModel($file, Product $product): void
     {
-        $extension = $file->getClientOriginalExtension();
-        $filename  = Str::uuid() . '.' . $extension;
-        $path      = $file->storeAs('product_models', $filename, 'public');
+        $extension = strtolower($file->getClientOriginalExtension());
+        $publicId  = 'product_models/' . Str::uuid() . '.' . $extension;
+
+        $result = cloudinary()->upload($file->getRealPath(), [
+            'public_id'     => $publicId,
+            'resource_type' => 'raw',
+        ]);
 
         ProductModel::create([
             'product_id' => $product->id,
-            'model_url'  => asset('storage/' . $path),
-            'model_path' => $path,
+            'model_url'  => $result->getSecurePath(),
+            'model_path' => $result->getPublicId(),
             'model_type' => $extension,
             'file_size'  => $file->getSize(),
             'metadata'   => [

@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 class ProfileController extends Controller
 {
@@ -20,14 +19,11 @@ class ProfileController extends Controller
         try {
             return response()->json([
                 'success' => true,
-                'user' => $this->formatUserResponse(Auth::user())
+                'user'    => $this->formatUserResponse(Auth::user()),
             ]);
         } catch (\Exception $e) {
             Log::error('Profile fetch error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch profile data'
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Failed to fetch profile data'], 500);
         }
     }
 
@@ -35,7 +31,7 @@ class ProfileController extends Controller
     {
         try {
             $user = Auth::user();
-            
+
             $validated = $request->validate([
                 'name'           => 'sometimes|string|max:255',
                 'surname'        => 'sometimes|string|max:255',
@@ -49,18 +45,28 @@ class ProfileController extends Controller
                 'contact_number' => 'nullable|digits:11',
             ]);
 
+            // ── Upload new profile picture to Cloudinary ───────────────────
             if ($request->hasFile('profile_picture')) {
+                // Delete old picture from Cloudinary if it exists
                 if ($user->profile_picture) {
-                    Storage::delete($user->profile_picture);
+                    try {
+                        cloudinary()->destroy($user->profile_picture);
+                    } catch (\Exception $e) {
+                        Log::warning('Cloudinary delete failed for profile picture: ' . $user->profile_picture);
+                    }
                 }
-                
-                $path = $request->file('profile_picture')->store('profile-pictures', 'public');
-                $validated['profile_picture'] = $path;
+
+                $result = cloudinary()->upload($request->file('profile_picture')->getRealPath(), [
+                    'folder'        => 'profile_pictures',
+                    'resource_type' => 'image',
+                ]);
+
+                $validated['profile_picture'] = $result->getPublicId();
             }
 
             if ($request->has('full_name')) {
-                $nameParts = explode(' ', $request->full_name, 2);
-                $validated['name'] = $nameParts[0];
+                $nameParts         = explode(' ', $request->full_name, 2);
+                $validated['name']    = $nameParts[0];
                 $validated['surname'] = $nameParts[1] ?? '';
                 unset($validated['full_name']);
             }
@@ -70,19 +76,14 @@ class ProfileController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Profile updated successfully',
-                'user' => $this->formatUserResponse($user->fresh())
+                'user'    => $this->formatUserResponse($user->fresh()),
             ]);
+
         } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'errors' => $e->errors()
-            ], 422);
+            return response()->json(['success' => false, 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             Log::error('Profile update error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update profile'
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Failed to update profile'], 500);
         }
     }
 
@@ -94,55 +95,66 @@ class ProfileController extends Controller
             ]);
 
             $user = Auth::user();
-            
+
+            // ── Delete old picture from Cloudinary ────────────────────────
             if ($user->profile_picture) {
-                Storage::delete($user->profile_picture);
+                try {
+                    cloudinary()->destroy($user->profile_picture);
+                } catch (\Exception $e) {
+                    Log::warning('Cloudinary delete failed: ' . $user->profile_picture);
+                }
             }
-            
-            $path = $request->file('profile_picture')->store('profile-pictures', 'public');
-            $user->profile_picture = $path;
+
+            // ── Upload new picture to Cloudinary ──────────────────────────
+            $result = cloudinary()->upload($request->file('profile_picture')->getRealPath(), [
+                'folder'        => 'profile_pictures',
+                'resource_type' => 'image',
+            ]);
+
+            $user->profile_picture = $result->getPublicId();
             $user->save();
 
             return response()->json([
-                'success' => true,
-                'message' => 'Profile picture updated successfully',
-                'profile_picture' => Storage::url($path),
-                'user' => $this->formatUserResponse($user->fresh())
+                'success'         => true,
+                'message'         => 'Profile picture updated successfully',
+                'profile_picture' => $result->getSecurePath(),
+                'user'            => $this->formatUserResponse($user->fresh()),
             ]);
+
         } catch (\Exception $e) {
             Log::error('Profile picture upload error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to upload profile picture'
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Failed to upload profile picture'], 500);
         }
     }
 
     private function formatUserResponse($user)
     {
+        // ── Generate profile picture URL from Cloudinary public_id ────────
+        $profilePicture = $user->profile_picture
+            ? cloudinary()->getUrl($user->profile_picture)
+            : 'https://ui-avatars.com/api/?name=' . urlencode($user->name . ' ' . $user->surname) . '&background=7F9CF5&color=ffffff&size=128';
+
         return [
-            'id' => $user->id,
-            'name' => $user->name,
-            'surname' => $user->surname,
-            'username' => $user->username,
-            'email' => $user->email,
-            'contact_number' => $user->contact_number,
-            'is_verified' => $user->is_verified,
-            'role' => $user->role,
-            'vendor_data' => $user->vendor_data,
+            'id'                => $user->id,
+            'name'              => $user->name,
+            'surname'           => $user->surname,
+            'username'          => $user->username,
+            'email'             => $user->email,
+            'contact_number'    => $user->contact_number,
+            'is_verified'       => $user->is_verified,
+            'role'              => $user->role,
+            'vendor_data'       => $user->vendor_data,
             'email_verified_at' => $user->email_verified_at,
-            'created_at' => $user->created_at,
-            'updated_at' => $user->updated_at,
-            'date_of_birth' => $user->date_of_birth,
-            'gender' => $user->gender,
-            'nationality' => $user->nationality,
-            'address' => $user->address,
-            'city' => $user->city,
-            'postal_code' => $user->postal_code,
-            'profile_picture' => $user->profile_picture 
-                ? Storage::url($user->profile_picture) 
-                : 'https://ui-avatars.com/api/?name=' . urlencode($user->name . ' ' . $user->surname) . '&background=7F9CF5&color=ffffff&size=128',
-            'plan' => $user->plan,
+            'created_at'        => $user->created_at,
+            'updated_at'        => $user->updated_at,
+            'date_of_birth'     => $user->date_of_birth,
+            'gender'            => $user->gender,
+            'nationality'       => $user->nationality,
+            'address'           => $user->address,
+            'city'              => $user->city,
+            'postal_code'       => $user->postal_code,
+            'profile_picture'   => $profilePicture,
+            'plan'              => $user->plan,
         ];
     }
 }

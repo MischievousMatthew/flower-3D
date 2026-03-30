@@ -133,137 +133,137 @@ class VendorApplicationController extends Controller
      * Update application status
      */
     public function updateStatus(Request $request, $id)
-{
-    try {
-        Log::info('Updating application status', ['id' => $id, 'status' => $request->status]);
-        
-        $validated = $request->validate([
-            'status' => 'required|in:pending,approved,rejected,under_review',
-            'rejection_reason' => 'nullable|string|max:1000',
-        ]);
-
-        $application = VendorApplication::findOrFail($id);
-        
-        $updateData = [
-            'status' => $validated['status'],
-            'reviewed_at' => now(),
-            'reviewed_by' => auth()->id() ?? 1,
-        ];
-
-        if (isset($validated['rejection_reason'])) {
-            $updateData['rejection_reason'] = $validated['rejection_reason'];
-        }
-
-        if ($validated['status'] === 'approved') {
-            $updateData['verification_level'] = 'verified';
+    {
+        try {
+            Log::info('Updating application status', ['id' => $id, 'status' => $request->status]);
             
-            // Create user account for the vendor
-            $this->createVendorAccount($application);
-        }
+            $validated = $request->validate([
+                'status' => 'required|in:pending,approved,rejected,under_review',
+                'rejection_reason' => 'nullable|string|max:1000',
+            ]);
 
-        $application->update($updateData);
-
-        return response()->json([
-            'message' => 'Application status updated successfully',
-            'application' => $application
-        ]);
-        
-    } catch (\Exception $e) {
-        Log::error('Error updating application status', [
-            'id' => $id,
-            'error' => $e->getMessage()
-        ]);
-        
-        return response()->json([
-            'error' => 'Failed to update status',
-            'message' => $e->getMessage()
-        ], 500);
-    }
-}
-
-/**
- * Create a user account for the approved vendor
- */
-private function createVendorAccount($application)
-{
-    try {
-        // Check if user already exists with this email
-        $existingUser = User::where('email', $application->email)->first();
-        
-        $user = null;
-        $password = null;
-        $isExistingUser = false;
-        
-        if ($existingUser) {
-            // Update existing user to be a vendor
-            $existingUser->role = 'vendor';
-            $existingUser->save();
-            $user = $existingUser;
-            $isExistingUser = true;
-        } else {
-            // Generate a random password
-            $password = Str::random(12);
+            $application = VendorApplication::findOrFail($id);
             
-            // Create username from email (remove @ and everything after)
-            $username = explode('@', $application->email)[0];
-            
-            // Check if username already exists, if yes append numbers
-            $originalUsername = $username;
-            $counter = 1;
-            while (User::where('username', $username)->exists()) {
-                $username = $originalUsername . $counter;
-                $counter++;
+            $updateData = [
+                'status' => $validated['status'],
+                'reviewed_at' => now(),
+                'reviewed_by' => auth()->id() ?? 1,
+            ];
+
+            if (isset($validated['rejection_reason'])) {
+                $updateData['rejection_reason'] = $validated['rejection_reason'];
             }
-            
-            // Split owner_name into name and surname if possible
-            $ownerName = $application->owner_name;
-            $nameParts = explode(' ', trim($ownerName));
-            
-            if (count($nameParts) >= 2) {
-                $surname = array_pop($nameParts); // Last part as surname
-                $name = implode(' ', $nameParts); // Rest as first name
-            } else {
-                // If only one name, use it as first name and empty surname
-                $name = $ownerName;
-                $surname = '';
+
+            if ($validated['status'] === 'approved') {
+                $updateData['verification_level'] = 'verified';
+                
+                // Create user account for the vendor
+                $this->createVendorAccount($application);
             }
-            
-            // Create new user
-            $user = User::create([
-                'name' => $name,
-                'surname' => $surname,
-                'username' => $username,
-                'email' => $application->email,
-                'contact_number' => $application->contact_number,
-                'password' => Hash::make($password),
-                'is_verified' => true,
-                'role' => 'vendor',
-                'vendor_data' => [ // Add this field if your users table has it
-                    'store_name' => $application->store_name,
-                    'application_id' => $application->id,
-                    'approved_at' => now()->toDateTimeString(),
-                    'needs_password_change' => true,
-                ]
+
+            $application->update($updateData);
+
+            return response()->json([
+                'message' => 'Application status updated successfully',
+                'application' => $application
             ]);
             
-            // Link the user to the vendor application (if you have a user_id column)
-            $application->update(['user_id' => $user->id]);
+        } catch (\Exception $e) {
+            Log::error('Error updating application status', [
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+            
+            return response()->json([
+                'error' => 'Failed to update status',
+                'message' => $e->getMessage()
+            ], 500);
         }
-        
-        // Send email in background (don't let email failure stop approval)
-        $this->sendVendorWelcomeEmail($application, $password, $isExistingUser);
-        
-        return $user;
-        
-    } catch (\Exception $e) {
-        Log::error('Error creating vendor account', [
-            'application_id' => $application->id,
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-        throw $e;
     }
-}
+
+    /**
+     * Create a user account for the approved vendor
+     */
+    private function createVendorAccount($application)
+    {
+        try {
+            // Check if user already exists with this email
+            $existingUser = User::where('email', $application->email)->first();
+            
+            $user = null;
+            $password = null;
+            $isExistingUser = false;
+            
+            if ($existingUser) {
+                // Update existing user to be a vendor
+                $existingUser->role = 'vendor';
+                $existingUser->save();
+                $user = $existingUser;
+                $isExistingUser = true;
+            } else {
+                // Generate a random password
+                $password = Str::random(12);
+                
+                // Create username from email (remove @ and everything after)
+                $username = explode('@', $application->email)[0];
+                
+                // Check if username already exists, if yes append numbers
+                $originalUsername = $username;
+                $counter = 1;
+                while (User::where('username', $username)->exists()) {
+                    $username = $originalUsername . $counter;
+                    $counter++;
+                }
+                
+                // Split owner_name into name and surname if possible
+                $ownerName = $application->owner_name;
+                $nameParts = explode(' ', trim($ownerName));
+                
+                if (count($nameParts) >= 2) {
+                    $surname = array_pop($nameParts); // Last part as surname
+                    $name = implode(' ', $nameParts); // Rest as first name
+                } else {
+                    // If only one name, use it as first name and empty surname
+                    $name = $ownerName;
+                    $surname = '';
+                }
+                
+                // Create new user
+                $user = User::create([
+                    'name' => $name,
+                    'surname' => $surname,
+                    'username' => $username,
+                    'email' => $application->email,
+                    'contact_number' => $application->contact_number,
+                    'password' => Hash::make($password),
+                    'is_verified' => true,
+                    'role' => 'vendor',
+                    'vendor_data' => [ // Add this field if your users table has it
+                        'store_name' => $application->store_name,
+                        'application_id' => $application->id,
+                        'approved_at' => now()->toDateTimeString(),
+                        'needs_password_change' => true,
+                    ]
+                ]);
+                
+                // Link the user to the vendor application (if you have a user_id column)
+                $application->update(['user_id' => $user->id]);
+            }
+            
+            // Send email in background (don't let email failure stop approval)
+            $this->sendVendorWelcomeEmail($application, $password, $isExistingUser);
+            
+            return $user;
+            
+        } catch (\Exception $e) {
+            Log::error('Error creating vendor account', [
+                'application_id' => $application->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+    }
 
 /**
  * Send welcome email to vendor (in background, don't block approval)
@@ -306,6 +306,90 @@ private function createVendorAccount($application)
             return response()->json([
                 'error' => 'Application not found'
             ], 404);
+        }
+    }
+
+    /**
+     * Approve a vendor application (dedicated endpoint)
+     */
+    public function approve(Request $request, $id)
+    {
+        try {
+            $application = VendorApplication::findOrFail($id);
+
+            if ($application->status !== 'pending') {
+                return response()->json([
+                    'message' => 'Application is not in pending status.'
+                ], 422);
+            }
+
+            $this->createVendorAccount($application);
+
+            $application->update([
+                'status'             => 'approved',
+                'verification_level' => 'verified',
+                'reviewed_at'        => now(),
+                'reviewed_by'        => auth()->id(),
+            ]);
+
+            return response()->json([
+                'message'     => 'Vendor application approved successfully!',
+                'application' => $application->fresh(),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error approving application', [
+                'id'    => $id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error'   => 'Failed to approve application',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Reject a vendor application (dedicated endpoint)
+     */
+    public function reject(Request $request, $id)
+    {
+        try {
+            $validated = $request->validate([
+                'rejection_reason' => 'required|string|min:10|max:1000',
+            ]);
+
+            $application = VendorApplication::findOrFail($id);
+
+            if ($application->status !== 'pending') {
+                return response()->json([
+                    'message' => 'Application is not in pending status.'
+                ], 422);
+            }
+
+            $application->update([
+                'status'           => 'rejected',
+                'rejection_reason' => $validated['rejection_reason'],
+                'reviewed_at'      => now(),
+                'reviewed_by'      => auth()->id(),
+            ]);
+
+            return response()->json([
+                'message'     => 'Vendor application rejected successfully!',
+                'application' => $application->fresh(),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error rejecting application', [
+                'id'    => $id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error'   => 'Failed to reject application',
+                'message' => $e->getMessage(),
+            ], 500);
         }
     }
 

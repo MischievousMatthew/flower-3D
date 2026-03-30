@@ -228,21 +228,25 @@ class ChatController extends Controller
             $attachments = [];
             $messageText = trim($request->input('message', ''));
             
-            // Handle file uploads
+            // ── Handle file uploads to Cloudinary ────────────────────────────────
             if ($request->hasFile('attachments')) {
                 foreach ($request->file('attachments') as $file) {
                     if ($file->isValid()) {
-                        $filename = time() . '_' . Str::random(10) . '.' . $file->getClientOriginalExtension();
-                        $path = $file->storeAs('chat/attachments/' . date('Y/m'), $filename, 'public');
-                        
-                        if ($path) {
+                        try {
+                            $result = cloudinary()->upload($file->getRealPath(), [
+                                'folder'        => 'chat/attachments/' . date('Y/m'),
+                                'resource_type' => 'auto',
+                            ]);
+
                             $attachments[] = [
-                                'url' => asset('storage/' . $path),
+                                'url'  => $result->getSecurePath(),
                                 'name' => $file->getClientOriginalName(),
                                 'type' => $file->getMimeType(),
                                 'size' => $file->getSize(),
-                                'path' => $path,
+                                'path' => $result->getPublicId(),
                             ];
+                        } catch (\Exception $e) {
+                            Log::warning('Cloudinary chat attachment upload failed: ' . $e->getMessage());
                         }
                     }
                 }
