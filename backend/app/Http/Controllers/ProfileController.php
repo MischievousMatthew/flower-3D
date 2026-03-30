@@ -106,12 +106,11 @@ class ProfileController extends Controller
 
             $user = Auth::user();
 
-            // Only destroy if it's a Cloudinary public_id (not a full URL)
             if ($user->profile_picture && !str_starts_with($user->profile_picture, 'http')) {
                 try {
                     cloudinary()->destroy($user->profile_picture);
                 } catch (\Throwable $e) {
-                    Log::warning('Cloudinary delete failed: ' . $user->profile_picture);
+                    Log::warning('Cloudinary delete failed: ' . $e->getMessage());
                 }
             }
 
@@ -131,8 +130,13 @@ class ProfileController extends Controller
             ]);
 
         } catch (\Throwable $e) {
-            Log::error('Profile picture upload error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to upload profile picture'], 500);
+            // TEMPORARY — exposes the real error so you can diagnose
+            Log::error('Profile picture upload error: ' . $e->getMessage() . ' | ' . $e->getTraceAsString());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to upload profile picture',
+                'debug'   => $e->getMessage(), // ← remove this after fixing
+            ], 500);
         }
     }
 
