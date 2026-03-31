@@ -775,14 +775,32 @@
       <div class="modal-content document-viewer" @click.stop>
         <div class="modal-header">
           <h2>Document Viewer</h2>
-          <button class="btn-close" @click="closeDocumentViewer">✕</button>
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <a 
+              v-if="currentDocument" 
+              :href="currentDocument" 
+              target="_blank" 
+              class="btn-action-sm btn-approve"
+              style="width: auto; padding: 4px 12px; font-size: 13px; text-decoration: none; border-radius: 6px; white-space: nowrap;"
+            >
+              Open in New Tab ↗
+            </a>
+            <button class="btn-close" @click="closeDocumentViewer">✕</button>
+          </div>
         </div>
         <div class="modal-body">
+          <iframe 
+            v-if="currentDocument && (currentDocument.toLowerCase().includes('.pdf') || currentDocument.toLowerCase().includes('/raw/'))"
+            :src="currentDocument"
+            class="document-image"
+            style="min-height: 60vh; border: none; width: 100%;"
+          ></iframe>
           <img
-            v-if="currentDocument"
+            v-else-if="currentDocument"
             :src="currentDocument"
             alt="Document"
             class="document-image"
+            @error="console.error('Image failed to load:', currentDocument)"
           />
           <div v-else class="no-document">
             <p>Document not found or could not be loaded</p>
