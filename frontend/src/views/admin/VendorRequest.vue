@@ -541,7 +541,16 @@
                 </div>
                 <div class="detail-item">
                   <label>Price Range</label>
-                  <p>{{ selectedApplication.price_range || "N/A" }}</p>
+                  <p>
+                    {{
+                      selectedApplication.formatted_price_range ||
+                      formatPriceRange(
+                        selectedApplication.price_min,
+                        selectedApplication.price_max,
+                      ) ||
+                      "N/A"
+                    }}
+                  </p>
                 </div>
                 <div class="detail-item">
                   <label>Same-Day Delivery</label>
@@ -556,8 +565,16 @@
                   </p>
                 </div>
                 <div class="detail-item">
-                  <label>Order Cut-Off Time</label>
-                  <p>{{ selectedApplication.order_cutoff || "N/A" }}</p>
+                  <label>Order Cutoff Times</label>
+                  <div v-if="selectedApplication.cutoff_times?.length">
+                    <p
+                      v-for="(cutoff, idx) in selectedApplication.cutoff_times"
+                      :key="idx"
+                    >
+                      {{ formatCutoffTime(cutoff) }}
+                    </p>
+                  </div>
+                  <p v-else>N/A</p>
                 </div>
               </div>
             </section>
@@ -1203,6 +1220,29 @@ const formatProductTypes = (productTypes) => {
   } catch (e) {
     return productTypes;
   }
+};
+
+const formatPriceRange = (min, max) => {
+  if (min === null || min === undefined || max === null || max === undefined)
+    return null;
+  const minNum = Number(min);
+  const maxNum = Number(max);
+  if (!Number.isFinite(minNum) || !Number.isFinite(maxNum)) return null;
+  const fmt = (n) =>
+    `₱${n.toLocaleString("en-PH", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  return `${fmt(minNum)} - ${fmt(maxNum)}`;
+};
+
+const formatCutoffTime = (cutoff) => {
+  if (!cutoff) return "N/A";
+  const day = cutoff.day || cutoff.Day || cutoff.weekday || cutoff.weekDay;
+  const time = cutoff.time || cutoff.Time || cutoff.cutoff || cutoff.cutoff_time;
+  if (!day && !time) return "N/A";
+  if (day && time) return `${day}: ${time}`;
+  return String(day || time);
 };
 
 const formatDate = (dateString) => {
