@@ -196,13 +196,26 @@ class ProductController extends Controller
                     : 'Product published successfully',
             ], 201);
 
-        } catch (\Exception $e) {
-            Log::error('Error creating product: ' . $e->getMessage());
-            Log::error($e->getTraceAsString());
+        } catch (\Throwable $e) {
+            $errorId = (string) Str::uuid();
+
+            Log::error('Error creating product', [
+                'error_id' => $errorId,
+                'message'  => $e->getMessage(),
+                'type'     => get_class($e),
+                'trace'    => $e->getTraceAsString(),
+                'user_id'  => $request->user()?->id,
+            ]);
+
             return response()->json([
-                'success' => false,
-                'message' => 'Failed to create product',
-                'error'   => config('app.debug') ? $e->getMessage() : null,
+                'success'  => false,
+                'message'  => 'Failed to create product',
+                'error_id' => $errorId,
+                // Include details only in debug to avoid leaking internals
+                'error'    => config('app.debug') ? [
+                    'type'    => get_class($e),
+                    'message' => $e->getMessage(),
+                ] : null,
             ], 500);
         }
     }

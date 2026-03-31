@@ -12,7 +12,7 @@ export function useInactivityTimeout(timeoutMinutes = 15) {
   const resetTimer = () => {
     if (!isAuthenticated.value) return;
 
-    localStorage.setItem('last_activity', Date.now().toString());
+    localStorage.setItem("last_activity", Date.now().toString());
 
     if (activityTimer) clearTimeout(activityTimer);
     activityTimer = setTimeout(handleInactivity, timeoutMs);
@@ -22,15 +22,22 @@ export function useInactivityTimeout(timeoutMinutes = 15) {
     if (!isAuthenticated.value) return;
 
     // Before logging out, double check if another tab was active recently
-    const lastActivity = parseInt(localStorage.getItem('last_activity') || '0', 10);
+    const lastActivity = parseInt(
+      localStorage.getItem("last_activity") || "0",
+      10,
+    );
     const now = Date.now();
 
     if (now - lastActivity >= timeoutMs) {
       // It's definitely expired!
-      console.log('User inactive for', timeoutMinutes, 'minutes. Logging out for security.');
+      console.log(
+        "User inactive for",
+        timeoutMinutes,
+        "minutes. Logging out for security.",
+      );
 
       // Clear activity
-      localStorage.removeItem('last_activity');
+      localStorage.removeItem("last_activity");
 
       // We must clear the timer to avoid infinite loops
       if (activityTimer) clearTimeout(activityTimer);
@@ -39,7 +46,9 @@ export function useInactivityTimeout(timeoutMinutes = 15) {
       await logout();
 
       // Show expiration alert
-      toast.error('Session expired due to inactivity. Please log in again.', { autoClose: 6000 });
+      toast.warning("Session expired due to inactivity. Please log in again.", {
+        autoClose: 6000,
+      });
     } else {
       // Another tab was active! Reset the timer relative to that tab's last activity
       const remainingTime = timeoutMs - (now - lastActivity);
@@ -49,10 +58,17 @@ export function useInactivityTimeout(timeoutMinutes = 15) {
   };
 
   const checkOnVisible = () => {
-    if (document.visibilityState === 'visible') {
+    if (document.visibilityState === "visible") {
       // Tab became active, check if we expired while it was hidden
-      const lastActivity = parseInt(localStorage.getItem('last_activity') || '0', 10);
-      if (isAuthenticated.value && lastActivity > 0 && (Date.now() - lastActivity >= timeoutMs)) {
+      const lastActivity = parseInt(
+        localStorage.getItem("last_activity") || "0",
+        10,
+      );
+      if (
+        isAuthenticated.value &&
+        lastActivity > 0 &&
+        Date.now() - lastActivity >= timeoutMs
+      ) {
         handleInactivity();
       }
     }
@@ -60,31 +76,46 @@ export function useInactivityTimeout(timeoutMinutes = 15) {
 
   const setupListeners = () => {
     // Standard activity events
-    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
-    events.forEach(event => {
+    const events = [
+      "mousemove",
+      "mousedown",
+      "keydown",
+      "touchstart",
+      "scroll",
+    ];
+    events.forEach((event) => {
       // Add passive listener for better performance
       window.addEventListener(event, resetTimer, { passive: true });
     });
 
     // Handle tab visibility change (e.g., returning to tab after an hour)
-    document.addEventListener('visibilitychange', checkOnVisible);
+    document.addEventListener("visibilitychange", checkOnVisible);
 
     // Check every minute just in case the browser throttles timeouts
     storageCheckTimer = setInterval(() => {
       if (!isAuthenticated.value) return;
-      const lastActivity = parseInt(localStorage.getItem('last_activity') || '0', 10);
-      if (lastActivity > 0 && (Date.now() - lastActivity >= timeoutMs)) {
+      const lastActivity = parseInt(
+        localStorage.getItem("last_activity") || "0",
+        10,
+      );
+      if (lastActivity > 0 && Date.now() - lastActivity >= timeoutMs) {
         handleInactivity();
       }
     }, 60000);
   };
 
   const cleanupListeners = () => {
-    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
-    events.forEach(event => {
+    const events = [
+      "mousemove",
+      "mousedown",
+      "keydown",
+      "touchstart",
+      "scroll",
+    ];
+    events.forEach((event) => {
       window.removeEventListener(event, resetTimer);
     });
-    document.removeEventListener('visibilitychange', checkOnVisible);
+    document.removeEventListener("visibilitychange", checkOnVisible);
 
     if (activityTimer) clearTimeout(activityTimer);
     if (storageCheckTimer) clearInterval(storageCheckTimer);
