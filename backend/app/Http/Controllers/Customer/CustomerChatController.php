@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use App\Helpers\CloudinaryHelper;
 
 class CustomerChatController extends Controller
 {
@@ -109,7 +110,7 @@ class CustomerChatController extends Controller
                 ? $conversation->sharedFiles()->orderBy('created_at', 'desc')->limit(10)->get()
                     ->map(fn($file) => [
                         'name' => $file->file_name,
-                        'url' => asset('storage/' . $file->file_path),
+                        'url' => CloudinaryHelper::getUrl($file->file_path, 'auto'),
                         'type' => $file->file_type,
                         'size' => $this->formatFileSize($file->file_size),
                         'icon' => $this->getFileIcon($file->file_type),

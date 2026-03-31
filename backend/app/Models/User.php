@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Helpers\CloudinaryHelper;
 
 class User extends Authenticatable
 {
@@ -68,12 +69,7 @@ class User extends Authenticatable
         }
 
         // Cloudinary public_id — generate URL
-        try {
-            return cloudinary()->getUrl($this->profile_picture);
-        } catch (\Throwable $e) {
-            return 'https://ui-avatars.com/api/?name=' . urlencode($this->full_name)
-                . '&background=7F9CF5&color=ffffff&size=128';
-        }
+        return CloudinaryHelper::getUrl($this->profile_picture);
     }
 
     protected function getIsOnlineAttribute(): bool

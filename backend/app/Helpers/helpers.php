@@ -1,20 +1,12 @@
 <?php
 
-use Illuminate\Support\Facades\Storage;
+use App\Helpers\CloudinaryHelper;
+
 
 if (!function_exists('storage_url')) {
     function storage_url($path)
     {
-        if (!$path) {
-            return null;
-        }
-        
-        // If it's already a full URL, return as is
-        if (filter_var($path, FILTER_VALIDATE_URL)) {
-            return $path;
-        }
-        
-        return Storage::url($path);
+        return CloudinaryHelper::getUrl($path);
     }
 }
 

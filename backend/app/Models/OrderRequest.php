@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
+use App\Helpers\CloudinaryHelper;
 
 class OrderRequest extends Model
 {
@@ -32,9 +32,10 @@ class OrderRequest extends Model
     public function getMediaUrlAttribute(): ?string
     {
         return $this->media_path
-            ? Storage::url($this->media_path)
+            ? CloudinaryHelper::getUrl($this->media_path, $this->media_type === 'image' ? 'image' : 'raw')
             : null;
     }
+
 
     public function isPending(): bool  { return $this->status === 'pending';  }
     public function isApproved(): bool { return $this->status === 'approved'; }

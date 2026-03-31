@@ -243,8 +243,6 @@ const logoFile = ref(null);
 
 const statusOptions = [
   { label: "Active", value: "active" },
-  { label: "Inactive", value: "inactive" },
-  { label: "Blacklisted", value: "blacklisted" },
 ];
 
 const form = reactive({

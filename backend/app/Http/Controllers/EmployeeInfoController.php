@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
+use App\Helpers\CloudinaryHelper;
 use Illuminate\Support\Facades\Validator;
 
 use App\Traits\ScopesOwner;
@@ -225,10 +225,13 @@ class EmployeeInfoController extends Controller
             $avatarPath = null;
             if ($request->hasFile('avatar') && $request->file('avatar')->isValid()) {
                 try {
-                    $avatarPath = $request->file('avatar')->store('avatars', 'public');
-                    Log::info('Avatar stored successfully:', ['path' => $avatarPath]);
+                    $result = CloudinaryHelper::upload($request->file('avatar')->getRealPath(), [
+                        'folder' => 'avatars'
+                    ]);
+                    $avatarPath = $result['public_id'];
+                    Log::info('Avatar stored successfully to Cloudinary:', ['path' => $avatarPath]);
                 } catch (\Exception $e) {
-                    Log::error('Avatar upload failed:', ['error' => $e->getMessage()]);
+                    Log::error('Avatar upload to Cloudinary failed:', ['error' => $e->getMessage()]);
                 }
             }
 
@@ -466,14 +469,17 @@ class EmployeeInfoController extends Controller
             $avatarPath = null;
             if ($request->hasFile('avatar') && $request->file('avatar')->isValid()) {
                 try {
-                    if ($employeeInfo->avatar && Storage::disk('public')->exists($employeeInfo->avatar)) {
-                        Storage::disk('public')->delete($employeeInfo->avatar);
+                    if ($employeeInfo->avatar) {
+                        CloudinaryHelper::destroy($employeeInfo->avatar);
                     }
                     
-                    $avatarPath = $request->file('avatar')->store('avatars', 'public');
-                    Log::info('Avatar uploaded successfully for update:', ['path' => $avatarPath]);
+                    $result = CloudinaryHelper::upload($request->file('avatar')->getRealPath(), [
+                        'folder' => 'avatars'
+                    ]);
+                    $avatarPath = $result['public_id'];
+                    Log::info('Avatar uploaded successfully to Cloudinary for update:', ['path' => $avatarPath]);
                 } catch (\Exception $e) {
-                    Log::error('Avatar upload failed during update:', ['error' => $e->getMessage()]);
+                    Log::error('Avatar upload to Cloudinary failed during update:', ['error' => $e->getMessage()]);
                 }
             }
 

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use App\Helpers\CloudinaryHelper;
 
 class ChatController extends Controller
 {
@@ -233,17 +234,17 @@ class ChatController extends Controller
                 foreach ($request->file('attachments') as $file) {
                     if ($file->isValid()) {
                         try {
-                            $result = cloudinary()->upload($file->getRealPath(), [
+                            $result = CloudinaryHelper::upload($file->getRealPath(), [
                                 'folder'        => 'chat/attachments/' . date('Y/m'),
                                 'resource_type' => 'auto',
                             ]);
-
+                            
                             $attachments[] = [
-                                'url'  => $result->getSecurePath(),
+                                'url'  => $result['secure_url'],
                                 'name' => $file->getClientOriginalName(),
                                 'type' => $file->getMimeType(),
                                 'size' => $file->getSize(),
-                                'path' => $result->getPublicId(),
+                                'path' => $result['public_id'],
                             ];
                         } catch (\Exception $e) {
                             Log::warning('Cloudinary chat attachment upload failed: ' . $e->getMessage());

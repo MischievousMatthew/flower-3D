@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\EmployeeInfo;
-use Illuminate\Support\Facades\Storage;
+use App\Helpers\CloudinaryHelper;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class EmployeeQRCodeService
@@ -30,14 +30,25 @@ class EmployeeQRCodeService
             ->errorCorrection('H')
             ->generate($qrData);
 
-        // Save QR code to storage
-        $filename = "qr-codes/employee-{$employee->id}-{$employee->employee_id}.png";
-        Storage::disk('public')->put($filename, $qrCode);
+        // Save QR code to Cloudinary using a temporary file
+        $tempPath = tempnam(sys_get_temp_dir(), 'qr_');
+        file_put_contents($tempPath, $qrCode);
+
+        try {
+            $result = CloudinaryHelper::upload($tempPath, [
+                'folder'    => 'qr-codes',
+                'public_id' => "employee-{$employee->id}-{$employee->employee_id}",
+            ]);
+        } finally {
+            if (file_exists($tempPath)) {
+                unlink($tempPath);
+            }
+        }
 
         return [
-            'qr_data' => $qrData,
-            'qr_code_url' => Storage::disk('public')->url($filename),
-            'qr_code_path' => $filename,
+            'qr_data'      => $qrData,
+            'qr_code_url'  => $result['secure_url'],
+            'qr_code_path' => $result['public_id'],
         ];
     }
 
@@ -141,12 +152,8 @@ class EmployeeQRCodeService
      */
     public function deleteQRCode(EmployeeInfo $employee): bool
     {
-        $filename = "qr-codes/employee-{$employee->id}-{$employee->employee_id}.png";
-        
-        if (Storage::disk('public')->exists($filename)) {
-            return Storage::disk('public')->delete($filename);
-        }
-
+        $publicId = "qr-codes/employee-{$employee->id}-{$employee->employee_id}";
+        CloudinaryHelper::destroy($publicId);
         return true;
     }
-}
+}

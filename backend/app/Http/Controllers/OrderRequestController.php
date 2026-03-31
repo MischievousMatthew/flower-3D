@@ -9,8 +9,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use App\Traits\ScopesOwner;
+use App\Helpers\CloudinaryHelper;
+use Illuminate\Support\Facades\Storage;
 
 
 class OrderRequestController extends Controller
@@ -240,7 +241,7 @@ class OrderRequestController extends Controller
             'reason'       => $r->reason,
             'media_path'   => $r->media_path,
             'media_url'    => $r->media_path
-                                ? \Illuminate\Support\Facades\Storage::url($r->media_path)
+                                ? CloudinaryHelper::getUrl($r->media_path, $r->media_type)
                                 : null,
             'media_type'   => $r->media_type,
             'status'       => $r->status,

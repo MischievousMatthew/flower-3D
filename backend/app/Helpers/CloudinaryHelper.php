@@ -39,9 +39,23 @@ class CloudinaryHelper
         }
     }
 
-    public static function getUrl(string $publicId): string
+    public static function getUrl(string $publicId, string $resourceType = 'image'): string
     {
+        if (!$publicId) {
+            return '';
+        }
+
+        // Return as-is if it's already a full URL
+        if (str_starts_with($publicId, 'http')) {
+            return $publicId;
+        }
+
         $cloudName = env('CLOUDINARY_CLOUD_NAME');
-        return "https://res.cloudinary.com/{$cloudName}/image/upload/{$publicId}";
+        
+        // Resource types: image, video, raw, auto
+        // URL structure: https://res.cloudinary.com/<cloud_name>/<resource_type>/upload/<public_id>
+        $type = ($resourceType === 'image') ? 'image' : (($resourceType === 'video') ? 'video' : 'raw');
+        
+        return "https://res.cloudinary.com/{$cloudName}/{$type}/upload/{$publicId}";
     }
-}
+}

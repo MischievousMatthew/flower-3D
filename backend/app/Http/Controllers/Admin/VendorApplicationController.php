@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\VendorAccountCreated;
 use Illuminate\Support\Str;
+use App\Helpers\CloudinaryHelper;
 
 class VendorApplicationController extends Controller
 {
@@ -421,14 +422,9 @@ class VendorApplicationController extends Controller
     public function serveFile($path)
     {
         try {
-            // Remove 'storage/' prefix if present
-            $path = str_replace('storage/', '', $path);
-            
-            if (!Storage::exists($path)) {
-                abort(404, 'File not found');
-            }
-            
-            return response()->file(storage_path('app/public/' . $path));
+            // Redirect to Cloudinary URL for documents (usually 'raw' type)
+            $url = CloudinaryHelper::getUrl($path, 'raw');
+            return redirect($url);
         } catch (\Exception $e) {
             Log::error('Error serving file', [
                 'path' => $path,

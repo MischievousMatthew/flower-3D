@@ -10,6 +10,8 @@ use Illuminate\Validation\Rule;
 
 use App\Traits\ScopesOwner;
  
+use App\Helpers\CloudinaryHelper;
+ 
 class SupplierController extends Controller
 {
     use ScopesOwner;
@@ -52,7 +54,10 @@ class SupplierController extends Controller
         ]);
 
         if ($request->hasFile('logo')) {
-            $data['logo'] = $request->file('logo')->store('supplier-logos', 'public');
+            $result = CloudinaryHelper::upload($request->file('logo')->getRealPath(), [
+                'folder' => 'supplier-logos'
+            ]);
+            $data['logo'] = $result['public_id'];
         }
 
         return response()->json($this->service->createSupplier($data, $this->getOwnerId()), 201);
@@ -72,8 +77,12 @@ class SupplierController extends Controller
         ]);
 
         if ($request->hasFile('logo')) {
-            $data['logo'] = $request->file('logo')->store('supplier-logos', 'public');
+            $result = CloudinaryHelper::upload($request->file('logo')->getRealPath(), [
+                'folder' => 'supplier-logos'
+            ]);
+            $data['logo'] = $result['public_id'];
         }
+
 
         return response()->json($this->service->updateSupplier($id, $data, $this->getOwnerId()));
     }

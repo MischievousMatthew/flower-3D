@@ -8,7 +8,7 @@ use App\Models\ProductReview;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
+use App\Helpers\CloudinaryHelper;
 
 class ProductReviewController extends Controller
 {
@@ -170,8 +170,10 @@ class ProductReviewController extends Controller
 
         $imagePath = null;
         if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')
-                ->store('reviews', 'public');
+            $result = CloudinaryHelper::upload($request->file('image')->getRealPath(), [
+                'folder' => 'reviews'
+            ]);
+            $imagePath = $result['public_id'];
         }
 
         // ── Create ────────────────────────────────────────────────────────────
@@ -220,15 +222,18 @@ class ProductReviewController extends Controller
 
         // Handle image replacement / removal
         if ($request->boolean('remove_image') && $review->image_path) {
-            Storage::disk('public')->delete($review->image_path);
+            CloudinaryHelper::destroy($review->image_path);
             $review->image_path = null;
         }
 
         if ($request->hasFile('image')) {
             if ($review->image_path) {
-                Storage::disk('public')->delete($review->image_path);
+                CloudinaryHelper::destroy($review->image_path);
             }
-            $review->image_path = $request->file('image')->store('reviews', 'public');
+            $result = CloudinaryHelper::upload($request->file('image')->getRealPath(), [
+                'folder' => 'reviews'
+            ]);
+            $review->image_path = $result['public_id'];
         }
 
         $review->fill($request->only(['rating', 'comment', 'is_anonymous']));
@@ -258,7 +263,7 @@ class ProductReviewController extends Controller
         }
 
         if ($review->image_path) {
-            Storage::disk('public')->delete($review->image_path);
+            CloudinaryHelper::destroy($review->image_path);
         }
 
         $review->delete();
@@ -473,7 +478,7 @@ class ProductReviewController extends Controller
             'order_id'      => $r->order_id,
             'rating'        => $r->rating,
             'comment'       => $r->comment,
-            'image_url'     => $r->image_path ? Storage::url($r->image_path) : null,
+            'image_url'     => $r->image_path ? CloudinaryHelper::getUrl($r->image_path) : null,
             'is_anonymous'  => $r->is_anonymous,
             'reviewer_name' => $r->is_anonymous ? 'Anonymous User' : ($r->user?->name ?? 'Customer'),
             // Alias so both old and new Vue components work regardless of which field they read

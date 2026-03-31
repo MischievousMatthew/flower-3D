@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use App\Helpers\CloudinaryHelper;
 
 class CustomerProductController extends Controller
 {
@@ -214,24 +215,19 @@ class CustomerProductController extends Controller
     public function serveModel($filename)
     {
         $filename = basename($filename);
-        $path     = storage_path('app/public/product_models/' . $filename);
+        // Find the model by filename/path if possible, or just redirect if we have the public_id
+        // Since we are migrating, it's better to just redirect to the Cloudinary URL.
+        // For GLB/RAW files, we use the raw resource type.
+        
+        $model = \App\Models\ProductModel::where('model_url', 'like', '%' . $filename . '%')
+            ->orWhere('model_path', 'like', '%' . $filename . '%')
+            ->first();
 
-        if (!file_exists($path)) {
-            return response()->json(['success' => false, 'message' => 'Model not found'], 404);
+        if ($model && $model->model_path) {
+             return redirect()->away(CloudinaryHelper::getUrl($model->model_path, 'raw'));
         }
 
-        $contentType = match (strtolower(pathinfo($filename, PATHINFO_EXTENSION))) {
-            'glb'   => 'model/gltf-binary',
-            'gltf'  => 'model/gltf+json',
-            default => 'application/octet-stream',
-        };
-
-        return response()->file($path, [
-            'Content-Type'                 => $contentType,
-            'Access-Control-Allow-Origin'  => '*',
-            'Access-Control-Allow-Methods' => 'GET, OPTIONS',
-            'Cache-Control'                => 'public, max-age=31536000',
-        ]);
+        return response()->json(['success' => false, 'message' => 'Model not found'], 404);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
@@ -364,7 +360,7 @@ class CustomerProductController extends Controller
             ])->values()->all(),
             'models' => $product->models->map(fn ($m) => [
                 'id'         => $m->id,
-                'model_url'  => url('api/customer/product-models/' . basename($m->model_url)),
+                'model_url'  => $m->model_path ? CloudinaryHelper::getUrl($m->model_path, 'raw') : $m->model_url,
                 'model_type' => $m->model_type,
             ])->values()->all(),
         ];

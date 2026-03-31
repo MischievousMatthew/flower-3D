@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
+use App\Helpers\CloudinaryHelper;
 
 class VendorStorefrontController extends Controller
 {
@@ -265,7 +265,7 @@ class VendorStorefrontController extends Controller
         if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
             return $path;
         }
-        return Storage::url($path);
+        return CloudinaryHelper::getUrl($path);
     }
 
     /**
@@ -349,7 +349,7 @@ class VendorStorefrontController extends Controller
             ])->values()->all(),
             'models' => $product->models->map(fn ($m) => [
                 'id'         => $m->id,
-                'model_url'  => url('api/customer/product-models/' . basename($m->model_url)),
+                'model_url'  => $m->model_path ? CloudinaryHelper::getUrl($m->model_path, 'raw') : $m->model_url,
                 'model_type' => $m->model_type,
             ])->values()->all(),
         ];

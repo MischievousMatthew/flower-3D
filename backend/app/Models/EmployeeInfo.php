@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
+use App\Helpers\CloudinaryHelper;
 
 class EmployeeInfo extends Model
 {
@@ -99,17 +99,11 @@ class EmployeeInfo extends Model
     }
 
     // Accessor for avatar_url
-   public function getAvatarUrlAttribute(): ?string
+    public function getAvatarUrlAttribute(): ?string
     {
-
-        if ($this->avatar) {
-            return Storage::disk('public')->url($this->avatar);
-        }
-        
-        return $this->avatar
-            ? asset('storage/' . $this->avatar)
-            : null;
+        return $this->avatar ? CloudinaryHelper::getUrl($this->avatar) : null;
     }
+
 
     // Relationships
     public function owner()

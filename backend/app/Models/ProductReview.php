@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
+use App\Helpers\CloudinaryHelper;
 
 class ProductReview extends Model
 {
@@ -59,9 +59,10 @@ class ProductReview extends Model
     public function getImageUrlAttribute(): ?string
     {
         return $this->image_path
-            ? Storage::url($this->image_path)
+            ? CloudinaryHelper::getUrl($this->image_path)
             : null;
     }
+
 
     // ─── Scopes ───────────────────────────────────────────────────────────────
 

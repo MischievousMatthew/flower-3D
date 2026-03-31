@@ -10,7 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
+use App\Helpers\CloudinaryHelper;
 
 class CustomerOrderTrackingController extends Controller
 {
@@ -294,10 +294,15 @@ class CustomerOrderTrackingController extends Controller
         $file      = $request->file('media');
         $mime      = $file->getMimeType();
         $mediaType = str_starts_with($mime, 'video/') ? 'video' : 'image';
-        $path      = $file->store('returns', 'public');
+        
+        $result = CloudinaryHelper::upload($file->getRealPath(), [
+            'folder'        => 'returns',
+            'resource_type' => $mediaType
+        ]);
 
-        return [$path, $mediaType];
+        return [$result['public_id'], $mediaType];
     }
+
 
     private function formatOrder(Order $order): array
     {

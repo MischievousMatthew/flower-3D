@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
+use App\Helpers\CloudinaryHelper;
 
 class VendorProfileController extends Controller
 {
@@ -152,21 +153,17 @@ class VendorProfileController extends Controller
 
             // ── Delete old store logo from Cloudinary ─────────────────────
             if ($vendorApplication->store_logo_path) {
-                try {
-                    cloudinary()->destroy($vendorApplication->store_logo_path);
-                } catch (\Exception $e) {
-                    Log::warning('Cloudinary delete failed for store logo: ' . $vendorApplication->store_logo_path);
-                }
+                CloudinaryHelper::destroy($vendorApplication->store_logo_path);
             }
 
             // ── Upload new store logo to Cloudinary ───────────────────────
-            $result = cloudinary()->upload($request->file('store_logo')->getRealPath(), [
+            $result = CloudinaryHelper::upload($request->file('store_logo')->getRealPath(), [
                 'folder'        => 'store_logos',
                 'resource_type' => 'image',
             ]);
 
             $vendorApplication->update([
-                'store_logo_path' => $result->getPublicId(),
+                'store_logo_path' => $result['public_id'],
             ]);
 
             return response()->json([
@@ -230,11 +227,7 @@ class VendorProfileController extends Controller
 
             if ($vendorApplication->store_logo_path) {
                 // ── Delete from Cloudinary ────────────────────────────────
-                try {
-                    cloudinary()->destroy($vendorApplication->store_logo_path);
-                } catch (\Exception $e) {
-                    Log::warning('Cloudinary delete failed for store logo: ' . $vendorApplication->store_logo_path);
-                }
+                CloudinaryHelper::destroy($vendorApplication->store_logo_path);
 
                 $vendorApplication->update(['store_logo_path' => null]);
             }

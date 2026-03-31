@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use App\Helpers\CloudinaryHelper;
 
 class ProductController extends Controller
 {
@@ -170,15 +171,15 @@ class ProductController extends Controller
             // ── Product image uploads to Cloudinary ───────────────────────
             if ($request->hasFile('images')) {
                 foreach ($request->file('images') as $index => $imageFile) {
-                    $result = cloudinary()->upload($imageFile->getRealPath(), [
-                        'folder'       => 'product_images',
+                    $result = CloudinaryHelper::upload($imageFile->getRealPath(), [
+                        'folder'        => 'product_images',
                         'resource_type' => 'image',
                     ]);
-
+                    
                     ProductImage::create([
                         'product_id'    => $product->id,
-                        'image_url'     => $result->getSecurePath(),
-                        'image_path'    => $result->getPublicId(),
+                        'image_url'     => $result['secure_url'],
+                        'image_path'    => $result['public_id'],
                         'is_primary'    => $index === 0,
                         'display_order' => $index,
                     ]);
@@ -302,11 +303,7 @@ class ProductController extends Controller
                     ->get()
                     ->each(function ($img) {
                         if ($img->image_path) {
-                            try {
-                                cloudinary()->destroy($img->image_path);
-                            } catch (\Exception $e) {
-                                Log::warning('Cloudinary delete failed for image: ' . $img->image_path);
-                            }
+                            CloudinaryHelper::destroy($img->image_path);
                         }
                         $img->delete();
                     });
@@ -315,15 +312,15 @@ class ProductController extends Controller
             // ── Upload new images to Cloudinary ───────────────────────────
             if ($request->hasFile('images')) {
                 foreach ($request->file('images') as $index => $imageFile) {
-                    $result = cloudinary()->upload($imageFile->getRealPath(), [
+                    $result = CloudinaryHelper::upload($imageFile->getRealPath(), [
                         'folder'        => 'product_images',
                         'resource_type' => 'image',
                     ]);
 
                     ProductImage::create([
                         'product_id'    => $product->id,
-                        'image_url'     => $result->getSecurePath(),
-                        'image_path'    => $result->getPublicId(),
+                        'image_url'     => $result['secure_url'],
+                        'image_path'    => $result['public_id'],
                         'is_primary'    => false,
                         'display_order' => $product->images()->count() + $index,
                     ]);
@@ -333,11 +330,7 @@ class ProductController extends Controller
             // ── Replace 3D model on Cloudinary ────────────────────────────
             if ($request->hasFile('model_file')) {
                 if ($product->model) {
-                    try {
-                        cloudinary()->destroy($product->model->model_path, ['resource_type' => 'raw']);
-                    } catch (\Exception $e) {
-                        Log::warning('Cloudinary delete failed for model: ' . $product->model->model_path);
-                    }
+                    CloudinaryHelper::destroy($product->model->model_path, ['resource_type' => 'raw']);
                     $product->model->delete();
                 }
                 $this->handle3DModel($request->file('model_file'), $product);
@@ -365,22 +358,14 @@ class ProductController extends Controller
 
             // ── Delete 3D model from Cloudinary ───────────────────────────
             if ($product->model && $product->model->model_path) {
-                try {
-                    cloudinary()->destroy($product->model->model_path, ['resource_type' => 'raw']);
-                } catch (\Exception $e) {
-                    Log::warning('Cloudinary delete failed for model: ' . $product->model->model_path);
-                }
+                CloudinaryHelper::destroy($product->model->model_path, ['resource_type' => 'raw']);
                 $product->model->delete();
             }
 
             // ── Delete all product images from Cloudinary ─────────────────
             foreach ($product->images as $image) {
                 if ($image->image_path) {
-                    try {
-                        cloudinary()->destroy($image->image_path);
-                    } catch (\Exception $e) {
-                        Log::warning('Cloudinary delete failed for image: ' . $image->image_path);
-                    }
+                    CloudinaryHelper::destroy($image->image_path);
                 }
             }
 
@@ -478,11 +463,7 @@ class ProductController extends Controller
 
             // ── Delete from Cloudinary ────────────────────────────────────
             if ($image->image_path) {
-                try {
-                    cloudinary()->destroy($image->image_path);
-                } catch (\Exception $e) {
-                    Log::warning('Cloudinary delete failed for image: ' . $image->image_path);
-                }
+                CloudinaryHelper::destroy($image->image_path);
             }
 
             $image->delete();
@@ -510,11 +491,7 @@ class ProductController extends Controller
 
             // ── Delete from Cloudinary ────────────────────────────────────
             if ($product->model->model_path) {
-                try {
-                    cloudinary()->destroy($product->model->model_path, ['resource_type' => 'raw']);
-                } catch (\Exception $e) {
-                    Log::warning('Cloudinary delete failed for model: ' . $product->model->model_path);
-                }
+                CloudinaryHelper::destroy($product->model->model_path, ['resource_type' => 'raw']);
             }
 
             $product->model->delete();
@@ -566,17 +543,16 @@ class ProductController extends Controller
     private function handle3DModel($file, Product $product): void
     {
         $extension = strtolower($file->getClientOriginalExtension());
-        $publicId  = 'product_models/' . Str::uuid() . '.' . $extension;
 
-        $result = cloudinary()->upload($file->getRealPath(), [
-            'public_id'     => $publicId,
+        $result = CloudinaryHelper::upload($file->getRealPath(), [
+            'folder'        => 'product_models',
             'resource_type' => 'raw',
         ]);
 
         ProductModel::create([
             'product_id' => $product->id,
-            'model_url'  => $result->getSecurePath(),
-            'model_path' => $result->getPublicId(),
+            'model_url'  => $result['secure_url'],
+            'model_path' => $result['public_id'],
             'model_type' => $extension,
             'file_size'  => $file->getSize(),
             'metadata'   => [

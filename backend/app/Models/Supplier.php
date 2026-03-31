@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+use App\Helpers\CloudinaryHelper;
+
 class Supplier extends Model
 {
     protected $fillable = [
@@ -26,8 +28,9 @@ class Supplier extends Model
 
     public function getLogoUrlAttribute(): ?string
     {
-        return $this->logo ? asset('storage/' . $this->logo) : null;
+        return $this->logo ? CloudinaryHelper::getUrl($this->logo) : null;
     }
+
 
     // ─── Relationships ────────────────────────────────────────────────────────
 

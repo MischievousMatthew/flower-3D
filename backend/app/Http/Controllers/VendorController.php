@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Helpers\CloudinaryHelper;
 
 class VendorController extends Controller
 {
@@ -94,30 +95,30 @@ class VendorController extends Controller
             // These are permanent documents — we store the URL directly.
 
             if ($request->hasFile('government_id')) {
-                $result = cloudinary()->upload($request->file('government_id')->getRealPath(), [
+                $result = CloudinaryHelper::upload($request->file('government_id')->getRealPath(), [
                     'folder'        => 'vendor-applications/ids',
                     'resource_type' => 'auto',
                     'public_id'     => 'vendor-applications/ids/gov_id_' . $applicationId,
                 ]);
-                $app->government_id_path = $result->getSecurePath();
+                $app->government_id_path = $result['secure_url'];
             }
 
             if ($request->hasFile('selfie_with_id')) {
-                $result = cloudinary()->upload($request->file('selfie_with_id')->getRealPath(), [
+                $result = CloudinaryHelper::upload($request->file('selfie_with_id')->getRealPath(), [
                     'folder'        => 'vendor-applications/selfies',
                     'resource_type' => 'image',
                     'public_id'     => 'vendor-applications/selfies/selfie_' . $applicationId,
                 ]);
-                $app->selfie_with_id_path = $result->getSecurePath();
+                $app->selfie_with_id_path = $result['secure_url'];
             }
 
             if ($request->hasFile('proof_of_address')) {
-                $result = cloudinary()->upload($request->file('proof_of_address')->getRealPath(), [
+                $result = CloudinaryHelper::upload($request->file('proof_of_address')->getRealPath(), [
                     'folder'        => 'vendor-applications/address-proof',
                     'resource_type' => 'auto',
                     'public_id'     => 'vendor-applications/address-proof/address_' . $applicationId,
                 ]);
-                $app->proof_of_address_path = $result->getSecurePath();
+                $app->proof_of_address_path = $result['secure_url'];
             }
 
             $app->dti_number                = $request->dti_number;
@@ -127,42 +128,42 @@ class VendorController extends Controller
             $app->bir_tin                   = $request->bir_tin;
 
             if ($request->hasFile('barangay_clearance')) {
-                $result = cloudinary()->upload($request->file('barangay_clearance')->getRealPath(), [
+                $result = CloudinaryHelper::upload($request->file('barangay_clearance')->getRealPath(), [
                     'folder'        => 'vendor-applications/barangay',
                     'resource_type' => 'auto',
                     'public_id'     => 'vendor-applications/barangay/barangay_' . $applicationId,
                 ]);
-                $app->barangay_clearance_path = $result->getSecurePath();
+                $app->barangay_clearance_path = $result['secure_url'];
             }
 
             if ($request->hasFile('mayor_permit')) {
-                $result = cloudinary()->upload($request->file('mayor_permit')->getRealPath(), [
+                $result = CloudinaryHelper::upload($request->file('mayor_permit')->getRealPath(), [
                     'folder'        => 'vendor-applications/permits',
                     'resource_type' => 'auto',
                     'public_id'     => 'vendor-applications/permits/mayor_' . $applicationId,
                 ]);
-                $app->mayor_permit_path = $result->getSecurePath();
+                $app->mayor_permit_path = $result['secure_url'];
             }
 
             // ── Store logo: store public_id so it can be replaced later ───
             if ($request->hasFile('store_logo')) {
-                $result = cloudinary()->upload($request->file('store_logo')->getRealPath(), [
+                $result = CloudinaryHelper::upload($request->file('store_logo')->getRealPath(), [
                     'folder'        => 'store_logos',
                     'resource_type' => 'image',
                 ]);
-                $app->store_logo_path = $result->getPublicId();
+                $app->store_logo_path = $result['public_id'];
             }
 
             // ── Portfolio photos: store full secure URLs ───────────────────
             if ($request->hasFile('portfolio_photos')) {
                 $portfolioUrls = [];
                 foreach ($request->file('portfolio_photos') as $index => $photo) {
-                    $result = cloudinary()->upload($photo->getRealPath(), [
+                    $result = CloudinaryHelper::upload($photo->getRealPath(), [
                         'folder'        => 'vendor-applications/portfolio',
                         'resource_type' => 'image',
                         'public_id'     => 'vendor-applications/portfolio/portfolio_' . $applicationId . '_' . $index,
                     ]);
-                    $portfolioUrls[] = $result->getSecurePath();
+                    $portfolioUrls[] = $result['secure_url'];
                 }
                 $app->portfolio_photos_paths = $portfolioUrls;
             }

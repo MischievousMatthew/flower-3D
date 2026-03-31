@@ -7,6 +7,7 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Helpers\CloudinaryHelper;
 
 class AdminProductController extends Controller
 {
@@ -307,18 +308,19 @@ class AdminProductController extends Controller
             try {
                 // Delete 3D model if exists
                 if ($product->model) {
-                    \Storage::disk('public')->delete($product->model->model_path);
+                    CloudinaryHelper::destroy($product->model->model_path, ['resource_type' => 'raw']);
                     $product->model->delete();
                 }
 
                 // Delete images
                 foreach ($product->images as $image) {
-                    \Storage::disk('public')->delete($image->image_path);
+                    CloudinaryHelper::destroy($image->image_path);
                 }
 
                 $product->delete();
 
                 DB::commit();
+
 
                 Log::info("Product deleted by admin", [
                     'product_id' => $id,

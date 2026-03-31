@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Crypt;
+use App\Helpers\CloudinaryHelper;
 
 class VendorApplication extends Model
 {
@@ -217,7 +218,7 @@ class VendorApplication extends Model
     {
         return Attribute::make(
             get: fn () => $this->store_logo_path
-                ? cloudinary()->getUrl($this->store_logo_path)
+                ? CloudinaryHelper::getUrl($this->store_logo_path)
                 : null
         );
     }
@@ -226,7 +227,7 @@ class VendorApplication extends Model
     {
         return Attribute::make(
             get: fn () => $this->store_logo_path
-                ? cloudinary()->getUrl($this->store_logo_path)
+                ? CloudinaryHelper::getUrl($this->store_logo_path)
                 : null
         );
     }
