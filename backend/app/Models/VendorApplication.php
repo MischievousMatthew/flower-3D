@@ -175,38 +175,45 @@ class VendorApplication extends Model
     // so we return them as-is from the accessor.
     // ─────────────────────────────────────────────────────────────────────
 
+    protected function resolvePathUrl(?string $path): ?string
+    {
+        if (!$path) return null;
+        if (str_starts_with($path, 'http')) return $path;
+        return asset('storage/' . $path);
+    }
+
     protected function governmentIdUrl(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->government_id_path ?: null
+            get: fn () => $this->resolvePathUrl($this->government_id_path)
         );
     }
 
     protected function selfieWithIdUrl(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->selfie_with_id_path ?: null
+            get: fn () => $this->resolvePathUrl($this->selfie_with_id_path)
         );
     }
 
     protected function proofOfAddressUrl(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->proof_of_address_path ?: null
+            get: fn () => $this->resolvePathUrl($this->proof_of_address_path)
         );
     }
 
     protected function barangayClearanceUrl(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->barangay_clearance_path ?: null
+            get: fn () => $this->resolvePathUrl($this->barangay_clearance_path)
         );
     }
 
     protected function mayorPermitUrl(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->mayor_permit_path ?: null
+            get: fn () => $this->resolvePathUrl($this->mayor_permit_path)
         );
     }
 
@@ -217,26 +224,32 @@ class VendorApplication extends Model
     protected function storeLogoUrl(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->store_logo_path
-                ? CloudinaryHelper::getUrl($this->store_logo_path)
-                : null
+            get: fn () => $this->resolveLogoUrl($this->store_logo_path)
         );
     }
 
     protected function profilePhotoUrl(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->store_logo_path
-                ? CloudinaryHelper::getUrl($this->store_logo_path)
-                : null
+            get: fn () => $this->resolveLogoUrl($this->store_logo_path)
         );
+    }
+
+    protected function resolveLogoUrl(?string $path): ?string
+    {
+        if (!$path) return null;
+        if (str_starts_with($path, 'http')) return $path;
+        if (preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $path)) {
+            return asset('storage/' . $path);
+        }
+        return CloudinaryHelper::getUrl($path);
     }
 
     // Portfolio stores array of full Cloudinary secure URLs
     protected function portfolioPhotosUrls(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->portfolio_photos_paths ?? []
+            get: fn () => array_map(fn($p) => $this->resolvePathUrl($p), $this->portfolio_photos_paths ?? [])
         );
     }
 
