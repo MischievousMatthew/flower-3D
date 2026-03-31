@@ -12,12 +12,25 @@ use Illuminate\Support\Facades\Log;
 
 class PayrollService
 {
+    protected GovernmentContributionService $contributionService;
+
+    public function __construct(GovernmentContributionService $contributionService)
+    {
+        $this->contributionService = $contributionService;
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // GENERATE / PREVIEW
     // ─────────────────────────────────────────────────────────────────────────
 
-    public function generatePayroll(int $ownerId, int $employeeId, string $periodStart, string $periodEnd, ?string $notes = null): array
-    {
+    public function generatePayroll(
+        int $ownerId,
+        int $employeeId,
+        string $periodStart,
+        string $periodEnd,
+        ?string $notes = null,
+        bool $includeContributions = false
+    ): array {
         try {
             DB::beginTransaction();
 
@@ -38,7 +51,11 @@ class PayrollService
 
             if ($existing) return ['success' => false, 'message' => 'Payroll already exists for this period.'];
 
-            $calculation = $this->calculate($ownerId, $employee, $periodStart, $periodEnd);
+            $calculation   = $this->calculate($ownerId, $employee, $periodStart, $periodEnd);
+            $contributions = $this->resolveContributions($employee, $includeContributions);
+
+            $totalDeductions = round($calculation['totalDeductions'] + $contributions['total'], 2);
+            $netSalary       = round(max(0, $calculation['netSalary'] - $contributions['total']), 2);
 
             $payroll = Payroll::create([
                 'owner_id'                    => $ownerId,
@@ -59,15 +76,23 @@ class PayrollService
                 'paid_leave_days'             => $calculation['paidLeaveDaysCount'],
                 'unpaid_leave_days'           => $calculation['unpaidLeaveDaysCount'],
                 'absent_days'                 => $calculation['absentDays'],
-                'deduction_amount'            => round($calculation['totalDeductions'], 2),
-                'net_salary'                  => round($calculation['netSalary'], 2),
+                'deduction_amount'            => $totalDeductions,
+                'net_salary'                  => $netSalary,
                 'notes'                       => $notes,
                 'status'                      => 'pending',
+                'include_contributions'       => $includeContributions,
+                'sss_contribution'            => $contributions['sss'],
+                'philhealth_contribution'     => $contributions['philhealth'],
+                'pagibig_contribution'        => $contributions['pagibig'],
             ]);
 
             DB::commit();
 
-            return ['success' => true, 'message' => 'Payroll generated successfully', 'data' => $payroll->load('employee')];
+            return [
+                'success' => true,
+                'message' => 'Payroll generated successfully',
+                'data'    => $payroll->load('employee'),
+            ];
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Payroll generation error', ['error' => $e->getMessage()]);
@@ -75,8 +100,13 @@ class PayrollService
         }
     }
 
-    public function previewPayroll(int $ownerId, int $employeeId, string $periodStart, string $periodEnd): array
-    {
+    public function previewPayroll(
+        int $ownerId,
+        int $employeeId,
+        string $periodStart,
+        string $periodEnd,
+        bool $includeContributions = false
+    ): array {
         try {
             $employee = EmployeeInfo::where('id', $employeeId)->where('owner_id', $ownerId)->first();
 
@@ -84,31 +114,40 @@ class PayrollService
             if (!$employee->basic_salary || !$employee->salary_type) return ['success' => false, 'message' => "Employee '{$employee->full_name}' does not have salary configuration set."];
             if (!$employee->standard_work_hours_per_day) return ['success' => false, 'message' => "Employee '{$employee->full_name}' is missing standard work hours per day."];
 
-            $c = $this->calculate($ownerId, $employee, $periodStart, $periodEnd);
+            $c             = $this->calculate($ownerId, $employee, $periodStart, $periodEnd);
+            $contributions = $this->resolveContributions($employee, $includeContributions);
+
+            $totalDeductions = round($c['totalDeductions'] + $contributions['total'], 2);
+            $netSalary       = round(max(0, $c['netSalary'] - $contributions['total']), 2);
 
             return [
                 'success' => true,
                 'data'    => [
-                    'employee_name'            => $employee->full_name,
-                    'employee_id'              => $employee->employee_id,
-                    'period_start'             => $periodStart,
-                    'period_end'               => $periodEnd,
-                    'salary_type'              => $employee->salary_type,
-                    'basic_salary'             => number_format($employee->basic_salary, 2),
-                    'hourly_rate'              => number_format($c['hourlyRate'], 2),
-                    'expected_work_days'       => $c['expectedWorkingDays'],
-                    'actual_work_days'         => $c['actualWorkDays'],
-                    'attendance_records_count' => $c['actualWorkDays'],
-                    'paid_leave_days'          => $c['paidLeaveDaysCount'],
-                    'unpaid_leave_days'        => $c['unpaidLeaveDaysCount'],
-                    'absent_days'              => $c['absentDays'],
-                    'total_hours_worked'       => number_format($c['totalHoursWorked'], 2),
-                    'expected_salary'          => number_format($c['grossSalary'], 2),
-                    'absent_deduction'         => number_format($c['absentDeduction'], 2),
-                    'unpaid_leave_deduction'   => number_format($c['unpaidLeaveDeduction'], 2),
-                    'gross_salary'             => number_format($c['grossSalary'], 2),
-                    'deduction_amount'         => number_format($c['totalDeductions'], 2),
-                    'net_salary'               => number_format($c['netSalary'], 2),
+                    'employee_name'             => $employee->full_name,
+                    'employee_id'               => $employee->employee_id,
+                    'period_start'              => $periodStart,
+                    'period_end'                => $periodEnd,
+                    'salary_type'               => $employee->salary_type,
+                    'basic_salary'              => number_format($employee->basic_salary, 2),
+                    'hourly_rate'               => number_format($c['hourlyRate'], 2),
+                    'expected_work_days'        => $c['expectedWorkingDays'],
+                    'actual_work_days'          => $c['actualWorkDays'],
+                    'attendance_records_count'  => $c['actualWorkDays'],
+                    'paid_leave_days'           => $c['paidLeaveDaysCount'],
+                    'unpaid_leave_days'         => $c['unpaidLeaveDaysCount'],
+                    'absent_days'               => $c['absentDays'],
+                    'total_hours_worked'        => number_format($c['totalHoursWorked'], 2),
+                    'gross_salary'              => number_format($c['grossSalary'], 2),
+                    'absent_deduction'          => number_format($c['absentDeduction'], 2),
+                    'unpaid_leave_deduction'    => number_format($c['unpaidLeaveDeduction'], 2),
+                    'deduction_amount'          => number_format($totalDeductions, 2),
+                    'net_salary'                => number_format($netSalary, 2),
+                    // Government contributions
+                    'include_contributions'     => $includeContributions,
+                    'sss_contribution'          => number_format($contributions['sss'], 2),
+                    'philhealth_contribution'   => number_format($contributions['philhealth'], 2),
+                    'pagibig_contribution'      => number_format($contributions['pagibig'], 2),
+                    'total_contributions'       => number_format($contributions['total'], 2),
                 ],
             ];
         } catch (\Exception $e) {
@@ -117,26 +156,37 @@ class PayrollService
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // HR QUERIES  (scoped by owner_id)
+    // Contribution resolver — returns zeros when disabled
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * HR view — only returns payrolls belonging to this HR user (owner_id scoped).
-     */
+    private function resolveContributions(EmployeeInfo $employee, bool $include): array
+    {
+        if (!$include) {
+            return ['sss' => 0.00, 'philhealth' => 0.00, 'pagibig' => 0.00, 'total' => 0.00];
+        }
+
+        $monthlySalary = $this->contributionService->toMonthlySalary(
+            (float) $employee->basic_salary,
+            $employee->salary_type
+        );
+
+        return $this->contributionService->computeAll($monthlySalary);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // HR QUERIES
+    // ─────────────────────────────────────────────────────────────────────────
+
     public function getPayrolls(int $ownerId, array $filters = [])
     {
         $query = Payroll::with('employee')->where('owner_id', $ownerId);
-
         return $this->applyPayrollFilters($query, $filters);
     }
 
     public function getPayrollSummary(int $ownerId, array $filters = []): array
     {
-        $query = Payroll::where('owner_id', $ownerId);
-
-        // Apply shared filters (month, year, search, status, etc)
-        $query = $this->applyPayrollFiltersBuilder($query, $filters);
-
+        $query    = Payroll::where('owner_id', $ownerId);
+        $query    = $this->applyPayrollFiltersBuilder($query, $filters);
         $payrolls = $query->get();
 
         return [
@@ -153,32 +203,19 @@ class PayrollService
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // FINANCE QUERIES  (NO owner_id scope — cross-account)
-    //
-    // Finance is a different user account. HR payrolls have owner_id = HR user.
-    // Finance must query ALL payrolls regardless of owner_id.
+    // FINANCE QUERIES
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Finance view — queries ALL payrolls with NO owner_id filter.
-     */
     public function getFinancePayrolls(array $filters = [])
     {
         $query = Payroll::with('employee');
-
         return $this->applyPayrollFilters($query, $filters);
     }
 
-    /**
-     * Finance summary cards — counts across ALL owner_ids.
-     */
     public function getFinanceSummary(array $filters = []): array
     {
-        $query = Payroll::query();
-
-        // Apply shared filters (month, year, search, status, etc)
-        $query = $this->applyPayrollFiltersBuilder($query, $filters);
-
+        $query    = Payroll::query();
+        $query    = $this->applyPayrollFiltersBuilder($query, $filters);
         $payrolls = $query->get();
 
         return [
@@ -197,68 +234,8 @@ class PayrollService
 
     public function financeApprovePayrolls(array $ids, ?string $notes = null): array
     {
-        $validator = Validator::make($request->all(), [
-            'ids'           => 'required|array|min:1',
-            'ids.*'         => 'integer|exists:payrolls,id',
-            'finance_notes' => 'nullable|string|max:1000',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
-        }
-
-        $result = $this->payrollService->financeApprovePayrolls($request->ids, $request->finance_notes);
-
-        // ── Deduct approved payroll amounts from vendor balance ──────────────
-        if ($result['success']) {
-            $employee = $request->user(); // Employee instance
-
-            $payrolls = \App\Models\Payroll::whereIn('id', $request->ids)->get();
-
-            foreach ($payrolls as $payroll) {
-                $vendorBalance = \App\Models\VendorBalance::forVendor($payroll->owner_id);
-
-                $balanceBefore = (float) $vendorBalance->balance;
-                $amount        = (float) ($payroll->net_salary ?? $payroll->gross_salary);
-                $balanceAfter  = max(0, $balanceBefore - $amount);
-
-                $vendorBalance->update([
-                    'balance'         => $balanceAfter,
-                    'total_withdrawn' => $vendorBalance->total_withdrawn + $amount,
-                ]);
-
-                \App\Models\VendorTransaction::create([
-                    'vendor_id'      => $payroll->owner_id,
-                    'order_id'       => null,
-                    'type'           => 'debit',
-                    'category'       => 'payroll',
-                    'amount'         => $amount,
-                    'balance_before' => $balanceBefore,
-                    'balance_after'  => $balanceAfter,
-                    'description'    => "Payroll approved for employee #{$payroll->employee_id} ({$payroll->period_start} – {$payroll->period_end})",
-                    'status'         => 'completed',
-                    'metadata'       => [
-                        'payroll_id'  => $payroll->id,
-                        'employee_id' => $payroll->employee_id,
-                        'period'      => $payroll->period_start . ' to ' . $payroll->period_end,
-                        'gross'       => (float) $payroll->gross_salary,
-                        'net'         => (float) $payroll->net_salary,
-                        'approved_by' => $employee?->name ?? 'Finance',
-                        'approved_at' => now()->toIso8601String(),
-                    ],
-                ]);
-            }
-        }
-        // ─────────────────────────────────────────────────────────────────────
-
-        return response()->json($result, $result['success'] ? 200 : 400);
-    }
-
-    public function financeRejectPayrolls(array $ids, ?string $notes = null): array
-    {
         try {
             $payrolls = Payroll::whereIn('id', $ids)->where('status', 'pending')->get();
-            // *** No owner_id scope ***
 
             if ($payrolls->isEmpty()) {
                 return ['success' => false, 'message' => 'No pending payrolls found for the selected IDs.'];
@@ -266,17 +243,41 @@ class PayrollService
 
             $updated = 0;
             foreach ($payrolls as $payroll) {
-                $payroll->update([
-                    'status'              => 'rejected',
-                    'finance_notes'       => $notes,
-                ]);
+                $payroll->update(['status' => 'approved', 'finance_notes' => $notes]);
                 $updated++;
             }
 
             $skipped = count($ids) - $updated;
             return [
                 'success' => true,
-                'message' => "{$updated} payroll(s) rejected." . ($skipped > 0 ? " {$skipped} skipped (not pending)." : ''),
+                'message' => "{$updated} payroll(s) approved." . ($skipped > 0 ? " {$skipped} skipped." : ''),
+                'updated' => $updated,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Finance approve error', ['error' => $e->getMessage()]);
+            return ['success' => false, 'message' => 'Failed to approve payrolls: ' . $e->getMessage()];
+        }
+    }
+
+    public function financeRejectPayrolls(array $ids, ?string $notes = null): array
+    {
+        try {
+            $payrolls = Payroll::whereIn('id', $ids)->where('status', 'pending')->get();
+
+            if ($payrolls->isEmpty()) {
+                return ['success' => false, 'message' => 'No pending payrolls found for the selected IDs.'];
+            }
+
+            $updated = 0;
+            foreach ($payrolls as $payroll) {
+                $payroll->update(['status' => 'rejected', 'finance_notes' => $notes]);
+                $updated++;
+            }
+
+            $skipped = count($ids) - $updated;
+            return [
+                'success' => true,
+                'message' => "{$updated} payroll(s) rejected." . ($skipped > 0 ? " {$skipped} skipped." : ''),
                 'updated' => $updated,
             ];
         } catch (\Exception $e) {
@@ -289,7 +290,6 @@ class PayrollService
     {
         try {
             $payrolls = Payroll::whereIn('id', $ids)->where('status', 'approved')->get();
-            // *** No owner_id scope — Finance approved these, HR marks paid ***
 
             if ($payrolls->isEmpty()) {
                 return ['success' => false, 'message' => 'No approved payrolls found for the selected IDs.'];
@@ -304,7 +304,7 @@ class PayrollService
             $skipped = count($ids) - $updated;
             return [
                 'success' => true,
-                'message' => "{$updated} payroll(s) marked as paid." . ($skipped > 0 ? " {$skipped} skipped (not approved)." : ''),
+                'message' => "{$updated} payroll(s) marked as paid." . ($skipped > 0 ? " {$skipped} skipped." : ''),
                 'updated' => $updated,
             ];
         } catch (\Exception $e) {
@@ -314,7 +314,7 @@ class PayrollService
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // SHARED FILTER HELPER
+    // SHARED FILTER HELPERS
     // ─────────────────────────────────────────────────────────────────────────
 
     public function applyPayrollFiltersBuilder($query, array $filters)
@@ -352,11 +352,16 @@ class PayrollService
         $query = $this->applyPayrollFiltersBuilder($query, $filters);
         $query->orderBy('created_at', 'desc');
 
-        return $query->paginate((int) ($filters['per_page'] ?? 15), ['*'], 'page', (int) ($filters['page'] ?? 1));
+        return $query->paginate(
+            (int) ($filters['per_page'] ?? 15),
+            ['*'],
+            'page',
+            (int) ($filters['page'] ?? 1)
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // PRIVATE CALCULATION HELPERS
+    // PRIVATE CALCULATION HELPERS (unchanged)
     // ─────────────────────────────────────────────────────────────────────────
 
     private function calculate(int $ownerId, EmployeeInfo $employee, string $periodStart, string $periodEnd): array
@@ -422,7 +427,8 @@ class PayrollService
             $q->whereBetween('start_date', [$periodStart, $periodEnd])
               ->orWhereBetween('end_date', [$periodStart, $periodEnd])
               ->orWhere(function ($inner) use ($periodStart, $periodEnd) {
-                  $inner->where('start_date', '<=', $periodStart)->where('end_date', '>=', $periodEnd);
+                  $inner->where('start_date', '<=', $periodStart)
+                        ->where('end_date', '>=', $periodEnd);
               });
         });
     }
@@ -434,8 +440,8 @@ class PayrollService
         $pe    = Carbon::parse($periodEnd);
 
         foreach ($leaveRecords as $leave) {
-            $start = Carbon::parse($leave->start_date)->max($ps);
-            $end   = Carbon::parse($leave->end_date)->min($pe);
+            $start  = Carbon::parse($leave->start_date)->max($ps);
+            $end    = Carbon::parse($leave->end_date)->min($pe);
             $total += $this->calculateLeaveDays($start, $end, $restDays);
         }
 

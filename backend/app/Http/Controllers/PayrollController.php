@@ -56,9 +56,10 @@ class PayrollController extends Controller
     public function preview(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'employee_id'  => 'required|exists:employees_info,id',
-            'period_start' => 'required|date',
-            'period_end'   => 'required|date|after_or_equal:period_start',
+            'employee_id'            => 'required|exists:employees_info,id',
+            'period_start'           => 'required|date',
+            'period_end'             => 'required|date|after_or_equal:period_start',
+            'include_contributions'  => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -66,7 +67,11 @@ class PayrollController extends Controller
         }
 
         $result = $this->payrollService->previewPayroll(
-            $this->getOwnerId(), $request->employee_id, $request->period_start, $request->period_end
+            $this->getOwnerId(),
+            $request->employee_id,
+            $request->period_start,
+            $request->period_end,
+            (bool) $request->input('include_contributions', false)
         );
 
         return response()->json($result, $result['success'] ? 200 : 400);
@@ -75,10 +80,11 @@ class PayrollController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'employee_id'  => 'required|exists:employees_info,id',
-            'period_start' => 'required|date',
-            'period_end'   => 'required|date|after_or_equal:period_start',
-            'notes'        => 'nullable|string|max:1000',
+            'employee_id'            => 'required|exists:employees_info,id',
+            'period_start'           => 'required|date',
+            'period_end'             => 'required|date|after_or_equal:period_start',
+            'notes'                  => 'nullable|string|max:1000',
+            'include_contributions'  => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -86,7 +92,12 @@ class PayrollController extends Controller
         }
 
         $result = $this->payrollService->generatePayroll(
-            $this->getOwnerId(), $request->employee_id, $request->period_start, $request->period_end, $request->notes
+            $this->getOwnerId(),
+            $request->employee_id,
+            $request->period_start,
+            $request->period_end,
+            $request->notes,
+            (bool) $request->input('include_contributions', false)
         );
 
         return response()->json($result, $result['success'] ? 200 : 400);
