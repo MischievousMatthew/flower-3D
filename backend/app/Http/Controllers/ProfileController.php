@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use App\Helpers\CloudinaryHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -16,24 +16,17 @@ class ProfileController extends Controller
 
     public function getProfile()
     {
-        $authUser = null;
         try {
-            $authUser = Auth::user();
-
             return response()->json([
                 'success' => true,
-                'user'    => $this->formatUserResponse($authUser),
+                'user'    => $this->formatUserResponse(Auth::user()),
             ]);
         } catch (\Throwable $e) {
             Log::error('Profile fetch error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch profile data',
-                'debug'   => [
-                    'exception_class'   => get_class($e),
-                    'exception_message' => $e->getMessage(),
-                    'auth_user_null'    => $authUser === null,
-                ],
+                'debug'   => $e->getMessage(),
             ], 500);
         }
     }
@@ -57,21 +50,16 @@ class ProfileController extends Controller
             ]);
 
             if ($request->hasFile('profile_picture')) {
-                // Delete old picture from Cloudinary if it's a public_id (not a URL)
                 if ($user->profile_picture && !str_starts_with($user->profile_picture, 'http')) {
-                    try {
-                        cloudinary()->destroy($user->profile_picture);
-                    } catch (\Throwable $e) {
-                        Log::warning('Cloudinary delete failed: ' . $user->profile_picture);
-                    }
+                    CloudinaryHelper::destroy($user->profile_picture);
                 }
 
-                $result = cloudinary()->upload($request->file('profile_picture')->getRealPath(), [
-                    'folder'        => 'profile_pictures',
-                    'resource_type' => 'image',
-                ]);
+                $result = CloudinaryHelper::upload(
+                    $request->file('profile_picture')->getRealPath(),
+                    ['folder' => 'profile_pictures', 'resource_type' => 'image']
+                );
 
-                $validated['profile_picture'] = $result->getPublicId();
+                $validated['profile_picture'] = $result['public_id'];
             }
 
             if ($request->has('full_name')) {
@@ -93,7 +81,7 @@ class ProfileController extends Controller
             return response()->json(['success' => false, 'errors' => $e->errors()], 422);
         } catch (\Throwable $e) {
             Log::error('Profile update error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to update profile'], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
@@ -106,62 +94,35 @@ class ProfileController extends Controller
 
             $user = Auth::user();
 
+            // Delete old picture if it's a Cloudinary public_id
             if ($user->profile_picture && !str_starts_with($user->profile_picture, 'http')) {
-                try {
-                    cloudinary()->destroy($user->profile_picture);
-                } catch (\Throwable $e) {
-                    Log::warning('Cloudinary delete failed: ' . $e->getMessage());
-                }
+                CloudinaryHelper::destroy($user->profile_picture);
             }
 
-            // ── Test Cloudinary connection before uploading ────────────────
-            try {
-                $filePath = $request->file('profile_picture')->getRealPath();
+            // Upload directly via SDK — no package config needed
+            $result = CloudinaryHelper::upload(
+                $request->file('profile_picture')->getRealPath(),
+                ['folder' => 'profile_pictures', 'resource_type' => 'image']
+            );
 
-
-                if (!file_exists($filePath)) {
-                    return response()->json([
-                        'success' => false,
-                        'debug'   => 'File does not exist at: ' . $filePath,
-                    ], 500);
-                }
-
-                $result = cloudinary()->upload($filePath, [
-                    'folder'        => 'profile_pictures',
-                    'resource_type' => 'image',
-                ]);
-
-
-            } catch (\Throwable $e) {
-                Log::error('Cloudinary upload failed: ' . $e->getMessage());
-                Log::error($e->getTraceAsString());
-                return response()->json([
-                    'success' => false,
-                    'debug'   => 'Cloudinary upload error: ' . $e->getMessage(),
-                    'trace'   => substr($e->getTraceAsString(), 0, 500), // Return first 500 chars of trace
-                ], 500);
-            }
-
-            $user->profile_picture = $result->getPublicId();
+            $user->profile_picture = $result['public_id'];
             $user->save();
 
             return response()->json([
                 'success'         => true,
                 'message'         => 'Profile picture updated successfully',
-                'profile_picture' => $result->getSecurePath(),
+                'profile_picture' => $result['secure_url'],
                 'user'            => $this->formatUserResponse($user->fresh()),
             ]);
 
         } catch (\Throwable $e) {
             Log::error('Profile picture upload error: ' . $e->getMessage());
-            Log::error($e->getTraceAsString());
             return response()->json([
                 'success' => false,
+                'message' => 'Failed to upload profile picture',
                 'debug'   => $e->getMessage(),
-                'trace'   => substr($e->getTraceAsString(), 0, 500),
             ], 500);
         }
-
     }
 
     private function resolveProfilePictureUrl(?string $profilePicture, string $fullName): string
@@ -173,20 +134,12 @@ class ProfileController extends Controller
             return $fallback;
         }
 
-        // Already a full URL — return as-is
-        // This covers: old local storage URLs that got migrated,
-        // or any Cloudinary secure URLs stored directly
         if (str_starts_with($profilePicture, 'http')) {
             return $profilePicture;
         }
 
-        // Cloudinary public_id — generate the URL
-        try {
-            return cloudinary()->getUrl($profilePicture);
-        } catch (\Throwable $e) {
-            Log::warning('Could not resolve Cloudinary URL for: ' . $profilePicture);
-            return $fallback;
-        }
+        // Build URL directly — no package needed
+        return CloudinaryHelper::getUrl($profilePicture);
     }
 
     private function formatUserResponse($user): array
