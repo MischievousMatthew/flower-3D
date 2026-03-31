@@ -404,7 +404,7 @@ const onVerifyFailure = ({ reason, score }) => {
     success: false,
     message:
       reason === "face_mismatch"
-        ? `Face verification failed (${score}% match). Please try again or contact admin.`
+        ? `Face verification failed. Please try again or contact admin.`
         : "Face verification was cancelled.",
     type: "error",
   };

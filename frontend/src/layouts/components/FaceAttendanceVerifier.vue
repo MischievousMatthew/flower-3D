@@ -229,10 +229,6 @@
         <h2 class="result-title">Identity Verified</h2>
         <div class="result-stats">
           <div class="stat-card">
-            <span class="stat-value">{{ matchScore }}%</span>
-            <span class="stat-label">Face Match</span>
-          </div>
-          <div class="stat-card">
             <span class="stat-value">{{ blinkCount }}x</span>
             <span class="stat-label">Blinks Detected</span>
           </div>
@@ -275,15 +271,6 @@
         </div>
         <h2 class="result-title">Verification Failed</h2>
         <p class="failure-reason">{{ failureReason }}</p>
-        <div class="failure-details" v-if="matchScore !== null">
-          <span
-            >Match score: <strong>{{ matchScore }}%</strong></span
-          >
-          <span
-            >Required:
-            <strong>≥ {{ Math.round(MATCH_THRESHOLD_PERCENT) }}%</strong></span
-          >
-        </div>
         <div class="retry-actions">
           <button class="btn-secondary" @click="closeVerifier">Cancel</button>
           <button class="btn-primary" @click="restart">Try Again</button>

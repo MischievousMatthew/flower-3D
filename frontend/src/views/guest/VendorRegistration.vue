@@ -531,33 +531,45 @@
         </p>
 
         <div class="input-group">
-          <label class="input-label">DTI Registration Number</label>
+          <label class="input-label">DTI Registration Number *</label>
           <input
             v-model="formData.dtiNumber"
             type="text"
             placeholder="Enter DTI number"
             class="form-input"
+            :class="{ error: errors.dtiNumber }"
           />
+          <div v-if="errors.dtiNumber" class="error-message">
+            {{ errors.dtiNumber }}
+          </div>
         </div>
 
         <div class="input-group">
-          <label class="input-label">SEC Registration Number</label>
+          <label class="input-label">SEC Registration Number *</label>
           <input
             v-model="formData.secNumber"
             type="text"
             placeholder="Enter SEC number"
             class="form-input"
+            :class="{ error: errors.secNumber }"
           />
+          <div v-if="errors.secNumber" class="error-message">
+            {{ errors.secNumber }}
+          </div>
         </div>
 
         <div class="input-group">
-          <label class="input-label">Barangay Clearance Number</label>
+          <label class="input-label">Barangay Clearance Number *</label>
           <input
             v-model="formData.barangayClearanceNumber"
             type="text"
             placeholder="Enter Barangay Clearance Number"
             class="form-input"
+            :class="{ error: errors.barangayClearanceNumber }"
           />
+          <div v-if="errors.barangayClearanceNumber" class="error-message">
+            {{ errors.barangayClearanceNumber }}
+          </div>
           <div class="file-upload-container">
             <div
               class="file-drop-zone"
@@ -620,18 +632,26 @@
               accept=".jpg,.jpeg,.png,.pdf,image/*"
               class="file-input-hidden"
               ref="barangay_clearanceInput"
+              :class="{ error: errors.barangay_clearance }"
             />
+          </div>
+          <div v-if="errors.barangay_clearance" class="error-message">
+            {{ errors.barangay_clearance }}
           </div>
         </div>
 
         <div class="input-group">
-          <label class="input-label">Mayor's Permit Number</label>
+          <label class="input-label">Mayor's Permit Number *</label>
           <input
             v-model="formData.mayorPermitNumber"
             type="text"
             placeholder="Enter Mayor's Permit Number"
             class="form-input"
+            :class="{ error: errors.mayorPermitNumber }"
           />
+          <div v-if="errors.mayorPermitNumber" class="error-message">
+            {{ errors.mayorPermitNumber }}
+          </div>
           <div class="file-upload-container">
             <div
               class="file-drop-zone"
@@ -687,18 +707,26 @@
               accept=".jpg,.jpeg,.png,.pdf,image/*"
               class="file-input-hidden"
               ref="mayor_permitInput"
+              :class="{ error: errors.mayor_permit }"
             />
+          </div>
+          <div v-if="errors.mayor_permit" class="error-message">
+            {{ errors.mayor_permit }}
           </div>
         </div>
 
         <div class="input-group">
-          <label class="input-label">BIR Registration / TIN</label>
+          <label class="input-label">BIR Registration / TIN *</label>
           <input
             v-model="formData.birTin"
             type="text"
             placeholder="Enter TIN"
             class="form-input"
+            :class="{ error: errors.birTin }"
           />
+          <div v-if="errors.birTin" class="error-message">
+            {{ errors.birTin }}
+          </div>
         </div>
 
         <div class="info-box">
@@ -1885,6 +1913,37 @@ const validateStep = (step) => {
       }
       if (!fileObjects.proof_of_address) {
         errors.proof_of_address = "Proof of address is required";
+        isValid = false;
+      }
+      break;
+
+    case 3:
+      if (!formData.dtiNumber.trim()) {
+        errors.dtiNumber = "DTI number is required";
+        isValid = false;
+      }
+      if (!formData.secNumber.trim()) {
+        errors.secNumber = "SEC number is required";
+        isValid = false;
+      }
+      if (!formData.barangayClearanceNumber.trim()) {
+        errors.barangayClearanceNumber = "Barangay Clearance number is required";
+        isValid = false;
+      }
+      if (!fileObjects.barangay_clearance) {
+        errors.barangay_clearance = "Barangay Clearance document is required";
+        isValid = false;
+      }
+      if (!formData.mayorPermitNumber.trim()) {
+        errors.mayorPermitNumber = "Mayor's Permit number is required";
+        isValid = false;
+      }
+      if (!fileObjects.mayor_permit) {
+        errors.mayor_permit = "Mayor's Permit document is required";
+        isValid = false;
+      }
+      if (!formData.birTin.trim()) {
+        errors.birTin = "BIR Registration / TIN is required";
         isValid = false;
       }
       break;
