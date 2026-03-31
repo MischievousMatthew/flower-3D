@@ -117,6 +117,23 @@
           ></textarea>
         </div>
 
+        <div class="form-group contributions-toggle">
+          <div class="toggle-row">
+            <label class="toggle-label-main">
+              <input
+                type="checkbox"
+                v-model="formData.include_contributions"
+                @change="clearPreview"
+                class="toggle-checkbox"
+              />
+              <span class="toggle-text">
+                Include Government Contributions
+                <span class="toggle-subtext">(SSS, PhilHealth, Pag-IBIG)</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
         <div class="action-buttons">
           <button
             @click="previewPayroll"
@@ -507,6 +524,52 @@
           </div>
         </div>
 
+        <!-- Government Contributions Breakdown -->
+        <div
+          v-if="previewData.include_contributions"
+          class="contributions-breakdown"
+        >
+          <h4 class="contributions-title">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            Government Contributions
+          </h4>
+
+          <div class="contribution-item">
+            <span class="contribution-label">SSS (4.5%, max ₱1,900)</span>
+            <span class="contribution-value"
+              >-₱{{ previewData.sss_contribution }}</span
+            >
+          </div>
+          <div class="contribution-item">
+            <span class="contribution-label"
+              >PhilHealth (2.5%, ceiling ₱100k)</span
+            >
+            <span class="contribution-value"
+              >-₱{{ previewData.philhealth_contribution }}</span
+            >
+          </div>
+          <div class="contribution-item">
+            <span class="contribution-label">Pag-IBIG (1-2%, cap ₱10k)</span>
+            <span class="contribution-value"
+              >-₱{{ previewData.pagibig_contribution }}</span
+            >
+          </div>
+          <div class="contribution-total">
+            <span>Total Contributions</span>
+            <span>-₱{{ previewData.total_contributions }}</span>
+          </div>
+        </div>
+
         <!-- Salary Breakdown Explanation -->
         <div class="salary-explanation">
           <h4>How Salary is Calculated:</h4>
@@ -682,6 +745,7 @@ const formData = ref({
   period_start: "",
   period_end: "",
   notes: "",
+  include_contributions: false,
 });
 
 // Computed
@@ -754,16 +818,14 @@ function clearPreview() {
 
 async function previewPayroll() {
   if (!canPreview.value) return;
-
   try {
     isPreviewLoading.value = true;
-
     const response = await payrollApi.previewPayroll({
       employee_id: formData.value.employee_id,
       period_start: formData.value.period_start,
       period_end: formData.value.period_end,
+      include_contributions: formData.value.include_contributions, // ← add
     });
-
     if (response.success) {
       previewData.value = response.data;
     } else {
@@ -771,7 +833,6 @@ async function previewPayroll() {
     }
   } catch (error) {
     toast.error(error.response?.data?.message || "Failed to preview payroll");
-    console.error("Preview error:", error);
   } finally {
     isPreviewLoading.value = false;
   }
@@ -779,19 +840,15 @@ async function previewPayroll() {
 
 async function generatePayroll() {
   if (!previewData.value) return;
-
   try {
     isGenerating.value = true;
-
     const response = await payrollApi.generatePayroll({
       employee_id: formData.value.employee_id,
       period_start: formData.value.period_start,
       period_end: formData.value.period_end,
       notes: formData.value.notes,
+      include_contributions: formData.value.include_contributions, // ← add
     });
-
-    console.log("Generate response:", response);
-
     if (response.success) {
       toast.success("Payroll generated successfully!");
       await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -800,8 +857,6 @@ async function generatePayroll() {
       toast.error(response.message || "Failed to generate payroll");
     }
   } catch (error) {
-    console.error("Generate error:", error);
-    console.error("Error response:", error.response?.data);
     toast.error(
       error.response?.data?.message ||
         error.message ||
@@ -1263,6 +1318,102 @@ onMounted(() => {
 .salary-config-warning svg {
   color: #d97706;
   flex-shrink: 0;
+}
+
+/* Government Contributions Toggle */
+.contributions-toggle {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #f0fff4;
+  border: 1px solid #9ae6b4;
+  border-radius: 10px;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+}
+
+.toggle-label-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.toggle-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: #48bb78;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toggle-subtext {
+  font-size: 12px;
+  font-weight: 400;
+  color: #718096;
+}
+
+/* Contributions Breakdown */
+.contributions-breakdown {
+  background: #fffbeb;
+  border: 1px solid #f6e05e;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.contributions-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #744210;
+  margin: 0 0 12px 0;
+}
+
+.contributions-title svg {
+  color: #d69e2e;
+}
+
+.contribution-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed #fef08a;
+  font-size: 13px;
+  color: #92400e;
+}
+
+.contribution-label {
+  font-weight: 500;
+}
+
+.contribution-value {
+  font-weight: 600;
+  color: #b45309;
+}
+
+.contribution-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #78350f;
 }
 
 .warning-content {
