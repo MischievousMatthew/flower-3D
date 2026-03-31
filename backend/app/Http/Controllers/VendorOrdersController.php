@@ -26,13 +26,6 @@ class VendorOrdersController extends Controller
                 ], 403);
             }
 
-            // Also check if vendor_data exists
-            if (empty($user->vendor_data)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Vendor data not found'
-                ], 403);
-            }
 
             Log::info('Fetching orders for vendor', [
                 'vendor_id' => $user->id,
