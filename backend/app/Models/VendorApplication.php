@@ -179,7 +179,7 @@ class VendorApplication extends Model
     {
         if (!$path) return null;
         if (str_starts_with($path, 'http')) return $path;
-        return asset('storage/' . $path);
+        return secure_asset('storage/' . $path);
     }
 
     protected function governmentIdUrl(): Attribute
@@ -240,7 +240,7 @@ class VendorApplication extends Model
         if (!$path) return null;
         if (str_starts_with($path, 'http')) return $path;
         if (preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $path)) {
-            return asset('storage/' . $path);
+            return secure_asset('storage/' . $path);
         }
         return CloudinaryHelper::getUrl($path);
     }

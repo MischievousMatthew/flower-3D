@@ -72,25 +72,13 @@
         </router-link>
       </div>
 
-      <!-- <div class="nav-section">
+      <div class="nav-section">
         <div class="section-label">FINANCE</div>
-        <router-link to="/accounts" class="nav-item">
-          <span class="nav-icon">🏦</span>
-          <span>Accounts</span>
-        </router-link>
-        <router-link to="/sales" class="nav-item">
+        <router-link to="/vendor/finance-dashboard" class="nav-item" active-class="active">
           <span class="nav-icon">📈</span>
-          <span>Sales</span>
+          <span>Finance Overview</span>
         </router-link>
-        <router-link to="/purchases" class="nav-item">
-          <span class="nav-icon">🛒</span>
-          <span>Purchases</span>
-        </router-link>
-        <router-link to="/payment-method" class="nav-item">
-          <span class="nav-icon">💳</span>
-          <span>Payment Method</span>
-        </router-link>
-      </div> -->
+      </div>
 
       <div class="nav-section">
         <div class="section-label">PHYSICAL ASSET</div>

@@ -108,6 +108,11 @@ const routes = [
         component: () => import("../views/vendor/VendorChat.vue"),
       },
       {
+        path: "finance-dashboard",
+        name: "VendorFinanceDashboard",
+        component: () => import("../views/ERP/Finance/Dashboard.vue"),
+      },
+      {
         path: "profile",
         name: "VendorProfile",
         component: () => import("../views/vendor/VendorProfile.vue"),

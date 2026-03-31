@@ -30,6 +30,7 @@ use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ShipmentController;
 use App\Http\Controllers\BarcodeController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\SupplyChainAnalyticsController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryBarcodeController;
 use App\Http\Controllers\VendorStorefrontController;
@@ -494,11 +495,11 @@ Route::middleware('auth:sanctum')->group(function () {
         });
 
         Route::prefix('analytics')->group(function () {
-            Route::get('/summary',              [AnalyticsController::class, 'summary']);
-            Route::get('/inventory',            [AnalyticsController::class, 'inventory']);
+            Route::get('/summary',              [SupplyChainAnalyticsController::class, 'summary']);
+            Route::get('/inventory',            [SupplyChainAnalyticsController::class, 'inventory']);
             Route::get('/orders',               [AnalyticsController::class, 'orders']);
             Route::get('/shipments',            [AnalyticsController::class, 'shipments']);
-            Route::get('/supplier-performance', [AnalyticsController::class, 'supplierPerformance']);
+            Route::get('/supplier-performance', [SupplyChainAnalyticsController::class, 'supplierPerformance']);
             Route::get('/movements',            [AnalyticsController::class, 'movements']);
         });
     });

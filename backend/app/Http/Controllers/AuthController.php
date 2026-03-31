@@ -503,7 +503,7 @@ class AuthController extends Controller
                     'username'   => $user->username,
                     'email'      => $user->email,
                     'role'       => $user->role,
-                    'store_name' => $user->vendor_data['store_name'] ?? null,
+                    'vendor_data'=> $user->vendor_data,
                 ],
             ]);
         } catch (Exception $e) {
