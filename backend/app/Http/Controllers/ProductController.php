@@ -168,10 +168,24 @@ class ProductController extends Controller
                 $this->handle3DModel($request->file('model_file'), $product);
             }
 
+            if ($request->hasFile('images')) {
+                Log::info('Product images received', [
+                    'count' => count($request->file('images')),
+                    'files' => collect($request->file('images'))->map(fn($f) => [
+                        'name'      => $f->getClientOriginalName(),
+                        'size'      => $f->getSize(),
+                        'mime'      => $f->getMimeType(),
+                        'real_path' => $f->getRealPath(),
+                        'path_exists' => file_exists($f->getRealPath() ?: ''),
+                    ])->toArray(),
+                ]);
+            }
+
             // ── Image uploads ─────────────────────────────────────────────────
             if ($request->hasFile('images')) {
                 foreach ($request->file('images') as $index => $imageFile) {
-                    // Pass the UploadedFile directly — helper resolves path safely
+
+                    // ✅ Pass UploadedFile directly — NOT $imageFile->getRealPath()
                     $result = CloudinaryHelper::upload($imageFile, [
                         'folder'        => 'product_images',
                         'resource_type' => 'image',
@@ -558,7 +572,7 @@ class ProductController extends Controller
     {
         $extension = strtolower($file->getClientOriginalExtension());
 
-        // Pass UploadedFile directly — helper handles getRealPath safely
+        // ✅ Pass UploadedFile directly — NOT $file->getRealPath()
         $result = CloudinaryHelper::upload($file, [
             'folder'        => 'product_models',
             'resource_type' => 'raw',
