@@ -562,22 +562,45 @@ Route::get('/storage/{path}', function (string $path) {
 ->where('path', '.*')
 ->name('storage.file');
 
-Route::get('/debug-cloudinary', function () {
+Route::get('/debug-cloudinary-upload', function () {
     try {
-        $cloudinaryUrl = env('CLOUDINARY_URL', 'NOT SET');
-        
+        // Test credentials
+        $connection = \App\Helpers\CloudinaryHelper::testConnection();
+
+        if (!$connection['connected']) {
+            return response()->json([
+                'status' => 'credentials_failed',
+                'error'  => $connection['error'],
+            ]);
+        }
+
+        // Test upload with a 1x1 pixel PNG
+        $tmpFile = tempnam(sys_get_temp_dir(), 'cld_test_');
+        file_put_contents($tmpFile, base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+        ));
+
+        $result = \App\Helpers\CloudinaryHelper::upload($tmpFile, [
+            'folder'        => 'debug_tests',
+            'resource_type' => 'image',
+        ]);
+
+        // Clean up test file
+        \App\Helpers\CloudinaryHelper::destroy($result['public_id']);
+        @unlink($tmpFile);
+
         return response()->json([
-            'UNIQUE_VERSION_ID'     => 'FIX_V4_NESTED_CLOUD',
-            'cloudinary_url_set'    => !empty($cloudinaryUrl),
-            'has_duplicate_prefix'  => str_contains($cloudinaryUrl, 'CLOUDINARY_URL='),
-            'first_20_chars'        => substr($cloudinaryUrl, 0, 20),
-            'config_cloud_url'      => substr(config('cloudinary.cloud_url') ?? 'null', 0, 20),
-            'has_cloud_key'         => config()->has('cloudinary.cloud'),
-            'cloud_name_set'        => !empty(config('cloudinary.cloud.cloud_name')),
-            'php_version'           => PHP_VERSION,
+            'status'     => 'upload_works',
+            'public_id'  => $result['public_id'],
+            'secure_url' => $result['secure_url'],
+            'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
         ]);
 
     } catch (\Throwable $e) {
-        return response()->json(['error' => $e->getMessage()]);
+        return response()->json([
+            'status' => 'failed',
+            'error'  => $e->getMessage(),
+            'type'   => get_class($e),
+        ]);
     }
 });

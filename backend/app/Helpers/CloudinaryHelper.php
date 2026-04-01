@@ -4,6 +4,7 @@ namespace App\Helpers;
 
 use Cloudinary\Cloudinary;
 use Cloudinary\Configuration\Configuration;
+use Illuminate\Support\Facades\Log;
 
 class CloudinaryHelper
 {
@@ -11,14 +12,13 @@ class CloudinaryHelper
      * Cloudinary can be configured either via:
      * - CLOUDINARY_CLOUD_NAME + CLOUDINARY_API_KEY + CLOUDINARY_API_SECRET
      * - or a single CLOUDINARY_URL like: cloudinary://<key>:<secret>@<cloud_name>
-     *
-     * Some hosts (e.g. Render) commonly provide only CLOUDINARY_URL.
      */
     private static function parseCloudinaryUrl(?string $cloudinaryUrl): array
     {
         if (!$cloudinaryUrl) return [null, null, null];
 
         $cloudinaryUrl = trim($cloudinaryUrl);
+
         // Some users accidentally paste "CLOUDINARY_URL=cloudinary://..."
         if (str_starts_with($cloudinaryUrl, 'CLOUDINARY_URL=')) {
             $cloudinaryUrl = substr($cloudinaryUrl, strlen('CLOUDINARY_URL='));
@@ -27,11 +27,11 @@ class CloudinaryHelper
         $parts = parse_url($cloudinaryUrl);
         if (!$parts) return [null, null, null];
 
-        $cloudName = $parts['host'] ?? null;
-        $apiKey    = $parts['user'] ?? null;
-        $apiSecret = $parts['pass'] ?? null;
-
-        return [$cloudName, $apiKey, $apiSecret];
+        return [
+            $parts['host'] ?? null,
+            $parts['user'] ?? null,
+            $parts['pass'] ?? null,
+        ];
     }
 
     private static function getClient(): Cloudinary
@@ -43,64 +43,209 @@ class CloudinaryHelper
         // Fallback to CLOUDINARY_URL if individual vars are not set
         if (empty($cloudName) || empty($apiKey) || empty($apiSecret)) {
             [$urlCloud, $urlKey, $urlSecret] = self::parseCloudinaryUrl(env('CLOUDINARY_URL'));
-            $cloudName ??= $urlCloud;
-            $apiKey    ??= $urlKey;
-            $apiSecret ??= $urlSecret;
+            $cloudName = $cloudName ?: $urlCloud;
+            $apiKey    = $apiKey    ?: $urlKey;
+            $apiSecret = $apiSecret ?: $urlSecret;
         }
 
         if (empty($cloudName) || empty($apiKey) || empty($apiSecret)) {
             throw new \RuntimeException(
-                'Cloudinary is not configured. Set CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME/CLOUDINARY_API_KEY/CLOUDINARY_API_SECRET.'
+                'Cloudinary is not configured. Set CLOUDINARY_URL or '
+                . 'CLOUDINARY_CLOUD_NAME/CLOUDINARY_API_KEY/CLOUDINARY_API_SECRET.'
             );
         }
 
         $config = new Configuration();
-        $config->cloud->cloudName  = $cloudName;
-        $config->cloud->apiKey     = $apiKey;
-        $config->cloud->apiSecret  = $apiSecret;
-        $config->url->secure       = true;
+        $config->cloud->cloudName = $cloudName;
+        $config->cloud->apiKey    = $apiKey;
+        $config->cloud->apiSecret = $apiSecret;
+        $config->url->secure      = true;
 
         return new Cloudinary($config);
     }
 
-    public static function upload(string $filePath, array $options = []): array
+    /**
+     * Upload a file to Cloudinary.
+     *
+     * Accepts either:
+     *   - A file path string
+     *   - An \Illuminate\Http\UploadedFile instance
+     *
+     * getRealPath() can return false on some server environments (e.g. Render).
+     * We copy to a guaranteed temp path as a safe fallback.
+     *
+     * @param  string|\Illuminate\Http\UploadedFile  $file
+     * @param  array  $options  Cloudinary upload options
+     * @return array{ public_id: string, secure_url: string }
+     * @throws \RuntimeException on upload failure
+     */
+    public static function upload($file, array $options = []): array
     {
-        $client = self::getClient();
-        $result = $client->uploadApi()->upload($filePath, $options);
+        $tmpPath = null;
 
-        return [
-            'public_id'   => $result['public_id'],
-            'secure_url'  => $result['secure_url'],
-        ];
-    }
+        // ── Resolve file path safely ──────────────────────────────────────
+        if ($file instanceof \Illuminate\Http\UploadedFile) {
+            $filePath = $file->getRealPath();
 
-    public static function destroy(string $publicId, array $options = []): void
-    {
+            if (!$filePath || !file_exists($filePath)) {
+                // Fallback: move to a known temp directory
+                $tmpPath  = tempnam(sys_get_temp_dir(), 'cld_upload_');
+                $file->move(dirname($tmpPath), basename($tmpPath));
+                $filePath = $tmpPath;
+            }
+        } else {
+            $filePath = $file;
+        }
+
+        if (!file_exists($filePath)) {
+            throw new \RuntimeException("Upload file not found at path: {$filePath}");
+        }
+
+        // ── Default resource_type to auto if not specified ────────────────
+        if (!isset($options['resource_type'])) {
+            $options['resource_type'] = 'auto';
+        }
+
         try {
             $client = self::getClient();
-            $client->uploadApi()->destroy($publicId, $options);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Cloudinary delete failed: ' . $e->getMessage());
+            $result = $client->uploadApi()->upload($filePath, $options);
+
+            // SDK v2 returns ApiResponse which implements ArrayAccess.
+            // Convert to plain array to avoid edge cases.
+            $data = is_array($result) ? $result : (array) $result;
+
+            $publicId  = $data['public_id']  ?? null;
+            $secureUrl = $data['secure_url'] ?? null;
+
+            if (!$publicId || !$secureUrl) {
+                Log::error('Cloudinary upload returned incomplete response', [
+                    'response_keys' => array_keys($data),
+                    'options'       => $options,
+                ]);
+                throw new \RuntimeException(
+                    'Cloudinary upload succeeded but returned no public_id or secure_url. '
+                    . 'Response keys: ' . implode(', ', array_keys($data))
+                );
+            }
+
+            Log::info('Cloudinary upload successful', [
+                'public_id'  => $publicId,
+                'secure_url' => substr($secureUrl, 0, 60) . '...',
+            ]);
+
+            return [
+                'public_id'  => $publicId,
+                'secure_url' => $secureUrl,
+            ];
+
+        } catch (\Cloudinary\Exception\Error $e) {
+            Log::error('Cloudinary API error during upload', [
+                'message' => $e->getMessage(),
+                'options' => $options,
+                'file'    => $filePath,
+            ]);
+            throw new \RuntimeException('Cloudinary upload failed: ' . $e->getMessage(), 0, $e);
+
+        } finally {
+            // Clean up temp file if we created one
+            if ($tmpPath && file_exists($tmpPath)) {
+                @unlink($tmpPath);
+            }
         }
     }
 
+    /**
+     * Delete a file from Cloudinary by public_id.
+     * Never throws — failures are logged and swallowed so they
+     * never block the main operation.
+     */
+    public static function destroy(string $publicId, array $options = []): void
+    {
+        if (!$publicId) return;
+
+        try {
+            $client = self::getClient();
+            $client->uploadApi()->destroy($publicId, $options);
+
+            Log::info('Cloudinary file deleted', ['public_id' => $publicId]);
+
+        } catch (\Throwable $e) {
+            Log::warning('Cloudinary delete failed (non-critical)', [
+                'public_id' => $publicId,
+                'error'     => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Build a Cloudinary delivery URL from a public_id.
+     *
+     * If the value is already a full URL (e.g. old local storage URLs
+     * or directly stored Cloudinary secure URLs), return it as-is.
+     *
+     * @param  string  $publicId       Cloudinary public_id or full URL
+     * @param  string  $resourceType   image | video | raw
+     */
     public static function getUrl(string $publicId, string $resourceType = 'image'): string
     {
         if (!$publicId) {
             return '';
         }
 
-        // Return as-is if it's already a full URL
+        // Already a full URL — return as-is
         if (str_starts_with($publicId, 'http')) {
             return $publicId;
         }
 
         $cloudName = env('CLOUDINARY_CLOUD_NAME');
-        
-        // Resource types: image, video, raw, auto
-        // URL structure: https://res.cloudinary.com/<cloud_name>/<resource_type>/upload/<public_id>
-        $type = ($resourceType === 'image') ? 'image' : (($resourceType === 'video') ? 'video' : 'raw');
-        
+
+        if (!$cloudName) {
+            // Fallback: try to parse from CLOUDINARY_URL
+            [$cloudName] = self::parseCloudinaryUrl(env('CLOUDINARY_URL'));
+        }
+
+        if (!$cloudName) {
+            Log::warning('CLOUDINARY_CLOUD_NAME not set, cannot build URL for: ' . $publicId);
+            return '';
+        }
+
+        $type = match ($resourceType) {
+            'video' => 'video',
+            'raw'   => 'raw',
+            default => 'image',
+        };
+
         return "https://res.cloudinary.com/{$cloudName}/{$type}/upload/{$publicId}";
+    }
+
+    /**
+     * Build a Cloudinary raw resource URL (for 3D models, PDFs, etc.)
+     */
+    public static function getRawUrl(string $publicId): string
+    {
+        return self::getUrl($publicId, 'raw');
+    }
+
+    /**
+     * Quick connectivity test — useful for debug endpoints.
+     * Returns ['connected' => true/false, ...]
+     */
+    public static function testConnection(): array
+    {
+        try {
+            $client = self::getClient();
+            // Ping by listing a single resource — minimal API call
+            $client->adminApi()->assets(['max_results' => 1]);
+
+            return [
+                'connected'  => true,
+                'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'connected' => false,
+                'error'     => $e->getMessage(),
+            ];
+        }
     }
 }

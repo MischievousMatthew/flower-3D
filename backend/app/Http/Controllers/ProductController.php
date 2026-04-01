@@ -153,7 +153,7 @@ class ProductController extends Controller
                 return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
             }
 
-            $data = $validator->validated();
+            $data             = $validator->validated();
             $data['owner_id'] = $ownerId;
 
             if (empty($data['has_discount'])) {
@@ -163,19 +163,20 @@ class ProductController extends Controller
 
             $product = Product::create($data);
 
-            // ── 3D Model upload to Cloudinary ─────────────────────────────
+            // ── 3D Model upload ───────────────────────────────────────────────
             if ($request->hasFile('model_file')) {
                 $this->handle3DModel($request->file('model_file'), $product);
             }
 
-            // ── Product image uploads to Cloudinary ───────────────────────
+            // ── Image uploads ─────────────────────────────────────────────────
             if ($request->hasFile('images')) {
                 foreach ($request->file('images') as $index => $imageFile) {
-                    $result = CloudinaryHelper::upload($imageFile->getRealPath(), [
+                    // Pass the UploadedFile directly — helper resolves path safely
+                    $result = CloudinaryHelper::upload($imageFile, [
                         'folder'        => 'product_images',
                         'resource_type' => 'image',
                     ]);
-                    
+
                     ProductImage::create([
                         'product_id'    => $product->id,
                         'image_url'     => $result['secure_url'],
@@ -199,23 +200,23 @@ class ProductController extends Controller
         } catch (\Throwable $e) {
             $errorId = (string) Str::uuid();
 
-            Log::error('Error creating product', [
-                'error_id' => $errorId,
-                'message'  => $e->getMessage(),
-                'type'     => get_class($e),
-                'trace'    => $e->getTraceAsString(),
-                'user_id'  => $request->user()?->id,
+            // Always log the full error — visible in Render logs regardless of APP_DEBUG
+            Log::error('ProductController::store failed', [
+                'error_id'   => $errorId,
+                'type'       => get_class($e),
+                'message'    => $e->getMessage(),
+                'file'       => $e->getFile(),
+                'line'       => $e->getLine(),
+                'user_id'    => $request->user()?->id,
+                'request'    => $request->except(['images', 'model_file']),
             ]);
 
             return response()->json([
                 'success'  => false,
                 'message'  => 'Failed to create product',
                 'error_id' => $errorId,
-                // Include details only in debug to avoid leaking internals
-                'error'    => config('app.debug') ? [
-                    'type'    => get_class($e),
-                    'message' => $e->getMessage(),
-                ] : null,
+                // Show message in debug, hide in production
+                'debug'    => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }
@@ -557,7 +558,8 @@ class ProductController extends Controller
     {
         $extension = strtolower($file->getClientOriginalExtension());
 
-        $result = CloudinaryHelper::upload($file->getRealPath(), [
+        // Pass UploadedFile directly — helper handles getRealPath safely
+        $result = CloudinaryHelper::upload($file, [
             'folder'        => 'product_models',
             'resource_type' => 'raw',
         ]);
