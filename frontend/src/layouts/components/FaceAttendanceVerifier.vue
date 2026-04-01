@@ -5,6 +5,7 @@
     @click.self="handleOverlayClick"
   >
     <div class="face-verifier-modal">
+      <!-- Header -->
       <div class="modal-header">
         <div class="header-left">
           <div class="employee-avatar" v-if="employee?.avatar_url">
@@ -17,11 +18,20 @@
             </span>
           </div>
         </div>
+        <div class="attempt-counter" v-if="attempts > 0">
+          <span
+            class="attempt-dot"
+            v-for="n in 3"
+            :key="n"
+            :class="{ used: n <= attempts }"
+          ></span>
+        </div>
         <button class="close-btn" @click="closeVerifier" :disabled="isSending">
           ✕
         </button>
       </div>
 
+      <!-- Step Progress -->
       <div class="step-progress">
         <div
           v-for="(step, index) in steps"
@@ -42,6 +52,7 @@
         <div class="step-line" :style="{ width: stepLineWidth }"></div>
       </div>
 
+      <!-- PHASE: Loading Models -->
       <div
         v-if="phase === 'LOADING_MODELS'"
         class="phase-container loading-phase"
@@ -79,15 +90,20 @@
         </div>
       </div>
 
+      <!-- PHASE: Webcam / Positioning / Liveness / Capturing / Matching -->
       <div
         v-show="
-          ['STARTING_WEBCAM', 'LIVENESS', 'CAPTURING', 'MATCHING'].includes(
-            phase,
-          )
+          [
+            'STARTING_WEBCAM',
+            'POSITIONING',
+            'LIVENESS',
+            'CAPTURING',
+            'MATCHING',
+          ].includes(phase)
         "
         class="phase-container webcam-phase"
       >
-        <!-- Video + Canvas overlay -->
+        <!-- Video + canvas -->
         <div class="video-wrapper">
           <video
             ref="videoRef"
@@ -98,7 +114,14 @@
           ></video>
           <canvas ref="overlayCanvasRef" class="overlay-canvas"></canvas>
 
-          <!-- Scanning frame -->
+          <!-- Depth check flash overlay -->
+          <div
+            class="env-flash"
+            :class="{ active: flashActive }"
+            :style="{ background: flashColor }"
+          ></div>
+
+          <!-- Scan frame corners -->
           <div
             class="scan-frame"
             :class="{
@@ -112,77 +135,42 @@
             <div class="corner br"></div>
           </div>
 
-          <!-- Phase overlay for STARTING_WEBCAM -->
+          <!-- Starting webcam overlay -->
           <div v-if="phase === 'STARTING_WEBCAM'" class="video-overlay">
             <div class="spinner-ring"></div>
             <p>Starting camera...</p>
           </div>
-        </div>
 
-        <!-- Liveness instruction panel -->
-        <div v-if="phase === 'LIVENESS'" class="liveness-panel">
-          <div
-            class="challenge-card"
-            :class="{ 'challenge-done': livenessStep === 'PASSED' }"
-          >
-            <div class="challenge-icon">{{ currentChallengeIcon }}</div>
-            <h3 class="challenge-title">{{ currentChallengeTitle }}</h3>
-            <p class="challenge-description">
-              {{ currentChallengeDescription }}
-            </p>
-
-            <!-- Blink progress indicators -->
-            <div
-              v-if="livenessStep === 'BLINK_CHALLENGE'"
-              class="blink-indicators"
-            >
-              <div
-                v-for="n in REQUIRED_BLINKS"
-                :key="n"
-                class="blink-dot"
-                :class="{ filled: blinkCount >= n }"
-              >
-                {{ blinkCount >= n ? "👁️" : "○" }}
-              </div>
+          <!-- Positioning overlay -->
+          <div v-if="phase === 'POSITIONING'" class="positioning-overlay">
+            <div class="guide-circle" :class="positionGuideClass">
+              <div class="guide-ring-inner"></div>
             </div>
-
-            <!-- Frame stability bar -->
-            <div
-              v-if="livenessStep === 'DETECT_FACE'"
-              class="stability-bar-wrapper"
-            >
-              <p class="stability-label">Hold still...</p>
+            <div class="position-label">{{ positionLabel }}</div>
+            <div class="stability-bar-wrapper">
               <div class="stability-bar">
                 <div
                   class="stability-fill"
                   :style="{
                     width:
-                      (stableFrameCount / REQUIRED_STABLE_FRAMES) * 100 + '%',
+                      (positionFrames / REQUIRED_POSITION_FRAMES) * 100 + '%',
                   }"
                 ></div>
               </div>
             </div>
           </div>
 
-          <!-- Status line -->
-          <div class="status-line" :class="faceDetected ? 'ok' : 'warn'">
-            <span>{{
-              faceDetected
-                ? "✅ Face detected"
-                : "⚠️ No face detected — look at the camera"
-            }}</span>
+          <!-- Capturing overlay -->
+          <div v-if="phase === 'CAPTURING'" class="video-overlay capture-flash">
+            <div class="flash-circle">📸</div>
+            <p>Capturing...</p>
           </div>
-        </div>
 
-        <!-- CAPTURING: brief overlay -->
-        <div v-if="phase === 'CAPTURING'" class="video-overlay capture-flash">
-          <div class="flash-circle">📸</div>
-          <p>Capturing...</p>
-        </div>
-
-        <!-- MATCHING: brief overlay -->
-        <div v-if="phase === 'MATCHING'" class="video-overlay matching-overlay">
-          <div class="matching-animation">
+          <!-- Matching overlay -->
+          <div
+            v-if="phase === 'MATCHING'"
+            class="video-overlay matching-overlay"
+          >
             <div class="face-compare">
               <div class="compare-face">
                 <img
@@ -207,8 +195,111 @@
             </div>
           </div>
         </div>
+
+        <!-- LIVENESS Challenge Panel -->
+        <div v-if="phase === 'LIVENESS'" class="liveness-panel">
+          <!-- Challenge timer ring + instruction -->
+          <div
+            class="challenge-card"
+            :class="{ 'challenge-done': currentChallengeComplete }"
+          >
+            <div class="challenge-header">
+              <div class="challenge-timer">
+                <svg class="timer-ring" viewBox="0 0 44 44">
+                  <circle
+                    cx="22"
+                    cy="22"
+                    r="18"
+                    fill="none"
+                    stroke="#e2e8f0"
+                    stroke-width="3"
+                  />
+                  <circle
+                    cx="22"
+                    cy="22"
+                    r="18"
+                    fill="none"
+                    stroke="#48bb78"
+                    stroke-width="3"
+                    stroke-dasharray="113"
+                    :stroke-dashoffset="timerDashOffset"
+                    stroke-linecap="round"
+                    transform="rotate(-90 22 22)"
+                  />
+                </svg>
+                <span class="timer-text">{{ challengeTimeLeft }}</span>
+              </div>
+              <div class="challenge-icon-title">
+                <span class="challenge-big-icon">{{
+                  currentChallenge?.icon
+                }}</span>
+                <div>
+                  <div class="challenge-title">
+                    {{ currentChallenge?.label }}
+                  </div>
+                  <div class="challenge-subtitle">
+                    {{ currentChallenge?.hint }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Chain progress dots -->
+            <div class="chain-progress">
+              <div
+                v-for="(ch, i) in activeChallenges"
+                :key="i"
+                class="chain-dot"
+                :class="{
+                  done: i < challengeIndex,
+                  active: i === challengeIndex,
+                  pending: i > challengeIndex,
+                }"
+              >
+                <span>{{ i < challengeIndex ? "✓" : ch.icon }}</span>
+              </div>
+              <div
+                class="chain-connector"
+                v-for="i in activeChallenges.length - 1"
+                :key="'c' + i"
+                :class="{ filled: i <= challengeIndex }"
+              ></div>
+            </div>
+
+            <!-- Blink indicators -->
+            <div
+              v-if="currentChallenge?.id === 'blink'"
+              class="blink-indicators"
+            >
+              <div
+                v-for="n in REQUIRED_BLINKS"
+                :key="n"
+                class="blink-dot"
+                :class="{ filled: blinkCount >= n }"
+              >
+                {{ blinkCount >= n ? "👁️" : "○" }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Face status -->
+          <div class="status-line" :class="faceDetected ? 'ok' : 'warn'">
+            <span>{{
+              faceDetected
+                ? "✅ Face detected"
+                : "⚠️ No face detected — look at the camera"
+            }}</span>
+          </div>
+        </div>
+
+        <!-- Positioning instruction -->
+        <div v-if="phase === 'POSITIONING'" class="instruction-bar">
+          <span class="inst-icon">📷</span>
+          <span>Center your face in the frame and hold still</span>
+        </div>
       </div>
 
+      <!-- PHASE: Success -->
       <div
         v-if="phase === 'SUCCESS'"
         class="phase-container result-phase success-phase"
@@ -229,12 +320,16 @@
         <h2 class="result-title">Identity Verified</h2>
         <div class="result-stats">
           <div class="stat-card">
-            <span class="stat-value">{{ blinkCount }}x</span>
-            <span class="stat-label">Blinks Detected</span>
+            <span class="stat-value">{{ activeChallenges.length }}</span>
+            <span class="stat-label">Challenges Passed</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value">{{ matchScore }}%</span>
+            <span class="stat-label">Match Score</span>
           </div>
           <div class="stat-card">
             <span class="stat-value">✅</span>
-            <span class="stat-label">Liveness Check</span>
+            <span class="stat-label">Liveness</span>
           </div>
         </div>
         <p class="result-subtitle">
@@ -252,6 +347,7 @@
         </div>
       </div>
 
+      <!-- PHASE: Failure -->
       <div
         v-if="phase === 'FAILURE'"
         class="phase-container result-phase failure-phase"
@@ -271,12 +367,21 @@
         </div>
         <h2 class="result-title">Verification Failed</h2>
         <p class="failure-reason">{{ failureReason }}</p>
-        <div class="retry-actions">
+        <div class="retry-actions" v-if="attempts < 3">
           <button class="btn-secondary" @click="closeVerifier">Cancel</button>
-          <button class="btn-primary" @click="restart">Try Again</button>
+          <button class="btn-primary" @click="restart">
+            Try Again ({{ 3 - attempts }} left)
+          </button>
+        </div>
+        <div v-else>
+          <p class="no-attempts">
+            No attempts remaining. Contact your administrator.
+          </p>
+          <button class="btn-secondary" @click="closeVerifier">Close</button>
         </div>
       </div>
 
+      <!-- PHASE: Photo Error -->
       <div
         v-if="phase === 'PHOTO_ERROR'"
         class="phase-container result-phase failure-phase"
@@ -287,6 +392,17 @@
         <p class="failure-hint">
           Ask admin to update the employee photo and try again.
         </p>
+        <button class="btn-secondary" @click="closeVerifier">Close</button>
+      </div>
+
+      <!-- PHASE: Suspicious Activity -->
+      <div
+        v-if="phase === 'SUSPICIOUS'"
+        class="phase-container result-phase failure-phase"
+      >
+        <div class="result-icon">🚫</div>
+        <h2 class="result-title">Access Denied</h2>
+        <p class="failure-reason">{{ failureReason }}</p>
         <button class="btn-secondary" @click="closeVerifier">Close</button>
       </div>
     </div>
@@ -309,19 +425,74 @@ const props = defineProps({
 const emit = defineEmits(["update:isOpen", "success", "failure"]);
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const MATCH_DISTANCE_THRESHOLD = 0.45; // up to 0.45 euclidean distance is a valid match
-const MATCH_DISPLAY_THRESHOLD = 75; // minimum % score required to pass
-
+const MATCH_DISTANCE_THRESHOLD = 0.55;
+const MATCH_DISPLAY_THRESHOLD = 70;
 const REQUIRED_BLINKS = 2;
+const REQUIRED_POSITION_FRAMES = 25; // frames before challenge starts
 const REQUIRED_STABLE_FRAMES = 20;
-const CALIBRATION_FRAMES_NEEDED = 15;
-const DETECTION_INTERVAL_MS = 50;
-const MAX_RETRY_COUNT = 3;
+const DETECTION_INTERVAL_MS = 80;
+const MAX_ATTEMPTS = 3;
+const NUM_CHALLENGES = 3; // chain length (was 2)
+const CHALLENGE_DURATION = 5; // seconds per challenge
+const DEPTH_SCALE_THRESHOLD = 0.08; // 8% size change for depth check
 
-// Blink detection — rolling delta method
+// Blink detection
 const BLINK_DROP_THRESHOLD = 0.018;
 const ROLLING_WINDOW_SIZE = 8;
 const MIN_CLOSED_FRAMES = 2;
+
+// ── Challenge Pool ────────────────────────────────────────────────────────────
+const CHALLENGE_POOL = [
+  {
+    id: "blink",
+    label: "Blink your eyes",
+    hint: "Slowly blink both eyes naturally",
+    icon: "👁️",
+    detect: "blink",
+  },
+  {
+    id: "smile",
+    label: "Smile naturally",
+    hint: "Give a genuine smile",
+    icon: "😊",
+    detect: "smile",
+  },
+  {
+    id: "turn_left",
+    label: "Turn head LEFT",
+    hint: "Rotate your head slightly to the left",
+    icon: "⬅️",
+    detect: "turn_left",
+  },
+  {
+    id: "turn_right",
+    label: "Turn head RIGHT",
+    hint: "Rotate your head slightly to the right",
+    icon: "➡️",
+    detect: "turn_right",
+  },
+  {
+    id: "nod",
+    label: "Nod your head",
+    hint: "Move your head up and down once",
+    icon: "⬆️⬇️",
+    detect: "nod",
+  },
+  {
+    id: "move_closer",
+    label: "Move CLOSER",
+    hint: "Lean in toward the camera",
+    icon: "🔍",
+    detect: "move_closer",
+  },
+  {
+    id: "move_back",
+    label: "Move BACK",
+    hint: "Lean away from the camera",
+    icon: "🔎",
+    detect: "move_back",
+  },
+];
 
 // ── Reactive State ────────────────────────────────────────────────────────────
 const videoRef = ref(null);
@@ -331,18 +502,34 @@ const capturePreviewRef = ref(null);
 const phase = ref("LOADING_MODELS");
 const faceDetected = ref(false);
 const blinkCount = ref(0);
-const stableFrameCount = ref(0);
-const livenessStep = ref("DETECT_FACE");
-const matchScore = ref(null);
+const matchScore = ref(0);
 const failureReason = ref("");
 const isSending = ref(false);
 const attendanceResult = ref(null);
-const retryCount = ref(0);
+const attempts = ref(0);
+const currentChallengeComplete = ref(false);
 
+// Positioning
+const positionFrames = ref(0);
+const positionGuideClass = ref("neutral");
+const positionLabel = ref("Looking for face...");
+
+// Liveness challenges
+const activeChallenges = ref([]);
+const challengeIndex = ref(0);
+const challengeTimeLeft = ref(CHALLENGE_DURATION);
+const timerDashOffset = ref(0);
+
+// Environmental flash (anti-replay)
+const flashActive = ref(false);
+const flashColor = ref("rgba(255,0,0,0.15)");
+
+// Model loading
 const modelStatus = ref([
   { name: "Face Detector", status: "pending" },
   { name: "Face Landmarks", status: "pending" },
   { name: "Face Recognition", status: "pending" },
+  { name: "Face Expressions", status: "pending" },
 ]);
 
 const modelLoadProgress = computed(() => {
@@ -350,14 +537,15 @@ const modelLoadProgress = computed(() => {
   return Math.round((loaded / modelStatus.value.length) * 100);
 });
 
-// ── Non-reactive variables ────────────────────────────────────────────────────
+// ── Non-reactive internals ────────────────────────────────────────────────────
 let stream = null;
 let detectionLoop = null;
+let challengeTimerLoop = null;
 let storedDescriptor = null;
 let capturedDescriptor = null;
 let modelsLoaded = false;
 
-// Blink tracking
+// Blink
 let waitingForReopen = false;
 let closedFrameCount = 0;
 let rollingEARWindow = [];
@@ -365,11 +553,24 @@ let rollingEARWindow = [];
 // Calibration
 let baselineEAR = null;
 let calibrationFrames = [];
+let stableFrameCount = 0;
+
+// Depth tracking
+let baselineFaceWidth = null;
+let lastNoseY = null;
+let nodFrames = 0;
+
+// Challenge state machine
+let challengePassed = false;
+let challengeStartTime = 0;
+
+// Screen replay / texture
+let lastTextureVar = null;
 
 // ── Step Progress ─────────────────────────────────────────────────────────────
 const steps = [
   { key: "models", label: "Load AI" },
-  { key: "webcam", label: "Camera" },
+  { key: "position", label: "Position" },
   { key: "liveness", label: "Liveness" },
   { key: "verify", label: "Verify" },
   { key: "done", label: "Done" },
@@ -378,12 +579,14 @@ const steps = [
 const PHASE_TO_STEP = {
   LOADING_MODELS: 0,
   STARTING_WEBCAM: 1,
+  POSITIONING: 1,
   LIVENESS: 2,
   CAPTURING: 3,
   MATCHING: 3,
   SUCCESS: 4,
   FAILURE: 4,
   PHOTO_ERROR: 4,
+  SUSPICIOUS: 4,
 };
 
 const stepIndex = computed(() => PHASE_TO_STEP[phase.value] ?? 0);
@@ -391,31 +594,9 @@ const stepLineWidth = computed(
   () => `${(stepIndex.value / (steps.length - 1)) * 100}%`,
 );
 
-// ── Liveness UI Computed ──────────────────────────────────────────────────────
-const currentChallengeIcon = computed(() => {
-  if (livenessStep.value === "DETECT_FACE") return "👁️";
-  if (livenessStep.value === "BLINK_CHALLENGE") return "😉";
-  if (livenessStep.value === "PASSED") return "✅";
-  return "⏳";
-});
-
-const currentChallengeTitle = computed(() => {
-  if (livenessStep.value === "DETECT_FACE") return "Look at the Camera";
-  if (livenessStep.value === "BLINK_CHALLENGE")
-    return `Blink ${REQUIRED_BLINKS} Times`;
-  if (livenessStep.value === "PASSED") return "Liveness Confirmed!";
-  return "Preparing...";
-});
-
-const currentChallengeDescription = computed(() => {
-  if (livenessStep.value === "DETECT_FACE")
-    return "Position your face within the frame and hold still.";
-  if (livenessStep.value === "BLINK_CHALLENGE")
-    return "Slowly blink your eyes naturally. Both eyes must close and reopen.";
-  if (livenessStep.value === "PASSED")
-    return "You're a real person! Capturing your photo now...";
-  return "";
-});
+const currentChallenge = computed(
+  () => activeChallenges.value[challengeIndex.value] ?? null,
+);
 
 // ── Watcher ───────────────────────────────────────────────────────────────────
 watch(
@@ -430,30 +611,85 @@ watch(
   },
 );
 
-// ── Verification Flow ─────────────────────────────────────────────────────────
+// ── Main Flow ─────────────────────────────────────────────────────────────────
 async function startVerification() {
   try {
+    // 1. Virtual camera check
+    await detectVirtualCamera();
+
+    // 2. Load models
     phase.value = "LOADING_MODELS";
     await loadModels();
 
+    // 3. Extract stored descriptor (parallel with webcam start)
     const photoPromise = extractStoredPhotoDescriptor();
 
+    // 4. Start webcam
     phase.value = "STARTING_WEBCAM";
     await startWebcam();
-
     storedDescriptor = await photoPromise;
 
+    // 5. Positioning gate
+    phase.value = "POSITIONING";
+    await runPositioningGate();
+
+    // 6. Environmental flash (anti-replay)
+    triggerEnvFlash();
+
+    // 7. Pick challenges
+    pickChallenges();
+
+    // 8. Run liveness challenges
     phase.value = "LIVENESS";
-    livenessStep.value = "DETECT_FACE";
-    startDetectionLoop();
+    await runChallengeChain();
+
+    // 9. Capture & match
+    await captureAndMatch();
   } catch (err) {
     console.error("[FaceVerifier]", err);
     if (err.code === "PHOTO_ERROR") {
       phase.value = "PHOTO_ERROR";
       failureReason.value = err.message;
+    } else if (err.code === "SUSPICIOUS") {
+      phase.value = "SUSPICIOUS";
+      failureReason.value = err.message;
     } else {
-      setFailure("Camera or model error: " + (err.message || "Unknown error"));
+      setFailure(err.message || "An unexpected error occurred.");
     }
+  }
+}
+
+// ── Virtual Camera Detection ──────────────────────────────────────────────────
+async function detectVirtualCamera() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoInputs = devices.filter((d) => d.kind === "videoinput");
+    const suspicious = [
+      "obs",
+      "manycam",
+      "xsplit",
+      "snap camera",
+      "virtual",
+      "fake",
+      "droid",
+      "iriun",
+      "epoccam",
+    ];
+
+    for (const device of videoInputs) {
+      const label = (device.label || "").toLowerCase();
+      if (suspicious.some((s) => label.includes(s))) {
+        throw Object.assign(
+          new Error(
+            `Virtual camera detected (${device.label}). Use your real webcam.`,
+          ),
+          { code: "SUSPICIOUS" },
+        );
+      }
+    }
+  } catch (err) {
+    if (err.code === "SUSPICIOUS") throw err;
+    // If enumeration fails (no permission yet), continue — real cameras don't need pre-permission labels
   }
 }
 
@@ -461,7 +697,7 @@ async function startVerification() {
 async function loadModels() {
   if (modelsLoaded) return;
 
-  const modelDefs = [
+  const defs = [
     {
       loader: () => faceapi.nets.tinyFaceDetector.loadFromUri(props.modelsPath),
       index: 0,
@@ -476,9 +712,14 @@ async function loadModels() {
         faceapi.nets.faceRecognitionNet.loadFromUri(props.modelsPath),
       index: 2,
     },
+    {
+      loader: () =>
+        faceapi.nets.faceExpressionNet.loadFromUri(props.modelsPath),
+      index: 3,
+    },
   ];
 
-  for (const def of modelDefs) {
+  for (const def of defs) {
     modelStatus.value[def.index].status = "loading";
     await def.loader();
     modelStatus.value[def.index].status = "loaded";
@@ -496,13 +737,11 @@ async function extractStoredPhotoDescriptor() {
     );
   }
 
-  const apiUrl = props.employee.avatar_url.replace(
-    "/storage/",
-    "/api/storage/",
-  );
-  const img = await loadImageFromUrl(apiUrl);
+  const url = props.employee.avatar_url.startsWith("http")
+    ? props.employee.avatar_url
+    : props.employee.avatar_url.replace("/storage/", "/api/storage/");
 
-  // Try multiple input sizes — use whichever gives a detection
+  const img = await loadImageFromUrl(url);
   const inputSizes = [416, 320, 608];
   let detection = null;
 
@@ -517,11 +756,7 @@ async function extractStoredPhotoDescriptor() {
       )
       .withFaceLandmarks()
       .withFaceDescriptor();
-
-    if (detection) {
-      console.log(`[FaceVerifier] Stored photo detected at inputSize=${size}`);
-      break;
-    }
+    if (detection) break;
   }
 
   if (!detection) {
@@ -541,25 +776,22 @@ function loadImageFromUrl(url) {
     try {
       const response = await fetch(url, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token") || ""}`,
+          Authorization: `Bearer ${localStorage.getItem("auth_token") || ""}`,
         },
         mode: "cors",
       });
-
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
       const img = new Image();
-
       img.onload = () => {
         URL.revokeObjectURL(objectUrl);
         resolve(img);
       };
-      img.onerror = () => reject(new Error(`Failed to render image: ${url}`));
+      img.onerror = () => reject(new Error(`Failed to render image`));
       img.src = objectUrl;
     } catch (err) {
-      reject(new Error(`Failed to load image: ${url}`));
+      reject(new Error(`Failed to load image: ${err.message}`));
     }
   });
 }
@@ -577,7 +809,6 @@ async function startWebcam() {
 
   await nextTick();
   videoRef.value.srcObject = stream;
-
   await new Promise((resolve) => {
     videoRef.value.onloadedmetadata = () => resolve();
   });
@@ -593,80 +824,322 @@ function stopWebcam() {
   }
 }
 
-// ── Detection Loop ────────────────────────────────────────────────────────────
-function startDetectionLoop() {
-  detectionLoop = setInterval(runDetectionFrame, DETECTION_INTERVAL_MS);
+// ── Positioning Gate ──────────────────────────────────────────────────────────
+// Requires face to be centered and large enough for REQUIRED_POSITION_FRAMES
+async function runPositioningGate() {
+  return new Promise((resolve, reject) => {
+    positionFrames.value = 0;
+    baselineFaceWidth = null;
+
+    const loop = setInterval(async () => {
+      if (!videoRef.value || videoRef.value.readyState < 2) return;
+
+      const det = await faceapi
+        .detectSingleFace(
+          videoRef.value,
+          new faceapi.TinyFaceDetectorOptions({
+            inputSize: 224,
+            scoreThreshold: 0.5,
+          }),
+        )
+        .withFaceLandmarks();
+
+      if (!det) {
+        positionFrames.value = 0;
+        positionGuideClass.value = "neutral";
+        positionLabel.value = "No face detected — move closer";
+        return;
+      }
+
+      const box = det.detection.box;
+      const vidW = videoRef.value.videoWidth || 640;
+      const vidH = videoRef.value.videoHeight || 480;
+
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2;
+      const centered =
+        Math.abs(cx - vidW / 2) < vidW * 0.25 &&
+        Math.abs(cy - vidH / 2) < vidH * 0.25;
+      const bigEnough = box.width > vidW * 0.18;
+
+      if (!centered || !bigEnough) {
+        positionFrames.value = 0;
+        positionGuideClass.value = "warning";
+        positionLabel.value = !bigEnough ? "Move closer" : "Center your face";
+        return;
+      }
+
+      // Check for screen replay via texture variance
+      const textureOk = checkTextureVariance(det);
+      if (!textureOk) {
+        clearInterval(loop);
+        reject(
+          Object.assign(
+            new Error("Screen or photo detected. Please use your real face."),
+            { code: "SUSPICIOUS" },
+          ),
+        );
+        return;
+      }
+
+      positionGuideClass.value = "good";
+      positionLabel.value = "Hold still...";
+      positionFrames.value++;
+
+      // Save baseline face width for depth checks
+      if (!baselineFaceWidth) baselineFaceWidth = box.width;
+
+      if (positionFrames.value >= REQUIRED_POSITION_FRAMES) {
+        clearInterval(loop);
+        resolve();
+      }
+    }, DETECTION_INTERVAL_MS);
+  });
 }
 
-function stopDetectionLoop() {
-  if (detectionLoop) {
-    clearInterval(detectionLoop);
-    detectionLoop = null;
-  }
-}
+// ── Screen Replay Detection (Texture Variance) ────────────────────────────────
+// Real faces have chaotic high-frequency texture; screens are smoother
+function checkTextureVariance(detection) {
+  try {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const box = detection.detection.box;
 
-async function runDetectionFrame() {
-  if (phase.value !== "LIVENESS") return;
-  if (!videoRef.value || videoRef.value.readyState < 2) return;
-
-  const detection = await faceapi
-    .detectSingleFace(
+    // Crop just the face region
+    const size = 32;
+    canvas.width = canvas.height = size;
+    ctx.drawImage(
       videoRef.value,
-      new faceapi.TinyFaceDetectorOptions({
-        inputSize: 224,
-        scoreThreshold: 0.5,
-      }),
-    )
-    .withFaceLandmarks();
+      box.x,
+      box.y,
+      box.width,
+      box.height,
+      0,
+      0,
+      size,
+      size,
+    );
 
-  drawOverlay(detection);
-
-  if (!detection) {
-    faceDetected.value = false;
-    if (livenessStep.value === "DETECT_FACE") {
-      stableFrameCount.value = 0;
-      calibrationFrames = [];
-    }
-    return;
-  }
-
-  faceDetected.value = true;
-  const ear = computeEAR(detection.landmarks);
-
-  // ── Phase 1: Stable face + calibrate baseline EAR ─────────────────────────
-  if (livenessStep.value === "DETECT_FACE") {
-    stableFrameCount.value++;
-
-    if (calibrationFrames.length < CALIBRATION_FRAMES_NEEDED) {
-      calibrationFrames.push(ear);
+    const pixels = ctx.getImageData(0, 0, size, size).data;
+    const grays = [];
+    for (let i = 0; i < pixels.length; i += 4) {
+      grays.push(
+        0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2],
+      );
     }
 
-    if (stableFrameCount.value >= REQUIRED_STABLE_FRAMES) {
-      baselineEAR =
-        calibrationFrames.reduce((a, b) => a + b, 0) / calibrationFrames.length;
-      console.log("[Blink] Baseline EAR calibrated:", baselineEAR.toFixed(4));
+    const mean = grays.reduce((a, b) => a + b, 0) / grays.length;
+    const variance =
+      grays.reduce((s, g) => s + Math.pow(g - mean, 2), 0) / grays.length;
 
-      livenessStep.value = "BLINK_CHALLENGE";
-      blinkCount.value = 0;
-      waitingForReopen = false;
+    // Screens typically show variance < 80 (very uniform); real skin > 120
+    if (lastTextureVar !== null && variance < 60) {
+      console.warn(
+        "[FaceVerifier] Low texture variance — possible replay:",
+        variance.toFixed(1),
+      );
+      return false;
     }
-    return;
-  }
-
-  // ── Phase 2: Detect blinks ─────────────────────────────────────────────────
-  if (livenessStep.value === "BLINK_CHALLENGE") {
-    detectBlink(ear);
-
-    if (blinkCount.value >= REQUIRED_BLINKS) {
-      livenessStep.value = "PASSED";
-      stopDetectionLoop();
-      await delay(800);
-      await captureAndMatch();
-    }
+    lastTextureVar = variance;
+    return true;
+  } catch (_) {
+    return true; // If we can't check, don't block
   }
 }
 
-// ── EAR Computation ───────────────────────────────────────────────────────────
+// ── Environmental Flash ───────────────────────────────────────────────────────
+function triggerEnvFlash() {
+  const colors = [
+    "rgba(255,50,50,0.18)",
+    "rgba(50,255,50,0.18)",
+    "rgba(50,50,255,0.18)",
+    "rgba(255,255,50,0.18)",
+  ];
+  flashColor.value = colors[Math.floor(Math.random() * colors.length)];
+  flashActive.value = true;
+  setTimeout(() => {
+    flashActive.value = false;
+  }, 700);
+}
+
+// ── Challenge Setup ───────────────────────────────────────────────────────────
+function pickChallenges() {
+  // Always include depth (move_closer → move_back) as first two for Z-axis verification
+  const depthPair = [
+    CHALLENGE_POOL.find((c) => c.id === "move_closer"),
+    CHALLENGE_POOL.find((c) => c.id === "move_back"),
+  ];
+
+  // Shuffle behavioral challenges
+  const behavioral = CHALLENGE_POOL.filter(
+    (c) => !["move_closer", "move_back"].includes(c.id),
+  )
+    .sort(() => Math.random() - 0.5)
+    .slice(0, NUM_CHALLENGES - 2); // fill remaining slots
+
+  // Chain: depth check first → behavioral
+  activeChallenges.value = [...depthPair, ...behavioral];
+  challengeIndex.value = 0;
+}
+
+// ── Challenge Chain ───────────────────────────────────────────────────────────
+async function runChallengeChain() {
+  for (let i = 0; i < activeChallenges.value.length; i++) {
+    challengeIndex.value = i;
+    currentChallengeComplete.value = false;
+
+    const passed = await runSingleChallenge(activeChallenges.value[i]);
+
+    if (!passed) {
+      attempts.value++;
+      const remaining = MAX_ATTEMPTS - attempts.value;
+      if (remaining <= 0) {
+        throw new Error("Maximum attempts reached. Verification blocked.");
+      }
+      throw new Error(
+        `Challenge failed: "${activeChallenges.value[i].label}". ` +
+          `${remaining} attempt(s) remaining.`,
+      );
+    }
+
+    currentChallengeComplete.value = true;
+    await delay(400);
+
+    // Flash again between challenges (anti-replay)
+    triggerEnvFlash();
+  }
+}
+
+function runSingleChallenge(challenge) {
+  return new Promise((resolve) => {
+    const totalMs = challenge.duration
+      ? challenge.duration * 1000
+      : CHALLENGE_DURATION * 1000;
+    challengeTimeLeft.value = challenge.duration || CHALLENGE_DURATION;
+    timerDashOffset.value = 0;
+    challengePassed = false;
+    challengeStartTime = Date.now();
+    blinkCount.value = 0;
+    waitingForReopen = false;
+    closedFrameCount = 0;
+    rollingEARWindow = [];
+    lastNoseY = null;
+    nodFrames = 0;
+
+    const startWidth = baselineFaceWidth;
+
+    // Timer countdown
+    challengeTimerLoop = setInterval(() => {
+      const elapsed = Date.now() - challengeStartTime;
+      const remaining = Math.max(0, (totalMs - elapsed) / 1000);
+      challengeTimeLeft.value = Math.ceil(remaining);
+      timerDashOffset.value = 113 * (1 - elapsed / totalMs);
+
+      if (remaining <= 0 && !challengePassed) {
+        clearInterval(challengeTimerLoop);
+        clearInterval(detectionLoop);
+        resolve(false);
+      }
+    }, 100);
+
+    // Detection loop
+    detectionLoop = setInterval(async () => {
+      if (challengePassed) return;
+      if (!videoRef.value || videoRef.value.readyState < 2) return;
+
+      const det = await faceapi
+        .detectSingleFace(
+          videoRef.value,
+          new faceapi.TinyFaceDetectorOptions({
+            inputSize: 224,
+            scoreThreshold: 0.45,
+          }),
+        )
+        .withFaceLandmarks()
+        .withFaceExpressions();
+
+      drawOverlay(det);
+      faceDetected.value = !!det;
+
+      if (!det) return;
+
+      const passed = evaluateChallenge(challenge.id, det, startWidth);
+      if (passed) {
+        challengePassed = true;
+        clearInterval(challengeTimerLoop);
+        clearInterval(detectionLoop);
+        resolve(true);
+      }
+    }, DETECTION_INTERVAL_MS);
+  });
+}
+
+// ── Challenge Evaluators ──────────────────────────────────────────────────────
+function evaluateChallenge(type, det, startWidth) {
+  const landmarks = det.landmarks;
+  const expr = det.expressions;
+  const box = det.detection.box;
+  const vidW = videoRef.value?.videoWidth || 640;
+
+  switch (type) {
+    case "blink": {
+      const ear = computeEAR(landmarks);
+      detectBlink(ear);
+      return blinkCount.value >= REQUIRED_BLINKS;
+    }
+
+    case "smile":
+      return (expr.happy ?? 0) > 0.65;
+
+    case "turn_left": {
+      const nose = landmarks.getNose?.() ?? [];
+      const noseX = nose[3]?.x ?? 0;
+      const centerX = box.x + box.width / 2;
+      return noseX < centerX - box.width * 0.12;
+    }
+
+    case "turn_right": {
+      const nose = landmarks.getNose?.() ?? [];
+      const noseX = nose[3]?.x ?? 0;
+      const centerX = box.x + box.width / 2;
+      return noseX > centerX + box.width * 0.12;
+    }
+
+    case "nod": {
+      const nose = landmarks.getNose?.() ?? [];
+      const noseY = nose[3]?.y ?? 0;
+      if (lastNoseY === null) {
+        lastNoseY = noseY;
+        return false;
+      }
+      const delta = Math.abs(noseY - lastNoseY);
+      if (delta > 8) nodFrames++;
+      lastNoseY = noseY;
+      return nodFrames >= 3;
+    }
+
+    case "move_closer": {
+      if (!startWidth) return false;
+      const ratio = box.width / startWidth;
+      if (ratio > 1 + DEPTH_SCALE_THRESHOLD) {
+        baselineFaceWidth = box.width; // update baseline after closer
+        return true;
+      }
+      return false;
+    }
+
+    case "move_back": {
+      if (!baselineFaceWidth) return false;
+      const ratio = box.width / baselineFaceWidth;
+      return ratio < 1 - DEPTH_SCALE_THRESHOLD;
+    }
+
+    default:
+      return false;
+  }
+}
+
+// ── EAR & Blink ──────────────────────────────────────────────────────────────
 function computeEAR(landmarks) {
   try {
     if (typeof landmarks.getLeftEye === "function") {
@@ -676,97 +1149,59 @@ function computeEAR(landmarks) {
         2
       );
     }
-
     const positions =
       landmarks.positions ?? (Array.isArray(landmarks) ? landmarks : null);
-    if (!positions) {
-      console.warn("[EAR] Cannot read landmarks:", landmarks);
-      return 0.3;
-    }
-
-    const leftEye = [36, 37, 38, 39, 40, 41].map((i) => positions[i]);
-    const rightEye = [42, 43, 44, 45, 46, 47].map((i) => positions[i]);
-    return (earForEye(leftEye) + earForEye(rightEye)) / 2;
-  } catch (e) {
-    console.error("[EAR] Error:", e);
+    if (!positions) return 0.3;
+    return (
+      (earForEye([36, 37, 38, 39, 40, 41].map((i) => positions[i])) +
+        earForEye([42, 43, 44, 45, 46, 47].map((i) => positions[i]))) /
+      2
+    );
+  } catch {
     return 0.3;
   }
 }
 
 function earForEye(pts) {
   if (!pts || pts.length < 6) return 0.3;
-  const v1 = eucDist(pts[1], pts[5]);
-  const v2 = eucDist(pts[2], pts[4]);
   const h = eucDist(pts[0], pts[3]);
-  return h === 0 ? 0 : (v1 + v2) / (2 * h);
+  return h === 0
+    ? 0
+    : (eucDist(pts[1], pts[5]) + eucDist(pts[2], pts[4])) / (2 * h);
 }
 
 function eucDist(a, b) {
   return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
 }
 
-// ── Blink Detection (rolling delta method) ────────────────────────────────────
 function detectBlink(ear) {
   if (!waitingForReopen) {
     rollingEARWindow.push(ear);
     if (rollingEARWindow.length > ROLLING_WINDOW_SIZE) rollingEARWindow.shift();
   }
-
   if (rollingEARWindow.length < 4) return;
 
-  const rollingAvg =
+  const avg =
     rollingEARWindow.reduce((a, b) => a + b, 0) / rollingEARWindow.length;
-  const drop = rollingAvg - ear;
+  const drop = avg - ear;
 
   if (!waitingForReopen && drop > BLINK_DROP_THRESHOLD) {
     closedFrameCount++;
-    if (closedFrameCount >= MIN_CLOSED_FRAMES) {
-      waitingForReopen = true;
-      console.log(
-        `[Blink] Eye closing — drop: ${drop.toFixed(4)} avg: ${rollingAvg.toFixed(4)}`,
-      );
-    }
+    if (closedFrameCount >= MIN_CLOSED_FRAMES) waitingForReopen = true;
   } else if (waitingForReopen && drop < BLINK_DROP_THRESHOLD * 0.5) {
     blinkCount.value++;
     waitingForReopen = false;
     closedFrameCount = 0;
     rollingEARWindow = [];
-    console.log(`[Blink] ✅ Blink #${blinkCount.value} detected`);
   } else if (!waitingForReopen) {
     closedFrameCount = 0;
   }
-}
-
-// ── Score Formula ─────────────────────────────────────────────────────────────
-// face-api euclidean distance scale:
-//   0.00 – 0.20 = near perfect  → 90–100%
-//   0.20 – 0.35 = excellent     → 80–90%
-//   0.35 – 0.45 = good match    → 75–80%
-//   0.45 – 0.60 = borderline    → 50–75%
-//   0.60+       = likely diff   → 0–50%
-function distanceToScore(distance) {
-  if (distance <= 0.2) return Math.round(90 + ((0.2 - distance) / 0.2) * 10);
-  if (distance <= 0.35) return Math.round(80 + ((0.35 - distance) / 0.15) * 10);
-  if (distance <= 0.45) return Math.round(75 + ((0.45 - distance) / 0.1) * 5);
-  if (distance <= 0.6) return Math.round(50 + ((0.6 - distance) / 0.15) * 25);
-  return Math.round(Math.max(0, 50 - (distance - 0.6) * 100));
-}
-
-// ── Descriptor Averaging ──────────────────────────────────────────────────────
-function averageDescriptors(descriptors) {
-  const length = descriptors[0].length;
-  const avg = new Float32Array(length);
-  for (let i = 0; i < length; i++) {
-    avg[i] = descriptors.reduce((sum, d) => sum + d[i], 0) / descriptors.length;
-  }
-  return avg;
 }
 
 // ── Canvas Overlay ────────────────────────────────────────────────────────────
 function drawOverlay(detection) {
   const canvas = overlayCanvasRef.value;
   if (!canvas) return;
-
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (!detection) return;
@@ -777,7 +1212,7 @@ function drawOverlay(detection) {
   ctx.strokeRect(box.x, box.y, box.width, box.height);
 
   if (detection.landmarks?.positions) {
-    ctx.fillStyle = "rgba(99, 179, 237, 0.8)";
+    ctx.fillStyle = "rgba(99,179,237,0.7)";
     for (const pt of detection.landmarks.positions) {
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2);
@@ -789,6 +1224,7 @@ function drawOverlay(detection) {
 // ── Capture & Match ───────────────────────────────────────────────────────────
 async function captureAndMatch() {
   phase.value = "CAPTURING";
+  stopChallengeLoops();
   await delay(300);
 
   const CAPTURE_ATTEMPTS = 10;
@@ -812,42 +1248,27 @@ async function captureAndMatch() {
     if (det) {
       const dist = faceapi.euclideanDistance(storedDescriptor, det.descriptor);
       results.push({ descriptor: det.descriptor, distance: dist });
-      console.log(
-        `[FaceVerifier] Frame ${results.length}: distance=${dist.toFixed(4)}`,
-      );
     }
   }
 
   if (results.length === 0) {
-    if (retryCount.value < MAX_RETRY_COUNT) {
-      retryCount.value++;
-      resetLivenessState();
-      phase.value = "LIVENESS";
-      startDetectionLoop();
-      return;
-    }
+    attempts.value++;
     setFailure("Could not detect face at capture time. Please try again.");
     return;
   }
 
-  // Sort by best match, average top 3
   results.sort((a, b) => a.distance - b.distance);
   const topN = results.slice(0, Math.min(3, results.length));
   capturedDescriptor = averageDescriptors(topN.map((r) => r.descriptor));
 
-  console.log(
-    `[FaceVerifier] Captured ${results.length}/${CAPTURE_ATTEMPTS} frames, using top ${topN.length}`,
-  );
-
   // Draw preview
-  nextTick(() => {
-    if (capturePreviewRef.value && videoRef.value) {
-      const ctx = capturePreviewRef.value.getContext("2d");
-      capturePreviewRef.value.width = videoRef.value.videoWidth;
-      capturePreviewRef.value.height = videoRef.value.videoHeight;
-      ctx.drawImage(videoRef.value, 0, 0);
-    }
-  });
+  await nextTick();
+  if (capturePreviewRef.value && videoRef.value) {
+    const ctx = capturePreviewRef.value.getContext("2d");
+    capturePreviewRef.value.width = videoRef.value.videoWidth;
+    capturePreviewRef.value.height = videoRef.value.videoHeight;
+    ctx.drawImage(videoRef.value, 0, 0);
+  }
 
   phase.value = "MATCHING";
   await delay(200);
@@ -859,16 +1280,20 @@ async function captureAndMatch() {
   matchScore.value = distanceToScore(distance);
 
   console.log(
-    `[FaceVerifier] Final distance=${distance.toFixed(4)} score=${matchScore.value}%`,
+    `[FaceVerifier] distance=${distance.toFixed(4)} score=${matchScore.value}%`,
   );
 
   await delay(1500);
 
-  if (matchScore.value >= MATCH_DISPLAY_THRESHOLD) {
+  if (
+    distance <= MATCH_DISTANCE_THRESHOLD &&
+    matchScore.value >= MATCH_DISPLAY_THRESHOLD
+  ) {
     stopWebcam();
     phase.value = "SUCCESS";
     await sendAttendance();
   } else {
+    attempts.value++;
     stopWebcam();
     setFailure(
       `Face does not match the registered photo. ` +
@@ -876,6 +1301,23 @@ async function captureAndMatch() {
     );
     emit("failure", { reason: "face_mismatch", score: matchScore.value });
   }
+}
+
+function distanceToScore(distance) {
+  if (distance <= 0.2) return Math.round(90 + ((0.2 - distance) / 0.2) * 10);
+  if (distance <= 0.35) return Math.round(80 + ((0.35 - distance) / 0.15) * 10);
+  if (distance <= 0.45) return Math.round(75 + ((0.45 - distance) / 0.1) * 5);
+  if (distance <= 0.6) return Math.round(50 + ((0.6 - distance) / 0.15) * 25);
+  return Math.round(Math.max(0, 50 - (distance - 0.6) * 100));
+}
+
+function averageDescriptors(descriptors) {
+  const len = descriptors[0].length;
+  const avg = new Float32Array(len);
+  for (let i = 0; i < len; i++) {
+    avg[i] = descriptors.reduce((sum, d) => sum + d[i], 0) / descriptors.length;
+  }
+  return avg;
 }
 
 // ── Send Attendance ───────────────────────────────────────────────────────────
@@ -886,13 +1328,12 @@ async function sendAttendance() {
       props.attendanceType === "time_in"
         ? "/attendance/time-in"
         : "/attendance/time-out";
-
     const { data } = await api.post(endpoint, {
       employee_id: props.employee.id,
       face_verified: true,
       match_score: matchScore.value,
       liveness_passed: true,
-      blink_count: blinkCount.value,
+      challenges: activeChallenges.value.map((c) => c.id),
     });
 
     if (data.success) {
@@ -925,23 +1366,43 @@ async function sendAttendance() {
 
 // ── Failure ───────────────────────────────────────────────────────────────────
 function setFailure(reason) {
-  stopDetectionLoop();
+  stopChallengeLoops();
   stopWebcam();
   failureReason.value = reason;
   phase.value = "FAILURE";
 }
 
-// ── Reset ─────────────────────────────────────────────────────────────────────
-function resetLivenessState() {
-  stableFrameCount.value = 0;
-  blinkCount.value = 0;
+// ── Reset & Cleanup ───────────────────────────────────────────────────────────
+function resetState() {
+  phase.value = "LOADING_MODELS";
+  matchScore.value = 0;
+  failureReason.value = "";
+  isSending.value = false;
+  attendanceResult.value = null;
   faceDetected.value = false;
-  livenessStep.value = "DETECT_FACE";
+  blinkCount.value = 0;
+  positionFrames.value = 0;
+  positionGuideClass.value = "neutral";
+  positionLabel.value = "Looking for face...";
+  currentChallengeComplete.value = false;
+  challengeIndex.value = 0;
+  challengeTimeLeft.value = CHALLENGE_DURATION;
+  timerDashOffset.value = 0;
+  flashActive.value = false;
+  activeChallenges.value = [];
+
+  storedDescriptor = null;
+  capturedDescriptor = null;
+  baselineFaceWidth = null;
+  baselineEAR = null;
+  calibrationFrames = [];
+  stableFrameCount = 0;
+  lastNoseY = null;
+  nodFrames = 0;
   waitingForReopen = false;
   closedFrameCount = 0;
   rollingEARWindow = [];
-  baselineEAR = null;
-  calibrationFrames = [];
+  lastTextureVar = null;
 
   const ctx = overlayCanvasRef.value?.getContext("2d");
   ctx?.clearRect(
@@ -952,16 +1413,20 @@ function resetLivenessState() {
   );
 }
 
-function resetState() {
-  phase.value = "LOADING_MODELS";
-  matchScore.value = null;
-  failureReason.value = "";
-  isSending.value = false;
-  attendanceResult.value = null;
-  retryCount.value = 0;
-  storedDescriptor = null;
-  capturedDescriptor = null;
-  resetLivenessState();
+function stopChallengeLoops() {
+  if (detectionLoop) {
+    clearInterval(detectionLoop);
+    detectionLoop = null;
+  }
+  if (challengeTimerLoop) {
+    clearInterval(challengeTimerLoop);
+    challengeTimerLoop = null;
+  }
+}
+
+function cleanup() {
+  stopChallengeLoops();
+  stopWebcam();
 }
 
 async function restart() {
@@ -971,12 +1436,6 @@ async function restart() {
   await startVerification();
 }
 
-// ── Modal / Cleanup ───────────────────────────────────────────────────────────
-function cleanup() {
-  stopDetectionLoop();
-  stopWebcam();
-}
-
 function closeVerifier() {
   if (isSending.value) return;
   cleanup();
@@ -984,7 +1443,9 @@ function closeVerifier() {
 }
 
 function handleOverlayClick() {
-  if (["SUCCESS", "FAILURE", "PHOTO_ERROR"].includes(phase.value)) {
+  if (
+    ["SUCCESS", "FAILURE", "PHOTO_ERROR", "SUSPICIOUS"].includes(phase.value)
+  ) {
     closeVerifier();
   }
 }
@@ -997,6 +1458,7 @@ onUnmounted(() => cleanup());
 </script>
 
 <style scoped>
+/* ── Base ───────────────────────────────────────────────────────────────────── */
 .face-verifier-overlay {
   position: fixed;
   inset: 0;
@@ -1008,7 +1470,6 @@ onUnmounted(() => cleanup());
   backdrop-filter: blur(4px);
   animation: fadeIn 0.25s ease;
 }
-
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -1019,7 +1480,7 @@ onUnmounted(() => cleanup());
 }
 
 .face-verifier-modal {
-  background: #ffffff;
+  background: #fff;
   border-radius: 20px;
   width: min(680px, 95vw);
   max-height: 90vh;
@@ -1029,7 +1490,6 @@ onUnmounted(() => cleanup());
   flex-direction: column;
   animation: slideUp 0.3s ease;
 }
-
 @keyframes slideUp {
   from {
     opacity: 0;
@@ -1041,14 +1501,15 @@ onUnmounted(() => cleanup());
   }
 }
 
+/* ── Header ──────────────────────────────────────────────────────────────────── */
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 20px 24px 16px;
   border-bottom: 1px solid #e5e7eb;
+  gap: 12px;
 }
-
 .header-left {
   display: flex;
   align-items: center;
@@ -1063,7 +1524,6 @@ onUnmounted(() => cleanup());
   border: 2px solid #3b82f6;
   flex-shrink: 0;
 }
-
 .employee-avatar img {
   width: 100%;
   height: 100%;
@@ -1076,7 +1536,6 @@ onUnmounted(() => cleanup());
   color: #111827;
   margin: 0 0 4px;
 }
-
 .badge {
   display: inline-block;
   padding: 2px 10px;
@@ -1084,7 +1543,6 @@ onUnmounted(() => cleanup());
   font-size: 12px;
   font-weight: 600;
 }
-
 .badge.time_in {
   background: #dcfce7;
   color: #166534;
@@ -1092,6 +1550,22 @@ onUnmounted(() => cleanup());
 .badge.time_out {
   background: #fee2e2;
   color: #991b1b;
+}
+
+/* Attempt dots */
+.attempt-counter {
+  display: flex;
+  gap: 6px;
+}
+.attempt-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  transition: background 0.3s;
+}
+.attempt-dot.used {
+  background: #ef4444;
 }
 
 .close-btn {
@@ -1108,7 +1582,6 @@ onUnmounted(() => cleanup());
   justify-content: center;
   transition: all 0.2s;
 }
-
 .close-btn:hover:not(:disabled) {
   background: #e5e7eb;
   color: #111827;
@@ -1118,6 +1591,7 @@ onUnmounted(() => cleanup());
   cursor: not-allowed;
 }
 
+/* ── Step Progress ───────────────────────────────────────────────────────────── */
 .step-progress {
   position: relative;
   display: flex;
@@ -1127,7 +1601,6 @@ onUnmounted(() => cleanup());
   background: #f9fafb;
   border-bottom: 1px solid #e5e7eb;
 }
-
 .step-line {
   position: absolute;
   top: 34px;
@@ -1138,7 +1611,6 @@ onUnmounted(() => cleanup());
   transition: width 0.5s ease;
   transform-origin: left;
 }
-
 .step {
   display: flex;
   flex-direction: column;
@@ -1147,7 +1619,6 @@ onUnmounted(() => cleanup());
   position: relative;
   z-index: 1;
 }
-
 .step-circle {
   width: 30px;
   height: 30px;
@@ -1159,7 +1630,6 @@ onUnmounted(() => cleanup());
   font-weight: 700;
   transition: all 0.3s;
 }
-
 .step.completed .step-circle {
   background: #3b82f6;
   color: white;
@@ -1173,14 +1643,12 @@ onUnmounted(() => cleanup());
   background: #e5e7eb;
   color: #6b7280;
 }
-
 .step-label {
   font-size: 11px;
   font-weight: 500;
   color: #6b7280;
   white-space: nowrap;
 }
-
 .step.active .step-label {
   color: #3b82f6;
   font-weight: 700;
@@ -1189,6 +1657,7 @@ onUnmounted(() => cleanup());
   color: #374151;
 }
 
+/* ── Phase Container ─────────────────────────────────────────────────────────── */
 .phase-container {
   padding: 28px;
   display: flex;
@@ -1199,6 +1668,7 @@ onUnmounted(() => cleanup());
   justify-content: center;
 }
 
+/* ── Loading Phase ───────────────────────────────────────────────────────────── */
 .loading-phase {
   text-align: center;
 }
@@ -1222,7 +1692,6 @@ onUnmounted(() => cleanup());
   align-items: center;
   justify-content: center;
 }
-
 .pulse-ring {
   position: absolute;
   inset: 0;
@@ -1230,7 +1699,6 @@ onUnmounted(() => cleanup());
   border: 3px solid #3b82f6;
   animation: pulseRing 1.5s ease-in-out infinite;
 }
-
 @keyframes pulseRing {
   0% {
     transform: scale(0.8);
@@ -1241,7 +1709,6 @@ onUnmounted(() => cleanup());
     opacity: 0;
   }
 }
-
 .pulse-core {
   font-size: 32px;
   z-index: 1;
@@ -1255,7 +1722,6 @@ onUnmounted(() => cleanup());
   border-radius: 999px;
   overflow: hidden;
 }
-
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #3b82f6, #8b5cf6);
@@ -1270,7 +1736,6 @@ onUnmounted(() => cleanup());
   width: 100%;
   max-width: 280px;
 }
-
 .model-item {
   display: flex;
   align-items: center;
@@ -1282,7 +1747,6 @@ onUnmounted(() => cleanup());
   background: #f3f4f6;
   transition: all 0.3s;
 }
-
 .model-item.loaded {
   background: #eff6ff;
   color: #1d4ed8;
@@ -1292,7 +1756,6 @@ onUnmounted(() => cleanup());
   color: #92400e;
   animation: blink 1s infinite;
 }
-
 @keyframes blink {
   0%,
   100% {
@@ -1303,10 +1766,7 @@ onUnmounted(() => cleanup());
   }
 }
 
-.model-icon {
-  font-size: 16px;
-}
-
+/* ── Webcam Phase ────────────────────────────────────────────────────────────── */
 .webcam-phase {
   padding: 20px;
   gap: 16px;
@@ -1322,32 +1782,42 @@ onUnmounted(() => cleanup());
   background: #111;
   aspect-ratio: 4/3;
 }
-
 .webcam-video {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transform: scaleX(-1); /* mirror for selfie feel */
+  transform: scaleX(-1);
   display: block;
 }
-
 .overlay-canvas {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  transform: scaleX(-1); /* mirror matches video */
+  transform: scaleX(-1);
   pointer-events: none;
 }
 
-/* Animated scan frame */
+/* Environmental flash */
+.env-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.08s;
+  z-index: 5;
+}
+.env-flash.active {
+  opacity: 1;
+}
+
+/* Scan frame corners */
 .scan-frame {
   position: absolute;
   inset: 16px;
   pointer-events: none;
   transition: all 0.3s;
 }
-
 .corner {
   position: absolute;
   width: 20px;
@@ -1355,7 +1825,6 @@ onUnmounted(() => cleanup());
   border-color: rgba(255, 255, 255, 0.8);
   border-style: solid;
 }
-
 .corner.tl {
   top: 0;
   left: 0;
@@ -1380,7 +1849,6 @@ onUnmounted(() => cleanup());
   border-width: 0 3px 3px 0;
   border-radius: 0 0 4px 0;
 }
-
 .scan-frame.success .corner {
   border-color: #4ade80;
 }
@@ -1388,7 +1856,6 @@ onUnmounted(() => cleanup());
   border-color: #facc15;
   animation: cornerPulse 1s ease-in-out infinite;
 }
-
 @keyframes cornerPulse {
   0%,
   100% {
@@ -1397,6 +1864,52 @@ onUnmounted(() => cleanup());
   50% {
     opacity: 0.4;
   }
+}
+
+/* Positioning overlay */
+.positioning-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+}
+.guide-circle {
+  width: 180px;
+  height: 220px;
+  border-radius: 50%;
+  border: 3px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.3s;
+}
+.guide-circle.neutral .guide-ring-inner {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.guide-circle.warning {
+  border-color: #f6ad55;
+}
+.guide-circle.good {
+  border-color: #48bb78;
+}
+.guide-ring-inner {
+  width: 160px;
+  height: 200px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+}
+
+.position-label {
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 /* Video overlays */
@@ -1413,7 +1926,6 @@ onUnmounted(() => cleanup());
   font-size: 14px;
   font-weight: 600;
 }
-
 .capture-flash {
   animation: flashEffect 0.3s ease;
 }
@@ -1425,14 +1937,13 @@ onUnmounted(() => cleanup());
     background: rgba(0, 0, 0, 0);
   }
 }
+.flash-circle {
+  font-size: 40px;
+}
 
 /* Matching overlay */
 .matching-overlay {
   background: rgba(0, 0, 0, 0.75);
-}
-.matching-animation {
-  width: 100%;
-  padding: 0 24px;
 }
 .face-compare {
   display: flex;
@@ -1440,14 +1951,12 @@ onUnmounted(() => cleanup());
   justify-content: center;
   gap: 20px;
 }
-
 .compare-face {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
 }
-
 .compare-face img,
 .compare-face canvas.capture-preview {
   width: 80px;
@@ -1457,12 +1966,10 @@ onUnmounted(() => cleanup());
   border: 2px solid #60a5fa;
   background: #1f2937;
 }
-
 .compare-face label {
   font-size: 11px;
   color: #d1d5db;
 }
-
 .compare-arrow {
   display: flex;
   flex-direction: column;
@@ -1471,12 +1978,10 @@ onUnmounted(() => cleanup());
   font-size: 11px;
   color: #9ca3af;
 }
-
 .arrow-pulse {
   font-size: 22px;
   animation: arrowPulse 0.8s ease-in-out infinite;
 }
-
 @keyframes arrowPulse {
   0%,
   100% {
@@ -1487,6 +1992,41 @@ onUnmounted(() => cleanup());
   }
 }
 
+/* Instruction bar */
+.instruction-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #f7fafc;
+  font-size: 13px;
+  color: #4a5568;
+  font-weight: 500;
+  width: 100%;
+}
+.inst-icon {
+  font-size: 18px;
+}
+
+/* Stability bar */
+.stability-bar-wrapper {
+  width: 100%;
+  max-width: 200px;
+}
+.stability-bar {
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.stability-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #48bb78, #3b82f6);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+/* ── Liveness Panel ──────────────────────────────────────────────────────────── */
 .liveness-panel {
   width: 100%;
   max-width: 480px;
@@ -1499,70 +2039,117 @@ onUnmounted(() => cleanup());
   background: #f0f9ff;
   border: 2px solid #bfdbfe;
   border-radius: 14px;
-  padding: 20px;
-  text-align: center;
+  padding: 18px;
   transition: all 0.3s;
 }
-
 .challenge-card.challenge-done {
   background: #f0fdf4;
   border-color: #86efac;
 }
 
-.challenge-icon {
-  font-size: 36px;
-  margin-bottom: 8px;
+.challenge-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.challenge-timer {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+.timer-ring {
+  width: 44px;
+  height: 44px;
+}
+.timer-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a202c;
+}
+
+.challenge-icon-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+.challenge-big-icon {
+  font-size: 28px;
 }
 .challenge-title {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: #1e3a5f;
-  margin: 0 0 6px;
 }
-.challenge-description {
-  font-size: 13px;
-  color: #4b5563;
-  margin: 0;
+.challenge-subtitle {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
 }
 
+/* Chain progress */
+.chain-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  flex-wrap: wrap;
+}
+.chain-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  transition: all 0.3s;
+  background: #e5e7eb;
+  color: #6b7280;
+  z-index: 1;
+}
+.chain-dot.done {
+  background: #3b82f6;
+  color: white;
+}
+.chain-dot.active {
+  background: #3b82f6;
+  color: white;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25);
+  transform: scale(1.15);
+}
+.chain-connector {
+  height: 3px;
+  width: 24px;
+  background: #e5e7eb;
+  transition: background 0.3s;
+}
+.chain-connector.filled {
+  background: #3b82f6;
+}
+
+/* Blink indicators */
 .blink-indicators {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   justify-content: center;
-  margin-top: 14px;
-  font-size: 24px;
-}
-
-.blink-dot {
-  transition: transform 0.3s;
+  margin-top: 10px;
+  font-size: 26px;
 }
 .blink-dot.filled {
   transform: scale(1.3);
 }
 
-.stability-bar-wrapper {
-  margin-top: 14px;
-}
-.stability-label {
-  font-size: 12px;
-  color: #6b7280;
-  margin-bottom: 6px;
-}
-
-.stability-bar {
-  height: 6px;
-  background: #dbeafe;
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.stability-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #60a5fa, #34d399);
-  border-radius: 999px;
-  transition: width 0.2s ease;
-}
-
+/* Status line */
 .status-line {
   padding: 8px 14px;
   border-radius: 8px;
@@ -1570,7 +2157,6 @@ onUnmounted(() => cleanup());
   font-weight: 600;
   text-align: center;
 }
-
 .status-line.ok {
   background: #f0fdf4;
   color: #166534;
@@ -1580,6 +2166,7 @@ onUnmounted(() => cleanup());
   color: #713f12;
 }
 
+/* ── Result Phases ───────────────────────────────────────────────────────────── */
 .result-phase {
   text-align: center;
 }
@@ -1605,6 +2192,11 @@ onUnmounted(() => cleanup());
   color: #9ca3af;
   margin: 0;
 }
+.no-attempts {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
 
 .result-stats {
   display: flex;
@@ -1612,7 +2204,6 @@ onUnmounted(() => cleanup());
   justify-content: center;
   flex-wrap: wrap;
 }
-
 .stat-card {
   background: #f0f9ff;
   border: 1px solid #bfdbfe;
@@ -1624,7 +2215,6 @@ onUnmounted(() => cleanup());
   gap: 4px;
   min-width: 80px;
 }
-
 .stat-value {
   font-size: 22px;
   font-weight: 800;
@@ -1643,7 +2233,6 @@ onUnmounted(() => cleanup());
   font-size: 14px;
   color: #6b7280;
 }
-
 .attendance-confirmation {
   background: #f0fdf4;
   border: 1px solid #86efac;
@@ -1656,21 +2245,23 @@ onUnmounted(() => cleanup());
   gap: 4px;
 }
 
-/* Animated success checkmark */
+/* SVG animations */
 .result-icon {
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
-.checkmark-circle {
+.checkmark-circle,
+.x-circle {
   width: 80px;
   height: 80px;
 }
-.checkmark-circle svg {
+.checkmark-circle svg,
+.x-circle svg {
   width: 100%;
   height: 100%;
 }
+
 .checkmark-bg {
   stroke: #22c55e;
   stroke-width: 2;
@@ -1681,31 +2272,6 @@ onUnmounted(() => cleanup());
   stroke-dasharray: 30;
   stroke-dashoffset: 30;
   animation: tickDraw 0.4s 0.3s ease forwards;
-}
-
-@keyframes circleDraw {
-  from {
-    stroke-dasharray: 0 158;
-  }
-  to {
-    stroke-dasharray: 158 0;
-  }
-}
-
-@keyframes tickDraw {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-/* Animated X */
-.x-circle {
-  width: 80px;
-  height: 80px;
-}
-.x-circle svg {
-  width: 100%;
-  height: 100%;
 }
 .x-bg {
   stroke: #ef4444;
@@ -1719,22 +2285,26 @@ onUnmounted(() => cleanup());
   animation: tickDraw 0.4s 0.3s ease forwards;
 }
 
-.failure-details {
-  display: flex;
-  gap: 16px;
-  font-size: 13px;
-  color: #374151;
-  background: #f9fafb;
-  padding: 10px 16px;
-  border-radius: 8px;
+@keyframes circleDraw {
+  from {
+    stroke-dasharray: 0 158;
+  }
+  to {
+    stroke-dasharray: 158 0;
+  }
+}
+@keyframes tickDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
+/* Retry actions */
 .retry-actions {
   display: flex;
   gap: 12px;
   justify-content: center;
 }
-
 .btn-primary,
 .btn-secondary {
   padding: 10px 24px;
@@ -1745,7 +2315,6 @@ onUnmounted(() => cleanup());
   border: none;
   transition: all 0.2s;
 }
-
 .btn-primary {
   background: #3b82f6;
   color: white;
@@ -1762,6 +2331,7 @@ onUnmounted(() => cleanup());
   background: #e5e7eb;
 }
 
+/* Spinner */
 .spinner-ring {
   width: 48px;
   height: 48px;
@@ -1770,13 +2340,11 @@ onUnmounted(() => cleanup());
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
-
 .spinner-ring.small {
   width: 20px;
   height: 20px;
   border-width: 3px;
 }
-
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -1792,12 +2360,8 @@ onUnmounted(() => cleanup());
   .step-label {
     display: none;
   }
-  .result-stats {
-    gap: 10px;
-  }
-  .stat-card {
-    padding: 10px 14px;
-    min-width: 70px;
+  .chain-progress {
+    gap: 4px;
   }
 }
 </style>
