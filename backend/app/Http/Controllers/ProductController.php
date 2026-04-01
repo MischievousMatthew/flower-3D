@@ -132,8 +132,8 @@ class ProductController extends Controller
                 'is_fragile'             => 'nullable|boolean',
                 'requires_refrigeration' => 'nullable|boolean',
                 'status'                 => 'required|in:draft,active,discontinued',
-                'images'                 => 'nullable|array|max:5',
-                'images.*' => 'file|mimes:jpeg,png,jpg,gif,webp|max:5120',
+                'images'   => 'nullable|array',
+                'images.*' => 'nullable',
                 'model_file' => [
                     'nullable', 'max:51200',
                     function ($attribute, $value, $fail) {
@@ -291,8 +291,8 @@ class ProductController extends Controller
                 'is_fragile'             => 'nullable|boolean',
                 'requires_refrigeration' => 'nullable|boolean',
                 'status'                 => 'nullable|in:draft,active,inactive,discontinued',
-                'images'                 => 'nullable|array',
-                'images.*' => 'file|mimes:jpeg,png,jpg,gif,webp|max:5120',
+                'images'   => 'nullable|array|max:5',
+                'images.*' => 'nullable',
                 'removed_image_ids'      => 'nullable|array',
                 'removed_image_ids.*'    => 'integer',
                 'model_file' => [
