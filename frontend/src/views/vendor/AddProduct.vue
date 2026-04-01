@@ -1004,51 +1004,117 @@ const submitProduct = async () => {
   try {
     const submitData = new FormData();
 
-    // 1. Handle Booleans (Convert to 1 or 0)
-    const booleans = ["is_fragile", "requires_refrigeration", "has_discount"];
-    booleans.forEach((key) => {
-      submitData.append(key, formData[key] ? "1" : "0");
-    });
+    // Booleans
+    submitData.append("is_fragile", formData.is_fragile ? "1" : "0");
+    submitData.append(
+      "requires_refrigeration",
+      formData.requires_refrigeration ? "1" : "0",
+    );
+    submitData.append("has_discount", formData.has_discount ? "1" : "0");
 
-    // 2. Handle All Other Fields (Including Nullables)
-    Object.entries(formData).forEach(([key, value]) => {
-      // Skip fields we handle specially
-      if ([...booleans, "occasion_tags", "owner_id"].includes(key)) return;
+    // All scalar fields
+    const scalarFields = [
+      "product_name",
+      "description",
+      "sku",
+      "category",
+      "flower_type",
+      "color",
+      "color_other",
+      "purchase_price",
+      "selling_price",
+      "discount_price",
+      "quantity_in_stock",
+      "min_stock_level",
+      "max_stock_level",
+      "selling_type",
+      "season",
+      "supplier_name",
+      "supplier_contact",
+      "supplier_sku",
+      "supplier_lead_time",
+      "care_instructions",
+      "notes",
+      "status",
+    ];
 
-      // Handle nullables: Laravel's ConvertEmptyStringsToNull handles this if we send ''
-      if (value === null || value === undefined) {
-        submitData.append(key, "");
-      } else {
+    scalarFields.forEach((key) => {
+      const value = formData[key];
+      if (value !== null && value !== undefined && value !== "") {
         submitData.append(key, value.toString());
       }
     });
 
-    // Always append owner_id
+    // owner_id
     submitData.append("owner_id", user.value.id.toString());
 
-    // 3. Handle Arrays (occasion_tags, images[])
-    if (Array.isArray(formData.occasion_tags)) {
+    // Occasion tags
+    if (
+      Array.isArray(formData.occasion_tags) &&
+      formData.occasion_tags.length > 0
+    ) {
       formData.occasion_tags.forEach((tag) => {
         submitData.append("occasion_tags[]", tag);
       });
     }
 
-    if (product3DModel.value?.file) {
-      submitData.append("model_file", product3DModel.value.file);
+    // ✅ Images — log each one so we can confirm they're attached
+    if (productImages.value.length > 0) {
+      productImages.value.forEach((img, index) => {
+        if (img.file instanceof File) {
+          submitData.append("images[]", img.file, img.file.name);
+          console.log(
+            `Appending image[${index}]:`,
+            img.file.name,
+            img.file.size,
+            img.file.type,
+          );
+        }
+      });
     }
 
-    productImages.value.forEach((img) => {
-      if (img.file) submitData.append("images[]", img.file);
-    });
+    // ✅ 3D model
+    if (product3DModel.value?.file instanceof File) {
+      submitData.append(
+        "model_file",
+        product3DModel.value.file,
+        product3DModel.value.file.name,
+      );
+      console.log(
+        "Appending model:",
+        product3DModel.value.file.name,
+        product3DModel.value.file.size,
+      );
+    }
 
-    // 4. Send Request (Axios handles boundary automatically)
-    const response = await api.post("vendor/products", submitData);
+    // ✅ Log FormData entries for debugging
+    console.log("=== FormData entries ===");
+    for (let [key, value] of submitData.entries()) {
+      if (value instanceof File) {
+        console.log(
+          key,
+          "→ File:",
+          value.name,
+          value.size + "bytes",
+          value.type,
+        );
+      } else {
+        console.log(key, "→", value);
+      }
+    }
+
+    const response = await api.post("vendor/products", submitData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
 
     if (response.data.success) {
       toast.success(response.data.message || "Product added successfully!");
       router.push("/vendor/products");
     }
   } catch (error) {
+    console.error("Submit error:", error.response?.data);
     if (error.response?.data?.errors) {
       Object.keys(errors).forEach((k) => delete errors[k]);
       Object.entries(error.response.data.errors).forEach(([k, v]) => {
