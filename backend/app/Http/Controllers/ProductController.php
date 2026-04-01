@@ -134,10 +134,17 @@ class ProductController extends Controller
                 'status'                 => 'required|in:draft,active,discontinued',
                 'images'                 => 'nullable|array|max:5',
                 'images.*'               => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120',
-                'model_file'             => [
-                    'nullable', 'file', 'max:51200',
+                'model_file' => [
+                    'nullable', 'max:51200',
                     function ($attribute, $value, $fail) {
-                        if (!in_array(strtolower($value->getClientOriginalExtension()), ['glb', 'gltf', 'obj', 'fbx'])) {
+                        // Laravel may parse as array if browser sends model_file[]
+                        $file = is_array($value) ? ($value[0] ?? null) : $value;
+
+                        if (!$file instanceof \Illuminate\Http\UploadedFile) {
+                            return; // Let the 'file' rule handle invalid types
+                        }
+
+                        if (!in_array(strtolower($file->getClientOriginalExtension()), ['glb', 'gltf', 'obj', 'fbx'])) {
                             $fail('Invalid 3D model format. Allowed: glb, gltf, obj, fbx.');
                         }
                     },
@@ -288,10 +295,16 @@ class ProductController extends Controller
                 'images.*'               => 'image|max:5120',
                 'removed_image_ids'      => 'nullable|array',
                 'removed_image_ids.*'    => 'integer',
-                'model_file'             => [
-                    'nullable', 'file', 'max:51200',
+                'model_file' => [
+                    'nullable', 'max:51200',
                     function ($attribute, $value, $fail) {
-                        if (!in_array(strtolower($value->getClientOriginalExtension()), ['glb', 'gltf', 'obj', 'fbx'])) {
+                        $file = is_array($value) ? ($value[0] ?? null) : $value;
+
+                        if (!$file instanceof \Illuminate\Http\UploadedFile) {
+                            return;
+                        }
+
+                        if (!in_array(strtolower($file->getClientOriginalExtension()), ['glb', 'gltf', 'obj', 'fbx'])) {
                             $fail('The model file must be: glb, gltf, obj, or fbx.');
                         }
                     },
