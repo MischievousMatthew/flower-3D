@@ -165,27 +165,32 @@ class ProductController extends Controller
 
             // ── 3D Model upload ───────────────────────────────────────────────
             if ($request->hasFile('model_file')) {
-                $this->handle3DModel($request->file('model_file'), $product);
+                $modelFile = $request->file('model_file');
+
+                // Laravel may parse it as an array if the browser sends model_file[]
+                if (is_array($modelFile)) {
+                    $modelFile = $modelFile[0];
+                }
+
+                if ($modelFile instanceof \Illuminate\Http\UploadedFile) {
+                    $this->handle3DModel($modelFile, $product);
+                }
             }
 
             if ($request->hasFile('images')) {
-                Log::info('Product images received', [
-                    'count' => count($request->file('images')),
-                    'files' => collect($request->file('images'))->map(fn($f) => [
-                        'name'      => $f->getClientOriginalName(),
-                        'size'      => $f->getSize(),
-                        'mime'      => $f->getMimeType(),
-                        'real_path' => $f->getRealPath(),
-                        'path_exists' => file_exists($f->getRealPath() ?: ''),
-                    ])->toArray(),
-                ]);
-            }
+                $imageFiles = $request->file('images');
 
-            // ── Image uploads ─────────────────────────────────────────────────
-            if ($request->hasFile('images')) {
-                foreach ($request->file('images') as $index => $imageFile) {
+                // Normalize — ensure it's always a flat array of UploadedFile objects
+                if (!is_array($imageFiles)) {
+                    $imageFiles = [$imageFiles];
+                }
 
-                    // ✅ Pass UploadedFile directly — NOT $imageFile->getRealPath()
+                foreach ($imageFiles as $index => $imageFile) {
+                    // Skip if not a valid uploaded file
+                    if (!($imageFile instanceof \Illuminate\Http\UploadedFile)) {
+                        continue;
+                    }
+
                     $result = CloudinaryHelper::upload($imageFile, [
                         'folder'        => 'product_images',
                         'resource_type' => 'image',
