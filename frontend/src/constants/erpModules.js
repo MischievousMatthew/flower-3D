@@ -78,7 +78,7 @@ export const ERP_MODULES = [
   },
   {
     key: "crm",
-    label: "CRM Chat",
+    label: "Chat",
     icon: "crm",
     group: "CRM",
     path: "/erp/crm/chat",
