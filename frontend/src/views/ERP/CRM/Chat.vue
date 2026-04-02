@@ -62,7 +62,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import ChatPanel from "../../../layouts/chat/chat.vue";
+import ChatPanel from "../../../layouts/Chat/Chat.vue";
 import DynamicSidebar from "../../../layouts/Sidebar/DynamicSidebar.vue";
 import { useAssignment } from "../../../composables/useAssignment";
 import { useSidebarState } from "../../../composables/useSidebarState";
