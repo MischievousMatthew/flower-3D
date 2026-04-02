@@ -208,29 +208,37 @@
                 </div>
               </td>
               <td>
-                <div class="module-badges">
+                <div class="module-pills">
                   <span
-                    v-for="perm in (employee.module_permissions || []).slice(
-                      0,
-                      3,
-                    )"
-                    :key="perm.module"
-                    class="module-badge"
+                    v-if="(employee.module_permissions || []).length > 0"
+                    class="module-pill"
                     :class="
-                      'badge-' +
-                      getModuleGroup(perm.module)
+                      'pill-' +
+                      getModuleGroup(employee.module_permissions[0].module)
                         .toLowerCase()
                         .replace(' ', '-')
                     "
-                    :title="perm.module + ' (' + perm.access + ')'"
-                    >{{ getModuleLabel(perm.module) }}</span
+                    :title="
+                      employee.module_permissions[0].module +
+                      ' (' +
+                      employee.module_permissions[0].access +
+                      ')'
+                    "
+                    >{{
+                      getModuleLabel(employee.module_permissions[0].module)
+                    }}</span
                   >
                   <span
-                    v-if="(employee.module_permissions || []).length > 3"
-                    class="module-badge badge-more"
+                    v-if="(employee.module_permissions || []).length > 1"
+                    class="module-pill pill-more"
+                    :title="
+                      (employee.module_permissions || [])
+                        .slice(1)
+                        .map((p) => getModuleLabel(p.module))
+                        .join(', ')
+                    "
+                    >+{{ employee.module_permissions.length - 1 }} more</span
                   >
-                    +{{ employee.module_permissions.length - 3 }} more
-                  </span>
                   <span
                     v-if="!(employee.module_permissions || []).length"
                     class="no-modules"
@@ -1400,6 +1408,66 @@ onMounted(async () => {
   background: #5568d3;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* ── Module Pill Capsules (table) ────────────────── */
+.module-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.module-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
+
+/* HR — blue */
+.pill-hr {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+/* Finance — emerald */
+.pill-finance {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+/* Procurement — amber */
+.pill-procurement {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+/* Supply Chain — violet */
+.pill-supply-chain {
+  background: #f5f3ff;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+}
+
+/* +N more pill */
+.pill-more {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.no-modules {
+  font-size: 12px;
+  color: #a0aec0;
+  font-style: italic;
 }
 
 /* ── Module Permissions ───────────────────────────── */
