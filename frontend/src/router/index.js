@@ -611,12 +611,12 @@ router.beforeEach(async (to, from, next) => {
   const user = auth.user.value;
   const role = user?.role;
 
-  // ── Employee routing: use assignment context ──────────────────────────
+  // ── Employee routing: use module-based permissions ──────────────────────
   if (userType === "employee") {
     const assignment = useAssignment();
 
-    // If no active assignment (or it was cleared), redirect to login
-    if (!assignment.activeAssignment.value) {
+    // If no permissions at all, redirect to login
+    if (!assignment.hasAnyPermission.value) {
       return next("/guest/login");
     }
 
@@ -625,36 +625,30 @@ router.beforeEach(async (to, from, next) => {
       return next(assignment.getDefaultRoute());
     }
 
-    // Enforce role silos based on active assignment
-    if (to.path.startsWith("/erp/hr") && !assignment.isRole("hr-manager")) {
+    // Enforce module-based access per ERP section
+    if (to.path.startsWith("/erp/hr") && !assignment.hasGroupAccess("HR")) {
       return next(assignment.getDefaultRoute());
     }
     if (
       to.path.startsWith("/erp/finance") &&
-      !assignment.isRole("finance-manager")
+      !assignment.hasGroupAccess("Finance")
     ) {
       return next(assignment.getDefaultRoute());
     }
     if (
       to.path.startsWith("/erp/procurement/inventory") &&
-      !assignment.isRole("inventory-manager")
+      !assignment.hasGroupAccess("Procurement")
     ) {
       return next(assignment.getDefaultRoute());
     }
     if (
       to.path.startsWith("/erp/procurement/supply-chain") &&
-      !assignment.isRole("supply-chain-coordinator")
-    ) {
-      return next(assignment.getDefaultRoute());
-    }
-    if (
-      to.path.startsWith("/erp/crm") &&
-      !assignment.isRole("crm-specialist")
+      !assignment.hasGroupAccess("Supply Chain")
     ) {
       return next(assignment.getDefaultRoute());
     }
 
-    // Pass through if the path matches the role silo or is generic
+    // Pass through if the path matches the permissions or is generic
     return next();
   }
 

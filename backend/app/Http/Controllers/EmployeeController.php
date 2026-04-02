@@ -6,6 +6,8 @@ use App\Models\Employee;
 use App\Models\Department;
 use App\Models\Role;
 use App\Models\EmployeeAssignment;
+use App\Models\EmployeeModulePermission;
+use App\Constants\ErpModule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
@@ -25,17 +27,17 @@ class EmployeeController extends Controller
             $ownerId = $this->getOwnerId();
 
             $employees = Employee::byOwner($ownerId)
-                ->with(['owner:id,name,email', 'activeAssignments.department', 'activeAssignments.role'])
+                ->with(['owner:id,name,email', 'modulePermissions'])
                 ->orderBy('created_at', 'desc')
                 ->get()
                 ->map(function ($employee) {
                     $employeeArray = $employee->toArray();
-                    // Fallback helpers for the frontend table View
-                    $primary = $employee->activeAssignments->where('is_primary', true)->first() 
-                               ?? $employee->activeAssignments->first();
-                    $employeeArray['department'] = $primary && $primary->department ? $primary->department->name : '-';
-                    $employeeArray['role'] = $primary && $primary->role ? $primary->role->name : '-';
-                    return $employeeArray;  
+                    // Flatten module_permissions for the frontend table
+                    $employeeArray['module_permissions'] = $employee->modulePermissions->map(fn ($p) => [
+                        'module' => $p->module,
+                        'access' => $p->access,
+                    ])->toArray();
+                    return $employeeArray;
                 });
 
             return response()->json([
@@ -138,9 +140,9 @@ class EmployeeController extends Controller
                 'status'       => 'required|in:Active,On Leave,Resign',
                 'phone'        => 'nullable|string|max:20',
                 'address'      => 'nullable|string|max:500',
-                'assignments'  => 'required|array|min:1',
-                'assignments.*.department' => 'required|string',
-                'assignments.*.role'       => 'required|string',
+                'permissions'             => 'required|array|min:1',
+                'permissions.*.module'    => 'required|string|' . ErpModule::validKeysRule(),
+                'permissions.*.access'    => 'required|string|' . ErpModule::validAccessRule(),
             ]);
 
             if ($validator->fails()) {
@@ -162,42 +164,34 @@ class EmployeeController extends Controller
                 'address'      => $request->address,
             ]);
 
-            // Track IDs of processed assignments to verify success
-            $assignedCount = 0;
+            // Create module permissions
+            $createdCount = 0;
+            $seenModules = [];
 
-            foreach ($request->assignments as $index => $assignmentData) {
-                // Look up by name
-                $department = Department::where('name', $assignmentData['department'])->first();
-                if (!$department) continue;
+            foreach ($request->permissions as $perm) {
+                // Skip duplicates within the request
+                if (in_array($perm['module'], $seenModules, true)) continue;
+                $seenModules[] = $perm['module'];
 
-                $role = Role::where('department_id', $department->id)
-                            ->where('name', $assignmentData['role'])
-                            ->first();
-                if (!$role) continue;
-
-                EmployeeAssignment::create([
-                    'employee_id'   => $employee->id,
-                    'department_id' => $department->id,
-                    'role_id'       => $role->id,
-                    'is_primary'    => ($index === 0), // First one is primary
-                    'is_active'     => true,
+                EmployeeModulePermission::create([
+                    'employee_id' => $employee->id,
+                    'module'      => $perm['module'],
+                    'access'      => $perm['access'],
                 ]);
-
-                $assignedCount++;
+                $createdCount++;
             }
 
-            if ($assignedCount === 0) {
-                // Rollback if no valid assignments were provided
+            if ($createdCount === 0) {
                 $employee->delete();
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to create employee: Invalid department or role'
+                    'message' => 'Failed to create employee: No valid permissions provided'
                 ], 422);
             }
 
             return response()->json([
                 'success' => true,
-                'data' => $employee->load(['owner', 'activeAssignments.department', 'activeAssignments.role']),
+                'data' => $employee->load(['owner', 'modulePermissions']),
                 'message' => 'Employee added successfully'
             ], 201);
         } catch (\Exception $e) {
@@ -275,9 +269,9 @@ class EmployeeController extends Controller
                 'status'       => 'nullable|in:Active,On Leave,Resign',
                 'phone'        => 'nullable|string|max:20',
                 'address'      => 'nullable|string|max:500',
-                'assignments'  => 'nullable|array|min:1',
-                'assignments.*.department' => 'required_with:assignments|string',
-                'assignments.*.role'       => 'required_with:assignments|string',
+                'permissions'             => 'nullable|array|min:1',
+                'permissions.*.module'    => 'required_with:permissions|string|' . ErpModule::validKeysRule(),
+                'permissions.*.access'    => 'required_with:permissions|string|' . ErpModule::validAccessRule(),
             ]);
 
             if ($validator->fails()) {
@@ -296,35 +290,32 @@ class EmployeeController extends Controller
                 unset($data['password']);
             }
 
+            // Remove permissions from $data so it doesn't get sent to Employee::update()
+            unset($data['permissions']);
+
             $employee->update($data);
 
-            // Sync assignments if provided
-            if ($request->has('assignments')) {
-                // Clear existing active assignments
-                $employee->activeAssignments()->delete();
+            // Sync module permissions if provided
+            if ($request->has('permissions')) {
+                // Clear old permissions
+                $employee->modulePermissions()->delete();
 
-                foreach ($request->assignments as $index => $assignmentData) {
-                    $department = Department::where('name', $assignmentData['department'])->first();
-                    if (!$department) continue;
-    
-                    $role = Role::where('department_id', $department->id)
-                                ->where('name', $assignmentData['role'])
-                                ->first();
-                    if (!$role) continue;
-    
-                    EmployeeAssignment::create([
-                        'employee_id'   => $employee->id,
-                        'department_id' => $department->id,
-                        'role_id'       => $role->id,
-                        'is_primary'    => ($index === 0), // First one is primary
-                        'is_active'     => true,
+                $seenModules = [];
+                foreach ($request->permissions as $perm) {
+                    if (in_array($perm['module'], $seenModules, true)) continue;
+                    $seenModules[] = $perm['module'];
+
+                    EmployeeModulePermission::create([
+                        'employee_id' => $employee->id,
+                        'module'      => $perm['module'],
+                        'access'      => $perm['access'],
                     ]);
                 }
             }
 
             return response()->json([
                 'success' => true,
-                'data' => $employee->fresh()->load(['owner', 'activeAssignments.department', 'activeAssignments.role']),
+                'data' => $employee->fresh()->load(['owner', 'modulePermissions']),
                 'message' => 'Employee updated successfully'
             ]);
         } catch (\Exception $e) {

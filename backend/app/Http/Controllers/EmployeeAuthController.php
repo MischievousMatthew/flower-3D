@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
+use App\Constants\ErpModule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -36,38 +37,29 @@ class EmployeeAuthController extends Controller
             // Revoke old tokens
             $employee->tokens()->delete();
 
-            // Create a clean Sanctum token — no stale role/department abilities
+            // Create a clean Sanctum token
             $token = $employee->createToken('employee-token')->plainTextToken;
 
-            // Load assignments to return on login
-            $assignments = $employee->activeAssignments()
-                ->with(['department', 'role.permissions'])
+            // Load module permissions
+            $modulePermissions = $employee->modulePermissions()
                 ->get()
-                ->map(fn ($a) => [
-                    'id'          => $a->id,
-                    'label'       => $a->label,
-                    'is_primary'  => $a->is_primary,
-                    'department'  => [
-                        'id'   => $a->department->id,
-                        'name' => $a->department->name,
-                        'slug' => $a->department->slug,
-                    ],
-                    'role'        => [
-                        'id'      => $a->role->id,
-                        'name'    => $a->role->name,
-                        'slug'    => $a->role->slug,
-                        'level'   => $a->role->hierarchy_level,
-                        'modules' => $a->role->accessible_modules,
-                    ],
-                    'permissions' => $a->role->permissions->pluck('slug'),
+                ->map(fn ($p) => [
+                    'module' => $p->module,
+                    'access' => $p->access,
                 ]);
 
-            $primary = $assignments->firstWhere('is_primary', true);
+            // Compute default route from first module permission
+            $defaultRoute = '/erp/dashboard';
+            if ($modulePermissions->isNotEmpty()) {
+                $firstModule = $modulePermissions->first()['module'];
+                // Use a simple mapping — the frontend has the full ERP_MODULES constant
+                $defaultRoute = $this->getModuleRoute($firstModule);
+            }
 
             Log::info('Employee login successful', [
                 'employee_id' => $employee->id,
                 'username'    => $employee->username,
-                'assignments' => $assignments->count(),
+                'modules'     => $modulePermissions->count(),
             ]);
 
             return response()->json([
@@ -76,16 +68,16 @@ class EmployeeAuthController extends Controller
                 'token'             => $token,
                 'token_type'        => 'Bearer',
                 'employee'          => [
-                    'id'           => $employee->id,
-                    'name'         => $employee->name,
-                    'email'        => $employee->email,
-                    'username'     => $employee->username,
-                    'status'       => $employee->status,
-                    'initials'     => $employee->initials,
-                    'joining_date' => $employee->formatted_joining_date,
-                    'assignments'  => $assignments,
+                    'id'                 => $employee->id,
+                    'name'               => $employee->name,
+                    'email'              => $employee->email,
+                    'username'           => $employee->username,
+                    'status'             => $employee->status,
+                    'initials'           => $employee->initials,
+                    'joining_date'       => $employee->formatted_joining_date,
+                    'module_permissions' => $modulePermissions,
+                    'default_route'      => $defaultRoute,
                 ],
-                'primary_assignment' => $primary,
             ]);
 
         } catch (\Throwable $e) {
@@ -132,41 +124,59 @@ class EmployeeAuthController extends Controller
             ], 401);
         }
 
-        $assignments = $employee->activeAssignments()
-            ->with(['department', 'role.permissions'])
+        $modulePermissions = $employee->modulePermissions()
             ->get()
-            ->map(fn ($a) => [
-                'id'          => $a->id,
-                'label'       => $a->label,
-                'is_primary'  => $a->is_primary,
-                'department'  => [
-                    'id'   => $a->department->id,
-                    'name' => $a->department->name,
-                    'slug' => $a->department->slug,
-                ],
-                'role'        => [
-                    'id'      => $a->role->id,
-                    'name'    => $a->role->name,
-                    'slug'    => $a->role->slug,
-                    'level'   => $a->role->hierarchy_level,
-                    'modules' => $a->role->accessible_modules,
-                ],
-                'permissions' => $a->role->permissions->pluck('slug'),
+            ->map(fn ($p) => [
+                'module' => $p->module,
+                'access' => $p->access,
             ]);
+
+        $defaultRoute = '/erp/dashboard';
+        if ($modulePermissions->isNotEmpty()) {
+            $defaultRoute = $this->getModuleRoute($modulePermissions->first()['module']);
+        }
 
         return response()->json([
             'success'  => true,
             'message'  => 'Employee data retrieved successfully',
             'employee' => [
-                'id'           => $employee->id,
-                'name'         => $employee->name,
-                'email'        => $employee->email,
-                'username'     => $employee->username,
-                'status'       => $employee->status,
-                'initials'     => $employee->initials,
-                'joining_date' => $employee->formatted_joining_date,
-                'assignments'  => $assignments,
+                'id'                 => $employee->id,
+                'name'               => $employee->name,
+                'email'              => $employee->email,
+                'username'           => $employee->username,
+                'status'             => $employee->status,
+                'initials'           => $employee->initials,
+                'joining_date'       => $employee->formatted_joining_date,
+                'module_permissions' => $modulePermissions,
+                'default_route'      => $defaultRoute,
             ],
         ]);
+    }
+
+    /**
+     * Get the default landing route for a module key.
+     */
+    private function getModuleRoute(string $moduleKey): string
+    {
+        $routes = [
+            'hr_dashboard'       => '/erp/hr',
+            'employees'          => '/erp/hr/employees/directory',
+            'attendance'         => '/erp/hr/attendance/logs',
+            'payroll'            => '/erp/hr/payroll/list',
+            'leave'              => '/erp/hr/leave/management-requests',
+            'finance_dashboard'  => '/erp/finance/dashboard',
+            'funding_requests'   => '/erp/finance/funding-requests',
+            'payroll_requests'   => '/erp/finance/payroll-requests',
+            'inventory_products' => '/erp/procurement/inventory/products',
+            'inventory_funding'  => '/erp/procurement/inventory/funding-request',
+            'sc_dashboard'       => '/erp/procurement/supply-chain/dashboard',
+            'suppliers'          => '/erp/procurement/supply-chain/suppliers',
+            'warehouse'          => '/erp/procurement/supply-chain/warehouse',
+            'sc_orders'          => '/erp/procurement/supply-chain/orders',
+            'deliveries'         => '/erp/procurement/supply-chain/deliveries',
+            'order_scan'         => '/erp/procurement/supply-chain/scan/process',
+        ];
+
+        return $routes[$moduleKey] ?? '/erp/dashboard';
     }
 }

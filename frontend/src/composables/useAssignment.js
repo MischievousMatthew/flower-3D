@@ -1,127 +1,117 @@
 // src/composables/useAssignment.js
 //
-// Drop this file in your composables folder.
-// Import it in any sidebar to get the active assignment state.
+// Module-based RBAC composable.
+// Replaces the old department/role assignment system with direct module permissions.
 //
-// The composable reads the assignments array that your /auth/me endpoint
-// already returns (from the multi-assignment work we did earlier).
-// If you haven't wired that up yet it also reads from localStorage as a
-// fallback so the sidebar dropdown still works.
+// Each employee has a flat array of { module, access } objects.
+// The composable provides helpers to check access per module.
 
 import { ref, computed } from "vue";
+import { ERP_MODULES, findModule } from "../constants/erpModules";
 
 // ─── Module-level singletons ──────────────────────────────────────────────────
-// Defined outside the function so every component that calls useAssignment()
-// shares the same reactive state — no prop-drilling needed.
-const assignments = ref([]); // All department-role assignments for this employee
-const activeAssignment = ref(null); // The currently selected one
-
-const STORAGE_KEY = "active_assignment_id";
-
-// ─── Route map ────────────────────────────────────────────────────────────────
-// Maps a role slug to the default landing path when the user switches context.
-const ROLE_ROUTE_MAP = {
-  "hr-manager": "/erp/hr",
-  "finance-manager": "/erp/finance/dashboard",
-  "inventory-manager": "/erp/procurement/inventory/funding-request",
-  "supply-chain-coordinator": "/erp/procurement/supply-chain/dashboard",
-  "crm-specialist": "/erp/crm/dashboard",
-};
+// Shared across all components that call useAssignment().
+const modulePermissions = ref([]); // Array of { module, access }
+const defaultRoute = ref("/erp/dashboard");
 
 export function useAssignment() {
   // ─── Bootstrap ─────────────────────────────────────────────────────────────
-  // Call this once after login, passing the user object from /auth/me.
-  // The user object must have an `assignments` array shaped like:
-  // [{ id, label, is_primary, department: { name, slug }, role: { name, slug } }]
+  // Called once after login, passing the user object from /auth/employee-me.
+  // The user object must have a `module_permissions` array.
   function loadAssignments(userData) {
-    if (!userData?.assignments?.length) {
-      // Fallback: build a single synthetic assignment from flat dept/role fields
-      // (supports employees created before the multi-assignment system)
-      if (userData?.department && userData?.role) {
-        const synthetic = {
-          id: null,
-          label: `${userData.department} — ${userData.role}`,
-          is_primary: true,
-          department: {
-            name: userData.department,
-            slug: userData.department?.toLowerCase(),
-          },
-          role: { name: userData.role, slug: slugify(userData.role) },
-        };
-        assignments.value = [synthetic];
-        activeAssignment.value = synthetic;
-      }
+    if (!userData?.module_permissions?.length) {
+      modulePermissions.value = [];
+      defaultRoute.value = "/erp/dashboard";
       return;
     }
 
-    assignments.value = userData.assignments;
-
-    // Restore the last-used assignment from localStorage, or fall back to
-    // the one marked is_primary, or the very first one.
-    const storedId = parseInt(localStorage.getItem(STORAGE_KEY));
-    const restored =
-      storedId && assignments.value.find((a) => a.id === storedId);
-    const primary = assignments.value.find((a) => a.is_primary);
-
-    activeAssignment.value = restored || primary || assignments.value[0];
-    _persist();
-  }
-
-  // ─── Switch ─────────────────────────────────────────────────────────────────
-  // Call this when the user picks a different assignment from the dropdown.
-  function switchAssignment(assignmentId) {
-    const found = assignments.value.find((a) => a.id === assignmentId);
-    if (!found) return;
-    activeAssignment.value = found;
-    _persist();
+    modulePermissions.value = userData.module_permissions;
+    defaultRoute.value = userData.default_route || "/erp/dashboard";
   }
 
   function clearAssignment() {
-    assignments.value = [];
-    activeAssignment.value = null;
-    localStorage.removeItem(STORAGE_KEY);
+    modulePermissions.value = [];
+    defaultRoute.value = "/erp/dashboard";
   }
 
-  function _persist() {
-    if (activeAssignment.value?.id) {
-      localStorage.setItem(STORAGE_KEY, activeAssignment.value.id);
-    }
+  // ─── Permission helpers ──────────────────────────────────────────────────
+  /**
+   * Does the employee have any access (view or edit) to this module?
+   */
+  function hasAccess(moduleKey) {
+    return modulePermissions.value.some((p) => p.module === moduleKey);
   }
 
-  // ─── Computed helpers ────────────────────────────────────────────────────────
-  const hasManyAssignments = computed(() => assignments.value.length > 1);
-  const activeRoleSlug = computed(
-    () => activeAssignment.value?.role?.slug ?? null,
+  /**
+   * Does the employee have at least view access?
+   */
+  function canView(moduleKey) {
+    return modulePermissions.value.some(
+      (p) => p.module === moduleKey && (p.access === "view" || p.access === "edit"),
+    );
+  }
+
+  /**
+   * Does the employee have edit access?
+   */
+  function canEdit(moduleKey) {
+    return modulePermissions.value.some(
+      (p) => p.module === moduleKey && p.access === "edit",
+    );
+  }
+
+  /**
+   * Check if the employee has access to any module in a given group.
+   * Useful for route guards that protect entire sections (e.g. /erp/hr/*).
+   */
+  function hasGroupAccess(group) {
+    const groupModuleKeys = ERP_MODULES.filter((m) => m.group === group).map((m) => m.key);
+    return modulePermissions.value.some((p) => groupModuleKeys.includes(p.module));
+  }
+
+  // ─── Computed helpers ────────────────────────────────────────────────────
+  const accessibleModules = computed(() =>
+    modulePermissions.value.map((p) => p.module),
   );
-  const activeDeptSlug = computed(
-    () => activeAssignment.value?.department?.slug ?? null,
-  );
 
-  const activeModules = computed(() => activeAssignment.value?.role?.modules ?? []);
-  const activePermissions = computed(() => activeAssignment.value?.permissions ?? []);
+  const hasAnyPermission = computed(() => modulePermissions.value.length > 0);
 
-  // ─── Permission helpers ──────────────────────────────────────────────────────
-  function can(permissionSlug) {
-    return activePermissions.value.includes(permissionSlug);
-  }
+  // For backwards compat — components that checked hasManyAssignments
+  const hasManyAssignments = computed(() => false);
 
-  function hasModule(moduleSlug) {
-    return activeModules.value.includes(moduleSlug);
-  }
-
-  function isRole(...slugs) {
-    return slugs.includes(activeRoleSlug.value);
-  }
-
-  function isDept(...slugs) {
-    return slugs.includes(activeDeptSlug.value);
-  }
-
+  // ─── Navigation ──────────────────────────────────────────────────────────
   function getDefaultRoute() {
-    return ROLE_ROUTE_MAP[activeRoleSlug.value] ?? "/erp/dashboard";
+    return defaultRoute.value;
   }
+
+  // ─── Deprecated stubs (prevent runtime errors in any code not yet updated) ─
+  const assignments = computed(() => []);
+  const activeAssignment = computed(() => null);
+  const activeRoleSlug = computed(() => null);
+  const activeDeptSlug = computed(() => null);
+  const activeModules = computed(() => accessibleModules.value);
+  const activePermissions = computed(() => []);
+
+  function switchAssignment() {}
+  function isRole() { return false; }
+  function isDept() { return false; }
+  function can() { return false; }
+  function hasModule(moduleKey) { return hasAccess(moduleKey); }
 
   return {
+    // New API
+    modulePermissions,
+    accessibleModules,
+    hasAnyPermission,
+    hasAccess,
+    canView,
+    canEdit,
+    hasGroupAccess,
+    loadAssignments,
+    clearAssignment,
+    getDefaultRoute,
+
+    // Deprecated — kept so existing imports don't crash
     assignments,
     activeAssignment,
     hasManyAssignments,
@@ -129,18 +119,10 @@ export function useAssignment() {
     activeDeptSlug,
     activeModules,
     activePermissions,
-    loadAssignments,
     switchAssignment,
-    clearAssignment,
     can,
     hasModule,
     isRole,
     isDept,
-    getDefaultRoute,
   };
-}
-
-// ─── Helper ───────────────────────────────────────────────────────────────────
-function slugify(str) {
-  return str?.toLowerCase().replace(/\s+/g, "-") ?? "";
 }

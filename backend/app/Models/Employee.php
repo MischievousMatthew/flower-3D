@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Collection;
+use App\Constants\ErpModule;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -64,6 +65,51 @@ class Employee extends Authenticatable
         return $this->hasMany(EmployeeAssignment::class)
             ->where('is_active', true)
             ->with(['department', 'role.permissions']);
+    }
+
+    // ── Module-Based RBAC ─────────────────────────────────────────────────
+
+    public function modulePermissions(): HasMany
+    {
+        return $this->hasMany(EmployeeModulePermission::class);
+    }
+
+    /**
+     * Does this employee have any access to the given module?
+     */
+    public function hasModuleAccess(string $module): bool
+    {
+        return $this->modulePermissions()->where('module', $module)->exists();
+    }
+
+    /**
+     * Does this employee have edit access to the given module?
+     */
+    public function canEditModule(string $module): bool
+    {
+        return $this->modulePermissions()
+            ->where('module', $module)
+            ->where('access', 'edit')
+            ->exists();
+    }
+
+    /**
+     * Does this employee have at least view access to the given module?
+     */
+    public function canViewModule(string $module): bool
+    {
+        return $this->modulePermissions()
+            ->where('module', $module)
+            ->whereIn('access', ['view', 'edit'])
+            ->exists();
+    }
+
+    /**
+     * Get all module keys this employee can access.
+     */
+    public function getAccessibleModules(): array
+    {
+        return $this->modulePermissions()->pluck('module')->toArray();
     }
 
     public function primaryAssignment(): HasOne
