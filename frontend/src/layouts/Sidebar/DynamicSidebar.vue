@@ -308,7 +308,6 @@ async function handleLogout() {
     isLoading.value = false;
   }
 }
-</script>
 
 const isLoading = ref(false);
 const expandedGroups = ref([]);
