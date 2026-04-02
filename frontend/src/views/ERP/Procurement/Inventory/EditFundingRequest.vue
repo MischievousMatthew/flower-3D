@@ -34,19 +34,23 @@
       </div>
 
       <form v-else @submit.prevent="handleSubmit" class="funding-form">
+        <fieldset class="form-fieldset" :disabled="!canEditFunding">
+        <p v-if="!canEditFunding" class="permission-notice">
+          You have view-only access to Inventory Funding. Editing and submitting requests is disabled.
+        </p>
         <div class="form-section">
           <h3 class="section-title">Request Identity</h3>
           <div class="form-row">
             <div class="form-group">
-              <label>Accounting Manager *</label>
-              <select v-model="formData.accounting_manager_id" required>
-                <option value="">Select Accounting Manager</option>
+              <label>Finance Approver *</label>
+              <select v-model="formData.approver_id" required>
+                <option value="">Select Finance Approver</option>
                 <option
-                  v-for="manager in accountingManagers"
-                  :key="manager.id"
-                  :value="manager.id"
+                  v-for="approver in financeApprovers"
+                  :key="approver.id"
+                  :value="approver.id"
                 >
-                  {{ manager.name }}
+                  {{ approver.label }}
                 </option>
               </select>
             </div>
@@ -495,30 +499,35 @@
             {{ submitting ? "Saving..." : "Save as Draft" }}
           </button>
           <button type="submit" class="btn-submit" :disabled="submitting">
-            {{ submitting ? "Submitting..." : "Submit to Accounting" }}
+            {{ submitting ? "Submitting..." : "Submit to Finance" }}
           </button>
         </div>
+        </fieldset>
       </form>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import api from "../../../../plugins/axios";
 import { toast } from "vue3-toastify";
+import { useAssignment } from "../../../../composables/useAssignment";
 
 const router = useRouter();
 const route = useRoute();
+const { canEdit } = useAssignment();
 
-const accountingManagers = ref([]);
+const financeApprovers = ref([]);
 const loading = ref(false);
 const error = ref(null);
 const submitting = ref(false);
+const canEditFunding = computed(() => canEdit("inventory_funding"));
+const requestId = window.history.state?.requestId ?? route.params.id;
 
 const formData = ref({
-  accounting_manager_id: "",
+  approver_id: "",
   related_sales_order_id: "",
   product_name: "",
   flower_category: "",
@@ -555,14 +564,12 @@ const formData = ref({
   additional_notes: "",
 });
 
-const fetchAccountingManagers = async () => {
+const fetchFinanceApprovers = async () => {
   try {
-    const { data } = await api.get(
-      "/procurement/inventory/accounting-managers",
-    );
-    if (data.success) accountingManagers.value = data.data;
+    const { data } = await api.get("/procurement/inventory/eligible-approvers");
+    if (data.success) financeApprovers.value = data.data;
   } catch (err) {
-    toast.error("Failed to load accounting managers");
+    toast.error("Failed to load finance approvers");
   }
 };
 
@@ -571,12 +578,12 @@ const fetchRequest = async () => {
   error.value = null;
   try {
     const { data } = await api.get(
-      `/procurement/inventory/funding-requests/${route.params.id}`,
+      `/procurement/inventory/funding-requests/${requestId}`,
     );
     if (data.success) {
       const r = data.data;
       formData.value = {
-        accounting_manager_id: r.accounting_manager_id,
+        approver_id: r.approver_id || r.accounting_manager_id,
         related_sales_order_id: r.related_sales_order_id || "",
         product_name: r.product_name,
         flower_category: r.flower_category,
@@ -623,19 +630,23 @@ const fetchRequest = async () => {
 };
 
 const handleSubmit = async () => {
+  if (!canEditFunding.value) {
+    toast.error("You do not have permission to edit funding requests");
+    return;
+  }
   submitting.value = true;
   try {
     const { data } = await api.put(
-      `/procurement/inventory/funding-requests/${route.params.id}`,
+      `/procurement/inventory/funding-requests/${requestId}`,
       { ...formData.value, is_draft: false },
     );
     if (data.success) {
       toast.success(data.message);
       const submitResult = await api.post(
-        `/procurement/inventory/funding-requests/${route.params.id}/submit`,
+        `/procurement/inventory/funding-requests/${requestId}/submit`,
       );
       if (submitResult.data.success)
-        toast.success("Request submitted to Accounting");
+        toast.success("Request submitted to Finance");
       router.push("/erp/procurement/inventory/funding-request");
     }
   } catch (err) {
@@ -650,10 +661,14 @@ const handleSubmit = async () => {
 };
 
 const saveAsDraft = async () => {
+  if (!canEditFunding.value) {
+    toast.error("You do not have permission to edit funding requests");
+    return;
+  }
   submitting.value = true;
   try {
     const { data } = await api.put(
-      `/procurement/inventory/funding-requests/${route.params.id}`,
+      `/procurement/inventory/funding-requests/${requestId}`,
       formData.value,
     );
     if (data.success) {
@@ -670,7 +685,7 @@ const saveAsDraft = async () => {
 const goBack = () => router.push("/erp/procurement/inventory/funding-request");
 
 onMounted(() => {
-  fetchAccountingManagers();
+  fetchFinanceApprovers();
   fetchRequest();
 });
 </script>
@@ -783,6 +798,22 @@ onMounted(() => {
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 32px;
+}
+.form-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.permission-notice {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: #fff5f5;
+  border: 1px solid #feb2b2;
+  border-radius: 10px;
+  color: #9b2c2c;
+  font-size: 13px;
+  font-weight: 600;
 }
 .form-section {
   margin-bottom: 32px;

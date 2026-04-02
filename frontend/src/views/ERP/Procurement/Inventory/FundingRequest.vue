@@ -8,7 +8,7 @@
         <div class="page-title-section">
           <h1 class="page-title">Purchase Funding Requests</h1>
           <p class="page-subtitle">
-            Prepare and submit funding requests to Accounting
+            Prepare and submit funding requests to Finance
           </p>
         </div>
 
@@ -32,7 +32,11 @@
               v-model="searchQuery"
             />
           </div>
-          <button class="create-btn" @click="goToCreate">
+          <button
+            class="create-btn"
+            @click="goToCreate"
+            :disabled="!canEditFunding"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="20"
@@ -82,7 +86,7 @@
             <tr>
               <th>Request Info</th>
               <th>Product Details</th>
-              <th>Accounting Manager</th>
+              <th>Finance Approver</th>
               <th>Financial Summary</th>
               <th>Urgency</th>
               <th>Status</th>
@@ -123,7 +127,7 @@
               <td>
                 <div class="manager-info">
                   <span class="manager-name">{{
-                    request.accounting_manager_name || "Not assigned"
+                    request.approver_name || request.accounting_manager_name || "Not assigned"
                   }}</span>
                 </div>
               </td>
@@ -203,16 +207,22 @@
                   <button
                     v-if="request.request_status === 'Draft'"
                     @click="editRequest(request.id)"
+                    :disabled="!canEditFunding"
                   >
                     Edit Request
                   </button>
                   <button
                     v-if="request.request_status === 'Draft'"
                     @click="submitRequest(request.id)"
+                    :disabled="!canEditFunding"
                   >
-                    Submit to Accounting
+                    Submit to Finance
                   </button>
-                  <button class="delete-btn" @click="deleteRequest(request.id)">
+                  <button
+                    class="delete-btn"
+                    @click="deleteRequest(request.id)"
+                    :disabled="!canEditFunding"
+                  >
                     Delete
                   </button>
                 </div>
@@ -235,9 +245,11 @@ import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../../plugins/axios";
 import { toast } from "vue3-toastify";
+import { useAssignment } from "../../../../composables/useAssignment";
 
 
 const router = useRouter();
+const { canEdit } = useAssignment();
 
 const searchQuery = ref("");
 const activeStatusTab = ref("all");
@@ -246,6 +258,7 @@ const openMenuId = ref(null);
 const loading = ref(false);
 const error = ref(null);
 const requests = ref([]);
+const canEditFunding = computed(() => canEdit("inventory_funding"));
 
 const statusTabs = [
   { label: "All Requests", value: "all" },
@@ -321,7 +334,9 @@ const fetchRequests = async () => {
 };
 
 const goToCreate = () =>
-  router.push("/erp/procurement/inventory/funding-request/create");
+  canEditFunding.value
+    ? router.push("/erp/procurement/inventory/funding-request/create")
+    : toast.error("You do not have permission to create funding requests");
 
 // ID is hidden in history state — never appears in the URL
 const viewRequest = (id) => {
@@ -333,6 +348,10 @@ const viewRequest = (id) => {
 };
 
 const editRequest = (id) => {
+  if (!canEditFunding.value) {
+    toast.error("You do not have permission to edit funding requests");
+    return;
+  }
   openMenuId.value = null;
   router.push({
     path: "/erp/procurement/inventory/funding-request/edit",
@@ -341,8 +360,12 @@ const editRequest = (id) => {
 };
 
 const submitRequest = async (id) => {
+  if (!canEditFunding.value) {
+    toast.error("You do not have permission to submit funding requests");
+    return;
+  }
   openMenuId.value = null;
-  if (!confirm("Submit this request to Accounting?")) return;
+  if (!confirm("Submit this request to Finance?")) return;
   try {
     const { data } = await api.post(
       `/procurement/inventory/funding-requests/${id}/submit`,
@@ -357,6 +380,10 @@ const submitRequest = async (id) => {
 };
 
 const deleteRequest = async (id) => {
+  if (!canEditFunding.value) {
+    toast.error("You do not have permission to delete funding requests");
+    return;
+  }
   openMenuId.value = null;
   if (!confirm("Are you sure you want to delete this funding request?")) return;
   try {
@@ -476,6 +503,13 @@ onMounted(() => fetchRequests());
   background: #2b6cb0;
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(66, 153, 225, 0.35);
+}
+.create-btn:disabled,
+.dropdown-menu button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .status-tabs {
@@ -824,6 +858,9 @@ onMounted(() => fetchRequests());
 }
 .dropdown-menu button:hover {
   background: #f0f7ff;
+}
+.dropdown-menu button:disabled:hover {
+  background: transparent;
 }
 .dropdown-menu button.delete-btn {
   color: #e53e3e;

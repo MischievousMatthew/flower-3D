@@ -394,7 +394,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/products/{id}/update-stock',              [ProductController::class, 'updateStock']);
         Route::delete('/products/{productId}/images/{imageId}', [ProductController::class, 'deleteImage']);
         Route::delete('/products/{productId}/model',            [ProductController::class, 'deleteModel']);
-        Route::get('accounting-managers',           [FundingRequestController::class, 'getAccountingManagers']);
+        Route::get('eligible-approvers',            [FundingRequestController::class, 'getEligibleApprovers']);
         Route::get('funding-requests/products',     [FundingRequestController::class, 'getProducts']);
         Route::get('funding-requests',              [FundingRequestController::class, 'index']);
         Route::post('funding-requests',             [FundingRequestController::class, 'store']);

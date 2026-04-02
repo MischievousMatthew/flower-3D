@@ -407,6 +407,22 @@
                 >Leave blank to keep current password</span
               >
             </div>
+            <div class="form-group">
+              <label>Department</label>
+              <input
+                type="text"
+                v-model="formData.department"
+                placeholder="Enter department"
+              />
+            </div>
+            <div class="form-group">
+              <label>Role</label>
+              <input
+                type="text"
+                v-model="formData.role"
+                placeholder="Enter role"
+              />
+            </div>
 
             <!-- ── Module Permissions ─────────────────────────────── -->
             <div class="permissions-section full-width">
@@ -606,6 +622,8 @@ const formData = ref({
   email: "",
   username: "",
   password: "",
+  department: "",
+  role: "",
   permissions: [],
   joiningDate: "",
   status: "Active",
@@ -728,6 +746,8 @@ const editEmployee = (employee) => {
     email: employee.email,
     username: employee.username,
     password: "",
+    department: employee.department || "",
+    role: employee.role || "",
     permissions: (employee.module_permissions || []).map((p) => ({
       module: p.module,
       access: p.access,
@@ -753,6 +773,8 @@ const resetForm = () => {
     email: "",
     username: "",
     password: "",
+    department: "",
+    role: "",
     permissions: [],
     joiningDate: "",
     status: "Active",
@@ -784,6 +806,8 @@ const saveEmployee = async () => {
     name: formData.value.name,
     email: formData.value.email,
     username: formData.value.username,
+    department: formData.value.department || null,
+    role: formData.value.role || null,
     joining_date: formatDateForAPI(formData.value.joiningDate),
     status: formData.value.status,
     phone: formData.value.phone,

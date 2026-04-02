@@ -13,7 +13,9 @@ class FundingRequest extends Model
         'owner_id',
         'finance_request_id',
         'submitted_by_employee_id',
+        'requester_id',
         'accounting_manager_id',
+        'approver_id',
         'related_sales_order_id',
         'request_date',
         'request_status',
@@ -135,6 +137,16 @@ class FundingRequest extends Model
     public function accountingManager(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'accounting_manager_id');
+    }
+
+    public function requester(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'requester_id');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'approver_id');
     }
 
     public function reviewedBy(): BelongsTo

@@ -140,6 +140,8 @@ class EmployeeController extends Controller
                 'status'       => 'required|in:Active,On Leave,Resign',
                 'phone'        => 'nullable|string|max:20',
                 'address'      => 'nullable|string|max:500',
+                'department'   => 'nullable|string|max:255',
+                'role'         => 'nullable|string|max:255',
                 'permissions'             => 'required|array|min:1',
                 'permissions.*.module'    => 'required|string|' . ErpModule::validKeysRule(),
                 'permissions.*.access'    => 'required|string|' . ErpModule::validAccessRule(),
@@ -162,6 +164,8 @@ class EmployeeController extends Controller
                 'status'       => $request->status,
                 'phone'        => $request->phone,
                 'address'      => $request->address,
+                'department'   => $request->department,
+                'role'         => $request->role,
             ]);
 
             // Create module permissions
@@ -269,6 +273,8 @@ class EmployeeController extends Controller
                 'status'       => 'nullable|in:Active,On Leave,Resign',
                 'phone'        => 'nullable|string|max:20',
                 'address'      => 'nullable|string|max:500',
+                'department'   => 'nullable|string|max:255',
+                'role'         => 'nullable|string|max:255',
                 'permissions'             => 'nullable|array|min:1',
                 'permissions.*.module'    => 'required_with:permissions|string|' . ErpModule::validKeysRule(),
                 'permissions.*.access'    => 'required_with:permissions|string|' . ErpModule::validAccessRule(),

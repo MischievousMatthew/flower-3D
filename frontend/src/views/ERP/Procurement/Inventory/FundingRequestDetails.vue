@@ -43,7 +43,7 @@
             <div>
               <h3>{{ request?.request_status }}</h3>
               <p v-if="request.request_status === 'Pending'">
-                Waiting for Accounting review
+                Waiting for Finance review
               </p>
               <p v-else-if="request.request_status === 'Approved'">
                 Approved by {{ request.reviewed_by_name }} on
@@ -53,14 +53,19 @@
                 Rejected by {{ request.reviewed_by_name }} on
                 {{ formatDate(request.accounting_decision_at) }}
               </p>
-              <p v-else>You can edit and submit this request</p>
+              <p v-else-if="canEditFunding">You can edit and submit this request</p>
+              <p v-else>You have view-only access to this request</p>
             </div>
             <!-- Edit/Submit actions only visible from Inventory context -->
             <div
               class="banner-actions"
               v-if="request.request_status === 'Draft' && isInventoryContext"
             >
-              <button class="edit-btn" @click="editRequest">
+              <button
+                class="edit-btn"
+                @click="editRequest"
+                :disabled="!canEditFunding"
+              >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="18"
@@ -79,7 +84,11 @@
                 </svg>
                 Edit Request
               </button>
-              <button class="submit-btn" @click="submitRequest">
+              <button
+                class="submit-btn"
+                @click="submitRequest"
+                :disabled="!canEditFunding"
+              >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="18"
@@ -92,7 +101,7 @@
                   <line x1="22" y1="2" x2="11" y2="13"></line>
                   <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                 </svg>
-                Submit to Accounting
+                Submit to Finance
               </button>
             </div>
           </div>
@@ -121,8 +130,10 @@
               <span class="value">{{ request.submitted_by_name }}</span>
             </div>
             <div class="info-item">
-              <span class="label">Accounting Manager</span>
-              <span class="value">{{ request.accounting_manager_name }}</span>
+              <span class="label">Finance Approver</span>
+              <span class="value">{{
+                request.approver_name || request.accounting_manager_name
+              }}</span>
             </div>
             <div class="info-item">
               <span class="label">Submitted Date</span>
@@ -413,7 +424,7 @@
           </div>
         </div>
 
-        <!-- Accounting Decision -->
+        <!-- Finance Decision -->
         <div
           class="info-section"
           v-if="
@@ -421,7 +432,7 @@
             request.request_status === 'Rejected'
           "
         >
-          <h3>Accounting Decision</h3>
+          <h3>Finance Decision</h3>
           <div
             class="decision-card"
             :class="request.request_status.toLowerCase()"
@@ -514,6 +525,7 @@ import { ref, computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import api from "../../../../plugins/axios";
 import { toast } from "vue3-toastify";
+import { useAssignment } from "../../../../composables/useAssignment";
 
 // Sidebar components
 
@@ -534,6 +546,7 @@ const props = defineProps({
 
 const router = useRouter();
 const route = useRoute();
+const { canEdit } = useAssignment();
 
 const request = ref(null);
 const loading = ref(false);
@@ -543,6 +556,7 @@ const error = ref(null);
 
 /** Convenience flag used in the template */
 const isInventoryContext = computed(() => props.context === "inventory");
+const canEditFunding = computed(() => canEdit("inventory_funding"));
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
@@ -584,13 +598,24 @@ const goBack = () => {
 };
 
 const editRequest = () => {
+  if (!canEditFunding.value) {
+    toast.error("You do not have permission to edit funding requests");
+    return;
+  }
   const requestId = window.history.state?.requestId;
-  router.push(`/erp/procurement/inventory/funding-request/${requestId}/edit`);
+  router.push({
+    path: "/erp/procurement/inventory/funding-request/edit",
+    state: { requestId },
+  });
 };
 
 const submitRequest = async () => {
+  if (!canEditFunding.value) {
+    toast.error("You do not have permission to submit funding requests");
+    return;
+  }
   const requestId = window.history.state?.requestId;
-  if (!confirm("Submit this request to Accounting?")) return;
+  if (!confirm("Submit this request to Finance?")) return;
   try {
     const { data } = await api.post(
       `/procurement/inventory/funding-requests/${requestId}/submit`,
@@ -823,6 +848,13 @@ onMounted(() => fetchRequest());
   background: #2b6cb0;
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(66, 153, 225, 0.35);
+}
+.edit-btn:disabled,
+.submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* Info Sections */

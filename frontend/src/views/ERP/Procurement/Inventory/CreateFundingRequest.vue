@@ -6,7 +6,7 @@
         <div>
           <h1 class="form-title">New Funding Request</h1>
           <p class="form-subtitle">
-            Fill in the details to request funds from Accounting
+            Fill in the details to request funds from Finance
           </p>
         </div>
         <button class="back-btn" @click="goBack">
@@ -27,20 +27,24 @@
       </div>
 
       <form @submit.prevent="handleSubmit" class="funding-form">
+        <fieldset class="form-fieldset" :disabled="!canEditFunding">
+        <p v-if="!canEditFunding" class="permission-notice">
+          You have view-only access to Inventory Funding. Creating and submitting requests is disabled.
+        </p>
         <!-- Request Identity -->
         <div class="form-section">
           <h3 class="section-title">Request Identity</h3>
           <div class="form-row">
             <div class="form-group">
-              <label>Accounting Manager *</label>
-              <select v-model="formData.accounting_manager_id" required>
-                <option value="">Select Accounting Manager</option>
+              <label>Finance Approver *</label>
+              <select v-model="formData.approver_id" required>
+                <option value="">Select Finance Approver</option>
                 <option
-                  v-for="manager in accountingManagers"
-                  :key="manager.id"
-                  :value="manager.id"
+                  v-for="approver in financeApprovers"
+                  :key="approver.id"
+                  :value="approver.id"
                 >
-                  {{ manager.name }}
+                  {{ approver.label }}
                 </option>
               </select>
             </div>
@@ -703,9 +707,10 @@
             class="btn-submit"
             :disabled="submitting || !!quantityError"
           >
-            {{ submitting ? "Submitting..." : "Submit to Accounting" }}
+            {{ submitting ? "Submitting..." : "Submit to Finance" }}
           </button>
         </div>
+        </fieldset>
       </form>
     </div>
   </div>
@@ -716,18 +721,21 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../../plugins/axios";
 import { toast } from "vue3-toastify";
+import { useAssignment } from "../../../../composables/useAssignment";
 
 
 const router = useRouter();
-const accountingManagers = ref([]);
+const { canEdit } = useAssignment();
+const financeApprovers = ref([]);
 const products = ref([]);
 const selectedProductId = ref("");
 const submitting = ref(false);
 const loadingProducts = ref(false);
 const quantityError = ref("");
+const canEditFunding = computed(() => canEdit("inventory_funding"));
 
 const formData = ref({
-  accounting_manager_id: "",
+  approver_id: "",
   related_sales_order_id: "",
   product_name: "",
   flower_category: "",
@@ -863,14 +871,12 @@ const validateQuantity = () => {
     formData.value.required_quantity = formData.value.requested_qty;
 };
 
-const fetchAccountingManagers = async () => {
+const fetchFinanceApprovers = async () => {
   try {
-    const { data } = await api.get(
-      "/procurement/inventory/accounting-managers",
-    );
-    if (data.success) accountingManagers.value = data.data;
+    const { data } = await api.get("/procurement/inventory/eligible-approvers");
+    if (data.success) financeApprovers.value = data.data;
   } catch (err) {
-    toast.error("Failed to load accounting managers");
+    toast.error("Failed to load finance approvers");
   }
 };
 
@@ -947,6 +953,10 @@ const preparePayload = () => ({
 });
 
 const handleSubmit = async () => {
+  if (!canEditFunding.value) {
+    toast.error("You do not have permission to create funding requests");
+    return;
+  }
   if (!selectedProduct.value) {
     toast.error("Please select a product");
     return;
@@ -977,6 +987,10 @@ const handleSubmit = async () => {
 };
 
 const saveAsDraft = async () => {
+  if (!canEditFunding.value) {
+    toast.error("You do not have permission to create funding requests");
+    return;
+  }
   if (!selectedProduct.value) {
     toast.error("Please select a product");
     return;
@@ -1014,7 +1028,7 @@ watch(
 );
 
 onMounted(() => {
-  fetchAccountingManagers();
+  fetchFinanceApprovers();
   fetchProducts();
 });
 </script>
@@ -1105,6 +1119,22 @@ onMounted(() => {
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 32px;
+}
+.form-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.permission-notice {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: #fff5f5;
+  border: 1px solid #feb2b2;
+  border-radius: 10px;
+  color: #9b2c2c;
+  font-size: 13px;
+  font-weight: 600;
 }
 .form-section {
   margin-bottom: 32px;

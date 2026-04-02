@@ -6,7 +6,7 @@
         <div class="page-title-section">
           <h1 class="page-title">Funding Requests Review</h1>
           <p class="page-subtitle">
-            Review and approve/reject funding requests from Finance
+            Review and approve/reject funding requests from Inventory
           </p>
         </div>
 
@@ -168,6 +168,7 @@
                   v-if="request.request_status === 'Pending'"
                   class="review-btn"
                   @click="openReviewModal(request)"
+                  :disabled="!canEditFunding"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -459,7 +460,7 @@
           <button
             class="btn-submit"
             @click="submitDecision"
-            :disabled="!reviewForm.decision || submitting"
+            :disabled="!reviewForm.decision || submitting || !canEditFunding"
           >
             {{
               submitting
@@ -480,8 +481,10 @@ import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../plugins/axios";
 import { toast } from "vue3-toastify";
+import { useAssignment } from "../../../composables/useAssignment";
 
 const router = useRouter();
+const { canEdit } = useAssignment();
 
 const searchQuery = ref("");
 const activeStatusTab = ref("all");
@@ -491,6 +494,7 @@ const error = ref(null);
 const requests = ref([]);
 const showReviewModal = ref(false);
 const submitting = ref(false);
+const canEditFunding = computed(() => canEdit("funding_requests"));
 
 const reviewForm = ref({
   id: null,
@@ -596,6 +600,10 @@ const viewRequest = (id) => {
 };
 
 const openReviewModal = (request) => {
+  if (!canEditFunding.value) {
+    toast.error("You do not have permission to review funding requests");
+    return;
+  }
   reviewForm.value = {
     id: request.id,
     finance_request_id: request.finance_request_id,
@@ -637,6 +645,10 @@ const closeReviewModal = () => {
 };
 
 const submitDecision = async () => {
+  if (!canEditFunding.value) {
+    toast.error("You do not have permission to review funding requests");
+    return;
+  }
   if (!reviewForm.value.decision) {
     toast.error("Please select a decision");
     return;
@@ -1183,6 +1195,13 @@ onMounted(() => {
   background: #38a169;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+}
+.review-btn:disabled,
+.btn-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .view-btn {
