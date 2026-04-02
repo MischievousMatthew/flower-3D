@@ -15,7 +15,6 @@
     <div class="activity-section">
       <h2>Recent Activity</h2>
       <div class="activity-cards">
-        <!-- Recent Hires -->
         <div class="activity-card">
           <h3>Recent Hires</h3>
           <div class="activity-list">
@@ -32,8 +31,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Resignations -->
         <div class="activity-card">
           <h3>Resignation</h3>
           <div class="activity-list">
@@ -50,8 +47,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Leave Approvals -->
         <div class="activity-card">
           <h3>Leave Approval</h3>
           <div class="activity-list">
@@ -70,7 +65,6 @@
         </div>
       </div>
 
-      <!-- On Leave & New Joins -->
       <div class="activity-row">
         <div class="activity-card half">
           <h3>On leave</h3>
@@ -88,7 +82,6 @@
             </div>
           </div>
         </div>
-
         <div class="activity-card half">
           <h3>New Joins this month</h3>
           <div class="activity-list">
@@ -118,7 +111,7 @@
           </h2>
         </div>
         <div class="table-actions">
-          <div class="search-box" @input="searchEmployees">
+          <div class="search-box">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="20"
@@ -167,7 +160,6 @@
         </div>
       </div>
 
-      <!-- Filters (collapsible) -->
       <div v-if="showFilters" class="filters-panel">
         <div class="filter-group">
           <label>Status</label>
@@ -193,7 +185,6 @@
         </button>
       </div>
 
-      <!-- Employee Table -->
       <div class="table-container">
         <table class="employee-table">
           <thead>
@@ -232,14 +223,14 @@
                         .replace(' ', '-')
                     "
                     :title="perm.module + ' (' + perm.access + ')'"
+                    >{{ getModuleLabel(perm.module) }}</span
                   >
-                    {{ getModuleLabel(perm.module) }}
-                  </span>
                   <span
                     v-if="(employee.module_permissions || []).length > 3"
                     class="module-badge badge-more"
-                    >+{{ employee.module_permissions.length - 3 }} more</span
                   >
+                    +{{ employee.module_permissions.length - 3 }} more
+                  </span>
                   <span
                     v-if="!(employee.module_permissions || []).length"
                     class="no-modules"
@@ -251,9 +242,8 @@
               <td>
                 <span
                   :class="['status-badge', getStatusClass(employee.status)]"
+                  >{{ employee.status }}</span
                 >
-                  {{ employee.status }}
-                </span>
               </td>
               <td>
                 <div class="action-menu">
@@ -409,19 +399,30 @@
                 >Leave blank to keep current password</span
               >
             </div>
+
             <!-- ── Module Permissions ─────────────────────────────── -->
             <div class="permissions-section full-width">
               <div class="permissions-header">
-                <h3>Module Permissions</h3>
-                <span class="permissions-hint"
-                  >At least one module required</span
-                >
+                <div>
+                  <h3>Module Permissions *</h3>
+                  <p class="permissions-hint">
+                    Grant access to specific ERP modules
+                  </p>
+                </div>
+                <div class="perm-legend">
+                  <span class="legend-item"
+                    ><span class="legend-dot blue"></span>View only</span
+                  >
+                  <span class="legend-item"
+                    ><span class="legend-dot violet"></span>Can edit</span
+                  >
+                </div>
               </div>
 
-              <div class="pm-wrapper">
-                <table class="pm-table">
+              <div class="perm-table-wrapper">
+                <table class="perm-table">
                   <thead>
-                    <tr>
+                    <tr class="perm-col-header">
                       <th>Module</th>
                       <th class="center">View</th>
                       <th class="center">Edit</th>
@@ -432,20 +433,26 @@
                       v-for="(group, groupName) in modulesByGroup"
                       :key="groupName"
                     >
-                      <tr class="group-row">
+                      <tr class="perm-group-row">
                         <td colspan="3">{{ groupName }}</td>
                       </tr>
-                      <tr v-for="mod in group" :key="mod.key" class="mod-row">
-                        <td class="mod-name">{{ mod.label }}</td>
-                        <td class="center">
+                      <tr
+                        v-for="mod in group"
+                        :key="mod.key"
+                        class="perm-mod-row"
+                      >
+                        <td class="mod-name-cell">{{ mod.label }}</td>
+                        <td class="perm-toggle-cell">
                           <button
                             type="button"
-                            class="perm-circle"
+                            class="perm-btn"
                             :class="{
-                              on: isModuleEnabled(mod.key),
-                              disabled:
-                                getModuleAccess(mod.key) === 'edit' &&
-                                isModuleEnabled(mod.key),
+                              'perm-btn--view':
+                                isModuleEnabled(mod.key) &&
+                                getModuleAccess(mod.key) === 'view',
+                              'perm-btn--locked':
+                                isModuleEnabled(mod.key) &&
+                                getModuleAccess(mod.key) === 'edit',
                             }"
                             @click="handleViewClick(mod.key)"
                           >
@@ -453,23 +460,24 @@
                               v-if="isModuleEnabled(mod.key)"
                               viewBox="0 0 12 12"
                               fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
                             >
                               <polyline
-                                points="2,6 5,9 10,3"
+                                points="2,6.5 5,9.5 10,2.5"
                                 stroke="white"
-                                stroke-width="1.8"
+                                stroke-width="2.2"
                                 stroke-linecap="round"
                                 stroke-linejoin="round"
                               />
                             </svg>
                           </button>
                         </td>
-                        <td class="center">
+                        <td class="perm-toggle-cell">
                           <button
                             type="button"
-                            class="perm-circle"
+                            class="perm-btn"
                             :class="{
-                              on:
+                              'perm-btn--edit':
                                 isModuleEnabled(mod.key) &&
                                 getModuleAccess(mod.key) === 'edit',
                             }"
@@ -482,11 +490,12 @@
                               "
                               viewBox="0 0 12 12"
                               fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
                             >
                               <polyline
-                                points="2,6 5,9 10,3"
+                                points="2,6.5 5,9.5 10,2.5"
                                 stroke="white"
-                                stroke-width="1.8"
+                                stroke-width="2.2"
                                 stroke-linecap="round"
                                 stroke-linejoin="round"
                               />
@@ -497,45 +506,45 @@
                     </template>
                   </tbody>
                 </table>
-                <p class="pm-note">Edit access automatically includes View.</p>
               </div>
             </div>
-          </div>
-          <div class="form-group">
-            <label>Joining Date *</label>
-            <input type="date" v-model="formData.joiningDate" required />
-          </div>
-          <div class="form-group">
-            <label>Status *</label>
-            <select v-model="formData.status" required>
-              <option value="Active">Active</option>
-              <option value="On Leave">On Leave</option>
-              <option value="Resign">Resign</option>
-            </select>
-          </div>
-          <div class="form-group full-width">
-            <label>Phone Number</label>
-            <input
-              type="tel"
-              v-model="formData.phone"
-              placeholder="09491234569"
-            />
-          </div>
-          <div class="form-group full-width">
-            <label>Address</label>
-            <textarea
-              v-model="formData.address"
-              placeholder="Enter address"
-              rows="3"
-            ></textarea>
+
+            <div class="form-group">
+              <label>Joining Date *</label>
+              <input type="date" v-model="formData.joiningDate" required />
+            </div>
+            <div class="form-group">
+              <label>Status *</label>
+              <select v-model="formData.status" required>
+                <option value="Active">Active</option>
+                <option value="On Leave">On Leave</option>
+                <option value="Resign">Resign</option>
+              </select>
+            </div>
+            <div class="form-group full-width">
+              <label>Phone Number</label>
+              <input
+                type="tel"
+                v-model="formData.phone"
+                placeholder="09491234569"
+              />
+            </div>
+            <div class="form-group full-width">
+              <label>Address</label>
+              <textarea
+                v-model="formData.address"
+                placeholder="Enter address"
+                rows="3"
+              ></textarea>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-cancel" @click="closeModal">Cancel</button>
-        <button class="btn-save" @click="saveEmployee">
-          {{ showEditModal ? "Update Employee" : "Add Employee" }}
-        </button>
+        <div class="modal-footer">
+          <button class="btn-cancel" @click="closeModal">Cancel</button>
+          <button class="btn-save" @click="saveEmployee">
+            {{ showEditModal ? "Update Employee" : "Add Employee" }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -583,41 +592,20 @@ function getModuleGroup(key) {
   return findModule(key)?.group ?? "";
 }
 
-function handleViewClick(moduleKey) {
-  const isEdit =
-    getModuleAccess(moduleKey) === "edit" && isModuleEnabled(moduleKey);
-  if (isEdit) return; // View is locked when Edit is on
-  toggleModule(moduleKey);
-}
-function handleEditClick(moduleKey) {
-  const isOn =
-    isModuleEnabled(moduleKey) && getModuleAccess(moduleKey) === "edit";
-  if (isOn) {
-    // Downgrade to view-only
-    setModuleAccess(moduleKey, "view");
-  } else if (isModuleEnabled(moduleKey)) {
-    setModuleAccess(moduleKey, "edit");
-  } else {
-    // Enable with edit
-    toggleModule(moduleKey);
-    setModuleAccess(moduleKey, "edit");
-  }
-}
-
-// Form Data — permissions replaces assignments
+// Form Data
 const formData = ref({
   name: "",
   email: "",
   username: "",
   password: "",
-  permissions: [], // [{ module, access }]
+  permissions: [],
   joiningDate: "",
   status: "Active",
   phone: "",
   address: "",
 });
 
-// Permissions table helpers
+// Permissions helpers
 function isModuleEnabled(moduleKey) {
   return formData.value.permissions.some((p) => p.module === moduleKey);
 }
@@ -640,6 +628,25 @@ function toggleModule(moduleKey) {
 function setModuleAccess(moduleKey, access) {
   const perm = formData.value.permissions.find((p) => p.module === moduleKey);
   if (perm) perm.access = access;
+}
+
+// View click: toggle on/off (disabled when edit is active)
+function handleViewClick(moduleKey) {
+  const isEdit =
+    isModuleEnabled(moduleKey) && getModuleAccess(moduleKey) === "edit";
+  if (isEdit) return;
+  toggleModule(moduleKey);
+}
+
+// Edit click: if off → enable with edit; if view → upgrade to edit; if edit → downgrade to view
+function handleEditClick(moduleKey) {
+  if (!isModuleEnabled(moduleKey)) {
+    formData.value.permissions.push({ module: moduleKey, access: "edit" });
+  } else if (getModuleAccess(moduleKey) === "edit") {
+    setModuleAccess(moduleKey, "view");
+  } else {
+    setModuleAccess(moduleKey, "edit");
+  }
 }
 
 // Filters
@@ -675,13 +682,7 @@ const fetchStatistics = async () => {
   const response = await api.get("/vendor/employees/statistics");
   if (response.data.success) {
     const stats = response.data.data;
-
-    recentHires.value = stats.recent_hires || [];
-    resignations.value = stats.resignations || [];
-    onLeave.value = stats.on_leave_list || [];
-    newJoins.value = stats.new_joins || [];
-
-    recentHires.value = recentHires.value.map((hire) => ({
+    recentHires.value = (stats.recent_hires || []).map((hire) => ({
       ...hire,
       initials:
         hire.initials ||
@@ -691,8 +692,9 @@ const fetchStatistics = async () => {
           .join("")
           .toUpperCase(),
     }));
-
-    newJoins.value = newJoins.value.map((join) => ({
+    resignations.value = stats.resignations || [];
+    onLeave.value = stats.on_leave_list || [];
+    newJoins.value = (stats.new_joins || []).map((join) => ({
       ...join,
       initials:
         join.initials ||
@@ -703,23 +705,6 @@ const fetchStatistics = async () => {
           .toUpperCase(),
       date: new Date(join.joining_date).toLocaleDateString("en-GB"),
     }));
-  }
-};
-
-const loadEmployeeData = async () => {
-  try {
-    isLoading.value = true;
-
-    isLoadingMessage.value = "Getting employees ready…";
-    await fetchEmployees();
-
-    isLoadingMessage.value = "Loading statistics...";
-    await fetchStatistics();
-  } catch (error) {
-    console.error("Error loading employee data:", error);
-    toast.error("Failed to load employee data");
-  } finally {
-    isLoading.value = false;
   }
 };
 
@@ -778,12 +763,10 @@ const saveEmployee = async () => {
     toast.error("Please fill in all required fields");
     return;
   }
-
   if (!formData.value.permissions || formData.value.permissions.length === 0) {
     toast.error("At least one module permission must be assigned");
     return;
   }
-
   if (!showEditModal.value && !formData.value.password) {
     toast.error("Password is required for new employees");
     return;
@@ -827,9 +810,9 @@ const saveEmployee = async () => {
   } catch (error) {
     console.error("Error saving employee:", error);
     if (error.response?.data?.errors) {
-      Object.values(error.response.data.errors).forEach((err) => {
-        toast.error(err[0]);
-      });
+      Object.values(error.response.data.errors).forEach((err) =>
+        toast.error(err[0]),
+      );
     } else {
       toast.error(error.response?.data?.message || "Failed to save employee");
     }
@@ -839,38 +822,20 @@ const saveEmployee = async () => {
 };
 
 const formatDateForAPI = (dateString) => {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-    return dateString;
-  }
-
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return dateString;
   if (dateString.includes("-")) {
     const parts = dateString.split("-");
     if (parts.length === 3) {
-      if (
-        parts[0].length === 2 &&
-        parts[1].length === 2 &&
-        parts[2].length === 4
-      ) {
+      if (parts[0].length === 2 && parts[2].length === 4)
         return `${parts[2]}-${parts[1]}-${parts[0]}`;
-      }
-      if (
-        parts[0].length === 2 &&
-        parts[1].length === 2 &&
-        parts[2].length === 2
-      ) {
+      if (parts[0].length === 2 && parts[2].length === 2)
         return `20${parts[2]}-${parts[1]}-${parts[0]}`;
-      }
     }
   }
-
   const date = new Date(dateString);
   if (!isNaN(date.getTime())) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
-
   return dateString;
 };
 
@@ -878,65 +843,20 @@ const changeStatus = async (employee, newStatus) => {
   try {
     isLoading.value = true;
     isLoadingMessage.value = `Updating status to ${newStatus}...`;
-
     const response = await api.patch(
       `/vendor/employees/${employee.id}/status`,
-      {
-        status: newStatus,
-      },
+      { status: newStatus },
     );
-
     if (response.data.success) {
       toast.success(`Status updated to ${newStatus}`);
       await Promise.all([fetchEmployees(), fetchStatistics()]);
     }
   } catch (error) {
-    console.error("Error updating status:", error);
     toast.error(error.response?.data?.message || "Failed to update status");
   } finally {
     isLoading.value = false;
   }
   activeMenuId.value = null;
-};
-
-const deleteEmployee = async (employee) => {
-  if (!confirm(`Are you sure you want to delete ${employee.name}?`)) {
-    return;
-  }
-
-  try {
-    isLoading.value = true;
-    isLoadingMessage.value = "Deleting employee...";
-
-    const response = await api.delete(`/vendor/employees/${employee.id}`);
-    if (response.data.success) {
-      toast.success("Employee deleted successfully");
-      await Promise.all([fetchEmployees(), fetchStatistics()]);
-    }
-  } catch (error) {
-    console.error("Error deleting employee:", error);
-    toast.error(error.response?.data?.message || "Failed to delete employee");
-  } finally {
-    isLoading.value = false;
-  }
-  activeMenuId.value = null;
-};
-
-const searchEmployees = async () => {
-  try {
-    const params = {};
-    if (searchTerm.value) params.search = searchTerm.value;
-    if (filterStatus.value !== "all") params.status = filterStatus.value;
-    if (filterDepartment.value !== "all")
-      params.department = filterDepartment.value;
-
-    const response = await api.get("/vendor/employees/search", { params });
-    if (response.data.success) {
-      employees.value = response.data.data;
-    }
-  } catch (error) {
-    console.error("Error searching employees:", error);
-  }
 };
 
 const toggleActionMenu = (id) => {
@@ -945,26 +865,18 @@ const toggleActionMenu = (id) => {
 
 const clearFilters = () => {
   filterStatus.value = "all";
-  filterDepartment.value = "all";
+  filterGroup.value = "all";
   searchTerm.value = "";
-  fetchEmployees(); // Reset to all employees
+  fetchEmployees();
 };
 
-const getStatusClass = (status) => {
-  return status.toLowerCase().replace(" ", "-");
-};
+const getStatusClass = (status) => status.toLowerCase().replace(" ", "-");
 
 onMounted(async () => {
   isLoading.value = true;
   isLoadingMessage.value = "Loading page data...";
-
   try {
-    // Run these independently so if one fails, others still load
-    await Promise.allSettled([
-      fetchEmployees(),
-      fetchStatistics(),
-      loadDepartmentsAndRoles(),
-    ]);
+    await Promise.allSettled([fetchEmployees(), fetchStatistics()]);
   } catch (error) {
     console.error("Critical error during page load:", error);
   } finally {
@@ -999,69 +911,14 @@ onMounted(async () => {
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
-
 .header-left h1 {
   font-size: 28px;
   font-weight: 600;
   color: #1a202c;
   margin-bottom: 4px;
 }
-
 .subtitle {
   font-size: 14px;
-  color: #718096;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.btn-icon {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  border: none;
-  background: #f7fafc;
-  border-radius: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s;
-}
-
-.btn-icon:hover {
-  background: #edf2f7;
-}
-
-.user-profile {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.user-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.user-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.user-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1a202c;
-}
-
-.user-role {
-  font-size: 12px;
   color: #718096;
 }
 
@@ -1069,57 +926,45 @@ onMounted(async () => {
 .activity-section {
   margin-bottom: 32px;
 }
-
 .activity-section h2 {
   font-size: 20px;
   font-weight: 600;
   color: #1a202c;
   margin-bottom: 16px;
 }
-
 .activity-cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-bottom: 16px;
 }
-
 .activity-row {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
 }
-
 .activity-card {
   background: white;
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
-
-.activity-card.half {
-  background: white;
-}
-
 .activity-card h3 {
   font-size: 16px;
   font-weight: 600;
   color: #1a202c;
   margin-bottom: 16px;
 }
-
 .activity-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
 .activity-item {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-
 .activity-avatar {
   width: 40px;
   height: 40px;
@@ -1133,19 +978,16 @@ onMounted(async () => {
   font-weight: 600;
   flex-shrink: 0;
 }
-
 .activity-details {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-
 .activity-name {
   font-size: 14px;
   font-weight: 500;
   color: #1a202c;
 }
-
 .activity-email,
 .activity-date {
   font-size: 12px;
@@ -1161,31 +1003,26 @@ onMounted(async () => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   z-index: 1;
 }
-
 .table-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
 }
-
 .table-title h2 {
   font-size: 18px;
   font-weight: 600;
   color: #1a202c;
 }
-
 .employee-count {
   color: #ef4444;
   font-weight: 700;
 }
-
 .table-actions {
   display: flex;
   gap: 12px;
   align-items: center;
 }
-
 .search-box {
   display: flex;
   align-items: center;
@@ -1197,12 +1034,10 @@ onMounted(async () => {
   height: 40px;
   min-width: 280px;
 }
-
 .search-box svg {
   color: #718096;
   flex-shrink: 0;
 }
-
 .search-box input {
   flex: 1;
   border: none;
@@ -1211,11 +1046,9 @@ onMounted(async () => {
   font-size: 14px;
   color: #1a202c;
 }
-
 .search-box input::placeholder {
   color: #a0aec0;
 }
-
 .btn-filter {
   display: flex;
   align-items: center;
@@ -1231,12 +1064,10 @@ onMounted(async () => {
   cursor: pointer;
   transition: all 0.3s;
 }
-
 .btn-filter:hover {
   background: #f7fafc;
   border-color: #cbd5e0;
 }
-
 .btn-add-employee {
   display: flex;
   align-items: center;
@@ -1252,105 +1083,13 @@ onMounted(async () => {
   cursor: pointer;
   transition: all 0.3s;
 }
-
 .btn-add-employee:hover {
   background: #dc2626;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
-.pm-wrapper {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  overflow: hidden;
-  margin-top: 8px;
-}
-.pm-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.pm-table th {
-  padding: 10px 14px;
-  text-align: left;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #718096;
-  background: #f7fafc;
-  border-bottom: 1px solid #e2e8f0;
-}
-.pm-table th.center {
-  text-align: center;
-  width: 80px;
-}
-.pm-table td {
-  padding: 10px 14px;
-  border-bottom: 1px solid #f1f5f9;
-}
-.pm-table td.center {
-  text-align: center;
-}
-.pm-table tr:last-child td {
-  border-bottom: none;
-}
-.group-row td {
-  padding: 7px 14px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: #4a5568;
-  background: #f7fafc;
-  border-bottom: 1px solid #e2e8f0;
-}
-.mod-row:hover {
-  background: #fafafa;
-}
-.mod-name {
-  font-size: 13px;
-  color: #1a202c;
-}
-.perm-circle {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1.5px solid #d1d5db;
-  background: transparent;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-}
-.perm-circle.on {
-  border-color: #22c55e;
-  background: #22c55e;
-}
-.perm-circle.disabled {
-  opacity: 0.4;
-  cursor: default;
-  pointer-events: none;
-}
-.perm-circle:hover:not(.disabled):not(.on) {
-  border-color: #9ca3af;
-  background: #f3f4f6;
-}
-.perm-circle svg {
-  width: 12px;
-  height: 12px;
-}
-.pm-note {
-  font-size: 11px;
-  color: #718096;
-  padding: 8px 14px;
-  background: #f7fafc;
-  margin: 0;
-  border-top: 1px solid #e2e8f0;
-}
-
-/* Filters Panel */
+/* Filters */
 .filters-panel {
   display: flex;
   gap: 16px;
@@ -1360,20 +1099,17 @@ onMounted(async () => {
   background: #f7fafc;
   border-radius: 8px;
 }
-
 .filter-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
   flex: 1;
 }
-
 .filter-group label {
   font-size: 13px;
   font-weight: 500;
   color: #4a5568;
 }
-
 .filter-group select {
   padding: 8px 12px;
   border: 1px solid #e2e8f0;
@@ -1383,7 +1119,6 @@ onMounted(async () => {
   background: white;
   cursor: pointer;
 }
-
 .btn-clear-filters {
   padding: 8px 16px;
   background: white;
@@ -1396,28 +1131,17 @@ onMounted(async () => {
   transition: all 0.3s;
 }
 
-.btn-clear-filters:hover {
-  background: #f7fafc;
-  border-color: #cbd5e0;
-}
-
 /* Table */
 .table-container {
-  position: relative;
-  overflow-x: auto;
-  overflow: visible !important;
+  overflow: visible;
 }
-
 .employee-table {
-  position: relative;
   width: 100%;
   border-collapse: collapse;
 }
-
 .employee-table thead tr {
   border-bottom: 2px solid #e2e8f0;
 }
-
 .employee-table th {
   padding: 12px 16px;
   text-align: left;
@@ -1427,28 +1151,23 @@ onMounted(async () => {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-
 .employee-table tbody tr {
   border-bottom: 1px solid #f1f5f9;
   transition: background 0.2s;
 }
-
 .employee-table tbody tr:hover {
   background: #f7fafc;
 }
-
 .employee-table td {
   padding: 16px;
   font-size: 14px;
   color: #1a202c;
 }
-
 .employee-info {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-
 .employee-avatar {
   width: 40px;
   height: 40px;
@@ -1462,23 +1181,19 @@ onMounted(async () => {
   font-weight: 600;
   flex-shrink: 0;
 }
-
 .employee-details {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-
 .employee-name {
   font-weight: 500;
   color: #1a202c;
 }
-
 .employee-email {
   font-size: 13px;
   color: #718096;
 }
-
 .status-badge {
   display: inline-block;
   padding: 4px 12px;
@@ -1486,27 +1201,21 @@ onMounted(async () => {
   font-size: 12px;
   font-weight: 500;
 }
-
 .status-badge.active {
   background: #d1fae5;
   color: #065f46;
 }
-
 .status-badge.on-leave {
   background: #fef3c7;
   color: #92400e;
 }
-
 .status-badge.resign {
   background: #fee2e2;
   color: #991b1b;
 }
-
-/* Action Menu */
 .action-menu {
   position: relative;
 }
-
 .btn-action {
   width: 32px;
   height: 32px;
@@ -1519,11 +1228,9 @@ onMounted(async () => {
   justify-content: center;
   transition: all 0.3s;
 }
-
 .btn-action:hover {
   background: #f7fafc;
 }
-
 .action-dropdown {
   position: absolute;
   right: 0;
@@ -1536,7 +1243,6 @@ onMounted(async () => {
   z-index: 100;
   overflow: hidden;
 }
-
 .action-dropdown button {
   width: 100%;
   display: flex;
@@ -1551,15 +1257,12 @@ onMounted(async () => {
   transition: all 0.2s;
   text-align: left;
 }
-
 .action-dropdown button:hover {
   background: #f7fafc;
 }
-
 .action-dropdown button.danger {
   color: #ef4444;
 }
-
 .action-dropdown button.danger:hover {
   background: #fef2f2;
 }
@@ -1578,7 +1281,6 @@ onMounted(async () => {
   z-index: 1000;
   padding: 20px;
 }
-
 .modal-content {
   background: white;
   border-radius: 16px;
@@ -1588,7 +1290,6 @@ onMounted(async () => {
   overflow-y: auto;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
 }
-
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -1596,13 +1297,11 @@ onMounted(async () => {
   padding: 24px;
   border-bottom: 1px solid #e2e8f0;
 }
-
 .modal-header h2 {
   font-size: 20px;
   font-weight: 600;
   color: #1a202c;
 }
-
 .btn-close {
   width: 32px;
   height: 32px;
@@ -1615,37 +1314,30 @@ onMounted(async () => {
   justify-content: center;
   transition: all 0.3s;
 }
-
 .btn-close:hover {
   background: #edf2f7;
 }
-
 .modal-body {
   padding: 24px;
 }
-
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 20px;
 }
-
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-
 .form-group.full-width {
   grid-column: 1 / -1;
 }
-
 .form-group label {
   font-size: 14px;
   font-weight: 500;
   color: #4a5568;
 }
-
 .form-group input,
 .form-group select,
 .form-group textarea {
@@ -1656,7 +1348,6 @@ onMounted(async () => {
   color: #1a202c;
   transition: all 0.3s;
 }
-
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
@@ -1664,18 +1355,15 @@ onMounted(async () => {
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
-
 .form-group textarea {
   resize: vertical;
   font-family: inherit;
 }
-
 .form-hint {
   font-size: 12px;
   color: #718096;
   font-style: italic;
 }
-
 .modal-footer {
   display: flex;
   justify-content: flex-end;
@@ -1683,7 +1371,6 @@ onMounted(async () => {
   padding: 24px;
   border-top: 1px solid #e2e8f0;
 }
-
 .btn-cancel {
   padding: 10px 20px;
   background: white;
@@ -1695,11 +1382,9 @@ onMounted(async () => {
   cursor: pointer;
   transition: all 0.3s;
 }
-
 .btn-cancel:hover {
   background: #f7fafc;
 }
-
 .btn-save {
   padding: 10px 20px;
   background: #667eea;
@@ -1711,154 +1396,228 @@ onMounted(async () => {
   cursor: pointer;
   transition: all 0.3s;
 }
-
 .btn-save:hover {
   background: #5568d3;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
-/* Assignments Dynamic Section */
-.assignments-section {
+/* ── Module Permissions ───────────────────────────── */
+.permissions-section {
   grid-column: 1 / -1;
-  background: #f7fafc;
-  padding: 16px;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
-.assignments-header {
+.permissions-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.assignments-header h3 {
-  font-size: 14px;
-  font-weight: 500;
-  color: #4a5568;
-}
-
-.btn-add-assignment {
-  background: transparent;
-  border: 1px dashed #667eea;
-  color: #667eea;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-add-assignment:hover {
-  background: #ebf4ff;
-}
-
-.assignment-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
+  align-items: flex-start;
   margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #edf2f7;
 }
 
-.assignment-row:last-child {
-  margin-bottom: 0;
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-.assignment-fields {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.btn-remove-assignment {
-  background: #fee2e2;
-  color: #ef4444;
-  border: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.2s;
-  /* Align with inputs (accounting for label height) */
+.permissions-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a202c;
   margin-bottom: 2px;
 }
 
-.btn-remove-assignment:hover {
-  background: #fecaca;
-}
-
-.assignment-tag {
-  background: #edf2f7;
-  color: #4a5568;
-  padding: 2px 8px;
-  border-radius: 4px;
+.permissions-hint {
   font-size: 12px;
-  display: inline-block;
-  margin-bottom: 4px;
-  white-space: nowrap;
+  color: #94a3b8;
+  margin: 0;
 }
 
-.mb-0 {
-  margin-bottom: 0 !important;
+.perm-legend {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding-top: 2px;
 }
 
-/* Responsive Design */
-@media (max-width: 1200px) {
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-dot.blue {
+  background: #3b82f6;
+}
+.legend-dot.violet {
+  background: #a78bfa;
+}
+
+.perm-table-wrapper {
+  border: 1px solid #e8ecf0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.perm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.perm-col-header th {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #94a3b8;
+  background: #f8fafc;
+  border-bottom: 1px solid #e8ecf0;
+}
+
+.perm-col-header th.center {
+  text-align: center;
+  width: 80px;
+}
+
+.perm-group-row td {
+  padding: 8px 16px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  color: #64748b;
+  background: #f1f5f9;
+  border-top: 1px solid #e8ecf0;
+  border-bottom: 1px solid #e8ecf0;
+}
+
+.perm-mod-row {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.12s;
+}
+
+.perm-mod-row:last-child {
+  border-bottom: none;
+}
+
+.perm-mod-row:hover {
+  background: #fafbff;
+}
+
+.mod-name-cell {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #334155;
+  font-weight: 400;
+}
+
+.perm-toggle-cell {
+  text-align: center;
+  vertical-align: middle;
+  padding: 12px 0;
+}
+
+/* The toggle button */
+.perm-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db; /* always visible gray border */
+  background: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    transform 0.12s,
+    box-shadow 0.15s;
+  outline: none;
+  padding: 0;
+}
+
+/* hover on empty state */
+.perm-btn:hover {
+  border-color: #9ca3af;
+  transform: scale(1.1);
+  background: #f3f4f6;
+}
+
+/* View only — filled blue */
+.perm-btn--view {
+  border-color: #3b82f6 !important;
+  background: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+.perm-btn--view:hover {
+  border-color: #2563eb !important;
+  background: #2563eb !important;
+  transform: scale(1.1);
+}
+
+/* View locked (edit is active) — pale blue, non-interactive */
+.perm-btn--locked {
+  border-color: #93c5fd !important;
+  background: #93c5fd !important;
+  box-shadow: none;
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+/* Edit — filled light violet */
+.perm-btn--edit {
+  border-color: #a78bfa !important;
+  background: #a78bfa !important;
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.18);
+}
+.perm-btn--edit:hover {
+  border-color: #8b5cf6 !important;
+  background: #8b5cf6 !important;
+  transform: scale(1.1);
+}
+
+.perm-btn svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+/* Responsive */
+@media (max-width: 968px) {
   .activity-cards {
     grid-template-columns: repeat(2, 1fr);
   }
-}
-
-@media (max-width: 968px) {
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-
-  .header-right {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .activity-cards {
-    grid-template-columns: 1fr;
-  }
-
   .activity-row {
     grid-template-columns: 1fr;
   }
-
   .table-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
   }
-
   .table-actions {
     width: 100%;
     flex-wrap: wrap;
   }
-
   .search-box {
     min-width: 100%;
   }
-
   .form-grid {
     grid-template-columns: 1fr;
+  }
+  .permissions-header {
+    flex-direction: column;
+    gap: 10px;
   }
 }
 
@@ -1866,49 +1625,23 @@ onMounted(async () => {
   .employee-management {
     padding: 16px;
   }
-
   .page-header {
     padding: 16px;
   }
-
   .header-left h1 {
     font-size: 22px;
   }
-
-  .user-info {
-    display: none;
-  }
-
   .table-section {
     padding: 16px;
   }
-
   .employee-table th,
   .employee-table td {
     padding: 12px 8px;
     font-size: 13px;
   }
-
-  .employee-info {
-    gap: 8px;
-  }
-
-  .employee-avatar {
-    width: 32px;
-    height: 32px;
-    font-size: 12px;
-  }
-
-  .activity-avatar {
-    width: 36px;
-    height: 36px;
-    font-size: 12px;
-  }
-
   .modal-content {
     max-width: 100%;
   }
-
   .modal-header,
   .modal-body,
   .modal-footer {
