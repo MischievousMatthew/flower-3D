@@ -44,8 +44,11 @@
           active-class="active"
         >
           <span class="nav-icon">🛍️</span>
-          <span>Orders</span>
-        </router-link>
+            <span>Orders</span>
+            <span v-if="notificationCounts.orders > 0" class="nav-badge">
+              {{ notificationCounts.orders > 99 ? "99+" : notificationCounts.orders }}
+            </span>
+          </router-link>
         <router-link
           to="/vendor/calendar"
           class="nav-item"
@@ -121,7 +124,7 @@ import { ref, onMounted, onUnmounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import { useSidebarState } from "../../composables/useSidebarState";
-import { toast } from "vue3-toastify";
+import api from "../../plugins/axios";
 import LoadingOverlay from "../components/LoadingOverlay.vue";
 
 const { logout } = useAuth();
@@ -131,6 +134,10 @@ const { isMobileOpen, closeMobile } = useSidebarState();
 
 const isLoading = ref(null);
 const isLoadingMessage = ref("");
+const notificationCounts = ref({
+  orders: 0,
+});
+let notificationInterval = null;
 
 isLoading.value = false;
 
@@ -192,16 +199,34 @@ const handlePageLoad = () => {
   }
 };
 
+const loadSidebarNotifications = async () => {
+  try {
+    const response = await api.get("/vendor/orders/statistics");
+    const statusBreakdown = response.data?.data?.status_breakdown ?? {};
+
+    notificationCounts.value.orders =
+      Number(statusBreakdown.pending ?? 0) +
+      Number(statusBreakdown.processing ?? 0);
+  } catch (error) {
+    console.error("Error loading vendor sidebar notifications:", error);
+  }
+};
+
 onMounted(() => {
   checkLogoutState();
   checkAuthState();
   handlePageLoad();
+  loadSidebarNotifications();
+  notificationInterval = window.setInterval(loadSidebarNotifications, 60000);
 
   window.addEventListener("beforeunload", handleBeforeUnload);
 });
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", handleBeforeUnload);
+  if (notificationInterval) {
+    window.clearInterval(notificationInterval);
+  }
 });
 
 // Close sidebar on route change (mobile)
@@ -314,6 +339,21 @@ watch(() => route.path, () => {
   font-size: 14px;
   transition: all 0.2s;
   cursor: pointer;
+}
+
+.nav-badge {
+  margin-left: auto;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
 }
 
 .nav-item:hover {

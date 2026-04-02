@@ -40,6 +40,60 @@
           🛒 Cart ({{ cartCount }})
         </router-link>
 
+        <div v-if="user?.role === 'customer'" class="notification-wrapper">
+          <button class="btn-notification" @click="toggleNotificationDropdown">
+            <span class="notification-bell">Notifications</span>
+            <span v-if="notificationCount > 0" class="notification-count-badge">
+              {{ notificationCount > 9 ? "9+" : notificationCount }}
+            </span>
+          </button>
+
+          <div v-if="showNotificationDropdown" class="notification-menu">
+            <div class="notification-menu-header">
+              <span>Order Notifications</span>
+              <button class="notification-refresh" @click="loadOrderNotifications">
+                Refresh
+              </button>
+            </div>
+
+            <div v-if="loadingNotifications" class="notification-empty">
+              Loading notifications...
+            </div>
+
+            <div
+              v-else-if="orderNotifications.length === 0"
+              class="notification-empty"
+            >
+              No order updates yet.
+            </div>
+
+            <div v-else class="notification-list">
+              <button
+                v-for="notification in orderNotifications"
+                :key="notification.id"
+                class="notification-entry"
+                @click="goToOrders"
+              >
+                <div
+                  class="notification-status-dot"
+                  :class="notification.variant"
+                ></div>
+                <div class="notification-entry-content">
+                  <div class="notification-entry-title">
+                    {{ notification.title }}
+                  </div>
+                  <div class="notification-entry-message">
+                    {{ notification.message }}
+                  </div>
+                  <div class="notification-entry-time">
+                    {{ notification.time }}
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div class="user-dropdown-wrapper">
           <button class="btn-user" @click="toggleUserDropdown">
             <div class="user-avatar" :class="{ loading: loadingProfile }">
@@ -166,12 +220,16 @@ const router = useRouter();
 const { isAuthenticated, logout, isLoggingOut, user } = useAuth();
 
 const showUserDropdown = ref(false);
+const showNotificationDropdown = ref(false);
 const cartPulse = ref(false);
 const userProfile = ref(null);
 const loadingProfile = ref(false);
+const loadingNotifications = ref(false);
 const isLoadingMessage = ref("Loading...");
 const isLoading = ref(null);
 const cartItems = ref([]);
+const orderNotifications = ref([]);
+let notificationInterval = null;
 
 isLoading.value = false;
 
@@ -251,14 +309,26 @@ const userRoleDisplay = computed(() => {
   return roleMap[user.value.role] || user.value.role;
 });
 
+const notificationCount = computed(() => orderNotifications.value.length);
+
 const scrollToSection = (sectionId) => {
   emit("scroll-to-section", sectionId);
 };
 
 const toggleUserDropdown = () => {
   showUserDropdown.value = !showUserDropdown.value;
+  showNotificationDropdown.value = false;
   if (showUserDropdown.value && isAuthenticated.value) {
     loadUserProfile();
+  }
+};
+
+const toggleNotificationDropdown = async () => {
+  showNotificationDropdown.value = !showNotificationDropdown.value;
+  showUserDropdown.value = false;
+
+  if (showNotificationDropdown.value) {
+    await loadOrderNotifications();
   }
 };
 
@@ -357,10 +427,112 @@ const handleLogout = async () => {
   }
 };
 
+const goToOrders = () => {
+  showNotificationDropdown.value = false;
+  router.push("/customer/orders");
+};
+
+const loadOrderNotifications = async () => {
+  if (!isAuthenticated.value || user.value?.role !== "customer") return;
+
+  try {
+    loadingNotifications.value = true;
+    const response = await api.get("/customer/orders", {
+      params: { per_page: 10 },
+    });
+
+    if (response.data.success) {
+      const orders = Array.isArray(response.data.data) ? response.data.data : [];
+      orderNotifications.value = orders.map(mapOrderToNotification).filter(Boolean);
+    }
+  } catch (error) {
+    console.error("Error loading order notifications:", error);
+  } finally {
+    loadingNotifications.value = false;
+  }
+};
+
+const mapOrderToNotification = (order) => {
+  const status = order?.delivery?.status || order?.status;
+
+  const statusMap = {
+    pending: {
+      title: "To Process",
+      message: `Order ${order.order_number} is waiting for vendor processing.`,
+      variant: "warning",
+    },
+    to_processed: {
+      title: "To Process",
+      message: `Order ${order.order_number} is queued for processing.`,
+      variant: "warning",
+    },
+    processing: {
+      title: "To Process",
+      message: `Order ${order.order_number} is now being prepared.`,
+      variant: "warning",
+    },
+    to_ship: {
+      title: "To Ship",
+      message: `Order ${order.order_number} is ready to be shipped.`,
+      variant: "info",
+    },
+    shipped: {
+      title: "To Ship",
+      message: `Order ${order.order_number} is being dispatched.`,
+      variant: "info",
+    },
+    to_received: {
+      title: "To Receive",
+      message: `Order ${order.order_number} is out for delivery.`,
+      variant: "success",
+    },
+    delivered: {
+      title: "To Receive",
+      message: `Order ${order.order_number} is arriving for delivery.`,
+      variant: "success",
+    },
+    completed: {
+      title: "Completed",
+      message: `Order ${order.order_number} has been completed.`,
+      variant: "completed",
+    },
+  };
+
+  const config = statusMap[status];
+  if (!config) return null;
+
+  const timestamp =
+    order?.delivery?.last_scanned_at || order?.delivered_at || order?.created_at;
+
+  return {
+    id: `${order.id}-${status}`,
+    ...config,
+    time: formatNotificationTime(timestamp),
+  };
+};
+
+const formatNotificationTime = (value) => {
+  if (!value) return "Just now";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Just now";
+
+  return date.toLocaleString("en-PH", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
 const handleClickOutside = (event) => {
   const dropdown = document.querySelector(".user-dropdown-wrapper");
+  const notificationDropdown = document.querySelector(".notification-wrapper");
   if (dropdown && !dropdown.contains(event.target)) {
     showUserDropdown.value = false;
+  }
+  if (notificationDropdown && !notificationDropdown.contains(event.target)) {
+    showNotificationDropdown.value = false;
   }
 };
 
@@ -399,11 +571,19 @@ onMounted(() => {
 
   if (isAuthenticated.value) {
     loadUserProfile();
+    loadOrderNotifications();
+
+    if (user.value?.role === "customer") {
+      notificationInterval = window.setInterval(loadOrderNotifications, 60000);
+    }
   }
 });
 
 onUnmounted(() => {
   document.removeEventListener("click", handleClickOutside);
+  if (notificationInterval) {
+    window.clearInterval(notificationInterval);
+  }
 });
 </script>
 
@@ -536,6 +716,167 @@ onUnmounted(() => {
 
 .user-dropdown-wrapper {
   position: relative;
+}
+
+.notification-wrapper {
+  position: relative;
+}
+
+.btn-notification {
+  position: relative;
+  padding: 8px 12px;
+  height: 42px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-notification:hover {
+  background: #f7fafc;
+  border-color: #cbd5e0;
+}
+
+.notification-bell {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.notification-count-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+}
+
+.notification-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 340px;
+  max-height: 420px;
+  overflow: hidden;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  z-index: 1001;
+}
+
+.notification-menu-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.notification-refresh {
+  border: none;
+  background: transparent;
+  color: #059669;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.notification-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.notification-entry {
+  width: 100%;
+  border: none;
+  background: white;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.notification-entry:hover {
+  background: #f8fafc;
+}
+
+.notification-entry + .notification-entry {
+  border-top: 1px solid #f1f5f9;
+}
+
+.notification-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.notification-status-dot.warning {
+  background: #f59e0b;
+}
+
+.notification-status-dot.info {
+  background: #3b82f6;
+}
+
+.notification-status-dot.success {
+  background: #10b981;
+}
+
+.notification-status-dot.completed {
+  background: #6366f1;
+}
+
+.notification-entry-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.notification-entry-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.notification-entry-message {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #4b5563;
+}
+
+.notification-entry-time {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.notification-empty {
+  padding: 20px 16px;
+  font-size: 13px;
+  color: #6b7280;
+  text-align: center;
 }
 
 .btn-user {
@@ -818,6 +1159,16 @@ onUnmounted(() => {
     width: auto;
     max-width: 320px;
   }
+
+  .notification-menu {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    left: 20px;
+    width: auto;
+    max-width: 340px;
+    margin-left: auto;
+  }
 }
 
 @media (max-width: 640px) {
@@ -853,6 +1204,12 @@ onUnmounted(() => {
     right: 10px;
     left: 10px;
     min-width: auto;
+  }
+
+  .notification-menu {
+    right: 10px;
+    left: 10px;
+    max-width: none;
   }
 }
 

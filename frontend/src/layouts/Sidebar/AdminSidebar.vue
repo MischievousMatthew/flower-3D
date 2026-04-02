@@ -44,6 +44,9 @@
         >
           <span class="nav-icon">🏪</span>
           <span>Vendor Requests</span>
+          <span v-if="notificationCounts.vendorRequests > 0" class="nav-badge">
+            {{ notificationCounts.vendorRequests > 99 ? "99+" : notificationCounts.vendorRequests }}
+          </span>
         </router-link>
         <router-link
           to="/admin/vendor-requests"
@@ -60,6 +63,9 @@
         >
           <span class="nav-icon">✅</span>
           <span>Product Approval</span>
+          <span v-if="notificationCounts.productApproval > 0" class="nav-badge">
+            {{ notificationCounts.productApproval > 99 ? "99+" : notificationCounts.productApproval }}
+          </span>
         </router-link>
         <router-link to="/admin/reports" class="nav-item" active-class="active">
           <span class="nav-icon">📦</span>
@@ -105,7 +111,7 @@ import { ref, onMounted, onUnmounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import { useSidebarState } from "../../composables/useSidebarState";
-import { toast } from "vue3-toastify";
+import api from "../../plugins/axios";
 import LoadingOverlay from "../components/LoadingOverlay.vue";
 
 const { logout, user } = useAuth();
@@ -114,6 +120,11 @@ const route = useRoute();
 const { isMobileOpen, closeMobile } = useSidebarState();
 const isLoading = ref(false);
 const isLoadingMessage = ref("Loading...");
+const notificationCounts = ref({
+  vendorRequests: 0,
+  productApproval: 0,
+});
+let notificationInterval = null;
 
 const handleLogout = async () => {
   if (isLoading.value) return;
@@ -183,16 +194,39 @@ const handlePageLoad = () => {
   }
 };
 
+const loadSidebarNotifications = async () => {
+  try {
+    const [vendorStatsResponse, productStatsResponse] = await Promise.all([
+      api.get("/admin/vendor-applications/statistics"),
+      api.get("/admin/products/statistics"),
+    ]);
+
+    notificationCounts.value.vendorRequests = Number(
+      vendorStatsResponse.data?.pending ?? 0,
+    );
+    notificationCounts.value.productApproval = Number(
+      productStatsResponse.data?.data?.draft_products ?? 0,
+    );
+  } catch (error) {
+    console.error("Error loading admin sidebar notifications:", error);
+  }
+};
+
 onMounted(() => {
   checkLogoutState();
   checkAuthState();
   handlePageLoad();
+  loadSidebarNotifications();
+  notificationInterval = window.setInterval(loadSidebarNotifications, 60000);
 
   window.addEventListener("beforeunload", handleBeforeUnload);
 });
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", handleBeforeUnload);
+  if (notificationInterval) {
+    window.clearInterval(notificationInterval);
+  }
 });
 
 // Close sidebar on route change (mobile)
@@ -311,6 +345,21 @@ watch(
   transition: all 0.2s;
   cursor: pointer;
   margin-bottom: 2px;
+}
+
+.nav-badge {
+  margin-left: auto;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
 }
 
 .nav-item:hover {
