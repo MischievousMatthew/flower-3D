@@ -2,14 +2,18 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ShipmentItem extends Model
 {
+    use BelongsToOwner;
+
     public $timestamps = false;
 
     protected $fillable = [
+        'owner_id',
         'shipment_id',
         'warehouse_item_id',
         'quantity',

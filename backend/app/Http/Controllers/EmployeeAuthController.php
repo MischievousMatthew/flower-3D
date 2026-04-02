@@ -167,6 +167,7 @@ class EmployeeAuthController extends Controller
             'finance_dashboard'  => '/erp/finance/dashboard',
             'funding_requests'   => '/erp/finance/funding-requests',
             'payroll_requests'   => '/erp/finance/payroll-requests',
+            'crm'                => '/erp/crm/chat',
             'inventory_products' => '/erp/procurement/inventory/products',
             'inventory_funding'  => '/erp/procurement/inventory/funding-request',
             'sc_dashboard'       => '/erp/procurement/supply-chain/dashboard',

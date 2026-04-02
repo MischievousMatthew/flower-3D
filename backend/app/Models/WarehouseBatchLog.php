@@ -2,16 +2,20 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WarehouseBatchLog extends Model
 {
+    use BelongsToOwner;
+
     public $timestamps = false;   // table has no updated_at — use created_at only
 
     protected $dates = ['created_at'];
 
     protected $fillable = [
+        'owner_id',
         'warehouse_batch_id',
         'performed_by',
         'event_type',

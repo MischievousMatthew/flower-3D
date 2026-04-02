@@ -121,6 +121,7 @@ class OrderRequestController extends Controller
             if ($orderRequest->type === 'return') {
                 $delivery->update(['status' => 'returned', 'last_scanned_at' => now()]);
                 $delivery->logs()->create([
+                    'owner_id'   => $delivery->owner_id ?? $order->vendor_id,
                     'status'     => 'returned',
                     'scanned_at' => now(),
                     'notes'      => 'Return approved by SC coordinator.',
@@ -129,6 +130,7 @@ class OrderRequestController extends Controller
             } elseif ($orderRequest->type === 'refund') {
                 $delivery->update(['status' => 'refunded', 'last_scanned_at' => now()]);
                 $delivery->logs()->create([
+                    'owner_id'   => $delivery->owner_id ?? $order->vendor_id,
                     'status'     => 'refunded',
                     'scanned_at' => now(),
                     'notes'      => 'Refund approved by SC coordinator.',

@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Delivery extends Model
 {
+    use BelongsToOwner;
+
     protected $fillable = [
+        'owner_id',
         'delivery_id',
         'order_id',
         'status',

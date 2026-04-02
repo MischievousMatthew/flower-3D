@@ -162,7 +162,7 @@ class PayrollController extends Controller
         }
 
         // No owner_id filter — payrolls were approved by Finance (different user)
-        $result = $this->payrollService->markPayrollsAsPaid($request->ids);
+        $result = $this->payrollService->markPayrollsAsPaid($this->getOwnerId(), $request->ids);
 
         return response()->json($result, $result['success'] ? 200 : 400);
     }
@@ -194,7 +194,7 @@ class PayrollController extends Controller
             'page'     => $request->page ?? 1,
         ];
 
-        $payrolls = $this->payrollService->getFinancePayrolls($filters);
+        $payrolls = $this->payrollService->getFinancePayrolls($this->getOwnerId(), $filters);
 
         return response()->json([
             'success'    => true,
@@ -222,7 +222,7 @@ class PayrollController extends Controller
             'status' => $request->status,
         ];
 
-        $summary = $this->payrollService->getFinanceSummary($filters);
+        $summary = $this->payrollService->getFinanceSummary($this->getOwnerId(), $filters);
 
         return response()->json(['success' => true, 'data' => $summary]);
     }
@@ -242,7 +242,7 @@ class PayrollController extends Controller
             return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
-        $result = $this->payrollService->financeApprovePayrolls($request->ids, $request->finance_notes);
+        $result = $this->payrollService->financeApprovePayrolls($this->getOwnerId(), $request->ids, $request->finance_notes);
 
         return response()->json($result, $result['success'] ? 200 : 400);
     }
@@ -262,7 +262,7 @@ class PayrollController extends Controller
             return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
-        $result = $this->payrollService->financeRejectPayrolls($request->ids, $request->finance_notes);
+        $result = $this->payrollService->financeRejectPayrolls($this->getOwnerId(), $request->ids, $request->finance_notes);
 
         return response()->json($result, $result['success'] ? 200 : 400);
     }

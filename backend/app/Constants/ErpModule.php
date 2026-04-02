@@ -21,6 +21,9 @@ class ErpModule
         'funding_requests',
         'payroll_requests',
 
+        // CRM
+        'crm',
+
         // Procurement / Inventory
         'inventory_products',
         'inventory_funding',

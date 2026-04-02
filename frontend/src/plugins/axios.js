@@ -17,13 +17,28 @@ const api = axios.create({
   withCredentials: true,
 });
 
+const getStoredAuthToken = () => {
+  const userType = localStorage.getItem("user_type");
+
+  if (userType === "employee") {
+    return localStorage.getItem("employee_token");
+  }
+
+  if (userType === "user") {
+    return localStorage.getItem("auth_token");
+  }
+
+  // Fallback for older sessions where user_type may be missing.
+  return (
+    localStorage.getItem("employee_token") ||
+    localStorage.getItem("auth_token")
+  );
+};
+
 // ================= REQUEST INTERCEPTOR =================
 api.interceptors.request.use(
   (config) => {
-    // Support BOTH token types
-    const token =
-      localStorage.getItem("auth_token") ||
-      localStorage.getItem("employee_token");
+    const token = getStoredAuthToken();
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

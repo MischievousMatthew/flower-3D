@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Collection;
 use App\Constants\ErpModule;
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -15,7 +16,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class Employee extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use BelongsToOwner, HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'owner_id',

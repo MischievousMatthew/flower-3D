@@ -123,6 +123,7 @@ class CustomerOrderTrackingController extends Controller
 
         $delivery->update(['status' => 'completed', 'last_scanned_at' => now()]);
         $delivery->logs()->create([
+            'owner_id'   => $delivery->owner_id ?? $order->vendor_id,
             'status'     => 'completed',
             'scanned_at' => now(),
             'notes'      => 'Confirmed received by customer.',
@@ -174,6 +175,7 @@ class CustomerOrderTrackingController extends Controller
         [$mediaPath, $mediaType] = $this->storeMedia($request);
 
         OrderRequest::create([
+            'owner_id'   => $order->vendor_id,
             'order_id'   => $order->id,
             'user_id'    => Auth::id(),
             'type'       => 'return',
@@ -186,6 +188,7 @@ class CustomerOrderTrackingController extends Controller
         // Advance delivery status
         $order->delivery->update(['status' => 'returned', 'last_scanned_at' => now()]);
         $order->delivery->logs()->create([
+            'owner_id'   => $order->delivery->owner_id ?? $order->vendor_id,
             'status'     => 'returned',
             'scanned_at' => now(),
             'notes'      => 'Return requested by customer.',
@@ -238,6 +241,7 @@ class CustomerOrderTrackingController extends Controller
         [$mediaPath, $mediaType] = $this->storeMedia($request);
 
         OrderRequest::create([
+            'owner_id'   => $order->vendor_id,
             'order_id'   => $order->id,
             'user_id'    => Auth::id(),
             'type'       => 'refund',
@@ -249,6 +253,7 @@ class CustomerOrderTrackingController extends Controller
 
         $order->delivery->update(['status' => 'refunded', 'last_scanned_at' => now()]);
         $order->delivery->logs()->create([
+            'owner_id'   => $order->delivery->owner_id ?? $order->vendor_id,
             'status'     => 'refunded',
             'scanned_at' => now(),
             'notes'      => 'Refund requested by customer.',

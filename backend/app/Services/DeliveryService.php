@@ -26,11 +26,13 @@ class DeliveryService
             $existing = Delivery::where('order_id', $orderId)->first();
             if ($existing) return $existing;
 
+            $order      = Order::findOrFail($orderId);
             $seq        = str_pad($orderId, 6, '0', STR_PAD_LEFT);
             $deliveryId = 'DLV-' . $seq;
             $barcode    = 'DLV-' . strtoupper(Str::random(10));
 
             return Delivery::create([
+                'owner_id'    => $order->vendor_id,
                 'delivery_id' => $deliveryId,
                 'order_id'    => $orderId,
                 'status'      => 'pending',
@@ -84,6 +86,7 @@ class DeliveryService
 
             // ── 5. Append audit log entry ──────────────────────────────────────
             DeliveryLog::create([
+                'owner_id'    => $delivery->owner_id,
                 'delivery_id' => $delivery->id,
                 'status'      => $targetStatus,
                 'scanned_by'  => $scannedBy,

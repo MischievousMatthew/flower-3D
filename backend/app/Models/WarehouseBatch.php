@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WarehouseBatch extends Model
 {
+    use BelongsToOwner;
     // ── Condition progression (in order) ──────────────────────────────────
     public const CONDITIONS = ['fresh', 'aging', 'wilting', 'spoiled', 'discarded'];
 

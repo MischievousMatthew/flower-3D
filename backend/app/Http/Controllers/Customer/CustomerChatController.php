@@ -161,10 +161,11 @@ class CustomerChatController extends Controller
             
             $conversation = Conversation::firstOrCreate(
                 ['vendor_id' => $vendor->id, 'customer_id' => $customer->id],
-                ['is_active' => true]
+                ['owner_id' => $vendor->id, 'is_active' => true]
             );
             
             $message = Message::create([
+                'owner_id' => $vendor->id,
                 'conversation_id' => $conversation->id,
                 'sender_id' => $customer->id,
                 'message' => $request->message,

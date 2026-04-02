@@ -1,11 +1,8 @@
 // src/constants/erpModules.js
-// ─────────────────────────────────────────────────────────────────────────────
 // Single source of truth for every ERP module exposed through the RBAC system.
 // Used by: StaffList RBAC table, DynamicSidebar nav filtering, router guards.
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const ERP_MODULES = [
-  // ── HR ─────────────────────────────────────────────────────────────────────
   {
     key: "hr_dashboard",
     label: "HR Dashboard",
@@ -58,7 +55,6 @@ export const ERP_MODULES = [
     ],
   },
 
-  // ── Finance ────────────────────────────────────────────────────────────────
   {
     key: "finance_dashboard",
     label: "Finance Dashboard",
@@ -80,8 +76,14 @@ export const ERP_MODULES = [
     group: "Finance",
     path: "/erp/finance/payroll-requests",
   },
+  {
+    key: "crm",
+    label: "CRM Chat",
+    icon: "crm",
+    group: "CRM",
+    path: "/erp/crm/chat",
+  },
 
-  // ── Procurement / Inventory ────────────────────────────────────────────────
   {
     key: "inventory_products",
     label: "Inventory Products",
@@ -101,7 +103,6 @@ export const ERP_MODULES = [
     path: "/erp/procurement/inventory/funding-request",
   },
 
-  // ── Supply Chain ───────────────────────────────────────────────────────────
   {
     key: "sc_dashboard",
     label: "SC Dashboard",
@@ -170,10 +171,8 @@ export const ERP_MODULES = [
   },
 ];
 
-// Unique module keys for validation
 export const MODULE_KEYS = ERP_MODULES.map((m) => m.key);
 
-// Group modules by their group name (for the RBAC table UI)
 export function getModulesByGroup() {
   const groups = {};
   for (const mod of ERP_MODULES) {
@@ -183,7 +182,6 @@ export function getModulesByGroup() {
   return groups;
 }
 
-// Find a module definition by key
 export function findModule(key) {
   return ERP_MODULES.find((m) => m.key === key) ?? null;
 }

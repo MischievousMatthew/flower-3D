@@ -2,14 +2,18 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PurchaseOrderItem extends Model
 {
+    use BelongsToOwner;
+
     public $timestamps = false; // ← FIX: table has no created_at / updated_at columns
 
     protected $fillable = [
+        'owner_id',
         'purchase_order_id',
         'product_id',          // ← ADDED: FK to products table
         'product_name',

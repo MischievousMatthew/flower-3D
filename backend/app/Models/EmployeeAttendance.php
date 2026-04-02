@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,7 +10,7 @@ use Carbon\Carbon;
 
 class EmployeeAttendance extends Model
 {
-    use HasFactory;
+    use BelongsToOwner, HasFactory;
 
     protected $table = 'employee_attendance';
 

@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class InventoryMovement extends Model
 {
+    use BelongsToOwner;
     public $timestamps = false; // only created_at defined in schema
 
     protected $fillable = [

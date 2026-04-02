@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Model;
 
 class Payroll extends Model
 {
+    use BelongsToOwner;
 
     protected $fillable = [
         'owner_id', 'employee_id', 'period_start', 'period_end',

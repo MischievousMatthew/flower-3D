@@ -1,7 +1,7 @@
 <template>
   <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
-  <div class="chat-layout">
-    <component :is="headerComponent" />
+  <div class="chat-layout" :class="{ embedded: isEmbeddedLayout }">
+    <component :is="headerComponent" v-if="headerComponent" />
 
     <div class="chat-container" :style="contentStyle">
       <div class="chat-content">
@@ -12,7 +12,7 @@
               <span class="search-icon">🔍</span>
               <input
                 type="text"
-                :placeholder="`Search ${isVendor ? 'customers' : 'vendors'}...`"
+                :placeholder="`Search ${counterpartLabel}...`"
                 v-model="searchQuery"
               />
             </div>
@@ -94,9 +94,16 @@
             >
               <div class="empty-icon">💬</div>
               <p>No conversations found</p>
-              <button class="btn-primary" @click="showNewChatModal = true">
+              <button
+                class="btn-primary"
+                @click="showNewChatModal = true"
+                :disabled="!canStartConversation"
+              >
                 Start New Chat
               </button>
+              <p v-if="!canStartConversation" class="read-only-note">
+                View-only access allows reading conversations only.
+              </p>
             </div>
           </div>
         </div>
@@ -107,12 +114,19 @@
             <div class="empty-icon">💬</div>
             <h3>Select a conversation</h3>
             <p>
-              Choose a {{ isVendor ? "customer" : "vendor" }} from the list to
+              Choose a {{ counterpartLabelSingular }} from the list to
               start chatting
             </p>
-            <button class="btn-primary" @click="showNewChatModal = true">
+            <button
+              class="btn-primary"
+              @click="showNewChatModal = true"
+              :disabled="!canStartConversation"
+            >
               Start New Chat
             </button>
+            <p v-if="!canStartConversation" class="read-only-note">
+              View-only access allows reading conversations only.
+            </p>
           </div>
 
           <div v-else class="chat-window">
@@ -285,7 +299,7 @@
                 >
                   <span class="file-icon">{{ getFileIcon(file.type) }}</span>
                   <span class="file-name">{{ file.name }}</span>
-                  <button class="remove-file-btn" @click="removeFile(index)">
+                  <button class="remove-file-btn" @click="removeFile(index)" :disabled="!canSendMessages">
                     ✕
                   </button>
                 </div>
@@ -296,6 +310,7 @@
                   class="attach-btn"
                   @click="openFileUpload"
                   title="Attach file"
+                  :disabled="!canSendMessages"
                 >
                   📎
                 </button>
@@ -311,10 +326,14 @@
                 <input
                   type="text"
                   v-model="messageText"
-                  placeholder="Type your message..."
+                  :placeholder="
+                    canSendMessages
+                      ? 'Type your message...'
+                      : 'You have view-only access to this chat'
+                  "
                   @keyup.enter="sendMessage"
                   @input="handleTyping"
-                  :disabled="isSending"
+                  :disabled="!canSendMessages || isSending"
                   class="message-input"
                 />
 
@@ -436,7 +455,7 @@
             <span class="search-icon">🔍</span>
             <input
               type="text"
-              :placeholder="`Search ${isVendor ? 'customers' : 'vendors'}...`"
+              :placeholder="`Search ${counterpartLabel}...`"
               v-model="userSearchQuery"
               @input="searchUsers"
             />
@@ -446,6 +465,7 @@
               v-for="user in searchedUsers"
               :key="user.id"
               class="vendor-item"
+              :class="{ disabled: !canStartConversation }"
               @click="startNewConversation(user)"
             >
               <img
@@ -468,7 +488,7 @@
               v-if="searchedUsers.length === 0 && userSearchQuery"
               class="no-vendors"
             >
-              <p>No {{ isVendor ? "customers" : "vendors" }} found</p>
+              <p>No {{ counterpartLabel }} found</p>
             </div>
           </div>
         </div>
@@ -487,16 +507,69 @@ import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import { toast } from "vue3-toastify";
 import api from "../../plugins/axios";
 
+const props = defineProps({
+  chatRole: {
+    type: String,
+    default: "auto",
+  },
+  layoutMode: {
+    type: String,
+    default: "default",
+  },
+  counterpartLabel: {
+    type: String,
+    default: "",
+  },
+  canSendMessages: {
+    type: Boolean,
+    default: true,
+  },
+  allowNewChat: {
+    type: Boolean,
+    default: true,
+  },
+});
+
 const router = useRouter();
 const { user, isAuthenticated } = useAuth();
 
-const isCustomer = computed(() => user.value?.role === "customer");
-const isVendor = computed(() => user.value?.role === "vendor");
-const headerComponent = computed(() =>
-  isVendor.value ? VendorSidebar : NavHeader,
+const isEmbeddedLayout = computed(() => props.layoutMode === "embedded");
+const isCustomer = computed(() => {
+  if (props.chatRole === "customer") return true;
+  if (props.chatRole === "vendor") return false;
+  return user.value?.role === "customer";
+});
+const isVendor = computed(() => {
+  if (props.chatRole === "vendor") return true;
+  if (props.chatRole === "customer") return false;
+  return user.value?.role === "vendor";
+});
+const counterpartLabel = computed(() => {
+  if (props.counterpartLabel) return props.counterpartLabel;
+  return isVendor.value ? "customers" : "vendors";
+});
+const counterpartLabelSingular = computed(() =>
+  counterpartLabel.value.endsWith("s")
+    ? counterpartLabel.value.slice(0, -1)
+    : counterpartLabel.value,
 );
+const canSendMessages = computed(() => props.canSendMessages);
+const canStartConversation = computed(
+  () => props.canSendMessages && props.allowNewChat,
+);
+const headerComponent = computed(() => {
+  if (isEmbeddedLayout.value) {
+    return null;
+  }
+
+  return isVendor.value ? VendorSidebar : NavHeader;
+});
 
 const contentStyle = computed(() => {
+  if (isEmbeddedLayout.value) {
+    return {};
+  }
+
   if (isCustomer.value) {
     return { marginTop: "80px", marginLeft: "0" };
   }
@@ -505,6 +578,10 @@ const contentStyle = computed(() => {
 });
 
 const sidebarStyle = computed(() => {
+  if (isEmbeddedLayout.value) {
+    return {};
+  }
+
   if (isVendor.value) {
     return { marginLeft: "260px" };
   }
@@ -513,6 +590,10 @@ const sidebarStyle = computed(() => {
 });
 
 const messageInputArea = computed(() => {
+  if (isEmbeddedLayout.value) {
+    return {};
+  }
+
   if (isCustomer.value) {
     return { marginBottom: "80px" };
   }
@@ -575,6 +656,7 @@ const unreadCount = computed(() => {
 
 const canSend = computed(() => {
   return (
+    props.canSendMessages &&
     (messageText.value.trim() || selectedFiles.value.length > 0) &&
     !isSending.value
   );
@@ -704,7 +786,7 @@ const formatLastMessagePreview = (conversation, message, currentUserId) => {
 };
 
 const sendMessage = async () => {
-  if (!canSend.value) return;
+  if (!props.canSendMessages || !canSend.value) return;
 
   const textToSend = messageText.value.trim();
   const filesToSend = [...selectedFiles.value];
@@ -772,16 +854,19 @@ const scrollToBottom = () => {
 };
 
 const openFileUpload = () => {
+  if (!props.canSendMessages) return;
   fileInput.value?.click();
 };
 
 const handleFileUpload = (event) => {
+  if (!props.canSendMessages) return;
   const files = Array.from(event.target.files);
   selectedFiles.value.push(...files);
   event.target.value = "";
 };
 
 const removeFile = (index) => {
+  if (!props.canSendMessages) return;
   selectedFiles.value.splice(index, 1);
 };
 
@@ -830,6 +915,11 @@ const downloadFile = (file) => {
 };
 
 const searchUsers = async () => {
+  if (!canStartConversation.value) {
+    searchedUsers.value = [];
+    return;
+  }
+
   if (!userSearchQuery.value.trim()) {
     searchedUsers.value = [];
     return;
@@ -852,6 +942,8 @@ const searchUsers = async () => {
 };
 
 const startNewConversation = async (otherUser) => {
+  if (!canStartConversation.value) return;
+
   try {
     const { data } = await api.post("/chat/conversations/start", {
       [isVendor.value ? "customer_id" : "vendor_id"]: otherUser.id,
@@ -979,7 +1071,7 @@ const fetchConversations = async () => {
 // Lifecycle
 onMounted(() => {
   if (!isAuthenticated.value) {
-    router.push(isVendor.value ? "/login" : "/guest/login");
+    router.push("/guest/login");
     return;
   }
 
@@ -1018,6 +1110,15 @@ body {
   overflow: hidden;
 }
 
+.chat-layout.embedded {
+  height: 100%;
+  min-height: calc(100vh - 170px);
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
 .chat-container {
   margin-left: 0;
   flex: 1;
@@ -1027,10 +1128,21 @@ body {
   overflow: hidden;
 }
 
+.chat-layout.embedded .chat-container {
+  height: 100%;
+}
+
 .chat-content {
   display: flex;
   width: 100%;
   height: 100%;
+}
+
+.read-only-note {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #64748b;
+  text-align: center;
 }
 
 .conversations-sidebar {
@@ -1390,6 +1502,13 @@ body {
 .btn-primary:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5);
+}
+
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .chat-window {
@@ -1862,6 +1981,14 @@ body {
   background: rgba(102, 126, 234, 0.1);
 }
 
+.attach-btn:disabled,
+.emoji-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  background: none;
+}
+
 .message-input {
   flex: 1;
   border: none;
@@ -2331,6 +2458,17 @@ body {
   background: rgba(102, 126, 234, 0.1);
   border-color: #2d3748;
   transform: translateX(4px);
+}
+
+.vendor-item.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.vendor-item.disabled:hover {
+  background: #f8f9fa;
+  border-color: #e9ecef;
+  transform: none;
 }
 
 .vendor-avatar-small {

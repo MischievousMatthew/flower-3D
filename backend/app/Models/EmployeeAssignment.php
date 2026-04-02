@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EmployeeAssignment extends Model
 {
-    use HasFactory;
+    use BelongsToOwner, HasFactory;
 
     protected $fillable = [
+        'owner_id',
         'employee_id', 'department_id', 'role_id',
         'is_primary', 'is_active',
     ];

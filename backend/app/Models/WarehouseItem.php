@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WarehouseItem extends Model
 {
+    use BelongsToOwner;
     public $timestamps = false;
 
     protected $fillable = [

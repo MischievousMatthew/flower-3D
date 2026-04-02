@@ -82,7 +82,7 @@ class WarehouseController extends Controller
 
         // Products are owned by the authenticated vendor/owner
         $query = Product::with(['images' => fn ($q) => $q->where('is_primary', true)->limit(1)])
-            ->where('owner_id', Auth::id())
+            ->where('owner_id', $this->getOwnerId())
             ->where('status', 'active')
             ->when(
                 $request->search,
@@ -162,6 +162,7 @@ class WarehouseController extends Controller
         $batchNumber = WarehouseBatch::generateBatchNumber($product->sku, $data['received_date']);
 
         $batch = WarehouseBatch::create([
+            'owner_id'              => $this->getOwnerId(),
             'product_id'            => $product->id,
             'warehouse_location_id' => $location->id,
             'storage_location'      => $location->name,
@@ -181,6 +182,7 @@ class WarehouseController extends Controller
 
         // Log the placement
         $batch->logs()->create([
+            'owner_id'     => $this->getOwnerId(),
             'performed_by' => Auth::id(),
             'event_type'   => 'QUANTITY_ADJUSTED',
             'qty_change'   => $data['qty_received'],

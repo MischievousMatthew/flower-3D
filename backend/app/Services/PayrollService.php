@@ -206,15 +206,15 @@ class PayrollService
     // FINANCE QUERIES
     // ─────────────────────────────────────────────────────────────────────────
 
-    public function getFinancePayrolls(array $filters = [])
+    public function getFinancePayrolls(int $ownerId, array $filters = [])
     {
-        $query = Payroll::with('employee');
+        $query = Payroll::with('employee')->where('owner_id', $ownerId);
         return $this->applyPayrollFilters($query, $filters);
     }
 
-    public function getFinanceSummary(array $filters = []): array
+    public function getFinanceSummary(int $ownerId, array $filters = []): array
     {
-        $query    = Payroll::query();
+        $query    = Payroll::where('owner_id', $ownerId);
         $query    = $this->applyPayrollFiltersBuilder($query, $filters);
         $payrolls = $query->get();
 
@@ -232,10 +232,10 @@ class PayrollService
         ];
     }
 
-    public function financeApprovePayrolls(array $ids, ?string $notes = null): array
+    public function financeApprovePayrolls(int $ownerId, array $ids, ?string $notes = null): array
     {
         try {
-            $payrolls = Payroll::whereIn('id', $ids)->where('status', 'pending')->get();
+            $payrolls = Payroll::where('owner_id', $ownerId)->whereIn('id', $ids)->where('status', 'pending')->get();
 
             if ($payrolls->isEmpty()) {
                 return ['success' => false, 'message' => 'No pending payrolls found for the selected IDs.'];
@@ -259,10 +259,10 @@ class PayrollService
         }
     }
 
-    public function financeRejectPayrolls(array $ids, ?string $notes = null): array
+    public function financeRejectPayrolls(int $ownerId, array $ids, ?string $notes = null): array
     {
         try {
-            $payrolls = Payroll::whereIn('id', $ids)->where('status', 'pending')->get();
+            $payrolls = Payroll::where('owner_id', $ownerId)->whereIn('id', $ids)->where('status', 'pending')->get();
 
             if ($payrolls->isEmpty()) {
                 return ['success' => false, 'message' => 'No pending payrolls found for the selected IDs.'];
@@ -286,10 +286,10 @@ class PayrollService
         }
     }
 
-    public function markPayrollsAsPaid(array $ids): array
+    public function markPayrollsAsPaid(int $ownerId, array $ids): array
     {
         try {
-            $payrolls = Payroll::whereIn('id', $ids)->where('status', 'approved')->get();
+            $payrolls = Payroll::where('owner_id', $ownerId)->whereIn('id', $ids)->where('status', 'approved')->get();
 
             if ($payrolls->isEmpty()) {
                 return ['success' => false, 'message' => 'No approved payrolls found for the selected IDs.'];

@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SupplierContact extends Model
 {
+    use BelongsToOwner;
+
     protected $fillable = [
+        'owner_id',
         'supplier_id',
         'company_name',
         'contact_person',

@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WarehouseLocation extends Model
 {
+    use BelongsToOwner;
     // Table has both created_at and updated_at columns
     public $timestamps = true;
 

@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Helpers\CloudinaryHelper;
 
 class OrderRequest extends Model
 {
+    use BelongsToOwner;
+
     protected $fillable = [
+        'owner_id',
         'order_id',
         'user_id',
         'type',

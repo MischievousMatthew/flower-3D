@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -9,6 +10,7 @@ use App\Helpers\CloudinaryHelper;
 
 class Supplier extends Model
 {
+    use BelongsToOwner;
     protected $fillable = [
         'owner_id',
         'company_name',

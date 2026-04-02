@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FundingRequest extends Model
 {
+    use BelongsToOwner;
     protected $table = 'funding_requests';
 
     protected $fillable = [

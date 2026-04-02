@@ -409,6 +409,17 @@ const routes = [
         ],
       },
 
+      {
+        path: "crm",
+        children: [
+          {
+            path: "chat",
+            name: "CRMChat",
+            component: () => import("../views/ERP/CRM/Chat.vue"),
+          },
+        ],
+      },
+
       // ================= HR =================
       {
         path: "hr",
@@ -621,7 +632,10 @@ router.beforeEach(async (to, from, next) => {
     }
 
     // If employee is trying to access a non-ERP path, send them home
-    if (!to.path.startsWith("/erp") && to.path !== "/guest/login") {
+    if (
+      !to.path.startsWith("/erp") &&
+      to.path !== "/guest/login"
+    ) {
       return next(assignment.getDefaultRoute());
     }
 
@@ -645,6 +659,9 @@ router.beforeEach(async (to, from, next) => {
       to.path.startsWith("/erp/procurement/supply-chain") &&
       !assignment.hasGroupAccess("Supply Chain")
     ) {
+      return next(assignment.getDefaultRoute());
+    }
+    if (to.path.startsWith("/erp/crm") && !assignment.canView("crm")) {
       return next(assignment.getDefaultRoute());
     }
 
