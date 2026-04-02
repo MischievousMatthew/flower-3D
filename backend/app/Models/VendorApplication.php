@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,6 +16,8 @@ use App\Helpers\CloudinaryHelper;
 class VendorApplication extends Model
 {
     use HasFactory;
+
+    public const RESERVATION_TIMEZONE = 'Asia/Manila';
 
     protected $fillable = [
         'application_id', 'status_token', 'store_name', 'store_description',
@@ -354,5 +358,108 @@ class VendorApplication extends Model
             'reviewed_at' => now(),
             'reviewed_by' => auth()->id(),
         ]);
+    }
+
+    public static function findApprovedForVendorUser(?User $vendor): ?self
+    {
+        if (!$vendor) {
+            return null;
+        }
+
+        return static::where('email', $vendor->email)
+            ->where('status', 'approved')
+            ->first();
+    }
+
+    public static function buildReservationSettings(?User $vendor, ?self $application = null, ?CarbonInterface $referenceNow = null): array
+    {
+        $application ??= static::findApprovedForVendorUser($vendor);
+
+        $now = $referenceNow
+            ? Carbon::instance($referenceNow)->setTimezone(self::RESERVATION_TIMEZONE)
+            : Carbon::now(self::RESERVATION_TIMEZONE);
+
+        $sameDayDelivery = (bool) ($application?->same_day_delivery ?? false);
+        $leadTimeDays = $application?->reservationLeadTimeDays() ?? ($sameDayDelivery ? 0 : 3);
+        $maxOrdersPerDay = max(1, (int) ($application?->max_orders_per_day ?? 10));
+        $cutoffTimeToday = $application?->cutoffTimeForDate($now);
+        $sameDayCutoffReached = $sameDayDelivery
+            ? $application?->isSameDayCutoffReached($now) ?? false
+            : true;
+
+        return [
+            'timezone' => self::RESERVATION_TIMEZONE,
+            'same_day_delivery' => $sameDayDelivery,
+            'lead_time_days' => max(0, $leadTimeDays),
+            'max_orders_per_day' => $maxOrdersPerDay,
+            'cutoff_time_today' => $cutoffTimeToday,
+            'same_day_cutoff_reached' => $sameDayCutoffReached,
+            'same_day_available_today' => $sameDayDelivery && !$sameDayCutoffReached,
+        ];
+    }
+
+    public function reservationLeadTimeDays(): int
+    {
+        $leadTime = strtolower(trim((string) $this->lead_time));
+
+        if ($leadTime === '') {
+            return $this->same_day_delivery ? 0 : 3;
+        }
+
+        if (str_contains($leadTime, 'same') && str_contains($leadTime, 'day')) {
+            return 0;
+        }
+
+        if (preg_match('/(\d+(?:\.\d+)?)/', $leadTime, $matches)) {
+            $value = (float) $matches[1];
+
+            if (str_contains($leadTime, 'hour')) {
+                return max(0, (int) ceil($value / 24));
+            }
+
+            return max(0, (int) ceil($value));
+        }
+
+        return $this->same_day_delivery ? 0 : 3;
+    }
+
+    public function cutoffTimeForDate(CarbonInterface $date): ?string
+    {
+        $dayName = Carbon::instance($date)->setTimezone(self::RESERVATION_TIMEZONE)->englishDayOfWeek;
+
+        foreach ((array) ($this->cutoff_times ?? []) as $cutoff) {
+            $cutoffDay = data_get($cutoff, 'day');
+            $cutoffTime = data_get($cutoff, 'time');
+
+            if ($cutoffDay === $dayName && is_string($cutoffTime) && preg_match('/^\d{2}:\d{2}$/', $cutoffTime)) {
+                return $cutoffTime;
+            }
+        }
+
+        return null;
+    }
+
+    public function isSameDayCutoffReached(?CarbonInterface $referenceNow = null): bool
+    {
+        if (!$this->same_day_delivery) {
+            return true;
+        }
+
+        $now = $referenceNow
+            ? Carbon::instance($referenceNow)->setTimezone(self::RESERVATION_TIMEZONE)
+            : Carbon::now(self::RESERVATION_TIMEZONE);
+
+        $cutoffTime = $this->cutoffTimeForDate($now);
+        if (!$cutoffTime) {
+            return false;
+        }
+
+        $cutoffDateTime = Carbon::createFromFormat(
+            'Y-m-d H:i',
+            $now->format('Y-m-d') . ' ' . $cutoffTime,
+            self::RESERVATION_TIMEZONE
+        );
+
+        return $now->greaterThanOrEqualTo($cutoffDateTime);
     }
 }

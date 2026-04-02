@@ -282,6 +282,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/closed-dates',         [VendorOrdersController::class, 'getClosedDates']);
             Route::post('/close-date',          [VendorOrdersController::class, 'markDateAsClosed']);
             Route::delete('/close-date/{id}',   [VendorOrdersController::class, 'removeClosedDate']);
+            Route::get('/orders-for-date',      [VendorOrdersController::class, 'getOrdersForDate']);
             Route::get('/orders/calendar-data', [VendorOrdersController::class, 'getCalendarData']);
         });
 

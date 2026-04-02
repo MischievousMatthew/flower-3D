@@ -162,6 +162,13 @@ class CheckoutController extends Controller
                     'store_address' => $vendorApplication->store_address ?? '',
                     'contact_number' => $vendorApplication->contact_number ?? '',
                     'email' => $vendorApplication->email ?? '',
+                    'max_orders_per_day' => $vendorApplication?->max_orders_per_day ?? 10,
+                    'lead_time' => $vendorApplication?->lead_time ?? '',
+                    'lead_time_days' => $vendorApplication?->reservationLeadTimeDays() ?? 3,
+                    'same_day_delivery' => (bool) ($vendorApplication?->same_day_delivery ?? false),
+                    'cutoff_times' => $vendorApplication?->cutoff_times ?? [],
+                    'cutoff_time_today' => $vendorApplication?->cutoffTimeForDate(Carbon::now(VendorApplication::RESERVATION_TIMEZONE)),
+                    'timezone' => VendorApplication::RESERVATION_TIMEZONE,
                 ],
                 'items' => $items,
                 'delivery_type' => 'standard',
@@ -194,7 +201,7 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Create order with reservation date - FIXED with proper timezone handling and 3-day lead time
+     * Create order with reservation date using vendor-specific reservation rules.
      */
     public function createOrder(Request $request)
     {
@@ -222,41 +229,10 @@ class CheckoutController extends Controller
                 ], 422);
             }
 
-            // Parse and validate reservation date with proper timezone handling
-            $reservationDate = Carbon::parse($request->reservation_date)->startOfDay();
-            $today = Carbon::today();
-            $minDate = $today->copy()->addDays(3); // 3-day lead time
-            $maxDate = $today->copy()->addMonths(3);
-
-            Log::info('Reservation date validation', [
-                'input' => $request->reservation_date,
-                'parsed' => $reservationDate->toDateString(),
-                'today' => $today->toDateString(),
-                'min_date' => $minDate->toDateString(),
-                'max_date' => $maxDate->toDateString(),
-            ]);
-
-            // Validate date is at least 3 days from today
-            if ($reservationDate->lessThan($minDate)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Reservation must be at least 3 days from today to allow preparation time',
-                    'errors' => [
-                        'reservation_date' => ['Please select a date at least 3 days from today']
-                    ]
-                ], 422);
-            }
-
-            // Validate date is within 3 months
-            if ($reservationDate->greaterThan($maxDate)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Reservations can only be made up to 3 months in advance',
-                    'errors' => [
-                        'reservation_date' => ['Reservations cannot exceed 3 months in advance']
-                    ]
-                ], 422);
-            }
+            $reservationDate = Carbon::parse(
+                $request->reservation_date,
+                VendorApplication::RESERVATION_TIMEZONE
+            )->startOfDay();
 
             if ($request->filled('product_id')) {
                 // Direct Order
@@ -313,6 +289,47 @@ class CheckoutController extends Controller
                 ], 400);
             }
 
+            $settings = VendorApplication::buildReservationSettings($vendorUser, $vendor);
+            $nowInPh = Carbon::now($settings['timezone']);
+            $todayInPh = $nowInPh->copy()->startOfDay();
+            $maxDate = $todayInPh->copy()->addMonths(3);
+
+            Log::info('Reservation date validation', [
+                'input' => $request->reservation_date,
+                'parsed' => $reservationDate->toDateString(),
+                'today_ph' => $todayInPh->toDateString(),
+                'timezone' => $settings['timezone'],
+                'lead_time_days' => $settings['lead_time_days'],
+                'same_day_delivery' => $settings['same_day_delivery'],
+                'cutoff_time_today' => $settings['cutoff_time_today'],
+            ]);
+
+            $reservationValidation = $this->validateReservationDateSelection(
+                $reservationDate,
+                $settings,
+                $todayInPh
+            );
+
+            if (!$reservationValidation['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $reservationValidation['message'],
+                    'errors' => [
+                        'reservation_date' => [$reservationValidation['field_error']]
+                    ]
+                ], 422);
+            }
+
+            if ($reservationDate->greaterThan($maxDate)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Reservations can only be made up to 3 months in advance',
+                    'errors' => [
+                        'reservation_date' => ['Reservations cannot exceed 3 months in advance']
+                    ]
+                ], 422);
+            }
+
             // Check if reservation date is closed
             if (VendorClosedDate::isDateClosed($vendorId, $reservationDate->toDateString())) {
                 return response()->json([
@@ -322,7 +339,7 @@ class CheckoutController extends Controller
             }
 
             // Check max orders per day
-            $maxOrders = $vendorUser->max_orders_per_day ?? 10;
+            $maxOrders = $settings['max_orders_per_day'];
             $ordersCount = Order::where('vendor_id', $vendorId)
                 ->whereDate('reservation_date', $reservationDate)
                 ->whereNotIn('status', ['cancelled', 'failed'])
@@ -843,12 +860,14 @@ class CheckoutController extends Controller
             return true;
         }
 
-        $reservationDate = Carbon::parse($order->reservation_date)->startOfDay();
-        $today = Carbon::today();
-        $minDate = $today->copy()->addDays(3);
+        $reservationDate = Carbon::parse(
+            $order->reservation_date,
+            VendorApplication::RESERVATION_TIMEZONE
+        )->startOfDay();
+        $today = Carbon::now(VendorApplication::RESERVATION_TIMEZONE)->startOfDay();
         $maxDate = $today->copy()->addMonths(3);
 
-        if ($reservationDate->lessThan($minDate) || $reservationDate->greaterThan($maxDate)) {
+        if ($reservationDate->greaterThan($maxDate)) {
             return false;
         }
 
@@ -857,7 +876,14 @@ class CheckoutController extends Controller
         }
 
         $vendor = \App\Models\User::find($order->vendor_id);
-        $maxOrders = $vendor->max_orders_per_day ?? 10;
+        $vendorApplication = VendorApplication::findApprovedForVendorUser($vendor);
+        $settings = VendorApplication::buildReservationSettings($vendor, $vendorApplication, $today);
+
+        if (!$this->validateReservationDateSelection($reservationDate, $settings, $today)['valid']) {
+            return false;
+        }
+
+        $maxOrders = $settings['max_orders_per_day'];
         
         $ordersCount = Order::where('vendor_id', $order->vendor_id)
             ->whereDate('reservation_date', $reservationDate)
@@ -889,6 +915,62 @@ class CheckoutController extends Controller
     private function handleCheckoutSessionFailed($payload)
     {
         return $this->handlePaymentFailed($payload);
+    }
+
+    private function validateReservationDateSelection(Carbon $reservationDate, array $settings, Carbon $today): array
+    {
+        if ($reservationDate->lessThan($today)) {
+            return [
+                'valid' => false,
+                'message' => 'Cannot book dates in the past',
+                'field_error' => 'Please select today or a future date',
+            ];
+        }
+
+        if ($reservationDate->isSameDay($today)) {
+            if (!$settings['same_day_delivery']) {
+                return [
+                    'valid' => false,
+                    'message' => 'Same-day delivery is not available for this vendor',
+                    'field_error' => 'This vendor does not accept same-day delivery',
+                ];
+            }
+
+            if ($settings['same_day_cutoff_reached']) {
+                $cutoff = $settings['cutoff_time_today']
+                    ? Carbon::createFromFormat(
+                        'H:i',
+                        $settings['cutoff_time_today'],
+                        $settings['timezone']
+                    )->format('g:i A')
+                    : null;
+
+                return [
+                    'valid' => false,
+                    'message' => $cutoff
+                        ? "Same-day delivery cutoff has been reached for today. Cutoff time is {$cutoff} PH time."
+                        : 'Same-day delivery cutoff has been reached for today.',
+                    'field_error' => $cutoff
+                        ? "Same-day orders are only available until {$cutoff} PH time"
+                        : 'Same-day delivery is no longer available today',
+                ];
+            }
+
+            return ['valid' => true, 'message' => null, 'field_error' => null];
+        }
+
+        $minimumDate = $today->copy()->addDays($settings['lead_time_days']);
+        if ($reservationDate->lessThan($minimumDate)) {
+            $days = $settings['lead_time_days'];
+
+            return [
+                'valid' => false,
+                'message' => "Reservation must be at least {$days} day(s) from today to allow preparation time",
+                'field_error' => "Please select a date at least {$days} day(s) from today",
+            ];
+        }
+
+        return ['valid' => true, 'message' => null, 'field_error' => null];
     }
     
 

@@ -45,11 +45,11 @@
               </p>
 
               <!-- Calendar Legend -->
-              <div class="calendar-legend">
-                <div class="legend-item">
-                  <span class="legend-dot dot-today"></span>
-                  <span class="legend-text">Today (Disabled)</span>
-                </div>
+                <div class="calendar-legend">
+                  <div class="legend-item">
+                    <span class="legend-dot dot-today"></span>
+                    <span class="legend-text">{{ todayLegendText }}</span>
+                  </div>
                 <div class="legend-item">
                   <span class="legend-dot dot-prep"></span>
                   <span class="legend-text">Preparation Time</span>
@@ -74,6 +74,10 @@
 
               <!-- Inline Calendar -->
               <div class="inline-calendar">
+                <div v-if="vendorReservationNotice" class="vendor-calendar-note">
+                  {{ vendorReservationNotice }}
+                </div>
+
                 <div class="calendar-header">
                   <button
                     @click="previousMonth"
@@ -645,6 +649,8 @@ import api from "../../plugins/axios.js";
 import { toast } from "vue3-toastify";
 import { usePrice } from "../../composables/usePrice.js";
 
+const PH_TIMEZONE = "Asia/Manila";
+
 const {
   effectivePrice,
   originalPrice,
@@ -668,7 +674,14 @@ const directCheckoutData = ref(null);
 const selectedDate = ref(null);
 const calendarDate = ref(new Date());
 const calendarData = ref({});
-const leadTimeDays = 3;
+const leadTimeDays = ref(3);
+const vendorReservationSettings = ref({
+  timezone: PH_TIMEZONE,
+  sameDayDelivery: false,
+  sameDayAvailableToday: false,
+  cutoffTimeToday: null,
+  maxOrdersPerDay: 10,
+});
 
 // Checkout data
 const checkoutData = ref({
@@ -717,6 +730,35 @@ const currentMonthName = computed(() =>
   calendarDate.value.toLocaleString("default", { month: "long" }),
 );
 
+const todayLegendText = computed(() =>
+  vendorReservationSettings.value.sameDayAvailableToday
+    ? "Today (Available)"
+    : "Today",
+);
+
+const vendorReservationNotice = computed(() => {
+  const parts = [];
+
+  parts.push(
+    `Vendor capacity: ${vendorReservationSettings.value.maxOrdersPerDay} orders per day.`,
+  );
+  parts.push(`Lead time: ${leadTimeDays.value} day(s).`);
+
+  if (vendorReservationSettings.value.sameDayDelivery) {
+    if (vendorReservationSettings.value.cutoffTimeToday) {
+      parts.push(
+        `Same-day delivery is available until ${formatCutoffTime(vendorReservationSettings.value.cutoffTimeToday)} PH time.`,
+      );
+    } else {
+      parts.push("Same-day delivery is available.");
+    }
+  } else {
+    parts.push("Same-day delivery is not available.");
+  }
+
+  return parts.join(" ");
+});
+
 const formatSelectedDate = computed(() => {
   if (!selectedDate.value) return "";
   const date = new Date(selectedDate.value);
@@ -729,7 +771,7 @@ const formatSelectedDate = computed(() => {
 });
 
 const canGoPrevious = computed(() => {
-  const today = new Date();
+  const today = getPhilippinesToday();
   const firstOfCurrentMonth = new Date(
     today.getFullYear(),
     today.getMonth(),
@@ -744,7 +786,7 @@ const canGoPrevious = computed(() => {
 });
 
 const canGoNext = computed(() => {
-  const today = new Date();
+  const today = getPhilippinesToday();
   const maxDate = new Date(today);
   maxDate.setMonth(maxDate.getMonth() + 3);
   const lastOfCalendarMonth = new Date(
@@ -763,12 +805,10 @@ const calendarDays = computed(() => {
   const lastDay = new Date(year, month + 1, 0);
 
   const days = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = getPhilippinesToday();
 
-  // Calculate min date (today + 3 days for lead time)
   const minDate = new Date(today);
-  minDate.setDate(minDate.getDate() + leadTimeDays);
+  minDate.setDate(minDate.getDate() + leadTimeDays.value);
 
   // Calculate max date (3 months from today)
   const maxDate = new Date(today);
@@ -838,8 +878,11 @@ function createDayObject(date, isCurrentMonth, today, minDate, maxDate) {
 
   const isTomorrow = cleanDate.getTime() === tomorrow.getTime();
   const isDayAfterTomorrow = cleanDate.getTime() === dayAfterTomorrow.getTime();
-  const isWithinLeadTime = cleanDate < minDate;
+  const isWithinLeadTime = Boolean(availability?.is_within_lead_time) || cleanDate < minDate;
   const isBeyondLimit = cleanDate > maxDate;
+  const isSameDayCutoffBlocked = Boolean(
+    availability?.is_same_day_cutoff_blocked,
+  );
 
   // Determine color class
   let colorClass = "day-white";
@@ -847,15 +890,18 @@ function createDayObject(date, isCurrentMonth, today, minDate, maxDate) {
 
   if (isPastDate || isBeyondLimit) {
     colorClass = "day-disabled";
-  } else if (isToday) {
+  } else if (isToday && !vendorReservationSettings.value.sameDayAvailableToday) {
     colorClass = "day-today";
+    label = "Today";
+  } else if (isToday && vendorReservationSettings.value.sameDayAvailableToday) {
+    colorClass = "day-available";
     label = "Today";
   } else if (isTomorrow || isDayAfterTomorrow) {
     colorClass = "day-prep-time";
     label = "Prep Time";
-  } else if (isWithinLeadTime) {
+  } else if (isWithinLeadTime || isSameDayCutoffBlocked) {
     colorClass = "day-prep-time";
-    label = "Prep Time";
+    label = isSameDayCutoffBlocked ? "Cutoff" : "Prep Time";
   } else if (availability) {
     if (availability.is_disabled || availability.status === "closed") {
       colorClass = "day-disabled";
@@ -874,6 +920,7 @@ function createDayObject(date, isCurrentMonth, today, minDate, maxDate) {
     isPastDate ||
     isBeyondLimit ||
     isWithinLeadTime ||
+    isSameDayCutoffBlocked ||
     availability?.is_disabled ||
     availability?.status === "fully_booked" ||
     false;
@@ -885,6 +932,7 @@ function createDayObject(date, isCurrentMonth, today, minDate, maxDate) {
     isToday,
     isPastDate,
     isWithinLeadTime,
+    isSameDayCutoffBlocked,
     isDisabled,
     availability,
     colorClass,
@@ -900,9 +948,18 @@ function selectDate(day) {
   if (!day.isCurrentMonth) return;
 
   if (day.isDisabled) {
-    if (day.isToday || day.isWithinLeadTime) {
+    if (day.isSameDayCutoffBlocked) {
+      const cutoffTime = vendorReservationSettings.value.cutoffTimeToday
+        ? formatCutoffTime(vendorReservationSettings.value.cutoffTimeToday)
+        : null;
       toast.error(
-        `Flowers require ${leadTimeDays} days preparation time. Please select a date at least ${leadTimeDays} days from today.`,
+        cutoffTime
+          ? `Same-day delivery is only available until ${cutoffTime} PH time.`
+          : "Same-day delivery cutoff has already been reached for today.",
+      );
+    } else if (day.isToday || day.isWithinLeadTime) {
+      toast.error(
+        `Flowers require ${leadTimeDays.value} day(s) preparation time. Please select a date at least ${leadTimeDays.value} day(s) from today.`,
       );
     } else if (day.isPastDate) {
       toast.error("Cannot select past dates.");
@@ -934,6 +991,15 @@ async function loadCalendarData() {
 
     if (res.data.success) {
       calendarData.value = res.data.data.calendar || {};
+      const vendor = res.data.data.vendor || {};
+      leadTimeDays.value = Number(vendor.lead_time_days ?? 3);
+      vendorReservationSettings.value = {
+        timezone: vendor.timezone || PH_TIMEZONE,
+        sameDayDelivery: Boolean(vendor.same_day_delivery),
+        sameDayAvailableToday: Boolean(vendor.same_day_available_today),
+        cutoffTimeToday: vendor.cutoff_time_today || null,
+        maxOrdersPerDay: Number(vendor.max_orders_per_day ?? 10),
+      };
     }
   } catch (e) {
     console.error("Error loading calendar:", e);
@@ -1098,6 +1164,40 @@ async function placeOrder() {
 
 function handleImageError(event) {
   event.target.src = "https://via.placeholder.com/80";
+}
+
+function getPhilippinesNowParts() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: PH_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const parts = formatter.formatToParts(new Date());
+  const get = (type) => parts.find((part) => part.type === type)?.value;
+
+  return {
+    year: Number(get("year")),
+    month: Number(get("month")),
+    day: Number(get("day")),
+  };
+}
+
+function getPhilippinesToday() {
+  const { year, month, day } = getPhilippinesNowParts();
+  return new Date(year, month - 1, day);
+}
+
+function formatCutoffTime(value) {
+  if (!value) return null;
+  const [hours, minutes] = value.split(":").map(Number);
+  const date = new Date(2000, 0, 1, hours, minutes);
+  return date.toLocaleTimeString("en-PH", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 }
 
 onMounted(async () => {
@@ -1309,6 +1409,17 @@ onMounted(async () => {
 .inline-calendar {
   max-width: 500px;
   margin: 0 auto;
+}
+
+.vendor-calendar-note {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #166534;
 }
 
 .calendar-header {

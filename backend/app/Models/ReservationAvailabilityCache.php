@@ -59,8 +59,9 @@ class ReservationAvailabilityCache extends Model
             ->count();
 
         if ($maxOrders === null) {
-            $vendor = VendorApplication::where('email', User::find($vendorId)->email)->first();
-            $maxOrders = $vendor->max_orders_per_day ?? 10;
+            $vendorUser = User::find($vendorId);
+            $settings = VendorApplication::buildReservationSettings($vendorUser);
+            $maxOrders = $settings['max_orders_per_day'];
         }
 
         $isClosed = VendorClosedDate::isDateClosed($vendorId, $date);

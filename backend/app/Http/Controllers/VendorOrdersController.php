@@ -3,6 +3,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\User;
+use App\Models\VendorClosedDate;
+use App\Models\ReservationAvailabilityCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
@@ -655,6 +657,158 @@ class VendorOrdersController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update order status'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get upcoming closed dates for the logged-in vendor.
+     */
+    public function getClosedDates(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            if ($user->role !== 'vendor') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User is not a vendor'
+                ], 403);
+            }
+
+            $closedDates = VendorClosedDate::forVendor($user->id)
+                ->upcoming()
+                ->orderBy('closed_date')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $closedDates,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching closed dates: ' . $e->getMessage(), [
+                'vendor_id' => $request->user()->id ?? null,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load closed dates'
+            ], 500);
+        }
+    }
+
+    /**
+     * Mark a reservation date as closed for the logged-in vendor.
+     */
+    public function markDateAsClosed(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            if ($user->role !== 'vendor') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User is not a vendor'
+                ], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'date' => 'required|date|after_or_equal:today',
+                'reason' => 'nullable|string|max:255',
+                'type' => 'nullable|in:manual,holiday,emergency',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $alreadyClosed = VendorClosedDate::where('vendor_id', $user->id)
+                ->whereDate('closed_date', $request->date)
+                ->exists();
+
+            if ($alreadyClosed) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This date is already marked as closed'
+                ], 422);
+            }
+
+            $closedDate = VendorClosedDate::create([
+                'vendor_id' => $user->id,
+                'closed_date' => $request->date,
+                'reason' => $request->reason,
+                'type' => $request->type ?? 'manual',
+            ]);
+
+            ReservationAvailabilityCache::updateForDate($user->id, $request->date);
+
+            return response()->json([
+                'success' => true,
+                'data' => $closedDate,
+                'message' => 'Date marked as closed successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error marking date as closed: ' . $e->getMessage(), [
+                'vendor_id' => $request->user()->id ?? null,
+                'payload' => $request->all(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to mark date as closed'
+            ], 500);
+        }
+    }
+
+    /**
+     * Remove a closed date for the logged-in vendor.
+     */
+    public function removeClosedDate(Request $request, $id)
+    {
+        try {
+            $user = $request->user();
+
+            if ($user->role !== 'vendor') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User is not a vendor'
+                ], 403);
+            }
+
+            $closedDate = VendorClosedDate::where('id', $id)
+                ->where('vendor_id', $user->id)
+                ->first();
+
+            if (!$closedDate) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Closed date not found'
+                ], 404);
+            }
+
+            $date = $closedDate->closed_date instanceof Carbon
+                ? $closedDate->closed_date->format('Y-m-d')
+                : Carbon::parse($closedDate->closed_date)->format('Y-m-d');
+
+            $closedDate->delete();
+            ReservationAvailabilityCache::updateForDate($user->id, $date);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Closed date removed successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error removing closed date: ' . $e->getMessage(), [
+                'vendor_id' => $request->user()->id ?? null,
+                'closed_date_id' => $id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to remove closed date'
             ], 500);
         }
     }

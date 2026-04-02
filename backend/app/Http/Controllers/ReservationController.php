@@ -3,6 +3,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\User;
+use App\Models\VendorApplication;
 use App\Models\VendorClosedDate;
 use App\Models\ReservationAvailabilityCache;
 use Illuminate\Http\Request;
@@ -12,10 +13,8 @@ use Carbon\Carbon;
 
 class ReservationController extends Controller
 {
-    const LEAD_TIME_DAYS = 3; // 3-day lead time for flower preparation
-
     /**
-     * Get calendar availability for a vendor (PUBLIC) with 3-day lead time
+     * Get calendar availability for a vendor with vendor-specific reservation rules.
      */
     public function getAvailability(Request $request)
     {
@@ -35,6 +34,8 @@ class ReservationController extends Controller
 
             $vendorId = $request->vendor_id;
             $vendor = User::find($vendorId);
+            $vendorApplication = VendorApplication::findApprovedForVendorUser($vendor);
+            $settings = VendorApplication::buildReservationSettings($vendor, $vendorApplication);
             
             if (!$vendor) {
                 return response()->json([
@@ -43,17 +44,16 @@ class ReservationController extends Controller
                 ], 404);
             }
 
-            // Calculate date ranges with 3-day lead time
-            $today = Carbon::today();
-            $minDate = $today->copy()->addDays(self::LEAD_TIME_DAYS);
-            $startDate = $request->start_date ?? $minDate->toDateString();
+            $today = Carbon::now($settings['timezone'])->startOfDay();
+            $minDate = $this->minimumAllowedDate($today, $settings);
+            $startDate = $request->start_date ?? $today->toDateString();
             $endDate = $request->end_date ?? $today->copy()->addMonths(3)->toDateString();
             $maxEndDate = $today->copy()->addMonths(3)->toDateString();
 
-            // Ensure start date respects lead time
+            // Keep the requested calendar range visible, but don't go before today.
             $requestedStartDate = Carbon::parse($startDate);
-            if ($requestedStartDate->lessThan($minDate)) {
-                $startDate = $minDate->toDateString();
+            if ($requestedStartDate->lessThan($today)) {
+                $startDate = $today->toDateString();
             }
 
             if ($endDate > $maxEndDate) {
@@ -79,15 +79,16 @@ class ReservationController extends Controller
 
             $calendar = [];
             foreach ($availability as $date => $data) {
-                $dateCarbon = Carbon::parse($date);
+                $dateCarbon = Carbon::parse($date, $settings['timezone'])->startOfDay();
                 $hasUserOrder = in_array($date, $userReservations);
-                
-                // Disable dates within lead time
-                $isWithinLeadTime = $dateCarbon->lessThan($minDate);
+
+                $isWithinLeadTime = $this->isWithinLeadTime($dateCarbon, $today, $settings);
                 $isPast = $dateCarbon->lessThan($today);
+                $isSameDayCutoffBlocked = $this->isSameDayCutoffBlocked($dateCarbon, $today, $settings);
                 
                 $isDisabled = $isPast || 
                              $isWithinLeadTime || 
+                             $isSameDayCutoffBlocked ||
                              in_array($data['status'], ['fully_booked', 'closed']);
 
                 $calendar[$date] = [
@@ -103,8 +104,11 @@ class ReservationController extends Controller
                     'is_disabled' => $isDisabled,
                     'has_user_order' => $hasUserOrder,
                     'is_within_lead_time' => $isWithinLeadTime,
-                    'lead_time_message' => $isWithinLeadTime ? 
-                        'Requires ' . self::LEAD_TIME_DAYS . ' days preparation time' : null,
+                    'is_same_day_cutoff_blocked' => $isSameDayCutoffBlocked,
+                    'cutoff_time_today' => $settings['cutoff_time_today'],
+                    'lead_time_message' => $isWithinLeadTime
+                        ? 'Requires ' . $settings['lead_time_days'] . ' day(s) preparation time'
+                        : null,
                 ];
             }
 
@@ -115,9 +119,13 @@ class ReservationController extends Controller
                     'vendor' => [
                         'id' => $vendor->id,
                         'store_name' => $vendor->store_name,
-                        'max_orders_per_day' => $vendor->max_orders_per_day ?? 10,
+                        'max_orders_per_day' => $settings['max_orders_per_day'],
                         'default_delivery_fee' => $vendor->default_delivery_fee ?? 0,
-                        'lead_time_days' => self::LEAD_TIME_DAYS,
+                        'lead_time_days' => $settings['lead_time_days'],
+                        'same_day_delivery' => $settings['same_day_delivery'],
+                        'same_day_available_today' => $settings['same_day_available_today'],
+                        'cutoff_time_today' => $settings['cutoff_time_today'],
+                        'timezone' => $settings['timezone'],
                     ],
                     'date_range' => [
                         'start' => $startDate,
@@ -143,7 +151,7 @@ class ReservationController extends Controller
     }
 
     /**
-     * Check if a specific date is available (PUBLIC) with 3-day lead time
+     * Check if a specific date is available using vendor-specific reservation rules.
      */
     public function checkDateAvailability(Request $request)
     {
@@ -164,6 +172,8 @@ class ReservationController extends Controller
             $requestDate = $request->reservation_date;
 
             $vendor = User::find($vendorId);
+            $vendorApplication = VendorApplication::findApprovedForVendorUser($vendor);
+            $settings = VendorApplication::buildReservationSettings($vendor, $vendorApplication);
             if (!$vendor) {
                 return response()->json([
                     'success' => false,
@@ -172,9 +182,8 @@ class ReservationController extends Controller
                 ], 404);
             }
 
-            $reservationDate = Carbon::parse($requestDate)->startOfDay();
-            $today = Carbon::today();
-            $minDate = $today->copy()->addDays(self::LEAD_TIME_DAYS);
+            $reservationDate = Carbon::parse($requestDate, $settings['timezone'])->startOfDay();
+            $today = Carbon::now($settings['timezone'])->startOfDay();
             $maxDate = $today->copy()->addMonths(3);
 
             // Check if date is in the past
@@ -187,14 +196,24 @@ class ReservationController extends Controller
                 ]);
             }
 
+            if ($this->isSameDayCutoffBlocked($reservationDate, $today, $settings)) {
+                return response()->json([
+                    'success' => true,
+                    'available' => false,
+                    'reason' => 'cutoff_reached',
+                    'message' => 'Same-day delivery cutoff has been reached for today',
+                    'cutoff_time_today' => $settings['cutoff_time_today'],
+                ]);
+            }
+
             // Check lead time
-            if ($reservationDate->lessThan($minDate)) {
+            if ($this->isWithinLeadTime($reservationDate, $today, $settings)) {
                 return response()->json([
                     'success' => true,
                     'available' => false,
                     'reason' => 'lead_time',
-                    'message' => 'This date requires at least ' . self::LEAD_TIME_DAYS . ' days preparation time',
-                    'min_date' => $minDate->toDateString(),
+                    'message' => 'This date requires at least ' . $settings['lead_time_days'] . ' day(s) preparation time',
+                    'min_date' => $this->minimumAllowedDate($today, $settings)->toDateString(),
                 ]);
             }
 
@@ -220,7 +239,7 @@ class ReservationController extends Controller
             }
 
             // Check max orders per day
-            $maxOrders = $vendor->max_orders_per_day ?? 10;
+            $maxOrders = $settings['max_orders_per_day'];
             $ordersCount = Order::where('vendor_id', $vendorId)
                 ->whereDate('reservation_date', $reservationDate)
                 ->whereNotIn('status', ['cancelled', 'failed'])
@@ -234,7 +253,9 @@ class ReservationController extends Controller
                 'orders_count' => $ordersCount,
                 'max_orders' => $maxOrders,
                 'remaining_slots' => max(0, $maxOrders - $ordersCount),
-                'lead_time_days' => self::LEAD_TIME_DAYS,
+                'lead_time_days' => $settings['lead_time_days'],
+                'same_day_delivery' => $settings['same_day_delivery'],
+                'cutoff_time_today' => $settings['cutoff_time_today'],
                 'message' => $available ? 'Date is available' : 'Date is fully booked'
             ]);
 
@@ -384,5 +405,34 @@ class ReservationController extends Controller
             'almost_full' => 'yellow',
             default => 'white',
         };
+    }
+
+    private function minimumAllowedDate(Carbon $today, array $settings): Carbon
+    {
+        return $settings['same_day_available_today']
+            ? $today->copy()
+            : $today->copy()->addDays($settings['lead_time_days']);
+    }
+
+    private function isWithinLeadTime(Carbon $date, Carbon $today, array $settings): bool
+    {
+        if ($date->lessThan($today)) {
+            return true;
+        }
+
+        if ($date->isSameDay($today)) {
+            return !$settings['same_day_available_today'];
+        }
+
+        $minDate = $today->copy()->addDays($settings['lead_time_days']);
+
+        return $date->lessThan($minDate);
+    }
+
+    private function isSameDayCutoffBlocked(Carbon $date, Carbon $today, array $settings): bool
+    {
+        return $date->isSameDay($today)
+            && $settings['same_day_delivery']
+            && $settings['same_day_cutoff_reached'];
     }
 }
