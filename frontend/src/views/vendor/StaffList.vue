@@ -179,12 +179,13 @@
           </select>
         </div>
         <div class="filter-group">
-          <label>Department</label>
-          <select v-model="filterDepartment">
-            <option value="all">All Departments</option>
+          <label>Module Group</label>
+          <select v-model="filterGroup">
+            <option value="all">All Groups</option>
             <option value="HR">HR</option>
             <option value="Finance">Finance</option>
             <option value="Procurement">Procurement</option>
+            <option value="Supply Chain">Supply Chain</option>
           </select>
         </div>
         <button class="btn-clear-filters" @click="clearFilters">
@@ -198,8 +199,7 @@
           <thead>
             <tr>
               <th>Name</th>
-              <th>Role</th>
-              <th>Department</th>
+              <th>Modules</th>
               <th>Joining Date</th>
               <th>Status</th>
               <th>Actions</th>
@@ -217,40 +217,25 @@
                 </div>
               </td>
               <td>
-                <div
-                  v-if="
-                    employee.active_assignments &&
-                    employee.active_assignments.length > 0
-                  "
-                >
-                  <div
-                    v-for="(assignment, i) in employee.active_assignments"
-                    :key="'role-' + i"
-                    class="assignment-tag"
+                <div class="module-badges">
+                  <span
+                    v-for="perm in (employee.module_permissions || []).slice(0, 3)"
+                    :key="perm.module"
+                    class="module-badge"
+                    :class="'badge-' + getModuleGroup(perm.module).toLowerCase().replace(' ', '-')"
+                    :title="perm.module + ' (' + perm.access + ')'"
                   >
-                    {{ assignment.role ? assignment.role.name : "-" }}
-                  </div>
+                    {{ getModuleLabel(perm.module) }}
+                  </span>
+                  <span
+                    v-if="(employee.module_permissions || []).length > 3"
+                    class="module-badge badge-more"
+                  >+{{ employee.module_permissions.length - 3 }} more</span>
+                  <span
+                    v-if="!(employee.module_permissions || []).length"
+                    class="no-modules"
+                  >No modules</span>
                 </div>
-                <div v-else>{{ employee.role || "-" }}</div>
-              </td>
-              <td>
-                <div
-                  v-if="
-                    employee.active_assignments &&
-                    employee.active_assignments.length > 0
-                  "
-                >
-                  <div
-                    v-for="(assignment, i) in employee.active_assignments"
-                    :key="'dept-' + i"
-                    class="assignment-tag"
-                  >
-                    {{
-                      assignment.department ? assignment.department.name : "-"
-                    }}
-                  </div>
-                </div>
-                <div v-else>{{ employee.department || "-" }}</div>
               </td>
               <td>{{ employee.joiningDate }}</td>
               <td>
@@ -414,82 +399,49 @@
                 >Leave blank to keep current password</span
               >
             </div>
-            <div class="assignments-section">
-              <div class="assignments-header">
-                <h3>Department & Roles *</h3>
-                <button
-                  type="button"
-                  class="btn-add-assignment"
-                  @click="addAssignment"
-                >
-                  + Add Another Department and Role
-                </button>
+                <!-- ── Module Permissions ─────────────────────────────── -->
+            <div class="permissions-section full-width">
+              <div class="permissions-header">
+                <h3>Module Permissions *</h3>
+                <span class="permissions-hint">Grant access to specific ERP modules</span>
               </div>
 
               <div
-                v-for="(assignment, index) in formData.assignments"
-                :key="index"
-                class="assignment-row"
+                v-for="(group, groupName) in modulesByGroup"
+                :key="groupName"
+                class="perm-group"
               >
-                <div class="assignment-fields">
-                  <div class="form-group mb-0">
-                    <label>Department</label>
+                <div class="perm-group-title">{{ groupName }}</div>
+                <div class="perm-rows">
+                  <div
+                    v-for="mod in group"
+                    :key="mod.key"
+                    class="perm-row"
+                    :class="{ 'perm-row--enabled': isModuleEnabled(mod.key) }"
+                  >
+                    <label class="perm-toggle">
+                      <input
+                        type="checkbox"
+                        :checked="isModuleEnabled(mod.key)"
+                        @change="toggleModule(mod.key)"
+                        class="perm-checkbox"
+                      />
+                      <span class="perm-label">{{ mod.label }}</span>
+                    </label>
                     <select
-                      v-model="assignment.department"
-                      @change="assignment.role = ''"
-                      required
+                      v-if="isModuleEnabled(mod.key)"
+                      :value="getModuleAccess(mod.key)"
+                      @change="setModuleAccess(mod.key, $event.target.value)"
+                      class="perm-select"
                     >
-                      <option value="">Select Department</option>
-                      <option
-                        v-for="dept in availableDepartments"
-                        :key="dept"
-                        :value="dept"
-                      >
-                        {{ dept }}
-                      </option>
+                      <option value="view">View Only</option>
+                      <option value="edit">Edit</option>
                     </select>
-                  </div>
-
-                  <div class="form-group mb-0">
-                    <label>Role</label>
-                    <select
-                      v-model="assignment.role"
-                      :disabled="!assignment.department"
-                      required
-                    >
-                      <option value="">Select Role</option>
-                      <option
-                        v-for="role in getFilteredRoles(assignment.department)"
-                        :key="role"
-                        :value="role"
-                      >
-                        {{ role }}
-                      </option>
-                    </select>
+                    <span v-else class="perm-disabled">—</span>
                   </div>
                 </div>
-
-                <button
-                  v-if="formData.assignments.length > 1"
-                  type="button"
-                  class="btn-remove-assignment"
-                  @click="removeAssignment(index)"
-                  title="Remove Assignment"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      fill="currentColor"
-                      d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z"
-                    />
-                  </svg>
-                </button>
               </div>
-            </div>
+            </div>          </div>
             <div class="form-group">
               <label>Joining Date *</label>
               <input type="date" v-model="formData.joiningDate" required />
@@ -528,7 +480,6 @@
         </div>
       </div>
     </div>
-  </div>
 </template>
 
 <script setup>
@@ -538,16 +489,16 @@ import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import { toast } from "vue3-toastify";
 import api from "../../plugins/axios";
+import { ERP_MODULES, getModulesByGroup, findModule } from "../../constants/erpModules";
 
 // State
 const showAddModal = ref(false);
 const showEditModal = ref(false);
 const showFilters = ref(false);
-const showNotifications = ref(false);
 const activeMenuId = ref(null);
 const searchTerm = ref("");
 const filterStatus = ref("all");
-const filterDepartment = ref("all");
+const filterGroup = ref("all");
 const isLoading = ref(false);
 const isLoadingMessage = ref("Loading...");
 
@@ -559,72 +510,63 @@ const leaveApprovals = ref([]);
 const onLeave = ref([]);
 const newJoins = ref([]);
 
-// Form Data
+// Module helpers
+const modulesByGroup = computed(() => getModulesByGroup());
+
+function getModuleLabel(key) {
+  return findModule(key)?.label ?? key;
+}
+function getModuleGroup(key) {
+  return findModule(key)?.group ?? "";
+}
+
+// Form Data — permissions replaces assignments
 const formData = ref({
   name: "",
   email: "",
   username: "",
   password: "",
-  assignments: [{ department: "", role: "" }],
+  permissions: [], // [{ module, access }]
   joiningDate: "",
   status: "Active",
   phone: "",
   address: "",
 });
 
-const roleOptions = ref({});
-const availableDepartments = ref([]);
-
-// Filtered roles based on selected department
-const getFilteredRoles = (department) => {
-  return department && roleOptions.value[department]
-    ? roleOptions.value[department]
-    : [];
-};
-
-const addAssignment = () => {
-  formData.value.assignments.push({ department: "", role: "" });
-};
-
-const removeAssignment = (index) => {
-  if (formData.value.assignments.length > 1) {
-    formData.value.assignments.splice(index, 1);
+// Permissions table helpers
+function isModuleEnabled(moduleKey) {
+  return formData.value.permissions.some((p) => p.module === moduleKey);
+}
+function getModuleAccess(moduleKey) {
+  return formData.value.permissions.find((p) => p.module === moduleKey)?.access ?? "view";
+}
+function toggleModule(moduleKey) {
+  const idx = formData.value.permissions.findIndex((p) => p.module === moduleKey);
+  if (idx > -1) {
+    formData.value.permissions.splice(idx, 1);
+  } else {
+    formData.value.permissions.push({ module: moduleKey, access: "view" });
   }
-};
+}
+function setModuleAccess(moduleKey, access) {
+  const perm = formData.value.permissions.find((p) => p.module === moduleKey);
+  if (perm) perm.access = access;
+}
 
-const loadDepartmentsAndRoles = async () => {
-  try {
-    const { data } = await api.get("/vendor/departments");
-    if (data.success) {
-      const options = {};
-      const depts = [];
-      data.data.forEach((dept) => {
-        depts.push(dept.name);
-        // Map the API roles array to an array of role names
-        options[dept.name] = dept.roles.map((r) => r.name);
-      });
-      availableDepartments.value = depts;
-      roleOptions.value = options;
-    }
-  } catch (error) {
-    console.error("Failed to load departments and roles:", error);
-  }
-};
-
-// Rest of your existing code remains the same...
+// Filters
 const filteredEmployees = computed(() => {
   return employees.value.filter((emp) => {
     const matchesSearch =
       emp.name.toLowerCase().includes(searchTerm.value.toLowerCase()) ||
-      emp.email.toLowerCase().includes(searchTerm.value.toLowerCase()) ||
-      emp.role.toLowerCase().includes(searchTerm.value.toLowerCase());
+      emp.email.toLowerCase().includes(searchTerm.value.toLowerCase());
     const matchesStatus =
       filterStatus.value === "all" || emp.status === filterStatus.value;
-    const matchesDepartment =
-      filterDepartment.value === "all" ||
-      emp.department === filterDepartment.value;
-
-    return matchesSearch && matchesStatus && matchesDepartment;
+    const matchesGroup =
+      filterGroup.value === "all" ||
+      (emp.module_permissions || []).some(
+        (p) => getModuleGroup(p.module) === filterGroup.value
+      );
+    return matchesSearch && matchesStatus && matchesGroup;
   });
 });
 
@@ -635,10 +577,7 @@ const fetchEmployees = async () => {
       ...emp,
       initials: emp.initials,
       joiningDate: emp.formatted_joining_date,
-      // Map roles and tracking data if needed
-      active_assignments: emp.active_assignments || [],
-      department: emp.department || "-",
-      role: emp.role || "-",
+      module_permissions: emp.module_permissions || [],
     }));
   }
 };
@@ -701,30 +640,16 @@ const openAddModal = () => {
 };
 
 const editEmployee = (employee) => {
-  let mappedAssignments = [{ department: "", role: "" }];
-
-  if (employee.active_assignments && employee.active_assignments.length > 0) {
-    mappedAssignments = employee.active_assignments.map((a) => ({
-      department: a.department?.name || "",
-      role: a.role?.name || "",
-    }));
-  } else if (
-    (employee.department && employee.department !== "-") ||
-    (employee.role && employee.role !== "-")
-  ) {
-    // Legacy fallback
-    mappedAssignments = [
-      { department: employee.department || "", role: employee.role || "" },
-    ];
-  }
-
   formData.value = {
     id: employee.id,
     name: employee.name,
     email: employee.email,
     username: employee.username,
     password: "",
-    assignments: mappedAssignments,
+    permissions: (employee.module_permissions || []).map((p) => ({
+      module: p.module,
+      access: p.access,
+    })),
     joiningDate: employee.joining_date,
     status: employee.status,
     phone: employee.phone || "",
@@ -746,7 +671,7 @@ const resetForm = () => {
     email: "",
     username: "",
     password: "",
-    assignments: [{ department: "", role: "" }],
+    permissions: [],
     joiningDate: "",
     status: "Active",
     phone: "",
@@ -755,7 +680,6 @@ const resetForm = () => {
 };
 
 const saveEmployee = async () => {
-  // Validate basic required fields
   if (
     !formData.value.name ||
     !formData.value.email ||
@@ -766,36 +690,9 @@ const saveEmployee = async () => {
     return;
   }
 
-  // Validate assignments array
-  const assignments = formData.value.assignments;
-  if (!assignments || assignments.length === 0) {
-    toast.error("At least one department and role must be assigned");
+  if (!formData.value.permissions || formData.value.permissions.length === 0) {
+    toast.error("At least one module permission must be assigned");
     return;
-  }
-
-  const seenCombinations = new Set();
-
-  for (let i = 0; i < assignments.length; i++) {
-    const a = assignments[i];
-    if (!a.department || !a.role) {
-      toast.error(
-        `Please select both Department and Role for assignment #${i + 1}`,
-      );
-      return;
-    }
-
-    const validRoles = roleOptions.value[a.department] || [];
-    if (!validRoles.includes(a.role)) {
-      toast.error(`Invalid role selected for ${a.department} department`);
-      return;
-    }
-
-    const comboKey = `${a.department}-${a.role}`;
-    if (seenCombinations.has(comboKey)) {
-      toast.error(`Duplicate assignment found: ${a.department} - ${a.role}`);
-      return;
-    }
-    seenCombinations.add(comboKey);
   }
 
   if (!showEditModal.value && !formData.value.password) {
@@ -803,10 +700,17 @@ const saveEmployee = async () => {
     return;
   }
 
-  const formattedData = {
-    ...formData.value,
+  const payload = {
+    name: formData.value.name,
+    email: formData.value.email,
+    username: formData.value.username,
     joining_date: formatDateForAPI(formData.value.joiningDate),
+    status: formData.value.status,
+    phone: formData.value.phone,
+    address: formData.value.address,
+    permissions: formData.value.permissions,
   };
+  if (formData.value.password) payload.password = formData.value.password;
 
   try {
     isLoading.value = true;
@@ -817,14 +721,14 @@ const saveEmployee = async () => {
     if (showEditModal.value) {
       const response = await api.put(
         `/vendor/employees/${formData.value.id}`,
-        formattedData,
+        payload,
       );
       if (response.data.success) {
         toast.success("Employee updated successfully!");
         await Promise.all([fetchEmployees(), fetchStatistics()]);
       }
     } else {
-      const response = await api.post("/vendor/employees", formattedData);
+      const response = await api.post("/vendor/employees", payload);
       if (response.data.success) {
         toast.success("Employee added successfully!");
         await Promise.all([fetchEmployees(), fetchStatistics()]);
