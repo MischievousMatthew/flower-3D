@@ -219,10 +219,18 @@
               <td>
                 <div class="module-badges">
                   <span
-                    v-for="perm in (employee.module_permissions || []).slice(0, 3)"
+                    v-for="perm in (employee.module_permissions || []).slice(
+                      0,
+                      3,
+                    )"
                     :key="perm.module"
                     class="module-badge"
-                    :class="'badge-' + getModuleGroup(perm.module).toLowerCase().replace(' ', '-')"
+                    :class="
+                      'badge-' +
+                      getModuleGroup(perm.module)
+                        .toLowerCase()
+                        .replace(' ', '-')
+                    "
                     :title="perm.module + ' (' + perm.access + ')'"
                   >
                     {{ getModuleLabel(perm.module) }}
@@ -230,11 +238,13 @@
                   <span
                     v-if="(employee.module_permissions || []).length > 3"
                     class="module-badge badge-more"
-                  >+{{ employee.module_permissions.length - 3 }} more</span>
+                    >+{{ employee.module_permissions.length - 3 }} more</span
+                  >
                   <span
                     v-if="!(employee.module_permissions || []).length"
                     class="no-modules"
-                  >No modules</span>
+                    >No modules</span
+                  >
                 </div>
               </td>
               <td>{{ employee.joiningDate }}</td>
@@ -399,87 +409,136 @@
                 >Leave blank to keep current password</span
               >
             </div>
-                <!-- ── Module Permissions ─────────────────────────────── -->
+            <!-- ── Module Permissions ─────────────────────────────── -->
             <div class="permissions-section full-width">
               <div class="permissions-header">
-                <h3>Module Permissions *</h3>
-                <span class="permissions-hint">Grant access to specific ERP modules</span>
+                <h3>Module Permissions</h3>
+                <span class="permissions-hint"
+                  >At least one module required</span
+                >
               </div>
 
-              <div
-                v-for="(group, groupName) in modulesByGroup"
-                :key="groupName"
-                class="perm-group"
-              >
-                <div class="perm-group-title">{{ groupName }}</div>
-                <div class="perm-rows">
-                  <div
-                    v-for="mod in group"
-                    :key="mod.key"
-                    class="perm-row"
-                    :class="{ 'perm-row--enabled': isModuleEnabled(mod.key) }"
-                  >
-                    <label class="perm-toggle">
-                      <input
-                        type="checkbox"
-                        :checked="isModuleEnabled(mod.key)"
-                        @change="toggleModule(mod.key)"
-                        class="perm-checkbox"
-                      />
-                      <span class="perm-label">{{ mod.label }}</span>
-                    </label>
-                    <select
-                      v-if="isModuleEnabled(mod.key)"
-                      :value="getModuleAccess(mod.key)"
-                      @change="setModuleAccess(mod.key, $event.target.value)"
-                      class="perm-select"
+              <div class="pm-wrapper">
+                <table class="pm-table">
+                  <thead>
+                    <tr>
+                      <th>Module</th>
+                      <th class="center">View</th>
+                      <th class="center">Edit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template
+                      v-for="(group, groupName) in modulesByGroup"
+                      :key="groupName"
                     >
-                      <option value="view">View Only</option>
-                      <option value="edit">Edit</option>
-                    </select>
-                    <span v-else class="perm-disabled">—</span>
-                  </div>
-                </div>
+                      <tr class="group-row">
+                        <td colspan="3">{{ groupName }}</td>
+                      </tr>
+                      <tr v-for="mod in group" :key="mod.key" class="mod-row">
+                        <td class="mod-name">{{ mod.label }}</td>
+                        <td class="center">
+                          <button
+                            type="button"
+                            class="perm-circle"
+                            :class="{
+                              on: isModuleEnabled(mod.key),
+                              disabled:
+                                getModuleAccess(mod.key) === 'edit' &&
+                                isModuleEnabled(mod.key),
+                            }"
+                            @click="handleViewClick(mod.key)"
+                          >
+                            <svg
+                              v-if="isModuleEnabled(mod.key)"
+                              viewBox="0 0 12 12"
+                              fill="none"
+                            >
+                              <polyline
+                                points="2,6 5,9 10,3"
+                                stroke="white"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                              />
+                            </svg>
+                          </button>
+                        </td>
+                        <td class="center">
+                          <button
+                            type="button"
+                            class="perm-circle"
+                            :class="{
+                              on:
+                                isModuleEnabled(mod.key) &&
+                                getModuleAccess(mod.key) === 'edit',
+                            }"
+                            @click="handleEditClick(mod.key)"
+                          >
+                            <svg
+                              v-if="
+                                isModuleEnabled(mod.key) &&
+                                getModuleAccess(mod.key) === 'edit'
+                              "
+                              viewBox="0 0 12 12"
+                              fill="none"
+                            >
+                              <polyline
+                                points="2,6 5,9 10,3"
+                                stroke="white"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                              />
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+                <p class="pm-note">Edit access automatically includes View.</p>
               </div>
-            </div>          </div>
-            <div class="form-group">
-              <label>Joining Date *</label>
-              <input type="date" v-model="formData.joiningDate" required />
-            </div>
-            <div class="form-group">
-              <label>Status *</label>
-              <select v-model="formData.status" required>
-                <option value="Active">Active</option>
-                <option value="On Leave">On Leave</option>
-                <option value="Resign">Resign</option>
-              </select>
-            </div>
-            <div class="form-group full-width">
-              <label>Phone Number</label>
-              <input
-                type="tel"
-                v-model="formData.phone"
-                placeholder="09491234569"
-              />
-            </div>
-            <div class="form-group full-width">
-              <label>Address</label>
-              <textarea
-                v-model="formData.address"
-                placeholder="Enter address"
-                rows="3"
-              ></textarea>
             </div>
           </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-cancel" @click="closeModal">Cancel</button>
-          <button class="btn-save" @click="saveEmployee">
-            {{ showEditModal ? "Update Employee" : "Add Employee" }}
-          </button>
+          <div class="form-group">
+            <label>Joining Date *</label>
+            <input type="date" v-model="formData.joiningDate" required />
+          </div>
+          <div class="form-group">
+            <label>Status *</label>
+            <select v-model="formData.status" required>
+              <option value="Active">Active</option>
+              <option value="On Leave">On Leave</option>
+              <option value="Resign">Resign</option>
+            </select>
+          </div>
+          <div class="form-group full-width">
+            <label>Phone Number</label>
+            <input
+              type="tel"
+              v-model="formData.phone"
+              placeholder="09491234569"
+            />
+          </div>
+          <div class="form-group full-width">
+            <label>Address</label>
+            <textarea
+              v-model="formData.address"
+              placeholder="Enter address"
+              rows="3"
+            ></textarea>
+          </div>
         </div>
       </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" @click="closeModal">Cancel</button>
+        <button class="btn-save" @click="saveEmployee">
+          {{ showEditModal ? "Update Employee" : "Add Employee" }}
+        </button>
+      </div>
     </div>
+  </div>
 </template>
 
 <script setup>
@@ -489,7 +548,11 @@ import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import { toast } from "vue3-toastify";
 import api from "../../plugins/axios";
-import { ERP_MODULES, getModulesByGroup, findModule } from "../../constants/erpModules";
+import {
+  ERP_MODULES,
+  getModulesByGroup,
+  findModule,
+} from "../../constants/erpModules";
 
 // State
 const showAddModal = ref(false);
@@ -520,6 +583,27 @@ function getModuleGroup(key) {
   return findModule(key)?.group ?? "";
 }
 
+function handleViewClick(moduleKey) {
+  const isEdit =
+    getModuleAccess(moduleKey) === "edit" && isModuleEnabled(moduleKey);
+  if (isEdit) return; // View is locked when Edit is on
+  toggleModule(moduleKey);
+}
+function handleEditClick(moduleKey) {
+  const isOn =
+    isModuleEnabled(moduleKey) && getModuleAccess(moduleKey) === "edit";
+  if (isOn) {
+    // Downgrade to view-only
+    setModuleAccess(moduleKey, "view");
+  } else if (isModuleEnabled(moduleKey)) {
+    setModuleAccess(moduleKey, "edit");
+  } else {
+    // Enable with edit
+    toggleModule(moduleKey);
+    setModuleAccess(moduleKey, "edit");
+  }
+}
+
 // Form Data — permissions replaces assignments
 const formData = ref({
   name: "",
@@ -538,10 +622,15 @@ function isModuleEnabled(moduleKey) {
   return formData.value.permissions.some((p) => p.module === moduleKey);
 }
 function getModuleAccess(moduleKey) {
-  return formData.value.permissions.find((p) => p.module === moduleKey)?.access ?? "view";
+  return (
+    formData.value.permissions.find((p) => p.module === moduleKey)?.access ??
+    "view"
+  );
 }
 function toggleModule(moduleKey) {
-  const idx = formData.value.permissions.findIndex((p) => p.module === moduleKey);
+  const idx = formData.value.permissions.findIndex(
+    (p) => p.module === moduleKey,
+  );
   if (idx > -1) {
     formData.value.permissions.splice(idx, 1);
   } else {
@@ -564,7 +653,7 @@ const filteredEmployees = computed(() => {
     const matchesGroup =
       filterGroup.value === "all" ||
       (emp.module_permissions || []).some(
-        (p) => getModuleGroup(p.module) === filterGroup.value
+        (p) => getModuleGroup(p.module) === filterGroup.value,
       );
     return matchesSearch && matchesStatus && matchesGroup;
   });
@@ -1168,6 +1257,97 @@ onMounted(async () => {
   background: #dc2626;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.pm-wrapper {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.pm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.pm-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #718096;
+  background: #f7fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+.pm-table th.center {
+  text-align: center;
+  width: 80px;
+}
+.pm-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.pm-table td.center {
+  text-align: center;
+}
+.pm-table tr:last-child td {
+  border-bottom: none;
+}
+.group-row td {
+  padding: 7px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #4a5568;
+  background: #f7fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+.mod-row:hover {
+  background: #fafafa;
+}
+.mod-name {
+  font-size: 13px;
+  color: #1a202c;
+}
+.perm-circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid #d1d5db;
+  background: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.perm-circle.on {
+  border-color: #22c55e;
+  background: #22c55e;
+}
+.perm-circle.disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+.perm-circle:hover:not(.disabled):not(.on) {
+  border-color: #9ca3af;
+  background: #f3f4f6;
+}
+.perm-circle svg {
+  width: 12px;
+  height: 12px;
+}
+.pm-note {
+  font-size: 11px;
+  color: #718096;
+  padding: 8px 14px;
+  background: #f7fafc;
+  margin: 0;
+  border-top: 1px solid #e2e8f0;
 }
 
 /* Filters Panel */
