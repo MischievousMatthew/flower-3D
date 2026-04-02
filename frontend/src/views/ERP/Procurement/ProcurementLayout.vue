@@ -4,11 +4,25 @@
       <DynamicSidebar />
     </div>
 
-    <div class="main-content" :style="{ marginLeft: isMobile ? '0' : sidebarWidth }">
+    <div
+      class="main-content"
+      :style="{ marginLeft: isMobile ? '0' : sidebarWidth }"
+    >
       <div class="top-section">
         <div class="header-left">
-          <button class="mobile-toggle" @click="toggleMobile" aria-label="Toggle Menu">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <button
+            class="mobile-toggle"
+            @click="toggleMobile"
+            aria-label="Toggle Menu"
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <line x1="3" y1="12" x2="21" y2="12"></line>
               <line x1="3" y1="6" x2="21" y2="6"></line>
               <line x1="3" y1="18" x2="21" y2="18"></line>
@@ -16,19 +30,19 @@
           </button>
           <div class="breadcrumbs">
             <router-link to="/erp/procurement">
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            </svg>
-            Procurement Portal
-          </router-link>
-          <span>/ {{ currentModuleLabel }}</span>
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              </svg>
+              Procurement Portal
+            </router-link>
+            <span>/ {{ currentModuleLabel }}</span>
           </div>
         </div>
       </div>
@@ -40,7 +54,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRoute } from "vue-router";
 import DynamicSidebar from "../../../layouts/Sidebar/DynamicSidebar.vue";
 import { useSidebarState } from "../../../composables/useSidebarState";
