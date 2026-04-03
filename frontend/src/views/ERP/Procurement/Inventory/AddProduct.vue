@@ -1,7 +1,5 @@
 <template>
   <div class="product-layout">
-    <DynamicSidebar />
-
     <main class="main-content">
       <!-- Header -->
       <header class="content-header">
@@ -678,7 +676,6 @@
 import { ref, computed, onMounted, reactive } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../../../composables/useAuth";
-import DynamicSidebar from "../../../../layouts/Sidebar/DynamicSidebar.vue";
 
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";

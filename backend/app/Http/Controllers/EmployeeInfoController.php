@@ -7,8 +7,10 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use App\Helpers\CloudinaryHelper;
 use Illuminate\Support\Facades\Validator;
+use App\Models\Employee;
 
 use App\Traits\ScopesOwner;
 
@@ -27,7 +29,7 @@ class EmployeeInfoController extends Controller
             Log::info('Loading employees for user:', [
                 'user_id' => $user->id,
                 'owner_id' => $ownerId,
-                'department' => $user->department,
+                'department' => $user->department ?? null,
             ]);
 
             $query = EmployeeInfo::forOwner($ownerId);
@@ -198,6 +200,7 @@ class EmployeeInfoController extends Controller
 
             $user = $request->user();
             $ownerId = $this->getOwnerId();
+            $creatorEmployeeId = $this->resolveCreatorEmployeeId($user, $ownerId);
 
             $userDepartment = strtolower(trim($user->department ?? ''));
             $allowedDepartments = ['hr', 'human resources'];
@@ -249,9 +252,8 @@ class EmployeeInfoController extends Controller
             }
 
             // ✅ UPDATED: Create with new fields
-            $employeeInfo = EmployeeInfo::create([
+            $employeeInfoData = [
                 'owner_id' => $ownerId,
-                'created_by_employee_id' => $user->id,
                 'employee_id' => $employeeId,
                 
                 // Basic Information
@@ -302,7 +304,14 @@ class EmployeeInfoController extends Controller
                 'account_number' => $request->account_number,
                 'tax_status' => $request->tax_status,
                 'allowance' => $request->allowance,
-            ]);
+            ];
+
+            if (Schema::hasColumn('employees_info', 'created_by_employee_id') && $creatorEmployeeId !== null) {
+                $employeeInfoData['created_by_employee_id'] = $creatorEmployeeId;
+            }
+
+            $employeeInfoData = $this->filterExistingEmployeeInfoColumns($employeeInfoData);
+            $employeeInfo = EmployeeInfo::create($employeeInfoData);
 
             DB::commit();
 
@@ -446,6 +455,7 @@ class EmployeeInfoController extends Controller
 
             $ownerId = $this->getOwnerId();
             $user = $request->user();
+            $creatorEmployeeId = $this->resolveCreatorEmployeeId($user, $ownerId);
             $userDepartment = strtolower(trim($user->department ?? ''));
             $allowedDepartments = ['hr', 'human resources'];
             
@@ -538,6 +548,12 @@ class EmployeeInfoController extends Controller
             if ($avatarPath) {
                 $updateData['avatar'] = $avatarPath;
             }
+
+            if (Schema::hasColumn('employees_info', 'created_by_employee_id') && $creatorEmployeeId !== null) {
+                $updateData['created_by_employee_id'] = $creatorEmployeeId;
+            }
+
+            $updateData = $this->filterExistingEmployeeInfoColumns($updateData);
 
             $employeeInfo->update($updateData);
 
@@ -669,6 +685,42 @@ class EmployeeInfoController extends Controller
         }
 
         return 'EMP-' . $newNumber;
+    }
+
+    private function filterExistingEmployeeInfoColumns(array $data): array
+    {
+        static $columns = null;
+
+        if ($columns === null) {
+            $columns = array_flip(Schema::getColumnListing('employees_info'));
+        }
+
+        return array_filter(
+            $data,
+            fn ($value, $key) => isset($columns[$key]),
+            ARRAY_FILTER_USE_BOTH
+        );
+    }
+
+    private function resolveCreatorEmployeeId($user, int $ownerId): ?int
+    {
+        if ($user instanceof Employee) {
+            return $user->id;
+        }
+
+        if (!$user) {
+            return null;
+        }
+
+        $employeeId = Employee::withoutGlobalScope('owner')
+            ->where('owner_id', $ownerId)
+            ->where(function ($query) use ($user) {
+                $query->where('email', $user->email)
+                    ->orWhere('username', $user->username ?? null);
+            })
+            ->value('id');
+
+        return $employeeId ? (int) $employeeId : null;
     }
 
     /**
