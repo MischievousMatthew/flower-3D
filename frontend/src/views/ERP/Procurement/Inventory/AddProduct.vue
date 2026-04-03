@@ -1,30 +1,13 @@
 <template>
   <div class="product-layout">
+    <DynamicSidebar />
+
     <main class="main-content">
-      <!-- ── Header ── -->
+      <!-- Header -->
       <header class="content-header">
         <div class="header-left">
-          <button @click="goBack" class="btn-back">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M19 12H5M12 5l-7 7 7 7" />
-            </svg>
-          </button>
-          <div>
-            <h1 class="page-title">Add New Product</h1>
-            <p class="page-subtitle">
-              Fill in the details below to list a new product
-            </p>
-          </div>
+          <button @click="goBack" class="btn-back"><span>←</span></button>
+          <h1 class="page-title">Add New Product</h1>
         </div>
         <div class="header-actions">
           <button
@@ -32,105 +15,30 @@
             class="btn-secondary"
             :disabled="isSubmitting"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
-              />
-              <path
-                d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
-              />
-            </svg>
-            <span>Save as Draft</span>
+            <span>📝</span><span>Save as Draft</span>
           </button>
           <button
             @click="publishProduct"
             class="btn-primary"
             :disabled="isSubmitting"
           >
-            <svg
-              v-if="!isSubmitting"
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <span class="btn-spinner" v-if="isSubmitting"></span>
-            <span>{{
+            <span>✅</span
+            ><span>{{
               isSubmitting ? "Publishing..." : "Publish Product"
             }}</span>
           </button>
         </div>
       </header>
 
-      <!-- ── Progress steps ── -->
-      <div class="progress-bar">
-        <div
-          class="progress-step"
-          :class="{ done: filledSections >= 1, active: filledSections === 0 }"
-        >
-          <span class="step-dot"></span
-          ><span class="step-label">Basic Info</span>
-        </div>
-        <div class="progress-line"></div>
-        <div
-          class="progress-step"
-          :class="{ done: filledSections >= 2, active: filledSections === 1 }"
-        >
-          <span class="step-dot"></span><span class="step-label">Pricing</span>
-        </div>
-        <div class="progress-line"></div>
-        <div
-          class="progress-step"
-          :class="{ done: filledSections >= 3, active: filledSections === 2 }"
-        >
-          <span class="step-dot"></span><span class="step-label">Stock</span>
-        </div>
-        <div class="progress-line"></div>
-        <div
-          class="progress-step"
-          :class="{ done: filledSections >= 4, active: filledSections === 3 }"
-        >
-          <span class="step-dot"></span><span class="step-label">Media</span>
-        </div>
-      </div>
-
-      <form @submit.prevent="publishProduct">
-        <div class="form-columns">
-          <!-- ══════════ LEFT COLUMN ══════════ -->
-          <div class="col-left">
-            <!-- Basic Information -->
-            <div class="form-card" id="section-basic">
-              <div class="card-header">
-                <div class="card-header-icon">🌸</div>
-                <div>
-                  <h2 class="card-title">Basic Information</h2>
-                  <p class="card-subtitle">
-                    Name, description, and classification
-                  </p>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label"
-                  >Product Name <span class="req">*</span></label
-                >
+      <!-- Form -->
+      <div class="form-container">
+        <form @submit.prevent="publishProduct">
+          <!-- Basic Information -->
+          <div class="form-section">
+            <h2 class="section-title">Basic Information</h2>
+            <div class="form-grid">
+              <div class="form-group full-width">
+                <label class="form-label">Product Name *</label>
                 <input
                   v-model="formData.product_name"
                   type="text"
@@ -138,287 +46,243 @@
                   class="form-input"
                   :class="{ 'is-invalid': errors.product_name }"
                   @input="clearError('product_name')"
+                  required
                 />
                 <span v-if="errors.product_name" class="error-text">{{
                   errors.product_name
                 }}</span>
               </div>
-
-              <div class="form-group">
-                <label class="form-label"
-                  >Description <span class="req">*</span></label
-                >
+              <div class="form-group full-width">
+                <label class="form-label">Product Description *</label>
                 <textarea
                   v-model="formData.description"
-                  placeholder="Describe your product — variety, size, arrangement style, care tips..."
+                  placeholder="Describe your product in detail..."
                   rows="4"
                   class="form-textarea"
                   :class="{ 'is-invalid': errors.description }"
                   @input="clearError('description')"
+                  required
                 ></textarea>
                 <span v-if="errors.description" class="error-text">{{
                   errors.description
                 }}</span>
               </div>
-
-              <div class="two-col">
-                <div class="form-group">
-                  <label class="form-label"
-                    >SKU <span class="req">*</span></label
-                  >
-                  <input
-                    v-model="formData.sku"
-                    type="text"
-                    placeholder="e.g., ROSE-RED-001"
-                    class="form-input"
-                    :class="{ 'is-invalid': errors.sku }"
-                    @input="clearError('sku')"
-                  />
-                  <span v-if="errors.sku" class="error-text">{{
-                    errors.sku
-                  }}</span>
-                  <span class="hint-text">Unique product identifier</span>
-                </div>
-                <div class="form-group">
-                  <label class="form-label"
-                    >Category <span class="req">*</span></label
-                  >
-                  <select
-                    v-model="formData.category"
-                    class="form-select"
-                    :class="{ 'is-invalid': errors.category }"
-                    @change="clearError('category')"
-                  >
-                    <option value="">Select category</option>
-                    <option value="roses">Roses</option>
-                    <option value="tulips">Tulips</option>
-                    <option value="lilies">Lilies</option>
-                    <option value="orchids">Orchids</option>
-                    <option value="sunflowers">Sunflowers</option>
-                    <option value="mixed-bouquets">Mixed Bouquets</option>
-                    <option value="arrangements">Arrangements</option>
-                    <option value="plants">Plants</option>
-                    <option value="gifts">Gifts & Add-ons</option>
-                    <option value="seasonal">Seasonal Flowers</option>
-                  </select>
-                  <span v-if="errors.category" class="error-text">{{
-                    errors.category
-                  }}</span>
-                </div>
-                <div class="form-group">
-                  <label class="form-label"
-                    >Flower Type <span class="req">*</span></label
-                  >
-                  <select
-                    v-model="formData.flower_type"
-                    class="form-select"
-                    :class="{ 'is-invalid': errors.flower_type }"
-                    @change="clearError('flower_type')"
-                  >
-                    <option value="">Select type</option>
-                    <option value="focal">Focal (Main attraction)</option>
-                    <option value="secondary">
-                      Secondary (Support & volume)
-                    </option>
-                    <option value="filler">Filler (Small texture)</option>
-                    <option value="line">Line (Height & direction)</option>
-                    <option value="greenery">Greenery (Foliage)</option>
-                  </select>
-                  <span v-if="errors.flower_type" class="error-text">{{
-                    errors.flower_type
-                  }}</span>
-                </div>
-                <div class="form-group">
-                  <label class="form-label"
-                    >Color <span class="req">*</span></label
-                  >
-                  <select
-                    v-model="formData.color"
-                    class="form-select"
-                    :class="{ 'is-invalid': errors.color }"
-                    @change="handleColorChange"
-                  >
-                    <option value="">Select color</option>
-                    <option value="white">White</option>
-                    <option value="yellow">Yellow</option>
-                    <option value="red">Red</option>
-                    <option value="pink">Pink</option>
-                    <option value="purple">Purple</option>
-                    <option value="orange">Orange</option>
-                    <option value="blue">Blue</option>
-                    <option value="green">Green</option>
-                    <option value="cream">Cream</option>
-                    <option value="other">Other</option>
-                  </select>
-                  <span v-if="errors.color" class="error-text">{{
-                    errors.color
-                  }}</span>
-                </div>
-                <div class="form-group" v-if="formData.color === 'other'">
-                  <label class="form-label"
-                    >Specify Color <span class="req">*</span></label
-                  >
-                  <input
-                    v-model="formData.color_other"
-                    type="text"
-                    placeholder="e.g., Burgundy, Lavender"
-                    class="form-input"
-                    :class="{ 'is-invalid': errors.color_other }"
-                    @input="clearError('color_other')"
-                  />
-                  <span v-if="errors.color_other" class="error-text">{{
-                    errors.color_other
-                  }}</span>
-                </div>
-                <div class="form-group">
-                  <label class="form-label"
-                    >Selling Type <span class="req">*</span></label
-                  >
-                  <select
-                    v-model="formData.selling_type"
-                    class="form-select"
-                    :class="{ 'is-invalid': errors.selling_type }"
-                    @change="clearError('selling_type')"
-                  >
-                    <option value="per_piece">Per Piece</option>
-                    <option value="per_piece_customizable">
-                      Per Piece (Customizable)
-                    </option>
-                    <option value="bouquet">Bouquet</option>
-                  </select>
-                  <span v-if="errors.selling_type" class="error-text">{{
-                    errors.selling_type
-                  }}</span>
-                </div>
+              <div class="form-group">
+                <label class="form-label">SKU (Stock Keeping Unit) *</label>
+                <input
+                  v-model="formData.sku"
+                  type="text"
+                  placeholder="e.g., ROSE-RED-001"
+                  class="form-input"
+                  :class="{ 'is-invalid': errors.sku }"
+                  @input="clearError('sku')"
+                  required
+                />
+                <span v-if="errors.sku" class="error-text">{{
+                  errors.sku
+                }}</span>
+                <span class="hint-text"
+                  >Unique identifier for this product</span
+                >
+              </div>
+              <div class="form-group">
+                <label class="form-label">Category / Type *</label>
+                <select
+                  v-model="formData.category"
+                  class="form-select"
+                  :class="{ 'is-invalid': errors.category }"
+                  @change="clearError('category')"
+                  required
+                >
+                  <option value="">Select category</option>
+                  <option value="roses">Roses</option>
+                  <option value="tulips">Tulips</option>
+                  <option value="lilies">Lilies</option>
+                  <option value="orchids">Orchids</option>
+                  <option value="sunflowers">Sunflowers</option>
+                  <option value="mixed-bouquets">Mixed Bouquets</option>
+                  <option value="arrangements">Arrangements</option>
+                  <option value="plants">Plants</option>
+                  <option value="gifts">Gifts & Add-ons</option>
+                  <option value="seasonal">Seasonal Flowers</option>
+                </select>
+                <span v-if="errors.category" class="error-text">{{
+                  errors.category
+                }}</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Flower Type *</label>
+                <select
+                  v-model="formData.flower_type"
+                  class="form-select"
+                  :class="{ 'is-invalid': errors.flower_type }"
+                  @change="clearError('flower_type')"
+                  required
+                >
+                  <option value="">Select flower type</option>
+                  <option value="focal">Focal Flowers (Main attraction)</option>
+                  <option value="secondary">
+                    Secondary Flowers (Support & volume)
+                  </option>
+                  <option value="filler">Filler Flowers (Small texture)</option>
+                  <option value="line">
+                    Line Flowers (Height & direction)
+                  </option>
+                  <option value="greenery">Greenery (Foliage)</option>
+                </select>
+                <span v-if="errors.flower_type" class="error-text">{{
+                  errors.flower_type
+                }}</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Color *</label>
+                <select
+                  v-model="formData.color"
+                  class="form-select"
+                  :class="{ 'is-invalid': errors.color }"
+                  @change="handleColorChange"
+                  required
+                >
+                  <option value="">Select color</option>
+                  <option value="white">White</option>
+                  <option value="yellow">Yellow</option>
+                  <option value="red">Red</option>
+                  <option value="pink">Pink</option>
+                  <option value="purple">Purple</option>
+                  <option value="orange">Orange</option>
+                  <option value="blue">Blue</option>
+                  <option value="green">Green</option>
+                  <option value="cream">Cream</option>
+                  <option value="other">Other</option>
+                </select>
+                <span v-if="errors.color" class="error-text">{{
+                  errors.color
+                }}</span>
+              </div>
+              <div class="form-group" v-if="formData.color === 'other'">
+                <label class="form-label">Specify Color *</label>
+                <input
+                  v-model="formData.color_other"
+                  type="text"
+                  placeholder="e.g., Burgundy, Lavender"
+                  class="form-input"
+                  :class="{ 'is-invalid': errors.color_other }"
+                  @input="clearError('color_other')"
+                  required
+                />
+                <span v-if="errors.color_other" class="error-text">{{
+                  errors.color_other
+                }}</span>
               </div>
             </div>
+          </div>
 
-            <!-- Pricing -->
-            <div class="form-card" id="section-pricing">
-              <div class="card-header">
-                <div class="card-header-icon">💰</div>
-                <div>
-                  <h2 class="card-title">Pricing</h2>
-                  <p class="card-subtitle">
-                    Set your cost, selling price, and optional discount
-                  </p>
-                </div>
-              </div>
-
-              <div class="two-col">
-                <div class="form-group">
-                  <label class="form-label"
-                    >Purchase Price <span class="req">*</span></label
-                  >
-                  <div class="input-prefix-wrap">
-                    <span class="input-prefix">₱</span>
-                    <input
-                      v-model.number="formData.purchase_price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      class="form-input has-prefix"
-                      :class="{ 'is-invalid': errors.purchase_price }"
-                      @input="clearError('purchase_price')"
-                    />
-                  </div>
-                  <span v-if="errors.purchase_price" class="error-text">{{
-                    errors.purchase_price
-                  }}</span>
-                  <span class="hint-text">Your acquisition cost</span>
-                </div>
-                <div class="form-group">
-                  <label class="form-label"
-                    >Selling Price <span class="req">*</span></label
-                  >
-                  <div class="input-prefix-wrap">
-                    <span class="input-prefix">₱</span>
-                    <input
-                      v-model.number="formData.selling_price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      class="form-input has-prefix"
-                      :class="{ 'is-invalid': errors.selling_price }"
-                      @input="clearError('selling_price')"
-                    />
-                  </div>
-                  <span v-if="errors.selling_price" class="error-text">{{
-                    errors.selling_price
-                  }}</span>
-                  <span class="hint-text">Price shown to customers</span>
-                </div>
-              </div>
-
-              <!-- Profit pill -->
-              <div
-                class="profit-pill"
-                :class="profitAmount >= 0 ? 'green' : 'red'"
-              >
-                <div class="profit-pill-left">
-                  <span class="profit-label">Estimated Profit</span>
-                  <span class="profit-value"
-                    >₱{{ profitAmount.toFixed(2) }}</span
-                  >
-                </div>
-                <div class="profit-pill-right">
-                  <span class="profit-pct"
-                    >{{ profitPercentage.toFixed(1) }}%</span
-                  >
-                  <span class="profit-pct-label">margin</span>
-                </div>
-              </div>
-
-              <!-- Discount toggle -->
-              <div
-                class="discount-toggle-card"
-                :class="{ active: formData.has_discount }"
-              >
-                <label class="toggle-switch">
+          <!-- Pricing Information -->
+          <div class="form-section">
+            <h2 class="section-title">Pricing Information</h2>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Purchase Price / Cost *</label>
+                <div class="input-with-prefix">
+                  <span class="prefix">₱</span>
                   <input
-                    type="checkbox"
-                    v-model="formData.has_discount"
-                    @change="handleDiscountToggle"
+                    v-model.number="formData.purchase_price"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    class="form-input"
+                    :class="{ 'is-invalid': errors.purchase_price }"
+                    @input="
+                      clearError('purchase_price');
+                      calculateProfit();
+                    "
+                    required
                   />
-                  <span class="toggle-track">
-                    <span class="toggle-thumb"></span>
-                  </span>
-                </label>
-                <div class="toggle-text">
-                  <span class="toggle-main">Enable Discount Price</span>
-                  <span class="toggle-sub"
-                    >Display a sale price with the original crossed out</span
+                </div>
+                <span v-if="errors.purchase_price" class="error-text">{{
+                  errors.purchase_price
+                }}</span>
+                <span class="hint-text">Your cost to acquire this product</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Selling Price / Retail Price *</label>
+                <div class="input-with-prefix">
+                  <span class="prefix">₱</span>
+                  <input
+                    v-model.number="formData.selling_price"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    class="form-input"
+                    :class="{ 'is-invalid': errors.selling_price }"
+                    @input="
+                      clearError('selling_price');
+                      calculateProfit();
+                    "
+                    required
+                  />
+                </div>
+                <span v-if="errors.selling_price" class="error-text">{{
+                  errors.selling_price
+                }}</span>
+                <span class="hint-text">Price customers will pay</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Profit Margin</label>
+                <div class="profit-display">
+                  <div class="profit-amount">
+                    ₱{{ profitAmount.toFixed(2) }}
+                  </div>
+                  <div class="profit-percentage">
+                    {{ profitPercentage.toFixed(1) }}% margin
+                  </div>
+                </div>
+              </div>
+
+              <!-- ── Discount Toggle (matches Edit modal style) ── -->
+              <div class="form-group full-width">
+                <div
+                  class="discount-toggle-row"
+                  :class="{ active: formData.has_discount }"
+                >
+                  <label class="toggle-switch">
+                    <input
+                      type="checkbox"
+                      v-model="formData.has_discount"
+                      @change="handleDiscountToggle"
+                    />
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <div class="toggle-label-group">
+                    <span class="toggle-label-main">Enable Discount Price</span>
+                    <span class="toggle-label-sub"
+                      >Show a crossed-out original price and a lower sale
+                      price</span
+                    >
+                  </div>
+                  <span
+                    v-if="formData.has_discount"
+                    class="discount-active-pill"
+                    >🏷️ Sale Active</span
                   >
                 </div>
-                <transition name="fade"
-                  ><span v-if="formData.has_discount" class="sale-badge"
-                    >🏷️ On Sale</span
-                  ></transition
-                >
               </div>
 
               <transition name="slide-down">
-                <div
-                  v-if="formData.has_discount"
-                  class="discount-fields two-col"
-                >
+                <div v-if="formData.has_discount">
                   <div class="form-group">
-                    <label class="form-label"
-                      >Discount Price <span class="req">*</span></label
-                    >
-                    <div class="input-prefix-wrap">
-                      <span class="input-prefix">₱</span>
+                    <label class="form-label">Discount Price *</label>
+                    <div class="input-with-prefix">
+                      <span class="prefix">₱</span>
                       <input
                         v-model.number="formData.discount_price"
                         type="number"
                         step="0.01"
-                        min="0"
                         placeholder="0.00"
-                        class="form-input has-prefix"
+                        class="form-input"
                         :class="{ 'is-invalid': errors.discount_price }"
                         @input="clearError('discount_price')"
+                        :required="formData.has_discount"
                       />
                     </div>
                     <span v-if="errors.discount_price" class="error-text">{{
@@ -429,188 +293,311 @@
                     >
                   </div>
                   <div class="form-group">
-                    <label class="form-label">Discount %</label>
-                    <div class="discount-pct-pill">
-                      <span class="discount-pct-num"
-                        >{{ discountPercentage.toFixed(1) }}%</span
-                      >
-                      <span class="discount-pct-label">off regular price</span>
+                    <label class="form-label">Discount Percentage</label>
+                    <div class="discount-display">
+                      <div class="discount-amount">
+                        {{ discountPercentage.toFixed(1) }}%
+                      </div>
+                      <div class="discount-text">off selling price</div>
                     </div>
                   </div>
                 </div>
               </transition>
             </div>
+          </div>
 
-            <!-- Stock -->
-            <div class="form-card" id="section-stock">
-              <div class="card-header">
-                <div class="card-header-icon">📦</div>
-                <div>
-                  <h2 class="card-title">Stock Management</h2>
-                  <p class="card-subtitle">Inventory levels and availability</p>
-                </div>
-              </div>
-
-              <div class="two-col">
-                <div class="form-group">
-                  <label class="form-label"
-                    >Quantity in Stock <span class="req">*</span></label
-                  >
-                  <input
-                    v-model.number="formData.quantity_in_stock"
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    class="form-input"
-                    :class="{ 'is-invalid': errors.quantity_in_stock }"
-                    @input="clearError('quantity_in_stock')"
-                  />
-                  <span v-if="errors.quantity_in_stock" class="error-text">{{
-                    errors.quantity_in_stock
-                  }}</span>
-                  <span class="hint-text">Current available units</span>
-                </div>
-                <div class="form-group">
-                  <label class="form-label"
-                    >Min Stock Level <span class="req">*</span></label
-                  >
-                  <input
-                    v-model.number="formData.min_stock_level"
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    class="form-input"
-                    :class="{ 'is-invalid': errors.min_stock_level }"
-                    @input="clearError('min_stock_level')"
-                  />
-                  <span v-if="errors.min_stock_level" class="error-text">{{
-                    errors.min_stock_level
-                  }}</span>
-                  <span class="hint-text">Low-stock alert threshold</span>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Max Stock Level</label>
-                  <input
-                    v-model.number="formData.max_stock_level"
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    class="form-input"
-                  />
-                  <span class="hint-text">Prevent overstocking</span>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Season</label>
-                  <select v-model="formData.season" class="form-select">
-                    <option value="all-year">All Year Round</option>
-                    <option value="spring">Spring</option>
-                    <option value="summer">Summer</option>
-                    <option value="autumn">Autumn</option>
-                    <option value="winter">Winter</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="info-banner">
-                <div class="info-banner-icon">🏭</div>
-                <div>
-                  <strong>Storage & Freshness → Warehouse Module</strong>
-                  <p>
-                    Harvest dates, expiration, storage location, and batch
-                    tracking are recorded when flowers physically arrive in the
-                    Warehouse module.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Supplier -->
-            <div class="form-card">
-              <div class="card-header">
-                <div class="card-header-icon">🚚</div>
-                <div>
-                  <h2 class="card-title">Supplier Information</h2>
-                  <p class="card-subtitle">Where this product comes from</p>
-                </div>
-              </div>
-              <div class="two-col">
-                <div class="form-group">
-                  <label class="form-label">Supplier Name</label>
-                  <input
-                    v-model="formData.supplier_name"
-                    type="text"
-                    placeholder="e.g., Garden Wholesale Inc."
-                    class="form-input"
-                  />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Supplier Contact</label>
-                  <input
-                    v-model="formData.supplier_contact"
-                    type="text"
-                    placeholder="Phone or email"
-                    class="form-input"
-                  />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Supplier SKU</label>
-                  <input
-                    v-model="formData.supplier_sku"
-                    type="text"
-                    placeholder="Supplier's product code"
-                    class="form-input"
-                  />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Lead Time (days)</label>
-                  <input
-                    v-model.number="formData.supplier_lead_time"
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    class="form-input"
-                  />
-                  <span class="hint-text">Time from order to receipt</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Additional Info -->
-            <div class="form-card">
-              <div class="card-header">
-                <div class="card-header-icon">📝</div>
-                <div>
-                  <h2 class="card-title">Additional Information</h2>
-                  <p class="card-subtitle">
-                    Care instructions, tags, and special notes
-                  </p>
-                </div>
-              </div>
-
+          <!-- Stock Management -->
+          <div class="form-section">
+            <h2 class="section-title">Stock Management</h2>
+            <div class="form-grid">
               <div class="form-group">
+                <label class="form-label">Quantity in Stock *</label>
+                <input
+                  v-model.number="formData.quantity_in_stock"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  class="form-input"
+                  :class="{ 'is-invalid': errors.quantity_in_stock }"
+                  @input="clearError('quantity_in_stock')"
+                  required
+                />
+                <span v-if="errors.quantity_in_stock" class="error-text">{{
+                  errors.quantity_in_stock
+                }}</span>
+                <span class="hint-text">Current available units</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Minimum Stock Level *</label>
+                <input
+                  v-model.number="formData.min_stock_level"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  class="form-input"
+                  :class="{ 'is-invalid': errors.min_stock_level }"
+                  @input="clearError('min_stock_level')"
+                  required
+                />
+                <span v-if="errors.min_stock_level" class="error-text">{{
+                  errors.min_stock_level
+                }}</span>
+                <span class="hint-text"
+                  >Alert when stock reaches this level</span
+                >
+              </div>
+              <div class="form-group">
+                <label class="form-label">Maximum Stock Level</label>
+                <input
+                  v-model.number="formData.max_stock_level"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  class="form-input"
+                />
+                <span class="hint-text">Avoid overstocking</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Season Availability</label>
+                <select v-model="formData.season" class="form-select">
+                  <option value="all-year">All Year Round</option>
+                  <option value="spring">Spring</option>
+                  <option value="summer">Summer</option>
+                  <option value="autumn">Autumn</option>
+                  <option value="winter">Winter</option>
+                </select>
+              </div>
+            </div>
+            <div class="info-banner">
+              <span class="info-icon">🏭</span>
+              <div>
+                <strong>Storage & Freshness managed by Warehouse</strong>
+                <p>
+                  Storage location, harvest dates, expiration dates, and batch
+                  tracking are handled in the Warehouse module when flowers
+                  physically arrive.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Selling Type -->
+          <div class="form-section">
+            <h2 class="section-title">Selling Type</h2>
+            <div class="form-grid">
+              <div class="form-group full-width">
+                <label class="form-label">How is this product sold? *</label>
+                <select
+                  v-model="formData.selling_type"
+                  class="form-select"
+                  :class="{ 'is-invalid': errors.selling_type }"
+                  @change="clearError('selling_type')"
+                  required
+                >
+                  <option value="per_piece">Per Piece</option>
+                  <option value="per_piece_customizable">
+                    Per Piece (Customizable)
+                  </option>
+                  <option value="bouquet">Bouquet</option>
+                </select>
+                <span v-if="errors.selling_type" class="error-text">{{
+                  errors.selling_type
+                }}</span>
+                <span class="hint-text">
+                  <template v-if="formData.selling_type === 'per_piece'"
+                    >Single stem or piece sold as-is</template
+                  >
+                  <template
+                    v-else-if="
+                      formData.selling_type === 'per_piece_customizable'
+                    "
+                    >Customer can customize quantity, color, or
+                    arrangement</template
+                  >
+                  <template v-else-if="formData.selling_type === 'bouquet'"
+                    >Pre-arranged bouquet ready for sale</template
+                  >
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Supplier Information -->
+          <div class="form-section">
+            <h2 class="section-title">Supplier Information</h2>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Supplier Name</label>
+                <input
+                  v-model="formData.supplier_name"
+                  type="text"
+                  placeholder="e.g., Garden Wholesale Inc."
+                  class="form-input"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Supplier Contact</label>
+                <input
+                  v-model="formData.supplier_contact"
+                  type="text"
+                  placeholder="Phone or email"
+                  class="form-input"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Supplier SKU / Code</label>
+                <input
+                  v-model="formData.supplier_sku"
+                  type="text"
+                  placeholder="Supplier's product code"
+                  class="form-input"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Lead Time (Days)</label>
+                <input
+                  v-model.number="formData.supplier_lead_time"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  class="form-input"
+                />
+                <span class="hint-text">Time to receive from supplier</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3D Model -->
+          <div class="form-section">
+            <h2 class="section-title">
+              3D Model <span class="optional-label">(Optional)</span>
+            </h2>
+            <div class="model-upload-section">
+              <div v-if="product3DModel" class="model-preview-container">
+                <div class="model-preview">
+                  <div class="model-info">
+                    <span class="model-icon">🎨</span>
+                    <div class="model-details">
+                      <p class="model-name">{{ product3DModel.file.name }}</p>
+                      <p class="model-size">
+                        {{ formatFileSize(product3DModel.file.size) }}
+                      </p>
+                      <p class="model-type">
+                        {{
+                          product3DModel.file.name
+                            .split(".")
+                            .pop()
+                            .toUpperCase()
+                        }}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    @click="remove3DModel"
+                    class="remove-model-btn"
+                  >
+                    ✕ Remove
+                  </button>
+                </div>
+              </div>
+              <div
+                v-else
+                class="model-upload-placeholder"
+                @click="trigger3DFileInput"
+                @dragover.prevent
+                @drop.prevent="handle3DFileDrop"
+              >
+                <span class="upload-icon">🎨</span>
+                <span class="upload-text">Upload 3D Model</span>
+                <span class="upload-hint">GLB, GLTF, OBJ, or FBX format</span>
+                <span class="upload-size-hint">Max 50MB</span>
+              </div>
+              <input
+                ref="modelFileInput"
+                type="file"
+                accept=".glb,.gltf,.obj,.fbx"
+                @change="handle3DFileSelect"
+                style="display: none"
+              />
+              <p class="hint-text">
+                Upload a 3D model to give customers an interactive view.
+                Supported: GLB (recommended), GLTF, OBJ, FBX
+              </p>
+            </div>
+          </div>
+
+          <!-- Product Images -->
+          <div class="form-section">
+            <h2 class="section-title">Product Images</h2>
+            <div class="image-upload-section">
+              <div class="image-grid">
+                <div
+                  v-for="(image, index) in productImages"
+                  :key="index"
+                  class="image-preview"
+                >
+                  <img :src="image.url" alt="Product" />
+                  <button
+                    type="button"
+                    @click="removeImage(index)"
+                    class="remove-image-btn"
+                  >
+                    ✕
+                  </button>
+                  <div v-if="index === 0" class="primary-badge">Primary</div>
+                </div>
+                <div
+                  v-if="productImages.length < 5"
+                  class="image-upload-placeholder"
+                  @click="triggerFileInput"
+                  @dragover.prevent
+                  @drop.prevent="handleDrop"
+                >
+                  <span class="upload-icon">📷</span>
+                  <span class="upload-text">Add Photo</span>
+                  <span class="upload-hint">Click or drag image here</span>
+                </div>
+              </div>
+              <input
+                ref="fileInput"
+                type="file"
+                accept="image/*"
+                multiple
+                @change="handleFileSelect"
+                style="display: none"
+              />
+              <p class="hint-text">
+                Upload up to 5 photos. First image will be the primary product
+                image.
+              </p>
+            </div>
+          </div>
+
+          <!-- Additional Information -->
+          <div class="form-section">
+            <h2 class="section-title">Additional Information</h2>
+            <div class="form-grid">
+              <div class="form-group full-width">
                 <label class="form-label">Care Instructions</label>
                 <textarea
                   v-model="formData.care_instructions"
-                  placeholder="How to keep these flowers fresh — water, light, temperature..."
+                  placeholder="How to care for these flowers..."
                   rows="3"
                   class="form-textarea"
                 ></textarea>
               </div>
-
-              <div class="form-group">
+              <div class="form-group full-width">
                 <label class="form-label"
                   >Occasion Tags
-                  <span class="optional-chip">optional · max 2</span></label
+                  <span class="optional-label">(Select up to 2)</span></label
                 >
-                <div class="tag-grid">
+                <div class="tag-selector">
                   <label
                     v-for="tag in occasionTags"
                     :key="tag"
-                    class="tag-chip"
-                    :class="{
-                      selected: formData.occasion_tags.includes(tag),
-                      disabled: isTagDisabled(tag),
-                    }"
+                    class="tag-option"
+                    :class="{ disabled: isTagDisabled(tag) }"
                   >
                     <input
                       type="checkbox"
@@ -625,314 +612,64 @@
                 <span v-if="errors.occasion_tags" class="error-text">{{
                   errors.occasion_tags
                 }}</span>
-                <span class="hint-text" v-if="formData.occasion_tags.length"
+                <span class="hint-text" v-if="formData.occasion_tags.length > 0"
                   >Selected: {{ formData.occasion_tags.join(", ") }}</span
                 >
               </div>
-
-              <div class="form-group">
+              <div class="form-group full-width">
                 <label class="form-label">Additional Notes</label>
                 <textarea
                   v-model="formData.notes"
-                  placeholder="Limited edition, special handling, known issues..."
+                  placeholder="Any extra information (e.g., fragile, limited edition, special handling)..."
                   rows="3"
                   class="form-textarea"
                 ></textarea>
               </div>
-
-              <div class="checkbox-row">
-                <label
-                  class="checkbox-card"
-                  :class="{ checked: formData.is_fragile }"
-                >
+              <div class="form-group full-width">
+                <label class="checkbox-label">
                   <input type="checkbox" v-model="formData.is_fragile" />
-                  <span class="checkbox-card-icon">⚠️</span>
-                  <div>
-                    <span class="checkbox-card-title">Fragile</span>
-                    <span class="checkbox-card-sub">Handle with care</span>
-                  </div>
+                  <span>⚠️ Fragile — Handle with Care</span>
                 </label>
-                <label
-                  class="checkbox-card"
-                  :class="{ checked: formData.requires_refrigeration }"
-                >
+              </div>
+              <div class="form-group full-width">
+                <label class="checkbox-label">
                   <input
                     type="checkbox"
                     v-model="formData.requires_refrigeration"
                   />
-                  <span class="checkbox-card-icon">❄️</span>
-                  <div>
-                    <span class="checkbox-card-title"
-                      >Requires Refrigeration</span
-                    >
-                    <span class="checkbox-card-sub">Cold storage needed</span>
-                  </div>
+                  <span>❄️ Requires Refrigeration</span>
                 </label>
               </div>
             </div>
           </div>
-          <!-- /col-left -->
 
-          <!-- ══════════ RIGHT COLUMN ══════════ -->
-          <div class="col-right">
-            <!-- 3D Model -->
-            <div class="form-card sticky-card" id="section-media">
-              <div class="card-header">
-                <div class="card-header-icon">🎨</div>
-                <div>
-                  <h2 class="card-title">
-                    3D Model <span class="optional-chip">optional</span>
-                  </h2>
-                  <p class="card-subtitle">Interactive view for customers</p>
-                </div>
-              </div>
-
-              <div v-if="product3DModel" class="model-preview-box">
-                <div class="model-file-info">
-                  <div class="model-file-icon">🎨</div>
-                  <div class="model-file-details">
-                    <p class="model-file-name">
-                      {{ product3DModel.file.name }}
-                    </p>
-                    <p class="model-file-meta">
-                      {{ formatFileSize(product3DModel.file.size) }} ·
-                      {{
-                        product3DModel.file.name.split(".").pop().toUpperCase()
-                      }}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  @click="remove3DModel"
-                  class="btn-remove-model"
-                >
-                  Remove
-                </button>
-              </div>
-
-              <div
-                v-else
-                class="drop-zone model-drop"
-                @click="trigger3DFileInput"
-                @dragover.prevent
-                @dragenter="model3DDragover = true"
-                @dragleave="model3DDragover = false"
-                @drop.prevent="handle3DFileDrop"
-                :class="{ dragging: model3DDragover }"
+          <!-- Form Actions -->
+          <div class="form-actions">
+            <button type="button" @click="goBack" class="btn-cancel">
+              Cancel
+            </button>
+            <div class="action-group">
+              <button
+                type="button"
+                @click="saveDraft"
+                class="btn-secondary"
+                :disabled="isSubmitting"
               >
-                <div class="drop-zone-icon">🎨</div>
-                <p class="drop-zone-title">Drop 3D model here</p>
-                <p class="drop-zone-sub">GLB · GLTF · OBJ · FBX</p>
-                <span class="drop-zone-btn">Browse file</span>
-                <p class="drop-zone-limit">Max 50 MB</p>
-              </div>
-              <input
-                ref="modelFileInput"
-                type="file"
-                accept=".glb,.gltf,.obj,.fbx"
-                @change="handle3DFileSelect"
-                style="display: none"
-              />
-            </div>
-
-            <!-- Product Images -->
-            <div class="form-card">
-              <div class="card-header">
-                <div class="card-header-icon">📷</div>
-                <div>
-                  <h2 class="card-title">Product Images</h2>
-                  <p class="card-subtitle">Up to 5 photos · first is primary</p>
-                </div>
-              </div>
-
-              <div class="image-grid">
-                <!-- existing images -->
-                <div
-                  v-for="(image, idx) in productImages"
-                  :key="idx"
-                  class="img-thumb"
-                  :class="{ 'is-primary': idx === 0 }"
-                >
-                  <img :src="image.url" alt="product" />
-                  <button
-                    type="button"
-                    class="img-remove"
-                    @click="removeImage(idx)"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="3"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
-                  <span v-if="idx === 0" class="img-primary-badge"
-                    >Primary</span
-                  >
-                </div>
-
-                <!-- upload slot -->
-                <div
-                  v-if="productImages.length < 5"
-                  class="drop-zone img-drop"
-                  @click="triggerFileInput"
-                  @dragover.prevent
-                  @dragenter="imgDragover = true"
-                  @dragleave="imgDragover = false"
-                  @drop.prevent="handleDrop"
-                  :class="{ dragging: imgDragover }"
-                >
-                  <div class="drop-zone-icon" style="font-size: 28px">📷</div>
-                  <p class="drop-zone-sub" style="margin: 4px 0 0">Add photo</p>
-                  <p class="drop-zone-limit">
-                    {{ 5 - productImages.length }} slot{{
-                      5 - productImages.length !== 1 ? "s" : ""
-                    }}
-                    left
-                  </p>
-                </div>
-              </div>
-
-              <input
-                ref="fileInput"
-                type="file"
-                accept="image/*"
-                multiple
-                @change="handleFileSelect"
-                style="display: none"
-              />
-              <p class="hint-text" style="margin-top: 10px">
-                JPEG, PNG, WEBP, GIF · Max 5 MB each
-              </p>
-            </div>
-
-            <!-- Quick summary card -->
-            <div class="summary-card">
-              <h3 class="summary-title">Product Summary</h3>
-              <div class="summary-row">
-                <span>Name</span>
-                <span>{{ formData.product_name || "—" }}</span>
-              </div>
-              <div class="summary-row">
-                <span>SKU</span>
-                <span class="mono">{{ formData.sku || "—" }}</span>
-              </div>
-              <div class="summary-row">
-                <span>Category</span>
-                <span>{{ formData.category || "—" }}</span>
-              </div>
-              <div class="summary-row">
-                <span>Selling Price</span>
-                <span class="green-val">{{
-                  formData.selling_price
-                    ? "₱" + parseFloat(formData.selling_price).toFixed(2)
-                    : "—"
-                }}</span>
-              </div>
-              <div
-                class="summary-row"
-                v-if="formData.has_discount && formData.discount_price"
+                <span v-if="isSubmitting && isDraft">Saving...</span>
+                <span v-else>📝 Save as Draft</span>
+              </button>
+              <button
+                type="submit"
+                class="btn-primary"
+                :disabled="isSubmitting"
               >
-                <span>Discount Price</span>
-                <span class="red-val"
-                  >₱{{ parseFloat(formData.discount_price).toFixed(2) }}</span
-                >
-              </div>
-              <div class="summary-row">
-                <span>Stock</span>
-                <span>{{ formData.quantity_in_stock }} units</span>
-              </div>
-              <div class="summary-row">
-                <span>Images</span>
-                <span>{{ productImages.length }} / 5</span>
-              </div>
-              <div class="summary-row">
-                <span>3D Model</span>
-                <span>{{ product3DModel ? "✅ Uploaded" : "None" }}</span>
-              </div>
+                <span v-if="isSubmitting && !isDraft">Publishing...</span>
+                <span v-else>✅ Publish Product</span>
+              </button>
             </div>
           </div>
-          <!-- /col-right -->
-        </div>
-
-        <!-- ── Bottom actions ── -->
-        <div class="form-actions-bar">
-          <button type="button" @click="goBack" class="btn-cancel">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-            Cancel
-          </button>
-          <div class="action-right">
-            <button
-              type="button"
-              @click="saveDraft"
-              class="btn-secondary"
-              :disabled="isSubmitting"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path
-                  d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
-                />
-                <path
-                  d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
-                />
-              </svg>
-              <span v-if="isSubmitting && isDraft">Saving...</span>
-              <span v-else>Save as Draft</span>
-            </button>
-            <button type="submit" class="btn-primary" :disabled="isSubmitting">
-              <svg
-                v-if="!isSubmitting"
-                xmlns="http://www.w3.org/2000/svg"
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span class="btn-spinner" v-if="isSubmitting && !isDraft"></span>
-              <span v-if="isSubmitting && !isDraft">Publishing...</span>
-              <span v-else>Publish Product</span>
-            </button>
-          </div>
-        </div>
-      </form>
+        </form>
+      </div>
     </main>
   </div>
 </template>
@@ -942,6 +679,7 @@ import { ref, computed, onMounted, reactive } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../../../composables/useAuth";
 import DynamicSidebar from "../../../../layouts/Sidebar/DynamicSidebar.vue";
+
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import api from "../../../../plugins/axios";
@@ -953,8 +691,6 @@ const modelFileInput = ref(null);
 const isSubmitting = ref(false);
 const isDraft = ref(false);
 const product3DModel = ref(null);
-const imgDragover = ref(false);
-const model3DDragover = ref(false);
 const errors = reactive({});
 
 const formData = reactive({
@@ -1004,37 +740,30 @@ const occasionTags = [
   "Just Because",
 ];
 
-// ── Progress ─────────────────────────────────────────────────────────────
-const filledSections = computed(() => {
-  let n = 0;
-  if (formData.product_name && formData.category && formData.flower_type) n++;
-  if (formData.selling_price > 0 && formData.purchase_price > 0) n++;
-  if (formData.quantity_in_stock >= 0 && formData.min_stock_level >= 0) n++;
-  if (productImages.value.length > 0) n++;
-  return n;
-});
+// ── Computed ───────────────────────────────────────────────────────────────
 
-// ── Computed ──────────────────────────────────────────────────────────────
-const profitAmount = computed(
-  () =>
-    (parseFloat(formData.selling_price) || 0) -
-    (parseFloat(formData.purchase_price) || 0),
-);
+const profitAmount = computed(() => {
+  const selling = parseFloat(formData.selling_price) || 0;
+  const purchase = parseFloat(formData.purchase_price) || 0;
+  return selling - purchase;
+});
 const profitPercentage = computed(() => {
-  const p = parseFloat(formData.purchase_price) || 0;
-  return p === 0 ? 0 : (profitAmount.value / p) * 100;
+  const purchase = parseFloat(formData.purchase_price) || 0;
+  if (purchase === 0) return 0;
+  return (profitAmount.value / purchase) * 100;
 });
 const discountPercentage = computed(() => {
   if (!formData.has_discount || !formData.discount_price) return 0;
-  const s = parseFloat(formData.selling_price) || 0;
-  const d = parseFloat(formData.discount_price) || 0;
-  return s === 0 ? 0 : ((s - d) / s) * 100;
+  const selling = parseFloat(formData.selling_price) || 0;
+  const discount = parseFloat(formData.discount_price) || 0;
+  if (selling === 0) return 0;
+  return ((selling - discount) / selling) * 100;
 });
 
-// ── Helpers ───────────────────────────────────────────────────────────────
-const clearError = (f) => {
-  if (errors[f]) delete errors[f];
-};
+// ── Methods ────────────────────────────────────────────────────────────────
+
+const calculateProfit = () => {}; // triggered by @input — computed handles the rest
+
 const handleColorChange = () => {
   clearError("color");
   if (formData.color !== "other") {
@@ -1042,12 +771,14 @@ const handleColorChange = () => {
     clearError("color_other");
   }
 };
+
 const handleDiscountToggle = () => {
   if (!formData.has_discount) {
     formData.discount_price = null;
     clearError("discount_price");
   }
 };
+
 const handleTagChange = () => {
   if (formData.occasion_tags.length > 2) {
     formData.occasion_tags = formData.occasion_tags.slice(0, 2);
@@ -1058,170 +789,199 @@ const handleTagChange = () => {
 const isTagDisabled = (tag) =>
   formData.occasion_tags.length >= 2 && !formData.occasion_tags.includes(tag);
 
-// ── 3D Model ──────────────────────────────────────────────────────────────
+// 3D model
 const trigger3DFileInput = () => modelFileInput.value?.click();
 const handle3DFileSelect = (e) => {
-  const f = e.target.files[0];
-  if (f) validate3DModel(f);
+  const file = e.target.files[0];
+  if (file) validate3DModel(file);
 };
 const handle3DFileDrop = (e) => {
-  model3DDragover.value = false;
-  const f = e.dataTransfer.files[0];
-  if (f) validate3DModel(f);
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) validate3DModel(file);
 };
 const validate3DModel = (file) => {
-  if (
-    ![".glb", ".gltf", ".obj", ".fbx"].some((ext) =>
-      file.name.toLowerCase().endsWith(ext),
-    )
-  ) {
-    toast.error("Invalid format. Upload GLB, GLTF, OBJ, or FBX.");
+  const allowed = [".glb", ".gltf", ".obj", ".fbx"];
+  const name = file.name.toLowerCase();
+  if (!allowed.some((ext) => name.endsWith(ext))) {
+    toast.error(
+      "Invalid file format. Please upload GLB, GLTF, OBJ, or FBX file.",
+    );
     return;
   }
   if (file.size > 50 * 1024 * 1024) {
-    toast.error("File exceeds 50 MB limit.");
+    toast.error("File size too large. Maximum size is 50MB.");
     return;
   }
-  product3DModel.value = {
-    file,
-    type: file.name.split(".").pop().toLowerCase(),
-    size: file.size,
-  };
-  toast.success("3D model ready!");
+  product3DModel.value = { file, type: name.split(".").pop(), size: file.size };
+  toast.success("3D model uploaded successfully!");
 };
 const remove3DModel = () => {
   product3DModel.value = null;
   if (modelFileInput.value) modelFileInput.value.value = "";
 };
-const formatFileSize = (b) => {
-  if (!b) return "0 B";
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return "0 Bytes";
   const k = 1024,
-    s = ["B", "KB", "MB", "GB"],
-    i = Math.floor(Math.log(b) / Math.log(k));
-  return parseFloat((b / Math.pow(k, i)).toFixed(2)) + " " + s[i];
+    sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 };
 
-// ── Images ────────────────────────────────────────────────────────────────
+// Images
 const triggerFileInput = () => fileInput.value?.click();
 const handleFileSelect = (e) => addImages(Array.from(e.target.files));
 const handleDrop = (e) => {
-  imgDragover.value = false;
+  e.preventDefault();
   addImages(Array.from(e.dataTransfer.files));
 };
 const addImages = (files) => {
-  const imgs = files.filter((f) => f.type.startsWith("image/"));
-  const rem = 5 - productImages.value.length;
-  if (imgs.length > rem) {
-    toast.info(`Only ${rem} slot(s) remaining.`);
-    imgs.splice(rem);
+  const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+  const remaining = 5 - productImages.value.length;
+  if (imageFiles.length > remaining) {
+    toast.info(`You can only upload ${remaining} more image(s).`);
+    imageFiles.splice(remaining);
   }
-  imgs.forEach((file) => {
-    const r = new FileReader();
-    r.onload = (e) => productImages.value.push({ file, url: e.target.result });
-    r.readAsDataURL(file);
+  imageFiles.forEach((file) => {
+    const reader = new FileReader();
+    reader.onload = (e) =>
+      productImages.value.push({ file, url: e.target.result });
+    reader.readAsDataURL(file);
   });
   if (fileInput.value) fileInput.value.value = "";
 };
-const removeImage = (i) => productImages.value.splice(i, 1);
+const removeImage = (index) => productImages.value.splice(index, 1);
+const clearError = (field) => {
+  if (errors[field]) delete errors[field];
+};
 
-// ── Validation ────────────────────────────────────────────────────────────
 const validateForm = () => {
   Object.keys(errors).forEach((k) => delete errors[k]);
-  let ok = true,
-    first = null;
+  let isValid = true;
+  let firstError = null;
 
   const required = [
-    { f: "product_name", l: "Product Name", v: formData.product_name },
-    { f: "description", l: "Description", v: formData.description },
-    { f: "sku", l: "SKU", v: formData.sku },
-    { f: "category", l: "Category", v: formData.category },
-    { f: "flower_type", l: "Flower Type", v: formData.flower_type },
-    { f: "color", l: "Color", v: formData.color },
-    { f: "selling_type", l: "Selling Type", v: formData.selling_type },
     {
-      f: "purchase_price",
-      l: "Purchase Price",
-      v: formData.purchase_price,
-      num: true,
+      field: "product_name",
+      label: "Product Name",
+      value: formData.product_name,
     },
     {
-      f: "selling_price",
-      l: "Selling Price",
-      v: formData.selling_price,
-      num: true,
+      field: "description",
+      label: "Product Description",
+      value: formData.description,
+    },
+    { field: "sku", label: "SKU", value: formData.sku },
+    { field: "category", label: "Category", value: formData.category },
+    { field: "flower_type", label: "Flower Type", value: formData.flower_type },
+    { field: "color", label: "Color", value: formData.color },
+    {
+      field: "purchase_price",
+      label: "Purchase Price",
+      value: formData.purchase_price,
+      type: "number",
     },
     {
-      f: "quantity_in_stock",
-      l: "Quantity in Stock",
-      v: formData.quantity_in_stock,
-      num: true,
+      field: "selling_price",
+      label: "Selling Price",
+      value: formData.selling_price,
+      type: "number",
     },
     {
-      f: "min_stock_level",
-      l: "Min Stock Level",
-      v: formData.min_stock_level,
-      num: true,
+      field: "quantity_in_stock",
+      label: "Quantity in Stock",
+      value: formData.quantity_in_stock,
+      type: "number",
+    },
+    {
+      field: "min_stock_level",
+      label: "Min Stock Level",
+      value: formData.min_stock_level,
+      type: "number",
+    },
+    {
+      field: "selling_type",
+      label: "Selling Type",
+      value: formData.selling_type,
     },
   ];
-  for (const r of required) {
-    if (r.num) {
-      if (isNaN(parseFloat(r.v)) || parseFloat(r.v) < 0) {
-        errors[r.f] = `${r.l} must be 0 or greater`;
-        ok = false;
-        if (!first) first = r.f;
+
+  for (const f of required) {
+    if (f.type === "number") {
+      if (isNaN(parseFloat(f.value)) || parseFloat(f.value) < 0) {
+        errors[f.field] = `${f.label} is required and must be 0 or greater`;
+        isValid = false;
+        if (!firstError) firstError = f.field;
       }
-    } else if (!r.v?.toString().trim()) {
-      errors[r.f] = `${r.l} is required`;
-      ok = false;
-      if (!first) first = r.f;
+    } else {
+      if (!f.value || f.value.trim() === "") {
+        errors[f.field] = `${f.label} is required`;
+        isValid = false;
+        if (!firstError) firstError = f.field;
+      }
     }
-  }
-  if (formData.color === "other" && !formData.color_other?.trim()) {
-    errors.color_other = "Please specify the color";
-    ok = false;
-    if (!first) first = "color_other";
-  }
-  const sp = parseFloat(formData.selling_price) || 0;
-  const pp = parseFloat(formData.purchase_price) || 0;
-  if (sp <= pp) {
-    errors.selling_price = "Selling price must exceed purchase price";
-    ok = false;
-    if (!first) first = "selling_price";
-  }
-  if (formData.has_discount) {
-    const dp = parseFloat(formData.discount_price) || 0;
-    if (!dp || dp <= 0) {
-      errors.discount_price = "Enter a valid discount price";
-      ok = false;
-      if (!first) first = "discount_price";
-    } else if (dp >= sp) {
-      errors.discount_price = "Discount price must be less than selling price";
-      ok = false;
-      if (!first) first = "discount_price";
-    }
-  }
-  if (formData.occasion_tags.length > 2) {
-    errors.occasion_tags = "Max 2 tags allowed";
-    ok = false;
   }
 
-  if (!ok && first) {
+  if (
+    formData.color === "other" &&
+    (!formData.color_other || !formData.color_other.trim())
+  ) {
+    errors.color_other = "Please specify the color";
+    isValid = false;
+    if (!firstError) firstError = "color_other";
+  }
+
+  const selling = parseFloat(formData.selling_price) || 0;
+  const purchase = parseFloat(formData.purchase_price) || 0;
+  if (selling <= purchase) {
+    errors.selling_price = "Selling price must be greater than purchase price";
+    isValid = false;
+    if (!firstError) firstError = "selling_price";
+  }
+
+  if (formData.has_discount) {
+    const disc = parseFloat(formData.discount_price) || 0;
+    if (!formData.discount_price || disc <= 0) {
+      errors.discount_price =
+        "Discount price is required when discount is enabled";
+      isValid = false;
+      if (!firstError) firstError = "discount_price";
+    } else if (disc >= selling) {
+      errors.discount_price = "Discount price must be less than selling price";
+      isValid = false;
+      if (!firstError) firstError = "discount_price";
+    }
+  }
+
+  if (formData.occasion_tags.length > 2) {
+    errors.occasion_tags = "You can only select up to 2 occasion tags";
+    isValid = false;
+  }
+
+  if (productImages.value.length === 0) {
+    errors.images = "At least one product image is required";
+    isValid = false;
+    if (!firstError) firstError = "images";
+  }
+
+  if (!isValid && firstError) {
     setTimeout(() => {
       const el = document.querySelector(
         ".form-input.is-invalid, .form-select.is-invalid, .form-textarea.is-invalid",
       );
-      el?.closest(".form-card")?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-      el?.focus();
-    }, 80);
-    toast.error(errors[first]);
+      if (el) {
+        el.closest(".form-section")?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+        el.focus();
+      }
+    }, 100);
+    toast.error(errors[firstError]);
   }
-  return ok;
+  return isValid;
 };
 
-// ── Submit ────────────────────────────────────────────────────────────────
 const saveDraft = async () => {
   isDraft.value = true;
   formData.status = "draft";
@@ -1238,57 +998,139 @@ const submitProduct = async () => {
   if (!validateForm()) return;
   if (!user.value?.id) {
     toast.error("Please login to continue");
-    router.push("/login");
+    router.push("/guest/login");
     return;
   }
 
   isSubmitting.value = true;
-  formData.owner_id = user.value.id; // backend overrides for employees via ResolvesOwner trait
+  formData.owner_id = user.value.id;
 
   try {
-    const fd = new FormData();
+    const submitData = new FormData();
 
-    ["is_fragile", "requires_refrigeration", "has_discount"].forEach((k) =>
-      fd.append(k, formData[k] ? "1" : "0"),
+    // Booleans
+    submitData.append("is_fragile", formData.is_fragile ? "1" : "0");
+    submitData.append(
+      "requires_refrigeration",
+      formData.requires_refrigeration ? "1" : "0",
     );
+    submitData.append("has_discount", formData.has_discount ? "1" : "0");
 
-    Object.entries(formData).forEach(([k, v]) => {
-      if (
-        [
-          "is_fragile",
-          "requires_refrigeration",
-          "has_discount",
-          "occasion_tags",
-          "owner_id",
-        ].includes(k)
-      )
-        return;
-      fd.append(k, v === null || v === undefined ? "" : v.toString());
+    // All scalar fields
+    const scalarFields = [
+      "product_name",
+      "description",
+      "sku",
+      "category",
+      "flower_type",
+      "color",
+      "color_other",
+      "purchase_price",
+      "selling_price",
+      "discount_price",
+      "quantity_in_stock",
+      "min_stock_level",
+      "max_stock_level",
+      "selling_type",
+      "season",
+      "supplier_name",
+      "supplier_contact",
+      "supplier_sku",
+      "supplier_lead_time",
+      "care_instructions",
+      "notes",
+      "status",
+    ];
+
+    scalarFields.forEach((key) => {
+      const value = formData[key];
+      if (value !== null && value !== undefined && value !== "") {
+        submitData.append(key, value.toString());
+      }
     });
 
-    fd.append("owner_id", user.value.id.toString());
-    formData.occasion_tags.forEach((t) => fd.append("occasion_tags[]", t));
-    if (product3DModel.value?.file)
-      fd.append("model_file", product3DModel.value.file);
-    productImages.value.forEach((img) => {
-      if (img.file) fd.append("images[]", img.file);
-    });
+    // owner_id
+    submitData.append("owner_id", user.value.id.toString());
 
-    const res = await api.post("vendor/products", fd);
-    if (res.data.success) {
-      toast.success(res.data.message || "Product added successfully!");
-      router.push("/vendor/products");
+    // Occasion tags
+    if (
+      Array.isArray(formData.occasion_tags) &&
+      formData.occasion_tags.length > 0
+    ) {
+      formData.occasion_tags.forEach((tag) => {
+        submitData.append("occasion_tags[]", tag);
+      });
     }
-  } catch (err) {
-    if (err.response?.data?.errors) {
+
+    // ✅ Images — log each one so we can confirm they're attached
+    if (productImages.value.length > 0) {
+      productImages.value.forEach((img, index) => {
+        if (img.file instanceof File) {
+          submitData.append("images[]", img.file, img.file.name);
+          console.log(
+            `Appending image[${index}]:`,
+            img.file.name,
+            img.file.size,
+            img.file.type,
+          );
+        }
+      });
+    }
+
+    // ✅ 3D model
+    if (product3DModel.value?.file instanceof File) {
+      submitData.append(
+        "model_file",
+        product3DModel.value.file,
+        product3DModel.value.file.name,
+      );
+      console.log(
+        "Appending model:",
+        product3DModel.value.file.name,
+        product3DModel.value.file.size,
+      );
+    }
+
+    // ✅ Log FormData entries for debugging
+    console.log("=== FormData entries ===");
+    for (let [key, value] of submitData.entries()) {
+      if (value instanceof File) {
+        console.log(
+          key,
+          "→ File:",
+          value.name,
+          value.size + "bytes",
+          value.type,
+        );
+      } else {
+        console.log(key, "→", value);
+      }
+    }
+
+    const response = await api.post("vendor/products", submitData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    if (response.data.success) {
+      toast.success(response.data.message || "Product added successfully!");
+      router.push("/erp/procurement/inventory/products");
+    }
+  } catch (error) {
+    console.error("Submit error:", error.response?.data);
+    if (error.response?.data?.errors) {
       Object.keys(errors).forEach((k) => delete errors[k]);
-      Object.entries(err.response.data.errors).forEach(([k, v]) => {
+      Object.entries(error.response.data.errors).forEach(([k, v]) => {
         errors[k] = Array.isArray(v) ? v[0] : v;
       });
-      const first = Object.keys(err.response.data.errors)[0];
-      if (first) toast.error(err.response.data.errors[first][0]);
+      const first = Object.keys(error.response.data.errors)[0];
+      if (first) toast.error(error.response.data.errors[first][0]);
     } else {
-      toast.error(err.response?.data?.message || "Failed to add product.");
+      toast.error(
+        error.response?.data?.message ||
+          "Failed to add product. Please try again.",
+      );
     }
   } finally {
     isSubmitting.value = false;
@@ -1297,7 +1139,8 @@ const submitProduct = async () => {
 };
 
 const goBack = () => {
-  if (confirm("Leave? Unsaved changes will be lost.")) router.back();
+  if (confirm("Are you sure you want to leave? Unsaved changes will be lost."))
+    router.back();
 };
 
 onMounted(() => {
@@ -1306,445 +1149,143 @@ onMounted(() => {
 </script>
 
 <style scoped>
-*,
-*::before,
-*::after {
-  font-family:
-    "Poppins",
-    -apple-system,
-    sans-serif;
+* {
+  font-family: "Poppins", sans-serif;
   box-sizing: border-box;
 }
 
-/* ── Layout ── */
 .product-layout {
   display: flex;
   min-height: 100vh;
-  background: #f0f4f8;
-}
-.main-content {
-  flex: 1;
-  padding: 28px 32px 60px;
+  background: #f8f9fa;
 }
 
-/* ── Page header ── */
+.main-content {
+  margin-left: 260px;
+  flex: 1;
+  padding: 24px;
+}
+
+/* Header */
 .content-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 20px;
-  gap: 20px;
+  align-items: center;
+  margin-bottom: 24px;
 }
 .header-left {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 .btn-back {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
-  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
   background: white;
   cursor: pointer;
+  font-size: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
   transition: all 0.2s;
-  flex-shrink: 0;
 }
 .btn-back:hover {
   border-color: #48bb78;
   color: #48bb78;
-  background: #f0fff4;
 }
 .page-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1a202c;
+  font-size: 28px;
+  font-weight: 600;
+  color: #2d3748;
   margin: 0;
-  line-height: 1.2;
-}
-.page-subtitle {
-  font-size: 13px;
-  color: #94a3b8;
-  margin: 2px 0 0;
 }
 .header-actions {
   display: flex;
-  gap: 10px;
-  flex-shrink: 0;
+  gap: 12px;
 }
 
-/* ── Progress bar ── */
-.progress-bar {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  margin-bottom: 24px;
+/* Form */
+.form-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.form-section {
   background: white;
   border-radius: 12px;
-  padding: 14px 24px;
+  padding: 24px;
+  margin-bottom: 20px;
   border: 1px solid #e2e8f0;
 }
-.progress-step {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.step-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #cbd5e0;
-  transition: all 0.3s;
-}
-.progress-step.done .step-dot {
-  background: #48bb78;
-  box-shadow: 0 0 0 3px #d1fae5;
-}
-.progress-step.active .step-dot {
-  background: #48bb78;
-  animation: pulse-dot 1.4s ease-in-out infinite;
-}
-@keyframes pulse-dot {
-  0%,
-  100% {
-    box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgba(72, 187, 120, 0.1);
-  }
-}
-.step-label {
-  font-size: 12px;
+.section-title {
+  font-size: 18px;
   font-weight: 600;
-  color: #94a3b8;
+  color: #2d3748;
+  margin: 0 0 20px 0;
 }
-.progress-step.done .step-label,
-.progress-step.active .step-label {
-  color: #48bb78;
+.optional-label {
+  font-size: 13px;
+  font-weight: 400;
+  color: #9ca3af;
+  margin-left: 6px;
 }
-.progress-line {
-  flex: 1;
-  height: 2px;
-  background: #e2e8f0;
-  margin: 0 12px;
-}
-
-/* ── Two-column layout ── */
-.form-columns {
+.form-grid {
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: repeat(2, 1fr);
   gap: 20px;
-  align-items: start;
-}
-.col-left {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.col-right {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.sticky-card {
-  position: sticky;
-  top: 20px;
-}
-
-/* ── Cards ── */
-.form-card {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  border: 1px solid #e8edf2;
-}
-.card-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 22px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid #f1f5f9;
-}
-.card-header-icon {
-  width: 42px;
-  height: 42px;
-  background: #f0fff4;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  flex-shrink: 0;
-}
-.card-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1a202c;
-  margin: 0 0 2px;
-}
-.card-subtitle {
-  font-size: 12.5px;
-  color: #94a3b8;
-  margin: 0;
-}
-
-/* ── Form elements ── */
-.two-col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 16px;
 }
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+}
+.form-group.full-width {
+  grid-column: 1 / -1;
 }
 .form-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #374151;
-}
-.req {
-  color: #e53e3e;
-}
-.optional-chip {
-  font-size: 11px;
-  font-weight: 400;
-  color: #9ca3af;
-  background: #f1f5f9;
-  padding: 2px 7px;
-  border-radius: 20px;
-  margin-left: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #2d3748;
 }
 .form-input,
 .form-select,
 .form-textarea {
-  padding: 10px 13px;
+  padding: 10px 14px;
   border: 1.5px solid #e2e8f0;
-  border-radius: 9px;
-  font-size: 13.5px;
-  color: #1a202c;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #2d3748;
+  transition: all 0.2s;
   background: white;
   font-family: inherit;
-  transition:
-    border-color 0.18s,
-    box-shadow 0.18s;
 }
 .form-input:focus,
 .form-select:focus,
 .form-textarea:focus {
   outline: none;
   border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.12);
-}
-.form-input.is-invalid,
-.form-select.is-invalid,
-.form-textarea.is-invalid {
-  border-color: #f87171;
+  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
 }
 .form-textarea {
   resize: vertical;
   min-height: 80px;
-  line-height: 1.6;
 }
 .error-text {
-  font-size: 11.5px;
-  color: #ef4444;
-  font-weight: 500;
+  color: #e53e3e;
+  font-size: 12px;
+}
+.form-input.is-invalid,
+.form-select.is-invalid,
+.form-textarea.is-invalid {
+  border-color: #e53e3e;
 }
 .hint-text {
-  font-size: 11.5px;
-  color: #9ca3af;
-}
-
-/* ── Input prefix ── */
-.input-prefix-wrap {
-  position: relative;
-}
-.input-prefix {
-  position: absolute;
-  left: 13px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-weight: 600;
-  color: #94a3b8;
-  font-size: 14px;
-  pointer-events: none;
-  z-index: 1;
-}
-.form-input.has-prefix {
-  padding-left: 30px;
-}
-
-/* ── Profit pill ── */
-.profit-pill {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 18px;
-  border-radius: 12px;
-  margin-top: 18px;
-}
-.profit-pill.green {
-  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
-  border: 1px solid #6ee7b7;
-}
-.profit-pill.red {
-  background: linear-gradient(135deg, #fee2e2, #fecaca);
-  border: 1px solid #fca5a5;
-}
-.profit-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #047857;
-  margin-bottom: 4px;
-}
-.profit-pill.red .profit-label {
-  color: #b91c1c;
-}
-.profit-value {
-  font-size: 22px;
-  font-weight: 700;
-  color: #065f46;
-}
-.profit-pill.red .profit-value {
-  color: #991b1b;
-}
-.profit-pct {
-  display: block;
-  font-size: 20px;
-  font-weight: 700;
-  color: #065f46;
-  text-align: right;
-}
-.profit-pill.red .profit-pct {
-  color: #991b1b;
-}
-.profit-pct-label {
-  display: block;
-  font-size: 11px;
-  color: #047857;
-  text-align: right;
-}
-.profit-pill.red .profit-pct-label {
-  color: #b91c1c;
-}
-
-/* ── Discount toggle ── */
-.discount-toggle-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 18px;
-  background: #f8fafc;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 12px;
-  margin-top: 16px;
-  transition: all 0.2s;
-  cursor: pointer;
-}
-.discount-toggle-card.active {
-  border-color: #48bb78;
-  background: #f0fff4;
-}
-.toggle-switch {
-  position: relative;
-  display: inline-block;
-  width: 46px;
-  height: 26px;
-  flex-shrink: 0;
-}
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-.toggle-track {
-  position: absolute;
-  inset: 0;
-  background: #cbd5e0;
-  border-radius: 26px;
-  transition: background 0.25s;
-  cursor: pointer;
-}
-.toggle-track::after {
-  content: "";
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  left: 3px;
-  top: 3px;
-  background: white;
-  border-radius: 50%;
-  transition: transform 0.25s;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
-}
-.toggle-switch input:checked + .toggle-track {
-  background: #48bb78;
-}
-.toggle-switch input:checked + .toggle-track::after {
-  transform: translateX(20px);
-}
-.toggle-text {
-  flex: 1;
-}
-.toggle-main {
-  display: block;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #1a202c;
-}
-.toggle-sub {
-  display: block;
   font-size: 12px;
   color: #9ca3af;
-  margin-top: 1px;
-}
-.sale-badge {
-  padding: 5px 12px;
-  background: #ef4444;
-  color: white;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.discount-fields {
-  margin-top: 14px;
-}
-.discount-pct-pill {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 14px;
-  background: #fef9c3;
-  border: 1px solid #fde68a;
-  border-radius: 10px;
-  min-height: 68px;
-}
-.discount-pct-num {
-  font-size: 22px;
-  font-weight: 700;
-  color: #92400e;
-}
-.discount-pct-label {
-  font-size: 12px;
-  color: #b45309;
-  margin-top: 2px;
 }
 
-/* ── Info banner ── */
+/* Info banner */
 .info-banner {
   display: flex;
   align-items: flex-start;
@@ -1753,405 +1294,169 @@ onMounted(() => {
   padding: 14px 18px;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
-  border-radius: 12px;
+  border-radius: 10px;
   border-left: 4px solid #3b82f6;
 }
-.info-banner-icon {
+.info-icon {
   font-size: 20px;
   flex-shrink: 0;
   margin-top: 1px;
 }
 .info-banner strong {
   display: block;
-  font-size: 13px;
+  font-size: 14px;
   color: #1e40af;
   margin-bottom: 4px;
 }
 .info-banner p {
-  font-size: 12px;
-  color: #2563eb;
-  margin: 0;
-  line-height: 1.6;
-}
-
-/* ── Tag grid ── */
-.tag-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 4px;
-}
-.tag-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 12.5px;
-  color: #4a5568;
-  transition: all 0.15s;
-  user-select: none;
-}
-.tag-chip input {
-  display: none;
-}
-.tag-chip:hover:not(.disabled) {
-  border-color: #48bb78;
-  color: #48bb78;
-  background: #f0fff4;
-}
-.tag-chip.selected {
-  border-color: #48bb78;
-  background: #f0fff4;
-  color: #22543d;
-  font-weight: 600;
-}
-.tag-chip.selected::before {
-  content: "✓ ";
-}
-.tag-chip.disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-/* ── Checkbox cards ── */
-.checkbox-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 16px;
-}
-.checkbox-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.checkbox-card input {
-  display: none;
-}
-.checkbox-card:hover {
-  border-color: #48bb78;
-  background: #f9fffc;
-}
-.checkbox-card.checked {
-  border-color: #48bb78;
-  background: #f0fff4;
-}
-.checkbox-card-icon {
-  font-size: 20px;
-  flex-shrink: 0;
-}
-.checkbox-card-title {
-  display: block;
   font-size: 13px;
-  font-weight: 600;
-  color: #2d3748;
-}
-.checkbox-card-sub {
-  display: block;
-  font-size: 11.5px;
-  color: #9ca3af;
+  color: #3b82f6;
+  margin: 0;
 }
 
-/* ── Drop zones ── */
-.drop-zone {
+/* Input prefix */
+.input-with-prefix {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.prefix {
+  position: absolute;
+  left: 14px;
+  color: #9ca3af;
+  font-weight: 500;
+  z-index: 1;
+  pointer-events: none;
+}
+.input-with-prefix .form-input {
+  padding-left: 32px;
+}
+
+/* Profit display */
+.profit-display {
+  padding: 16px;
+  background: #d1fae5;
+  border-radius: 8px;
+  border: 1px solid #a7f3d0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 2px dashed #cbd5e0;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: #f8fafc;
-  text-align: center;
+  min-height: 64px;
 }
-.drop-zone:hover,
-.drop-zone.dragging {
+.profit-amount {
+  font-size: 24px;
+  font-weight: 700;
+  color: #065f46;
+  margin-bottom: 4px;
+}
+.profit-percentage {
+  font-size: 13px;
+  color: #047857;
+}
+
+/* Discount display */
+.discount-display {
+  padding: 16px;
+  background: #fef3c7;
+  border-radius: 8px;
+  border: 1px solid #fde68a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+}
+.discount-amount {
+  font-size: 24px;
+  font-weight: 700;
+  color: #92400e;
+  margin-bottom: 4px;
+}
+.discount-text {
+  font-size: 13px;
+  color: #b45309;
+}
+
+/* ─── Toggle Switch (matches edit modal) ──────────────── */
+.discount-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #f7fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+.discount-toggle-row.active {
   border-color: #48bb78;
   background: #f0fff4;
 }
-.model-drop {
-  padding: 36px 24px;
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
 }
-.drop-zone-icon {
-  font-size: 36px;
-  margin-bottom: 10px;
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
 }
-.drop-zone-title {
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: #cbd5e0;
+  border-radius: 24px;
+  transition: 0.3s;
+}
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.3s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.toggle-switch input:checked + .toggle-slider {
+  background: #48bb78;
+}
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+.toggle-label-group {
+  flex: 1;
+}
+.toggle-label-main {
+  display: block;
   font-size: 14px;
   font-weight: 600;
   color: #2d3748;
-  margin: 0 0 4px;
 }
-.drop-zone-sub {
-  font-size: 12.5px;
-  color: #94a3b8;
-  margin: 0 0 12px;
-}
-.drop-zone-btn {
-  display: inline-block;
-  padding: 8px 20px;
-  background: #48bb78;
-  color: white;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-}
-.drop-zone-limit {
-  font-size: 11.5px;
-  color: #94a3b8;
-  margin: 10px 0 0;
-}
-
-/* ── 3D model preview ── */
-.model-preview-box {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 16px;
-  background: #f7fafc;
-  border-radius: 12px;
-  border: 1.5px solid #e2e8f0;
-}
-.model-file-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.model-file-icon {
-  font-size: 28px;
-}
-.model-file-name {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0;
-}
-.model-file-meta {
-  font-size: 12px;
-  color: #94a3b8;
-  margin: 2px 0 0;
-}
-.btn-remove-model {
-  padding: 7px 14px;
-  background: #fee2e2;
-  color: #991b1b;
-  border: none;
-  border-radius: 7px;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.2s;
-}
-.btn-remove-model:hover {
-  background: #fecaca;
-}
-
-/* ── Image grid ── */
-.image-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-.img-thumb {
-  position: relative;
-  aspect-ratio: 1;
-  border-radius: 10px;
-  overflow: hidden;
-  border: 2px solid #e2e8f0;
-  transition: border-color 0.2s;
-}
-.img-thumb.is-primary {
-  border-color: #48bb78;
-}
-.img-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.toggle-label-sub {
   display: block;
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 2px;
 }
-.img-remove {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 22px;
-  height: 22px;
-  background: rgba(239, 68, 68, 0.9);
-  border: none;
-  border-radius: 50%;
+.discount-active-pill {
+  padding: 5px 12px;
+  background: #e53e3e;
   color: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-.img-thumb:hover .img-remove {
-  opacity: 1;
-}
-.img-primary-badge {
-  position: absolute;
-  bottom: 6px;
-  left: 6px;
-  padding: 2px 7px;
-  background: #48bb78;
-  color: white;
-  font-size: 10px;
+  border-radius: 20px;
+  font-size: 11px;
   font-weight: 700;
-  border-radius: 4px;
-}
-.img-drop {
-  aspect-ratio: 1;
-  padding: 12px;
-}
-
-/* ── Summary card ── */
-.summary-card {
-  background: #1a202c;
-  border-radius: 16px;
-  padding: 22px;
-}
-.summary-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin: 0 0 14px;
-}
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #2d3748;
-  font-size: 13px;
-}
-.summary-row:last-child {
-  border-bottom: none;
-}
-.summary-row span:first-child {
-  color: #94a3b8;
-}
-.summary-row span:last-child {
-  color: #e2e8f0;
-  font-weight: 500;
-  text-align: right;
-  max-width: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.summary-row .green-val {
-  color: #68d391;
-  font-weight: 700;
-}
-.summary-row .red-val {
-  color: #fc8181;
-}
-.summary-row .mono {
-  font-family: monospace;
-  font-size: 12px;
-  color: #a0aec0;
-}
 
-/* ── Bottom actions bar ── */
-.form-actions-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 24px;
-  padding: 18px 24px;
-  background: white;
-  border-radius: 14px;
-  border: 1px solid #e2e8f0;
-}
-.action-right {
-  display: flex;
-  gap: 10px;
-}
-
-/* ── Buttons ── */
-.btn-primary,
-.btn-secondary,
-.btn-cancel {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 22px;
-  border-radius: 9px;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  font-family: inherit;
-  transition: all 0.2s;
-}
-.btn-primary {
-  background: #48bb78;
-  color: white;
-}
-.btn-primary:hover:not(:disabled) {
-  background: #38a169;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(72, 187, 120, 0.35);
-}
-.btn-primary:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.btn-secondary {
-  background: white;
-  color: #374151;
-  border: 1.5px solid #e2e8f0;
-}
-.btn-secondary:hover:not(:disabled) {
-  border-color: #48bb78;
-  color: #48bb78;
-  background: #f0fff4;
-}
-.btn-secondary:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.btn-cancel {
-  background: white;
-  color: #6b7280;
-  border: 1.5px solid #e2e8f0;
-}
-.btn-cancel:hover {
-  border-color: #f87171;
-  color: #ef4444;
-  background: #fff5f5;
-}
-
-/* ── Spinner ── */
-.btn-spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* ── Transitions ── */
+/* Slide transition */
 .slide-down-enter-active,
 .slide-down-leave-active {
   transition: all 0.25s ease;
@@ -2161,72 +1466,338 @@ onMounted(() => {
 .slide-down-leave-to {
   opacity: 0;
   max-height: 0;
-  margin-top: 0;
+  transform: translateY(-8px);
 }
 .slide-down-enter-to,
 .slide-down-leave-from {
   opacity: 1;
-  max-height: 400px;
-}
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+  max-height: 200px;
+  transform: translateY(0);
 }
 
-/* ── Responsive ── */
-@media (max-width: 1280px) {
-  .form-columns {
-    grid-template-columns: 1fr 340px;
-  }
+/* 3D model */
+.model-upload-section {
+  width: 100%;
 }
-@media (max-width: 1100px) {
+.model-preview-container {
+  margin-bottom: 16px;
+}
+.model-preview {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #f7fafc;
+  border-radius: 12px;
+  border: 2px solid #e2e8f0;
+}
+.model-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.model-icon {
+  font-size: 32px;
+}
+.model-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.model-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+.model-size,
+.model-type {
+  font-size: 12px;
+  color: #718096;
+  margin: 0;
+}
+.remove-model-btn {
+  padding: 8px 16px;
+  background: #fee2e2;
+  color: #991b1b;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.remove-model-btn:hover {
+  background: #fecaca;
+}
+.model-upload-placeholder {
+  padding: 48px;
+  border: 2px dashed #cbd5e0;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #f7fafc;
+}
+.model-upload-placeholder:hover {
+  border-color: #48bb78;
+  background: #d1fae5;
+}
+.upload-icon {
+  font-size: 40px;
+  margin-bottom: 10px;
+}
+.upload-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 6px;
+}
+.upload-hint {
+  font-size: 13px;
+  color: #718096;
+  margin-bottom: 4px;
+}
+.upload-size-hint {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* Images */
+.image-upload-section {
+  width: 100%;
+}
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.image-preview {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid #e2e8f0;
+  transition: all 0.2s;
+}
+.image-preview:hover {
+  border-color: #48bb78;
+}
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.remove-image-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.2s;
+}
+.image-preview:hover .remove-image-btn {
+  opacity: 1;
+}
+.primary-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  background: #48bb78;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+}
+.image-upload-placeholder {
+  aspect-ratio: 1;
+  border: 2px dashed #cbd5e0;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #f7fafc;
+}
+.image-upload-placeholder:hover {
+  border-color: #48bb78;
+  background: #d1fae5;
+}
+
+/* Tags */
+.tag-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 4px;
+}
+.tag-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 13px;
+  background: white;
+}
+.tag-option:hover:not(.disabled) {
+  border-color: #48bb78;
+  background: #f0fdf4;
+}
+.tag-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.tag-option input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: #48bb78;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #2d3748;
+  padding: 8px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+.checkbox-label:hover {
+  background: #f7fafc;
+}
+.checkbox-label input[type="checkbox"] {
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  accent-color: #48bb78;
+}
+
+/* Actions */
+.form-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  margin-top: 20px;
+}
+.action-group {
+  display: flex;
+  gap: 12px;
+}
+.btn-primary,
+.btn-secondary,
+.btn-cancel {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+  border: none;
+  font-family: inherit;
+}
+.btn-primary {
+  background: #48bb78;
+  color: white;
+}
+.btn-primary:hover:not(:disabled) {
+  background: #38a169;
+  transform: translateY(-1px);
+}
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn-secondary {
+  background: white;
+  color: #2d3748;
+  border: 1px solid #e2e8f0;
+}
+.btn-secondary:hover:not(:disabled) {
+  border-color: #48bb78;
+  color: #48bb78;
+  background: #f0fdf4;
+}
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn-cancel {
+  background: white;
+  color: #6b7280;
+  border: 1px solid #e2e8f0;
+}
+.btn-cancel:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: #fff5f5;
+}
+
+@media (max-width: 1024px) {
   .main-content {
     margin-left: 0;
   }
-}
-@media (max-width: 960px) {
-  .form-columns {
+  .form-grid {
     grid-template-columns: 1fr;
   }
-  .sticky-card {
-    position: static;
+  .tag-selector {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .form-actions {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .action-group {
+    width: 100%;
+    justify-content: space-between;
   }
 }
 @media (max-width: 768px) {
   .main-content {
     padding: 16px;
   }
-  .two-col {
-    grid-template-columns: 1fr;
-  }
-  .tag-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .checkbox-row {
-    grid-template-columns: 1fr;
+  .form-section {
+    padding: 16px;
   }
 }
-@media (max-width: 600px) {
-  .form-columns {
-    grid-template-columns: 1fr;
+@media (max-width: 640px) {
+  .page-title {
+    font-size: 22px;
   }
-  .image-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .tag-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-  .form-actions-bar {
+  .action-group {
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
   }
-  .action-right {
-    width: 100%;
-    justify-content: flex-end;
+  .tag-selector {
+    grid-template-columns: 1fr;
   }
 }
 </style>

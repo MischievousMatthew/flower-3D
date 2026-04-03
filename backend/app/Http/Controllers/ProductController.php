@@ -76,6 +76,7 @@ class ProductController extends Controller
     {
         try {
             $ownerId = $this->resolveOwnerId($request);
+            $request->merge($this->normalizeProductPayload($request));
             $product = Product::where('id', $id)
                 ->where('owner_id', $ownerId)
                 ->with(['images', 'models'])
@@ -140,12 +141,26 @@ class ProductController extends Controller
                 'is_fragile'             => 'nullable|boolean',
                 'requires_refrigeration' => 'nullable|boolean',
                 'status'                 => 'required|in:draft,active,discontinued',
+                'images'                 => 'required|array|min:1',
+                'images.*'               => 'file|image|max:10240',
+                'model_file'             => 'nullable|file|max:51200',
                 // ── files validated separately below ──
             ], [
                 'selling_price.gt'  => 'Selling price must be greater than purchase price',
                 'discount_price.lt' => 'Discount price must be less than selling price',
                 'occasion_tags.max' => 'You can only select up to 2 occasion tags',
+                'images.required'   => 'At least one product image is required',
+                'images.min'        => 'At least one product image is required',
             ]);
+
+            $validator->after(function ($validator) use ($request) {
+                foreach (['product_name', 'description', 'sku', 'category'] as $field) {
+                    $value = $request->input($field);
+                    if (!is_string($value) || trim($value) === '') {
+                        $validator->errors()->add($field, ucfirst(str_replace('_', ' ', $field)) . ' is required');
+                    }
+                }
+            });
 
             if ($validator->fails()) {
                 return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
@@ -214,6 +229,8 @@ class ProductController extends Controller
             if (!$product) {
                 return response()->json(['success' => false, 'message' => 'Product not found'], 404);
             }
+
+            $request->merge($this->normalizeProductPayload($request));
 
             if ($request->has('occasion_tags') && !is_array($request->occasion_tags)) {
                 $tags = json_decode($request->occasion_tags, true);
@@ -576,6 +593,49 @@ class ProductController extends Controller
                 ]);
             }
         }
+    }
+
+    private function normalizeProductPayload(Request $request): array
+    {
+        $payload = $request->all();
+
+        foreach ([
+            'product_name',
+            'description',
+            'sku',
+            'category',
+            'flower_type',
+            'color',
+            'color_other',
+            'selling_type',
+            'season',
+            'supplier_name',
+            'supplier_contact',
+            'supplier_sku',
+            'care_instructions',
+            'notes',
+            'status',
+        ] as $field) {
+            if (array_key_exists($field, $payload) && is_string($payload[$field])) {
+                $payload[$field] = trim($payload[$field]);
+            }
+        }
+
+        foreach ([
+            'color_other',
+            'supplier_name',
+            'supplier_contact',
+            'supplier_sku',
+            'care_instructions',
+            'notes',
+            'season',
+        ] as $field) {
+            if (($payload[$field] ?? null) === '') {
+                $payload[$field] = null;
+            }
+        }
+
+        return $payload;
     }
 
     /**

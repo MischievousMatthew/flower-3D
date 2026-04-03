@@ -1167,7 +1167,19 @@ const fetchProfile = async () => {
 // ── Update handlers ───────────────────────────────────────────────────────
 const updateGeneralInfo = () =>
   generalForm.submit(
-    () => api.put("/vendor/profile/general-info", formData.general),
+    () =>
+      api.put("/vendor/profile/general-info", {
+        store_name: (formData.general.store_name || "").trim(),
+        store_description: (formData.general.store_description || "").trim(),
+        store_address: (formData.general.store_address || "").trim(),
+        service_areas: (formData.general.service_areas || "").trim(),
+        operating_hours: (formData.general.operating_hours || "").trim(),
+        owner_name: (formData.general.owner_name || "").trim(),
+        position: (formData.general.position || "").trim(),
+        contact_number: (formData.general.contact_number || "").trim(),
+        facebook_page: (formData.general.facebook_page || "").trim(),
+        instagram_page: (formData.general.instagram_page || "").trim(),
+      }),
     {
       successMsg: "General info updated successfully!",
       onSuccess: (res) => {
@@ -1179,7 +1191,14 @@ const updateGeneralInfo = () =>
 
 const updatePaymentDetails = () =>
   paymentForm.submit(
-    () => api.put("/vendor/profile/payment-details", formData.payment),
+    () =>
+      api.put("/vendor/profile/payment-details", {
+        payout_method: (formData.payment.payout_method || "").trim(),
+        account_holder_name: (formData.payment.account_holder_name || "").trim(),
+        account_number: (formData.payment.account_number || "").trim(),
+        bank_name: (formData.payment.bank_name || "").trim(),
+        billing_address: (formData.payment.billing_address || "").trim(),
+      }),
     {
       successMsg: "Payment details updated successfully!",
       onSuccess: (res) => {
@@ -1203,7 +1222,23 @@ const updateProductDetails = () => {
     return;
   }
   productForm.submit(
-    () => api.put("/vendor/profile/product-details", formData.product),
+    () =>
+      api.put("/vendor/profile/product-details", {
+        product_types: Array.isArray(formData.product.product_types)
+          ? formData.product.product_types
+          : [],
+        price_min: formData.product.price_min,
+        price_max: formData.product.price_max,
+        same_day_delivery: formData.product.same_day_delivery,
+        cutoff_times: Array.isArray(formData.product.cutoff_times)
+          ? formData.product.cutoff_times
+              .map((cutoff) => ({
+                day: (cutoff?.day || "").trim(),
+                time: (cutoff?.time || "").trim(),
+              }))
+              .filter((cutoff) => cutoff.day && cutoff.time)
+          : [],
+      }),
     {
       successMsg: "Product details updated successfully!",
       onSuccess: (res) => {
@@ -1216,7 +1251,13 @@ const updateProductDetails = () => {
 
 const updateDeliveryDetails = () =>
   deliveryForm.submit(
-    () => api.put("/vendor/profile/delivery-details", formData.delivery),
+    () =>
+      api.put("/vendor/profile/delivery-details", {
+        delivery_handled_by: (formData.delivery.delivery_handled_by || "self").trim(),
+        max_orders_per_day: formData.delivery.max_orders_per_day,
+        lead_time: (formData.delivery.lead_time || "").trim(),
+        cancellation_policy: (formData.delivery.cancellation_policy || "").trim(),
+      }),
     {
       successMsg: "Delivery details updated successfully!",
       onSuccess: (res) => {

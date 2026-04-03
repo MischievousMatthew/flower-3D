@@ -960,6 +960,12 @@ const validateForm = () => {
     isValid = false;
   }
 
+  if (productImages.value.length === 0) {
+    errors.images = "At least one product image is required";
+    isValid = false;
+    if (!firstError) firstError = "images";
+  }
+
   if (!isValid && firstError) {
     setTimeout(() => {
       const el = document.querySelector(
@@ -994,7 +1000,7 @@ const submitProduct = async () => {
   if (!validateForm()) return;
   if (!user.value?.id) {
     toast.error("Please login to continue");
-    router.push("/login");
+    router.push("/guest/login");
     return;
   }
 
