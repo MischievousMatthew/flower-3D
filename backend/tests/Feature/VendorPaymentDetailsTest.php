@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\User;
 use App\Models\VendorApplication;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
@@ -107,7 +108,7 @@ class VendorPaymentDetailsTest extends TestCase
         $vendorApplication->refresh();
 
         $this->assertSame($accountNumber, $vendorApplication->decrypted_account_number);
-        $this->assertNotSame($accountNumber, $vendorApplication->getRawOriginal('account_number'));
+        $this->assertSame($accountNumber, $vendorApplication->getRawOriginal('account_number'));
         $this->assertSame('Gcash', $vendorApplication->bank_name);
         $this->assertTrue($vendorApplication->payment_details_completed);
     }
@@ -148,7 +149,26 @@ class VendorPaymentDetailsTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.decrypted_account_number', null);
+            ->assertJsonPath('data.decrypted_account_number', 'corrupted-ciphertext');
+    }
+
+    public function test_legacy_encrypted_account_number_is_still_readable(): void
+    {
+        $user = $this->createVendorUser();
+        $vendorApplication = $this->createApprovedVendorApplication($user);
+
+        DB::table('vendor_applications')
+            ->where('id', $vendorApplication->id)
+            ->update(['account_number' => Crypt::encryptString('09171234567')]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->getJson('/api/vendor/profile');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.decrypted_account_number', '09171234567');
     }
 
     public function test_payment_details_update_survives_legacy_corrupted_profile_fields(): void

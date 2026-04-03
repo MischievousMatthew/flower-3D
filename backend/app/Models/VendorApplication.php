@@ -124,7 +124,9 @@ class VendorApplication extends Model
     // ─────────────────────────────────────────────────────────────────────────
     public function setAccountNumberAttribute($value): void
     {
-        if (empty($value)) {
+        $value = is_string($value) ? trim($value) : $value;
+
+        if ($value === null || $value === '') {
             $this->attributes['account_number'] = null;
             return;
         }
@@ -133,7 +135,7 @@ class VendorApplication extends Model
         // If something tries to set a pre-encrypted value, it will be
         // double-encrypted here, which is actually safer — the accessor
         // will cleanly decrypt it twice.  Callers must always pass plain text.
-        $this->attributes['account_number'] = Crypt::encryptString((string) $value);
+        $this->attributes['account_number'] = (string) $value;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -162,12 +164,8 @@ class VendorApplication extends Model
 
                 try {
                     return Crypt::decryptString($value);
-                } catch (\Exception $e) {
-                    \Log::warning('Failed to decrypt account_number', [
-                        'application_id' => $this->application_id ?? null,
-                        'error'          => $e->getMessage(),
-                    ]);
-                    return null;
+                } catch (\Throwable) {
+                    return $value;
                 }
             }
         );
@@ -178,8 +176,6 @@ class VendorApplication extends Model
         $deliveryHandledBy       = strtolower(trim((string) ($this->attributes['delivery_handled_by'] ?? null)));
         $isVendorManagedDelivery = in_array($deliveryHandledBy, ['self', 'vendor'], true);
 
-        // account_number is stored encrypted; check the raw attribute instead
-        // of the accessor so we don't trigger a decrypt on every save().
         $hasAccountNumber = !empty($this->attributes['account_number'] ?? null);
         $hasProductTypes = $this->hasFilledJsonLikeAttribute('product_types');
         $hasPriceMin = $this->hasFilledScalarAttribute('price_min');
