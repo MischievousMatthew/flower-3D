@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Helpers\CloudinaryHelper;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\VendorApplication;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,6 +18,13 @@ class VendorProfileController extends Controller
     public function getProfile(Request $request)
     {
         try {
+            if (!$this->authenticatedVendorUser()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Access denied. Vendor only.',
+                ], 403);
+            }
+
             $vendorApplication = $this->findApprovedVendorApplication();
 
             if (!$vendorApplication) {
@@ -43,6 +51,13 @@ class VendorProfileController extends Controller
     public function updatePaymentDetails(Request $request)
     {
         try {
+            if (!$this->authenticatedVendorUser()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Access denied. Vendor only.',
+                ], 403);
+            }
+
             $vendorApplication = $this->findApprovedVendorApplication();
 
             if (!$vendorApplication) {
@@ -128,6 +143,13 @@ class VendorProfileController extends Controller
     public function updateProductDetails(Request $request)
     {
         try {
+            if (!$this->authenticatedVendorUser()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Access denied. Vendor only.',
+                ], 403);
+            }
+
             $vendorApplication = $this->findApprovedVendorApplication();
 
             if (!$vendorApplication) {
@@ -198,6 +220,13 @@ class VendorProfileController extends Controller
     public function updateDeliveryDetails(Request $request)
     {
         try {
+            if (!$this->authenticatedVendorUser()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Access denied. Vendor only.',
+                ], 403);
+            }
+
             $vendorApplication = $this->findApprovedVendorApplication();
 
             if (!$vendorApplication) {
@@ -255,6 +284,13 @@ class VendorProfileController extends Controller
     public function updateStoreLogo(Request $request)
     {
         try {
+            if (!$this->authenticatedVendorUser()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Access denied. Vendor only.',
+                ], 403);
+            }
+
             $vendorApplication = $this->findApprovedVendorApplication();
 
             if (!$vendorApplication) {
@@ -299,6 +335,13 @@ class VendorProfileController extends Controller
     public function updateGeneralInfo(Request $request)
     {
         try {
+            if (!$this->authenticatedVendorUser()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Access denied. Vendor only.',
+                ], 403);
+            }
+
             $vendorApplication = $this->findApprovedVendorApplication();
 
             if (!$vendorApplication) {
@@ -365,6 +408,13 @@ class VendorProfileController extends Controller
     public function deleteStoreLogo(Request $request)
     {
         try {
+            if (!$this->authenticatedVendorUser()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Access denied. Vendor only.',
+                ], 403);
+            }
+
             $vendorApplication = $this->findApprovedVendorApplication();
 
             if (!$vendorApplication) {
@@ -392,6 +442,13 @@ class VendorProfileController extends Controller
     {
         try {
             $user = Auth::user();
+
+            if (!$user instanceof User || !$user->isVendor()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Access denied. Vendor only.',
+                ], 403);
+            }
 
             $validator = Validator::make($request->all(), [
                 'current_password'      => 'required|string',
@@ -446,9 +503,20 @@ class VendorProfileController extends Controller
         }
     }
 
-    private function findApprovedVendorApplication(): ?VendorApplication
+    private function authenticatedVendorUser(): ?User
     {
         $user = Auth::user();
+
+        if (!$user instanceof User || !$user->isVendor()) {
+            return null;
+        }
+
+        return $user;
+    }
+
+    private function findApprovedVendorApplication(): ?VendorApplication
+    {
+        $user = $this->authenticatedVendorUser();
 
         if (!$user) {
             return null;

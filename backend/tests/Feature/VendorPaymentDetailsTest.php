@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Employee;
 use App\Models\User;
 use App\Models\VendorApplication;
 use Illuminate\Database\Schema\Blueprint;
@@ -17,6 +18,7 @@ class VendorPaymentDetailsTest extends TestCase
         parent::setUp();
 
         Schema::disableForeignKeyConstraints();
+        Schema::dropIfExists('employees');
         Schema::dropIfExists('vendor_applications');
         Schema::dropIfExists('users');
         Schema::enableForeignKeyConstraints();
@@ -57,6 +59,24 @@ class VendorPaymentDetailsTest extends TestCase
             $table->boolean('delivery_details_completed')->default(false);
             $table->boolean('profile_fully_completed')->default(false);
             $table->timestamp('submitted_at')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('employees', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('owner_id')->nullable();
+            $table->string('name');
+            $table->string('email')->unique();
+            $table->string('username')->nullable();
+            $table->string('role')->nullable();
+            $table->string('department')->nullable();
+            $table->string('password');
+            $table->date('joining_date')->nullable();
+            $table->string('status')->nullable();
+            $table->string('phone')->nullable();
+            $table->text('address')->nullable();
+            $table->rememberToken()->nullable();
+            $table->softDeletes();
             $table->timestamps();
         });
     }
@@ -163,6 +183,37 @@ class VendorPaymentDetailsTest extends TestCase
             ->assertJsonPath('data.bank_name', 'BDO')
             ->assertJsonMissingPath('data.product_types')
             ->assertJsonMissingPath('data.cutoff_times');
+    }
+
+    public function test_employee_token_returns_403_for_vendor_payment_details_endpoint(): void
+    {
+        $owner = $this->createVendorUser();
+
+        $employee = Employee::query()->create([
+            'owner_id'  => $owner->id,
+            'name'      => 'ERP Employee',
+            'email'     => 'employee@example.com',
+            'username'  => 'erp.employee',
+            'role'      => 'staff',
+            'department'=> 'Finance',
+            'password'  => 'password',
+            'status'    => 'Active',
+        ]);
+
+        Sanctum::actingAs($employee);
+
+        $response = $this->putJson('/api/vendor/profile/payment-details', [
+            'payout_method'       => 'bank',
+            'account_holder_name' => 'ERP Employee',
+            'account_number'      => '1234567890',
+            'bank_name'           => 'BDO',
+            'billing_address'     => 'Quezon City',
+        ]);
+
+        $response
+            ->assertForbidden()
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Access denied. Vendor only.');
     }
 
     private function createVendorUser(): User

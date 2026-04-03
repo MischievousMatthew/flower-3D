@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuth } from "../composables/useAuth";
 import { useAssignment } from "../composables/useAssignment";
+import { getPreferredAuthToken, getPreferredUserType } from "../utils/authSession";
 
 const routes = [
   // ===== PUBLIC =====
@@ -570,11 +571,8 @@ const router = createRouter({
  */
 router.beforeEach(async (to, from, next) => {
   const auth = useAuth();
-  const userType = localStorage.getItem("user_type");
-  const token =
-    userType === "employee"
-      ? localStorage.getItem("employee_token")
-      : localStorage.getItem("auth_token");
+  const userType = getPreferredUserType(to.path);
+  const token = getPreferredAuthToken(to.path);
 
   if (to.meta.public) {
     return next();
@@ -597,7 +595,7 @@ router.beforeEach(async (to, from, next) => {
   // Load user if not in memory
   if (!auth.user.value) {
     try {
-      await auth.loadUser();
+      await auth.loadUser(to.path);
 
       // Bootstrap assignments from user data if it's an employee
       if (userType === "employee") {

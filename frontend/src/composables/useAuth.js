@@ -4,6 +4,12 @@ import { useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import { useAssignment } from "./useAssignment";
 import { buildLoginContext } from "../utils/loginContext";
+import {
+  getPreferredAuthToken,
+  getPreferredUserType,
+  getStoredEmployeeToken,
+  getStoredUserToken,
+} from "../utils/authSession";
 
 const user = ref(null);
 const loading = ref(false);
@@ -16,11 +22,9 @@ export function useAuth() {
   const isAuthenticated = computed(() => !!user.value);
 
   // ==================== Helpers ====================
-  const setAuthHeader = (type) => {
+  const setAuthHeader = (type = getPreferredUserType(window.location.pathname)) => {
     const token =
-      type === "employee"
-        ? localStorage.getItem("employee_token")
-        : localStorage.getItem("auth_token");
+      type === "employee" ? getStoredEmployeeToken() : getStoredUserToken();
 
     if (token) {
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
@@ -33,9 +37,11 @@ export function useAuth() {
     if (type === "employee") {
       localStorage.setItem("employee_token", token);
       localStorage.removeItem("auth_token");
+      localStorage.removeItem("vendor_token");
     } else {
       localStorage.setItem("auth_token", token);
       localStorage.removeItem("employee_token");
+      localStorage.removeItem("vendor_token");
     }
 
     localStorage.setItem("user_type", type);
@@ -270,9 +276,9 @@ export function useAuth() {
   };
 
   // ================= FETCH USER =================
-  const fetchUser = async () => {
+  const fetchUser = async (path = window.location.pathname) => {
     try {
-      const userType = localStorage.getItem("user_type");
+      const userType = getPreferredUserType(path);
       const endpoint =
         userType === "employee" ? "/auth/employee-me" : "/auth/me";
 
@@ -287,6 +293,7 @@ export function useAuth() {
         loadAssignments(data.employee);
       }
 
+      localStorage.setItem("user_type", userType === "employee" ? "employee" : "user");
       localStorage.setItem("user", JSON.stringify(user.value));
       setAuthHeader(userType);
     } catch (err) {
@@ -297,12 +304,9 @@ export function useAuth() {
   };
 
   // ================= LOAD USER FROM STORAGE =================
-  const loadUser = async () => {
-    const userType = localStorage.getItem("user_type") || "user";
-    const token =
-      userType === "employee"
-        ? localStorage.getItem("employee_token")
-        : localStorage.getItem("auth_token");
+  const loadUser = async (path = window.location.pathname) => {
+    const userType = getPreferredUserType(path) || "user";
+    const token = getPreferredAuthToken(path);
     const storedUser = localStorage.getItem("user");
 
     if (!token) throw new Error("No token found");
@@ -318,25 +322,22 @@ export function useAuth() {
       }
     }
 
-    await fetchUser();
+    await fetchUser(path);
   };
 
   // ================= INIT AUTH =================
-  const initAuth = async () => {
+  const initAuth = async (path = window.location.pathname) => {
     if (initialized.value) return;
 
-    const userType = localStorage.getItem("user_type");
-    const token =
-      userType === "employee"
-        ? localStorage.getItem("employee_token")
-        : localStorage.getItem("auth_token");
+    const userType = getPreferredUserType(path);
+    const token = getPreferredAuthToken(path);
     const storedUser = localStorage.getItem("user");
 
     if (token && storedUser) {
       try {
         user.value = JSON.parse(storedUser);
         setAuthHeader(userType);
-        await fetchUser();
+        await fetchUser(path);
       } catch {
         clearAuthData();
       }

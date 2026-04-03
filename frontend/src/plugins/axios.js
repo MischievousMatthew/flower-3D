@@ -1,5 +1,6 @@
 // frontend/src/plugins/axios.js
 import axios from "axios";
+import { getPreferredAuthToken } from "../utils/authSession";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL?.trim();
 
@@ -17,31 +18,15 @@ const api = axios.create({
   withCredentials: true,
 });
 
-const getStoredAuthToken = () => {
-  const userType = localStorage.getItem("user_type");
-
-  if (userType === "employee") {
-    return localStorage.getItem("employee_token");
-  }
-
-  if (userType === "user") {
-    return localStorage.getItem("auth_token");
-  }
-
-  // Fallback for older sessions where user_type may be missing.
-  return (
-    localStorage.getItem("employee_token") ||
-    localStorage.getItem("auth_token")
-  );
-};
-
 // ================= REQUEST INTERCEPTOR =================
 api.interceptors.request.use(
   (config) => {
-    const token = getStoredAuthToken();
+    const token = getPreferredAuthToken(window.location.pathname);
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      delete config.headers.Authorization;
     }
 
     // Inject active assignment context for the backend CheckActiveAssignment middleware
