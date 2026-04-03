@@ -228,7 +228,7 @@ class EmployeeInfoController extends Controller
             $avatarPath = null;
             if ($request->hasFile('avatar') && $request->file('avatar')->isValid()) {
                 try {
-                    $result = CloudinaryHelper::upload($request->file('avatar')->getRealPath(), [
+                    $result = CloudinaryHelper::upload($request->file('avatar'), [
                         'folder' => 'avatars'
                     ]);
                     $avatarPath = $result['public_id'];
@@ -483,7 +483,7 @@ class EmployeeInfoController extends Controller
                         CloudinaryHelper::destroy($employeeInfo->avatar);
                     }
                     
-                    $result = CloudinaryHelper::upload($request->file('avatar')->getRealPath(), [
+                    $result = CloudinaryHelper::upload($request->file('avatar'), [
                         'folder' => 'avatars'
                     ]);
                     $avatarPath = $result['public_id'];
