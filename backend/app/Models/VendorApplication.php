@@ -175,12 +175,21 @@ class VendorApplication extends Model
 
     public function updateProfileCompletion(): void
     {
-        $deliveryHandledBy       = strtolower(trim((string) $this->delivery_handled_by));
+        $deliveryHandledBy       = strtolower(trim((string) ($this->attributes['delivery_handled_by'] ?? null)));
         $isVendorManagedDelivery = in_array($deliveryHandledBy, ['self', 'vendor'], true);
 
         // account_number is stored encrypted; check the raw attribute instead
         // of the accessor so we don't trigger a decrypt on every save().
         $hasAccountNumber = !empty($this->attributes['account_number'] ?? null);
+        $hasProductTypes = $this->hasFilledJsonLikeAttribute('product_types');
+        $hasPriceMin = $this->hasFilledScalarAttribute('price_min');
+        $hasPriceMax = $this->hasFilledScalarAttribute('price_max');
+        $hasSameDayDelivery = array_key_exists('same_day_delivery', $this->attributes)
+            && $this->attributes['same_day_delivery'] !== null
+            && $this->attributes['same_day_delivery'] !== '';
+        $hasMaxOrdersPerDay = $this->hasFilledScalarAttribute('max_orders_per_day');
+        $hasLeadTime = $this->hasFilledScalarAttribute('lead_time');
+        $hasCancellationPolicy = $this->hasFilledScalarAttribute('cancellation_policy');
 
         $this->payment_details_completed = !empty($this->payout_method)
             && !empty($this->account_holder_name)
@@ -188,19 +197,57 @@ class VendorApplication extends Model
             && !empty($this->bank_name)
             && !empty($this->billing_address);
 
-        $this->product_details_completed = !empty($this->product_types)
-            && !empty($this->price_min)
-            && !empty($this->price_max)
-            && !is_null($this->same_day_delivery);
+        $this->product_details_completed = $hasProductTypes
+            && $hasPriceMin
+            && $hasPriceMax
+            && $hasSameDayDelivery;
 
         $this->delivery_details_completed = $isVendorManagedDelivery
-            && !empty($this->max_orders_per_day)
-            && !empty($this->lead_time)
-            && !empty($this->cancellation_policy);
+            && $hasMaxOrdersPerDay
+            && $hasLeadTime
+            && $hasCancellationPolicy;
 
         $this->profile_fully_completed = $this->payment_details_completed
             && $this->product_details_completed
             && $this->delivery_details_completed;
+    }
+
+    private function hasFilledScalarAttribute(string $key): bool
+    {
+        if (!array_key_exists($key, $this->attributes)) {
+            return false;
+        }
+
+        $value = $this->attributes[$key];
+
+        return $value !== null && $value !== '';
+    }
+
+    private function hasFilledJsonLikeAttribute(string $key): bool
+    {
+        if (!array_key_exists($key, $this->attributes)) {
+            return false;
+        }
+
+        $value = $this->attributes[$key];
+
+        if (is_array($value)) {
+            return $value !== [];
+        }
+
+        if ($value === null || $value === '') {
+            return false;
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return !empty($decoded);
+            }
+        }
+
+        return true;
     }
 
     protected function profileCompletionPercentage(): Attribute

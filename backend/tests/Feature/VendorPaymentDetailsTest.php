@@ -142,6 +142,9 @@ class VendorPaymentDetailsTest extends TestCase
                 'account_number' => 'corrupted-ciphertext',
                 'product_types'  => 'not-json',
                 'cutoff_times'   => 'also-not-json',
+                'price_min'      => 'bad-decimal',
+                'price_max'      => 'still-bad',
+                'same_day_delivery' => 'not-a-bool',
             ]);
 
         Sanctum::actingAs($user);
