@@ -41,60 +41,60 @@ class VendorProfileController extends Controller
             }
 
             $payload = [
-                'payout_method' => trim((string) $request->input('payout_method', '')),
+                'payout_method'       => trim((string) $request->input('payout_method', '')),
                 'account_holder_name' => trim((string) $request->input('account_holder_name', '')),
-                'account_number' => trim((string) $request->input('account_number', '')),
-                'bank_name' => trim((string) $request->input('bank_name', '')),
-                'billing_address' => trim((string) $request->input('billing_address', '')),
+                'account_number'      => trim((string) $request->input('account_number', '')),
+                'bank_name'           => trim((string) $request->input('bank_name', '')),
+                'billing_address'     => trim((string) $request->input('billing_address', '')),
             ];
 
+            // Auto-fill bank_name for e-wallet methods
             if (in_array($payload['payout_method'], ['gcash', 'maya'], true) && $payload['bank_name'] === '') {
                 $payload['bank_name'] = ucfirst($payload['payout_method']);
             }
 
             $validator = Validator::make($payload, [
-                'payout_method'      => 'required|in:bank,gcash,maya',
-                'account_holder_name'=> 'required|string|max:255',
-                'account_number'     => 'required|string|max:255',
-                'bank_name'          => 'required|string|max:255',
-                'billing_address'    => 'required|string|max:500',
+                'payout_method'       => 'required|in:bank,gcash,maya',
+                'account_holder_name' => 'required|string|max:255',
+                'account_number'      => 'required|string|max:255',
+                'bank_name'           => 'required|string|max:255',
+                'billing_address'     => 'required|string|max:500',
             ]);
 
             if ($validator->fails()) {
-                return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors'  => $validator->errors(),
+                ], 422);
             }
 
             $validated = $validator->validated();
-            $completionFlags = $this->buildCompletionFlags($vendorApplication, $validated);
 
-            DB::table('vendor_applications')
-                ->where('id', $vendorApplication->id)
-                ->update([
-                    'payout_method' => $validated['payout_method'],
-                    'account_holder_name' => $validated['account_holder_name'],
-                    'account_number' => encrypt($validated['account_number']),
-                    'bank_name' => $validated['bank_name'],
-                    'billing_address' => $validated['billing_address'],
-                    'payment_details_completed' => $completionFlags['payment_details_completed'],
-                    'product_details_completed' => $completionFlags['product_details_completed'],
-                    'delivery_details_completed' => $completionFlags['delivery_details_completed'],
-                    'profile_fully_completed' => $completionFlags['profile_fully_completed'],
-                    'updated_at' => now(),
-                ]);
+            // ── FIX: Use the Eloquent model so setAccountNumberAttribute
+            //         handles encryption correctly via Crypt::encryptString(),
+            //         instead of calling encrypt() directly (which serializes
+            //         the value and breaks decryptString() in the getter).
+            $vendorApplication->payout_method       = $validated['payout_method'];
+            $vendorApplication->account_holder_name = $validated['account_holder_name'];
+            $vendorApplication->account_number      = $validated['account_number']; // triggers setAccountNumberAttribute
+            $vendorApplication->bank_name           = $validated['bank_name'];
+            $vendorApplication->billing_address     = $validated['billing_address'];
+            $vendorApplication->save(); // triggers updateProfileCompletion() via boot saving hook
 
             $vendorApplication->refresh();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Payment details updated successfully',
-                'data' => $this->serializeVendorApplication($vendorApplication),
+                'data'    => $this->serializeVendorApplication($vendorApplication),
             ]);
 
         } catch (\Throwable $e) {
             Log::error('Error updating payment details', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user' => Auth::id(),
+                'error'   => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+                'user'    => Auth::id(),
                 'payload' => $request->except(['account_number']),
             ]);
             return response()->json(['success' => false, 'message' => 'Failed to update payment details'], 500);
@@ -111,13 +111,13 @@ class VendorProfileController extends Controller
             }
 
             $payload = [
-                'product_types' => array_values(array_filter((array) $request->input('product_types', []))),
-                'price_min' => $request->input('price_min'),
-                'price_max' => $request->input('price_max'),
-                'same_day_delivery' => $request->has('same_day_delivery')
+                'product_types'    => array_values(array_filter((array) $request->input('product_types', []))),
+                'price_min'        => $request->input('price_min'),
+                'price_max'        => $request->input('price_max'),
+                'same_day_delivery'=> $request->has('same_day_delivery')
                     ? filter_var($request->input('same_day_delivery'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
                     : null,
-                'cutoff_times' => array_values(array_filter((array) $request->input('cutoff_times', []), function ($cutoff) {
+                'cutoff_times'     => array_values(array_filter((array) $request->input('cutoff_times', []), function ($cutoff) {
                     return is_array($cutoff)
                         && filled($cutoff['day'] ?? null)
                         && filled($cutoff['time'] ?? null);
@@ -138,47 +138,35 @@ class VendorProfileController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors'  => $validator->errors(),
+                ], 422);
             }
 
             $validated = $validator->validated();
 
-            $completionFlags = $this->buildCompletionFlags($vendorApplication, [
-                'product_types' => $validated['product_types'],
-                'price_min' => $validated['price_min'],
-                'price_max' => $validated['price_max'],
-                'same_day_delivery' => $validated['same_day_delivery'],
-                'cutoff_times' => $validated['cutoff_times'] ?? [],
-            ]);
-
-            DB::table('vendor_applications')
-                ->where('id', $vendorApplication->id)
-                ->update([
-                    'product_types' => json_encode($validated['product_types']),
-                    'price_min' => $validated['price_min'],
-                    'price_max' => $validated['price_max'],
-                    'same_day_delivery' => $validated['same_day_delivery'],
-                    'cutoff_times' => json_encode($validated['cutoff_times'] ?? []),
-                    'payment_details_completed' => $completionFlags['payment_details_completed'],
-                    'product_details_completed' => $completionFlags['product_details_completed'],
-                    'delivery_details_completed' => $completionFlags['delivery_details_completed'],
-                    'profile_fully_completed' => $completionFlags['profile_fully_completed'],
-                    'updated_at' => now(),
-                ]);
+            $vendorApplication->product_types     = $validated['product_types'];
+            $vendorApplication->price_min         = $validated['price_min'];
+            $vendorApplication->price_max         = $validated['price_max'];
+            $vendorApplication->same_day_delivery = $validated['same_day_delivery'];
+            $vendorApplication->cutoff_times      = $validated['cutoff_times'] ?? [];
+            $vendorApplication->save();
 
             $vendorApplication->refresh();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Product details updated successfully',
-                'data' => $this->serializeVendorApplication($vendorApplication),
+                'data'    => $this->serializeVendorApplication($vendorApplication),
             ]);
 
         } catch (\Throwable $e) {
             Log::error('Error updating product details', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user' => Auth::id(),
+                'error'   => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+                'user'    => Auth::id(),
                 'payload' => $request->all(),
             ]);
             return response()->json(['success' => false, 'message' => 'Failed to update product details'], 500);
@@ -196,8 +184,8 @@ class VendorProfileController extends Controller
 
             $payload = [
                 'delivery_handled_by' => trim((string) $request->input('delivery_handled_by', 'self')),
-                'max_orders_per_day' => $request->input('max_orders_per_day'),
-                'lead_time' => trim((string) $request->input('lead_time', '')),
+                'max_orders_per_day'  => $request->input('max_orders_per_day'),
+                'lead_time'           => trim((string) $request->input('lead_time', '')),
                 'cancellation_policy' => trim((string) $request->input('cancellation_policy', '')),
             ];
 
@@ -209,45 +197,35 @@ class VendorProfileController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors'  => $validator->errors(),
+                ], 422);
             }
 
-            $validated = $validator->validated();
-            $storableDeliveryHandledBy = $this->normalizeDeliveryHandledByForStorage($validated['delivery_handled_by']);
-            $completionFlags = $this->buildCompletionFlags($vendorApplication, [
-                'delivery_handled_by' => $storableDeliveryHandledBy,
-                'max_orders_per_day' => $validated['max_orders_per_day'],
-                'lead_time' => $validated['lead_time'],
-                'cancellation_policy' => $validated['cancellation_policy'],
-            ]);
+            $validated       = $validator->validated();
+            $storableDelivery = $this->normalizeDeliveryHandledByForStorage($validated['delivery_handled_by']);
 
-            DB::table('vendor_applications')
-                ->where('id', $vendorApplication->id)
-                ->update([
-                    'delivery_handled_by' => $storableDeliveryHandledBy,
-                    'max_orders_per_day' => $validated['max_orders_per_day'],
-                    'lead_time' => $validated['lead_time'],
-                    'cancellation_policy' => $validated['cancellation_policy'],
-                    'payment_details_completed' => $completionFlags['payment_details_completed'],
-                    'product_details_completed' => $completionFlags['product_details_completed'],
-                    'delivery_details_completed' => $completionFlags['delivery_details_completed'],
-                    'profile_fully_completed' => $completionFlags['profile_fully_completed'],
-                    'updated_at' => now(),
-                ]);
+            $vendorApplication->delivery_handled_by = $storableDelivery;
+            $vendorApplication->max_orders_per_day  = $validated['max_orders_per_day'];
+            $vendorApplication->lead_time           = $validated['lead_time'];
+            $vendorApplication->cancellation_policy = $validated['cancellation_policy'];
+            $vendorApplication->save();
 
             $vendorApplication->refresh();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Delivery details updated successfully',
-                'data' => $this->serializeVendorApplication($vendorApplication),
+                'data'    => $this->serializeVendorApplication($vendorApplication),
             ]);
 
         } catch (\Throwable $e) {
             Log::error('Error updating delivery details', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user' => Auth::id(),
+                'error'   => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+                'user'    => Auth::id(),
                 'payload' => $request->all(),
             ]);
             return response()->json(['success' => false, 'message' => 'Failed to update delivery details'], 500);
@@ -268,23 +246,23 @@ class VendorProfileController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors'  => $validator->errors(),
+                ], 422);
             }
 
-            // ── Delete old store logo from Cloudinary ─────────────────────
             if ($vendorApplication->store_logo_path) {
                 CloudinaryHelper::destroy($vendorApplication->store_logo_path);
             }
 
-            // ── Upload new store logo to Cloudinary ───────────────────────
             $result = CloudinaryHelper::upload($request->file('store_logo')->getRealPath(), [
                 'folder'        => 'store_logos',
                 'resource_type' => 'image',
             ]);
 
-            $vendorApplication->update([
-                'store_logo_path' => $result['public_id'],
-            ]);
+            $vendorApplication->update(['store_logo_path' => $result['public_id']]);
 
             return response()->json([
                 'success' => true,
@@ -308,16 +286,16 @@ class VendorProfileController extends Controller
             }
 
             $payload = [
-                'store_name' => trim((string) $request->input('store_name', '')),
+                'store_name'        => trim((string) $request->input('store_name', '')),
                 'store_description' => $request->filled('store_description') ? trim((string) $request->input('store_description')) : null,
-                'store_address' => trim((string) $request->input('store_address', '')),
-                'service_areas' => $request->filled('service_areas') ? trim((string) $request->input('service_areas')) : null,
-                'operating_hours' => $request->filled('operating_hours') ? trim((string) $request->input('operating_hours')) : null,
-                'owner_name' => trim((string) $request->input('owner_name', '')),
-                'position' => $request->filled('position') ? trim((string) $request->input('position')) : null,
-                'contact_number' => trim((string) $request->input('contact_number', '')),
-                'facebook_page' => $request->filled('facebook_page') ? trim((string) $request->input('facebook_page')) : null,
-                'instagram_page' => $request->filled('instagram_page') ? trim((string) $request->input('instagram_page')) : null,
+                'store_address'     => trim((string) $request->input('store_address', '')),
+                'service_areas'     => $request->filled('service_areas') ? trim((string) $request->input('service_areas')) : null,
+                'operating_hours'   => $request->filled('operating_hours') ? trim((string) $request->input('operating_hours')) : null,
+                'owner_name'        => trim((string) $request->input('owner_name', '')),
+                'position'          => $request->filled('position') ? trim((string) $request->input('position')) : null,
+                'contact_number'    => trim((string) $request->input('contact_number', '')),
+                'facebook_page'     => $request->filled('facebook_page') ? trim((string) $request->input('facebook_page')) : null,
+                'instagram_page'    => $request->filled('instagram_page') ? trim((string) $request->input('instagram_page')) : null,
             ];
 
             $validator = Validator::make($payload, [
@@ -334,7 +312,11 @@ class VendorProfileController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors'  => $validator->errors(),
+                ], 422);
             }
 
             $validated = $validator->validated();
@@ -348,14 +330,14 @@ class VendorProfileController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Profile updated successfully',
-                'data' => $this->serializeVendorApplication($vendorApplication->fresh()),
+                'data'    => $this->serializeVendorApplication($vendorApplication->fresh()),
             ]);
 
         } catch (\Throwable $e) {
             Log::error('Error updating general info', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user' => Auth::id(),
+                'error'   => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+                'user'    => Auth::id(),
                 'payload' => $request->all(),
             ]);
             return response()->json(['success' => false, 'message' => 'Failed to update profile'], 500);
@@ -372,16 +354,14 @@ class VendorProfileController extends Controller
             }
 
             if ($vendorApplication->store_logo_path) {
-                // ── Delete from Cloudinary ────────────────────────────────
                 CloudinaryHelper::destroy($vendorApplication->store_logo_path);
-
                 $vendorApplication->update(['store_logo_path' => null]);
             }
 
             return response()->json([
                 'success' => true,
                 'message' => 'Store logo deleted successfully',
-                'data' => $this->serializeVendorApplication($vendorApplication->fresh()),
+                'data'    => $this->serializeVendorApplication($vendorApplication->fresh()),
             ]);
 
         } catch (\Exception $e) {
@@ -405,15 +385,27 @@ class VendorProfileController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors'  => $validator->errors(),
+                ], 422);
             }
 
             if (!Hash::check($request->current_password, $user->password)) {
-                return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => ['current_password' => ['The current password you entered is incorrect.']]], 422);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors'  => ['current_password' => ['The current password you entered is incorrect.']],
+                ], 422);
             }
 
             if (Hash::check($request->password, $user->password)) {
-                return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => ['password' => ['New password must be different from your current password.']]], 422);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors'  => ['password' => ['New password must be different from your current password.']],
+                ], 422);
             }
 
             $user->password = Hash::make($request->password);
@@ -435,6 +427,8 @@ class VendorProfileController extends Controller
             return response()->json(['success' => false, 'message' => 'Failed to update password.'], 500);
         }
     }
+
+    // ── Private helpers ───────────────────────────────────────────────────
 
     private function findApprovedVendorApplication(): ?VendorApplication
     {
@@ -471,53 +465,11 @@ class VendorProfileController extends Controller
         return $normalized !== '' ? $normalized : 'self';
     }
 
-    private function buildCompletionFlags(VendorApplication $vendorApplication, array $overrides = []): array
-    {
-        $state = array_merge([
-            'payout_method' => $vendorApplication->payout_method,
-            'account_holder_name' => $vendorApplication->account_holder_name,
-            'account_number' => $vendorApplication->decrypted_account_number,
-            'bank_name' => $vendorApplication->bank_name,
-            'billing_address' => $vendorApplication->billing_address,
-            'product_types' => $vendorApplication->product_types ?? [],
-            'price_min' => $vendorApplication->price_min,
-            'price_max' => $vendorApplication->price_max,
-            'same_day_delivery' => $vendorApplication->same_day_delivery,
-            'delivery_handled_by' => $vendorApplication->delivery_handled_by,
-            'max_orders_per_day' => $vendorApplication->max_orders_per_day,
-            'lead_time' => $vendorApplication->lead_time,
-            'cancellation_policy' => $vendorApplication->cancellation_policy,
-        ], $overrides);
-
-        $paymentComplete = filled($state['payout_method'])
-            && filled($state['account_holder_name'])
-            && filled($state['account_number'])
-            && filled($state['bank_name'])
-            && filled($state['billing_address']);
-
-        $productComplete = !empty((array) ($state['product_types'] ?? []))
-            && filled($state['price_min'])
-            && filled($state['price_max'])
-            && !is_null($state['same_day_delivery']);
-
-        $deliveryComplete = in_array($this->normalizeDeliveryHandledByForDisplay($state['delivery_handled_by'] ?? null), ['self'], true)
-            && filled($state['max_orders_per_day'])
-            && filled($state['lead_time'])
-            && filled($state['cancellation_policy']);
-
-        return [
-            'payment_details_completed' => $paymentComplete,
-            'product_details_completed' => $productComplete,
-            'delivery_details_completed' => $deliveryComplete,
-            'profile_fully_completed' => $paymentComplete && $productComplete && $deliveryComplete,
-        ];
-    }
-
     private function serializeVendorApplication(VendorApplication $vendorApplication): array
     {
         $data = $vendorApplication->toArray();
         $data['decrypted_account_number'] = $vendorApplication->decrypted_account_number;
-        $data['delivery_handled_by'] = $this->normalizeDeliveryHandledByForDisplay($vendorApplication->delivery_handled_by);
+        $data['delivery_handled_by']      = $this->normalizeDeliveryHandledByForDisplay($vendorApplication->delivery_handled_by);
 
         return $data;
     }
