@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -99,9 +101,14 @@ class User extends Authenticatable
         return $this->hasMany(SharedFile::class, 'uploaded_by');
     }
 
-    public function vendorApplication()
+    public function vendor(): HasOne
     {
         return $this->hasOne(VendorApplication::class, 'email', 'email');
+    }
+
+    public function vendorApplication(): HasOne
+    {
+        return $this->vendor();
     }
 
     public function employees()

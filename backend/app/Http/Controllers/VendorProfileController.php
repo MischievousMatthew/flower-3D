@@ -2,14 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\CloudinaryHelper;
 use App\Http\Controllers\Controller;
 use App\Models\VendorApplication;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
-use App\Helpers\CloudinaryHelper;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class VendorProfileController extends Controller
 {
@@ -51,25 +52,28 @@ class VendorProfileController extends Controller
                 ], 404);
             }
 
-            $payload = [
-                'payout_method'       => trim((string) $request->input('payout_method', '')),
-                'account_holder_name' => trim((string) $request->input('account_holder_name', '')),
-                'account_number'      => trim((string) $request->input('account_number', '')),
-                'bank_name'           => trim((string) $request->input('bank_name', '')),
-                'billing_address'     => trim((string) $request->input('billing_address', '')),
-            ];
-
-            // Auto-fill bank_name for e-wallet methods
-            if (in_array($payload['payout_method'], ['gcash', 'maya'], true) && $payload['bank_name'] === '') {
-                $payload['bank_name'] = ucfirst($payload['payout_method']);
-            }
+            $payload = array_map(
+                static fn ($value) => is_string($value) ? trim($value) : $value,
+                $request->only([
+                    'payout_method',
+                    'account_holder_name',
+                    'account_number',
+                    'bank_name',
+                    'billing_address',
+                ])
+            );
 
             $validator = Validator::make($payload, [
-                'payout_method'       => 'required|in:bank,gcash,maya',
-                'account_holder_name' => 'required|string|max:255',
-                'account_number'      => 'required|string|max:255',
-                'bank_name'           => 'required|string|max:255',
-                'billing_address'     => 'required|string|max:500',
+                'payout_method'       => ['required', Rule::in(['bank', 'gcash', 'maya'])],
+                'account_holder_name' => ['required', 'string', 'max:255'],
+                'account_number'      => ['required', 'string', 'max:50'],
+                'bank_name'           => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                    Rule::requiredIf(static fn () => ($payload['payout_method'] ?? null) === 'bank'),
+                ],
+                'billing_address'     => ['required', 'string', 'max:500'],
             ]);
 
             if ($validator->fails()) {
@@ -82,50 +86,11 @@ class VendorProfileController extends Controller
 
             $validated = $validator->validated();
 
-            // ─────────────────────────────────────────────────────────────────
-            // ROOT CAUSE FIX
-            //
-            // The model's setAccountNumberAttribute checks whether the incoming
-            // value is already encrypted by calling Crypt::decryptString() on it.
-            // If that succeeds it stores the value unchanged; if it fails it
-            // encrypts it fresh with Crypt::encryptString().
-            //
-            // The previous controller mixed two approaches:
-            //   1. encrypt() — PHP-serialises the value before encrypting, so
-            //      decryptString() returns 's:N:"value";' (a serialised string).
-            //      The model accessor has a regex to unwrap this, which worked
-            //      most of the time but broke on edge cases.
-            //   2. DB::table()->update() followed by model->save() — the in-
-            //      memory model still held the OLD encrypted value.  save()
-            //      triggered setAccountNumberAttribute on the stale in-memory
-            //      value, which decrypted fine (so the mutator left it as-is),
-            //      and then wrote the OLD ciphertext back over the new one.
-            //      After that, toArray() evaluated the $appends accessor
-            //      decrypted_account_number against a corrupted/stale ciphertext
-            //      → Crypt\DecryptException → 500.
-            //
-            // CORRECT APPROACH:
-            //   • Set the plain-text value directly on the Eloquent model.
-            //   • The mutator receives a plain string that cannot be decrypted,
-            //     so it falls into the catch branch and encrypts it correctly
-            //     with Crypt::encryptString().
-            //   • A single save() writes everything atomically — no stale state.
-            //   • The accessor then decrypts cleanly with decryptString().
-            // ─────────────────────────────────────────────────────────────────
+            if (in_array($validated['payout_method'], ['gcash', 'maya'], true) && empty($validated['bank_name'])) {
+                $validated['bank_name'] = ucfirst($validated['payout_method']);
+            }
 
-            $vendorApplication->payout_method       = $validated['payout_method'];
-            $vendorApplication->account_holder_name = $validated['account_holder_name'];
-
-            // Force the mutator to treat this as a PLAIN-TEXT value.
-            // We unset the attribute first so the model does not see the old
-            // ciphertext in memory when the mutator runs its decrypt-check.
-            unset($vendorApplication->account_number);
-            $vendorApplication->account_number = $validated['account_number'];
-
-            $vendorApplication->bank_name      = $validated['bank_name'];
-            $vendorApplication->billing_address = $validated['billing_address'];
-
-            // save() triggers the 'saving' boot hook → updateProfileCompletion()
+            $vendorApplication->fill($validated);
             $vendorApplication->save();
             $vendorApplication->refresh();
 
@@ -471,8 +436,6 @@ class VendorProfileController extends Controller
         }
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────
-
     private function findApprovedVendorApplication(): ?VendorApplication
     {
         $user = Auth::user();
@@ -481,7 +444,7 @@ class VendorProfileController extends Controller
             return null;
         }
 
-        return VendorApplication::where('email', $user->email)
+        return $user->vendor()
             ->where('status', 'approved')
             ->first();
     }
