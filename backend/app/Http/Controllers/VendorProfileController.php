@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use App\Helpers\CloudinaryHelper;
 
 class VendorProfileController extends Controller
@@ -16,16 +17,13 @@ class VendorProfileController extends Controller
     public function getProfile(Request $request)
     {
         try {
-            $user = Auth::user();
-            $vendorApplication = VendorApplication::where('email', $user->email)
-                ->where('status', 'approved')
-                ->first();
+            $vendorApplication = $this->findApprovedVendorApplication();
 
             if (!$vendorApplication) {
                 return response()->json(['success' => false, 'message' => 'Vendor application not found or not approved'], 404);
             }
 
-            return response()->json(['success' => true, 'data' => $vendorApplication]);
+            return response()->json(['success' => true, 'data' => $this->serializeVendorApplication($vendorApplication)]);
 
         } catch (\Exception $e) {
             Log::error('Error fetching vendor profile', ['error' => $e->getMessage(), 'user' => Auth::id()]);
@@ -36,8 +34,7 @@ class VendorProfileController extends Controller
     public function updatePaymentDetails(Request $request)
     {
         try {
-            $user              = Auth::user();
-            $vendorApplication = VendorApplication::where('email', $user->email)->where('status', 'approved')->first();
+            $vendorApplication = $this->findApprovedVendorApplication();
 
             if (!$vendorApplication) {
                 return response()->json(['success' => false, 'message' => 'Vendor application not found'], 404);
@@ -68,15 +65,30 @@ class VendorProfileController extends Controller
             }
 
             $validated = $validator->validated();
+            $completionFlags = $this->buildCompletionFlags($vendorApplication, $validated);
 
-            $vendorApplication->payout_method = $validated['payout_method'];
-            $vendorApplication->account_holder_name = $validated['account_holder_name'];
-            $vendorApplication->account_number = $validated['account_number'];
-            $vendorApplication->bank_name = $validated['bank_name'];
-            $vendorApplication->billing_address = $validated['billing_address'];
-            $vendorApplication->save();
+            DB::table('vendor_applications')
+                ->where('id', $vendorApplication->id)
+                ->update([
+                    'payout_method' => $validated['payout_method'],
+                    'account_holder_name' => $validated['account_holder_name'],
+                    'account_number' => encrypt($validated['account_number']),
+                    'bank_name' => $validated['bank_name'],
+                    'billing_address' => $validated['billing_address'],
+                    'payment_details_completed' => $completionFlags['payment_details_completed'],
+                    'product_details_completed' => $completionFlags['product_details_completed'],
+                    'delivery_details_completed' => $completionFlags['delivery_details_completed'],
+                    'profile_fully_completed' => $completionFlags['profile_fully_completed'],
+                    'updated_at' => now(),
+                ]);
 
-            return response()->json(['success' => true, 'message' => 'Payment details updated successfully', 'data' => $vendorApplication->fresh()]);
+            $vendorApplication->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment details updated successfully',
+                'data' => $this->serializeVendorApplication($vendorApplication),
+            ]);
 
         } catch (\Throwable $e) {
             Log::error('Error updating payment details', [
@@ -92,8 +104,7 @@ class VendorProfileController extends Controller
     public function updateProductDetails(Request $request)
     {
         try {
-            $user              = Auth::user();
-            $vendorApplication = VendorApplication::where('email', $user->email)->where('status', 'approved')->first();
+            $vendorApplication = $this->findApprovedVendorApplication();
 
             if (!$vendorApplication) {
                 return response()->json(['success' => false, 'message' => 'Vendor application not found'], 404);
@@ -132,14 +143,36 @@ class VendorProfileController extends Controller
 
             $validated = $validator->validated();
 
-            $vendorApplication->product_types = $validated['product_types'];
-            $vendorApplication->price_min = $validated['price_min'];
-            $vendorApplication->price_max = $validated['price_max'];
-            $vendorApplication->same_day_delivery = $validated['same_day_delivery'];
-            $vendorApplication->cutoff_times = $validated['cutoff_times'] ?? [];
-            $vendorApplication->save();
+            $completionFlags = $this->buildCompletionFlags($vendorApplication, [
+                'product_types' => $validated['product_types'],
+                'price_min' => $validated['price_min'],
+                'price_max' => $validated['price_max'],
+                'same_day_delivery' => $validated['same_day_delivery'],
+                'cutoff_times' => $validated['cutoff_times'] ?? [],
+            ]);
 
-            return response()->json(['success' => true, 'message' => 'Product details updated successfully', 'data' => $vendorApplication->fresh()]);
+            DB::table('vendor_applications')
+                ->where('id', $vendorApplication->id)
+                ->update([
+                    'product_types' => json_encode($validated['product_types']),
+                    'price_min' => $validated['price_min'],
+                    'price_max' => $validated['price_max'],
+                    'same_day_delivery' => $validated['same_day_delivery'],
+                    'cutoff_times' => json_encode($validated['cutoff_times'] ?? []),
+                    'payment_details_completed' => $completionFlags['payment_details_completed'],
+                    'product_details_completed' => $completionFlags['product_details_completed'],
+                    'delivery_details_completed' => $completionFlags['delivery_details_completed'],
+                    'profile_fully_completed' => $completionFlags['profile_fully_completed'],
+                    'updated_at' => now(),
+                ]);
+
+            $vendorApplication->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Product details updated successfully',
+                'data' => $this->serializeVendorApplication($vendorApplication),
+            ]);
 
         } catch (\Throwable $e) {
             Log::error('Error updating product details', [
@@ -155,8 +188,7 @@ class VendorProfileController extends Controller
     public function updateDeliveryDetails(Request $request)
     {
         try {
-            $user              = Auth::user();
-            $vendorApplication = VendorApplication::where('email', $user->email)->where('status', 'approved')->first();
+            $vendorApplication = $this->findApprovedVendorApplication();
 
             if (!$vendorApplication) {
                 return response()->json(['success' => false, 'message' => 'Vendor application not found'], 404);
@@ -181,14 +213,35 @@ class VendorProfileController extends Controller
             }
 
             $validated = $validator->validated();
+            $storableDeliveryHandledBy = $this->normalizeDeliveryHandledByForStorage($validated['delivery_handled_by']);
+            $completionFlags = $this->buildCompletionFlags($vendorApplication, [
+                'delivery_handled_by' => $storableDeliveryHandledBy,
+                'max_orders_per_day' => $validated['max_orders_per_day'],
+                'lead_time' => $validated['lead_time'],
+                'cancellation_policy' => $validated['cancellation_policy'],
+            ]);
 
-            $vendorApplication->delivery_handled_by = $validated['delivery_handled_by'];
-            $vendorApplication->max_orders_per_day = $validated['max_orders_per_day'];
-            $vendorApplication->lead_time = $validated['lead_time'];
-            $vendorApplication->cancellation_policy = $validated['cancellation_policy'];
-            $vendorApplication->save();
+            DB::table('vendor_applications')
+                ->where('id', $vendorApplication->id)
+                ->update([
+                    'delivery_handled_by' => $storableDeliveryHandledBy,
+                    'max_orders_per_day' => $validated['max_orders_per_day'],
+                    'lead_time' => $validated['lead_time'],
+                    'cancellation_policy' => $validated['cancellation_policy'],
+                    'payment_details_completed' => $completionFlags['payment_details_completed'],
+                    'product_details_completed' => $completionFlags['product_details_completed'],
+                    'delivery_details_completed' => $completionFlags['delivery_details_completed'],
+                    'profile_fully_completed' => $completionFlags['profile_fully_completed'],
+                    'updated_at' => now(),
+                ]);
 
-            return response()->json(['success' => true, 'message' => 'Delivery details updated successfully', 'data' => $vendorApplication->fresh()]);
+            $vendorApplication->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Delivery details updated successfully',
+                'data' => $this->serializeVendorApplication($vendorApplication),
+            ]);
 
         } catch (\Throwable $e) {
             Log::error('Error updating delivery details', [
@@ -204,8 +257,7 @@ class VendorProfileController extends Controller
     public function updateStoreLogo(Request $request)
     {
         try {
-            $user              = Auth::user();
-            $vendorApplication = VendorApplication::where('email', $user->email)->where('status', 'approved')->first();
+            $vendorApplication = $this->findApprovedVendorApplication();
 
             if (!$vendorApplication) {
                 return response()->json(['success' => false, 'message' => 'Vendor application not found'], 404);
@@ -237,7 +289,7 @@ class VendorProfileController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Store logo updated successfully',
-                'data'    => $vendorApplication->fresh(),
+                'data'    => $this->serializeVendorApplication($vendorApplication->fresh()),
             ]);
 
         } catch (\Exception $e) {
@@ -249,8 +301,7 @@ class VendorProfileController extends Controller
     public function updateGeneralInfo(Request $request)
     {
         try {
-            $user              = Auth::user();
-            $vendorApplication = VendorApplication::where('email', $user->email)->where('status', 'approved')->first();
+            $vendorApplication = $this->findApprovedVendorApplication();
 
             if (!$vendorApplication) {
                 return response()->json(['success' => false, 'message' => 'Vendor application not found'], 404);
@@ -294,7 +345,11 @@ class VendorProfileController extends Controller
 
             $vendorApplication->save();
 
-            return response()->json(['success' => true, 'message' => 'Profile updated successfully', 'data' => $vendorApplication->fresh()]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Profile updated successfully',
+                'data' => $this->serializeVendorApplication($vendorApplication->fresh()),
+            ]);
 
         } catch (\Throwable $e) {
             Log::error('Error updating general info', [
@@ -310,8 +365,7 @@ class VendorProfileController extends Controller
     public function deleteStoreLogo(Request $request)
     {
         try {
-            $user              = Auth::user();
-            $vendorApplication = VendorApplication::where('email', $user->email)->where('status', 'approved')->first();
+            $vendorApplication = $this->findApprovedVendorApplication();
 
             if (!$vendorApplication) {
                 return response()->json(['success' => false, 'message' => 'Vendor application not found'], 404);
@@ -324,7 +378,11 @@ class VendorProfileController extends Controller
                 $vendorApplication->update(['store_logo_path' => null]);
             }
 
-            return response()->json(['success' => true, 'message' => 'Store logo deleted successfully', 'data' => $vendorApplication->fresh()]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Store logo deleted successfully',
+                'data' => $this->serializeVendorApplication($vendorApplication->fresh()),
+            ]);
 
         } catch (\Exception $e) {
             Log::error('Error deleting store logo', ['error' => $e->getMessage(), 'user' => Auth::id()]);
@@ -376,5 +434,91 @@ class VendorProfileController extends Controller
             Log::error('Error changing password', ['error' => $e->getMessage(), 'user' => Auth::id()]);
             return response()->json(['success' => false, 'message' => 'Failed to update password.'], 500);
         }
+    }
+
+    private function findApprovedVendorApplication(): ?VendorApplication
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return null;
+        }
+
+        return VendorApplication::where('email', $user->email)
+            ->where('status', 'approved')
+            ->first();
+    }
+
+    private function normalizeDeliveryHandledByForStorage(?string $value): ?string
+    {
+        $normalized = strtolower(trim((string) $value));
+
+        if ($normalized === 'self') {
+            return 'vendor';
+        }
+
+        return $normalized !== '' ? $normalized : null;
+    }
+
+    private function normalizeDeliveryHandledByForDisplay(?string $value): string
+    {
+        $normalized = strtolower(trim((string) $value));
+
+        if (in_array($normalized, ['self', 'vendor'], true)) {
+            return 'self';
+        }
+
+        return $normalized !== '' ? $normalized : 'self';
+    }
+
+    private function buildCompletionFlags(VendorApplication $vendorApplication, array $overrides = []): array
+    {
+        $state = array_merge([
+            'payout_method' => $vendorApplication->payout_method,
+            'account_holder_name' => $vendorApplication->account_holder_name,
+            'account_number' => $vendorApplication->decrypted_account_number,
+            'bank_name' => $vendorApplication->bank_name,
+            'billing_address' => $vendorApplication->billing_address,
+            'product_types' => $vendorApplication->product_types ?? [],
+            'price_min' => $vendorApplication->price_min,
+            'price_max' => $vendorApplication->price_max,
+            'same_day_delivery' => $vendorApplication->same_day_delivery,
+            'delivery_handled_by' => $vendorApplication->delivery_handled_by,
+            'max_orders_per_day' => $vendorApplication->max_orders_per_day,
+            'lead_time' => $vendorApplication->lead_time,
+            'cancellation_policy' => $vendorApplication->cancellation_policy,
+        ], $overrides);
+
+        $paymentComplete = filled($state['payout_method'])
+            && filled($state['account_holder_name'])
+            && filled($state['account_number'])
+            && filled($state['bank_name'])
+            && filled($state['billing_address']);
+
+        $productComplete = !empty((array) ($state['product_types'] ?? []))
+            && filled($state['price_min'])
+            && filled($state['price_max'])
+            && !is_null($state['same_day_delivery']);
+
+        $deliveryComplete = in_array($this->normalizeDeliveryHandledByForDisplay($state['delivery_handled_by'] ?? null), ['self'], true)
+            && filled($state['max_orders_per_day'])
+            && filled($state['lead_time'])
+            && filled($state['cancellation_policy']);
+
+        return [
+            'payment_details_completed' => $paymentComplete,
+            'product_details_completed' => $productComplete,
+            'delivery_details_completed' => $deliveryComplete,
+            'profile_fully_completed' => $paymentComplete && $productComplete && $deliveryComplete,
+        ];
+    }
+
+    private function serializeVendorApplication(VendorApplication $vendorApplication): array
+    {
+        $data = $vendorApplication->toArray();
+        $data['decrypted_account_number'] = $vendorApplication->decrypted_account_number;
+        $data['delivery_handled_by'] = $this->normalizeDeliveryHandledByForDisplay($vendorApplication->delivery_handled_by);
+
+        return $data;
     }
 }

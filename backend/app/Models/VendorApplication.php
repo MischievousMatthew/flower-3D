@@ -135,6 +135,9 @@ class VendorApplication extends Model
 
     public function updateProfileCompletion()
     {
+        $deliveryHandledBy = strtolower(trim((string) $this->delivery_handled_by));
+        $isVendorManagedDelivery = in_array($deliveryHandledBy, ['self', 'vendor'], true);
+
         $this->payment_details_completed = !empty($this->payout_method)
             && !empty($this->account_holder_name)
             && !empty($this->account_number)
@@ -146,7 +149,7 @@ class VendorApplication extends Model
             && !empty($this->price_max)
             && !is_null($this->same_day_delivery);
 
-        $this->delivery_details_completed = $this->delivery_handled_by === 'self'
+        $this->delivery_details_completed = $isVendorManagedDelivery
             && !empty($this->max_orders_per_day)
             && !empty($this->lead_time)
             && !empty($this->cancellation_policy);
