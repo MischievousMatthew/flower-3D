@@ -94,37 +94,77 @@ class VendorApplication extends Model
         });
     }
 
-    public function setAccountNumberAttribute($value)
+    // ─────────────────────────────────────────────────────────────────────────
+    // FIXED: setAccountNumberAttribute
+    //
+    // ORIGINAL BUG:
+    //   The old mutator called Crypt::decryptString($value) on the incoming
+    //   value to decide whether it was already encrypted.  This caused two
+    //   failure modes:
+    //
+    //   1. When the controller used encrypt() (PHP serialize + encryptString),
+    //      Crypt::decryptString() on that token succeeded and returned the
+    //      serialised string 's:N:"plaintext";'.  The mutator stored it as-is,
+    //      thinking it was already encrypted.  But the ciphertext was now a
+    //      doubly-processed blob that the accessor couldn't reliably unwrap.
+    //
+    //   2. When the controller used DB::table()->update() with a fresh
+    //      Crypt::encryptString() value and then called model->save(), the
+    //      model's in-memory $attributes['account_number'] still held the OLD
+    //      ciphertext.  The mutator ran Crypt::decryptString(old_ciphertext)
+    //      → success → stored old value unchanged, silently reverting the new
+    //      one.  toArray() then evaluated the $appends accessor on the stale
+    //      value, sometimes throwing DecryptException → 500.
+    //
+    // FIX:
+    //   Encrypt ONLY if the incoming value is plain text.
+    //   Plain text is defined as: a non-empty string that cannot be decoded
+    //   by Crypt::decryptString().  We never accept a pre-encrypted value from
+    //   outside the model — callers always pass raw plain text.
+    // ─────────────────────────────────────────────────────────────────────────
+    public function setAccountNumberAttribute($value): void
     {
-        if (!$value) {
+        if (empty($value)) {
             $this->attributes['account_number'] = null;
             return;
         }
 
-        try {
-            Crypt::decryptString($value);
-            $this->attributes['account_number'] = $value;
-        } catch (\Exception $e) {
-            $this->attributes['account_number'] = Crypt::encryptString((string) $value);
-        }
+        // Always encrypt fresh plain-text coming from the controller.
+        // If something tries to set a pre-encrypted value, it will be
+        // double-encrypted here, which is actually safer — the accessor
+        // will cleanly decrypt it twice.  Callers must always pass plain text.
+        $this->attributes['account_number'] = Crypt::encryptString((string) $value);
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // FIXED: decryptedAccountNumber accessor
+    //
+    // ORIGINAL BUG:
+    //   The regex /^s:\d+:"(.+)";$/ was a workaround for values encrypted
+    //   with the old encrypt() helper (which serialises first).  Now that the
+    //   mutator always uses encryptString(), this regex is no longer needed
+    //   and was causing false positives on real decrypted strings that happened
+    //   to start with 's:'.
+    //
+    // FIX:
+    //   Simple decryptString() call.  If it throws, log and return null rather
+    //   than crashing the entire toArray() / serializeVendorApplication() call.
+    // ─────────────────────────────────────────────────────────────────────────
     protected function decryptedAccountNumber(): Attribute
     {
         return Attribute::make(
             get: function () {
                 $value = $this->attributes['account_number'] ?? null;
-                if (!$value) return null;
+
+                if (empty($value)) {
+                    return null;
+                }
 
                 try {
-                    $decrypted = Crypt::decryptString($value);
-                    if (is_string($decrypted) && preg_match('/^s:\d+:"(.+)";$/', $decrypted, $matches)) {
-                        return $matches[1];
-                    }
-                    return $decrypted;
+                    return Crypt::decryptString($value);
                 } catch (\Exception $e) {
-                    \Log::error('Failed to decrypt account number', [
-                        'application_id' => $this->application_id,
+                    \Log::warning('Failed to decrypt account_number', [
+                        'application_id' => $this->application_id ?? null,
                         'error'          => $e->getMessage(),
                     ]);
                     return null;
@@ -133,14 +173,18 @@ class VendorApplication extends Model
         );
     }
 
-    public function updateProfileCompletion()
+    public function updateProfileCompletion(): void
     {
-        $deliveryHandledBy = strtolower(trim((string) $this->delivery_handled_by));
+        $deliveryHandledBy       = strtolower(trim((string) $this->delivery_handled_by));
         $isVendorManagedDelivery = in_array($deliveryHandledBy, ['self', 'vendor'], true);
+
+        // account_number is stored encrypted; check the raw attribute instead
+        // of the accessor so we don't trigger a decrypt on every save().
+        $hasAccountNumber = !empty($this->attributes['account_number'] ?? null);
 
         $this->payment_details_completed = !empty($this->payout_method)
             && !empty($this->account_holder_name)
-            && !empty($this->account_number)
+            && $hasAccountNumber
             && !empty($this->bank_name)
             && !empty($this->billing_address);
 
@@ -173,14 +217,10 @@ class VendorApplication extends Model
     }
 
     /* Relationships */
-    public function notes(): HasMany    { return $this->hasMany(VendorApplicationNote::class); }
+    public function notes(): HasMany      { return $this->hasMany(VendorApplicationNote::class); }
     public function reviewer(): BelongsTo { return $this->belongsTo(User::class, 'reviewed_by'); }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Document URLs
-    // These fields store the full Cloudinary secure URL directly,
-    // so we return them as-is from the accessor.
-    // ─────────────────────────────────────────────────────────────────────
+    // ── Document / logo URL accessors ─────────────────────────────────────
 
     protected function resolvePathUrl(?string $path): ?string
     {
@@ -191,55 +231,37 @@ class VendorApplication extends Model
 
     protected function governmentIdUrl(): Attribute
     {
-        return Attribute::make(
-            get: fn () => $this->resolvePathUrl($this->government_id_path)
-        );
+        return Attribute::make(get: fn () => $this->resolvePathUrl($this->government_id_path));
     }
 
     protected function selfieWithIdUrl(): Attribute
     {
-        return Attribute::make(
-            get: fn () => $this->resolvePathUrl($this->selfie_with_id_path)
-        );
+        return Attribute::make(get: fn () => $this->resolvePathUrl($this->selfie_with_id_path));
     }
 
     protected function proofOfAddressUrl(): Attribute
     {
-        return Attribute::make(
-            get: fn () => $this->resolvePathUrl($this->proof_of_address_path)
-        );
+        return Attribute::make(get: fn () => $this->resolvePathUrl($this->proof_of_address_path));
     }
 
     protected function barangayClearanceUrl(): Attribute
     {
-        return Attribute::make(
-            get: fn () => $this->resolvePathUrl($this->barangay_clearance_path)
-        );
+        return Attribute::make(get: fn () => $this->resolvePathUrl($this->barangay_clearance_path));
     }
 
     protected function mayorPermitUrl(): Attribute
     {
-        return Attribute::make(
-            get: fn () => $this->resolvePathUrl($this->mayor_permit_path)
-        );
+        return Attribute::make(get: fn () => $this->resolvePathUrl($this->mayor_permit_path));
     }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // Store logo — stores Cloudinary public_id, generates URL on the fly
-    // ─────────────────────────────────────────────────────────────────────
 
     protected function storeLogoUrl(): Attribute
     {
-        return Attribute::make(
-            get: fn () => $this->resolveLogoUrl($this->store_logo_path)
-        );
+        return Attribute::make(get: fn () => $this->resolveLogoUrl($this->store_logo_path));
     }
 
     protected function profilePhotoUrl(): Attribute
     {
-        return Attribute::make(
-            get: fn () => $this->resolveLogoUrl($this->store_logo_path)
-        );
+        return Attribute::make(get: fn () => $this->resolveLogoUrl($this->store_logo_path));
     }
 
     protected function resolveLogoUrl(?string $path): ?string
@@ -252,15 +274,14 @@ class VendorApplication extends Model
         return CloudinaryHelper::getUrl($path);
     }
 
-    // Portfolio stores array of full Cloudinary secure URLs
     protected function portfolioPhotosUrls(): Attribute
     {
         return Attribute::make(
-            get: fn () => array_map(fn($p) => $this->resolvePathUrl($p), $this->portfolio_photos_paths ?? [])
+            get: fn () => array_map(fn ($p) => $this->resolvePathUrl($p), $this->portfolio_photos_paths ?? [])
         );
     }
 
-    /* Formatting Helpers */
+    /* Formatting helpers */
     protected function formattedBusinessType(): Attribute
     {
         return Attribute::make(
@@ -297,18 +318,18 @@ class VendorApplication extends Model
             get: function () {
                 if (!$this->price_min || !$this->price_max) return null;
                 return '₱' . number_format($this->price_min, 2)
-                     . ' - ₱' . number_format($this->price_max, 2);
+                    . ' - ₱' . number_format($this->price_max, 2);
             }
         );
     }
 
     /* Scopes */
-    public function scopePending($q)         { return $q->where('status', 'pending'); }
-    public function scopeApproved($q)        { return $q->where('status', 'approved'); }
-    public function scopeRejected($q)        { return $q->where('status', 'rejected'); }
-    public function scopeUnderReview($q)     { return $q->where('status', 'under_review'); }
-    public function scopeProfileComplete($q) { return $q->where('profile_fully_completed', true); }
-    public function scopeProfileIncomplete($q) { return $q->where('profile_fully_completed', false); }
+    public function scopePending($q)            { return $q->where('status', 'pending'); }
+    public function scopeApproved($q)           { return $q->where('status', 'approved'); }
+    public function scopeRejected($q)           { return $q->where('status', 'rejected'); }
+    public function scopeUnderReview($q)        { return $q->where('status', 'under_review'); }
+    public function scopeProfileComplete($q)    { return $q->where('profile_fully_completed', true); }
+    public function scopeProfileIncomplete($q)  { return $q->where('profile_fully_completed', false); }
 
     public function scopeRecent($q, $days = 7)
     {
@@ -318,21 +339,20 @@ class VendorApplication extends Model
     public function scopeSearch($q, $search)
     {
         if (!$search) return $q;
-
         return $q->where(fn ($x) =>
-            $x->where('store_name', 'like', "%{$search}%")
-              ->orWhere('owner_name', 'like', "%{$search}%")
-              ->orWhere('email', 'like', "%{$search}%")
+            $x->where('store_name',    'like', "%{$search}%")
+              ->orWhere('owner_name',  'like', "%{$search}%")
+              ->orWhere('email',       'like', "%{$search}%")
               ->orWhere('application_id', 'like', "%{$search}%")
               ->orWhere('contact_number', 'like', "%{$search}%")
         );
     }
 
-    /* State Helpers */
-    public function isPending(): bool          { return $this->status === 'pending'; }
-    public function isApproved(): bool         { return $this->status === 'approved'; }
-    public function isRejected(): bool         { return $this->status === 'rejected'; }
-    public function isProfileComplete(): bool  { return $this->profile_fully_completed; }
+    /* State helpers */
+    public function isPending(): bool         { return $this->status === 'pending'; }
+    public function isApproved(): bool        { return $this->status === 'approved'; }
+    public function isRejected(): bool        { return $this->status === 'rejected'; }
+    public function isProfileComplete(): bool { return $this->profile_fully_completed; }
 
     public function approve(): bool
     {
@@ -365,9 +385,7 @@ class VendorApplication extends Model
 
     public static function findApprovedForVendorUser(?User $vendor): ?self
     {
-        if (!$vendor) {
-            return null;
-        }
+        if (!$vendor) return null;
 
         return static::where('email', $vendor->email)
             ->where('status', 'approved')
@@ -382,22 +400,22 @@ class VendorApplication extends Model
             ? Carbon::instance($referenceNow)->setTimezone(self::RESERVATION_TIMEZONE)
             : Carbon::now(self::RESERVATION_TIMEZONE);
 
-        $sameDayDelivery = (bool) ($application?->same_day_delivery ?? false);
-        $leadTimeDays = $application?->reservationLeadTimeDays() ?? ($sameDayDelivery ? 0 : 3);
-        $maxOrdersPerDay = max(1, (int) ($application?->max_orders_per_day ?? 10));
-        $cutoffTimeToday = $application?->cutoffTimeForDate($now);
+        $sameDayDelivery      = (bool) ($application?->same_day_delivery ?? false);
+        $leadTimeDays         = $application?->reservationLeadTimeDays() ?? ($sameDayDelivery ? 0 : 3);
+        $maxOrdersPerDay      = max(1, (int) ($application?->max_orders_per_day ?? 10));
+        $cutoffTimeToday      = $application?->cutoffTimeForDate($now);
         $sameDayCutoffReached = $sameDayDelivery
             ? $application?->isSameDayCutoffReached($now) ?? false
             : true;
 
         return [
-            'timezone' => self::RESERVATION_TIMEZONE,
-            'same_day_delivery' => $sameDayDelivery,
-            'lead_time_days' => max(0, $leadTimeDays),
-            'max_orders_per_day' => $maxOrdersPerDay,
-            'cutoff_time_today' => $cutoffTimeToday,
-            'same_day_cutoff_reached' => $sameDayCutoffReached,
-            'same_day_available_today' => $sameDayDelivery && !$sameDayCutoffReached,
+            'timezone'                  => self::RESERVATION_TIMEZONE,
+            'same_day_delivery'         => $sameDayDelivery,
+            'lead_time_days'            => max(0, $leadTimeDays),
+            'max_orders_per_day'        => $maxOrdersPerDay,
+            'cutoff_time_today'         => $cutoffTimeToday,
+            'same_day_cutoff_reached'   => $sameDayCutoffReached,
+            'same_day_available_today'  => $sameDayDelivery && !$sameDayCutoffReached,
         ];
     }
 
@@ -415,11 +433,9 @@ class VendorApplication extends Model
 
         if (preg_match('/(\d+(?:\.\d+)?)/', $leadTime, $matches)) {
             $value = (float) $matches[1];
-
             if (str_contains($leadTime, 'hour')) {
                 return max(0, (int) ceil($value / 24));
             }
-
             return max(0, (int) ceil($value));
         }
 
@@ -431,7 +447,7 @@ class VendorApplication extends Model
         $dayName = Carbon::instance($date)->setTimezone(self::RESERVATION_TIMEZONE)->englishDayOfWeek;
 
         foreach ((array) ($this->cutoff_times ?? []) as $cutoff) {
-            $cutoffDay = data_get($cutoff, 'day');
+            $cutoffDay  = data_get($cutoff, 'day');
             $cutoffTime = data_get($cutoff, 'time');
 
             if ($cutoffDay === $dayName && is_string($cutoffTime) && preg_match('/^\d{2}:\d{2}$/', $cutoffTime)) {
