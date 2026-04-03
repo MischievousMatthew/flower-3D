@@ -97,7 +97,7 @@ class VendorProfileController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Payment details updated successfully',
-                'data'    => $this->serializeVendorApplication($vendorApplication),
+                'data'    => $this->serializePaymentDetails($vendorApplication),
             ]);
 
         } catch (\Throwable $e) {
@@ -515,6 +515,22 @@ class VendorProfileController extends Controller
             'formatted_business_type'    => $this->safeVendorValue($vendorApplication, 'formatted_business_type'),
             'formatted_status'           => $this->safeVendorValue($vendorApplication, 'formatted_status'),
             'formatted_date'             => $this->safeVendorValue($vendorApplication, 'formatted_date'),
+        ];
+    }
+
+    private function serializePaymentDetails(VendorApplication $vendorApplication): array
+    {
+        return [
+            'id'                        => $vendorApplication->id,
+            'application_id'            => $vendorApplication->application_id,
+            'payout_method'             => $this->safeVendorValue($vendorApplication, 'payout_method', ''),
+            'account_holder_name'       => $this->safeVendorValue($vendorApplication, 'account_holder_name', ''),
+            'decrypted_account_number'  => $this->safeVendorValue($vendorApplication, 'decrypted_account_number'),
+            'bank_name'                 => $this->safeVendorValue($vendorApplication, 'bank_name', ''),
+            'billing_address'           => $this->safeVendorValue($vendorApplication, 'billing_address', ''),
+            'payment_details_completed' => (bool) $this->safeVendorValue($vendorApplication, 'payment_details_completed', false),
+            'profile_fully_completed'   => (bool) $this->safeVendorValue($vendorApplication, 'profile_fully_completed', false),
+            'profile_completion_percentage' => (int) $this->safeVendorValue($vendorApplication, 'profile_completion_percentage', 0),
         ];
     }
 

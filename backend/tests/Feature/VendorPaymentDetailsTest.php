@@ -158,8 +158,8 @@ class VendorPaymentDetailsTest extends TestCase
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.bank_name', 'BDO')
-            ->assertJsonPath('data.product_types', [])
-            ->assertJsonPath('data.cutoff_times', []);
+            ->assertJsonMissingPath('data.product_types')
+            ->assertJsonMissingPath('data.cutoff_times');
     }
 
     private function createVendorUser(): User
