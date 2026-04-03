@@ -488,22 +488,16 @@
             </button>
           </div>
           <div v-else class="products-grid">
-            <div
+            <ProductCard
               v-for="product in products"
               :key="product.id"
-              class="product-card"
-            >
-              <ProductCard
-                v-for="product in products"
-                :key="product.id"
-                :product="product"
-                :selected-vendor="selectedVendor"
-                :adding-to-cart="addingToCartProductId === product.id"
-                @open-modal="openProductModal"
-                @add-to-cart="addToCartDirect"
-                @select-vendor="selectVendorById"
-              />
-            </div>
+              :product="product"
+              :selected-vendor="selectedVendor"
+              :adding-to-cart="addingToCartProductId === product.id"
+              @open-modal="openProductModal"
+              @add-to-cart="addToCartDirect"
+              @select-vendor="selectVendorById"
+            />
           </div>
           <div v-if="pagination.total > 0" class="pagination">
             <button
@@ -981,16 +975,18 @@ const fetchVendors = async () => {
     if (vendorSearch.value) params.search = vendorSearch.value;
     const r = await api.get("vendors", { params });
     if (r.data.success) {
-      vendors.value = r.data.data.data;
+      const vendorData = Array.isArray(r.data.data?.data) ? r.data.data.data : [];
+      vendors.value = vendorData;
       vendorPagination.value = {
-        current_page: r.data.data.current_page,
-        last_page: r.data.data.last_page,
-        per_page: r.data.data.per_page,
-        total: r.data.data.total,
+        current_page: r.data.data?.current_page ?? 1,
+        last_page: r.data.data?.last_page ?? 1,
+        per_page: r.data.data?.per_page ?? vendorData.length,
+        total: r.data.data?.total ?? vendorData.length,
       };
     }
   } catch (e) {
     console.error(e);
+    vendors.value = [];
   } finally {
     loadingVendors.value = false;
   }
@@ -1034,8 +1030,12 @@ const selectVendorById = async (vendorId) => {
   if (!vendorId) return;
   try {
     const r = await api.get(`vendors/${vendorId}`);
-    if (r.data) selectVendor(r.data);
-  } catch (e) {}
+    if (r.data?.success && r.data.data) {
+      selectVendor(r.data.data);
+    }
+  } catch (e) {
+    console.error(e);
+  }
 };
 const clearVendorFilter = () => {
   selectedVendor.value = null;

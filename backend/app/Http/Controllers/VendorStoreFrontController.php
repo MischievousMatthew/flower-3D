@@ -53,11 +53,14 @@ class VendorStorefrontController extends Controller
 
             $perPage = min((int) $request->get('per_page', 8), 50);
             $vendors = $query->orderBy('created_at', 'desc')->paginate($perPage);
+            $formattedVendors = $vendors->getCollection()
+                ->map(fn ($vendor) => $this->formatVendor($vendor))
+                ->values();
 
             return response()->json([
                 'success' => true,
                 'data'    => [
-                    'data'         => $vendors->map(fn ($v) => $this->formatVendor($v)),
+                    'data'         => $formattedVendors,
                     'current_page' => $vendors->currentPage(),
                     'last_page'    => $vendors->lastPage(),
                     'per_page'     => $vendors->perPage(),

@@ -94,8 +94,8 @@
                 </td>
                 <td>
                   <div class="meta-cell">
-                    <strong>{{ log.device_name || "Unknown device" }}</strong>
-                    <small>{{ [log.browser, log.platform].filter(Boolean).join(" • ") || "Unknown environment" }}</small>
+                    <strong>{{ formatDevice(log) }}</strong>
+                    <small>{{ formatEnvironment(log) }}</small>
                   </div>
                 </td>
                 <td>
@@ -110,7 +110,9 @@
                     </small>
                   </div>
                 </td>
-                <td>{{ log.ip_address || "Unknown IP" }}</td>
+                <td>
+                  <div class="ip-cell">{{ log.ip_address || "Unknown IP" }}</div>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -203,6 +205,28 @@ const formatRelative = (value) => {
 
   const days = Math.round(hours / 24);
   return `${days} day${days === 1 ? "" : "s"} ago`;
+};
+
+const formatDevice = (log) => {
+  const rawDevice = `${log?.device_name ?? ""}`.trim();
+  const normalized = rawDevice.toLowerCase();
+
+  if (["phone", "tablet", "laptop", "desktop"].includes(normalized)) {
+    return rawDevice;
+  }
+
+  const platform = `${log?.platform ?? ""}`.toLowerCase();
+  const userAgent = `${log?.user_agent ?? ""}`.toLowerCase();
+
+  if (/(iphone|ipod|android.+mobile|windows phone)/.test(userAgent)) return "Phone";
+  if (/(ipad|tablet|android(?!.*mobile))/.test(userAgent)) return "Tablet";
+  if (/(mac|win|linux)/.test(platform)) return "Desktop";
+
+  return rawDevice || "Unknown device";
+};
+
+const formatEnvironment = (log) => {
+  return [log?.platform, log?.browser].filter(Boolean).join(" • ") || "Unknown environment";
 };
 
 const fetchLogs = async (page = 1) => {
@@ -376,7 +400,38 @@ onMounted(() => {
 
 .logs-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
+}
+
+.logs-table th:nth-child(1),
+.logs-table td:nth-child(1) {
+  width: 22%;
+}
+
+.logs-table th:nth-child(2),
+.logs-table td:nth-child(2) {
+  width: 11%;
+}
+
+.logs-table th:nth-child(3),
+.logs-table td:nth-child(3) {
+  width: 20%;
+}
+
+.logs-table th:nth-child(4),
+.logs-table td:nth-child(4) {
+  width: 18%;
+}
+
+.logs-table th:nth-child(5),
+.logs-table td:nth-child(5) {
+  width: 19%;
+}
+
+.logs-table th:nth-child(6),
+.logs-table td:nth-child(6) {
+  width: 10%;
 }
 
 .logs-table th,
@@ -385,6 +440,7 @@ onMounted(() => {
   padding: 14px 12px;
   border-bottom: 1px solid #eef2f7;
   vertical-align: top;
+  word-break: break-word;
 }
 
 .logs-table th {
@@ -409,6 +465,13 @@ onMounted(() => {
 .user-cell span,
 .meta-cell small {
   color: #64748b;
+}
+
+.ip-cell {
+  font-family: "Courier New", monospace;
+  font-size: 13px;
+  color: #0f172a;
+  white-space: nowrap;
 }
 
 .badge {
@@ -478,6 +541,10 @@ onMounted(() => {
 
   .stats-grid {
     grid-template-columns: 1fr;
+  }
+
+  .logs-table {
+    min-width: 920px;
   }
 }
 </style>

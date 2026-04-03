@@ -1,5 +1,16 @@
 const GEOLOCATION_TIMEOUT_MS = 4000;
 
+function normalizePlatformName(rawPlatform, userAgent) {
+  const source = `${rawPlatform ?? ""} ${userAgent ?? ""}`;
+  if (!source.trim()) return "Unknown";
+  if (/win/i.test(source)) return "Windows";
+  if (/mac/i.test(source)) return "macOS";
+  if (/android/i.test(source)) return "Android";
+  if (/(iphone|ipad|ipod|ios)/i.test(source)) return "iOS";
+  if (/linux/i.test(source)) return "Linux";
+  return rawPlatform || "Unknown";
+}
+
 function detectBrowser(userAgent) {
   if (!userAgent) return "Unknown";
   if (userAgent.includes("Edg/")) return "Edge";
@@ -11,14 +22,29 @@ function detectBrowser(userAgent) {
 }
 
 function detectPlatform(userAgent, fallbackPlatform) {
-  if (fallbackPlatform) return fallbackPlatform;
-  if (!userAgent) return "Unknown";
-  if (userAgent.includes("Windows")) return "Windows";
-  if (userAgent.includes("Mac OS")) return "macOS";
-  if (userAgent.includes("Android")) return "Android";
-  if (userAgent.includes("iPhone") || userAgent.includes("iPad")) return "iOS";
-  if (userAgent.includes("Linux")) return "Linux";
-  return "Unknown";
+  return normalizePlatformName(fallbackPlatform, userAgent);
+}
+
+function detectDeviceType(userAgent, maxTouchPoints = 0, screenWidth = 0) {
+  if (!userAgent) return "Unknown device";
+
+  if (/(iphone|ipod|android.+mobile|windows phone)/i.test(userAgent)) {
+    return "Phone";
+  }
+
+  if (/(ipad|tablet|android(?!.*mobile))/i.test(userAgent)) {
+    return "Tablet";
+  }
+
+  if (maxTouchPoints > 1 && screenWidth > 0 && screenWidth <= 1024) {
+    return "Tablet";
+  }
+
+  if (screenWidth > 0 && screenWidth <= 1440) {
+    return "Laptop";
+  }
+
+  return "Desktop";
 }
 
 function getCurrentPosition() {
@@ -46,13 +72,19 @@ export async function buildLoginContext() {
   }
 
   const userAgent = window.navigator?.userAgent ?? "";
+  const screenWidth = window.screen?.width ?? 0;
   const platform = detectPlatform(userAgent, window.navigator?.platform ?? "");
   const browser = detectBrowser(userAgent);
+  const deviceType = detectDeviceType(
+    userAgent,
+    window.navigator?.maxTouchPoints ?? 0,
+    screenWidth,
+  );
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
   const position = await getCurrentPosition();
 
   const context = {
-    device_name: `${browser} on ${platform}`,
+    device_name: deviceType,
     browser,
     platform,
     timezone,
