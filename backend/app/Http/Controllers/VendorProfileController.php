@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Crypt;
 use App\Helpers\CloudinaryHelper;
 
 class VendorProfileController extends Controller
@@ -71,17 +72,28 @@ class VendorProfileController extends Controller
 
             $validated = $validator->validated();
 
-            // ── FIX: Use the Eloquent model so setAccountNumberAttribute
-            //         handles encryption correctly via Crypt::encryptString(),
-            //         instead of calling encrypt() directly (which serializes
-            //         the value and breaks decryptString() in the getter).
-            $vendorApplication->payout_method       = $validated['payout_method'];
-            $vendorApplication->account_holder_name = $validated['account_holder_name'];
-            $vendorApplication->account_number      = $validated['account_number']; // triggers setAccountNumberAttribute
-            $vendorApplication->bank_name           = $validated['bank_name'];
-            $vendorApplication->billing_address     = $validated['billing_address'];
-            $vendorApplication->save(); // triggers updateProfileCompletion() via boot saving hook
+            // ── Encrypt account_number safely with encryptString (not encrypt())
+            // encrypt() uses PHP serialize() under the hood, which breaks
+            // Crypt::decryptString() in the model accessor.
+            // We bypass the model's setAccountNumberAttribute and write directly
+            // via DB to avoid any double-encryption if the attribute mutator
+            // tries to re-encrypt an already-encrypted value on model->save().
+            $encryptedAccountNumber = Crypt::encryptString($validated['account_number']);
 
+            DB::table('vendor_applications')
+                ->where('id', $vendorApplication->id)
+                ->update([
+                    'payout_method'        => $validated['payout_method'],
+                    'account_holder_name'  => $validated['account_holder_name'],
+                    'account_number'       => $encryptedAccountNumber,
+                    'bank_name'            => $validated['bank_name'],
+                    'billing_address'      => $validated['billing_address'],
+                    'updated_at'           => now(),
+                ]);
+
+            // Reload fresh model so updateProfileCompletion runs via boot saving hook
+            $vendorApplication = VendorApplication::find($vendorApplication->id);
+            $vendorApplication->save(); // triggers updateProfileCompletion()
             $vendorApplication->refresh();
 
             return response()->json([
@@ -97,7 +109,13 @@ class VendorProfileController extends Controller
                 'user'    => Auth::id(),
                 'payload' => $request->except(['account_number']),
             ]);
-            return response()->json(['success' => false, 'message' => 'Failed to update payment details'], 500);
+
+            // Return the actual error in non-production so you can see it
+            $debug = app()->environment('production')
+                ? 'Failed to update payment details'
+                : $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine();
+
+            return response()->json(['success' => false, 'message' => $debug], 500);
         }
     }
 
@@ -111,13 +129,13 @@ class VendorProfileController extends Controller
             }
 
             $payload = [
-                'product_types'    => array_values(array_filter((array) $request->input('product_types', []))),
-                'price_min'        => $request->input('price_min'),
-                'price_max'        => $request->input('price_max'),
-                'same_day_delivery'=> $request->has('same_day_delivery')
+                'product_types'     => array_values(array_filter((array) $request->input('product_types', []))),
+                'price_min'         => $request->input('price_min'),
+                'price_max'         => $request->input('price_max'),
+                'same_day_delivery' => $request->has('same_day_delivery')
                     ? filter_var($request->input('same_day_delivery'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
                     : null,
-                'cutoff_times'     => array_values(array_filter((array) $request->input('cutoff_times', []), function ($cutoff) {
+                'cutoff_times'      => array_values(array_filter((array) $request->input('cutoff_times', []), function ($cutoff) {
                     return is_array($cutoff)
                         && filled($cutoff['day'] ?? null)
                         && filled($cutoff['time'] ?? null);
@@ -153,7 +171,6 @@ class VendorProfileController extends Controller
             $vendorApplication->same_day_delivery = $validated['same_day_delivery'];
             $vendorApplication->cutoff_times      = $validated['cutoff_times'] ?? [];
             $vendorApplication->save();
-
             $vendorApplication->refresh();
 
             return response()->json([
@@ -169,7 +186,12 @@ class VendorProfileController extends Controller
                 'user'    => Auth::id(),
                 'payload' => $request->all(),
             ]);
-            return response()->json(['success' => false, 'message' => 'Failed to update product details'], 500);
+
+            $debug = app()->environment('production')
+                ? 'Failed to update product details'
+                : $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine();
+
+            return response()->json(['success' => false, 'message' => $debug], 500);
         }
     }
 
@@ -204,7 +226,7 @@ class VendorProfileController extends Controller
                 ], 422);
             }
 
-            $validated       = $validator->validated();
+            $validated        = $validator->validated();
             $storableDelivery = $this->normalizeDeliveryHandledByForStorage($validated['delivery_handled_by']);
 
             $vendorApplication->delivery_handled_by = $storableDelivery;
@@ -212,7 +234,6 @@ class VendorProfileController extends Controller
             $vendorApplication->lead_time           = $validated['lead_time'];
             $vendorApplication->cancellation_policy = $validated['cancellation_policy'];
             $vendorApplication->save();
-
             $vendorApplication->refresh();
 
             return response()->json([
@@ -228,7 +249,12 @@ class VendorProfileController extends Controller
                 'user'    => Auth::id(),
                 'payload' => $request->all(),
             ]);
-            return response()->json(['success' => false, 'message' => 'Failed to update delivery details'], 500);
+
+            $debug = app()->environment('production')
+                ? 'Failed to update delivery details'
+                : $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine();
+
+            return response()->json(['success' => false, 'message' => $debug], 500);
         }
     }
 
@@ -340,7 +366,12 @@ class VendorProfileController extends Controller
                 'user'    => Auth::id(),
                 'payload' => $request->all(),
             ]);
-            return response()->json(['success' => false, 'message' => 'Failed to update profile'], 500);
+
+            $debug = app()->environment('production')
+                ? 'Failed to update profile'
+                : $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine();
+
+            return response()->json(['success' => false, 'message' => $debug], 500);
         }
     }
 
