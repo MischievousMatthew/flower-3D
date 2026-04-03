@@ -1,14 +1,14 @@
 // frontend/src/plugins/axios.js
 import axios from "axios";
 
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+const baseURL = import.meta.env.VITE_API_BASE_URL?.trim();
 
 if (!baseURL) {
-  console.warn("VITE_API_BASE_URL is NOT defined! Falling back to localhost for development.");
+  throw new Error("VITE_API_BASE_URL is not defined.");
 }
 
 const api = axios.create({
-  baseURL: baseURL || "http://localhost:8000/api",
+  baseURL,
   headers: {
     Accept: "application/json",
     "Content-Type": "application/json",
