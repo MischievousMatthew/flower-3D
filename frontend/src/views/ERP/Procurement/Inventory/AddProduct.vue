@@ -11,14 +11,14 @@
           <button
             @click="saveDraft"
             class="btn-secondary"
-            :disabled="isSubmitting"
+            :disabled="isReadOnlyInventoryProducts || isSubmitting"
           >
             <span>📝</span><span>Save as Draft</span>
           </button>
           <button
             @click="publishProduct"
             class="btn-primary"
-            :disabled="isSubmitting"
+            :disabled="isReadOnlyInventoryProducts || isSubmitting"
           >
             <span>✅</span
             ><span>{{
@@ -30,7 +30,11 @@
 
       <!-- Form -->
       <div class="form-container">
+        <p v-if="isReadOnlyInventoryProducts" class="permission-banner">
+          Read-only mode. You can review product details, but only employees with edit access can create or update inventory products.
+        </p>
         <form @submit.prevent="publishProduct">
+          <fieldset :disabled="isReadOnlyInventoryProducts" class="permission-fieldset">
           <!-- Basic Information -->
           <div class="form-section">
             <h2 class="section-title">Basic Information</h2>
@@ -651,7 +655,7 @@
                 type="button"
                 @click="saveDraft"
                 class="btn-secondary"
-                :disabled="isSubmitting"
+                :disabled="isReadOnlyInventoryProducts || isSubmitting"
               >
                 <span v-if="isSubmitting && isDraft">Saving...</span>
                 <span v-else>📝 Save as Draft</span>
@@ -659,13 +663,14 @@
               <button
                 type="submit"
                 class="btn-primary"
-                :disabled="isSubmitting"
+                :disabled="isReadOnlyInventoryProducts || isSubmitting"
               >
                 <span v-if="isSubmitting && !isDraft">Publishing...</span>
                 <span v-else>✅ Publish Product</span>
               </button>
             </div>
           </div>
+          </fieldset>
         </form>
       </div>
     </main>
@@ -676,6 +681,7 @@
 import { ref, computed, onMounted, reactive } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../../../composables/useAuth";
+import { useAssignment } from "../../../../composables/useAssignment";
 
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
@@ -683,12 +689,17 @@ import api from "../../../../plugins/axios";
 
 const router = useRouter();
 const { user } = useAuth();
+const { canEdit, isReadOnly } = useAssignment();
 const fileInput = ref(null);
 const modelFileInput = ref(null);
 const isSubmitting = ref(false);
 const isDraft = ref(false);
 const product3DModel = ref(null);
 const errors = reactive({});
+const canEditInventoryProducts = computed(() => canEdit("inventory_products"));
+const isReadOnlyInventoryProducts = computed(() =>
+  isReadOnly("inventory_products"),
+);
 
 const formData = reactive({
   owner_id: null,
@@ -787,12 +798,17 @@ const isTagDisabled = (tag) =>
   formData.occasion_tags.length >= 2 && !formData.occasion_tags.includes(tag);
 
 // 3D model
-const trigger3DFileInput = () => modelFileInput.value?.click();
+const trigger3DFileInput = () => {
+  if (!canEditInventoryProducts.value) return;
+  modelFileInput.value?.click();
+};
 const handle3DFileSelect = (e) => {
+  if (!canEditInventoryProducts.value) return;
   const file = e.target.files[0];
   if (file) validate3DModel(file);
 };
 const handle3DFileDrop = (e) => {
+  if (!canEditInventoryProducts.value) return;
   e.preventDefault();
   const file = e.dataTransfer.files[0];
   if (file) validate3DModel(file);
@@ -814,6 +830,7 @@ const validate3DModel = (file) => {
   toast.success("3D model uploaded successfully!");
 };
 const remove3DModel = () => {
+  if (!canEditInventoryProducts.value) return;
   product3DModel.value = null;
   if (modelFileInput.value) modelFileInput.value.value = "";
 };
@@ -826,13 +843,18 @@ const formatFileSize = (bytes) => {
 };
 
 // Images
-const triggerFileInput = () => fileInput.value?.click();
+const triggerFileInput = () => {
+  if (!canEditInventoryProducts.value) return;
+  fileInput.value?.click();
+};
 const handleFileSelect = (e) => addImages(Array.from(e.target.files));
 const handleDrop = (e) => {
+  if (!canEditInventoryProducts.value) return;
   e.preventDefault();
   addImages(Array.from(e.dataTransfer.files));
 };
 const addImages = (files) => {
+  if (!canEditInventoryProducts.value) return;
   const imageFiles = files.filter((f) => f.type.startsWith("image/"));
   const remaining = 5 - productImages.value.length;
   if (imageFiles.length > remaining) {
@@ -847,7 +869,10 @@ const addImages = (files) => {
   });
   if (fileInput.value) fileInput.value.value = "";
 };
-const removeImage = (index) => productImages.value.splice(index, 1);
+const removeImage = (index) => {
+  if (!canEditInventoryProducts.value) return;
+  productImages.value.splice(index, 1);
+};
 const clearError = (field) => {
   if (errors[field]) delete errors[field];
 };
@@ -980,17 +1005,29 @@ const validateForm = () => {
 };
 
 const saveDraft = async () => {
+  if (!canEditInventoryProducts.value) {
+    toast.error("You do not have permission to create inventory products.");
+    return;
+  }
   isDraft.value = true;
   formData.status = "draft";
   await submitProduct();
 };
 const publishProduct = async () => {
+  if (!canEditInventoryProducts.value) {
+    toast.error("You do not have permission to create inventory products.");
+    return;
+  }
   isDraft.value = false;
   formData.status = "active";
   await submitProduct();
 };
 
 const submitProduct = async () => {
+  if (!canEditInventoryProducts.value) {
+    toast.error("You do not have permission to create inventory products.");
+    return;
+  }
   if (isSubmitting.value) return;
   if (!validateForm()) return;
   if (!user.value?.id) {
@@ -1146,6 +1183,24 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.permission-banner {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid #f6ad55;
+  border-radius: 12px;
+  background: #fffaf0;
+  color: #9c4221;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.permission-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
 * {
   font-family: "Poppins", sans-serif;
   box-sizing: border-box;

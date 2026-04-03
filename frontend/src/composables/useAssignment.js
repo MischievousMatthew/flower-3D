@@ -61,6 +61,13 @@ export function useAssignment() {
   }
 
   /**
+   * Is this module currently view-only for the employee?
+   */
+  function isReadOnly(moduleKey) {
+    return canView(moduleKey) && !canEdit(moduleKey);
+  }
+
+  /**
    * Check if the employee has access to any module in a given group.
    * Useful for route guards that protect entire sections (e.g. /erp/hr/*).
    */
@@ -106,6 +113,7 @@ export function useAssignment() {
     hasAccess,
     canView,
     canEdit,
+    isReadOnly,
     hasGroupAccess,
     loadAssignments,
     clearAssignment,

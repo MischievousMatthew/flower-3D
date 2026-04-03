@@ -80,7 +80,12 @@
             Status
           </button>
 
-          <button class="add-employee-btn" @click="openAddModal">
+          <button
+            class="add-employee-btn"
+            @click="openAddModal"
+            :disabled="isReadOnlyEmployees"
+            :title="isReadOnlyEmployees ? 'You do not have permission to add employees' : 'Add employee'"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="20"
@@ -95,6 +100,9 @@
             </svg>
           </button>
         </div>
+        <p v-if="isReadOnlyEmployees" class="permission-banner">
+          Read-only mode. You can review employee records, but only employees with edit access can create or update profiles.
+        </p>
       </div>
 
       <!-- Loading Overlay -->
@@ -143,7 +151,12 @@
                 </span>
               </td>
               <td class="action-cell" @click.stop>
-                <button class="action-btn" @click="toggleMenu(employee.id)">
+                <button
+                  class="action-btn"
+                  @click="toggleMenu(employee.id)"
+                  :disabled="isReadOnlyEmployees"
+                  :title="isReadOnlyEmployees ? 'You do not have permission to modify employees' : 'Open actions'"
+                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="18"
@@ -160,16 +173,17 @@
                   <button @click="selectEmployee(employee)">
                     View Details
                   </button>
-                  <button @click="openEditModal(employee)">Edit</button>
-                  <button @click="updateEmployeeStatus(employee, 'Regular')">
+                  <button :disabled="isReadOnlyEmployees" @click="openEditModal(employee)">Edit</button>
+                  <button :disabled="isReadOnlyEmployees" @click="updateEmployeeStatus(employee, 'Regular')">
                     Mark as Regular
                   </button>
                   <button
+                    :disabled="isReadOnlyEmployees"
                     @click="updateEmployeeStatus(employee, 'Probationary')"
                   >
                     Mark as Probationary
                   </button>
-                  <button class="delete-btn" @click="deleteEmployee(employee)">
+                  <button class="delete-btn" :disabled="isReadOnlyEmployees" @click="deleteEmployee(employee)">
                     Delete
                   </button>
                 </div>
@@ -179,7 +193,7 @@
               <td colspan="6" class="no-data">
                 <div class="no-data-message">
                   <p>No employees found</p>
-                  <button @click="openAddModal" class="btn-add-first">
+                  <button @click="openAddModal" class="btn-add-first" :disabled="isReadOnlyEmployees">
                     Add First Employee
                   </button>
                 </div>
@@ -575,6 +589,10 @@
         </div>
 
         <form @submit.prevent="saveEmployee" class="modal-body">
+          <p v-if="isReadOnlyEmployees" class="permission-banner">
+            Read-only mode. Form fields are disabled because you only have view access to Employees.
+          </p>
+          <fieldset :disabled="isReadOnlyEmployees" class="permission-fieldset">
           <!-- Profile Picture -->
           <div class="form-section">
             <h3 class="section-title">Profile Photo</h3>
@@ -1090,7 +1108,7 @@
             <button type="button" class="btn-cancel" @click="closeModal">
               Cancel
             </button>
-            <button type="submit" class="btn-submit" :disabled="isSaving">
+            <button type="submit" class="btn-submit" :disabled="isReadOnlyEmployees || isSaving">
               {{
                 isSaving
                   ? "Saving..."
@@ -1100,6 +1118,7 @@
               }}
             </button>
           </div>
+          </fieldset>
         </form>
       </div>
     </div>
@@ -1114,9 +1133,11 @@ import { toast } from "vue3-toastify";
 import LoadingOverlay from "../../../../layouts/components/LoadingOverlay.vue";
 import EmployeeQRCode from "../../../../layouts/components/EmployeeQRCode.vue";
 import employeeInfoService from "../../../../services/employeeInfoService";
+import { useAssignment } from "../../../../composables/useAssignment";
 
 // State
 const searchQuery = ref("");
+const { canEdit, isReadOnly } = useAssignment();
 const selectedEmployee = ref(null);
 const activeTab = ref("basic");
 const showModal = ref(false);
@@ -1128,6 +1149,8 @@ const isSaving = ref(false);
 const employees = ref([]);
 const validationErrors = ref({});
 const showDayPicker = ref(false);
+const canEditEmployees = computed(() => canEdit("employees"));
+const isReadOnlyEmployees = computed(() => isReadOnly("employees"));
 
 const allWeekDays = [
   "Monday",
@@ -1304,10 +1327,18 @@ const selectEmployee = (employee) => {
 };
 
 const toggleMenu = (id) => {
+  if (!canEditEmployees.value) {
+    openMenuId.value = null;
+    return;
+  }
   openMenuId.value = openMenuId.value === id ? null : id;
 };
 
 async function updateEmployeeStatus(employee, status) {
+  if (!canEditEmployees.value) {
+    toast.error("You do not have permission to update employee status.");
+    return;
+  }
   try {
     loadingMessage.value = "Updating employee status...";
     isLoading.value = true;
@@ -1333,6 +1364,10 @@ async function updateEmployeeStatus(employee, status) {
 }
 
 async function deleteEmployee(employee) {
+  if (!canEditEmployees.value) {
+    toast.error("You do not have permission to delete employees.");
+    return;
+  }
   if (!confirm(`Are you sure you want to delete ${employee.full_name}?`)) {
     return;
   }
@@ -1362,6 +1397,10 @@ async function deleteEmployee(employee) {
 
 // Open modal
 const openAddModal = () => {
+  if (!canEditEmployees.value) {
+    toast.error("You do not have permission to add employees.");
+    return;
+  }
   isEditMode.value = false;
   validationErrors.value = {};
   showDayPicker.value = false;
@@ -1409,6 +1448,10 @@ const formatDateForInput = (dateString) => {
 };
 
 const openEditModal = (employee) => {
+  if (!canEditEmployees.value) {
+    toast.error("You do not have permission to edit employees.");
+    return;
+  }
   isEditMode.value = true;
   validationErrors.value = {};
   showDayPicker.value = false;
@@ -1477,6 +1520,9 @@ const closeModal = () => {
 
 // File upload with preview
 const handleFileUpload = (event) => {
+  if (!canEditEmployees.value) {
+    return;
+  }
   const file = event.target.files[0];
   if (file) {
     formData.value.avatar = file;
@@ -1489,6 +1535,10 @@ const handleFileUpload = (event) => {
 };
 
 async function saveEmployee() {
+  if (!canEditEmployees.value) {
+    toast.error("You do not have permission to save employee profiles.");
+    return;
+  }
   try {
     isSaving.value = true;
     loadingMessage.value = isEditMode.value
@@ -1644,6 +1694,24 @@ if (typeof document !== "undefined") {
 </script>
 
 <style scoped>
+.permission-banner {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #f6ad55;
+  border-radius: 10px;
+  background: #fffaf0;
+  color: #9c4221;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.permission-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
 * {
   margin: 0;
   padding: 0;

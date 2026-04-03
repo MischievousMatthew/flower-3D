@@ -200,17 +200,22 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── Chat ─────────────────────────────────────────────────────────────
     Route::prefix('chat')->group(function () {
-        Route::get('/conversations',                  [ChatController::class, 'getConversations']);
-        Route::get('/my-conversations',               [ChatController::class, 'getConversations']);
-        Route::get('/conversations/{id}/messages',    [ChatController::class, 'getMessages']);
-        Route::post('/messages/send',                 [ChatController::class, 'sendMessage']);
-        Route::get('/poll',                           [ChatController::class, 'pollNewMessages']);
-        Route::post('/conversations/start',           [ChatController::class, 'startConversation']);
-        Route::get('/search-users',                   [ChatController::class, 'searchUsers']);
-        Route::get('/search-customers',               [ChatController::class, 'searchUsers']);
-        Route::get('/search-vendors',                 [ChatController::class, 'searchUsers']);
-        Route::get('/customer/{id}/details',          [ChatController::class, 'getUserDetails']);
-        Route::get('/vendor/{id}/details',            [ChatController::class, 'getUserDetails']);
+        Route::middleware('employee.module:crm,view')->group(function () {
+            Route::get('/conversations',                  [ChatController::class, 'getConversations']);
+            Route::get('/my-conversations',               [ChatController::class, 'getConversations']);
+            Route::get('/conversations/{id}/messages',    [ChatController::class, 'getMessages']);
+            Route::get('/poll',                           [ChatController::class, 'pollNewMessages']);
+            Route::get('/customer/{id}/details',          [ChatController::class, 'getUserDetails']);
+            Route::get('/vendor/{id}/details',            [ChatController::class, 'getUserDetails']);
+        });
+
+        Route::middleware('employee.module:crm,edit')->group(function () {
+            Route::post('/messages/send',                 [ChatController::class, 'sendMessage']);
+            Route::post('/conversations/start',           [ChatController::class, 'startConversation']);
+            Route::get('/search-users',                   [ChatController::class, 'searchUsers']);
+            Route::get('/search-customers',               [ChatController::class, 'searchUsers']);
+            Route::get('/search-vendors',                 [ChatController::class, 'searchUsers']);
+        });
     });
 
     // ----------------------------------------------------------
@@ -324,53 +329,84 @@ Route::middleware('auth:sanctum')->group(function () {
     // ----------------------------------------------------------
 
     Route::prefix('employees-info')->group(function () {
-        Route::get('/',              [EmployeeInfoController::class, 'index']);
-        Route::get('/statistics',    [EmployeeInfoController::class, 'statistics']);
-        Route::post('/',             [EmployeeInfoController::class, 'store']);
-        Route::get('/{id}',          [EmployeeInfoController::class, 'show']);
-        Route::put('/{id}',          [EmployeeInfoController::class, 'update']);
-        Route::patch('/{id}/status', [EmployeeInfoController::class, 'updateStatus']);
-        Route::delete('/{id}',       [EmployeeInfoController::class, 'destroy']);
+        Route::middleware('employee.module:employees,view')->group(function () {
+            Route::get('/',              [EmployeeInfoController::class, 'index']);
+            Route::get('/statistics',    [EmployeeInfoController::class, 'statistics']);
+            Route::get('/{id}',          [EmployeeInfoController::class, 'show']);
+        });
+
+        Route::middleware('employee.module:employees,edit')->group(function () {
+            Route::post('/',             [EmployeeInfoController::class, 'store']);
+            Route::put('/{id}',          [EmployeeInfoController::class, 'update']);
+            Route::patch('/{id}/status', [EmployeeInfoController::class, 'updateStatus']);
+            Route::delete('/{id}',       [EmployeeInfoController::class, 'destroy']);
+        });
     });
 
     Route::prefix('attendance')->group(function () {
-        Route::post('/scan',     [AttendanceController::class, 'scanQR']);
-        Route::get('/',          [AttendanceController::class, 'index']);
-        Route::get('/summary',   [AttendanceController::class, 'summary']);
-        Route::post('/',         [AttendanceController::class, 'store']);
-        Route::put('/{id}',      [AttendanceController::class, 'update']);
-        Route::delete('/{id}',   [AttendanceController::class, 'destroy']);
-        Route::post('/time-in',  [AttendanceController::class, 'timeIn']);
-        Route::post('/time-out', [AttendanceController::class, 'timeOut']);
+        Route::middleware('employee.module:attendance,view')->group(function () {
+            Route::get('/',        [AttendanceController::class, 'index']);
+            Route::get('/summary', [AttendanceController::class, 'summary']);
+        });
+
+        Route::middleware('employee.module:attendance,edit')->group(function () {
+            Route::post('/scan',     [AttendanceController::class, 'scanQR']);
+            Route::post('/',         [AttendanceController::class, 'store']);
+            Route::put('/{id}',      [AttendanceController::class, 'update']);
+            Route::delete('/{id}',   [AttendanceController::class, 'destroy']);
+            Route::post('/time-in',  [AttendanceController::class, 'timeIn']);
+            Route::post('/time-out', [AttendanceController::class, 'timeOut']);
+        });
     });
 
     Route::prefix('employees/{employeeId}/qr-code')->group(function () {
-        Route::post('/generate', [EmployeeQRController::class, 'generate']);
-        Route::get('/svg',       [EmployeeQRController::class, 'getSVG']);
-        Route::get('/base64',    [EmployeeQRController::class, 'getBase64']);
-        Route::get('/download',  [EmployeeQRController::class, 'download']);
+        Route::middleware('employee.module:employees,view')->group(function () {
+            Route::get('/svg',       [EmployeeQRController::class, 'getSVG']);
+            Route::get('/base64',    [EmployeeQRController::class, 'getBase64']);
+            Route::get('/download',  [EmployeeQRController::class, 'download']);
+        });
+
+        Route::middleware('employee.module:employees,edit')->group(function () {
+            Route::post('/generate', [EmployeeQRController::class, 'generate']);
+        });
     });
 
     Route::prefix('payroll')->group(function () {
-        Route::get('/',                 [PayrollController::class, 'index']);
-        Route::post('/',                [PayrollController::class, 'store']);
-        Route::post('/preview',         [PayrollController::class, 'preview']);
-        Route::get('/summary',          [PayrollController::class, 'summary']);
-        Route::post('/hr-approve',      [PayrollController::class, 'hrApprove']);
-        Route::get('/finance-requests', [PayrollController::class, 'financeRequests']);
-        Route::get('/finance-summary',  [PayrollController::class, 'financeSummary']);
-        Route::post('/finance-approve', [PayrollController::class, 'financeApprove']);
-        Route::post('/finance-reject',  [PayrollController::class, 'financeReject']);
-        Route::post('/mark-paid',       [PayrollController::class, 'markAsPaid']);
-        Route::get('/{id}',             [PayrollController::class, 'show']);
-        Route::delete('/{id}',          [PayrollController::class, 'destroy']);
+        Route::middleware('employee.module:payroll,view')->group(function () {
+            Route::get('/',                 [PayrollController::class, 'index']);
+            Route::get('/summary',          [PayrollController::class, 'summary']);
+            Route::get('/{id}',             [PayrollController::class, 'show']);
+        });
+
+        Route::middleware('employee.module:payroll,edit')->group(function () {
+            Route::post('/',                [PayrollController::class, 'store']);
+            Route::post('/preview',         [PayrollController::class, 'preview']);
+            Route::post('/hr-approve',      [PayrollController::class, 'hrApprove']);
+            Route::delete('/{id}',          [PayrollController::class, 'destroy']);
+        });
+
+        Route::middleware('employee.module:payroll_requests,view')->group(function () {
+            Route::get('/finance-requests', [PayrollController::class, 'financeRequests']);
+            Route::get('/finance-summary',  [PayrollController::class, 'financeSummary']);
+        });
+
+        Route::middleware('employee.module:payroll_requests,edit')->group(function () {
+            Route::post('/finance-approve', [PayrollController::class, 'financeApprove']);
+            Route::post('/finance-reject',  [PayrollController::class, 'financeReject']);
+            Route::post('/mark-paid',       [PayrollController::class, 'markAsPaid']);
+        });
     });
 
     Route::prefix('leaves')->group(function () {
-        Route::get('/',            [EmployeeLeaveController::class, 'index']);
-        Route::get('/statistics',  [EmployeeLeaveController::class, 'getStatistics']);
-        Route::put('/{id}/status', [EmployeeLeaveController::class, 'updateStatus']);
-        Route::delete('/{id}',     [EmployeeLeaveController::class, 'destroy']);
+        Route::middleware('employee.module:leave,view')->group(function () {
+            Route::get('/',            [EmployeeLeaveController::class, 'index']);
+            Route::get('/statistics',  [EmployeeLeaveController::class, 'getStatistics']);
+        });
+
+        Route::middleware('employee.module:leave,edit')->group(function () {
+            Route::put('/{id}/status', [EmployeeLeaveController::class, 'updateStatus']);
+            Route::delete('/{id}',     [EmployeeLeaveController::class, 'destroy']);
+        });
     });
 
     // ----------------------------------------------------------
@@ -378,32 +414,43 @@ Route::middleware('auth:sanctum')->group(function () {
     // ----------------------------------------------------------
 
     Route::prefix('procurement/inventory')->group(function () {
-        Route::get('/products',          [ProductController::class, 'myProducts']);
-        Route::get('/my-products',       [ProductController::class, 'myProducts']);
-        Route::get('/products/draft',    [ProductController::class, 'draftProducts']);
-        Route::get('/draft-products',    [ProductController::class, 'draftProducts']);
-        Route::get('/products/inactive', [ProductController::class, 'inactiveProducts']);
-        Route::get('/inactive-products', [ProductController::class, 'inactiveProducts']);
-        Route::get('/products/search',   [ProductController::class, 'searchForWarehouse']);
-        Route::post('/products',         [ProductController::class, 'store']);
-        Route::get('/products/{id}',     [ProductController::class, 'show']);
-        Route::put('/products/{id}',     [ProductController::class, 'update']);
-        Route::patch('/products/{id}',   [ProductController::class, 'update']);
-        Route::delete('/products/{id}',  [ProductController::class, 'destroy']);
-        Route::post('/products/{id}/toggle-status',             [ProductController::class, 'toggleStatus']);
-        Route::post('/products/{id}/status',                    [ProductController::class, 'updateStatus']);
-        Route::patch('/products/{id}/stock',                    [ProductController::class, 'updateStock']);
-        Route::post('/products/{id}/update-stock',              [ProductController::class, 'updateStock']);
-        Route::delete('/products/{productId}/images/{imageId}', [ProductController::class, 'deleteImage']);
-        Route::delete('/products/{productId}/model',            [ProductController::class, 'deleteModel']);
-        Route::get('eligible-approvers',            [FundingRequestController::class, 'getEligibleApprovers']);
-        Route::get('funding-requests/products',     [FundingRequestController::class, 'getProducts']);
-        Route::get('funding-requests',              [FundingRequestController::class, 'index']);
-        Route::post('funding-requests',             [FundingRequestController::class, 'store']);
-        Route::get('funding-requests/{id}',         [FundingRequestController::class, 'show']);
-        Route::put('funding-requests/{id}',         [FundingRequestController::class, 'update']);
-        Route::delete('funding-requests/{id}',      [FundingRequestController::class, 'destroy']);
-        Route::post('funding-requests/{id}/submit', [FundingRequestController::class, 'submitToAccounting']);
+        Route::middleware('employee.module:inventory_products,view')->group(function () {
+            Route::get('/products',          [ProductController::class, 'myProducts']);
+            Route::get('/my-products',       [ProductController::class, 'myProducts']);
+            Route::get('/products/draft',    [ProductController::class, 'draftProducts']);
+            Route::get('/draft-products',    [ProductController::class, 'draftProducts']);
+            Route::get('/products/inactive', [ProductController::class, 'inactiveProducts']);
+            Route::get('/inactive-products', [ProductController::class, 'inactiveProducts']);
+            Route::get('/products/search',   [ProductController::class, 'searchForWarehouse']);
+            Route::get('/products/{id}',     [ProductController::class, 'show']);
+        });
+
+        Route::middleware('employee.module:inventory_products,edit')->group(function () {
+            Route::post('/products',         [ProductController::class, 'store']);
+            Route::put('/products/{id}',     [ProductController::class, 'update']);
+            Route::patch('/products/{id}',   [ProductController::class, 'update']);
+            Route::delete('/products/{id}',  [ProductController::class, 'destroy']);
+            Route::post('/products/{id}/toggle-status',             [ProductController::class, 'toggleStatus']);
+            Route::post('/products/{id}/status',                    [ProductController::class, 'updateStatus']);
+            Route::patch('/products/{id}/stock',                    [ProductController::class, 'updateStock']);
+            Route::post('/products/{id}/update-stock',              [ProductController::class, 'updateStock']);
+            Route::delete('/products/{productId}/images/{imageId}', [ProductController::class, 'deleteImage']);
+            Route::delete('/products/{productId}/model',            [ProductController::class, 'deleteModel']);
+        });
+
+        Route::middleware('employee.module:inventory_funding,view')->group(function () {
+            Route::get('eligible-approvers',            [FundingRequestController::class, 'getEligibleApprovers']);
+            Route::get('funding-requests/products',     [FundingRequestController::class, 'getProducts']);
+            Route::get('funding-requests',              [FundingRequestController::class, 'index']);
+            Route::get('funding-requests/{id}',         [FundingRequestController::class, 'show']);
+        });
+
+        Route::middleware('employee.module:inventory_funding,edit')->group(function () {
+            Route::post('funding-requests',             [FundingRequestController::class, 'store']);
+            Route::put('funding-requests/{id}',         [FundingRequestController::class, 'update']);
+            Route::delete('funding-requests/{id}',      [FundingRequestController::class, 'destroy']);
+            Route::post('funding-requests/{id}/submit', [FundingRequestController::class, 'submitToAccounting']);
+        });
     });
 
     // ----------------------------------------------------------
@@ -413,96 +460,133 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('procurement/supply-chain')->group(function () {
 
         Route::prefix('suppliers')->group(function () {
-            Route::get('/',               [SupplierController::class, 'index']);
-            Route::post('/',              [SupplierController::class, 'store']);
-            Route::get('/{id}',           [SupplierController::class, 'show']);
-            Route::put('/{id}',           [SupplierController::class, 'update']);
-            Route::patch('/{id}',         [SupplierController::class, 'update']);
-            Route::delete('/{id}',        [SupplierController::class, 'destroy']);
-            Route::patch('/{id}/activate',   [SupplierController::class, 'activate']);
-            Route::patch('/{id}/deactivate', [SupplierController::class, 'deactivate']);
-            Route::patch('/{id}/blacklist',  [SupplierController::class, 'blacklist']);
-            Route::get('/{supplierId}/contacts',         [SupplierController::class, 'contacts']);
-            Route::post('/{supplierId}/contacts',        [SupplierController::class, 'storeContact']);
-            Route::put('/{supplierId}/contacts/{id}',    [SupplierController::class, 'updateContact']);
-            Route::delete('/{supplierId}/contacts/{id}', [SupplierController::class, 'destroyContact']);
+            Route::middleware('employee.module:suppliers,view')->group(function () {
+                Route::get('/',               [SupplierController::class, 'index']);
+                Route::get('/{id}',           [SupplierController::class, 'show']);
+                Route::get('/{supplierId}/contacts',         [SupplierController::class, 'contacts']);
+            });
+
+            Route::middleware('employee.module:suppliers,edit')->group(function () {
+                Route::post('/',              [SupplierController::class, 'store']);
+                Route::put('/{id}',           [SupplierController::class, 'update']);
+                Route::patch('/{id}',         [SupplierController::class, 'update']);
+                Route::delete('/{id}',        [SupplierController::class, 'destroy']);
+                Route::patch('/{id}/activate',   [SupplierController::class, 'activate']);
+                Route::patch('/{id}/deactivate', [SupplierController::class, 'deactivate']);
+                Route::patch('/{id}/blacklist',  [SupplierController::class, 'blacklist']);
+                Route::post('/{supplierId}/contacts',        [SupplierController::class, 'storeContact']);
+                Route::put('/{supplierId}/contacts/{id}',    [SupplierController::class, 'updateContact']);
+                Route::delete('/{supplierId}/contacts/{id}', [SupplierController::class, 'destroyContact']);
+            });
         });
 
         Route::prefix('warehouses')->group(function () {
-            Route::get('/',        [WarehouseController::class, 'index']);
-            Route::post('/',       [WarehouseController::class, 'store']);
-            Route::get('/{id}',    [WarehouseController::class, 'show']);
-            Route::put('/{id}',    [WarehouseController::class, 'update']);
-            Route::patch('/{id}',  [WarehouseController::class, 'update']);
-            Route::delete('/{id}', [WarehouseController::class, 'destroy']);
-            Route::get('/{warehouseId}/items',              [WarehouseController::class, 'items']);
-            Route::post('/{warehouseId}/items',             [WarehouseController::class, 'addItem']);
-            Route::put('/{warehouseId}/items/{id}',         [WarehouseController::class, 'updateItem']);
-            Route::patch('/{warehouseId}/items/{id}/stock', [WarehouseController::class, 'adjustStock']);
-            Route::get('/{warehouseId}/movements',          [WarehouseController::class, 'movements']);
-            Route::get('/{warehouseId}/barcodes',           [WarehouseController::class, 'barcodes']);
+            Route::middleware('employee.module:warehouse,view')->group(function () {
+                Route::get('/',        [WarehouseController::class, 'index']);
+                Route::get('/{id}',    [WarehouseController::class, 'show']);
+                Route::get('/{warehouseId}/items',              [WarehouseController::class, 'items']);
+                Route::get('/{warehouseId}/movements',          [WarehouseController::class, 'movements']);
+                Route::get('/{warehouseId}/barcodes',           [WarehouseController::class, 'barcodes']);
+            });
+
+            Route::middleware('employee.module:warehouse,edit')->group(function () {
+                Route::post('/',       [WarehouseController::class, 'store']);
+                Route::put('/{id}',    [WarehouseController::class, 'update']);
+                Route::patch('/{id}',  [WarehouseController::class, 'update']);
+                Route::delete('/{id}', [WarehouseController::class, 'destroy']);
+                Route::post('/{warehouseId}/items',             [WarehouseController::class, 'addItem']);
+                Route::put('/{warehouseId}/items/{id}',         [WarehouseController::class, 'updateItem']);
+                Route::patch('/{warehouseId}/items/{id}/stock', [WarehouseController::class, 'adjustStock']);
+            });
         });
 
         Route::prefix('warehouse/batches')->group(function () {
-            Route::get('/floor-view',          [WarehouseBatchController::class, 'floorView']);
-            Route::get('/product/{productId}', [WarehouseBatchController::class, 'byProduct']);
-            Route::post('/',                   [WarehouseBatchController::class, 'receive']);
-            Route::get('/{id}/logs',           [WarehouseBatchController::class, 'logs']);
-            Route::post('/{id}/cull',          [WarehouseBatchController::class, 'cull']);
-            Route::patch('/{id}/condition',    [WarehouseBatchController::class, 'updateCondition']);
-            Route::patch('/{id}/transfer',     [WarehouseBatchController::class, 'transfer']);
+            Route::middleware('employee.module:warehouse,view')->group(function () {
+                Route::get('/floor-view',          [WarehouseBatchController::class, 'floorView']);
+                Route::get('/product/{productId}', [WarehouseBatchController::class, 'byProduct']);
+                Route::get('/{id}/logs',           [WarehouseBatchController::class, 'logs']);
+            });
+
+            Route::middleware('employee.module:warehouse,edit')->group(function () {
+                Route::post('/',                   [WarehouseBatchController::class, 'receive']);
+                Route::post('/{id}/cull',          [WarehouseBatchController::class, 'cull']);
+                Route::patch('/{id}/condition',    [WarehouseBatchController::class, 'updateCondition']);
+                Route::patch('/{id}/transfer',     [WarehouseBatchController::class, 'transfer']);
+            });
         });
 
         Route::prefix('warehouse/locations')->group(function () {
-            Route::get('/',              [WarehouseLocationController::class, 'index']);
-            Route::post('/',             [WarehouseLocationController::class, 'store']);
-            Route::get('/{id}',          [WarehouseLocationController::class, 'show']);
-            Route::patch('/{id}',        [WarehouseLocationController::class, 'update']);
-            Route::delete('/{id}',       [WarehouseLocationController::class, 'destroy']);
-            Route::patch('/{id}/toggle', [WarehouseLocationController::class, 'toggle']);
+            Route::middleware('employee.module:warehouse,view')->group(function () {
+                Route::get('/',              [WarehouseLocationController::class, 'index']);
+                Route::get('/{id}',          [WarehouseLocationController::class, 'show']);
+            });
+
+            Route::middleware('employee.module:warehouse,edit')->group(function () {
+                Route::post('/',             [WarehouseLocationController::class, 'store']);
+                Route::patch('/{id}',        [WarehouseLocationController::class, 'update']);
+                Route::delete('/{id}',       [WarehouseLocationController::class, 'destroy']);
+                Route::patch('/{id}/toggle', [WarehouseLocationController::class, 'toggle']);
+            });
         });
 
         Route::prefix('orders')->group(function () {
-            Route::get('/',                                 [OrderController::class, 'index']);
-            Route::post('/',                                [OrderController::class, 'store']);
-            Route::get('/funding-requests/approved',        [OrderController::class, 'approvedFundingRequests']);
-            Route::post('/from-funding/{fundingRequestId}', [OrderController::class, 'createFromFunding']);
-            Route::get('/{id}',                             [OrderController::class, 'show']);
-            Route::put('/{id}',                             [OrderController::class, 'update']);
-            Route::patch('/{id}',                           [OrderController::class, 'update']);
-            Route::delete('/{id}',                          [OrderController::class, 'destroy']);
-            Route::patch('/{id}/status',                    [OrderController::class, 'updateStatus']);
-            Route::post('/{id}/items',                      [OrderController::class, 'attachItems']);
-            Route::delete('/{id}/items/{itemId}',           [OrderController::class, 'removeItem']);
-            Route::post('/{id}/recalculate',                [OrderController::class, 'recalculateTotals']);
+            Route::middleware('employee.module:sc_orders,view')->group(function () {
+                Route::get('/',                                 [OrderController::class, 'index']);
+                Route::get('/funding-requests/approved',        [OrderController::class, 'approvedFundingRequests']);
+                Route::get('/{id}',                             [OrderController::class, 'show']);
+            });
+
+            Route::middleware('employee.module:sc_orders,edit')->group(function () {
+                Route::post('/',                                [OrderController::class, 'store']);
+                Route::post('/from-funding/{fundingRequestId}', [OrderController::class, 'createFromFunding']);
+                Route::put('/{id}',                             [OrderController::class, 'update']);
+                Route::patch('/{id}',                           [OrderController::class, 'update']);
+                Route::delete('/{id}',                          [OrderController::class, 'destroy']);
+                Route::patch('/{id}/status',                    [OrderController::class, 'updateStatus']);
+                Route::post('/{id}/items',                      [OrderController::class, 'attachItems']);
+                Route::delete('/{id}/items/{itemId}',           [OrderController::class, 'removeItem']);
+                Route::post('/{id}/recalculate',                [OrderController::class, 'recalculateTotals']);
+            });
         });
 
         Route::prefix('shipments')->group(function () {
-            Route::get('/',                [ShipmentController::class, 'index']);
-            Route::post('/',               [ShipmentController::class, 'store']);
-            Route::get('/{id}',            [ShipmentController::class, 'show']);
-            Route::put('/{id}',            [ShipmentController::class, 'update']);
-            Route::patch('/{id}',          [ShipmentController::class, 'update']);
-            Route::delete('/{id}',         [ShipmentController::class, 'destroy']);
-            Route::patch('/{id}/status',   [ShipmentController::class, 'updateStatus']);
-            Route::patch('/{id}/tracking', [ShipmentController::class, 'updateTracking']);
-            Route::patch('/{id}/ship',     [ShipmentController::class, 'markShipped']);
-            Route::patch('/{id}/receive',  [ShipmentController::class, 'markReceived']);
+            Route::middleware('employee.module:deliveries,view')->group(function () {
+                Route::get('/',                [ShipmentController::class, 'index']);
+                Route::get('/{id}',            [ShipmentController::class, 'show']);
+            });
+
+            Route::middleware('employee.module:deliveries,edit')->group(function () {
+                Route::post('/',               [ShipmentController::class, 'store']);
+                Route::put('/{id}',            [ShipmentController::class, 'update']);
+                Route::patch('/{id}',          [ShipmentController::class, 'update']);
+                Route::delete('/{id}',         [ShipmentController::class, 'destroy']);
+                Route::patch('/{id}/status',   [ShipmentController::class, 'updateStatus']);
+                Route::patch('/{id}/tracking', [ShipmentController::class, 'updateTracking']);
+                Route::patch('/{id}/ship',     [ShipmentController::class, 'markShipped']);
+                Route::patch('/{id}/receive',  [ShipmentController::class, 'markReceived']);
+            });
         });
 
         Route::prefix('barcode')->group(function () {
-            Route::post('/scan',     [BarcodeController::class, 'scan']);
-            Route::post('/generate', [BarcodeController::class, 'generate']);
-            Route::get('/lookup',    [BarcodeController::class, 'lookup']);
+            Route::middleware('employee.module:order_scan,view')->group(function () {
+                Route::get('/lookup',    [BarcodeController::class, 'lookup']);
+            });
+
+            Route::middleware('employee.module:order_scan,edit')->group(function () {
+                Route::post('/scan',     [BarcodeController::class, 'scan']);
+                Route::post('/generate', [BarcodeController::class, 'generate']);
+            });
         });
 
         Route::prefix('analytics')->group(function () {
-            Route::get('/summary',              [SupplyChainAnalyticsController::class, 'summary']);
-            Route::get('/inventory',            [SupplyChainAnalyticsController::class, 'inventory']);
-            Route::get('/orders',               [AnalyticsController::class, 'orders']);
-            Route::get('/shipments',            [AnalyticsController::class, 'shipments']);
-            Route::get('/supplier-performance', [SupplyChainAnalyticsController::class, 'supplierPerformance']);
-            Route::get('/movements',            [AnalyticsController::class, 'movements']);
+            Route::middleware('employee.module:sc_dashboard,view')->group(function () {
+                Route::get('/summary',              [SupplyChainAnalyticsController::class, 'summary']);
+                Route::get('/inventory',            [SupplyChainAnalyticsController::class, 'inventory']);
+                Route::get('/orders',               [AnalyticsController::class, 'orders']);
+                Route::get('/shipments',            [AnalyticsController::class, 'shipments']);
+                Route::get('/supplier-performance', [SupplyChainAnalyticsController::class, 'supplierPerformance']);
+                Route::get('/movements',            [AnalyticsController::class, 'movements']);
+            });
         });
     });
 
@@ -511,9 +595,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // ----------------------------------------------------------
 
     Route::prefix('finance')->group(function () {
-        Route::get('funding-requests',               [AccountingFundingRequestController::class, 'index']);
-        Route::post('funding-requests/{id}/approve', [AccountingFundingRequestController::class, 'approve']);
-        Route::post('funding-requests/{id}/reject',  [AccountingFundingRequestController::class, 'reject']);
+        Route::middleware('employee.module:funding_requests,view')->group(function () {
+            Route::get('funding-requests',               [AccountingFundingRequestController::class, 'index']);
+        });
+
+        Route::middleware('employee.module:funding_requests,edit')->group(function () {
+            Route::post('funding-requests/{id}/approve', [AccountingFundingRequestController::class, 'approve']);
+            Route::post('funding-requests/{id}/reject',  [AccountingFundingRequestController::class, 'reject']);
+        });
     });
 
     Route::prefix('admin')->group(function () {

@@ -32,7 +32,11 @@
       <!-- Selection Form -->
       <div class="selection-card">
         <h3 class="card-title">Payroll Details</h3>
+        <p v-if="isReadOnlyPayroll" class="permission-banner">
+          Read-only mode. You can review payroll details, but only employees with edit access can preview or generate payroll.
+        </p>
 
+        <fieldset :disabled="isReadOnlyPayroll" class="permission-fieldset">
         <div class="form-group">
           <label>Employee *</label>
           <div class="select-wrapper">
@@ -133,12 +137,13 @@
             </label>
           </div>
         </div>
+        </fieldset>
 
         <div class="action-buttons">
           <button
             @click="previewPayroll"
             class="btn-preview"
-            :disabled="!canPreview || isPreviewLoading"
+            :disabled="isReadOnlyPayroll || !canPreview || isPreviewLoading"
           >
             <svg
               v-if="!isPreviewLoading"
@@ -681,7 +686,7 @@
         <button
           @click="generatePayroll"
           class="btn-generate"
-          :disabled="isGenerating"
+          :disabled="isReadOnlyPayroll || isGenerating || !previewData"
         >
           <svg
             v-if="!isGenerating"
@@ -728,8 +733,10 @@ import { toast } from "vue3-toastify";
 import LoadingOverlay from "../../../../layouts/components/LoadingOverlay.vue";
 import employeeInfoService from "../../../../services/employeeInfoService";
 import payrollApi from "../../../../services/payrollApi";
+import { useAssignment } from "../../../../composables/useAssignment";
 
 const router = useRouter();
+const { canEdit, isReadOnly } = useAssignment();
 
 // State
 const employees = ref([]);
@@ -747,6 +754,9 @@ const formData = ref({
   notes: "",
   include_contributions: false,
 });
+
+const canEditPayroll = computed(() => canEdit("payroll"));
+const isReadOnlyPayroll = computed(() => isReadOnly("payroll"));
 
 // Computed
 const canPreview = computed(() => {
@@ -817,6 +827,10 @@ function clearPreview() {
 }
 
 async function previewPayroll() {
+  if (!canEditPayroll.value) {
+    toast.error("You do not have permission to preview payroll.");
+    return;
+  }
   if (!canPreview.value) return;
   try {
     isPreviewLoading.value = true;
@@ -839,6 +853,10 @@ async function previewPayroll() {
 }
 
 async function generatePayroll() {
+  if (!canEditPayroll.value) {
+    toast.error("You do not have permission to generate payroll.");
+    return;
+  }
   if (!previewData.value) return;
   try {
     isGenerating.value = true;
@@ -902,6 +920,24 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.permission-banner {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #f6ad55;
+  border-radius: 10px;
+  background: #fffaf0;
+  color: #9c4221;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.permission-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
 .payroll-create-page {
   padding: 24px;
   background: #f8f9fa;

@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'paymongo.webhook'  => \App\Http\Middleware\VerifyPayMongoWebhook::class,
             'finance.manager'   => \App\Http\Middleware\CheckFinanceManager::class,
             'assignment'        => \App\Http\Middleware\CheckActiveAssignment::class,
+            'employee.module'   => \App\Http\Middleware\EnsureEmployeeModuleAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
