@@ -473,10 +473,79 @@ class VendorProfileController extends Controller
 
     private function serializeVendorApplication(VendorApplication $vendorApplication): array
     {
-        $data = $vendorApplication->toArray();
-        $data['decrypted_account_number'] = $vendorApplication->decrypted_account_number;
-        $data['delivery_handled_by']      = $this->normalizeDeliveryHandledByForDisplay($vendorApplication->delivery_handled_by);
+        return [
+            'id'                         => $vendorApplication->id,
+            'application_id'             => $vendorApplication->application_id,
+            'store_name'                 => $this->safeVendorValue($vendorApplication, 'store_name', ''),
+            'store_description'          => $this->safeVendorValue($vendorApplication, 'store_description', ''),
+            'store_address'              => $this->safeVendorValue($vendorApplication, 'store_address', ''),
+            'service_areas'              => $this->safeVendorValue($vendorApplication, 'service_areas', ''),
+            'operating_hours'            => $this->safeVendorValue($vendorApplication, 'operating_hours', ''),
+            'owner_name'                 => $this->safeVendorValue($vendorApplication, 'owner_name', ''),
+            'position'                   => $this->safeVendorValue($vendorApplication, 'position', ''),
+            'contact_number'             => $this->safeVendorValue($vendorApplication, 'contact_number', ''),
+            'email'                      => $this->safeVendorValue($vendorApplication, 'email', ''),
+            'facebook_page'              => $this->safeVendorValue($vendorApplication, 'facebook_page', ''),
+            'instagram_page'             => $this->safeVendorValue($vendorApplication, 'instagram_page', ''),
+            'payout_method'              => $this->safeVendorValue($vendorApplication, 'payout_method', ''),
+            'account_holder_name'        => $this->safeVendorValue($vendorApplication, 'account_holder_name', ''),
+            'decrypted_account_number'   => $this->safeVendorValue($vendorApplication, 'decrypted_account_number'),
+            'bank_name'                  => $this->safeVendorValue($vendorApplication, 'bank_name', ''),
+            'billing_address'            => $this->safeVendorValue($vendorApplication, 'billing_address', ''),
+            'product_types'              => $this->safeVendorArray($vendorApplication, 'product_types'),
+            'price_min'                  => $this->safeVendorValue($vendorApplication, 'price_min'),
+            'price_max'                  => $this->safeVendorValue($vendorApplication, 'price_max'),
+            'formatted_price_range'      => $this->safeVendorValue($vendorApplication, 'formatted_price_range'),
+            'same_day_delivery'          => $this->safeVendorValue($vendorApplication, 'same_day_delivery'),
+            'cutoff_times'               => $this->safeVendorArray($vendorApplication, 'cutoff_times'),
+            'delivery_handled_by'        => $this->normalizeDeliveryHandledByForDisplay(
+                (string) $this->safeVendorValue($vendorApplication, 'delivery_handled_by', 'self')
+            ),
+            'max_orders_per_day'         => $this->safeVendorValue($vendorApplication, 'max_orders_per_day'),
+            'lead_time'                  => $this->safeVendorValue($vendorApplication, 'lead_time', ''),
+            'cancellation_policy'        => $this->safeVendorValue($vendorApplication, 'cancellation_policy', ''),
+            'store_logo_url'             => $this->safeVendorValue($vendorApplication, 'store_logo_url'),
+            'profile_photo_url'          => $this->safeVendorValue($vendorApplication, 'profile_photo_url'),
+            'portfolio_photos_urls'      => $this->safeVendorArray($vendorApplication, 'portfolio_photos_urls'),
+            'payment_details_completed'  => (bool) $this->safeVendorValue($vendorApplication, 'payment_details_completed', false),
+            'product_details_completed'  => (bool) $this->safeVendorValue($vendorApplication, 'product_details_completed', false),
+            'delivery_details_completed' => (bool) $this->safeVendorValue($vendorApplication, 'delivery_details_completed', false),
+            'profile_fully_completed'    => (bool) $this->safeVendorValue($vendorApplication, 'profile_fully_completed', false),
+            'profile_completion_percentage' => (int) $this->safeVendorValue($vendorApplication, 'profile_completion_percentage', 0),
+            'formatted_business_type'    => $this->safeVendorValue($vendorApplication, 'formatted_business_type'),
+            'formatted_status'           => $this->safeVendorValue($vendorApplication, 'formatted_status'),
+            'formatted_date'             => $this->safeVendorValue($vendorApplication, 'formatted_date'),
+        ];
+    }
 
-        return $data;
+    private function safeVendorValue(VendorApplication $vendorApplication, string $field, mixed $default = null): mixed
+    {
+        try {
+            return $vendorApplication->{$field};
+        } catch (\Throwable $e) {
+            Log::warning('Vendor profile serialization failed for field', [
+                'application_id' => $vendorApplication->application_id,
+                'field'          => $field,
+                'error'          => $e->getMessage(),
+            ]);
+
+            return $default;
+        }
+    }
+
+    private function safeVendorArray(VendorApplication $vendorApplication, string $field): array
+    {
+        $value = $this->safeVendorValue($vendorApplication, $field, []);
+
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && $value !== '') {
+            $decoded = json_decode($value, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        return [];
     }
 }

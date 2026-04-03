@@ -131,6 +131,37 @@ class VendorPaymentDetailsTest extends TestCase
             ->assertJsonPath('data.decrypted_account_number', null);
     }
 
+    public function test_payment_details_update_survives_legacy_corrupted_profile_fields(): void
+    {
+        $user = $this->createVendorUser();
+        $vendorApplication = $this->createApprovedVendorApplication($user);
+
+        DB::table('vendor_applications')
+            ->where('id', $vendorApplication->id)
+            ->update([
+                'account_number' => 'corrupted-ciphertext',
+                'product_types'  => 'not-json',
+                'cutoff_times'   => 'also-not-json',
+            ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->putJson('/api/vendor/profile/payment-details', [
+            'payout_method'       => 'bank',
+            'account_holder_name' => 'Vendor Name',
+            'account_number'      => '12345678901234567890',
+            'bank_name'           => 'BDO',
+            'billing_address'     => 'Makati City',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.bank_name', 'BDO')
+            ->assertJsonPath('data.product_types', [])
+            ->assertJsonPath('data.cutoff_times', []);
+    }
+
     private function createVendorUser(): User
     {
         return User::query()->create([
