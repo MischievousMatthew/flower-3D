@@ -23,10 +23,10 @@
     </div>
 
     <div class="business-info">
-      <div class="business-avatar">B</div>
+      <div class="business-avatar">{{ businessInitial }}</div>
       <div class="business-details">
-        <div class="business-name">BloomCraft Shop</div>
-        <div class="business-address">123 Garden St, Flower City</div>
+        <div class="business-name">{{ businessName }}</div>
+        <div class="business-address">{{ businessAddress }}</div>
       </div>
     </div>
 
@@ -120,10 +120,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from "vue";
+import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import { useSidebarState } from "../../composables/useSidebarState";
+import { useVendorProfile } from "../../composables/useVendorProfile";
 import api from "../../plugins/axios";
 import LoadingOverlay from "../components/LoadingOverlay.vue";
 
@@ -131,6 +132,7 @@ const { logout } = useAuth();
 const router = useRouter();
 const route = useRoute();
 const { isMobileOpen, closeMobile } = useSidebarState();
+const { vendorProfile, fetchProfile } = useVendorProfile({ autoFetch: false, showToast: false });
 
 const isLoading = ref(null);
 const isLoadingMessage = ref("");
@@ -138,6 +140,34 @@ const notificationCounts = ref({
   orders: 0,
 });
 let notificationInterval = null;
+
+const businessName = computed(() => {
+  return (
+    vendorProfile.value?.store_name?.trim() ||
+    vendorProfile.value?.owner_name?.trim() ||
+    "Vendor Store"
+  );
+});
+
+const businessAddress = computed(() => {
+  return (
+    vendorProfile.value?.store_address?.trim() ||
+    vendorProfile.value?.service_areas?.trim() ||
+    "No store address set"
+  );
+});
+
+const businessInitial = computed(() => {
+  const source = businessName.value.trim();
+  if (!source) return "V";
+
+  const words = source.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    return `${words[0][0]}${words[1][0]}`.toUpperCase();
+  }
+
+  return source.slice(0, 1).toUpperCase();
+});
 
 isLoading.value = false;
 
@@ -216,6 +246,7 @@ onMounted(() => {
   checkLogoutState();
   checkAuthState();
   handlePageLoad();
+  fetchProfile().catch(() => {});
   loadSidebarNotifications();
   notificationInterval = window.setInterval(loadSidebarNotifications, 60000);
 
