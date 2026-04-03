@@ -4,6 +4,7 @@ namespace App\Helpers;
 
 use Cloudinary\Cloudinary;
 use Cloudinary\Configuration\Configuration;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 
 class CloudinaryHelper
@@ -152,6 +153,30 @@ class CloudinaryHelper
                 @unlink($tmpPath);
             }
         }
+    }
+
+    /**
+     * Upload an image file using the safer UploadedFile path handling.
+     */
+    public static function uploadImage(
+        ?UploadedFile $file,
+        string $folder,
+        array $options = []
+    ): ?array {
+        if (!$file) {
+            return null;
+        }
+
+        if (!$file->isValid()) {
+            throw new \RuntimeException('Uploaded image is invalid.');
+        }
+
+        $result = self::upload($file, array_merge([
+            'folder' => $folder,
+            'resource_type' => 'image',
+        ], $options));
+
+        return $result;
     }
 
     /**

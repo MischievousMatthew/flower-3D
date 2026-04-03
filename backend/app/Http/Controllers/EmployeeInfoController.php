@@ -144,7 +144,7 @@ class EmployeeInfoController extends Controller
         ];
 
         if ($request->hasFile('avatar')) {
-            $rules['avatar'] = 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120';
+            $rules['avatar'] = 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120';
         }
 
         $validator = Validator::make($request->all(), $rules);
@@ -197,6 +197,7 @@ class EmployeeInfoController extends Controller
 
         try {
             DB::beginTransaction();
+            $uploadedAvatarId = null;
 
             $user = $request->user();
             $ownerId = $this->getOwnerId();
@@ -227,15 +228,13 @@ class EmployeeInfoController extends Controller
 
             $avatarPath = null;
             if ($request->hasFile('avatar') && $request->file('avatar')->isValid()) {
-                try {
-                    $result = CloudinaryHelper::upload($request->file('avatar'), [
-                        'folder' => 'avatars'
-                    ]);
-                    $avatarPath = $result['public_id'];
-                    Log::info('Avatar stored successfully to Cloudinary:', ['path' => $avatarPath]);
-                } catch (\Exception $e) {
-                    Log::error('Avatar upload to Cloudinary failed:', ['error' => $e->getMessage()]);
-                }
+                $result = CloudinaryHelper::uploadImage(
+                    $request->file('avatar'),
+                    'avatars'
+                );
+                $avatarPath = $result['public_id'];
+                $uploadedAvatarId = $avatarPath;
+                Log::info('Avatar stored successfully to Cloudinary:', ['path' => $avatarPath]);
             }
 
             $employeeId = $this->generateEmployeeId($ownerId);
@@ -323,6 +322,10 @@ class EmployeeInfoController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
+            if (!empty($uploadedAvatarId)) {
+                CloudinaryHelper::destroy($uploadedAvatarId);
+            }
             
             Log::error('Error creating employee info: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
@@ -409,7 +412,7 @@ class EmployeeInfoController extends Controller
         ];
 
         if ($request->hasFile('avatar')) {
-            $rules['avatar'] = 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120';
+            $rules['avatar'] = 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120';
         }
 
         $validator = Validator::make($request->all(), $rules);
@@ -452,6 +455,7 @@ class EmployeeInfoController extends Controller
 
         try {
             DB::beginTransaction();
+            $uploadedAvatarId = null;
 
             $ownerId = $this->getOwnerId();
             $user = $request->user();
@@ -475,22 +479,17 @@ class EmployeeInfoController extends Controller
             }
 
             $employeeInfo = EmployeeInfo::forOwner($ownerId)->findOrFail($id);
+            $previousAvatar = $employeeInfo->avatar;
 
             $avatarPath = null;
             if ($request->hasFile('avatar') && $request->file('avatar')->isValid()) {
-                try {
-                    if ($employeeInfo->avatar) {
-                        CloudinaryHelper::destroy($employeeInfo->avatar);
-                    }
-                    
-                    $result = CloudinaryHelper::upload($request->file('avatar'), [
-                        'folder' => 'avatars'
-                    ]);
-                    $avatarPath = $result['public_id'];
-                    Log::info('Avatar uploaded successfully to Cloudinary for update:', ['path' => $avatarPath]);
-                } catch (\Exception $e) {
-                    Log::error('Avatar upload to Cloudinary failed during update:', ['error' => $e->getMessage()]);
-                }
+                $result = CloudinaryHelper::uploadImage(
+                    $request->file('avatar'),
+                    'avatars'
+                );
+                $avatarPath = $result['public_id'];
+                $uploadedAvatarId = $avatarPath;
+                Log::info('Avatar uploaded successfully to Cloudinary for update:', ['path' => $avatarPath]);
             }
 
             $shiftStart = $request->shift_start;
@@ -557,6 +556,15 @@ class EmployeeInfoController extends Controller
 
             $employeeInfo->update($updateData);
 
+            if (
+                $avatarPath &&
+                $previousAvatar &&
+                !str_starts_with($previousAvatar, 'http') &&
+                $previousAvatar !== $avatarPath
+            ) {
+                CloudinaryHelper::destroy($previousAvatar);
+            }
+
             DB::commit();
 
             return response()->json([
@@ -567,12 +575,19 @@ class EmployeeInfoController extends Controller
 
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             DB::rollBack();
+            if (!empty($uploadedAvatarId)) {
+                CloudinaryHelper::destroy($uploadedAvatarId);
+            }
             return response()->json([
                 'success' => false,
                 'message' => 'Employee record not found'
             ], 404);
         } catch (\Exception $e) {
             DB::rollBack();
+
+            if (!empty($uploadedAvatarId)) {
+                CloudinaryHelper::destroy($uploadedAvatarId);
+            }
             
             Log::error('Error updating employee info: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()

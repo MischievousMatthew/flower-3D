@@ -431,9 +431,8 @@
             <div class="info-box">
               <span class="info-icon">ℹ️</span>
               <p>
-                Your payment information is encrypted and stored securely. This
-                is used to process vendor payouts and enable payment options for
-                customers.
+                Your payment information is stored securely and used to process
+                vendor payouts and enable payment options for customers.
               </p>
             </div>
             <div class="form-actions">

@@ -567,6 +567,12 @@ import NavHeader from "../../layouts/NavHeader.vue";
 import { useAuth } from "../../composables/useAuth";
 import { toast } from "vue3-toastify";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
+import {
+  buildMultipartFormData,
+  clearFileInput,
+  getSelectedFile,
+  validateImageFile,
+} from "../../utils/imageUpload";
 
 const router = useRouter();
 const { isAuthenticated } = useAuth();
@@ -932,13 +938,21 @@ const triggerFileInput = () => {
 };
 
 const handleProfilePictureUpload = async (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
+  let file = null;
 
   try {
+    file = validateImageFile(getSelectedFile(event), {
+      fieldLabel: "Profile picture",
+      maxSizeMB: 2,
+    });
+
+    if (!file) return;
+
     const token = localStorage.getItem("auth_token");
-    const formData = new FormData();
-    formData.append("profile_picture", file);
+    const formData = buildMultipartFormData(
+      { profile_picture: file },
+      { fileFields: ["profile_picture"] },
+    );
 
     const response = await api.post("/profile/picture", formData, {
       headers: {
@@ -964,13 +978,13 @@ const handleProfilePictureUpload = async (event) => {
       localStorage.removeItem("token");
       logout();
       router.push("/guest/login");
+    } else if (error instanceof Error && !error.response) {
+      toast.error(error.message);
     } else {
       toast.error("Failed to upload profile picture");
     }
   } finally {
-    if (fileInput.value) {
-      fileInput.value.value = "";
-    }
+    clearFileInput(fileInput);
   }
 };
 

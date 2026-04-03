@@ -35,6 +35,8 @@ class ProfileController extends Controller
     {
         try {
             $user = Auth::user();
+            $previousProfilePicture = $user->profile_picture;
+            $uploadedProfilePicture = null;
 
             $validated = $request->validate([
                 'name'           => 'sometimes|string|max:255',
@@ -47,18 +49,16 @@ class ProfileController extends Controller
                 'city'           => 'nullable|string|max:100',
                 'postal_code'    => 'nullable|string|max:20',
                 'contact_number' => 'nullable|digits:11',
+                'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             ]);
 
             if ($request->hasFile('profile_picture')) {
-                if ($user->profile_picture && !str_starts_with($user->profile_picture, 'http')) {
-                    CloudinaryHelper::destroy($user->profile_picture);
-                }
-
-                $result = CloudinaryHelper::upload(
-                    $request->file('profile_picture')->getRealPath(),
-                    ['folder' => 'profile_pictures', 'resource_type' => 'image']
+                $result = CloudinaryHelper::uploadImage(
+                    $request->file('profile_picture'),
+                    'profile_pictures'
                 );
 
+                $uploadedProfilePicture = $result['public_id'];
                 $validated['profile_picture'] = $result['public_id'];
             }
 
@@ -71,6 +71,15 @@ class ProfileController extends Controller
 
             $user->update($validated);
 
+            if (
+                isset($validated['profile_picture']) &&
+                $previousProfilePicture &&
+                !str_starts_with($previousProfilePicture, 'http') &&
+                $previousProfilePicture !== $validated['profile_picture']
+            ) {
+                CloudinaryHelper::destroy($previousProfilePicture);
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Profile updated successfully',
@@ -80,6 +89,9 @@ class ProfileController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json(['success' => false, 'errors' => $e->errors()], 422);
         } catch (\Throwable $e) {
+            if (!empty($uploadedProfilePicture)) {
+                CloudinaryHelper::destroy($uploadedProfilePicture);
+            }
             Log::error('Profile update error: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
@@ -89,24 +101,29 @@ class ProfileController extends Controller
     {
         try {
             $request->validate([
-                'profile_picture' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'profile_picture' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             ]);
 
             $user = Auth::user();
+            $previousProfilePicture = $user->profile_picture;
+            $uploadedProfilePicture = null;
 
-            // Delete old picture if it's a Cloudinary public_id
-            if ($user->profile_picture && !str_starts_with($user->profile_picture, 'http')) {
-                CloudinaryHelper::destroy($user->profile_picture);
-            }
-
-            // Upload directly via SDK — no package config needed
-            $result = CloudinaryHelper::upload(
-                $request->file('profile_picture')->getRealPath(),
-                ['folder' => 'profile_pictures', 'resource_type' => 'image']
+            $result = CloudinaryHelper::uploadImage(
+                $request->file('profile_picture'),
+                'profile_pictures'
             );
 
+            $uploadedProfilePicture = $result['public_id'];
             $user->profile_picture = $result['public_id'];
             $user->save();
+
+            if (
+                $previousProfilePicture &&
+                !str_starts_with($previousProfilePicture, 'http') &&
+                $previousProfilePicture !== $user->profile_picture
+            ) {
+                CloudinaryHelper::destroy($previousProfilePicture);
+            }
 
             return response()->json([
                 'success'         => true,
@@ -116,6 +133,9 @@ class ProfileController extends Controller
             ]);
 
         } catch (\Throwable $e) {
+            if (!empty($uploadedProfilePicture)) {
+                CloudinaryHelper::destroy($uploadedProfilePicture);
+            }
             Log::error('Profile picture upload error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,

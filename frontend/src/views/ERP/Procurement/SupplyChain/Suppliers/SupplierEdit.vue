@@ -237,7 +237,13 @@ import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import { supplierService } from "../../../../../services/supplierService";
-
+import {
+  buildMultipartFormData,
+  clearFileInput,
+  getSelectedFile,
+  readImagePreview,
+  validateImageFile,
+} from "../../../../../utils/imageUpload";
 
 const route = useRoute();
 const router = useRouter();
@@ -288,11 +294,22 @@ onMounted(async () => {
   }
 });
 
-function handleLogoChange(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  logoFile.value = file;
-  logoPreview.value = URL.createObjectURL(file);
+async function handleLogoChange(event) {
+  try {
+    const file = validateImageFile(getSelectedFile(event), {
+      fieldLabel: "Company logo",
+      maxSizeMB: 2,
+    });
+
+    if (!file) return;
+
+    logoFile.value = file;
+    logoPreview.value = await readImagePreview(file);
+  } catch (error) {
+    logoFile.value = null;
+    clearFileInput(logoInput);
+    showToast(error.message || "Failed to read the selected logo", "error");
+  }
 }
 
 function validate() {
@@ -306,15 +323,16 @@ async function submit() {
   if (!validate()) return;
   submitting.value = true;
   try {
-    const fd = new FormData();
-    Object.entries(form).forEach(([key, val]) => {
-      if (key === "contacts") {
-        fd.append("contacts", JSON.stringify(val));
-      } else if (val !== null && val !== undefined) {
-        fd.append(key, val);
-      }
-    });
-    if (logoFile.value) fd.append("logo", logoFile.value);
+    const fd = buildMultipartFormData(
+      {
+        ...form,
+        logo: logoFile.value,
+      },
+      {
+        fileFields: ["logo"],
+        jsonFields: ["contacts"],
+      },
+    );
 
     await supplierService.update(route.params.id, fd);
     showToast("Supplier updated successfully!");

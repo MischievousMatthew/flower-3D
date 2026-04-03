@@ -6,6 +6,7 @@ use App\Services\SupplierService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 use App\Traits\ScopesOwner;
@@ -50,17 +51,38 @@ class SupplierController extends Controller
             'phone'          => ['required', 'string', 'max:20'],
             'address'        => ['required', 'string'],
             'status'         => ['nullable', Rule::in(['active', 'inactive', 'blacklisted'])],
-            'logo'           => ['nullable', 'image', 'max:2048'],
+            'logo'           => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
         ]);
 
-        if ($request->hasFile('logo')) {
-            $result = CloudinaryHelper::upload($request->file('logo')->getRealPath(), [
-                'folder' => 'supplier-logos'
-            ]);
-            $data['logo'] = $result['public_id'];
-        }
+        $uploadedLogoId = null;
 
-        return response()->json($this->service->createSupplier($data, $this->getOwnerId()), 201);
+        try {
+            if ($request->hasFile('logo')) {
+                $result = CloudinaryHelper::uploadImage(
+                    $request->file('logo'),
+                    'supplier-logos'
+                );
+                $uploadedLogoId = $result['public_id'];
+                $data['logo'] = $uploadedLogoId;
+            }
+
+            return response()->json($this->service->createSupplier($data, $this->getOwnerId()), 201);
+        } catch (\Throwable $e) {
+            if ($uploadedLogoId) {
+                CloudinaryHelper::destroy($uploadedLogoId);
+            }
+
+            Log::error('Supplier create failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $request->user()?->id,
+                'has_logo' => $request->hasFile('logo'),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create supplier',
+            ], 500);
+        }
     }
 
     /** PUT /suppliers/{id} */
@@ -73,18 +95,63 @@ class SupplierController extends Controller
             'phone'          => ['sometimes', 'string', 'max:20'],
             'address'        => ['sometimes', 'string'],
             'status'         => ['sometimes', Rule::in(['active', 'inactive', 'blacklisted'])],
-            'logo'           => ['nullable', 'image', 'max:2048'],
+            'logo'           => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
         ]);
 
-        if ($request->hasFile('logo')) {
-            $result = CloudinaryHelper::upload($request->file('logo')->getRealPath(), [
-                'folder' => 'supplier-logos'
+        $uploadedLogoId = null;
+
+        try {
+            $previousLogoId = null;
+
+            if ($request->hasFile('logo')) {
+                $supplier = $this->service->findSupplier($id, $this->getOwnerId());
+                $previousLogoId = $supplier->logo;
+                $result = CloudinaryHelper::uploadImage(
+                    $request->file('logo'),
+                    'supplier-logos'
+                );
+                $uploadedLogoId = $result['public_id'];
+                $data['logo'] = $uploadedLogoId;
+            }
+
+            $supplier = $this->service->updateSupplier($id, $data, $this->getOwnerId());
+
+            if (
+                $uploadedLogoId &&
+                $previousLogoId &&
+                !str_starts_with($previousLogoId, 'http') &&
+                $previousLogoId !== $uploadedLogoId
+            ) {
+                CloudinaryHelper::destroy($previousLogoId);
+            }
+
+            return response()->json($supplier);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            if ($uploadedLogoId) {
+                CloudinaryHelper::destroy($uploadedLogoId);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Supplier not found',
+            ], 404);
+        } catch (\Throwable $e) {
+            if ($uploadedLogoId) {
+                CloudinaryHelper::destroy($uploadedLogoId);
+            }
+
+            Log::error('Supplier update failed', [
+                'supplier_id' => $id,
+                'error' => $e->getMessage(),
+                'user_id' => $request->user()?->id,
+                'has_logo' => $request->hasFile('logo'),
             ]);
-            $data['logo'] = $result['public_id'];
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update supplier',
+            ], 500);
         }
-
-
-        return response()->json($this->service->updateSupplier($id, $data, $this->getOwnerId()));
     }
 
     /** PATCH /suppliers/{id}/activate */

@@ -1134,6 +1134,13 @@ import LoadingOverlay from "../../../../layouts/components/LoadingOverlay.vue";
 import EmployeeQRCode from "../../../../layouts/components/EmployeeQRCode.vue";
 import employeeInfoService from "../../../../services/employeeInfoService";
 import { useAssignment } from "../../../../composables/useAssignment";
+import {
+  buildMultipartFormData,
+  clearFileInput,
+  getSelectedFile,
+  readImagePreview,
+  validateImageFile,
+} from "../../../../utils/imageUpload";
 
 // State
 const searchQuery = ref("");
@@ -1519,18 +1526,26 @@ const closeModal = () => {
 };
 
 // File upload with preview
-const handleFileUpload = (event) => {
+const handleFileUpload = async (event) => {
   if (!canEditEmployees.value) {
     return;
   }
-  const file = event.target.files[0];
-  if (file) {
+
+  try {
+    const file = validateImageFile(getSelectedFile(event), {
+      fieldLabel: "Employee avatar",
+      maxSizeMB: 5,
+    });
+
+    if (!file) {
+      return;
+    }
+
     formData.value.avatar = file;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      formData.value.avatarPreview = e.target.result;
-    };
-    reader.readAsDataURL(file);
+    formData.value.avatarPreview = await readImagePreview(file);
+  } catch (error) {
+    clearFileInput(event.target);
+    toast.error(error.message || "Failed to read the selected employee image");
   }
 };
 
@@ -1546,48 +1561,10 @@ async function saveEmployee() {
       : "Creating employee...";
     validationErrors.value = {};
 
-    const payload = new FormData();
-
-    // Debug: Log what we're sending
-    console.log("=== DEBUG: Saving Employee ===");
-    console.log("Form data:", JSON.parse(JSON.stringify(formData.value)));
-
-    // Build FormData
-    for (const key in formData.value) {
-      const value = formData.value[key];
-
-      // Skip avatarPreview
-      if (key === "avatarPreview") continue;
-
-      // Handle avatar specially
-      if (key === "avatar") {
-        if (value instanceof File) {
-          payload.append("avatar", value);
-          console.log(
-            "Avatar file appended:",
-            value.name,
-            value.type,
-            value.size,
-          );
-        } else if (value === null || value === undefined) {
-          console.log("Avatar is null/undefined, not appending");
-        } else {
-          console.log("Avatar is not a File:", typeof value, value);
-        }
-        continue;
-      }
-
-      // Handle other fields
-      if (value !== null && value !== undefined && value !== "") {
-        payload.append(key, value);
-      }
-    }
-
-    // Debug: Log FormData contents
-    console.log("FormData entries:");
-    for (let pair of payload.entries()) {
-      console.log(pair[0] + ":", pair[1]);
-    }
+    const payload = buildMultipartFormData(formData.value, {
+      skipFields: ["avatarPreview", "id", "rest_days_array", "est_days"],
+      fileFields: ["avatar"],
+    });
 
     let response;
     if (isEditMode.value) {
@@ -1609,12 +1586,6 @@ async function saveEmployee() {
       }
     }
   } catch (error) {
-    console.error("=== SAVE ERROR DETAILS ===");
-    console.error("Error object:", error);
-    console.error("Error status:", error.status);
-    console.error("Error message:", error.message);
-    console.error("Validation errors:", error.errors);
-
     if (error.status === 422) {
       validationErrors.value = error.errors || {};
 
@@ -1637,13 +1608,6 @@ async function saveEmployee() {
         }
       } else {
         toast.error("Please fix the validation errors");
-      }
-
-      // Log each validation error for debugging
-      if (error.errors) {
-        Object.keys(error.errors).forEach((field) => {
-          console.error(`Validation error for ${field}:`, error.errors[field]);
-        });
       }
     } else if (error.status === 403) {
       toast.error(
