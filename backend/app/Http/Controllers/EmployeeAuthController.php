@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Constants\ErpModule;
+use App\Services\LoginAuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -11,6 +12,10 @@ use Illuminate\Support\Facades\Log;
 
 class EmployeeAuthController extends Controller
 {
+    public function __construct(private readonly LoginAuditService $loginAuditService)
+    {
+    }
+
     /**
      * POST /auth/employee-login
      */
@@ -20,6 +25,7 @@ class EmployeeAuthController extends Controller
             $request->validate([
                 'username' => 'required|string',
                 'password' => 'required|string',
+                'login_context' => 'nullable|array',
             ]);
 
             $employee = Employee::where('username', $request->username)
@@ -39,6 +45,7 @@ class EmployeeAuthController extends Controller
 
             // Create a clean Sanctum token
             $token = $employee->createToken('employee-token')->plainTextToken;
+            $this->loginAuditService->logEmployeeLogin($employee, $request);
 
             // Load module permissions
             $modulePermissions = $employee->modulePermissions()

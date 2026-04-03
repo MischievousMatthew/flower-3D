@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Services\LoginAuditService;
 use App\Services\EmailOtpService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
-    public function __construct()
+    public function __construct(private readonly LoginAuditService $loginAuditService)
     {
         $this->middleware('auth:sanctum')->only(['me', 'logout']);
     }
@@ -103,6 +104,7 @@ class AuthController extends Controller
             $request->validate([
                 'username' => 'required|string',
                 'password' => 'required|string',
+                'login_context' => 'nullable|array',
             ]);
 
             // Find user by username or email
@@ -141,6 +143,7 @@ class AuthController extends Controller
 
             // Create token
             $token = $user->createToken('auth_token')->plainTextToken;
+            $this->loginAuditService->logUserLogin($user, $request);
 
             Log::info('Login successful', [
                 'user_id' => $user->id,
@@ -326,6 +329,7 @@ class AuthController extends Controller
             $request->validate([
                 'username' => 'required|string',
                 'password' => 'required|string',
+                'login_context' => 'nullable|array',
             ]);
 
             // Find employee by username or email
@@ -493,6 +497,7 @@ class AuthController extends Controller
             }
             
             $token = $user->createToken('vendor_token')->plainTextToken;
+            $this->loginAuditService->logUserLogin($user, $request);
 
             return response()->json([
                 'message' => 'Vendor login successful',

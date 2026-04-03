@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Customer\CustomerProductController;
 use App\Http\Controllers\Admin\VendorApplicationController;
+use App\Http\Controllers\Admin\LoginAuditLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\ProductController;
@@ -513,6 +514,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('funding-requests',               [AccountingFundingRequestController::class, 'index']);
         Route::post('funding-requests/{id}/approve', [AccountingFundingRequestController::class, 'approve']);
         Route::post('funding-requests/{id}/reject',  [AccountingFundingRequestController::class, 'reject']);
+    });
+
+    Route::prefix('admin')->group(function () {
+        Route::get('/login-logs', [LoginAuditLogController::class, 'index']);
     });
 
 }); // end auth:sanctum

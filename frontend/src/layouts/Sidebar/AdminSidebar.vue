@@ -1,19 +1,19 @@
 <template>
   <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
 
-  <!-- Backdrop for mobile -->
   <div v-if="isMobileOpen" class="sidebar-backdrop" @click="closeMobile"></div>
 
   <aside class="sidebar" :class="{ 'mobile-open': isMobileOpen }">
     <div class="logo-section">
       <div class="logo">
-        <span class="logo-icon"
-          ><img
+        <span class="logo-icon">
+          <img
             src="../../../public/bloomcraft-blankBg.png"
             alt="Bloomcraft Logo"
             width="50"
             height="50"
-        /></span>
+          />
+        </span>
         <span class="logo-text">BloomCraft Admin</span>
       </div>
     </div>
@@ -37,6 +37,7 @@
           <span class="nav-icon">📊</span>
           <span>Dashboard</span>
         </router-link>
+
         <router-link
           to="/admin/vendor-requests"
           class="nav-item"
@@ -45,9 +46,14 @@
           <span class="nav-icon">🏪</span>
           <span>Vendor Requests</span>
           <span v-if="notificationCounts.vendorRequests > 0" class="nav-badge">
-            {{ notificationCounts.vendorRequests > 99 ? "99+" : notificationCounts.vendorRequests }}
+            {{
+              notificationCounts.vendorRequests > 99
+                ? "99+"
+                : notificationCounts.vendorRequests
+            }}
           </span>
         </router-link>
+
         <router-link
           to="/admin/vendor-requests"
           class="nav-item"
@@ -56,45 +62,36 @@
           <span class="nav-icon">👥</span>
           <span>Vendors</span>
         </router-link>
+
         <router-link
-          to="/admin/product-approval"
+          to="/admin/reports"
           class="nav-item"
           active-class="active"
         >
-          <span class="nav-icon">✅</span>
-          <span>Product Approval</span>
-          <span v-if="notificationCounts.productApproval > 0" class="nav-badge">
-            {{ notificationCounts.productApproval > 99 ? "99+" : notificationCounts.productApproval }}
-          </span>
-        </router-link>
-        <router-link to="/admin/reports" class="nav-item" active-class="active">
           <span class="nav-icon">📦</span>
           <span>Reported Products</span>
+          <span
+            v-if="notificationCounts.reportedProducts > 0"
+            class="nav-badge"
+          >
+            {{
+              notificationCounts.reportedProducts > 99
+                ? "99+"
+                : notificationCounts.reportedProducts
+            }}
+          </span>
+        </router-link>
+
+        <router-link
+          to="/admin/login-logs"
+          class="nav-item"
+          active-class="active"
+        >
+          <span class="nav-icon">🕒</span>
+          <span>Login Logs</span>
         </router-link>
       </nav>
     </div>
-
-    <!-- <div class="menu-section">
-      <p class="menu-label">REPORTS</p>
-      <nav class="nav-menu">
-        <router-link
-          to="/admin/analytics"
-          class="nav-item"
-          active-class="active"
-        >
-          <span class="nav-icon">📈</span>
-          <span>Analytics</span>
-        </router-link>
-        <router-link
-          to="/admin/reporting"
-          class="nav-item"
-          active-class="active"
-        >
-          <span class="nav-icon">📋</span>
-          <span>Reports</span>
-        </router-link>
-      </nav>
-    </div> -->
 
     <div class="sidebar-footer">
       <button @click="handleLogout" class="logout-btn" :disabled="isLoading">
@@ -108,21 +105,20 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from "vue";
-import { useRouter, useRoute } from "vue-router";
+import { useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import { useSidebarState } from "../../composables/useSidebarState";
 import api from "../../plugins/axios";
 import LoadingOverlay from "../components/LoadingOverlay.vue";
 
-const { logout, user } = useAuth();
-const router = useRouter();
+const { logout } = useAuth();
 const route = useRoute();
 const { isMobileOpen, closeMobile } = useSidebarState();
 const isLoading = ref(false);
 const isLoadingMessage = ref("Loading...");
 const notificationCounts = ref({
   vendorRequests: 0,
-  productApproval: 0,
+  reportedProducts: 0,
 });
 let notificationInterval = null;
 
@@ -153,26 +149,27 @@ const handleLogout = async () => {
 
 const checkLogoutState = () => {
   const logoutInitiated = sessionStorage.getItem("logout_initiated_admin");
-  if (logoutInitiated) {
-    const logoutTime = parseInt(logoutInitiated);
-    const currentTime = Date.now();
+  if (!logoutInitiated) return;
 
-    if (currentTime - logoutTime < 5000) {
-      isLoading.value = true;
+  const logoutTime = parseInt(logoutInitiated, 10);
+  const currentTime = Date.now();
 
-      setTimeout(() => {
-        isLoading.value = false;
-        sessionStorage.removeItem("logout_initiated_admin");
-      }, 1000);
-    } else {
+  if (currentTime - logoutTime < 5000) {
+    isLoading.value = true;
+
+    setTimeout(() => {
+      isLoading.value = false;
       sessionStorage.removeItem("logout_initiated_admin");
-    }
+    }, 1000);
+  } else {
+    sessionStorage.removeItem("logout_initiated_admin");
   }
 };
 
 const checkAuthState = () => {
   const token =
     localStorage.getItem("auth_token") || localStorage.getItem("admin_token");
+
   if (!token && isLoading.value) {
     setTimeout(() => {
       isLoading.value = false;
@@ -196,16 +193,23 @@ const handlePageLoad = () => {
 
 const loadSidebarNotifications = async () => {
   try {
-    const [vendorStatsResponse, productStatsResponse] = await Promise.all([
+    const [vendorStatsResponse, reportedProductsResponse] = await Promise.all([
       api.get("/admin/vendor-applications/statistics"),
-      api.get("/admin/products/statistics"),
+      api.get("/admin/reports", {
+        params: {
+          status: "pending",
+          per_page: 1,
+        },
+      }),
     ]);
 
     notificationCounts.value.vendorRequests = Number(
       vendorStatsResponse.data?.pending ?? 0,
     );
-    notificationCounts.value.productApproval = Number(
-      productStatsResponse.data?.data?.draft_products ?? 0,
+    notificationCounts.value.reportedProducts = Number(
+      reportedProductsResponse.data?.data?.total ??
+        reportedProductsResponse.data?.meta?.total ??
+        0,
     );
   } catch (error) {
     console.error("Error loading admin sidebar notifications:", error);
@@ -224,16 +228,18 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", handleBeforeUnload);
+
   if (notificationInterval) {
     window.clearInterval(notificationInterval);
   }
 });
 
-// Close sidebar on route change (mobile)
 watch(
   () => route.path,
   () => {
-    if (isMobileOpen.value) closeMobile();
+    if (isMobileOpen.value) {
+      closeMobile();
+    }
   },
 );
 </script>
@@ -243,7 +249,6 @@ watch(
   font-family: "Poppins", sans-serif;
 }
 
-/* Sidebar Styles */
 .sidebar {
   width: 240px;
   height: 100vh;
@@ -291,7 +296,7 @@ watch(
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: #2d3748; /* Admin theme color */
+  background: #2d3748;
   color: white;
   display: flex;
   align-items: center;
@@ -436,7 +441,6 @@ watch(
   margin-left: 8px;
 }
 
-/* Scrollbar styling */
 .sidebar::-webkit-scrollbar {
   width: 4px;
 }
@@ -454,7 +458,6 @@ watch(
   background: #a0aec0;
 }
 
-/* Responsive Styles */
 @media (max-width: 1200px) {
   .sidebar {
     width: 200px;
@@ -483,5 +486,15 @@ watch(
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(2px);
   z-index: 999;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

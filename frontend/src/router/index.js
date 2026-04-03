@@ -541,6 +541,11 @@ const routes = [
         name: "ReportedProducts",
         component: () => import("../views/admin/ReportedProducts.vue"),
       },
+      {
+        path: "login-logs",
+        name: "AdminLoginLogs",
+        component: () => import("../views/admin/LoginLogs.vue"),
+      },
     ],
   },
 

@@ -3,6 +3,7 @@ import api from "../plugins/axios";
 import { useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import { useAssignment } from "./useAssignment";
+import { buildLoginContext } from "../utils/loginContext";
 
 const user = ref(null);
 const loading = ref(false);
@@ -61,10 +62,13 @@ export function useAuth() {
     try {
       loading.value = true;
       error.value = null;
+      const loginContext =
+        credentials?.loginContext ?? (await buildLoginContext());
 
       const { data } = await api.post("/auth/employee-login", {
         username: credentials.username,
         password: credentials.password,
+        login_context: loginContext,
       });
 
       if (!data?.success) {
@@ -123,10 +127,13 @@ export function useAuth() {
     try {
       loading.value = true;
       error.value = null;
+      const loginContext =
+        credentials?.loginContext ?? (await buildLoginContext());
 
       const { data } = await api.post("/auth/login", {
         username: credentials.username,
         password: credentials.password,
+        login_context: loginContext,
       });
 
       const token = data?.token;
@@ -172,10 +179,18 @@ export function useAuth() {
 
   // ================= COMBINED LOGIN =================
   const combinedLogin = async (credentials) => {
-    const employeeResult = await employeeLogin(credentials);
+    const loginContext = await buildLoginContext();
+
+    const employeeResult = await employeeLogin({
+      ...credentials,
+      loginContext,
+    });
     if (employeeResult.success) return employeeResult;
 
-    const userResult = await login(credentials);
+    const userResult = await login({
+      ...credentials,
+      loginContext,
+    });
     if (userResult.success) return userResult;
 
     return {
