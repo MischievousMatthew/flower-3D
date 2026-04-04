@@ -6,7 +6,9 @@ use App\Services\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 use App\Traits\ScopesOwner;
  
@@ -51,7 +53,19 @@ class OrderController extends Controller
             'status' => ['required', 'string', Rule::in(['pending', 'processing', 'shipped', 'received', 'completed'])],
         ]);
 
-        return response()->json($this->service->updateOrderStatus($id, $data['status'], $this->getOwnerId()));
+        try {
+            return response()->json($this->service->updateOrderStatus($id, $data['status'], $this->getOwnerId()));
+        } catch (Throwable $e) {
+            Log::error('Order status update failed', [
+                'error' => $e->getMessage(),
+                'order_id' => $id,
+                'payload' => $request->all(),
+                'user_id' => auth()->id(),
+                'owner_id' => $this->getOwnerId(),
+            ]);
+
+            throw $e;
+        }
     }
 
     public function attachItems(Request $request, int $id): JsonResponse

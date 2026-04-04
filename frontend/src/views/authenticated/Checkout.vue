@@ -1135,28 +1135,26 @@ async function placeOrder() {
 
     console.log("Order response:", response.data);
 
+    const checkoutUrl = response.data.checkout_url;
+
+    if (checkoutUrl) {
+      if (isDirectCheckout.value) {
+        sessionStorage.removeItem("directCheckout");
+      } else {
+        localStorage.removeItem("checkout_data");
+      }
+
+      window.location.href = checkoutUrl;
+      return;
+    }
+
     if (response.data.success) {
-      const checkoutUrl =
-        response.data.checkout_url ||
-        response.data.data?.payment?.redirect_url ||
-        response.data.data?.payment?.checkout_url;
-
       if (response.data.data?.payment?.requires_redirect) {
-        if (!checkoutUrl) {
-          console.error("Checkout redirect URL missing:", response.data);
-          toast.error(
-            "Payment session was created but no checkout URL was returned.",
-          );
-          return;
-        }
-
-        if (isDirectCheckout.value) {
-          sessionStorage.removeItem("directCheckout");
-        } else {
-          localStorage.removeItem("checkout_data");
-        }
-
-        window.location.href = checkoutUrl;
+        console.error("Checkout redirect URL missing:", response.data);
+        toast.error(
+          "Payment session was created but no checkout URL was returned.",
+        );
+        return;
       } else {
         toast.success("Order created successfully!");
 

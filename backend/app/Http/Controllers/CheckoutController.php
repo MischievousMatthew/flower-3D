@@ -2,11 +2,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\PayMongoWebhookEvent;
 use App\Models\Cart;
 use App\Models\Product;
 use App\Models\VendorApplication;
 use App\Models\VendorClosedDate;
 use App\Models\ReservationAvailabilityCache;
+use App\Services\VendorFinanceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -441,31 +443,18 @@ class CheckoutController extends Controller
                     
                     if ($paymentResponse['success']) {
                         $order->update([
-                            'paymongo_payment_intent_id' => $paymentResponse['payment_intent_id'] ?? null,
+                            'paymongo_payment_intent_id' => $paymentResponse['checkout_session_id'] ?? null,
                             'paymongo_source_id' => $paymentResponse['source_id'] ?? null,
                             'paymongo_checkout_url' => $paymentResponse['checkout_url'] ?? null,
+                            'paymongo_response' => [
+                                'checkout_session_id' => $paymentResponse['checkout_session_id'] ?? null,
+                                'reference_number' => $paymentResponse['reference_number'] ?? null,
+                                'payment_method' => $paymentMethod,
+                            ],
                         ]);
                         
                         return response()->json([
-                            'success' => true,
-                            'message' => 'Order created. Redirecting to payment...',
                             'checkout_url' => $paymentResponse['checkout_url'],
-                            'data' => [
-                                'order' => [
-                                    'id' => $order->id,
-                                    'order_number' => $order->order_number,
-                                    'total_amount' => $order->total_amount,
-                                    'payment_method' => $order->payment_method,
-                                    'status' => $order->status,
-                                    'reservation_date' => $order->reservation_date,
-                                ],
-                                'payment' => [
-                                    'requires_redirect' => true,
-                                    'redirect_url' => $paymentResponse['checkout_url'],
-                                    'payment_intent_id' => $paymentResponse['payment_intent_id'],
-                                    'message' => 'Redirecting to PayMongo checkout...'
-                                ]
-                            ]
                         ]);
                     }
 
@@ -601,6 +590,7 @@ class CheckoutController extends Controller
         }
 
         $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:5173'), '/');
+        $referenceNumber = $this->buildPayMongoReference($order);
 
         $order->loadMissing('user');
 
@@ -628,11 +618,13 @@ class CheckoutController extends Controller
                             ]
                         ],
                         'payment_method_types' => [$checkoutMethod],
-                        'success_url' => $frontendUrl . '/customer/orders',
+                        'success_url' => $frontendUrl . '/customer/orders?payment=success&reference=' . urlencode($referenceNumber),
                         'cancel_url' => $frontendUrl . '/customer/checkout?payment=cancelled',
+                        'reference_number' => $referenceNumber,
                         'metadata' => [
                             'order_id' => (string) $order->id,
                             'order_number' => $order->order_number,
+                            'reference_number' => $referenceNumber,
                             'reservation_date' => $order->reservation_date,
                             'payment_method' => $paymentMethod,
                         ],
@@ -681,7 +673,8 @@ class CheckoutController extends Controller
 
             return [
                 'success' => true,
-                'payment_intent_id' => $responseData['data']['id'],
+                'checkout_session_id' => $responseData['data']['id'],
+                'reference_number' => $referenceNumber,
                 'checkout_url' => $responseData['data']['attributes']['checkout_url'],
             ];
         } catch (\Throwable $e) {
@@ -744,6 +737,8 @@ class CheckoutController extends Controller
      */
     public function handleWebhook(Request $request)
     {
+        $webhookEvent = null;
+
         try {
             $payload = $request->all();
             Log::info('PayMongo Webhook Received:', $payload);
@@ -760,6 +755,29 @@ class CheckoutController extends Controller
 
             $eventType = $payload['data']['attributes']['type'] ?? null;
             $resource = $payload['data']['attributes']['data'] ?? null;
+            $eventId = $payload['data']['id'] ?? null;
+
+            if ($eventId && $eventType) {
+                $webhookEvent = PayMongoWebhookEvent::firstOrCreate(
+                    ['event_id' => $eventId],
+                    [
+                        'event_type' => $eventType,
+                        'payload' => $payload,
+                        'status' => 'pending',
+                    ]
+                );
+
+                if ($webhookEvent->isProcessed()) {
+                    return response()->json(['status' => 'already processed']);
+                }
+
+                if ($webhookEvent->event_type !== $eventType || $webhookEvent->payload !== $payload) {
+                    $webhookEvent->update([
+                        'event_type' => $eventType,
+                        'payload' => $payload,
+                    ]);
+                }
+            }
 
             Log::info('Processing webhook event:', [
                 'event_type' => $eventType,
@@ -768,26 +786,28 @@ class CheckoutController extends Controller
 
             switch ($eventType) {
                 case 'checkout_session.payment.paid':
-                    return $this->handleCheckoutSessionPaid($payload);
+                    return $this->handleCheckoutSessionPaid($payload, $webhookEvent);
                     
                 case 'checkout_session.payment.failed':
-                    return $this->handleCheckoutSessionFailed($payload);
+                    return $this->handleCheckoutSessionFailed($payload, $webhookEvent);
                     
                 case 'payment.paid':
-                    return $this->handlePaymentPaid($resource);
+                    return $this->handlePaymentPaid($resource, $webhookEvent);
                     
                 case 'payment.failed':
-                    return $this->handlePaymentFailed($resource);
+                    return $this->handlePaymentFailed($resource, $webhookEvent);
                     
                 case 'source.chargeable':
-                    return $this->handleSourceChargeable($resource);
+                    return $this->handleSourceChargeable($resource, $webhookEvent);
                     
                 default:
                     Log::warning('Unhandled webhook event type:', ['event_type' => $eventType]);
+                    $webhookEvent?->markAsProcessed();
                     return response()->json(['success' => true, 'message' => 'Event ignored']);
             }
 
         } catch (\Exception $e) {
+            $webhookEvent?->markAsFailed($e->getMessage());
             Log::error('Webhook processing error:', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -796,57 +816,41 @@ class CheckoutController extends Controller
         }
     }
 
-    private function handleCheckoutSessionPaid(array $payload)
+    private function handleCheckoutSessionPaid(array $payload, ?PayMongoWebhookEvent $webhookEvent = null)
     {
         try {
             $eventAttributes = $payload['data']['attributes'] ?? [];
             $sessionData     = $eventAttributes['data'] ?? [];
-            $metadata        = $sessionData['attributes']['metadata'] ?? [];
-
-            if (!isset($metadata['order_id'])) {
-                Log::error('Checkout session paid but order_id missing', ['payload' => $payload]);
-                return response()->json(['success' => false, 'message' => 'Missing order_id'], 400);
-            }
-
-            $order = Order::find($metadata['order_id']);
+            $sessionAttributes = $sessionData['attributes'] ?? [];
+            $metadata        = $sessionAttributes['metadata'] ?? [];
+            $order = $this->resolveWebhookOrder($sessionAttributes, $metadata);
 
             if (!$order) {
-                Log::error('Order not found', ['order_id' => $metadata['order_id']]);
+                Log::error('Checkout session paid but order not found', ['payload' => $payload]);
                 return response()->json(['success' => false, 'message' => 'Order not found'], 404);
             }
 
             if ($order->payment_status === 'paid') {
-                return response()->json(['success' => true]);
+                $webhookEvent?->update(['order_id' => $order->id]);
+                $webhookEvent?->markAsProcessed();
+                return response()->json(['success' => true, 'status' => 'already processed']);
             }
 
-            DB::transaction(function () use ($order, $sessionData) {
-                $order->update([
-                    'payment_status'             => 'paid',
-                    'status'                     => 'processing',
-                    'paid_at'                    => now(),
-                    'paymongo_payment_intent_id' => $sessionData['id'] ?? null,
-                ]);
-
-                if ($order->reservation_date) {
-                    ReservationAvailabilityCache::updateForDate(
-                        $order->vendor_id,
-                        $order->reservation_date
-                    );
-                }
-            });
-
-            // ── Credit vendor balance immediately on payment ──────────────────
-            $order->refresh();
-            app(\App\Services\VendorFinanceService::class)->handleOrderPayment($order); // ← NEW
-
-            Log::info('Order marked as PAID', [
-                'order_id'     => $order->id,
-                'order_number' => $order->order_number,
+            $this->markOrderPaidFromWebhook($order, [
+                'checkout_session_id' => $sessionData['id'] ?? null,
+                'reference_number' => $sessionAttributes['reference_number'] ?? ($metadata['reference_number'] ?? null),
+                'resource' => 'checkout_session.payment.paid',
             ]);
 
-            return response()->json(['success' => true]);
+            // ── Credit vendor balance immediately on payment ──────────────────
+
+            $webhookEvent?->update(['order_id' => $order->id]);
+            $webhookEvent?->markAsProcessed();
+
+            return response()->json(['success' => true, 'status' => 'processed']);
 
         } catch (\Exception $e) {
+            $webhookEvent?->markAsFailed($e->getMessage());
             Log::error('handleCheckoutSessionPaid FAILED', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -855,39 +859,30 @@ class CheckoutController extends Controller
         }
     }
 
-    private function handlePaymentPaid(array $paymentData)
+    private function handlePaymentPaid(array $paymentData, ?PayMongoWebhookEvent $webhookEvent = null)
     {
-        $metadata = $paymentData['attributes']['metadata'] ?? [];
-        $orderId = $metadata['order_id'] ?? null;
-        
-        if (!$orderId) {
-            Log::error('No order_id in payment metadata', $paymentData);
-            return;
-        }
+        $attributes = $paymentData['attributes'] ?? [];
+        $metadata = $attributes['metadata'] ?? [];
+        $order = $this->resolveWebhookOrder($attributes, $metadata);
 
-        $order = Order::find($orderId);
         if (!$order) {
-            Log::error('Order not found for payment', ['order_id' => $orderId]);
-            return;
+            Log::error('Order not found for payment.paid webhook', ['payload' => $paymentData]);
+            return response()->json(['success' => false, 'message' => 'Order not found'], 404);
         }
 
-        if (!$this->validateReservationAvailability($order)) {
-            Log::error('Reservation no longer available for paid order', ['order_id' => $orderId]);
-            return;
-        }
-
-        $order->update([
-            'payment_status' => 'paid',
-            'status' => 'processing',
-            'paid_at' => now(),
-            'paymongo_payment_id' => $paymentData['id'] ?? null,
+        $this->markOrderPaidFromWebhook($order, [
+            'payment_id' => $paymentData['id'] ?? null,
+            'reference_number' => $attributes['reference_number']
+                ?? $attributes['external_reference_number']
+                ?? ($metadata['reference_number'] ?? $metadata['pm_reference_number'] ?? null),
+            'resource' => 'payment.paid',
         ]);
 
-        if ($order->reservation_date) {
-            ReservationAvailabilityCache::updateForDate($order->vendor_id, $order->reservation_date);
-        }
+        $webhookEvent?->update(['order_id' => $order->id]);
+        $webhookEvent?->markAsProcessed();
 
-        Log::info('Order marked as paid via payment.paid webhook', ['order_id' => $orderId]);
+        Log::info('Order marked as paid via payment.paid webhook', ['order_id' => $order->id]);
+        return response()->json(['success' => true, 'status' => 'processed']);
     }
 
     private function validateReservationAvailability(Order $order): bool
@@ -931,26 +926,29 @@ class CheckoutController extends Controller
         return $ordersCount < $maxOrders;
     }
 
-    private function handlePaymentFailed($payload)
+    private function handlePaymentFailed($payload, ?PayMongoWebhookEvent $webhookEvent = null)
     {
-        $paymentData = $payload['data']['attributes']['data'];
-        $orderId = $paymentData['metadata']['order_id'] ?? null;
-        
-        if ($orderId) {
-            $order = Order::find($orderId);
-            if ($order) {
-                $order->update([
-                    'payment_status' => 'failed',
-                    'status' => 'payment_failed',
-                ]);
-                Log::info('Order marked as failed via webhook', ['order_id' => $orderId]);
-            }
+        $paymentData = $payload['data']['attributes']['data'] ?? $payload;
+        $attributes = $paymentData['attributes'] ?? [];
+        $metadata = $attributes['metadata'] ?? [];
+        $order = $this->resolveWebhookOrder($attributes, $metadata);
+
+        if ($order) {
+            $order->update([
+                'payment_status' => 'failed',
+                'status' => 'payment_failed',
+            ]);
+            $webhookEvent?->update(['order_id' => $order->id]);
+            Log::info('Order marked as failed via webhook', ['order_id' => $order->id]);
         }
+
+        $webhookEvent?->markAsProcessed();
+        return response()->json(['success' => true, 'status' => 'processed']);
     }
 
-    private function handleCheckoutSessionFailed($payload)
+    private function handleCheckoutSessionFailed($payload, ?PayMongoWebhookEvent $webhookEvent = null)
     {
-        return $this->handlePaymentFailed($payload);
+        return $this->handlePaymentFailed($payload, $webhookEvent);
     }
 
     private function validateReservationDateSelection(Carbon $reservationDate, array $settings, Carbon $today): array
@@ -1010,28 +1008,28 @@ class CheckoutController extends Controller
     }
     
 
-    private function handleSourceChargeable($payload)
+    private function handleSourceChargeable($payload, ?PayMongoWebhookEvent $webhookEvent = null)
     {
-        $sourceData = $payload['data']['attributes']['data'];
+        $sourceData = $payload['data']['attributes']['data'] ?? $payload;
         $sourceId = $sourceData['id'] ?? null;
-        $orderId = $sourceData['metadata']['order_id'] ?? null;
+        $attributes = $sourceData['attributes'] ?? [];
+        $metadata = $attributes['metadata'] ?? [];
+        $order = $this->resolveWebhookOrder($attributes, $metadata);
         
-        if (!$orderId || !$sourceId) {
-            Log::error('Missing order_id or source_id in source.chargeable', $sourceData);
-            return;
-        }
-        
-        $order = Order::find($orderId);
-        if (!$order) {
-            Log::error('Order not found for source.chargeable', ['order_id' => $orderId]);
-            return;
+        if (!$order || !$sourceId) {
+            Log::error('Missing order or source_id in source.chargeable', $sourceData);
+            return response()->json(['success' => false, 'message' => 'Missing order or source'], 400);
         }
         
         $order->update([
             'paymongo_source_id' => $sourceId,
         ]);
+
+        $webhookEvent?->update(['order_id' => $order->id]);
+        $webhookEvent?->markAsProcessed();
         
-        Log::info('Source marked as chargeable', ['order_id' => $orderId, 'source_id' => $sourceId]);
+        Log::info('Source marked as chargeable', ['order_id' => $order->id, 'source_id' => $sourceId]);
+        return response()->json(['success' => true, 'status' => 'processed']);
     }
 
     private function verifyWebhookSignature(Request $request): bool
@@ -1049,9 +1047,18 @@ class CheckoutController extends Controller
         }
 
         $payload = $request->getContent();
-        $computedSignature = hash_hmac('sha256', $payload, $secretKey);
+        $parts = [];
+
+        foreach (explode(',', $signature) as $part) {
+            [$key, $value] = explode('=', $part, 2);
+            $parts[$key] = $value;
+        }
+
+        $timestamp = $parts['t'] ?? '';
+        $expectedSignature = $parts['te'] ?? '';
+        $computedSignature = hash_hmac('sha256', $timestamp . '.' . $payload, $secretKey);
         
-        return hash_equals($signatureHeaderParts['v1'] ?? '', $computedSignature);
+        return $expectedSignature !== '' && hash_equals($expectedSignature, $computedSignature);
     }
 
     /**
@@ -1087,21 +1094,71 @@ class CheckoutController extends Controller
         }
 
         if ($success) {
-            $order->update([
-                'payment_status' => 'paid',
-                'status'         => 'processing',
-                'paid_at'        => now(),
-            ]);
-
-            // ← redirect to order list, not specific order
-            return redirect('/customer/orders')->with('success', 'Payment successful! Your order is now being processed.');
+            return redirect('/customer/orders?payment=success&reference=' . urlencode($this->buildPayMongoReference($order)));
         } else {
-            $order->update([
-                'payment_status' => 'failed',
-                'status'         => 'payment_failed',
-            ]);
-
             return redirect('/customer/checkout')->with('error', 'Payment failed. Please try again.');
         }
+    }
+
+    private function buildPayMongoReference(Order $order): string
+    {
+        return $order->order_number;
+    }
+
+    private function resolveWebhookOrder(array $attributes = [], array $metadata = []): ?Order
+    {
+        $referenceNumber = $attributes['reference_number']
+            ?? $attributes['external_reference_number']
+            ?? $metadata['reference_number']
+            ?? $metadata['pm_reference_number']
+            ?? $metadata['order_number']
+            ?? null;
+
+        if ($referenceNumber) {
+            $order = Order::where('order_number', $referenceNumber)->first();
+            if ($order) {
+                return $order;
+            }
+        }
+
+        $orderId = $metadata['order_id'] ?? null;
+
+        return $orderId ? Order::find($orderId) : null;
+    }
+
+    private function markOrderPaidFromWebhook(Order $order, array $paymentContext = []): void
+    {
+        DB::transaction(function () use ($order, $paymentContext) {
+            $updates = [
+                'payment_status' => 'paid',
+                'paid_at' => $order->paid_at ?? now(),
+            ];
+
+            if (in_array($order->status, ['pending', 'failed', 'payment_failed'], true)) {
+                $updates['status'] = 'processing';
+            }
+
+            $paymongoResponse = is_array($order->paymongo_response) ? $order->paymongo_response : [];
+
+            $order->update(array_merge($updates, [
+                'paymongo_payment_intent_id' => $paymentContext['checkout_session_id']
+                    ?? $paymentContext['payment_id']
+                    ?? $order->paymongo_payment_intent_id,
+                'paymongo_response' => array_filter(array_merge($paymongoResponse, [
+                    'reference_number' => $paymentContext['reference_number'] ?? null,
+                    'webhook_resource' => $paymentContext['resource'] ?? null,
+                    'paid_at' => now()->toIso8601String(),
+                ]), fn ($value) => $value !== null),
+            ]));
+
+            if ($order->reservation_date) {
+                ReservationAvailabilityCache::updateForDate(
+                    $order->vendor_id,
+                    $order->reservation_date
+                );
+            }
+        });
+
+        app(VendorFinanceService::class)->handleOrderPayment($order->fresh());
     }
 }

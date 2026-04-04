@@ -103,9 +103,7 @@ class WarehouseBatchService
     {
         $product  = Product::where('owner_id', $ownerId)->findOrFail($data['product_id']);
         $location = isset($data['warehouse_location_id'])
-            ? WarehouseLocation::where('warehouse_id', function($q) use ($ownerId) {
-                $q->select('id')->from('warehouses')->where('owner_id', $ownerId);
-            })->find($data['warehouse_location_id'])
+            ? $this->findOwnedLocation($data['warehouse_location_id'], $ownerId)
             : null;
 
         $batchNumber = WarehouseBatch::generateBatchNumber(
@@ -188,9 +186,7 @@ class WarehouseBatchService
     public function transferBatch(int $batchId, int $locationId, int $ownerId, ?string $notes = null): WarehouseBatch
     {
         $batch    = WarehouseBatch::where('owner_id', $ownerId)->findOrFail($batchId);
-        $location = WarehouseLocation::where('warehouse_id', function($q) use ($ownerId) {
-            $q->select('id')->from('warehouses')->where('owner_id', $ownerId);
-        })->where('owner_id', $ownerId)->findOrFail($locationId);
+        $location = $this->findOwnedLocation($locationId, $ownerId, true);
 
         $batch->transferTo($location, Auth::id(), $notes);
 
@@ -314,5 +310,19 @@ class WarehouseBatchService
     {
         return 'WB-' . strtoupper(base_convert((string) time(), 10, 36))
              . '-' . strtoupper(Str::random(4));
+    }
+
+    private function findOwnedLocation(int $locationId, int $ownerId, bool $fail = false): ?WarehouseLocation
+    {
+        $query = WarehouseLocation::query()
+            ->whereKey($locationId)
+            ->where('owner_id', $ownerId)
+            ->whereHas('warehouse', fn ($warehouseQuery) => $warehouseQuery->where('owner_id', $ownerId));
+
+        if ($fail) {
+            return $query->firstOrFail();
+        }
+
+        return $query->first();
     }
 }

@@ -6,7 +6,9 @@ use App\Models\PurchaseOrder;
 use App\Services\WarehouseBatchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 use App\Traits\ScopesOwner;
  
@@ -73,7 +75,13 @@ class WarehouseBatchController extends Controller
             'harvest_date'          => ['nullable', 'date'],
             'expiration_date'       => ['nullable', 'date', 'after:today'],
             'freshness_days'        => ['nullable', 'integer', 'min:1', 'max:365'],
-            'warehouse_location_id' => ['nullable', 'integer', 'exists:warehouse_locations,id'],
+            'warehouse_location_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('warehouse_locations', 'id')->where(
+                    fn ($query) => $query->where('owner_id', $this->getOwnerId())
+                ),
+            ],
             'lot_number'            => ['nullable', 'string', 'max:100'],
             'notes'                 => ['nullable', 'string', 'max:500'],
             // ADDED: optional link back to the purchase order
@@ -83,7 +91,18 @@ class WarehouseBatchController extends Controller
         $sourceOrderId = $data['source_order_id'] ?? null;
         unset($data['source_order_id']); // don't pass to service — it doesn't expect it
 
-        $batch = $this->service->receiveBatch($data, $this->getOwnerId());
+        try {
+            $batch = $this->service->receiveBatch($data, $this->getOwnerId());
+        } catch (Throwable $e) {
+            Log::error('Batch creation failed', [
+                'error' => $e->getMessage(),
+                'payload' => $request->all(),
+                'user_id' => auth()->id(),
+                'owner_id' => $this->getOwnerId(),
+            ]);
+
+            throw $e;
+        }
 
         // Auto-complete the purchase order when a batch is received from it
         if ($sourceOrderId) {
@@ -120,10 +139,16 @@ class WarehouseBatchController extends Controller
     public function transfer(Request $request, int $batchId): JsonResponse
     {
         $data = $request->validate([
-            'warehouse_location_id' => ['required', 'integer', 'exists:warehouse_locations,id'],
+            'warehouse_location_id' => [
+                'required',
+                'integer',
+                Rule::exists('warehouse_locations', 'id')->where(
+                    fn ($query) => $query->where('owner_id', $this->getOwnerId())
+                ),
+            ],
             'notes'                 => ['nullable', 'string', 'max:500'],
         ]);
 
-        return response()->json($this->service->transferBatch($batchId, $data['warehouse_location_id'], $this->resolveOwnerId(), $data['notes'] ?? null));
+        return response()->json($this->service->transferBatch($batchId, $data['warehouse_location_id'], $this->getOwnerId(), $data['notes'] ?? null));
     }
 }

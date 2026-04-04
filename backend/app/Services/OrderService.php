@@ -9,6 +9,7 @@ use App\Models\FundingRequest;
 use App\Models\Product;
 use App\Models\WarehouseBatch;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -165,6 +166,12 @@ class OrderService
      */
     public function updateOrderStatus(int $orderId, string $newStatus, int $ownerId): PurchaseOrder
     {
+        $newStatus = trim($newStatus);
+
+        if ($newStatus === '') {
+            throw new \InvalidArgumentException('Order status is required.');
+        }
+
         $order   = PurchaseOrder::where('owner_id', $ownerId)->with('items', 'supplier')->findOrFail($orderId);
         $allowed = self::STATUS_TRANSITIONS[$order->status] ?? [];
 
@@ -196,42 +203,29 @@ class OrderService
         $funding = FundingRequest::where('linked_order_id', $order->id)->first();
 
         foreach ($order->items as $item) {
-            // FIXED: prefer the stored product_id, fall back to name match only
-            // if product_id was never set (legacy rows).
-            $product = null;
-
-            if ($item->product_id) {
-                $product = Product::withTrashed()->find($item->product_id);
-            }
-
-            if (!$product) {
-                $ownerId = $order->supplier->owner_id ?? null;
-                $product = Product::where('product_name', $item->product_name)
-                    ->when($ownerId, fn ($q) => $q->where('owner_id', $ownerId))
-                    ->first();
-            }
+            $product = $this->resolveOrderItemProduct($order, $item);
 
             $shelfLife      = $funding?->shelf_life;
             $expirationDate = $shelfLife ? now()->addDays((int) $shelfLife)->toDateString() : null;
+            $batchNumber    = WarehouseBatch::generateBatchNumber($product->sku, now()->toDateString());
 
             WarehouseBatch::create([
                 'owner_id'              => $order->owner_id,
-                'product_id'            => $product?->id,
-                'product_name_snapshot' => $item->product_name,
+                'product_id'            => $product->id,
                 'qty_received'          => $item->quantity,
                 'qty_remaining'         => $item->quantity,
+                'batch_number'          => $batchNumber,
+                'barcode'               => $this->generateBatchBarcode(),
                 'received_date'         => now()->toDateString(),
                 'lot_number'            => $order->order_number,
+                'condition_status'      => 'fresh',
                 'status'                => 'active',
                 'freshness_days'        => $shelfLife,
                 'expiration_date'       => $expirationDate,
                 'notes'                 => "Auto-received from Order {$order->order_number}",
-                'source_order_id'       => $order->id,
             ]);
 
-            if ($product) {
-                $product->increment('quantity_in_stock', $item->quantity);
-            }
+            $product->increment('quantity_in_stock', $item->quantity);
         }
     }
 
@@ -307,5 +301,46 @@ class OrderService
         } while (PurchaseOrder::where('order_number', $number)->exists());
 
         return $number;
+    }
+
+    private function resolveOrderItemProduct(PurchaseOrder $order, PurchaseOrderItem $item): Product
+    {
+        if ($item->product_id) {
+            $product = Product::withTrashed()
+                ->where('owner_id', $order->owner_id)
+                ->find($item->product_id);
+
+            if ($product) {
+                return $product;
+            }
+        }
+
+        $product = Product::withTrashed()
+            ->where('owner_id', $order->owner_id)
+            ->where('product_name', $item->product_name)
+            ->first();
+
+        if ($product) {
+            return $product;
+        }
+
+        Log::error('Order completion failed: product resolution missing for order item', [
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'owner_id' => $order->owner_id,
+            'item_id' => $item->id,
+            'item_product_id' => $item->product_id,
+            'item_product_name' => $item->product_name,
+        ]);
+
+        throw new \RuntimeException(
+            "Cannot complete order [{$order->order_number}]: no product found for item [{$item->product_name}]."
+        );
+    }
+
+    private function generateBatchBarcode(): string
+    {
+        return 'WB-' . strtoupper(base_convert((string) time(), 10, 36))
+            . '-' . strtoupper(Str::random(4));
     }
 }

@@ -926,6 +926,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import api from "../../plugins/axios";
 import { useAuth } from "../../composables/useAuth";
 import NavHeader from "../../layouts/NavHeader.vue";
@@ -934,6 +935,8 @@ import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 
 const API_BASE = "customer/orders";
+const route = useRoute();
+const router = useRouter();
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const { isAuthenticated } = useAuth();
@@ -1314,7 +1317,21 @@ const scrollToSection = (id) => {
 
 const cartCount = ref(0);
 
-onMounted(() => fetchOrders());
+onMounted(async () => {
+  await fetchOrders();
+
+  if (route.query.payment === "success") {
+    toast.success("Payment confirmed. Your order has been updated.", {
+      position: toast.POSITION.TOP_RIGHT,
+    });
+
+    const nextQuery = { ...route.query };
+    delete nextQuery.payment;
+    delete nextQuery.reference;
+
+    router.replace({ query: nextQuery });
+  }
+});
 </script>
 
 <style scoped>
