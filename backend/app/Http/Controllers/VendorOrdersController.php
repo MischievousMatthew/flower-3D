@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Helpers\CloudinaryHelper;
 use App\Models\Order;
 use App\Models\User;
 use App\Models\VendorClosedDate;
@@ -134,15 +135,10 @@ class VendorOrdersController extends Controller
                         'address' => $order->user->address,
                     ],
                     'items' => $order->items->map(function($item) {
-                        // Get 3D model from product relationship or item directly
                         $model3d = $item->product?->models?->first();
-                        
-                        // Convert model URL to CORS-enabled route
-                        $modelUrl = $model3d?->model_url ?? $item->model_3d_url;
-                        if ($modelUrl) {
-                            $filename = basename($modelUrl);
-                            $modelUrl = url('api/customer/product-models/' . $filename);
-                        }
+                        $modelUrl = $model3d?->model_path
+                            ? CloudinaryHelper::getUrl($model3d->model_path, 'raw')
+                            : ($model3d?->model_url ?: $item->model_3d_url);
                         
                         return [
                             'id' => $item->id,
@@ -156,10 +152,11 @@ class VendorOrdersController extends Controller
                                 'product_name' => $item->product->product_name,
                                 'images' => $item->product->images ?? [],
                                 'models' => $item->product->models ? $item->product->models->map(function($model) {
-                                    $filename = basename($model->model_url);
                                     return [
                                         'id' => $model->id,
-                                        'model_url' => url('api/customer/product-models/' . $filename),
+                                        'model_url' => $model->model_path
+                                            ? CloudinaryHelper::getUrl($model->model_path, 'raw')
+                                            : $model->model_url,
                                         'model_type' => $model->model_type,
                                         'thumbnail_url' => $model->thumbnail_url,
                                         'metadata' => $model->metadata
@@ -404,13 +401,9 @@ class VendorOrdersController extends Controller
                     ],
                     'items' => $order->items->map(function($item) {
                         $model3d = $item->product?->models?->first();
-                        
-                        // Convert model URL to CORS-enabled route
-                        $modelUrl = $model3d?->model_url ?? $item->model_3d_url;
-                        if ($modelUrl) {
-                            $filename = basename($modelUrl);
-                            $modelUrl = url('api/customer/product-models/' . $filename);
-                        }
+                        $modelUrl = $model3d?->model_path
+                            ? CloudinaryHelper::getUrl($model3d->model_path, 'raw')
+                            : ($model3d?->model_url ?: $item->model_3d_url);
                         
                         return [
                             'id' => $item->id,
@@ -423,10 +416,11 @@ class VendorOrdersController extends Controller
                                 'product_name' => $item->product->product_name,
                                 'images' => $item->product->images ?? [],
                                 'models' => $item->product->models ? $item->product->models->map(function($model) {
-                                    $filename = basename($model->model_url);
                                     return [
                                         'id' => $model->id,
-                                        'model_url' => url('api/customer/product-models/' . $filename),
+                                        'model_url' => $model->model_path
+                                            ? CloudinaryHelper::getUrl($model->model_path, 'raw')
+                                            : $model->model_url,
                                         'model_type' => $model->model_type,
                                         'thumbnail_url' => $model->thumbnail_url,
                                         'metadata' => $model->metadata
@@ -535,13 +529,10 @@ class VendorOrdersController extends Controller
                         ];
                     })->sortBy('sort_order')->values()->all();
                     
-                    // Get 3D model if exists and convert to CORS-enabled URL
                     $model3d = $item->product?->models?->first();
-                    $modelUrl = $model3d?->model_url ?? $item->model_3d_url;
-                    if ($modelUrl) {
-                        $filename = basename($modelUrl);
-                        $modelUrl = url('api/customer/product-models/' . $filename);
-                    }
+                    $modelUrl = $model3d?->model_path
+                        ? CloudinaryHelper::getUrl($model3d->model_path, 'raw')
+                        : ($model3d?->model_url ?: $item->model_3d_url);
                     
                     return [
                         'id' => $item->id,

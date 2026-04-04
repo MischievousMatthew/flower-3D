@@ -638,7 +638,7 @@ class CheckoutController extends Controller
             return ['success' => false, 'message' => 'Unsupported online payment method.'];
         }
 
-        $frontendUrl = rtrim(config('app.frontend_url', 'https://bloomcraft-app.vercel.app'), '/');
+        $frontendUrl = $this->frontendUrl();
         $callbackUrl = url('/api/payment/callback');
         $referenceNumber = $this->buildPayMongoReference($order);
 
@@ -1141,7 +1141,7 @@ class CheckoutController extends Controller
         $success = $request->get('success') === 'true';
         $orderId = $request->get('order_id');
         $reference = $request->get('reference');
-        $frontendUrl = rtrim(config('app.frontend_url', 'https://bloomcraft-app.vercel.app'), '/');
+        $frontendUrl = $this->frontendUrl();
 
         if (!$orderId && !$reference) {
             return redirect($frontendUrl . '/customer/orders?payment=invalid');
@@ -1190,6 +1190,21 @@ class CheckoutController extends Controller
     private function getPayMongoSecretKey(): ?string
     {
         return config('services.paymongo.secret_key') ?: env('PAYMONGO_SECRET_KEY');
+    }
+
+    private function frontendUrl(): string
+    {
+        $frontendUrl = trim((string) config('app.frontend_url', 'https://bloomcraft-app.vercel.app'));
+
+        if ($frontendUrl === '') {
+            return 'https://bloomcraft-app.vercel.app';
+        }
+
+        if (!preg_match('#^https?://#i', $frontendUrl)) {
+            $frontendUrl = 'https://' . ltrim($frontendUrl, '/');
+        }
+
+        return rtrim($frontendUrl, '/');
     }
 
     private function normalizePaymentMethod(?string $paymentMethod): ?string

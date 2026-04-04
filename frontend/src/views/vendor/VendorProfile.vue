@@ -144,6 +144,30 @@
           </div>
 
           <!-- ── Alert banners ── -->
+          <div class="logo-card">
+            <div class="logo-card__preview">
+              <img
+                v-if="profileData.store_logo_url"
+                :src="profileData.store_logo_url"
+                alt="Store logo"
+              />
+              <div v-else class="logo-card__fallback">BC</div>
+            </div>
+            <div class="logo-card__content">
+              <h3 class="logo-card__title">Store Logo</h3>
+              <p class="logo-card__text">
+                Update your store logo here. This uses the existing Cloudinary upload flow.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="btn-secondary logo-card__action"
+              @click="openLogoUploadModal"
+            >
+              Change Logo
+            </button>
+          </div>
+
           <transition name="alert-slide">
             <div v-if="generalForm.successMsg" class="alert-banner success">
               <span class="alert-icon">✅</span>
@@ -1389,6 +1413,58 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
   margin-bottom: 28px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   border: 1px solid #e2e8f0;
+}
+
+.logo-card {
+  display: grid;
+  grid-template-columns: 88px 1fr auto;
+  gap: 18px;
+  align-items: center;
+  padding: 20px;
+  margin-bottom: 22px;
+  border: 1px solid #dbe7f3;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f8fffb 0%, #eef7ff 100%);
+}
+
+.logo-card__preview {
+  width: 88px;
+  height: 88px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #d9e7ef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-card__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.logo-card__fallback {
+  font-size: 28px;
+  font-weight: 700;
+  color: #2f855a;
+}
+
+.logo-card__title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: #1f2937;
+}
+
+.logo-card__text {
+  margin: 0;
+  color: #5f6c7b;
+  line-height: 1.5;
+}
+
+.logo-card__action {
+  white-space: nowrap;
 }
 .completion-header {
   display: flex;
