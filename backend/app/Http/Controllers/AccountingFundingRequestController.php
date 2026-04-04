@@ -118,6 +118,8 @@ class AccountingFundingRequestController extends Controller
                     ->where('id', $id)
                     ->update([
                         'request_status' => 'Approved',
+                        'payment_status' => 'paid',
+                        'paid_at' => now(),
                         'reviewed_by_employee_id' => $employee->id,
                         'accounting_decision_at' => now(),
                         'approved_quantity' => $request->approved_quantity,
@@ -147,7 +149,7 @@ class AccountingFundingRequestController extends Controller
                     'balance_before' => $balanceBefore,
                     'balance_after' => $balanceAfter,
                     'description' => "Procurement: {$fundingRequest->product_name} ({$request->approved_quantity} {$fundingRequest->uom})",
-                    'status' => 'completed',
+                    'status' => 'paid',
                     'metadata' => [
                         'funding_request_id' => $fundingRequest->finance_request_id,
                         'product_name' => $fundingRequest->product_name,
@@ -212,6 +214,8 @@ class AccountingFundingRequestController extends Controller
                 ->where('id', $id)
                 ->update([
                     'request_status' => 'Rejected',
+                    'payment_status' => 'unpaid',
+                    'paid_at' => null,
                     'reviewed_by_employee_id' => $employee->id,
                     'accounting_decision_at' => now(),
                     'approved_quantity' => 0,

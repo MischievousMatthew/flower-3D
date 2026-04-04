@@ -1259,6 +1259,10 @@ onMounted(() => {
   background: #c6f6d5;
   color: #22543d;
 }
+.status-badge.paid {
+  background: #c6f6d5;
+  color: #22543d;
+}
 .status-badge.pending {
   background: #feebc8;
   color: #7c2d12;

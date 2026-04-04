@@ -158,9 +158,9 @@
               <td>
                 <span
                   class="status-badge"
-                  :class="getStatusClass(request.request_status)"
+                  :class="getStatusClass(request)"
                 >
-                  {{ request.request_status }}
+                  {{ displayRequestStatus(request) }}
                 </span>
               </td>
               <td class="action-cell" @click.stop>
@@ -547,7 +547,18 @@ const getMarginClass = (margin) => {
 };
 
 const getStatusClass = (status) => {
+  if (typeof status === "object" && status !== null) {
+    return displayRequestStatus(status).toLowerCase().replace(" ", "-");
+  }
   return status.toLowerCase().replace(" ", "-");
+};
+
+const displayRequestStatus = (request) => {
+  if (request?.request_status === "Approved" && request?.payment_status === "paid") {
+    return "Paid";
+  }
+
+  return request?.request_status || "Unknown";
 };
 
 const formatDate = (date) => {

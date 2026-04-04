@@ -37,13 +37,17 @@
         <!-- Status Banner -->
         <div
           class="status-banner"
-          :class="getStatusClass(request.request_status)"
+          :class="getStatusClass(request)"
         >
           <div class="banner-content">
             <div>
-              <h3>{{ request?.request_status }}</h3>
+              <h3>{{ displayRequestStatus(request) }}</h3>
               <p v-if="request.request_status === 'Pending'">
                 Waiting for Finance review
+              </p>
+              <p v-else-if="request.request_status === 'Approved' && request.payment_status === 'paid'">
+                Paid by {{ request.reviewed_by_name }} on
+                {{ formatDate(request.paid_at || request.accounting_decision_at) }}
               </p>
               <p v-else-if="request.request_status === 'Approved'">
                 Approved by {{ request.reviewed_by_name }} on
@@ -435,7 +439,7 @@
           <h3>Finance Decision</h3>
           <div
             class="decision-card"
-            :class="request.request_status.toLowerCase()"
+            :class="getStatusClass(request)"
           >
             <div class="decision-header">
               <svg
@@ -464,9 +468,9 @@
                 <line x1="6" y1="6" x2="18" y2="18"></line>
               </svg>
               <span
-                >{{ request.request_status }} by
-                {{ request.reviewed_by_name }}</span
-              >
+                >{{ displayRequestStatus(request) }} by
+                  {{ request.reviewed_by_name }}</span
+                >
             </div>
             <div class="info-grid">
               <div
@@ -666,8 +670,21 @@ const formatNumber = (num) => {
   });
 };
 
-const getStatusClass = (status) =>
-  status?.toLowerCase().replace(" ", "-") || "";
+const displayRequestStatus = (request) => {
+  if (request?.request_status === "Approved" && request?.payment_status === "paid") {
+    return "Paid";
+  }
+
+  return request?.request_status || "Unknown";
+};
+
+const getStatusClass = (status) => {
+  if (typeof status === "object" && status !== null) {
+    return displayRequestStatus(status).toLowerCase().replace(" ", "-") || "";
+  }
+
+  return status?.toLowerCase().replace(" ", "-") || "";
+};
 
 const getMarginClass = (margin) => {
   if (margin >= 30) return "text-success";

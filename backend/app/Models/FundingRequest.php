@@ -21,6 +21,8 @@ class FundingRequest extends Model
         'related_sales_order_id',
         'request_date',
         'request_status',
+        'payment_status',
+        'paid_at',
 
         // Product info
         'product_name',
@@ -93,6 +95,7 @@ class FundingRequest extends Model
         'required_delivery_date'     => 'date',
         'submitted_to_accounting_at' => 'datetime',
         'accounting_decision_at'     => 'datetime',
+        'paid_at'                    => 'datetime',
 
         'requested_qty'          => 'float',
         'moq'                    => 'float',
