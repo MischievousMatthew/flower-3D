@@ -34,7 +34,7 @@ use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\SupplyChainAnalyticsController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryBarcodeController;
-use App\Http\Controllers\VendorStorefrontController;
+use App\Http\Controllers\VendorStoreFrontController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\CustomerOrderTrackingController;
@@ -91,9 +91,9 @@ Route::prefix('customer')->group(function () {
 
 // ── Public vendor storefront ──────────────────────────────────────────────
 Route::prefix('vendors')->group(function () {
-    Route::get('/',                    [VendorStorefrontController::class, 'index']);
-    Route::get('/{id}',                [VendorStorefrontController::class, 'show']);
-    Route::get('/{vendorId}/products', [VendorStorefrontController::class, 'getProducts']);
+    Route::get('/',                    [VendorStoreFrontController::class, 'index']);
+    Route::get('/{id}',                [VendorStoreFrontController::class, 'show']);
+    Route::get('/{vendorId}/products', [VendorStoreFrontController::class, 'getProducts']);
 });
 
 // ── PUBLIC — Product reviews (no auth required) ───────────────────────────
@@ -195,8 +195,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/reviews/{id}', [ProductReviewController::class, 'destroy'])->whereNumber('id');
 
     // ── Vendor follow/unfollow ────────────────────────────────────────────
-    Route::post('/vendors/{vendorId}/follow',   [VendorStorefrontController::class, 'follow']);
-    Route::post('/vendors/{vendorId}/unfollow', [VendorStorefrontController::class, 'unfollow']);
+    Route::post('/vendors/{vendorId}/follow',   [VendorStoreFrontController::class, 'follow']);
+    Route::post('/vendors/{vendorId}/unfollow', [VendorStoreFrontController::class, 'unfollow']);
 
     // ── Chat ─────────────────────────────────────────────────────────────
     Route::prefix('chat')->group(function () {
