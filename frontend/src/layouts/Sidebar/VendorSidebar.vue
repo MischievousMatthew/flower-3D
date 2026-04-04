@@ -11,14 +11,22 @@
   <aside class="sidebar" :class="{ 'mobile-open': isMobileOpen }">
     <div class="logo-section">
       <div class="logo">
-        <span class="logo-icon"
-          ><img
+        <span class="logo-icon">
+          <img
+            v-if="sidebarLogoUrl"
+            :src="sidebarLogoUrl"
+            :alt="`${businessName} logo`"
+            class="logo-image"
+            @error="handleLogoError"
+          />
+          <img
+            v-else
             src="../../../public/bloomcraft-blankBg.png"
             alt="Bloomcraft Logo"
-            width="50"
-            height="50"
-        /></span>
-        <span class="logo-text">BloomCraft</span>
+            class="logo-image"
+          />
+        </span>
+        <span class="logo-text">{{ businessName }}</span>
       </div>
     </div>
 
@@ -136,6 +144,7 @@ const { vendorProfile, fetchProfile } = useVendorProfile({ autoFetch: false, sho
 
 const isLoading = ref(null);
 const isLoadingMessage = ref("");
+const logoLoadFailed = ref(false);
 const notificationCounts = ref({
   orders: 0,
 });
@@ -169,7 +178,16 @@ const businessInitial = computed(() => {
   return source.slice(0, 1).toUpperCase();
 });
 
+const sidebarLogoUrl = computed(() => {
+  if (logoLoadFailed.value) return "";
+  return vendorProfile.value?.store_logo_url?.trim() || "";
+});
+
 isLoading.value = false;
+
+const handleLogoError = () => {
+  logoLoadFailed.value = true;
+};
 
 const handleLogout = async () => {
   if (isLoading.value) return;
@@ -264,6 +282,13 @@ onUnmounted(() => {
 watch(() => route.path, () => {
   if (isMobileOpen.value) closeMobile();
 });
+
+watch(
+  () => vendorProfile.value?.store_logo_url,
+  () => {
+    logoLoadFailed.value = false;
+  },
+);
 </script>
 
 <style scoped>
@@ -295,6 +320,14 @@ watch(() => route.path, () => {
 
 .logo-icon {
   font-size: 24px;
+}
+
+.logo-image {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 14px;
+  display: block;
 }
 
 .logo-text {

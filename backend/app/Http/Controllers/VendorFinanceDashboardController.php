@@ -44,17 +44,17 @@ class VendorFinanceDashboardController extends Controller
                 : ($thisMonthRevenue > 0 ? 100 : 0);
 
             // Completed orders this month
-            $completedThisMonth = Order::where('vendor_id', $vendorId)
-                ->where('status', 'completed')
-                ->whereMonth('delivered_at', now()->month)
-                ->whereYear('delivered_at', now()->year)
-                ->count();
+            $completedThisMonth = $this->countCompletedOrdersForPeriod(
+                $vendorId,
+                now()->copy()->startOfMonth(),
+                now()->copy()->endOfMonth(),
+            );
 
-            $completedLastMonth = Order::where('vendor_id', $vendorId)
-                ->where('status', 'completed')
-                ->whereMonth('delivered_at', now()->subMonth()->month)
-                ->whereYear('delivered_at', now()->subMonth()->year)
-                ->count();
+            $completedLastMonth = $this->countCompletedOrdersForPeriod(
+                $vendorId,
+                now()->copy()->subMonth()->startOfMonth(),
+                now()->copy()->subMonth()->endOfMonth(),
+            );
 
             $ordersChange = $completedLastMonth > 0
                 ? round((($completedThisMonth - $completedLastMonth) / $completedLastMonth) * 100, 1)
@@ -296,5 +296,19 @@ class VendorFinanceDashboardController extends Controller
 
         // Regular User (vendor logging in directly)
         return $user->id;
+    }
+
+    private function countCompletedOrdersForPeriod(int $vendorId, $from, $to): int
+    {
+        return Order::where('vendor_id', $vendorId)
+            ->where('status', 'completed')
+            ->where(function ($query) use ($from, $to) {
+                $query->whereBetween('delivered_at', [$from, $to])
+                    ->orWhere(function ($fallbackQuery) use ($from, $to) {
+                        $fallbackQuery->whereNull('delivered_at')
+                            ->whereBetween('updated_at', [$from, $to]);
+                    });
+            })
+            ->count();
     }
 }

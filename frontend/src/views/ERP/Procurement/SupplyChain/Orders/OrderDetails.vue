@@ -164,7 +164,7 @@
               ><span>{{ formatDate(order.shipment.received_date) }}</span>
             </div>
             <router-link
-              :to="`/erp/logistics/${order.shipment.id}`"
+              :to="`/erp/procurement/supply-chain/logistics/${order.shipment.id}`"
               class="view-shipment-btn"
               >View Shipment Details →</router-link
             >
@@ -314,11 +314,18 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { orderService } from "../../../../../services/orderService";
 
+const props = defineProps({
+  id: {
+    type: [String, Number],
+    default: null,
+  },
+});
 
 const router = useRouter();
+const route = useRoute();
 const order = ref(null);
 const showStatusModal = ref(false);
 const nextStatus = ref("");
@@ -411,12 +418,24 @@ function formatDate(d) {
 }
 
 onMounted(() => {
-  const raw = history.state?.order;
-  if (raw) {
-    order.value = JSON.parse(raw);
-  } else {
+  const orderId = props.id ?? route.params.id;
+
+  if (!orderId) {
     router.replace({ name: "OrderList" });
+    return;
   }
+
+  orderService
+    .find(orderId)
+    .then((res) => {
+      order.value = res.data?.data ?? res.data ?? null;
+      if (!order.value) {
+        router.replace({ name: "OrderList" });
+      }
+    })
+    .catch(() => {
+      router.replace({ name: "OrderList" });
+    });
 });
 </script>
 

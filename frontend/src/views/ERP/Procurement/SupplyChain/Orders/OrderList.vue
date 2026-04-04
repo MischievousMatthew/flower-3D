@@ -440,7 +440,7 @@ const router = useRouter();
 function goToDetail(order) {
   router.push({
     name: "OrderDetail",
-    state: { order: JSON.stringify(order) },
+    params: { id: order.id },
   });
 }
 

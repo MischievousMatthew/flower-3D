@@ -594,8 +594,8 @@ const fetchRequests = async () => {
 const viewRequest = (id) => {
   selectedRequestId.value = id;
   router.push({
-    path: "/erp/finance/funding-request/details",
-    state: { requestId: id },
+    name: "FinanceFundingRequestDetails",
+    params: { id },
   });
 };
 

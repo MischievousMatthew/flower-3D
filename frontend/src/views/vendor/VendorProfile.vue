@@ -998,8 +998,13 @@ import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import api from "../../plugins/axios";
 import { toast } from "vue3-toastify";
 import { useFormSubmit } from "../../composables/useFormSubmit";
+import { useVendorProfile } from "../../composables/useVendorProfile";
 
 const router = useRouter();
+const { updateLocalProfile } = useVendorProfile({
+  autoFetch: false,
+  showToast: false,
+});
 
 // Each tab gets its own isolated form state
 const generalForm = useFormSubmit();
@@ -1142,6 +1147,7 @@ const fetchProfile = async () => {
     if (response.data.success) {
       const data = response.data.data;
       Object.assign(profileData, data);
+      updateLocalProfile(data);
       formData.general = {
         store_name: data.store_name || "",
         owner_name: data.owner_name || "",
@@ -1206,7 +1212,10 @@ const updateGeneralInfo = () =>
     {
       successMsg: "General info updated successfully!",
       onSuccess: (res) => {
-        if (res.data?.data) Object.assign(profileData, res.data.data);
+        if (res.data?.data) {
+          Object.assign(profileData, res.data.data);
+          updateLocalProfile(res.data.data);
+        }
         toast.success("Profile updated!");
       },
     },
@@ -1225,7 +1234,10 @@ const updatePaymentDetails = () =>
     {
       successMsg: "Payment details updated successfully!",
       onSuccess: (res) => {
-        if (res.data?.data) Object.assign(profileData, res.data.data);
+        if (res.data?.data) {
+          Object.assign(profileData, res.data.data);
+          updateLocalProfile(res.data.data);
+        }
         toast.success("Payment details saved!");
       },
     },
@@ -1265,7 +1277,10 @@ const updateProductDetails = () => {
     {
       successMsg: "Product details updated successfully!",
       onSuccess: (res) => {
-        if (res.data?.data) Object.assign(profileData, res.data.data);
+        if (res.data?.data) {
+          Object.assign(profileData, res.data.data);
+          updateLocalProfile(res.data.data);
+        }
         toast.success("Product details saved!");
       },
     },
@@ -1284,7 +1299,10 @@ const updateDeliveryDetails = () =>
     {
       successMsg: "Delivery details updated successfully!",
       onSuccess: (res) => {
-        if (res.data?.data) Object.assign(profileData, res.data.data);
+        if (res.data?.data) {
+          Object.assign(profileData, res.data.data);
+          updateLocalProfile(res.data.data);
+        }
         toast.success("Delivery details saved!");
       },
     },
@@ -1362,12 +1380,13 @@ const uploadStoreLogo = async () => {
     data.append("store_logo", selectedLogo.value);
     const response = await api.post("/vendor/profile/store-logo", data, {
       headers: { "Content-Type": "multipart/form-data" },
-    });
-    if (response.data.success) {
-      Object.assign(profileData, response.data.data);
-      toast.success("Store logo updated!");
-      closeLogoUploadModal();
-    }
+      });
+      if (response.data.success) {
+        Object.assign(profileData, response.data.data);
+        updateLocalProfile(response.data.data);
+        toast.success("Store logo updated!");
+        closeLogoUploadModal();
+      }
   } catch (error) {
     toast.error(error.response?.data?.message || "Failed to upload logo");
   } finally {

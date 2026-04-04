@@ -532,6 +532,10 @@ import { useAssignment } from "../../../../composables/useAssignment";
 
 
 const props = defineProps({
+  id: {
+    type: [String, Number],
+    default: null,
+  },
   /**
    * 'finance'   → renders Finance sidebar, hides Inventory-only actions
    * 'inventory' → renders Inventory sidebar, shows edit/submit actions
@@ -564,7 +568,8 @@ const fetchRequest = async () => {
   loading.value = true;
   error.value = null;
 
-  const requestId = window.history.state?.requestId;
+  const requestId =
+    props.id ?? route.params.id ?? window.history.state?.requestId;
 
   if (!requestId) {
     error.value = "No request selected. Please go back and try again.";
@@ -602,10 +607,11 @@ const editRequest = () => {
     toast.error("You do not have permission to edit funding requests");
     return;
   }
-  const requestId = window.history.state?.requestId;
+  const requestId =
+    props.id ?? route.params.id ?? window.history.state?.requestId;
   router.push({
-    path: "/erp/procurement/inventory/funding-request/edit",
-    state: { requestId },
+    name: "EditFundingRequest",
+    params: { id: requestId },
   });
 };
 
@@ -614,7 +620,8 @@ const submitRequest = async () => {
     toast.error("You do not have permission to submit funding requests");
     return;
   }
-  const requestId = window.history.state?.requestId;
+  const requestId =
+    props.id ?? route.params.id ?? window.history.state?.requestId;
   if (!confirm("Submit this request to Finance?")) return;
   try {
     const { data } = await api.post(

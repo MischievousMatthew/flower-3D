@@ -2,7 +2,10 @@
   <div class="tracking-page" v-if="shipment">
     
     <div class="page-header">
-      <router-link to="/erp/logistics" class="back-link">
+      <router-link
+        to="/erp/procurement/supply-chain/logistics"
+        class="back-link"
+      >
         <svg
           viewBox="0 0 20 20"
           fill="none"

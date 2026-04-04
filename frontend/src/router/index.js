@@ -194,18 +194,21 @@ const routes = [
                   import("../views/ERP/Procurement/Inventory/CreateFundingRequest.vue"),
               },
               {
-                path: "funding-request/edit",
+                path: "funding-request/edit/:id",
                 name: "EditFundingRequest",
                 meta: { requiresInventoryManager: true },
-                props: () => ({}),
+                props: true,
                 component: () =>
                   import("../views/ERP/Procurement/Inventory/EditFundingRequest.vue"),
               },
               {
-                path: "funding-request/details",
+                path: "funding-request/details/:id",
                 name: "FundingRequestDetails",
                 meta: { requiresInventoryManager: true },
-                props: () => ({ context: "inventory" }),
+                props: (route) => ({
+                  id: route.params.id,
+                  context: "inventory",
+                }),
                 component: () =>
                   import("../views/ERP/Procurement/Inventory/FundingRequestDetails.vue"),
               },
@@ -327,8 +330,15 @@ const routes = [
                       import("../views/ERP/Procurement/SupplyChain/Orders/OrderList.vue"),
                   },
                   {
-                    path: "detail",
+                    path: "create",
+                    name: "OrderCreate",
+                    component: () =>
+                      import("../views/ERP/Procurement/SupplyChain/Orders/CreateOrder.vue"),
+                  },
+                  {
+                    path: "detail/:id",
                     name: "OrderDetail",
+                    props: true,
                     component: () =>
                       import("../views/ERP/Procurement/SupplyChain/Orders/OrderDetails.vue"),
                   },

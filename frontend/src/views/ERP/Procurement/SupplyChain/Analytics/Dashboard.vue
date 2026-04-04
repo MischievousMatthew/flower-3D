@@ -14,7 +14,10 @@
           <span class="date-sep">—</span>
           <input type="date" v-model="dateTo" @change="reload" />
         </div>
-        <router-link to="/erp/orders/create" class="btn-primary">
+        <router-link
+          to="/erp/procurement/supply-chain/orders/create"
+          class="btn-primary"
+        >
           <svg viewBox="0 0 20 20" fill="currentColor" width="14">
             <path
               d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
@@ -92,7 +95,9 @@
       <div class="chart-card wide">
         <div class="chart-header">
           <h3>Recent Shipments</h3>
-          <router-link to="/erp/logistics" class="view-all"
+          <router-link
+            to="/erp/procurement/supply-chain/logistics"
+            class="view-all"
             >View All →</router-link
           >
         </div>

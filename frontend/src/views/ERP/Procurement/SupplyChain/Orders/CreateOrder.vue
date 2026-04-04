@@ -2,7 +2,10 @@
   <div class="form-page">
     
     <div class="form-header">
-      <router-link to="/erp/orders" class="back-link">
+      <router-link
+        to="/erp/procurement/supply-chain/orders"
+        class="back-link"
+      >
         <svg
           viewBox="0 0 20 20"
           fill="none"
@@ -146,7 +149,11 @@
           >
             {{ submitting ? "Creating…" : "Create Order" }}
           </button>
-          <router-link to="/erp/orders" class="btn-cancel">Cancel</router-link>
+          <router-link
+            to="/erp/procurement/supply-chain/orders"
+            class="btn-cancel"
+            >Cancel</router-link
+          >
         </div>
       </div>
     </div>
@@ -203,7 +210,10 @@ async function submit() {
   try {
     await orderService.create(form);
     showToast("Purchase order created!");
-    setTimeout(() => router.push("/erp/orders"), 1000);
+    setTimeout(
+      () => router.push("/erp/procurement/supply-chain/orders"),
+      1000,
+    );
   } catch (e) {
     Object.assign(errors, e?.errors || {});
     showToast(e?.message || "Failed to create order", "error");

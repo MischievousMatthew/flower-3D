@@ -326,37 +326,6 @@
                 </div>
               </div>
 
-              <!-- Employee Assignment -->
-              <div class="info-section-compact">
-                <h4>Employee Assignment</h4>
-                <div class="employee-assignment" @click.stop>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      fill="currentColor"
-                      d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
-                    />
-                  </svg>
-                  <select
-                    class="employee-select"
-                    :value="order.assigned_employee_id || ''"
-                    @change="assignEmployee(order.id, $event.target.value)"
-                  >
-                    <option value="">-- Select Employee --</option>
-                    <option
-                      v-for="emp in employees"
-                      :key="emp.id"
-                      :value="emp.id"
-                    >
-                      {{ emp.name }}
-                    </option>
-                  </select>
-                </div>
-              </div>
 
               <!-- Customer Notes -->
               <div v-if="order.customer_notes" class="info-section-compact">
@@ -658,37 +627,6 @@
                 </div>
               </div>
 
-              <!-- Employee Assignment -->
-              <div class="info-section-compact">
-                <h4>Employee Assignment</h4>
-                <div class="employee-assignment" @click.stop>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      fill="currentColor"
-                      d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
-                    />
-                  </svg>
-                  <select
-                    class="employee-select"
-                    :value="order.assigned_employee_id || ''"
-                    @change="assignEmployee(order.id, $event.target.value)"
-                  >
-                    <option value="">-- Select Employee --</option>
-                    <option
-                      v-for="emp in employees"
-                      :key="emp.id"
-                      :value="emp.id"
-                    >
-                      {{ emp.name }}
-                    </option>
-                  </select>
-                </div>
-              </div>
 
               <!-- Customer Notes -->
               <div v-if="order.customer_notes" class="info-section-compact">
@@ -1236,15 +1174,6 @@ const showOrderDetailsModal = ref(false);
 const selectedOrderDetails = ref(null);
 const loadingOrderDetails = ref(false);
 
-// Employee assignment
-const employees = ref([
-  { id: 1, name: "John Doe" },
-  { id: 2, name: "Jane Smith" },
-  { id: 3, name: "Mike Johnson" },
-  { id: 4, name: "Sarah Williams" },
-  { id: 5, name: "Robert Brown" },
-]);
-
 // Notifications
 const notifications = ref([]);
 
@@ -1574,19 +1503,6 @@ function goToToday() {
   loadCalendarOrders();
 }
 
-function assignEmployee(orderId, employeeId) {
-  const order = orders.value.find((o) => o.id === orderId);
-  if (order) {
-    order.assigned_employee_id = employeeId ? parseInt(employeeId) : null;
-    const employee = employees.value.find((e) => e.id === parseInt(employeeId));
-    if (employee) {
-      toast.success(`Order assigned to ${employee.name}`);
-    } else {
-      toast.info("Employee assignment cleared");
-    }
-  }
-}
-
 function show3DModel(item) {
   console.log("=== 3D MODEL DEBUG ===");
   console.log("Full item:", item);
@@ -1825,7 +1741,64 @@ function handleImageError(event) {
 }
 
 function updateOrderStatus(orderId, currentStatus) {
-  toast.info("Status update feature - implement modal here");
+  const nextStatusMap = {
+    pending: "processing",
+    processing: "delivered",
+    delivered: "completed",
+  };
+
+  const nextStatus = nextStatusMap[currentStatus];
+
+  if (!nextStatus) {
+    toast.info(`Order is already ${formatStatus(currentStatus)}`);
+    return;
+  }
+
+  const confirmationMessage = `Mark this order as ${formatStatus(nextStatus)}?`;
+
+  if (!window.confirm(confirmationMessage)) {
+    return;
+  }
+
+  isLoading.value = true;
+  loadingMessage.value = `Updating order to ${formatStatus(nextStatus)}...`;
+
+  api
+    .put(`/vendor/orders/${orderId}/status`, { status: nextStatus })
+    .then(async (response) => {
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || "Failed to update order");
+      }
+
+      const updatedStatus = response.data.data?.new_status || nextStatus;
+
+      orders.value = orders.value.map((order) =>
+        order.id === orderId ? { ...order, status: updatedStatus } : order,
+      );
+
+      if (selectedOrderDetails.value?.id === orderId) {
+        selectedOrderDetails.value = {
+          ...selectedOrderDetails.value,
+          status: updatedStatus,
+        };
+      }
+
+      generateNotifications();
+      await loadCalendarOrders();
+      toast.success(`Order marked as ${formatStatus(updatedStatus)}`);
+    })
+    .catch((error) => {
+      console.error("Error updating vendor order status:", error);
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to update order status",
+      );
+    })
+    .finally(() => {
+      isLoading.value = false;
+      loadingMessage.value = "";
+    });
 }
 
 onMounted(async () => {
@@ -2583,35 +2556,6 @@ onMounted(async () => {
   color: #48bb78;
   font-weight: 600;
   margin: 0;
-}
-
-.employee-assignment {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: #f9fafb;
-  border-radius: 8px;
-}
-
-.employee-assignment svg {
-  color: #48bb78;
-  flex-shrink: 0;
-}
-
-.employee-select {
-  flex: 1;
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-  background: white;
-}
-
-.employee-select:focus {
-  outline: none;
-  border-color: #48bb78;
 }
 
 .customer-notes {

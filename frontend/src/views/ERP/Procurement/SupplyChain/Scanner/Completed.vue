@@ -98,7 +98,10 @@
             <td>
               <div class="order-num-cell">
                 <div class="done-check">✓</div>
-                <router-link :to="`/erp/orders/${o.id}`" class="order-link">{{
+                <router-link
+                  :to="`/erp/procurement/supply-chain/orders/detail/${o.id}`"
+                  class="order-link"
+                  >{{
                   o.order_number
                 }}</router-link>
               </div>
@@ -114,7 +117,7 @@
             <td class="muted">{{ formatDate(o.updated_at) }}</td>
             <td>
               <router-link
-                :to="`/erp/orders/${o.id}`"
+                  :to="`/erp/procurement/supply-chain/orders/detail/${o.id}`"
                 class="action-btn"
                 title="View"
               >
@@ -183,7 +186,10 @@
               {{ formatDate(s.received_date || s.updated_at) }}
             </td>
             <td>
-              <router-link :to="`/erp/logistics/${s.id}`" class="action-btn">
+              <router-link
+                :to="`/erp/procurement/supply-chain/logistics/${s.id}`"
+                class="action-btn"
+              >
                 <svg
                   viewBox="0 0 20 20"
                   fill="none"

@@ -55,7 +55,10 @@
           </tr>
           <tr v-for="s in shipments" :key="s.id" class="data-row">
             <td>
-              <router-link :to="`/erp/logistics/${s.id}`" class="tracking-link">
+              <router-link
+                :to="`/erp/procurement/supply-chain/logistics/${s.id}`"
+                class="tracking-link"
+              >
                 <svg
                   viewBox="0 0 20 20"
                   fill="none"
@@ -89,7 +92,7 @@
             <td>
               <div class="action-cell">
                 <router-link
-                  :to="`/erp/logistics/${s.id}`"
+                  :to="`/erp/procurement/supply-chain/logistics/${s.id}`"
                   class="action-btn"
                   title="Track"
                 >

@@ -40,7 +40,7 @@ class VendorOrdersController extends Controller
             $validator = Validator::make($request->all(), [
                 'date_from' => 'nullable|date',
                 'date_to' => 'nullable|date|after_or_equal:date_from',
-                'status' => 'nullable|in:pending,processing,completed,cancelled,failed',
+                'status' => 'nullable|in:pending,processing,delivered,completed,cancelled,refunded,failed',
                 'payment_status' => 'nullable|in:unpaid,paid,refunded,failed',
                 'sort_by' => 'nullable|in:reservation_date,created_at,total_amount,status',
                 'sort_order' => 'nullable|in:asc,desc',
@@ -302,8 +302,10 @@ class VendorOrdersController extends Controller
                 'status_breakdown' => [
                     'pending' => $orders->where('status', 'pending')->count(),
                     'processing' => $orders->where('status', 'processing')->count(),
+                    'delivered' => $orders->where('status', 'delivered')->count(),
                     'completed' => $orders->where('status', 'completed')->count(),
                     'cancelled' => $orders->where('status', 'cancelled')->count(),
+                    'refunded' => $orders->where('status', 'refunded')->count(),
                     'failed' => $orders->where('status', 'failed')->count(),
                 ],
                 'payment_status_breakdown' => [
@@ -576,7 +578,7 @@ class VendorOrdersController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'status' => 'required|in:pending,processing,completed,cancelled,refunded',
+                'status' => 'required|in:pending,processing,delivered,completed,cancelled,refunded',
             ]);
  
             if ($validator->fails()) {
@@ -607,17 +609,42 @@ class VendorOrdersController extends Controller
                 ], 404);
             }
  
-            $oldStatus = $order->status;
-            $newStatus = $request->status;
- 
-            // Route through model helpers so finance/stock logic fires automatically
-            if ($newStatus === 'completed' && $oldStatus !== 'completed') {
-                // Deducts stock + credits vendor balance + writes ledger entry
-                $order->markAsCompleted();
- 
-            } elseif ($newStatus === 'refunded' && $oldStatus !== 'refunded') {
-                // Debits vendor balance + writes refund ledger entry
-                $order->markAsRefunded();
+              $oldStatus = $order->status;
+              $newStatus = $request->status;
+
+              $allowedTransitions = [
+                  'pending' => ['processing', 'cancelled'],
+                  'processing' => ['delivered', 'completed', 'cancelled'],
+                  'delivered' => ['completed', 'refunded'],
+                  'completed' => ['refunded'],
+                  'cancelled' => [],
+                  'refunded' => [],
+              ];
+
+              if ($oldStatus !== $newStatus) {
+                  $permitted = $allowedTransitions[$oldStatus] ?? [];
+
+                  if (! in_array($newStatus, $permitted, true)) {
+                      return response()->json([
+                          'success' => false,
+                          'message' => "Cannot update order from {$oldStatus} to {$newStatus}",
+                      ], 422);
+                  }
+              }
+
+              // Route through model helpers so finance/stock logic fires automatically
+              if ($newStatus === 'completed' && $oldStatus !== 'completed') {
+                  // Deducts stock + credits vendor balance + writes ledger entry
+                  $order->markAsCompleted();
+
+              } elseif ($newStatus === 'delivered' && $oldStatus !== 'delivered') {
+                  $order->delivered_at = now();
+                  $order->status = 'delivered';
+                  $order->save();
+
+              } elseif ($newStatus === 'refunded' && $oldStatus !== 'refunded') {
+                  // Debits vendor balance + writes refund ledger entry
+                  $order->markAsRefunded();
  
             } else {
                 // Simple status change — no financial side-effects

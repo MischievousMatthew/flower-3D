@@ -342,8 +342,8 @@ const goToCreate = () =>
 const viewRequest = (id) => {
   selectedRequestId.value = id;
   router.push({
-    path: "/erp/procurement/inventory/funding-request/details",
-    state: { requestId: id },
+    name: "FundingRequestDetails",
+    params: { id },
   });
 };
 
@@ -354,8 +354,8 @@ const editRequest = (id) => {
   }
   openMenuId.value = null;
   router.push({
-    path: "/erp/procurement/inventory/funding-request/edit",
-    state: { requestId: id },
+    name: "EditFundingRequest",
+    params: { id },
   });
 };
 

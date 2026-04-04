@@ -515,6 +515,13 @@ import api from "../../../../plugins/axios";
 import { toast } from "vue3-toastify";
 import { useAssignment } from "../../../../composables/useAssignment";
 
+const props = defineProps({
+  id: {
+    type: [String, Number],
+    default: null,
+  },
+});
+
 const router = useRouter();
 const route = useRoute();
 const { canEdit } = useAssignment();
@@ -524,7 +531,9 @@ const loading = ref(false);
 const error = ref(null);
 const submitting = ref(false);
 const canEditFunding = computed(() => canEdit("inventory_funding"));
-const requestId = window.history.state?.requestId ?? route.params.id;
+const requestId = computed(
+  () => props.id ?? route.params.id ?? window.history.state?.requestId,
+);
 
 const formData = ref({
   approver_id: "",
@@ -578,7 +587,7 @@ const fetchRequest = async () => {
   error.value = null;
   try {
     const { data } = await api.get(
-      `/procurement/inventory/funding-requests/${requestId}`,
+      `/procurement/inventory/funding-requests/${requestId.value}`,
     );
     if (data.success) {
       const r = data.data;
@@ -637,13 +646,13 @@ const handleSubmit = async () => {
   submitting.value = true;
   try {
     const { data } = await api.put(
-      `/procurement/inventory/funding-requests/${requestId}`,
+      `/procurement/inventory/funding-requests/${requestId.value}`,
       { ...formData.value, is_draft: false },
     );
     if (data.success) {
       toast.success(data.message);
       const submitResult = await api.post(
-        `/procurement/inventory/funding-requests/${requestId}/submit`,
+        `/procurement/inventory/funding-requests/${requestId.value}/submit`,
       );
       if (submitResult.data.success)
         toast.success("Request submitted to Finance");
@@ -668,7 +677,7 @@ const saveAsDraft = async () => {
   submitting.value = true;
   try {
     const { data } = await api.put(
-      `/procurement/inventory/funding-requests/${requestId}`,
+      `/procurement/inventory/funding-requests/${requestId.value}`,
       formData.value,
     );
     if (data.success) {
