@@ -438,7 +438,7 @@ class CheckoutController extends Controller
                 DB::commit();
 
                 // Handle payment
-                if (in_array($paymentMethod, ['gcash', 'maya', 'card'])) {
+                if (in_array($paymentMethod, ['gcash', 'maya', 'card', 'bank_transfer'], true)) {
                     $paymentResponse = $this->createPayMongoPayment($order, $paymentMethod);
                     
                     if ($paymentResponse['success']) {
@@ -582,6 +582,7 @@ class CheckoutController extends Controller
             'gcash' => 'gcash',
             'maya' => 'paymaya',
             'card' => 'card',
+            'bank_transfer' => 'dob',
             default => null,
         };
 
