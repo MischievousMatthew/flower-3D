@@ -1392,7 +1392,18 @@ const addToCartModal = async () => {
     imageEl: selectedProductImageRef.value,
   });
 };
-const addToCartDirect = async (product, qty = 1, animationContext = {}) => {
+const addToCartDirect = async (
+  product,
+  qtyOrAnimationContext = 1,
+  animationContext = {},
+) => {
+  const qty =
+    typeof qtyOrAnimationContext === "number" ? qtyOrAnimationContext : 1;
+  const resolvedAnimationContext =
+    typeof qtyOrAnimationContext === "number"
+      ? animationContext
+      : (qtyOrAnimationContext ?? {});
+
   if (!isAuthenticated.value) {
     requireAuth("addToCart", product, qty);
     return false;
@@ -1408,7 +1419,7 @@ const addToCartDirect = async (product, qty = 1, animationContext = {}) => {
       customizations: {},
     });
     if (r.success) {
-      await flyToCart(animationContext.imageEl);
+      await flyToCart(resolvedAnimationContext.imageEl);
       if (navHeaderRef.value) navHeaderRef.value.triggerCartPulse();
       toast.success(`${product.product_name} added to cart!`, {
         autoClose: 2000,
