@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\QueryException;
 use App\Helpers\CloudinaryHelper;
 use Illuminate\Support\Facades\Validator;
 use App\Models\Employee;
@@ -320,6 +321,38 @@ class EmployeeInfoController extends Controller
                 'data' => $employeeInfo
             ], 201);
 
+        } catch (QueryException $e) {
+            DB::rollBack();
+
+            if (!empty($uploadedAvatarId)) {
+                CloudinaryHelper::destroy($uploadedAvatarId);
+            }
+
+            if ($this->isEmploymentStatusConstraintViolation($e)) {
+                Log::warning('Employee info employment status constraint mismatch', [
+                    'error' => $e->getMessage(),
+                    'employment_status' => $request->input('employment_status'),
+                    'owner_id' => $this->getOwnerId(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employment status configuration is out of sync. Please try again after the latest backend migration is deployed.',
+                    'errors' => [
+                        'employment_status' => ['The selected employment status is not currently allowed by the database.'],
+                    ],
+                ], 422);
+            }
+
+            Log::error('Error creating employee info: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create employee record',
+                'error' => config('app.debug') ? $e->getMessage() : null
+            ], 500);
         } catch (\Exception $e) {
             DB::rollBack();
 
@@ -582,6 +615,39 @@ class EmployeeInfoController extends Controller
                 'success' => false,
                 'message' => 'Employee record not found'
             ], 404);
+        } catch (QueryException $e) {
+            DB::rollBack();
+
+            if (!empty($uploadedAvatarId)) {
+                CloudinaryHelper::destroy($uploadedAvatarId);
+            }
+
+            if ($this->isEmploymentStatusConstraintViolation($e)) {
+                Log::warning('Employee update employment status constraint mismatch', [
+                    'error' => $e->getMessage(),
+                    'employment_status' => $request->input('employment_status'),
+                    'employee_info_id' => $id,
+                    'owner_id' => $this->getOwnerId(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employment status configuration is out of sync. Please try again after the latest backend migration is deployed.',
+                    'errors' => [
+                        'employment_status' => ['The selected employment status is not currently allowed by the database.'],
+                    ],
+                ], 422);
+            }
+
+            Log::error('Error updating employee info: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update employee record',
+                'error' => config('app.debug') ? $e->getMessage() : null
+            ], 500);
         } catch (\Exception $e) {
             DB::rollBack();
 
@@ -736,6 +802,14 @@ class EmployeeInfoController extends Controller
             ->value('id');
 
         return $employeeId ? (int) $employeeId : null;
+    }
+
+    private function isEmploymentStatusConstraintViolation(QueryException $e): bool
+    {
+        $message = $e->getMessage();
+
+        return str_contains($message, 'employees_info_employment_status_check')
+            || str_contains($message, 'employment_status');
     }
 
     /**
