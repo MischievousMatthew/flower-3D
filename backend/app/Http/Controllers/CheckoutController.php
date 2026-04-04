@@ -209,7 +209,7 @@ class CheckoutController extends Controller
             $user = Auth::user();
 
             $validator = Validator::make($request->all(), [
-                'payment_method' => 'required|in:bank_transfer,gcash,maya,cod,card',
+                'payment_method' => 'required|in:bank_transfer,gcash,maya,paymaya,cod,card',
                 'delivery_address' => 'required|string',
                 'contact_number' => 'required|string',
                 'delivery_notes' => 'nullable|string',
@@ -392,7 +392,7 @@ class CheckoutController extends Controller
                 }
 
                 $total = $subtotal;
-                $paymentMethod = $request->payment_method;
+                $paymentMethod = $this->normalizePaymentMethod($request->payment_method);
 
                 // Create order with CORRECT reservation date (Y-m-d format)
                 $order = Order::create([
@@ -422,9 +422,31 @@ class CheckoutController extends Controller
                 ]);
 
                 // Create order items with 3D model references
+                $timestamp = now();
+                $orderItems = [];
+
                 foreach ($itemsData as $itemData) {
-                    $order->items()->create($itemData);
+                    $orderItems[] = [
+                        'order_id' => $order->id,
+                        'product_id' => $itemData['product_id'],
+                        'product_name' => $itemData['product_name'],
+                        'product_description' => $itemData['product_description'] ?? null,
+                        'product_image' => $itemData['product_image'] ?? null,
+                        'quantity' => $itemData['quantity'],
+                        'unit_price' => $itemData['unit_price'],
+                        'subtotal' => $itemData['subtotal'],
+                        'color' => $itemData['color'] ?? null,
+                        'size' => $itemData['size'] ?? null,
+                        'notes' => $itemData['notes'] ?? null,
+                        'customizations' => json_encode($itemData['customizations'] ?? []),
+                        'model_3d_path' => $itemData['model_3d_path'] ?? null,
+                        'model_3d_url' => $itemData['model_3d_url'] ?? null,
+                        'created_at' => $timestamp,
+                        'updated_at' => $timestamp,
+                    ];
                 }
+
+                DB::table('order_items')->insert($orderItems);
 
                 // Update reservation cache
                 ReservationAvailabilityCache::updateForDate($vendorId, $reservationDate->toDateString());
@@ -593,6 +615,7 @@ class CheckoutController extends Controller
      */
     private function createPayMongoPayment(Order $order, string $paymentMethod)
     {
+        $paymentMethod = $this->normalizePaymentMethod($paymentMethod);
         $secretKey = $this->getPayMongoSecretKey();
 
         if (!$secretKey) {
@@ -1138,6 +1161,14 @@ class CheckoutController extends Controller
     private function getPayMongoSecretKey(): ?string
     {
         return config('services.paymongo.secret_key') ?: env('PAYMONGO_SECRET_KEY');
+    }
+
+    private function normalizePaymentMethod(?string $paymentMethod): ?string
+    {
+        return match ($paymentMethod) {
+            'paymaya' => 'maya',
+            default => $paymentMethod,
+        };
     }
 
     private function hasPayMongoConfiguration(): bool
