@@ -455,7 +455,7 @@
                     </div>
                   </div>
                   <div class="ro-group">
-                    <label class="ro-label">Lead Time</label>
+                    <label class="ro-label">Preparation Time</label>
                     <div class="ro-value">
                       {{
                         selectedProduct.supplier_lead_time
@@ -945,14 +945,18 @@
                     />
                   </div>
                   <div class="form-group">
-                    <label class="form-label">Lead Time (Days)</label>
+                    <label class="form-label">Preparation Time (Days Only)</label>
                     <input
-                      v-model.number="editFormData.supplier_lead_time"
+                      v-model.number="editFormData.preparation_days"
                       type="number"
                       min="0"
+                      step="1"
                       class="form-input"
                       placeholder="0"
                     />
+                    <span v-if="editErrors.preparation_days" class="error-text">{{
+                      editErrors.preparation_days
+                    }}</span>
                   </div>
                 </div>
               </div>
@@ -1246,7 +1250,7 @@ const editFormData = reactive({
   supplier_name: "",
   supplier_contact: "",
   supplier_sku: "",
-  supplier_lead_time: null,
+  preparation_days: 0,
   care_instructions: "",
   occasion_tags: [],
   notes: "",
@@ -1551,9 +1555,7 @@ const populateEditForm = (p) => {
     supplier_name: p.supplier_name || "",
     supplier_contact: p.supplier_contact || "",
     supplier_sku: p.supplier_sku || "",
-    supplier_lead_time: p.supplier_lead_time
-      ? parseInt(p.supplier_lead_time)
-      : null,
+    preparation_days: Number(p.preparation_days ?? p.supplier_lead_time ?? 0),
     care_instructions: p.care_instructions || "",
     occasion_tags: tags,
     notes: p.notes || "",
@@ -1669,6 +1671,16 @@ const validateEditForm = () => {
         "Discount price must be less than selling price";
       isValid = false;
     }
+  }
+
+  if (
+    !Number.isInteger(Number(editFormData.preparation_days)) ||
+    Number(editFormData.preparation_days) < 0 ||
+    Number(editFormData.preparation_days) > 365
+  ) {
+    editErrors.preparation_days =
+      "Preparation time must be a whole number of days between 0 and 365";
+    isValid = false;
   }
 
   if (!isValid) {

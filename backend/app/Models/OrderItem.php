@@ -27,7 +27,6 @@ class OrderItem extends Model
         'model_3d_url',
         'vendor_id', // Store vendor ID at purchase time
         'product_data_snapshot', // JSON snapshot of all product data
-        'preparation_time', // Store preparation time
     ];
 
     protected $casts = [
@@ -36,7 +35,6 @@ class OrderItem extends Model
         'quantity' => 'integer',
         'customizations' => 'array',
         'product_data_snapshot' => 'array',
-        'preparation_time' => 'integer',
     ];
 
     // Relationships
@@ -135,7 +133,7 @@ class OrderItem extends Model
             'price' => (float) ($product->discount_price ?: $product->selling_price),
             'original_price' => (float) $product->selling_price,
             'discount_price' => $product->discount_price ? (float) $product->discount_price : null,
-            'preparation_time' => $product->preparation_time ?? 0,
+            'preparation_time' => (int) ($product->preparation_time ?? $product->supplier_lead_time ?? 0),
             'category' => $product->category,
             'flower_type' => $product->flower_type,
             'weight' => $product->weight,

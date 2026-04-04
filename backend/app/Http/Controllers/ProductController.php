@@ -178,7 +178,8 @@ class ProductController extends Controller
                 'supplier_name'          => 'nullable|string|max:255',
                 'supplier_contact'       => 'nullable|string|max:100',
                 'supplier_sku'           => 'nullable|string|max:255',
-                'supplier_lead_time'     => 'nullable|integer|min:0',
+                'preparation_days'       => 'required|integer|min:0|max:365',
+                'supplier_lead_time'     => 'nullable|integer|min:0|max:365',
                 'care_instructions'      => 'nullable|string',
                 'occasion_tags'          => 'nullable|array|max:2',
                 'occasion_tags.*'        => 'string',
@@ -308,7 +309,8 @@ class ProductController extends Controller
                 'supplier_name'          => 'nullable|string|max:255',
                 'supplier_contact'       => 'nullable|string|max:100',
                 'supplier_sku'           => 'nullable|string|max:255',
-                'supplier_lead_time'     => 'nullable|integer|min:0',
+                'preparation_days'       => 'nullable|integer|min:0|max:365',
+                'supplier_lead_time'     => 'nullable|integer|min:0|max:365',
                 'care_instructions'      => 'nullable|string',
                 'occasion_tags'          => 'nullable|array|max:2',
                 'notes'                  => 'nullable|string',
@@ -727,6 +729,11 @@ class ProductController extends Controller
                 $payload[$field] = null;
             }
         }
+
+        $rawPreparationDays = $payload['preparation_days'] ?? $payload['supplier_lead_time'] ?? 0;
+        $normalizedPreparationDays = max(0, (int) $rawPreparationDays);
+        $payload['preparation_days'] = $normalizedPreparationDays;
+        $payload['supplier_lead_time'] = $normalizedPreparationDays;
 
         return $payload;
     }

@@ -17,6 +17,7 @@ class VendorApplication extends Model
 {
     use HasFactory;
 
+    public const SAME_DAY_CUTOFF_TIME = '17:00';
     public const RESERVATION_TIMEZONE = 'Asia/Manila';
 
     protected $fillable = [
@@ -444,7 +445,7 @@ class VendorApplication extends Model
             : Carbon::now(self::RESERVATION_TIMEZONE);
 
         $sameDayDelivery      = (bool) ($application?->same_day_delivery ?? false);
-        $leadTimeDays         = $application?->reservationLeadTimeDays() ?? ($sameDayDelivery ? 0 : 3);
+        $leadTimeDays         = $application?->reservationLeadTimeDays() ?? 0;
         $maxOrdersPerDay      = max(1, (int) ($application?->max_orders_per_day ?? 10));
         $cutoffTimeToday      = $application?->cutoffTimeForDate($now);
         $sameDayCutoffReached = $sameDayDelivery
@@ -467,7 +468,7 @@ class VendorApplication extends Model
         $leadTime = strtolower(trim((string) $this->lead_time));
 
         if ($leadTime === '') {
-            return $this->same_day_delivery ? 0 : 3;
+            return 0;
         }
 
         if (str_contains($leadTime, 'same') && str_contains($leadTime, 'day')) {
@@ -482,23 +483,16 @@ class VendorApplication extends Model
             return max(0, (int) ceil($value));
         }
 
-        return $this->same_day_delivery ? 0 : 3;
+        return 0;
     }
 
     public function cutoffTimeForDate(CarbonInterface $date): ?string
     {
-        $dayName = Carbon::instance($date)->setTimezone(self::RESERVATION_TIMEZONE)->englishDayOfWeek;
-
-        foreach ((array) ($this->cutoff_times ?? []) as $cutoff) {
-            $cutoffDay  = data_get($cutoff, 'day');
-            $cutoffTime = data_get($cutoff, 'time');
-
-            if ($cutoffDay === $dayName && is_string($cutoffTime) && preg_match('/^\d{2}:\d{2}$/', $cutoffTime)) {
-                return $cutoffTime;
-            }
+        if (!$this->same_day_delivery) {
+            return null;
         }
 
-        return null;
+        return self::SAME_DAY_CUTOFF_TIME;
     }
 
     public function isSameDayCutoffReached(?CarbonInterface $referenceNow = null): bool

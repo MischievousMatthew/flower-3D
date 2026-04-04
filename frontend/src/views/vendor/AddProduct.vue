@@ -455,15 +455,21 @@
                 />
               </div>
               <div class="form-group">
-                <label class="form-label">Lead Time (Days)</label>
+                <label class="form-label">Preparation Time (Days Only)</label>
                 <input
-                  v-model.number="formData.supplier_lead_time"
+                  v-model.number="formData.preparation_days"
                   type="number"
                   min="0"
+                  step="1"
                   placeholder="0"
                   class="form-input"
+                  :class="{ 'is-invalid': errors.preparation_days }"
+                  @input="clearError('preparation_days')"
                 />
-                <span class="hint-text">Time to receive from supplier</span>
+                <span v-if="errors.preparation_days" class="error-text">{{
+                  errors.preparation_days
+                }}</span>
+                <span class="hint-text">Preparation starts tomorrow. Use whole days only.</span>
               </div>
             </div>
           </div>
@@ -716,7 +722,7 @@ const formData = reactive({
   supplier_name: "",
   supplier_contact: "",
   supplier_sku: "",
-  supplier_lead_time: null,
+  preparation_days: 0,
   care_instructions: "",
   occasion_tags: [],
   notes: "",
@@ -960,6 +966,17 @@ const validateForm = () => {
     isValid = false;
   }
 
+  if (
+    !Number.isInteger(Number(formData.preparation_days)) ||
+    Number(formData.preparation_days) < 0 ||
+    Number(formData.preparation_days) > 365
+  ) {
+    errors.preparation_days =
+      "Preparation time must be a whole number of days between 0 and 365";
+    isValid = false;
+    if (!firstError) firstError = "preparation_days";
+  }
+
   if (productImages.value.length === 0) {
     errors.images = "At least one product image is required";
     isValid = false;
@@ -1038,10 +1055,10 @@ const submitProduct = async () => {
       "supplier_name",
       "supplier_contact",
       "supplier_sku",
-      "supplier_lead_time",
-      "care_instructions",
-      "notes",
-      "status",
+        "preparation_days",
+        "care_instructions",
+        "notes",
+        "status",
     ];
 
     scalarFields.forEach((key) => {

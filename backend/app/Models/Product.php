@@ -43,6 +43,7 @@ class Product extends Model
         'supplier_name',
         'supplier_contact',
         'supplier_sku',
+        'preparation_days',
         'supplier_lead_time',
 
         // Product attributes
@@ -70,6 +71,8 @@ class Product extends Model
         'selling_price'          => 'decimal:2',
         'discount_price'         => 'decimal:2',
         'occasion_tags'          => 'array',
+        'preparation_days'       => 'integer',
+        'supplier_lead_time'     => 'integer',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────────
@@ -119,6 +122,25 @@ class Product extends Model
     public function getWarehouseQtyAttribute(): int
     {
         return $this->activeBatches()->sum('qty_remaining');
+    }
+
+    public function getPreparationDaysAttribute($value): int
+    {
+        return max(0, (int) ($value ?? $this->attributes['supplier_lead_time'] ?? 0));
+    }
+
+    public function setPreparationDaysAttribute($value): void
+    {
+        $normalized = max(0, (int) $value);
+        $this->attributes['preparation_days'] = $normalized;
+        $this->attributes['supplier_lead_time'] = $normalized;
+    }
+
+    public function setSupplierLeadTimeAttribute($value): void
+    {
+        $normalized = max(0, (int) $value);
+        $this->attributes['supplier_lead_time'] = $normalized;
+        $this->attributes['preparation_days'] = $normalized;
     }
 
     public function hasExpiringBatch(int $days = 3): bool

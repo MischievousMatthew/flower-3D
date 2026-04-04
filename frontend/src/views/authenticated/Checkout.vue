@@ -738,25 +738,29 @@ const todayLegendText = computed(() =>
 
 const vendorReservationNotice = computed(() => {
   const parts = [];
-  const prepDays = preparationDays.value;
-  const prepText =
-    prepDays === 1 ? "1 day preparation time." : `${prepDays} days preparation time.`;
+  const leadDays = leadTimeDays.value;
 
   parts.push(
     `Vendor capacity: ${vendorReservationSettings.value.maxOrdersPerDay} orders per day.`,
   );
-  parts.push(prepText);
+  if (leadDays === 0) {
+    parts.push("No lead time required for future dates.");
+  } else if (leadDays === 1) {
+    parts.push("1 day lead time (starts tomorrow).");
+  } else {
+    parts.push(`${leadDays} days lead time (starts tomorrow).`);
+  }
   parts.push(
-    `Available dates start after ${leadTimeDays.value} ${leadTimeDays.value === 1 ? "day" : "days"} prep time.`,
+    `Earliest future delivery date is after ${leadDays} ${leadDays === 1 ? "day" : "days"} from tomorrow.`,
   );
 
   if (vendorReservationSettings.value.sameDayDelivery) {
-    if (vendorReservationSettings.value.cutoffTimeToday) {
+    if (vendorReservationSettings.value.sameDayAvailableToday) {
       parts.push(
         `Same-day delivery is available until ${formatCutoffTime(vendorReservationSettings.value.cutoffTimeToday)} PH time.`,
       );
     } else {
-      parts.push("Same-day delivery is available.");
+      parts.push("Same-day delivery is not available for today.");
     }
   } else {
     parts.push("Same-day delivery is not available.");
@@ -814,9 +818,7 @@ const calendarDays = computed(() => {
   const today = getPhilippinesToday();
 
   const minDate = new Date(today);
-  if (!vendorReservationSettings.value.sameDayAvailableToday) {
-    minDate.setDate(minDate.getDate() + leadTimeDays.value);
-  }
+  minDate.setDate(minDate.getDate() + leadTimeDays.value + 1);
 
   // Calculate max date (3 months from today)
   const maxDate = new Date(today);
@@ -900,7 +902,7 @@ function createDayObject(date, isCurrentMonth, today, minDate, maxDate) {
     colorClass = "day-prep-time";
     label = isSameDayCutoffBlocked
       ? "Cutoff"
-      : `${leadTimeDays.value} Day${leadTimeDays.value === 1 ? "" : "s"} Prep`;
+      : "Prep Time";
   } else if (availability) {
     if (availability.is_disabled || availability.status === "closed") {
       colorClass = "day-disabled";
@@ -958,7 +960,7 @@ function selectDate(day) {
       );
     } else if (day.isToday || day.isWithinLeadTime) {
       toast.error(
-        `Flowers require ${leadTimeDays.value} ${leadTimeDays.value === 1 ? "day" : "days"} preparation time. Please select a date at least ${leadTimeDays.value} ${leadTimeDays.value === 1 ? "day" : "days"} from today.`,
+        `Preparation starts tomorrow. Please select a date at least ${leadTimeDays.value} ${leadTimeDays.value === 1 ? "day" : "days"} from today.`,
       );
     } else if (day.isPastDate) {
       toast.error("Cannot select past dates.");
@@ -985,15 +987,14 @@ async function loadCalendarData() {
         vendor_id: checkoutData.value.vendor?.id,
         start_date: startDate,
         end_date: endDate,
-        prep_days: preparationDays.value,
       },
     });
 
     if (res.data.success) {
       calendarData.value = res.data.data.calendar || {};
       const vendor = res.data.data.vendor || {};
-      leadTimeDays.value = Number(vendor.lead_time_days ?? 3);
-      preparationDays.value = Number(vendor.preparation_days ?? preparationDays.value);
+      leadTimeDays.value = Number(vendor.lead_time_days ?? 0);
+      preparationDays.value = leadTimeDays.value;
       vendorReservationSettings.value = {
         timezone: vendor.timezone || PH_TIMEZONE,
         sameDayDelivery: Boolean(vendor.same_day_delivery),
@@ -1053,13 +1054,9 @@ async function loadCheckoutData() {
       if (response.data.success) {
         checkoutData.value = response.data.data;
         preparationDays.value = Number(
-          checkoutData.value.summary?.preparation_days ??
-            Math.max(
-              0,
-              ...(checkoutData.value.items || []).map((item) =>
-                Number(item.preparation_days ?? 0),
-              ),
-            ),
+          checkoutData.value.summary?.lead_time_days ??
+            checkoutData.value.vendor?.lead_time_days ??
+            0,
         );
       } else {
         toast.error("Failed to load direct checkout data");
@@ -1081,13 +1078,9 @@ async function loadCheckoutData() {
       if (response.data.success) {
         checkoutData.value = response.data.data;
         preparationDays.value = Number(
-          checkoutData.value.summary?.preparation_days ??
-            Math.max(
-              0,
-              ...(checkoutData.value.items || []).map((item) =>
-                Number(item.preparation_days ?? 0),
-              ),
-            ),
+          checkoutData.value.summary?.lead_time_days ??
+            checkoutData.value.vendor?.lead_time_days ??
+            0,
         );
       } else {
         toast.error("Failed to load checkout data");

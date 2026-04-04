@@ -23,7 +23,6 @@ class ReservationController extends Controller
                 'vendor_id' => 'required|exists:users,id',
                 'start_date' => 'nullable|date',
                 'end_date' => 'nullable|date|after_or_equal:start_date',
-                'prep_days' => 'nullable|integer|min:0|max:365',
             ]);
 
             if ($validator->fails()) {
@@ -36,10 +35,7 @@ class ReservationController extends Controller
             $vendorId = $request->vendor_id;
             $vendor = User::find($vendorId);
             $vendorApplication = VendorApplication::findApprovedForVendorUser($vendor);
-            $settings = $this->applyPreparationLeadTime(
-                VendorApplication::buildReservationSettings($vendor, $vendorApplication),
-                (int) $request->input('prep_days', 0)
-            );
+            $settings = VendorApplication::buildReservationSettings($vendor, $vendorApplication);
             
             if (!$vendor) {
                 return response()->json([
@@ -126,7 +122,6 @@ class ReservationController extends Controller
                         'max_orders_per_day' => $settings['max_orders_per_day'],
                         'default_delivery_fee' => $vendor->default_delivery_fee ?? 0,
                         'lead_time_days' => $settings['lead_time_days'],
-                        'preparation_days' => $settings['preparation_days'],
                         'same_day_delivery' => $settings['same_day_delivery'],
                         'same_day_available_today' => $settings['same_day_available_today'],
                         'cutoff_time_today' => $settings['cutoff_time_today'],
@@ -164,7 +159,6 @@ class ReservationController extends Controller
             $validator = Validator::make($request->all(), [
                 'vendor_id' => 'required|exists:users,id',
                 'reservation_date' => 'required|date_format:Y-m-d',
-                'prep_days' => 'nullable|integer|min:0|max:365',
             ]);
 
             if ($validator->fails()) {
@@ -179,10 +173,7 @@ class ReservationController extends Controller
 
             $vendor = User::find($vendorId);
             $vendorApplication = VendorApplication::findApprovedForVendorUser($vendor);
-            $settings = $this->applyPreparationLeadTime(
-                VendorApplication::buildReservationSettings($vendor, $vendorApplication),
-                (int) $request->input('prep_days', 0)
-            );
+            $settings = VendorApplication::buildReservationSettings($vendor, $vendorApplication);
             if (!$vendor) {
                 return response()->json([
                     'success' => false,
@@ -263,7 +254,6 @@ class ReservationController extends Controller
                 'max_orders' => $maxOrders,
                 'remaining_slots' => max(0, $maxOrders - $ordersCount),
                 'lead_time_days' => $settings['lead_time_days'],
-                'preparation_days' => $settings['preparation_days'],
                 'same_day_delivery' => $settings['same_day_delivery'],
                 'cutoff_time_today' => $settings['cutoff_time_today'],
                 'message' => $available ? 'Date is available' : 'Date is fully booked'
@@ -421,7 +411,7 @@ class ReservationController extends Controller
     {
         return $settings['same_day_available_today']
             ? $today->copy()
-            : $today->copy()->addDays($settings['lead_time_days']);
+            : $today->copy()->addDays(((int) ($settings['lead_time_days'] ?? 0)) + 1);
     }
 
     private function isWithinLeadTime(Carbon $date, Carbon $today, array $settings): bool
@@ -434,7 +424,7 @@ class ReservationController extends Controller
             return !$settings['same_day_available_today'];
         }
 
-        $minDate = $today->copy()->addDays($settings['lead_time_days']);
+        $minDate = $today->copy()->addDays(((int) ($settings['lead_time_days'] ?? 0)) + 1);
 
         return $date->lessThan($minDate);
     }
@@ -444,19 +434,5 @@ class ReservationController extends Controller
         return $date->isSameDay($today)
             && $settings['same_day_delivery']
             && $settings['same_day_cutoff_reached'];
-    }
-
-    private function applyPreparationLeadTime(array $settings, int $preparationDays): array
-    {
-        $effectiveLeadTime = max((int) ($settings['lead_time_days'] ?? 0), $preparationDays);
-        $sameDayAvailable = ($settings['same_day_delivery'] ?? false)
-            && $effectiveLeadTime === 0
-            && !($settings['same_day_cutoff_reached'] ?? true);
-
-        $settings['lead_time_days'] = $effectiveLeadTime;
-        $settings['preparation_days'] = $preparationDays;
-        $settings['same_day_available_today'] = $sameDayAvailable;
-
-        return $settings;
     }
 }

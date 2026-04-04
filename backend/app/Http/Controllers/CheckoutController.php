@@ -141,13 +141,10 @@ class CheckoutController extends Controller
                     'customizations' => $cartItem->customizations,
                     'model_3d_url' => $model3d?->model_url,
                     'model_3d_path' => $model3d?->model_path,
-                    'preparation_days' => $this->resolveProductPreparationDays($cartItem->product),
                 ];
             }
 
             $totalAmount = $subtotal;
-            $preparationDays = $this->resolvePreparationDays($cartItems);
-
             // Payment methods
             $paymentMethods = $this->getAvailablePaymentMethods($vendorApplication);
 
@@ -166,8 +163,7 @@ class CheckoutController extends Controller
                     'email' => $vendorApplication->email ?? '',
                     'max_orders_per_day' => $vendorApplication?->max_orders_per_day ?? 10,
                     'lead_time' => $vendorApplication?->lead_time ?? '',
-                    'lead_time_days' => $vendorApplication?->reservationLeadTimeDays() ?? 3,
-                    'preparation_days' => $preparationDays,
+                    'lead_time_days' => $vendorApplication?->reservationLeadTimeDays() ?? 0,
                     'same_day_delivery' => (bool) ($vendorApplication?->same_day_delivery ?? false),
                     'cutoff_times' => $vendorApplication?->cutoff_times ?? [],
                     'cutoff_time_today' => $vendorApplication?->cutoffTimeForDate(Carbon::now(VendorApplication::RESERVATION_TIMEZONE)),
@@ -182,7 +178,7 @@ class CheckoutController extends Controller
                 'summary' => [
                     'subtotal' => $subtotal,
                     'total_amount' => $totalAmount,
-                    'preparation_days' => $preparationDays,
+                    'lead_time_days' => $vendorApplication?->reservationLeadTimeDays() ?? 0,
                 ],
             ];
 
@@ -292,11 +288,7 @@ class CheckoutController extends Controller
                 ], 400);
             }
 
-            $preparationDays = $this->resolvePreparationDays($cartItems);
-            $settings = $this->applyPreparationLeadTime(
-                VendorApplication::buildReservationSettings($vendorUser, $vendor),
-                $preparationDays
-            );
+            $settings = VendorApplication::buildReservationSettings($vendorUser, $vendor);
             $nowInPh = Carbon::now($settings['timezone']);
             $todayInPh = $nowInPh->copy()->startOfDay();
             $maxDate = $todayInPh->copy()->addMonths(3);
@@ -307,7 +299,6 @@ class CheckoutController extends Controller
                 'today_ph' => $todayInPh->toDateString(),
                 'timezone' => $settings['timezone'],
                 'lead_time_days' => $settings['lead_time_days'],
-                'preparation_days' => $preparationDays,
                 'same_day_delivery' => $settings['same_day_delivery'],
                 'cutoff_time_today' => $settings['cutoff_time_today'],
             ]);
@@ -397,7 +388,6 @@ class CheckoutController extends Controller
                         'customizations' => $item->customizations ?? [],
                         'model_3d_url' => $model3d?->model_url,
                         'model_3d_path' => $model3d?->model_path,
-                        'preparation_time' => $this->resolveProductPreparationDays($item->product),
                     ];
                 }
 
@@ -1006,7 +996,7 @@ class CheckoutController extends Controller
                 ];
             }
 
-            if ($settings['same_day_cutoff_reached']) {
+            if (!$settings['same_day_available_today']) {
                 $cutoff = $settings['cutoff_time_today']
                     ? Carbon::createFromFormat(
                         'H:i',
@@ -1017,26 +1007,30 @@ class CheckoutController extends Controller
 
                 return [
                     'valid' => false,
-                    'message' => $cutoff
-                        ? "Same-day delivery cutoff has been reached for today. Cutoff time is {$cutoff} PH time."
-                        : 'Same-day delivery cutoff has been reached for today.',
-                    'field_error' => $cutoff
-                        ? "Same-day orders are only available until {$cutoff} PH time"
-                        : 'Same-day delivery is no longer available today',
+                    'message' => $settings['same_day_cutoff_reached']
+                        ? ($cutoff
+                            ? "Same-day delivery cutoff has been reached for today. Cutoff time is {$cutoff} PH time."
+                            : 'Same-day delivery cutoff has been reached for today.')
+                        : 'Selected date is too early based on preparation time.',
+                    'field_error' => $settings['same_day_cutoff_reached']
+                        ? ($cutoff
+                            ? "Same-day orders are only available until {$cutoff} PH time"
+                            : 'Same-day delivery is no longer available today')
+                        : 'Preparation starts tomorrow. Please choose a later date.',
                 ];
             }
 
             return ['valid' => true, 'message' => null, 'field_error' => null];
         }
 
-        $minimumDate = $today->copy()->addDays($settings['lead_time_days']);
+        $minimumDate = $today->copy()->addDays(((int) ($settings['lead_time_days'] ?? 0)) + 1);
         if ($reservationDate->lessThan($minimumDate)) {
             $days = $settings['lead_time_days'];
 
             return [
                 'valid' => false,
-                'message' => "Reservation must be at least {$days} day(s) from today to allow preparation time",
-                'field_error' => "Please select a date at least {$days} day(s) from today",
+                'message' => "Selected date is too early based on lead time. Earliest available date is {$minimumDate->toDateString()}.",
+                'field_error' => "Lead time starts tomorrow. Please select a date after {$days} preparation day(s).",
             ];
         }
 
@@ -1151,44 +1145,6 @@ class CheckoutController extends Controller
         return !empty($this->getPayMongoSecretKey());
     }
 
-    private function resolvePreparationDays(iterable $cartItems): int
-    {
-        $days = 0;
-
-        foreach ($cartItems as $cartItem) {
-            $days = max($days, $this->resolveProductPreparationDays($cartItem->product ?? null));
-        }
-
-        return $days;
-    }
-
-    private function resolveProductPreparationDays(?Product $product): int
-    {
-        if (!$product) {
-            return 0;
-        }
-
-        $rawDays = $product->preparation_time
-            ?? $product->preparation_days
-            ?? $product->supplier_lead_time
-            ?? 0;
-
-        return max(0, (int) ceil((float) $rawDays));
-    }
-
-    private function applyPreparationLeadTime(array $settings, int $preparationDays): array
-    {
-        $effectiveLeadTime = max((int) ($settings['lead_time_days'] ?? 0), $preparationDays);
-        $sameDayAvailable = ($settings['same_day_delivery'] ?? false)
-            && $effectiveLeadTime === 0
-            && !($settings['same_day_cutoff_reached'] ?? true);
-
-        $settings['lead_time_days'] = $effectiveLeadTime;
-        $settings['preparation_days'] = $preparationDays;
-        $settings['same_day_available_today'] = $sameDayAvailable;
-
-        return $settings;
-    }
 
     private function resolveWebhookOrder(array $attributes = [], array $metadata = []): ?Order
     {
