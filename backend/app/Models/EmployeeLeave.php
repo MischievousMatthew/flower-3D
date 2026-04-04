@@ -41,7 +41,7 @@ class EmployeeLeave extends Model
     // Relationships
     public function owner(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'owner_id');
+        return $this->belongsTo(Employee::class, 'owner_id');
     }
 
     public function employee(): BelongsTo

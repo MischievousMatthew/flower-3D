@@ -372,19 +372,6 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::prefix('payroll')->group(function () {
-        Route::middleware('employee.module:payroll,view')->group(function () {
-            Route::get('/',                 [PayrollController::class, 'index']);
-            Route::get('/summary',          [PayrollController::class, 'summary']);
-            Route::get('/{id}',             [PayrollController::class, 'show']);
-        });
-
-        Route::middleware('employee.module:payroll,edit')->group(function () {
-            Route::post('/',                [PayrollController::class, 'store']);
-            Route::post('/preview',         [PayrollController::class, 'preview']);
-            Route::post('/hr-approve',      [PayrollController::class, 'hrApprove']);
-            Route::delete('/{id}',          [PayrollController::class, 'destroy']);
-        });
-
         Route::middleware('employee.module:payroll_requests,view')->group(function () {
             Route::get('/finance-requests', [PayrollController::class, 'financeRequests']);
             Route::get('/finance-summary',  [PayrollController::class, 'financeSummary']);
@@ -394,6 +381,19 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/finance-approve', [PayrollController::class, 'financeApprove']);
             Route::post('/finance-reject',  [PayrollController::class, 'financeReject']);
             Route::post('/mark-paid',       [PayrollController::class, 'markAsPaid']);
+        });
+
+        Route::middleware('employee.module:payroll,view')->group(function () {
+            Route::get('/',                 [PayrollController::class, 'index']);
+            Route::get('/summary',          [PayrollController::class, 'summary']);
+            Route::get('/{id}',             [PayrollController::class, 'show'])->whereNumber('id');
+        });
+
+        Route::middleware('employee.module:payroll,edit')->group(function () {
+            Route::post('/',                [PayrollController::class, 'store']);
+            Route::post('/preview',         [PayrollController::class, 'preview']);
+            Route::post('/hr-approve',      [PayrollController::class, 'hrApprove']);
+            Route::delete('/{id}',          [PayrollController::class, 'destroy'])->whereNumber('id');
         });
     });
 

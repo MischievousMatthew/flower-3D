@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Employee;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductModel;
@@ -17,9 +18,37 @@ class ProductController extends Controller
 {
     use ResolvesOwner;
 
+    private const INVENTORY_PRODUCTS_MODULE = 'inventory_products';
+
+    private function requireInventoryProductAccess(Request $request, string $access = 'view')
+    {
+        $user = $request->user();
+
+        if (!$user instanceof Employee) {
+            return null;
+        }
+
+        $allowed = $access === 'edit'
+            ? $user->canEditModule(self::INVENTORY_PRODUCTS_MODULE)
+            : $user->canViewModule(self::INVENTORY_PRODUCTS_MODULE);
+
+        if (!$allowed) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden',
+            ], 403);
+        }
+
+        return null;
+    }
+
     public function myProducts(Request $request)
     {
         try {
+            if ($response = $this->requireInventoryProductAccess($request, 'view')) {
+                return $response;
+            }
+
             $ownerId  = $this->resolveOwnerId($request);
             $products = Product::where('owner_id', $ownerId)
                 ->where('status', 'active')
@@ -41,6 +70,10 @@ class ProductController extends Controller
     public function draftProducts(Request $request)
     {
         try {
+            if ($response = $this->requireInventoryProductAccess($request, 'view')) {
+                return $response;
+            }
+
             $ownerId  = $this->resolveOwnerId($request);
             $products = Product::where('owner_id', $ownerId)
                 ->where('status', 'draft')
@@ -58,6 +91,10 @@ class ProductController extends Controller
     public function inactiveProducts(Request $request)
     {
         try {
+            if ($response = $this->requireInventoryProductAccess($request, 'view')) {
+                return $response;
+            }
+
             $ownerId  = $this->resolveOwnerId($request);
             $products = Product::where('owner_id', $ownerId)
                 ->where('status', 'inactive')
@@ -75,6 +112,10 @@ class ProductController extends Controller
     public function show(Request $request, $id)
     {
         try {
+            if ($response = $this->requireInventoryProductAccess($request, 'view')) {
+                return $response;
+            }
+
             $ownerId = $this->resolveOwnerId($request);
             $request->merge($this->normalizeProductPayload($request));
             $product = Product::where('id', $id)
@@ -96,6 +137,10 @@ class ProductController extends Controller
     public function store(Request $request)
     {
         try {
+            if ($response = $this->requireInventoryProductAccess($request, 'edit')) {
+                return $response;
+            }
+
             $ownerId = $this->resolveOwnerId($request);
 
             // ── Debug log: confirm files received ────────────────────────────
@@ -223,6 +268,10 @@ class ProductController extends Controller
     public function update(Request $request, $id)
     {
         try {
+            if ($response = $this->requireInventoryProductAccess($request, 'edit')) {
+                return $response;
+            }
+
             $ownerId = $this->resolveOwnerId($request);
             $product = Product::where('id', $id)->where('owner_id', $ownerId)->first();
 
@@ -340,6 +389,10 @@ class ProductController extends Controller
     public function destroy(Request $request, $id)
     {
         try {
+            if ($response = $this->requireInventoryProductAccess($request, 'edit')) {
+                return $response;
+            }
+
             $ownerId = $this->resolveOwnerId($request);
             $product = Product::where('id', $id)->where('owner_id', $ownerId)->first();
 
@@ -371,6 +424,10 @@ class ProductController extends Controller
     public function toggleStatus(Request $request, $id)
     {
         try {
+            if ($response = $this->requireInventoryProductAccess($request, 'edit')) {
+                return $response;
+            }
+
             $ownerId = $this->resolveOwnerId($request);
             $product = Product::where('id', $id)->where('owner_id', $ownerId)->first();
 
@@ -390,26 +447,50 @@ class ProductController extends Controller
     public function updateStock(Request $request, $id)
     {
         try {
-            $ownerId = $this->resolveOwnerId($request);
-            $product = Product::where('id', $id)->where('owner_id', $ownerId)->first();
-
-            if (!$product) {
-                return response()->json(['success' => false, 'message' => 'Product not found'], 404);
+            if ($response = $this->requireInventoryProductAccess($request, 'edit')) {
+                return $response;
             }
 
-            $request->validate(['quantity_in_stock' => 'required|integer|min:0']);
-            $product->updateStock($request->quantity_in_stock);
+            $ownerId = $this->resolveOwnerId($request);
+            $product = Product::where('id', $id)->where('owner_id', $ownerId)->firstOrFail();
 
-            return response()->json(['success' => true, 'data' => $product, 'message' => 'Stock updated successfully']);
-        } catch (\Exception $e) {
-            Log::error('Error updating stock: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to update stock'], 500);
+            $data = $request->validate(['quantity_in_stock' => 'required|integer|min:0']);
+
+            $product->update([
+                'quantity_in_stock' => $data['quantity_in_stock'],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => $product->fresh(['primaryImage', 'images', 'models']),
+                'message' => 'Stock updated successfully',
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['success' => false, 'message' => 'Product not found'], 404);
+        } catch (\Throwable $e) {
+            Log::error('Stock update failed', [
+                'error' => $e->getMessage(),
+                'product_id' => $id,
+                'payload' => $request->all(),
+                'user_id' => $request->user()?->id,
+                'owner_id' => $ownerId ?? null,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update stock',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
         }
     }
 
     public function updateStatus(Request $request, $id)
     {
         try {
+            if ($response = $this->requireInventoryProductAccess($request, 'edit')) {
+                return $response;
+            }
+
             $ownerId = $this->resolveOwnerId($request);
             $product = Product::where('id', $id)->where('owner_id', $ownerId)->first();
 
@@ -438,6 +519,10 @@ class ProductController extends Controller
     public function deleteImage(Request $request, $productId, $imageId)
     {
         try {
+            if ($response = $this->requireInventoryProductAccess($request, 'edit')) {
+                return $response;
+            }
+
             $ownerId = $this->resolveOwnerId($request);
             $product = Product::where('id', $productId)->where('owner_id', $ownerId)->first();
 
@@ -466,6 +551,10 @@ class ProductController extends Controller
     public function deleteModel(Request $request, $productId)
     {
         try {
+            if ($response = $this->requireInventoryProductAccess($request, 'edit')) {
+                return $response;
+            }
+
             $ownerId = $this->resolveOwnerId($request);
             $product = Product::where('id', $productId)->where('owner_id', $ownerId)->first();
 
@@ -493,6 +582,10 @@ class ProductController extends Controller
     public function searchForWarehouse(Request $request)
     {
         try {
+            if ($response = $this->requireInventoryProductAccess($request, 'view')) {
+                return $response;
+            }
+
             $ownerId = $this->resolveOwnerId($request);
 
             $query = Product::where('owner_id', $ownerId)

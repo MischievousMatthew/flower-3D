@@ -45,6 +45,12 @@
           <router-link
             to="/erp/procurement/inventory/funding-request/create"
             class="btn-ghost"
+            :class="{ 'btn-disabled-link': !canEditInventoryProducts }"
+            :aria-disabled="!canEditInventoryProducts"
+            @click.prevent="
+              !canEditInventoryProducts &&
+              toast.error('You do not have permission to create funding requests.')
+            "
           >
             <svg
               width="16"
@@ -66,6 +72,12 @@
           <router-link
             to="/erp/procurement/inventory/add-product"
             class="btn-primary"
+            :class="{ 'btn-disabled-link': !canEditInventoryProducts }"
+            :aria-disabled="!canEditInventoryProducts"
+            @click.prevent="
+              !canEditInventoryProducts &&
+              toast.error('You do not have permission to create inventory products.')
+            "
           >
             <svg
               width="15"
@@ -84,6 +96,11 @@
       </div>
 
       <!-- ── Stat Cards ── -->
+      <div v-if="isReadOnlyInventoryProducts" class="permission-banner">
+        Read-only mode. You can review stock levels, but only employees with
+        edit access can update inventory products.
+      </div>
+
       <div class="stat-grid">
         <div class="stat-card">
           <div class="stat-icon si-purple">
@@ -292,7 +309,16 @@
                   : "No draft products. Create one to get started!"
               }}
             </p>
-            <router-link to="/vendor/add-product" class="btn-primary">
+            <router-link
+              to="/erp/procurement/inventory/add-product"
+              class="btn-primary"
+              :class="{ 'btn-disabled-link': !canEditInventoryProducts }"
+              :aria-disabled="!canEditInventoryProducts"
+              @click.prevent="
+                !canEditInventoryProducts &&
+                toast.error('You do not have permission to create inventory products.')
+              "
+            >
               <svg
                 width="14"
                 height="14"
@@ -406,7 +432,16 @@
 
               <div class="td td-action">
                 <div class="menu-wrap">
-                  <button class="menu-btn" @click.stop="toggleMenu(product.id)">
+                  <button
+                    class="menu-btn"
+                    :disabled="!canEditInventoryProducts"
+                    :title="
+                      canEditInventoryProducts
+                        ? 'Open product actions'
+                        : 'You do not have permission to edit inventory products.'
+                    "
+                    @click.stop="toggleMenu(product.id)"
+                  >
                     <svg
                       width="15"
                       height="15"
@@ -442,6 +477,7 @@
                       <button
                         v-if="activeTab !== 'approved'"
                         class="menu-item"
+                        :disabled="!canEditInventoryProducts"
                         @click="goEdit(product.id)"
                       >
                         <svg
@@ -464,6 +500,7 @@
                       <button
                         v-if="activeTab === 'draft'"
                         class="menu-item"
+                        :disabled="!canEditInventoryProducts"
                         @click="openSubmitModal(product)"
                       >
                         <svg
@@ -482,6 +519,7 @@
                       <button
                         v-if="activeTab === 'approved'"
                         class="menu-item"
+                        :disabled="!canEditInventoryProducts"
                         @click="openUpdateStockModal(product)"
                       >
                         <svg
@@ -500,6 +538,7 @@
                       <div class="menu-sep"></div>
                       <button
                         class="menu-item danger"
+                        :disabled="!canEditInventoryProducts"
                         @click="openDeleteModal(product)"
                       >
                         <svg
@@ -800,6 +839,7 @@
             <button
               v-if="activeTab === 'approved'"
               class="btn-primary"
+              :disabled="!canEditInventoryProducts"
               @click="openUpdateStockModal(selectedProduct)"
             >
               Update Stock
@@ -849,6 +889,7 @@
                 v-model.number="newStockQuantity"
                 placeholder="Enter new quantity"
                 min="0"
+                :disabled="!canEditInventoryProducts"
               />
             </div>
           </div>
@@ -859,7 +900,11 @@
             <button
               class="btn-primary"
               @click="confirmUpdateStock"
-              :disabled="newStockQuantity === null || newStockQuantity < 0"
+              :disabled="
+                !canEditInventoryProducts ||
+                newStockQuantity === null ||
+                newStockQuantity < 0
+              "
             >
               Update Stock
             </button>
@@ -956,10 +1001,12 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../../plugins/axios";
 import { useAuth } from "../../../../composables/useAuth";
+import { useAssignment } from "../../../../composables/useAssignment";
 import { toast } from "vue3-toastify";
 
 const router = useRouter();
 const { user } = useAuth();
+const { canEdit, isReadOnly } = useAssignment();
 
 const tableSearch = ref("");
 const activeTab = ref("approved");
@@ -974,6 +1021,10 @@ const showViewDetailsModal = ref(false);
 const showUpdateStockModal = ref(false);
 const showSubmitModal = ref(false);
 const showDeleteModal = ref(false);
+const canEditInventoryProducts = computed(() => canEdit("inventory_products"));
+const isReadOnlyInventoryProducts = computed(() =>
+  isReadOnly("inventory_products"),
+);
 
 const colorPalette = [
   "#dcfce7",
@@ -991,8 +1042,8 @@ const fetchProducts = async () => {
     isLoadingMessage.value = "Loading products…";
     const endpoint =
       activeTab.value === "draft"
-        ? "/vendor/draft-products"
-        : "/vendor/my-products";
+        ? "/procurement/inventory/draft-products"
+        : "/procurement/inventory/my-products";
     const res = await api.get(endpoint);
     if (res.data.success) products.value = res.data.data;
     else toast.error("Failed to load products");
@@ -1034,8 +1085,17 @@ const getTabCount = (tab) =>
     ? products.value.filter((p) => p.status !== "draft").length
     : products.value.filter((p) => p.status === "draft").length;
 const goEdit = (id) => {
+  if (!canEditInventoryProducts.value) {
+    toast.error("You do not have permission to edit inventory products.");
+    activeMenu.value = null;
+    return;
+  }
+
   activeMenu.value = null;
-  router.push(`/vendor/products/${id}/edit`);
+  router.push({
+    path: "/erp/procurement/inventory/add-product",
+    query: { edit: id },
+  });
 };
 
 const totalAssetValue = computed(() =>
@@ -1134,6 +1194,10 @@ const cleanedOccasionTags = computed(() => {
 });
 
 const toggleMenu = (id) => {
+  if (!canEditInventoryProducts.value) {
+    return;
+  }
+
   activeMenu.value = activeMenu.value === id ? null : id;
 };
 
@@ -1147,6 +1211,12 @@ const closeViewDetailsModal = () => {
   selectedProduct.value = null;
 };
 const openUpdateStockModal = (p) => {
+  if (!canEditInventoryProducts.value) {
+    toast.error("You do not have permission to update stock.");
+    activeMenu.value = null;
+    return;
+  }
+
   selectedProduct.value = p;
   newStockQuantity.value = p.quantity_in_stock;
   showUpdateStockModal.value = true;
@@ -1159,6 +1229,12 @@ const closeUpdateStockModal = () => {
   newStockQuantity.value = null;
 };
 const openSubmitModal = (p) => {
+  if (!canEditInventoryProducts.value) {
+    toast.error("You do not have permission to submit products for approval.");
+    activeMenu.value = null;
+    return;
+  }
+
   selectedProduct.value = p;
   showSubmitModal.value = true;
   activeMenu.value = null;
@@ -1168,6 +1244,12 @@ const closeSubmitModal = () => {
   selectedProduct.value = null;
 };
 const openDeleteModal = (p) => {
+  if (!canEditInventoryProducts.value) {
+    toast.error("You do not have permission to delete inventory products.");
+    activeMenu.value = null;
+    return;
+  }
+
   selectedProduct.value = p;
   showDeleteModal.value = true;
   activeMenu.value = null;
@@ -1178,13 +1260,18 @@ const closeDeleteModal = () => {
 };
 
 const confirmUpdateStock = async () => {
+  if (!canEditInventoryProducts.value) {
+    toast.error("You do not have permission to update stock.");
+    return;
+  }
+
   if (newStockQuantity.value === null || newStockQuantity.value < 0) {
     toast.error("Enter a valid quantity");
     return;
   }
   try {
     const r = await api.patch(
-      `/vendor/products/${selectedProduct.value.id}/stock`,
+      `/procurement/inventory/products/${selectedProduct.value.id}/stock`,
       { quantity_in_stock: newStockQuantity.value },
     );
     if (r.data.success) {
@@ -1197,6 +1284,11 @@ const confirmUpdateStock = async () => {
   }
 };
 const confirmSubmitForApproval = async () => {
+  if (!canEditInventoryProducts.value) {
+    toast.error("You do not have permission to submit products for approval.");
+    return;
+  }
+
   try {
     const r = await api.post(
       `/vendor/products/${selectedProduct.value.id}/submit-approval`,
@@ -1211,8 +1303,15 @@ const confirmSubmitForApproval = async () => {
   }
 };
 const confirmDeleteProduct = async () => {
+  if (!canEditInventoryProducts.value) {
+    toast.error("You do not have permission to delete inventory products.");
+    return;
+  }
+
   try {
-    const r = await api.delete(`/vendor/products/${selectedProduct.value.id}`);
+    const r = await api.delete(
+      `/procurement/inventory/products/${selectedProduct.value.id}`,
+    );
     if (r.data.success) {
       closeDeleteModal();
       fetchProducts();
@@ -1289,6 +1388,16 @@ watch(activeTab, () => {
   font-size: 13px;
   color: #6b7280;
   margin-top: 3px;
+}
+.permission-banner {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.5;
 }
 .header-right {
   display: flex;
@@ -1378,6 +1487,13 @@ watch(activeTab, () => {
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+.btn-disabled-link {
+  opacity: 0.55;
+  pointer-events: auto;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* ── Stat Grid ── */
@@ -1810,6 +1926,12 @@ watch(activeTab, () => {
   color: #16a34a;
   background: #dcfce7;
 }
+.menu-btn:disabled {
+  cursor: not-allowed;
+  color: #d1d5db;
+  background: #f9fafb;
+  border-color: #e5e7eb;
+}
 .menu-dropdown {
   position: absolute;
   right: 0;
@@ -1839,6 +1961,11 @@ watch(activeTab, () => {
 }
 .menu-item:hover {
   background: #f9fafb;
+}
+.menu-item:disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+  background: transparent;
 }
 .menu-item.danger {
   color: #dc2626;

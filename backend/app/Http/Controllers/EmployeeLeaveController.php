@@ -13,11 +13,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
-use App\Traits\ScopesOwner;
-
 class EmployeeLeaveController extends Controller
 {
-    use ScopesOwner;
     /**
      * Verify QR token and get employee details for leave request
      */
@@ -128,6 +125,8 @@ class EmployeeLeaveController extends Controller
             }
 
             $ownerId = $this->resolveLeaveOwnerEmployeeId($employee);
+            $vendorOwnerId = (int) $employee->owner_id;
+            $leaveOwnerEmployeeIds = $this->resolveLeaveOwnerEmployeeIdsForVendor($vendorOwnerId);
 
             // Rate limiting check
             $recentAttempts = DB::table('leave_request_attempts')
@@ -155,7 +154,7 @@ class EmployeeLeaveController extends Controller
             $endDate = Carbon::parse($request->end_date);
 
             $overlapping = EmployeeLeave::where('employee_id', $employeeId)
-                ->where('owner_id', $ownerId)
+                ->whereIn('owner_id', $leaveOwnerEmployeeIds)
                 ->where('status', '!=', 'rejected')
                 ->where(function ($query) use ($startDate, $endDate) {
                     $query->whereBetween('start_date', [$startDate, $endDate])
@@ -231,9 +230,11 @@ class EmployeeLeaveController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $ownerId = $this->resolveAuthenticatedLeaveOwnerId();
+            $vendorOwnerId = $this->resolveAuthenticatedVendorOwnerId();
+            $leaveOwnerEmployeeIds = $this->resolveLeaveOwnerEmployeeIdsForVendor($vendorOwnerId);
 
-            $query = EmployeeLeave::forOwner($ownerId)
+            $query = EmployeeLeave::query()
+                ->whereIn('owner_id', $leaveOwnerEmployeeIds)
                 ->with(['employee', 'reviewer']);
 
             // Filters
@@ -303,7 +304,8 @@ class EmployeeLeaveController extends Controller
 
         try {
             // auth()->id() is the authenticated reviewer's ID.
-            $ownerId    = $this->resolveAuthenticatedLeaveOwnerId();
+            $vendorOwnerId = $this->resolveAuthenticatedVendorOwnerId();
+            $leaveOwnerEmployeeIds = $this->resolveLeaveOwnerEmployeeIdsForVendor($vendorOwnerId);
             $reviewerId = auth()->id();
 
             if (!$reviewerId) {
@@ -315,7 +317,7 @@ class EmployeeLeaveController extends Controller
 
             // Find the leave request using the correct owner scope
             $leave = EmployeeLeave::where('id', $id)
-                ->where('owner_id', $ownerId)
+                ->whereIn('owner_id', $leaveOwnerEmployeeIds)
                 ->first();
 
             if (!$leave) {
@@ -361,21 +363,22 @@ class EmployeeLeaveController extends Controller
     public function getStatistics(Request $request): JsonResponse
     {
         try {
-            $ownerId = $this->resolveAuthenticatedLeaveOwnerId();
+            $vendorOwnerId = $this->resolveAuthenticatedVendorOwnerId();
+            $leaveOwnerEmployeeIds = $this->resolveLeaveOwnerEmployeeIdsForVendor($vendorOwnerId);
 
             $stats = [
-                'pending' => EmployeeLeave::forOwner($ownerId)->pending()->count(),
-                'approved_this_month' => EmployeeLeave::forOwner($ownerId)
+                'pending' => EmployeeLeave::query()->whereIn('owner_id', $leaveOwnerEmployeeIds)->pending()->count(),
+                'approved_this_month' => EmployeeLeave::query()->whereIn('owner_id', $leaveOwnerEmployeeIds)
                     ->approved()
                     ->whereMonth('start_date', now()->month)
                     ->whereYear('start_date', now()->year)
                     ->count(),
-                'total_days_this_month' => EmployeeLeave::forOwner($ownerId)
+                'total_days_this_month' => EmployeeLeave::query()->whereIn('owner_id', $leaveOwnerEmployeeIds)
                     ->approved()
                     ->whereMonth('start_date', now()->month)
                     ->whereYear('start_date', now()->year)
                     ->sum('total_days'),
-                'rejected' => EmployeeLeave::forOwner($ownerId)->rejected()->count()
+                'rejected' => EmployeeLeave::query()->whereIn('owner_id', $leaveOwnerEmployeeIds)->rejected()->count()
             ];
 
             return response()->json([
@@ -398,10 +401,11 @@ class EmployeeLeaveController extends Controller
     public function destroy(int $id): JsonResponse
     {
         try {
-            $ownerId = $this->resolveAuthenticatedLeaveOwnerId();
+            $vendorOwnerId = $this->resolveAuthenticatedVendorOwnerId();
+            $leaveOwnerEmployeeIds = $this->resolveLeaveOwnerEmployeeIdsForVendor($vendorOwnerId);
 
             $leave = EmployeeLeave::where('id', $id)
-                ->where('owner_id', $ownerId)
+                ->whereIn('owner_id', $leaveOwnerEmployeeIds)
                 ->first();
 
             if (!$leave) {
@@ -480,30 +484,33 @@ class EmployeeLeaveController extends Controller
         return (int) $ownerEmployee->id;
     }
 
-    private function resolveAuthenticatedLeaveOwnerId(): int
+    private function resolveAuthenticatedVendorOwnerId(): int
     {
         $user = auth()->user();
 
         if ($user instanceof Employee) {
-            return (int) $user->id;
+            return (int) $user->owner_id;
         }
 
-        $ownerEmployee = Employee::query()
-            ->where('owner_id', $user->id)
-            ->orderByRaw("
-                CASE
-                    WHEN LOWER(COALESCE(role, '')) LIKE '%hr%' THEN 0
-                    WHEN LOWER(COALESCE(department, '')) LIKE '%hr%' THEN 1
-                    ELSE 2
-                END
-            ")
-            ->orderBy('id')
-            ->first();
-
-        if (!$ownerEmployee) {
-            throw new \RuntimeException('No HR employee found for this owner.');
+        if (!$user) {
+            throw new \RuntimeException('Unauthenticated user.');
         }
 
-        return (int) $ownerEmployee->id;
+        return (int) $user->id;
+    }
+
+    private function resolveLeaveOwnerEmployeeIdsForVendor(int $vendorOwnerId): array
+    {
+        $employeeIds = Employee::query()
+            ->where('owner_id', $vendorOwnerId)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (empty($employeeIds)) {
+            throw new \RuntimeException('No employee leave owners found for this vendor.');
+        }
+
+        return $employeeIds;
     }
 }
