@@ -318,14 +318,14 @@
           </div>
         </div>
         <h2 class="result-title">Identity Verified</h2>
-        <div class="result-stats">
+        <div v-if="false" class="result-stats">
           <div class="stat-card">
             <span class="stat-value">{{ activeChallenges.length }}</span>
             <span class="stat-label">Challenges Passed</span>
           </div>
           <div class="stat-card">
-            <span class="stat-value">{{ matchScore }}%</span>
-            <span class="stat-label">Match Score</span>
+            <span class="stat-value">✓</span>
+            <span class="stat-label">Verified</span>
           </div>
           <div class="stat-card">
             <span class="stat-value">✅</span>
@@ -334,7 +334,7 @@
         </div>
         <p class="result-subtitle">
           {{ attendanceType === "time_in" ? "Time In" : "Time Out" }} recorded
-          for
+          successfully for
           <strong>{{ employee?.full_name }}</strong>
         </p>
         <div v-if="isSending" class="sending-indicator">
@@ -366,7 +366,9 @@
           </div>
         </div>
         <h2 class="result-title">Verification Failed</h2>
-        <p class="failure-reason">{{ failureReason }}</p>
+        <p class="failure-reason">
+          Face verification failed. Attendance was not recorded.
+        </p>
         <div class="retry-actions" v-if="attempts < 3">
           <button class="btn-secondary" @click="closeVerifier">Cancel</button>
           <button class="btn-primary" @click="restart">

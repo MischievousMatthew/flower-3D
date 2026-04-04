@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Employee;
 use App\Models\EmployeeLeave;
 use App\Models\EmployeeInfo;
 use Illuminate\Http\Request;
@@ -126,7 +127,7 @@ class EmployeeLeaveController extends Controller
                 ], 404);
             }
 
-            $ownerId = $employee->owner_id;
+            $ownerId = $this->resolveLeaveOwnerEmployeeId($employee);
 
             // Rate limiting check
             $recentAttempts = DB::table('leave_request_attempts')
@@ -230,7 +231,7 @@ class EmployeeLeaveController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $ownerId = $this->getOwnerId();
+            $ownerId = $this->resolveAuthenticatedLeaveOwnerId();
 
             $query = EmployeeLeave::forOwner($ownerId)
                 ->with(['employee', 'reviewer']);
@@ -302,7 +303,7 @@ class EmployeeLeaveController extends Controller
 
         try {
             // auth()->id() is the authenticated reviewer's ID.
-            $ownerId    = $this->getOwnerId();
+            $ownerId    = $this->resolveAuthenticatedLeaveOwnerId();
             $reviewerId = auth()->id();
 
             if (!$reviewerId) {
@@ -360,7 +361,7 @@ class EmployeeLeaveController extends Controller
     public function getStatistics(Request $request): JsonResponse
     {
         try {
-            $ownerId = $this->getOwnerId();
+            $ownerId = $this->resolveAuthenticatedLeaveOwnerId();
 
             $stats = [
                 'pending' => EmployeeLeave::forOwner($ownerId)->pending()->count(),
@@ -397,7 +398,7 @@ class EmployeeLeaveController extends Controller
     public function destroy(int $id): JsonResponse
     {
         try {
-            $ownerId = $this->getOwnerId();
+            $ownerId = $this->resolveAuthenticatedLeaveOwnerId();
 
             $leave = EmployeeLeave::where('id', $id)
                 ->where('owner_id', $ownerId)
@@ -449,5 +450,60 @@ class EmployeeLeaveController extends Controller
         }
 
         return $totalDays;
+    }
+
+    private function resolveLeaveOwnerEmployeeId(EmployeeInfo $employee): int
+    {
+        if (!empty($employee->created_by_employee_id)) {
+            $creator = Employee::find($employee->created_by_employee_id);
+            if ($creator) {
+                return (int) $creator->id;
+            }
+        }
+
+        $ownerEmployee = Employee::query()
+            ->where('owner_id', $employee->owner_id)
+            ->orderByRaw("
+                CASE
+                    WHEN LOWER(COALESCE(role, '')) LIKE '%hr%' THEN 0
+                    WHEN LOWER(COALESCE(department, '')) LIKE '%hr%' THEN 1
+                    ELSE 2
+                END
+            ")
+            ->orderBy('id')
+            ->first();
+
+        if (!$ownerEmployee) {
+            throw new \RuntimeException('No HR employee found for this employee record.');
+        }
+
+        return (int) $ownerEmployee->id;
+    }
+
+    private function resolveAuthenticatedLeaveOwnerId(): int
+    {
+        $user = auth()->user();
+
+        if ($user instanceof Employee) {
+            return (int) $user->id;
+        }
+
+        $ownerEmployee = Employee::query()
+            ->where('owner_id', $user->id)
+            ->orderByRaw("
+                CASE
+                    WHEN LOWER(COALESCE(role, '')) LIKE '%hr%' THEN 0
+                    WHEN LOWER(COALESCE(department, '')) LIKE '%hr%' THEN 1
+                    ELSE 2
+                END
+            ")
+            ->orderBy('id')
+            ->first();
+
+        if (!$ownerEmployee) {
+            throw new \RuntimeException('No HR employee found for this owner.');
+        }
+
+        return (int) $ownerEmployee->id;
     }
 }
