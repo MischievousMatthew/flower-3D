@@ -157,25 +157,25 @@ class SupplierController extends Controller
     /** PATCH /suppliers/{id}/activate */
     public function activate(int $id): JsonResponse
     {
-        return response()->json($this->service->activateSupplier($id));
+        return response()->json($this->service->activateSupplier($id, $this->getOwnerId()));
     }
 
     /** PATCH /suppliers/{id}/deactivate */
     public function deactivate(int $id): JsonResponse
     {
-        return response()->json($this->service->deactivateSupplier($id));
+        return response()->json($this->service->deactivateSupplier($id, $this->getOwnerId()));
     }
 
     /** PATCH /suppliers/{id}/blacklist */
     public function blacklist(int $id): JsonResponse
     {
-        return response()->json($this->service->blacklistSupplier($id));
+        return response()->json($this->service->blacklistSupplier($id, $this->getOwnerId()));
     }
 
     /** DELETE /suppliers/{id} */
     public function destroy(int $id): JsonResponse
     {
-        $this->service->deleteSupplier($id);
+        $this->service->deleteSupplier($id, $this->getOwnerId());
 
         return response()->json(['message' => 'Supplier deleted successfully.']);
     }
@@ -183,7 +183,7 @@ class SupplierController extends Controller
     // ─── Contacts ─────────────────────────────────────────────────────────────
 
     /** POST /suppliers/{id}/contacts */
-    public function storeContact(Request $request, int $id): JsonResponse
+    public function storeContact(Request $request, int $supplierId): JsonResponse
     {
         $data = $request->validate([
             'company_name'   => ['required', 'string', 'max:255'],
@@ -194,28 +194,28 @@ class SupplierController extends Controller
             'status'         => ['nullable', Rule::in(['active', 'inactive'])],
         ]);
 
-        return response()->json($this->service->addContact($id, $data), 201);
+        return response()->json($this->service->addContact($supplierId, $data, $this->getOwnerId()), 201);
     }
 
-    /** PUT /supplier-contacts/{contactId} */
-    public function updateContact(Request $request, int $contactId): JsonResponse
+    /** PUT /suppliers/{supplierId}/contacts/{id} */
+    public function updateContact(Request $request, int $supplierId, int $id): JsonResponse
     {
         $data = $request->validate([
             'company_name'   => ['sometimes', 'string', 'max:255'],
             'contact_person' => ['sometimes', 'string', 'max:255'],
-            'email'          => ['sometimes', 'email', Rule::unique('supplier_contacts', 'email')->ignore($contactId)],
+            'email'          => ['sometimes', 'email', Rule::unique('supplier_contacts', 'email')->ignore($id)],
             'phone'          => ['sometimes', 'string', 'max:20'],
             'address'        => ['sometimes', 'string'],
             'status'         => ['sometimes', Rule::in(['active', 'inactive'])],
         ]);
 
-        return response()->json($this->service->updateContact($contactId, $data));
+        return response()->json($this->service->updateContact($id, $data, $this->getOwnerId()));
     }
 
-    /** DELETE /supplier-contacts/{contactId} */
-    public function destroyContact(int $contactId): JsonResponse
+    /** DELETE /suppliers/{supplierId}/contacts/{id} */
+    public function destroyContact(int $supplierId, int $id): JsonResponse
     {
-        $this->service->removeContact($contactId);
+        $this->service->removeContact($id, $this->getOwnerId());
 
         return response()->json(['message' => 'Contact removed successfully.']);
     }

@@ -1,8 +1,9 @@
 <template>
-  <div class="product-card">
+  <div ref="cardRef" class="product-card">
     <!-- ── Image ─────────────────────────────────────── -->
     <div class="product-image">
       <img
+        ref="imageRef"
         :src="getProductImage(product)"
         :alt="product.product_name"
         @error="handleImageError"
@@ -100,7 +101,7 @@
         <button
           class="btn-add-to-cart"
           :disabled="product.quantity_in_stock === 0 || addingToCart"
-          @click="$emit('add-to-cart', product)"
+          @click="handleAddToCart"
         >
           <span v-if="addingToCart" class="loading-spinner-small"></span>
           <span v-else>
@@ -194,9 +195,18 @@ const props = defineProps({
   selectedVendor: { type: Object, default: null },
   addingToCart: { type: Boolean, default: false },
 });
-defineEmits(["open-modal", "add-to-cart", "select-vendor"]);
+const emit = defineEmits(["open-modal", "add-to-cart", "select-vendor"]);
 
 const { isAuthenticated } = useAuth();
+const cardRef = ref(null);
+const imageRef = ref(null);
+
+const handleAddToCart = () => {
+  emit("add-to-cart", props.product, {
+    imageEl: imageRef.value,
+    cardEl: cardRef.value,
+  });
+};
 
 // ── 3-dot menu ────────────────────────────────────────
 const menuOpen = ref(false);

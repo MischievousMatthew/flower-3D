@@ -355,7 +355,7 @@
                     <button
                       class="btn-add-to-cart"
                       :disabled="product.quantity_in_stock === 0"
-                      @click="addToCart(product)"
+                      @click="addToCart(product, 1, $event)"
                     >
                       {{
                         product.quantity_in_stock > 0
@@ -538,6 +538,7 @@
             <!-- Photo View -->
             <div v-else class="image-container">
               <img
+                ref="selectedProductImageRef"
                 :src="
                   selectedProduct.images?.[selectedImageIndex]?.image_url ||
                   getProductImage(selectedProduct)
@@ -630,7 +631,7 @@
                 class="btn-add-to-cart-modal"
                 :disabled="selectedProduct.quantity_in_stock === 0"
                 @click="
-                  addToCart(selectedProduct, qty);
+                  addToCart(selectedProduct, qty, null, selectedProductImageRef);
                   closeModal();
                 "
               >
@@ -684,13 +685,16 @@ import api from "../../plugins/axios";
 import NavHeader from "../../layouts/NavHeader.vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import ModelViewer3D from "../../layouts/3D/3DModelViewer.vue";
-import cartService from "../../services/cartService.js";
+import { useCart } from "../../composables/useCart";
+import { useFlyToCart } from "../../composables/useFlyToCart";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 
 const route = useRoute();
 const router = useRouter();
 const { isAuthenticated } = useAuth();
+const cartStore = useCart();
+const { flyToCart } = useFlyToCart();
 const navHeaderRef = ref(null);
 
 // ── IDs ────────────────────────────────────────────────────────────────────
@@ -729,7 +733,6 @@ const vendor = ref({
 });
 
 const products = ref([]);
-const cartItems = ref([]);
 
 // ── Filters ────────────────────────────────────────────────────────────────
 const filters = ref({ category: "All", flowerType: "All", occasion: "All" });
@@ -744,13 +747,14 @@ const openFilters = ref({
 const showModal = ref(false);
 const selectedProduct = ref(null);
 const selectedImageIndex = ref(0);
+const selectedProductImageRef = ref(null);
 const show3D = ref(false);
 const qty = ref(1);
 const galleryIndex = ref(null);
 
 // ── Computed ───────────────────────────────────────────────────────────────
 
-const cartCount = computed(() => cartItems.value.length);
+const cartCount = computed(() => cartStore.count.value);
 
 // store_address = "General Trias" — use it directly as the location chip
 const storeCity = computed(() => {
@@ -883,10 +887,7 @@ const fetchProducts = async () => {
 
 const loadCart = async () => {
   if (!isAuthenticated.value) return;
-  try {
-    const r = await cartService.getCart();
-    if (r.success) cartItems.value = r.data.items || [];
-  } catch {}
+  await cartStore.initialize();
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -943,15 +944,28 @@ const resetFilters = () => {
 
 // ── Cart / Wishlist ────────────────────────────────────────────────────────
 
-const addToCart = async (product, quantity = 1) => {
+const getCardImageElement = (event) =>
+  event?.currentTarget
+    ?.closest(".product-card")
+    ?.querySelector(".product-image img");
+
+const addToCart = async (
+  product,
+  quantity = 1,
+  event = null,
+  sourceImageEl = null,
+) => {
   if (!isAuthenticated.value) {
     router.push({ path: "/guest/login", query: { redirect: route.fullPath } });
     return;
   }
   try {
-    const r = await cartService.addToCart({ product_id: product.id, quantity });
+    const r = await cartStore.addToCart({
+      product_id: product.id,
+      quantity,
+    });
     if (r.success) {
-      await loadCart();
+      await flyToCart(sourceImageEl || getCardImageElement(event));
       if (navHeaderRef.value?.triggerCartPulse)
         navHeaderRef.value.triggerCartPulse();
       toast.success(`${product.product_name} added to cart!`, {

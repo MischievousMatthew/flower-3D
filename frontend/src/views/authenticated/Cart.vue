@@ -1,7 +1,7 @@
 <!-- frontend/src/views/authenticated/Cart.vue -->
 <template>
   <div class="cart-page">
-    <NavHeader :cartCount="cartItems.length" />
+    <NavHeader :cartCount="cartStore.count.value" />
 
     <!-- ✅ Profile Incomplete Modal -->
     <Teleport to="body">
@@ -431,12 +431,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import { usePrice } from "../../composables/usePrice";
+import { useCart } from "../../composables/useCart";
 import NavHeader from "../../layouts/NavHeader.vue";
-import cartService from "../../services/cartService.js";
 import api from "../../plugins/axios"; // ✅ needed to fetch profile
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
@@ -444,6 +444,7 @@ import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 
 const router = useRouter();
 const { isAuthenticated } = useAuth();
+const cartStore = useCart();
 const {
   effectivePrice,
   originalPrice,
@@ -507,6 +508,28 @@ const fetchUserProfile = async () => {
 const goToProfile = () => {
   showProfileModal.value = false;
   router.push("/customer/profile");
+};
+
+const hydrateCartItems = (sourceItems = []) => {
+  cartItems.value = sourceItems.map((item) => ({
+    id: item.id,
+    quantity: item.quantity,
+    price: parseFloat(item.price || 0),
+    color: item.color,
+    size: item.size,
+    product: item.product
+      ? {
+          ...item.product,
+          selling_price: parseFloat(item.product.selling_price || 0),
+          discount_price: item.product.discount_price
+            ? parseFloat(item.product.discount_price)
+            : null,
+          quantity_in_stock: parseInt(item.product.quantity_in_stock || 0),
+          owner: item.product.owner || null,
+          images: item.product.images || [],
+        }
+      : null,
+  }));
 };
 
 // ── Vendor grouping ───────────────────────────────────────────
@@ -629,33 +652,18 @@ const loadCart = async (showLoading = true) => {
       isLoading.value = true;
       isLoadingMessage.value = "Preparing your cart...";
     }
-    const response = await cartService.getCart();
-    if (response.success) {
-      cartItems.value = response.data.items.map((item) => ({
-        id: item.id,
-        quantity: item.quantity,
-        price: parseFloat(item.price || 0),
-        color: item.color,
-        size: item.size,
-        product: item.product
-          ? {
-              ...item.product,
-              selling_price: parseFloat(item.product.selling_price || 0),
-              discount_price: item.product.discount_price
-                ? parseFloat(item.product.discount_price)
-                : null,
-              quantity_in_stock: parseInt(item.product.quantity_in_stock || 0),
-              owner: item.product.owner || null,
-              images: item.product.images || [],
-            }
-          : null,
-      }));
+    await cartStore.refreshCart();
+    hydrateCartItems(cartStore.items.value);
+    if (cartItems.value.length > 0) {
       selectedItems.value = cartItems.value
         .filter((i) => i.product?.quantity_in_stock > 0)
         .map((i) => i.id);
       selectAll.value =
         selectedItems.value.length ===
         cartItems.value.filter((i) => i.product?.quantity_in_stock > 0).length;
+    } else {
+      selectedItems.value = [];
+      selectAll.value = false;
     }
   } catch (error) {
     console.error("Error loading cart:", error);
@@ -665,6 +673,22 @@ const loadCart = async (showLoading = true) => {
     if (showLoading) isLoading.value = false;
   }
 };
+
+watch(
+  () => cartStore.items.value,
+  (value) => {
+    hydrateCartItems(value);
+    const validIds = new Set(cartItems.value.map((item) => item.id));
+    selectedItems.value = selectedItems.value.filter((id) => validIds.has(id));
+    const selectableItems = cartItems.value.filter(
+      (item) => item.product?.quantity_in_stock > 0,
+    );
+    selectAll.value =
+      selectableItems.length > 0 &&
+      selectableItems.every((item) => selectedItems.value.includes(item.id));
+  },
+  { deep: true },
+);
 
 // ── Quantity controls ─────────────────────────────────────────
 const increaseQuantity = (itemId) => {
@@ -705,7 +729,7 @@ const scheduleQuantityUpdate = (itemId, quantity) => {
   pendingUpdates.value[itemId] = true;
   updateTimeouts.value[itemId] = setTimeout(async () => {
     try {
-      await cartService.updateCartItem(itemId, quantity);
+      await cartStore.updateCartItem(itemId, quantity);
       await loadCart(false);
     } catch {
       await loadCart(false);
@@ -748,7 +772,8 @@ const removeFromCart = async (itemId) => {
   delete updateTimeouts.value[itemId];
   delete pendingUpdates.value[itemId];
   try {
-    await cartService.removeFromCart(itemId);
+    await cartStore.removeFromCart(itemId);
+    await loadCart(false);
     toast.success("Item removed from cart");
   } catch {
     cartItems.value.splice(removed.index, 0, removed);

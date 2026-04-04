@@ -76,7 +76,12 @@
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
-          <input type="text" placeholder="Search" class="search-input" />
+          <input
+            v-model.trim="searchQuery"
+            type="text"
+            placeholder="Search modules"
+            class="search-input"
+          />
           <span class="search-kbd">K</span>
         </div>
       </div>
@@ -99,64 +104,70 @@
 
       <!-- ── Nav ────────────────────────────────────── -->
       <nav class="sidebar-nav">
-        <template
-          v-for="item in currentConfig.nav"
-          :key="item.path ?? item.label"
-        >
-          <router-link
-            v-if="item.path"
-            :to="item.path"
-            class="nav-item"
-            :exact-active-class="'active'"
-            :title="isCollapsed ? item.label : undefined"
-          >
-            <span class="nav-icon" v-html="getIcon(item.icon)"></span>
-            <span class="nav-label" v-if="!isCollapsed">{{ item.label }}</span>
-          </router-link>
+        <template v-for="section in currentConfig.sections" :key="section.group">
+          <div v-if="!isCollapsed" class="nav-section-label">
+            {{ section.group }}
+          </div>
 
-          <div v-else class="nav-group">
-            <button
-              class="nav-item expandable"
-              :class="{ 'is-parent-active': isGroupActive(item) }"
-              @click="!isCollapsed && toggleGroup(item.label)"
-              :title="isCollapsed ? item.label : undefined"
+          <template
+            v-for="item in section.items"
+            :key="item.path ?? item.label"
+          >
+            <router-link
+              v-if="item.path"
+              :to="item.path"
+              class="nav-item"
+              :exact-active-class="'active'"
+              :title="isCollapsed ? `${section.group}: ${item.label}` : undefined"
             >
               <span class="nav-icon" v-html="getIcon(item.icon)"></span>
-              <span class="nav-label" v-if="!isCollapsed">{{
-                item.label
-              }}</span>
-              <svg
-                v-if="!isCollapsed"
-                class="chevron"
-                :class="{ rotated: expandedGroups.includes(item.label) }"
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
+              <span class="nav-label" v-if="!isCollapsed">{{ item.label }}</span>
+            </router-link>
 
-            <div
-              class="sub-menu"
-              v-show="expandedGroups.includes(item.label) && !isCollapsed"
-            >
-              <span class="bracket-line"></span>
-              <div class="sub-items">
-                <router-link
-                  v-for="child in item.children"
-                  :key="child.path"
-                  :to="child.path"
-                  class="sub-item"
-                  active-class="active"
-                  >{{ child.label }}</router-link
+            <div v-else class="nav-group">
+              <button
+                class="nav-item expandable"
+                :class="{ 'is-parent-active': isGroupActive(item) }"
+                @click="!isCollapsed && toggleGroup(item.label)"
+                :title="isCollapsed ? `${section.group}: ${item.label}` : undefined"
+              >
+                <span class="nav-icon" v-html="getIcon(item.icon)"></span>
+                <span class="nav-label" v-if="!isCollapsed">{{
+                  item.label
+                }}</span>
+                <svg
+                  v-if="!isCollapsed"
+                  class="chevron"
+                  :class="{ rotated: expandedGroups.includes(item.label) }"
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
                 >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+
+              <div
+                class="sub-menu"
+                v-show="expandedGroups.includes(item.label) && !isCollapsed"
+              >
+                <span class="bracket-line"></span>
+                <div class="sub-items">
+                  <router-link
+                    v-for="child in item.children"
+                    :key="child.path"
+                    :to="child.path"
+                    class="sub-item"
+                    active-class="active"
+                    >{{ child.label }}</router-link
+                  >
+                </div>
               </div>
             </div>
-          </div>
+          </template>
         </template>
       </nav>
 
@@ -207,6 +218,7 @@ const { isCollapsed, isMobileOpen, closeMobile } = useSidebarState();
 
 const isLoading = ref(false);
 const expandedGroups = ref([]);
+const searchQuery = ref("");
 
 // ── Icons ────────────────────────────────────────────────────────────────
 const ICONS = {
@@ -231,29 +243,56 @@ function getIcon(key) {
 
 // ── Build nav from ERP_MODULES, filtered by permissions ──────────────────
 const currentConfig = computed(() => {
-  const nav = [];
+  const query = searchQuery.value.toLowerCase();
+  const groupedSections = new Map();
 
   for (const mod of ERP_MODULES) {
     if (!canView(mod.key)) continue;
 
-    if (mod.children && mod.children.length > 0) {
-      nav.push({
-        label: mod.label,
-        icon: mod.icon,
-        moduleKey: mod.key,
-        children: mod.children,
-      });
-    } else {
-      nav.push({
-        label: mod.label,
-        path: mod.path,
-        icon: mod.icon,
-        moduleKey: mod.key,
-      });
+    const matchedChildren = mod.children?.filter((child) =>
+      child.label.toLowerCase().includes(query),
+    );
+    const matches =
+      !query ||
+      mod.label.toLowerCase().includes(query) ||
+      mod.group.toLowerCase().includes(query) ||
+      mod.key.toLowerCase().includes(query) ||
+      matchedChildren?.length;
+
+    if (!matches) continue;
+
+    const item =
+      mod.children && mod.children.length > 0
+        ? {
+            label: mod.label,
+            icon: mod.icon,
+            moduleKey: mod.key,
+            children: query ? matchedChildren : mod.children,
+          }
+        : {
+            label: mod.label,
+            path: mod.path,
+            icon: mod.icon,
+            moduleKey: mod.key,
+          };
+
+    if (item.children && item.children.length === 0) {
+      continue;
     }
+
+    const sectionItems = groupedSections.get(mod.group) ?? [];
+    sectionItems.push(item);
+    groupedSections.set(mod.group, sectionItems);
   }
 
-  return { nav };
+  const sections = Array.from(groupedSections.entries()).map(
+    ([group, items]) => ({
+      group,
+      items,
+    }),
+  );
+
+  return { sections };
 });
 
 const themeGradient = "linear-gradient(135deg, #48bb78, #38a169)";
@@ -261,10 +300,13 @@ const themeGradient = "linear-gradient(135deg, #48bb78, #38a169)";
 watch(
   () => route.path,
   (path) => {
-    for (const item of currentConfig.value.nav ?? []) {
-      if (item.children?.some((c) => path.startsWith(c.path))) {
-        if (!expandedGroups.value.includes(item.label))
-          expandedGroups.value.push(item.label);
+    for (const section of currentConfig.value.sections ?? []) {
+      for (const item of section.items) {
+        if (item.children?.some((c) => path.startsWith(c.path))) {
+          if (!expandedGroups.value.includes(item.label)) {
+            expandedGroups.value.push(item.label);
+          }
+        }
       }
     }
   },
@@ -568,6 +610,18 @@ async function handleLogout() {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+.nav-section-label {
+  margin-top: 10px;
+  padding: 8px 12px 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+.nav-section-label:first-child {
+  margin-top: 0;
 }
 .sidebar-nav::-webkit-scrollbar {
   width: 3px;

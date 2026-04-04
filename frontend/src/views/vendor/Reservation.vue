@@ -428,7 +428,7 @@ async function loadVendorInfo() {
 async function handleDateSelected(data) {
   try {
     isLoading.value = true;
-    const response = await api.get("/reservations/orders-for-date", {
+    const response = await api.get("/vendor/reservations/orders-for-date", {
       params: { date: data.date },
     });
 
@@ -445,7 +445,7 @@ async function handleDateSelected(data) {
 
 async function loadClosedDates() {
   try {
-    const response = await api.get("/reservations/closed-dates");
+    const response = await api.get("/vendor/reservations/closed-dates");
 
     if (response.data.success) {
       closedDates.value = response.data.data;
@@ -464,7 +464,7 @@ async function submitCloseDate() {
 
     isLoading.value = true;
     const response = await api.post(
-      "/reservations/close-date",
+      "/vendor/reservations/close-date",
       closeDateForm.value,
     );
 
@@ -494,7 +494,7 @@ async function removeClosedDate(id) {
     if (!confirmed) return;
 
     isLoading.value = true;
-    const response = await api.delete(`/reservations/close-date/${id}`);
+    const response = await api.delete(`/vendor/reservations/close-date/${id}`);
 
     if (response.data.success) {
       toast.success("Closed date removed successfully");

@@ -327,16 +327,20 @@ function createDayObject(date, isCurrentMonth) {
   const isPastDate = cleanDate < today;
   const isToday = cleanDate.getTime() === today.getTime();
 
-  // Calculate lead time days - FIXED: Today should always be disabled for customers
+  const sameDayAvailableToday = Boolean(
+    vendorInfo.value?.same_day_available_today,
+  );
+
+  // Calculate lead time days for customers, while honoring same-day availability.
   let isWithinLeadTime = false;
   if (props.disablePastDates) {
-    // Today should ALWAYS be disabled for customers (no same-day orders for flowers)
     if (isToday) {
-      isWithinLeadTime = true;
+      isWithinLeadTime = !sameDayAvailableToday;
     } else if (leadTimeDays.value > 0) {
-      // For future dates, check lead time
       const minAvailableDate = new Date(today);
-      minAvailableDate.setDate(minAvailableDate.getDate() + leadTimeDays.value);
+      if (!sameDayAvailableToday) {
+        minAvailableDate.setDate(minAvailableDate.getDate() + leadTimeDays.value);
+      }
 
       const cleanMinAvailableDate = new Date(
         minAvailableDate.getFullYear(),
@@ -387,7 +391,7 @@ function createDayObject(date, isCurrentMonth) {
     colorClass = "day-gray";
   }
 
-  // Special override for lead time days (including today)
+  // Special override for lead time days.
   if (isWithinLeadTime && isCurrentMonth) {
     colorClass = "lead-time-day";
   }
@@ -430,9 +434,15 @@ function selectDate(day) {
   if (props.disablePastDates && day.isDisabled) {
     // Customer view - show error for disabled dates
     if (day.isToday) {
-      toast.error(
-        "Same-day orders are not available. Please select a future date.",
-      );
+      if (vendorInfo.value?.same_day_delivery) {
+        toast.error(
+          "Same-day delivery is no longer available today.",
+        );
+      } else {
+        toast.error(
+          "Same-day orders are not available. Please select a future date.",
+        );
+      }
     } else if (day.isWithinLeadTime) {
       toast.error(
         `This date requires ${leadTimeDays.value} days preparation time. Please select a date at least ${leadTimeDays.value} days from today.`,

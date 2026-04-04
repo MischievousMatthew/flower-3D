@@ -97,12 +97,12 @@
           >
         </div>
 
-        <div v-if="recentShipments.length === 0" class="empty-chart">
+        <div v-if="visibleRecentShipments.length === 0" class="empty-chart">
           No shipments yet
         </div>
 
         <div
-          v-for="ship in recentShipments"
+          v-for="ship in visibleRecentShipments"
           :key="ship.id"
           class="shipment-row"
         >
@@ -255,7 +255,7 @@
         <!-- Live shipment list -->
         <div class="section-label">Active Shipments</div>
         <div
-          v-for="ship in recentShipments.slice(0, 4)"
+          v-for="ship in visibleRecentShipments.slice(0, 4)"
           :key="ship.id"
           class="live-ship-row"
         >
@@ -305,11 +305,11 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-if="!supplierPerf.length">
+            <tr v-if="!visibleSupplierPerf.length">
               <td colspan="5" class="empty-row">No data</td>
             </tr>
             <tr
-              v-for="(sup, i) in supplierPerf.slice(0, 6)"
+              v-for="(sup, i) in visibleSupplierPerf.slice(0, 6)"
               :key="sup.supplier_id"
               class="perf-row"
             >
@@ -434,6 +434,14 @@ const summary = ref({});
 const inventoryData = ref({});
 const supplierPerf = ref([]);
 const recentShipments = ref([]);
+
+const visibleSupplierPerf = computed(() =>
+  Array.isArray(supplierPerf.value) ? supplierPerf.value : [],
+);
+
+const visibleRecentShipments = computed(() =>
+  Array.isArray(recentShipments.value) ? recentShipments.value : [],
+);
 
 const userName = "Daniel";
 
@@ -652,12 +660,24 @@ async function reload() {
       analyticsService.supplierPerformance(params),
     ]);
 
-    summary.value = sumRes;
-    inventoryData.value = invRes;
-    supplierPerf.value = supRes.suppliers || supRes.data || [];
+    const summaryPayload = sumRes?.data ?? sumRes ?? {};
+    const inventoryPayload = invRes?.data ?? invRes ?? {};
+    const supplierPayload = supRes?.data ?? supRes ?? {};
+
+    summary.value = summaryPayload;
+    inventoryData.value = inventoryPayload;
+    supplierPerf.value = Array.isArray(supplierPayload)
+      ? supplierPayload
+      : Array.isArray(supplierPayload.suppliers)
+        ? supplierPayload.suppliers
+        : Array.isArray(supplierPayload.data)
+          ? supplierPayload.data
+          : [];
 
     // Extract recent shipments from summary if available
-    recentShipments.value = sumRes.recent_shipments || generateMockShipments();
+    recentShipments.value = Array.isArray(summaryPayload.recent_shipments)
+      ? summaryPayload.recent_shipments
+      : generateMockShipments();
   } catch (e) {
     console.error("Dashboard load error:", e);
     // Fallback to mock data for demo

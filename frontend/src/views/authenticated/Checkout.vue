@@ -593,7 +593,7 @@
             <div class="summary-total-row">
               <div class="total-label">
                 <span>Total</span>
-                <span class="total-note">incl. delivery by vendor</span>
+                <span class="total-note">Final order total</span>
               </div>
               <span class="total-amount">₱{{ formatPrice(totalAmount) }}</span>
             </div>
@@ -630,7 +630,7 @@
                     />
                   </svg>
                 </div>
-                <span>Delivery fee handled by the vendor.</span>
+                <span>No delivery fee is included in this checkout.</span>
               </div>
             </div>
           </div>
@@ -720,8 +720,7 @@ const dayHeaders = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 // Computed
 const totalAmount = computed(() => {
-  const subtotal = parseFloat(checkoutData.value.summary?.subtotal || 0);
-  return subtotal;
+  return parseFloat(checkoutData.value.summary?.total_amount || 0);
 });
 
 const currentMonth = computed(() => calendarDate.value.getMonth());
@@ -808,7 +807,9 @@ const calendarDays = computed(() => {
   const today = getPhilippinesToday();
 
   const minDate = new Date(today);
-  minDate.setDate(minDate.getDate() + leadTimeDays.value);
+  if (!vendorReservationSettings.value.sameDayAvailableToday) {
+    minDate.setDate(minDate.getDate() + leadTimeDays.value);
+  }
 
   // Calculate max date (3 months from today)
   const maxDate = new Date(today);
@@ -1113,7 +1114,6 @@ async function placeOrder() {
       reservation_date: selectedDate.value,
       payment_method: selectedPaymentMethod.value,
       delivery_address: checkoutData.value.user?.address || "",
-      delivery_fee: checkoutData.value.summary?.delivery_fee || 0,
       contact_number: checkoutData.value.user?.contact_number || "",
       customer_notes: customerNotes.value,
 

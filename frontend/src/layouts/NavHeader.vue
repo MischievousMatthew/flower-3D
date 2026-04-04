@@ -34,6 +34,7 @@
         <router-link
           v-if="user?.role === 'customer'"
           to="/customer/cart"
+          id="cart-icon"
           class="btn-cart"
           :class="{ 'cart-pulse': cartPulse }"
         >
@@ -211,10 +212,10 @@
 import { ref, onMounted, onUnmounted, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../composables/useAuth";
+import { useCart } from "../composables/useCart";
 import api from "../plugins/axios";
 import { toast } from "vue3-toastify";
 import LoadingOverlay from "../layouts/components/LoadingOverlay.vue";
-import cartService from "../services/cartService.js";
 
 const router = useRouter();
 const { isAuthenticated, logout, isLoggingOut, user } = useAuth();
@@ -227,9 +228,10 @@ const loadingProfile = ref(false);
 const loadingNotifications = ref(false);
 const isLoadingMessage = ref("Loading...");
 const isLoading = ref(null);
-const cartItems = ref([]);
 const orderNotifications = ref([]);
 let notificationInterval = null;
+
+const cartStore = useCart();
 
 isLoading.value = false;
 
@@ -242,22 +244,7 @@ const props = defineProps({
 
 const emit = defineEmits(["scroll-to-section"]);
 
-const cartCount = computed(() => {
-  return cartItems.value.length;
-});
-
-const loadCart = async () => {
-  if (!isAuthenticated.value) return;
-
-  try {
-    const response = await cartService.getCart();
-    if (response.success) {
-      cartItems.value = response.data.items || [];
-    }
-  } catch (error) {
-    console.error("Error loading cart:", error);
-  }
-};
+const cartCount = computed(() => cartStore.count.value);
 
 const userName = computed(() => {
   if (userProfile.value?.name && userProfile.value?.surname) {
@@ -547,6 +534,9 @@ watch(
   isAuthenticated,
   (newVal) => {
     if (newVal && user.value) {
+      if (user.value.role === "customer") {
+        cartStore.initialize();
+      }
       userProfile.value = {
         name: user.value.name,
         surname: user.value.surname,
@@ -555,6 +545,7 @@ watch(
       };
     } else {
       userProfile.value = null;
+      cartStore.resetCart();
     }
   },
   { immediate: true },
@@ -567,9 +558,10 @@ defineExpose({
 onMounted(() => {
   document.addEventListener("click", handleClickOutside);
 
-  loadCart();
-
   if (isAuthenticated.value) {
+    if (user.value?.role === "customer") {
+      cartStore.initialize();
+    }
     loadUserProfile();
     loadOrderNotifications();
 

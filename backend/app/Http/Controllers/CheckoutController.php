@@ -142,9 +142,7 @@ class CheckoutController extends Controller
                 ];
             }
 
-            // Vendor-defined delivery fee (NO TAX)
-            $deliveryFee = $vendorApplication->default_delivery_fee ?? 50.00;
-            $totalAmount = $subtotal + $deliveryFee;
+            $totalAmount = $subtotal;
 
             // Payment methods
             $paymentMethods = $this->getAvailablePaymentMethods($vendorApplication);
@@ -211,7 +209,6 @@ class CheckoutController extends Controller
             $validator = Validator::make($request->all(), [
                 'payment_method' => 'required|in:bank_transfer,gcash,maya,cod,card',
                 'delivery_address' => 'required|string',
-                'delivery_fee' => 'required|numeric|min:0',
                 'contact_number' => 'required|string',
                 'delivery_notes' => 'nullable|string',
                 'customer_notes' => 'nullable|string',
@@ -392,8 +389,7 @@ class CheckoutController extends Controller
                     ];
                 }
 
-                $deliveryFee = $request->delivery_fee;
-                $total = $subtotal + $deliveryFee; // NO TAX
+                $total = $subtotal;
                 $paymentMethod = $request->payment_method;
 
                 // Create order with CORRECT reservation date (Y-m-d format)
@@ -402,7 +398,7 @@ class CheckoutController extends Controller
                     'vendor_id' => $vendorId,
                     'order_number' => 'ORD-' . strtoupper(uniqid()),
                     'subtotal' => $subtotal,
-                    'delivery_fee' => $deliveryFee,
+                    'delivery_fee' => 0,
                     'total_amount' => $total,
                     'payment_method' => $paymentMethod,
                     'payment_status' => 'unpaid',
@@ -471,6 +467,26 @@ class CheckoutController extends Controller
                             ]
                         ]);
                     }
+
+                    $order->update([
+                        'status' => 'failed',
+                        'payment_status' => 'failed',
+                        'paymongo_response' => [
+                            'error' => $paymentResponse['message'] ?? 'Failed to initialize online payment.',
+                            'payment_method' => $paymentMethod,
+                        ],
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => $paymentResponse['message'] ?? 'Failed to initialize online payment.',
+                        'data' => [
+                            'order' => [
+                                'id' => $order->id,
+                                'order_number' => $order->order_number,
+                            ],
+                        ],
+                    ], 502);
                 }
 
                 // For COD or bank transfer
@@ -572,13 +588,16 @@ class CheckoutController extends Controller
             return ['success' => false, 'message' => 'Payment gateway not configured'];
         }
 
-        $paymentTypes = [
+        $checkoutMethod = match ($paymentMethod) {
             'gcash' => 'gcash',
             'maya' => 'paymaya',
             'card' => 'card',
-        ];
+            default => null,
+        };
 
-        $sourceType = $paymentTypes[$paymentMethod] ?? 'gcash';
+        if (!$checkoutMethod) {
+            return ['success' => false, 'message' => 'Unsupported online payment method.'];
+        }
 
         $client = new Client(['timeout' => 30]);
         $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
@@ -611,7 +630,7 @@ class CheckoutController extends Controller
                             ]
                         ],
 
-                        'payment_method_types' => [$sourceType],
+                        'payment_method_types' => [$checkoutMethod],
 
                         'success_url' => $frontendUrl . '/customer/orders',
                         'failure_url' => $frontendUrl . '/customer/checkout?payment=failed',

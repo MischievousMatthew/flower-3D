@@ -606,6 +606,7 @@
             />
             <div v-else class="image-container">
               <img
+                ref="selectedProductImageRef"
                 :src="
                   selectedProduct.images?.[selectedImageIndex]?.image_url ||
                   getProductImage(selectedProduct, true)
@@ -812,7 +813,8 @@ import NavHeader from "../../layouts/NavHeader.vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import ModelViewer3D from "../../layouts/3D/3DModelViewer.vue";
 import productService from "../../services/productService.js";
-import cartService from "../../services/cartService.js";
+import { useCart } from "../../composables/useCart";
+import { useFlyToCart } from "../../composables/useFlyToCart";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import ProductReviews from "../../layouts/components/ProductReviews.vue";
@@ -820,9 +822,10 @@ import ProductCard from "../../layouts/components/ProductCard.vue";
 
 const router = useRouter();
 const { isAuthenticated } = useAuth();
+const cartStore = useCart();
+const { flyToCart } = useFlyToCart();
 
 const navHeaderRef = ref(null);
-const cartItems = ref([]);
 const addingToCart = ref(false);
 const addingToCartProductId = ref(null);
 const addingToCartModal = ref(false);
@@ -830,6 +833,7 @@ const show3D = ref(false);
 const showProductModal = ref(false);
 const selectedProduct = ref(null);
 const selectedImageIndex = ref(0);
+const selectedProductImageRef = ref(null);
 const quantity = ref(1);
 const showAuthModal = ref(false);
 const pendingAction = ref(null);
@@ -898,7 +902,7 @@ let countdownInterval = null;
 let vendorSearchTimeout = null;
 
 // ── Computed ──────────────────────────────────────────────────────────────
-const cartCount = computed(() => cartItems.value.length);
+const cartCount = computed(() => cartStore.count.value);
 const priceRangeText = computed(() =>
   selectedFilters.value.priceMin !== null &&
   selectedFilters.value.priceMax !== null
@@ -959,7 +963,7 @@ watch(isAuthenticated, async (val) => {
       await loadPendingActionFromStorage();
     }
   } else {
-    cartItems.value = [];
+    cartStore.resetCart();
     clearPendingActionFromStorage();
   }
 });
@@ -1159,10 +1163,7 @@ const fetchFilterOptions = async () => {
 };
 const loadCart = async () => {
   if (!isAuthenticated.value) return;
-  try {
-    const r = await cartService.getCart();
-    if (r.success) cartItems.value = r.data.items || [];
-  } catch (e) {}
+  await cartStore.initialize();
 };
 const clearAllFilters = () => {
   selectedFilters.value = {
@@ -1255,10 +1256,10 @@ const executePendingAction = async (action, product, qty) => {
   if (action === "addToCartModal") await addToCartModalAction(product, qty);
   if (action === "buyNow") await buyNowAction(product, qty);
 };
-const addToCartModalAction = async (product, qty) => {
+const addToCartModalAction = async (product, qty, animationContext = {}) => {
   if (!product) return;
   addingToCartModal.value = true;
-  const s = await addToCartDirect(product, qty);
+  const s = await addToCartDirect(product, qty, animationContext);
   if (s) setTimeout(() => closeModal(), 800);
   addingToCartModal.value = false;
 };
@@ -1387,9 +1388,11 @@ const addToCartModal = async () => {
   if (!selectedProduct.value) return;
   if (!requireAuth("addToCartModal", selectedProduct.value, quantity.value))
     return;
-  await addToCartModalAction(selectedProduct.value, quantity.value);
+  await addToCartModalAction(selectedProduct.value, quantity.value, {
+    imageEl: selectedProductImageRef.value,
+  });
 };
-const addToCartDirect = async (product, qty = 1) => {
+const addToCartDirect = async (product, qty = 1, animationContext = {}) => {
   if (!isAuthenticated.value) {
     requireAuth("addToCart", product, qty);
     return false;
@@ -1397,7 +1400,7 @@ const addToCartDirect = async (product, qty = 1) => {
   addingToCartProductId.value = product.id;
   addingToCart.value = true;
   try {
-    const r = await cartService.addToCart({
+    const r = await cartStore.addToCart({
       product_id: product.id,
       quantity: qty,
       color: product.color || null,
@@ -1405,7 +1408,7 @@ const addToCartDirect = async (product, qty = 1) => {
       customizations: {},
     });
     if (r.success) {
-      await loadCart();
+      await flyToCart(animationContext.imageEl);
       if (navHeaderRef.value) navHeaderRef.value.triggerCartPulse();
       toast.success(`${product.product_name} added to cart!`, {
         autoClose: 2000,
