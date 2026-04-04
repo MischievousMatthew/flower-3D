@@ -1136,17 +1136,36 @@ async function placeOrder() {
     console.log("Order response:", response.data);
 
     if (response.data.success) {
-      toast.success("Order created successfully!");
-
-      if (isDirectCheckout.value) {
-        sessionStorage.removeItem("directCheckout");
-      } else {
-        localStorage.removeItem("checkout_data");
-      }
+      const checkoutUrl =
+        response.data.checkout_url ||
+        response.data.data?.payment?.redirect_url ||
+        response.data.data?.payment?.checkout_url;
 
       if (response.data.data?.payment?.requires_redirect) {
-        window.location.href = response.data.data.payment.redirect_url;
+        if (!checkoutUrl) {
+          console.error("Checkout redirect URL missing:", response.data);
+          toast.error(
+            "Payment session was created but no checkout URL was returned.",
+          );
+          return;
+        }
+
+        if (isDirectCheckout.value) {
+          sessionStorage.removeItem("directCheckout");
+        } else {
+          localStorage.removeItem("checkout_data");
+        }
+
+        window.location.href = checkoutUrl;
       } else {
+        toast.success("Order created successfully!");
+
+        if (isDirectCheckout.value) {
+          sessionStorage.removeItem("directCheckout");
+        } else {
+          localStorage.removeItem("checkout_data");
+        }
+
         router.push("/customer/orders");
       }
     } else {
@@ -1154,7 +1173,7 @@ async function placeOrder() {
     }
   } catch (error) {
     console.log("Validation errors:", error.response?.data?.errors);
-    console.error("Error placing order:", error);
+    console.error("Checkout error:", error.response?.data || error);
     toast.error(error.response?.data?.message || "Failed to place order");
   } finally {
     isProcessing.value = false;

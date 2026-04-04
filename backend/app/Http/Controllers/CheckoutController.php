@@ -10,9 +10,9 @@ use App\Models\ReservationAvailabilityCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use GuzzleHttp\Client;
 use Carbon\Carbon;
 
 class CheckoutController extends Controller
@@ -449,6 +449,7 @@ class CheckoutController extends Controller
                         return response()->json([
                             'success' => true,
                             'message' => 'Order created. Redirecting to payment...',
+                            'checkout_url' => $paymentResponse['checkout_url'],
                             'data' => [
                                 'order' => [
                                     'id' => $order->id,
@@ -581,7 +582,7 @@ class CheckoutController extends Controller
      */
     private function createPayMongoPayment(Order $order, string $paymentMethod)
     {
-        $secretKey = env('PAYMONGO_SECRET_KEY');
+        $secretKey = config('services.paymongo.secret_key');
 
         if (!$secretKey) {
             Log::error('PayMongo secret key not configured');
@@ -599,8 +600,9 @@ class CheckoutController extends Controller
             return ['success' => false, 'message' => 'Unsupported online payment method.'];
         }
 
-        $client = new Client(['timeout' => 30]);
-        $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+        $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:5173'), '/');
+
+        $order->loadMissing('user');
 
         try {
             $checkoutData = [
@@ -609,17 +611,13 @@ class CheckoutController extends Controller
                         'send_email_receipt' => true,
                         'show_description' => true,
                         'show_line_items' => true,
-
-                        // ✅ CUSTOMER CONTAINER (THIS IS WHAT YOU WANT)
                         'customer' => [
-                            'name' => $order->delivery_contact_name, // REQUIRED
-                            'email' => $order->user->email,           // REQUIRED
-                            'phone' => $order->delivery_contact_number ?: null, // OPTIONAL
+                            'name' => $order->delivery_contact_name,
+                            'email' => $order->user?->email,
+                            'phone' => $order->delivery_contact_number ?: null,
                         ],
-
                         'description' => 'Order #' . $order->order_number .
                             ' | Reservation: ' . $order->reservation_date,
-
                         'line_items' => [
                             [
                                 'currency' => 'PHP',
@@ -629,37 +627,55 @@ class CheckoutController extends Controller
                                 'name' => 'Order #' . $order->order_number,
                             ]
                         ],
-
                         'payment_method_types' => [$checkoutMethod],
-
                         'success_url' => $frontendUrl . '/customer/orders',
-                        'failure_url' => $frontendUrl . '/customer/checkout?payment=failed',
-
+                        'cancel_url' => $frontendUrl . '/customer/checkout?payment=cancelled',
                         'metadata' => [
                             'order_id' => (string) $order->id,
                             'order_number' => $order->order_number,
                             'reservation_date' => $order->reservation_date,
+                            'payment_method' => $paymentMethod,
                         ],
                     ],
                 ],
             ];
 
-            $response = $client->post(
-                'https://api.paymongo.com/v1/checkout_sessions',
-                [
-                    'headers' => [
-                        'Authorization' => 'Basic ' . base64_encode($secretKey . ':'),
-                        'Content-Type' => 'application/json',
-                        'Accept' => 'application/json',
-                    ],
-                    'json' => $checkoutData,
-                ]
-            );
+            Log::info('Creating PayMongo checkout session', [
+                'order_id' => $order->id,
+                'payment_method' => $paymentMethod,
+                'checkout_method' => $checkoutMethod,
+                'amount_centavos' => $checkoutData['data']['attributes']['line_items'][0]['amount'],
+                'success_url' => $checkoutData['data']['attributes']['success_url'],
+                'cancel_url' => $checkoutData['data']['attributes']['cancel_url'],
+            ]);
 
-            $responseData = json_decode($response->getBody(), true);
+            $response = Http::withBasicAuth($secretKey, '')
+                ->acceptJson()
+                ->timeout(30)
+                ->post('https://api.paymongo.com/v1/checkout_sessions', $checkoutData);
+
+            $responseData = $response->json();
+
+            Log::info('PayMongo response', [
+                'order_id' => $order->id,
+                'status' => $response->status(),
+                'response' => $responseData,
+            ]);
+
+            if (!$response->successful()) {
+                return [
+                    'success' => false,
+                    'message' => $responseData['errors'][0]['detail']
+                        ?? $responseData['message']
+                        ?? 'Payment gateway error. Please try again.',
+                ];
+            }
 
             if (!isset($responseData['data']['attributes']['checkout_url'])) {
-                Log::error('PayMongo checkout URL missing', $responseData);
+                Log::error('PayMongo checkout URL missing', [
+                    'order_id' => $order->id,
+                    'response' => $responseData,
+                ]);
                 return ['success' => false, 'message' => 'Invalid PayMongo response'];
             }
 
@@ -668,17 +684,18 @@ class CheckoutController extends Controller
                 'payment_intent_id' => $responseData['data']['id'],
                 'checkout_url' => $responseData['data']['attributes']['checkout_url'],
             ];
-
-        } catch (\GuzzleHttp\Exception\RequestException $e) {
-            $response = $e->getResponse();
+        } catch (\Throwable $e) {
             Log::error('PayMongo API error', [
-                'status' => $response?->getStatusCode(),
-                'body' => $response?->getBody()?->getContents(),
+                'order_id' => $order->id,
+                'payment_method' => $paymentMethod,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [
                 'success' => false,
                 'message' => 'Payment gateway error. Please try again.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
             ];
         }
     }
