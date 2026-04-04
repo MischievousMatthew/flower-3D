@@ -675,6 +675,7 @@ const selectedDate = ref(null);
 const calendarDate = ref(new Date());
 const calendarData = ref({});
 const leadTimeDays = ref(3);
+const preparationDays = ref(0);
 const vendorReservationSettings = ref({
   timezone: PH_TIMEZONE,
   sameDayDelivery: false,
@@ -737,11 +738,17 @@ const todayLegendText = computed(() =>
 
 const vendorReservationNotice = computed(() => {
   const parts = [];
+  const prepDays = preparationDays.value;
+  const prepText =
+    prepDays === 1 ? "1 day preparation time." : `${prepDays} days preparation time.`;
 
   parts.push(
     `Vendor capacity: ${vendorReservationSettings.value.maxOrdersPerDay} orders per day.`,
   );
-  parts.push(`Lead time: ${leadTimeDays.value} day(s).`);
+  parts.push(prepText);
+  parts.push(
+    `Available dates start after ${leadTimeDays.value} ${leadTimeDays.value === 1 ? "day" : "days"} prep time.`,
+  );
 
   if (vendorReservationSettings.value.sameDayDelivery) {
     if (vendorReservationSettings.value.cutoffTimeToday) {
@@ -871,14 +878,6 @@ function createDayObject(date, isCurrentMonth, today, minDate, maxDate) {
   const isPastDate = cleanDate < today;
   const isToday = cleanDate.getTime() === today.getTime();
 
-  // Calculate tomorrow and day after tomorrow
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const dayAfterTomorrow = new Date(today);
-  dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-
-  const isTomorrow = cleanDate.getTime() === tomorrow.getTime();
-  const isDayAfterTomorrow = cleanDate.getTime() === dayAfterTomorrow.getTime();
   const isWithinLeadTime = Boolean(availability?.is_within_lead_time) || cleanDate < minDate;
   const isBeyondLimit = cleanDate > maxDate;
   const isSameDayCutoffBlocked = Boolean(
@@ -897,12 +896,11 @@ function createDayObject(date, isCurrentMonth, today, minDate, maxDate) {
   } else if (isToday && vendorReservationSettings.value.sameDayAvailableToday) {
     colorClass = "day-available";
     label = "Today";
-  } else if (isTomorrow || isDayAfterTomorrow) {
-    colorClass = "day-prep-time";
-    label = "Prep Time";
   } else if (isWithinLeadTime || isSameDayCutoffBlocked) {
     colorClass = "day-prep-time";
-    label = isSameDayCutoffBlocked ? "Cutoff" : "Prep Time";
+    label = isSameDayCutoffBlocked
+      ? "Cutoff"
+      : `${leadTimeDays.value} Day${leadTimeDays.value === 1 ? "" : "s"} Prep`;
   } else if (availability) {
     if (availability.is_disabled || availability.status === "closed") {
       colorClass = "day-disabled";
@@ -960,7 +958,7 @@ function selectDate(day) {
       );
     } else if (day.isToday || day.isWithinLeadTime) {
       toast.error(
-        `Flowers require ${leadTimeDays.value} day(s) preparation time. Please select a date at least ${leadTimeDays.value} day(s) from today.`,
+        `Flowers require ${leadTimeDays.value} ${leadTimeDays.value === 1 ? "day" : "days"} preparation time. Please select a date at least ${leadTimeDays.value} ${leadTimeDays.value === 1 ? "day" : "days"} from today.`,
       );
     } else if (day.isPastDate) {
       toast.error("Cannot select past dates.");
@@ -987,6 +985,7 @@ async function loadCalendarData() {
         vendor_id: checkoutData.value.vendor?.id,
         start_date: startDate,
         end_date: endDate,
+        prep_days: preparationDays.value,
       },
     });
 
@@ -994,6 +993,7 @@ async function loadCalendarData() {
       calendarData.value = res.data.data.calendar || {};
       const vendor = res.data.data.vendor || {};
       leadTimeDays.value = Number(vendor.lead_time_days ?? 3);
+      preparationDays.value = Number(vendor.preparation_days ?? preparationDays.value);
       vendorReservationSettings.value = {
         timezone: vendor.timezone || PH_TIMEZONE,
         sameDayDelivery: Boolean(vendor.same_day_delivery),
@@ -1052,6 +1052,15 @@ async function loadCheckoutData() {
 
       if (response.data.success) {
         checkoutData.value = response.data.data;
+        preparationDays.value = Number(
+          checkoutData.value.summary?.preparation_days ??
+            Math.max(
+              0,
+              ...(checkoutData.value.items || []).map((item) =>
+                Number(item.preparation_days ?? 0),
+              ),
+            ),
+        );
       } else {
         toast.error("Failed to load direct checkout data");
         router.push("/shop");
@@ -1071,6 +1080,15 @@ async function loadCheckoutData() {
 
       if (response.data.success) {
         checkoutData.value = response.data.data;
+        preparationDays.value = Number(
+          checkoutData.value.summary?.preparation_days ??
+            Math.max(
+              0,
+              ...(checkoutData.value.items || []).map((item) =>
+                Number(item.preparation_days ?? 0),
+              ),
+            ),
+        );
       } else {
         toast.error("Failed to load checkout data");
         router.push("/customer/cart");

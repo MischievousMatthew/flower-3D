@@ -141,10 +141,12 @@ class CheckoutController extends Controller
                     'customizations' => $cartItem->customizations,
                     'model_3d_url' => $model3d?->model_url,
                     'model_3d_path' => $model3d?->model_path,
+                    'preparation_days' => $this->resolveProductPreparationDays($cartItem->product),
                 ];
             }
 
             $totalAmount = $subtotal;
+            $preparationDays = $this->resolvePreparationDays($cartItems);
 
             // Payment methods
             $paymentMethods = $this->getAvailablePaymentMethods($vendorApplication);
@@ -165,6 +167,7 @@ class CheckoutController extends Controller
                     'max_orders_per_day' => $vendorApplication?->max_orders_per_day ?? 10,
                     'lead_time' => $vendorApplication?->lead_time ?? '',
                     'lead_time_days' => $vendorApplication?->reservationLeadTimeDays() ?? 3,
+                    'preparation_days' => $preparationDays,
                     'same_day_delivery' => (bool) ($vendorApplication?->same_day_delivery ?? false),
                     'cutoff_times' => $vendorApplication?->cutoff_times ?? [],
                     'cutoff_time_today' => $vendorApplication?->cutoffTimeForDate(Carbon::now(VendorApplication::RESERVATION_TIMEZONE)),
@@ -179,6 +182,7 @@ class CheckoutController extends Controller
                 'summary' => [
                     'subtotal' => $subtotal,
                     'total_amount' => $totalAmount,
+                    'preparation_days' => $preparationDays,
                 ],
             ];
 
@@ -288,7 +292,11 @@ class CheckoutController extends Controller
                 ], 400);
             }
 
-            $settings = VendorApplication::buildReservationSettings($vendorUser, $vendor);
+            $preparationDays = $this->resolvePreparationDays($cartItems);
+            $settings = $this->applyPreparationLeadTime(
+                VendorApplication::buildReservationSettings($vendorUser, $vendor),
+                $preparationDays
+            );
             $nowInPh = Carbon::now($settings['timezone']);
             $todayInPh = $nowInPh->copy()->startOfDay();
             $maxDate = $todayInPh->copy()->addMonths(3);
@@ -299,6 +307,7 @@ class CheckoutController extends Controller
                 'today_ph' => $todayInPh->toDateString(),
                 'timezone' => $settings['timezone'],
                 'lead_time_days' => $settings['lead_time_days'],
+                'preparation_days' => $preparationDays,
                 'same_day_delivery' => $settings['same_day_delivery'],
                 'cutoff_time_today' => $settings['cutoff_time_today'],
             ]);
@@ -388,6 +397,7 @@ class CheckoutController extends Controller
                         'customizations' => $item->customizations ?? [],
                         'model_3d_url' => $model3d?->model_url,
                         'model_3d_path' => $model3d?->model_path,
+                        'preparation_time' => $this->resolveProductPreparationDays($item->product),
                     ];
                 }
 
@@ -439,6 +449,28 @@ class CheckoutController extends Controller
 
                 // Handle payment
                 if (in_array($paymentMethod, ['gcash', 'maya', 'card', 'bank_transfer'], true)) {
+                    if ($paymentMethod === 'bank_transfer' && ! $this->hasPayMongoConfiguration()) {
+                        Log::warning('Falling back to manual bank transfer because PayMongo is not configured', [
+                            'order_id' => $order->id,
+                            'vendor_id' => $vendorId,
+                        ]);
+
+                        return response()->json([
+                            'success' => true,
+                            'message' => 'Order created. Awaiting bank transfer.',
+                            'data' => [
+                                'order' => [
+                                    'id' => $order->id,
+                                    'order_number' => $order->order_number,
+                                    'total_amount' => $order->total_amount,
+                                    'payment_method' => $order->payment_method,
+                                    'status' => $order->status,
+                                    'reservation_date' => $order->reservation_date,
+                                ],
+                            ],
+                        ]);
+                    }
+
                     $paymentResponse = $this->createPayMongoPayment($order, $paymentMethod);
                     
                     if ($paymentResponse['success']) {
@@ -571,10 +603,13 @@ class CheckoutController extends Controller
      */
     private function createPayMongoPayment(Order $order, string $paymentMethod)
     {
-        $secretKey = config('services.paymongo.secret_key');
+        $secretKey = $this->getPayMongoSecretKey();
 
         if (!$secretKey) {
-            Log::error('PayMongo secret key not configured');
+            Log::error('PayMongo secret key not configured', [
+                'payment_method' => $paymentMethod,
+                'order_id' => $order->id,
+            ]);
             return ['success' => false, 'message' => 'Payment gateway not configured'];
         }
 
@@ -1104,6 +1139,55 @@ class CheckoutController extends Controller
     private function buildPayMongoReference(Order $order): string
     {
         return $order->order_number;
+    }
+
+    private function getPayMongoSecretKey(): ?string
+    {
+        return config('services.paymongo.secret_key') ?: env('PAYMONGO_SECRET_KEY');
+    }
+
+    private function hasPayMongoConfiguration(): bool
+    {
+        return !empty($this->getPayMongoSecretKey());
+    }
+
+    private function resolvePreparationDays(iterable $cartItems): int
+    {
+        $days = 0;
+
+        foreach ($cartItems as $cartItem) {
+            $days = max($days, $this->resolveProductPreparationDays($cartItem->product ?? null));
+        }
+
+        return $days;
+    }
+
+    private function resolveProductPreparationDays(?Product $product): int
+    {
+        if (!$product) {
+            return 0;
+        }
+
+        $rawDays = $product->preparation_time
+            ?? $product->preparation_days
+            ?? $product->supplier_lead_time
+            ?? 0;
+
+        return max(0, (int) ceil((float) $rawDays));
+    }
+
+    private function applyPreparationLeadTime(array $settings, int $preparationDays): array
+    {
+        $effectiveLeadTime = max((int) ($settings['lead_time_days'] ?? 0), $preparationDays);
+        $sameDayAvailable = ($settings['same_day_delivery'] ?? false)
+            && $effectiveLeadTime === 0
+            && !($settings['same_day_cutoff_reached'] ?? true);
+
+        $settings['lead_time_days'] = $effectiveLeadTime;
+        $settings['preparation_days'] = $preparationDays;
+        $settings['same_day_available_today'] = $sameDayAvailable;
+
+        return $settings;
     }
 
     private function resolveWebhookOrder(array $attributes = [], array $metadata = []): ?Order
