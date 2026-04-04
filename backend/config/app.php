@@ -123,6 +123,6 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
-    'frontend_url' => env('FRONTEND_URL', 'https://flower-3d.vercel.app'),
+    'frontend_url' => env('FRONTEND_URL', 'https://bloomcraft-app.vercel.app'),
 
 ];

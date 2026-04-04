@@ -638,7 +638,8 @@ class CheckoutController extends Controller
             return ['success' => false, 'message' => 'Unsupported online payment method.'];
         }
 
-        $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:5173'), '/');
+        $frontendUrl = rtrim(config('app.frontend_url', 'https://bloomcraft-app.vercel.app'), '/');
+        $callbackUrl = url('/api/payment/callback');
         $referenceNumber = $this->buildPayMongoReference($order);
 
         $order->loadMissing('user');
@@ -667,8 +668,12 @@ class CheckoutController extends Controller
                             ]
                         ],
                         'payment_method_types' => [$checkoutMethod],
-                        'success_url' => $frontendUrl . '/customer/orders?payment=success&reference=' . urlencode($referenceNumber),
-                        'cancel_url' => $frontendUrl . '/customer/checkout?payment=cancelled',
+                        'success_url' => $callbackUrl
+                            . '?success=true&order_id=' . urlencode((string) $order->id)
+                            . '&reference=' . urlencode($referenceNumber),
+                        'cancel_url' => $callbackUrl
+                            . '?success=false&order_id=' . urlencode((string) $order->id)
+                            . '&reference=' . urlencode($referenceNumber),
                         'reference_number' => $referenceNumber,
                         'metadata' => [
                             'order_id' => (string) $order->id,
@@ -1135,22 +1140,46 @@ class CheckoutController extends Controller
     {
         $success = $request->get('success') === 'true';
         $orderId = $request->get('order_id');
+        $reference = $request->get('reference');
+        $frontendUrl = rtrim(config('app.frontend_url', 'https://bloomcraft-app.vercel.app'), '/');
 
-        if (!$orderId) {
-            return redirect('/')->with('error', 'Invalid payment callback');
+        if (!$orderId && !$reference) {
+            return redirect($frontendUrl . '/customer/orders?payment=invalid');
         }
 
-        $order = Order::find($orderId);
+        $order = $orderId ? Order::find($orderId) : null;
+
+        if (!$order && $reference) {
+            $order = Order::where('order_number', $reference)->first();
+        }
 
         if (!$order) {
-            return redirect('/')->with('error', 'Order not found');
+            return redirect($frontendUrl . '/customer/orders?payment=missing');
         }
 
         if ($success) {
-            return redirect('/customer/orders?payment=success&reference=' . urlencode($this->buildPayMongoReference($order)));
-        } else {
-            return redirect('/customer/checkout')->with('error', 'Payment failed. Please try again.');
+            if ($order->payment_status !== 'paid') {
+                try {
+                    $this->markOrderPaidFromWebhook($order, [
+                        'reference_number' => $reference ?: $this->buildPayMongoReference($order),
+                        'resource' => 'payment.callback',
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::error('Payment callback failed to mark order as paid', [
+                        'order_id' => $order->id,
+                        'reference' => $reference,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            return redirect(
+                $frontendUrl . '/customer/orders?payment=success&reference='
+                . urlencode($reference ?: $this->buildPayMongoReference($order))
+            );
         }
+
+        return redirect($frontendUrl . '/customer/checkout?payment=cancelled');
     }
 
     private function buildPayMongoReference(Order $order): string
@@ -1200,6 +1229,10 @@ class CheckoutController extends Controller
 
     private function markOrderPaidFromWebhook(Order $order, array $paymentContext = []): void
     {
+        if ($order->payment_status === 'paid') {
+            return;
+        }
+
         DB::transaction(function () use ($order, $paymentContext) {
             $updates = [
                 'payment_status' => 'paid',
