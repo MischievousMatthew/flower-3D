@@ -6,7 +6,7 @@
         <div class="header-left">
           <router-link to="/" class="logo"
             ><img
-              src="../../../public/bloomcraft-blankBg.png"
+              src="../../../../../public/bloomcraft-blankBg.png"
               alt="Bloomcraft Logo"
               width="60"
               height="60"
