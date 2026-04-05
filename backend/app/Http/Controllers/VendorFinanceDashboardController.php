@@ -3,11 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\Payroll;
 use App\Models\VendorBalance;
 use App\Models\VendorTransaction;
 use App\Traits\ResolvesOwner;
+use Carbon\Carbon;
+use Carbon\CarbonPeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 class VendorFinanceDashboardController extends Controller
@@ -24,55 +29,56 @@ class VendorFinanceDashboardController extends Controller
     {
         try {
             $vendorId = $this->resolveVendorId($request);
+            $period = $request->input('period', 'this_month');
+            [$periodFrom, $periodTo] = $this->periodBounds($period);
 
             $balance = VendorBalance::forVendor($vendorId);
 
             $thisMonthRevenue = VendorTransaction::forVendor($vendorId)
                 ->credits()
                 ->where('category', 'order_revenue')
-                ->whereMonth('created_at', now()->month)
-                ->whereYear('created_at', now()->year)
+                ->whereBetween('created_at', [$periodFrom, $periodTo])
                 ->sum('amount');
 
-            $lastMonthRevenue = VendorTransaction::forVendor($vendorId)
+            [$comparisonFrom, $comparisonTo] = $this->comparisonBounds($periodFrom, $periodTo, $period);
+
+            $comparisonRevenue = VendorTransaction::forVendor($vendorId)
                 ->credits()
                 ->where('category', 'order_revenue')
-                ->whereMonth('created_at', now()->subMonth()->month)
-                ->whereYear('created_at', now()->subMonth()->year)
+                ->whereBetween('created_at', [$comparisonFrom, $comparisonTo])
                 ->sum('amount');
 
-            $revenueChange = $lastMonthRevenue > 0
-                ? round((($thisMonthRevenue - $lastMonthRevenue) / $lastMonthRevenue) * 100, 1)
+            $revenueChange = $comparisonRevenue > 0
+                ? round((($thisMonthRevenue - $comparisonRevenue) / $comparisonRevenue) * 100, 1)
                 : ($thisMonthRevenue > 0 ? 100 : 0);
 
-            $completedThisMonth = $this->countCompletedOrdersForPeriod(
+            $completedThisPeriod = $this->countCompletedOrdersForPeriod(
                 $vendorId,
-                now()->copy()->startOfMonth(),
-                now()->copy()->endOfMonth(),
+                $periodFrom,
+                $periodTo,
             );
 
-            $completedLastMonth = $this->countCompletedOrdersForPeriod(
+            $completedComparisonPeriod = $this->countCompletedOrdersForPeriod(
                 $vendorId,
-                now()->copy()->subMonth()->startOfMonth(),
-                now()->copy()->subMonth()->endOfMonth(),
+                $comparisonFrom,
+                $comparisonTo,
             );
 
-            $ordersChange = $completedLastMonth > 0
-                ? round((($completedThisMonth - $completedLastMonth) / $completedLastMonth) * 100, 1)
-                : ($completedThisMonth > 0 ? 100 : 0);
+            $ordersChange = $completedComparisonPeriod > 0
+                ? round((($completedThisPeriod - $completedComparisonPeriod) / $completedComparisonPeriod) * 100, 1)
+                : ($completedThisPeriod > 0 ? 100 : 0);
 
             $expensesByCategory = VendorTransaction::forVendor($vendorId)
                 ->debits()
-                ->whereIn('category', ['refund', 'procurement', 'payroll'])
-                ->whereMonth('created_at', now()->month)
-                ->whereYear('created_at', now()->year)
+                ->whereIn('category', ['refund', 'procurement'])
+                ->whereBetween('created_at', [$periodFrom, $periodTo])
                 ->selectRaw('category, SUM(amount) as total')
                 ->groupBy('category')
                 ->pluck('total', 'category');
 
             $refundsThisMonth = (float) ($expensesByCategory['refund'] ?? 0);
             $procurementThisMonth = (float) ($expensesByCategory['procurement'] ?? 0);
-            $payrollThisMonth = (float) ($expensesByCategory['payroll'] ?? 0);
+            $payrollThisMonth = $this->sumPayrollExpensesForPeriod($vendorId, $periodFrom, $periodTo);
             $totalExpenses = $refundsThisMonth + $procurementThisMonth + $payrollThisMonth;
             $netProfit = $thisMonthRevenue - $totalExpenses;
 
@@ -90,20 +96,20 @@ class VendorFinanceDashboardController extends Controller
                         'raw' => $thisMonthRevenue,
                         'change_pct' => $revenueChange,
                         'label' => 'Total Revenue',
-                        'period' => 'This Month',
+                        'period' => $this->periodLabel($period),
                     ],
                     'net_profit' => [
                         'amount' => number_format($netProfit, 2),
                         'raw' => $netProfit,
                         'change_pct' => null,
                         'label' => 'Net Profit',
-                        'period' => 'This Month',
+                        'period' => $this->periodLabel($period),
                     ],
                     'completed_orders' => [
-                        'count' => $completedThisMonth,
+                        'count' => $completedThisPeriod,
                         'change_pct' => $ordersChange,
                         'label' => 'Completed Orders',
-                        'period' => 'This Month',
+                        'period' => $this->periodLabel($period),
                     ],
                     'lifetime' => [
                         'total_earned' => (float) $balance->total_earned,
@@ -115,6 +121,7 @@ class VendorFinanceDashboardController extends Controller
                         'payroll' => $payrollThisMonth,
                         'total' => $totalExpenses,
                     ],
+                    'selected_period' => $period,
                 ],
             ]);
         } catch (\Exception $e) {
@@ -141,39 +148,24 @@ class VendorFinanceDashboardController extends Controller
             $request->validate([
                 'type' => 'nullable|in:all,credit,debit',
                 'per_page' => 'nullable|integer|min:5|max:100',
+                'page' => 'nullable|integer|min:1',
             ]);
 
-            $query = VendorTransaction::forVendor($vendorId)
-                ->with('order:id,order_number,status')
-                ->orderByDesc('created_at');
-
             $type = $request->input('type', 'all');
-            if ($type !== 'all') {
-                $query->where('type', $type);
-            }
+            $perPage = (int) $request->input('per_page', 15);
+            $page = (int) $request->input('page', 1);
 
-            $transactions = $query->paginate($request->input('per_page', 15));
-
-            $formatted = $transactions->map(function (VendorTransaction $transaction) {
-                return [
-                    'id' => $transaction->id,
-                    'date' => $transaction->created_at->format('d/m/Y'),
-                    'serial_no' => $transaction->order?->order_number ?? 'ADJ-' . $transaction->id,
-                    'organization' => 'Customer Order',
-                    'type' => ucfirst(str_replace('_', ' ', $transaction->category)),
-                    'amount' => number_format((float) $transaction->amount, 2),
-                    'raw_amount' => (float) $transaction->amount,
-                    'status' => ucfirst($transaction->status),
-                    'category' => $transaction->type === 'credit' ? 'income' : 'expense',
-                    'balance_after' => number_format((float) $transaction->balance_after, 2),
-                    'description' => $transaction->description,
-                    'metadata' => $transaction->metadata,
-                ];
-            });
+            $formatted = $this->combinedTransactions($vendorId, $type);
+            $transactions = new LengthAwarePaginator(
+                $formatted->forPage($page, $perPage)->values(),
+                $formatted->count(),
+                $perPage,
+                $page
+            );
 
             return response()->json([
                 'success' => true,
-                'data' => $formatted,
+                'data' => $transactions->items(),
                 'meta' => [
                     'total' => $transactions->total(),
                     'per_page' => $transactions->perPage(),
@@ -203,40 +195,16 @@ class VendorFinanceDashboardController extends Controller
             $vendorId = $this->resolveVendorId($request);
             $period = $request->input('period', 'this_month');
 
-            [$from, $to, $groupFormat] = $this->periodRange($period);
-
-            $rows = VendorTransaction::forVendor($vendorId)
-                ->whereBetween('created_at', [$from, $to])
-                ->selectRaw("
-                    DATE_FORMAT(created_at, '{$groupFormat}') as period_label,
-                    SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END) as income,
-                    SUM(CASE WHEN type = 'debit' THEN amount ELSE 0 END) as expense
-                ")
-                ->groupByRaw("DATE_FORMAT(created_at, '{$groupFormat}')")
-                ->orderByRaw('MIN(created_at)')
-                ->get();
-
-            $maxIncome = $rows->max('income') ?: 1;
-            $maxExpense = $rows->max('expense') ?: 1;
-            $maxVal = max($maxIncome, $maxExpense);
-
-            $data = $rows->map(function ($row) use ($maxVal) {
-                $income = (float) $row->income;
-                $expense = (float) $row->expense;
-
-                return [
-                    'month' => $row->period_label,
-                    'income' => $maxVal > 0 ? round(($income / $maxVal) * 100) : 0,
-                    'expense' => $maxVal > 0 ? round(($expense / $maxVal) * 100) : 0,
-                    'incomeAmount' => $income,
-                    'expenseAmount' => $expense,
-                    'change' => 0,
-                ];
-            });
+            [$from, $to, $granularity] = $this->periodRange($period);
+            $data = $this->buildCashflowData($vendorId, $from, $to, $granularity);
 
             return response()->json([
                 'success' => true,
                 'data' => $data,
+                'meta' => [
+                    'period' => $period,
+                    'max_value' => $data->max(fn ($row) => max($row['incomeAmount'], $row['expenseAmount'])) ?? 0,
+                ],
             ]);
         } catch (\Exception $e) {
             Log::error('VendorFinanceDashboard::cashflow error: ' . $e->getMessage());
@@ -259,23 +227,62 @@ class VendorFinanceDashboardController extends Controller
             'last_month' => [
                 $now->copy()->subMonth()->startOfMonth(),
                 $now->copy()->subMonth()->endOfMonth(),
-                '%d',
+                'day',
             ],
             'this_quarter' => [
                 $now->copy()->startOfQuarter(),
                 $now->copy()->endOfQuarter(),
-                '%u',
+                'week',
             ],
             'this_year' => [
                 $now->copy()->startOfYear(),
                 $now->copy()->endOfYear(),
-                '%b',
+                'month',
             ],
             default => [
                 $now->copy()->startOfMonth(),
                 $now->copy()->endOfMonth(),
-                '%d',
+                'day',
             ],
+        };
+    }
+
+    private function periodBounds(string $period): array
+    {
+        [$from, $to] = $this->periodRange($period);
+
+        return [$from, $to];
+    }
+
+    private function comparisonBounds(Carbon $from, Carbon $to, string $period): array
+    {
+        return match ($period) {
+            'last_month' => [
+                $from->copy()->subMonth()->startOfMonth(),
+                $to->copy()->subMonth()->endOfMonth(),
+            ],
+            'this_quarter' => [
+                $from->copy()->subQuarter()->startOfQuarter(),
+                $to->copy()->subQuarter()->endOfQuarter(),
+            ],
+            'this_year' => [
+                $from->copy()->subYear()->startOfYear(),
+                $to->copy()->subYear()->endOfYear(),
+            ],
+            default => [
+                $from->copy()->subMonth()->startOfMonth(),
+                $to->copy()->subMonth()->endOfMonth(),
+            ],
+        };
+    }
+
+    private function periodLabel(string $period): string
+    {
+        return match ($period) {
+            'last_month' => 'Last Month',
+            'this_quarter' => 'This Quarter',
+            'this_year' => 'This Year',
+            default => 'This Month',
         };
     }
 
@@ -296,5 +303,217 @@ class VendorFinanceDashboardController extends Controller
                     });
             })
             ->count();
+    }
+
+    private function sumPayrollExpensesForPeriod(int $vendorId, Carbon $from, Carbon $to): float
+    {
+        return (float) $this->payrollExpenseQuery($vendorId)
+            ->get()
+            ->filter(function (Payroll $payroll) use ($from, $to) {
+                $effectiveAt = $this->payrollEffectiveAt($payroll);
+
+                return $effectiveAt !== null && $effectiveAt->between($from, $to);
+            })
+            ->sum('net_salary');
+    }
+
+    private function payrollExpenseQuery(int $vendorId)
+    {
+        return Payroll::with('employee')
+            ->where('owner_id', $vendorId)
+            ->whereIn('status', ['approved', 'paid']);
+    }
+
+    private function payrollEffectiveAt(Payroll $payroll): ?Carbon
+    {
+        if ($payroll->status === 'paid' && $payroll->paid_at) {
+            return $payroll->paid_at->copy();
+        }
+
+        return $payroll->updated_at?->copy();
+    }
+
+    private function combinedTransactions(int $vendorId, string $type): Collection
+    {
+        $ledgerTransactions = VendorTransaction::forVendor($vendorId)
+            ->with('order:id,order_number,status')
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function (VendorTransaction $transaction) {
+                return [
+                    'id' => 'ledger-' . $transaction->id,
+                    'sort_at' => $transaction->created_at,
+                    'date' => $transaction->created_at->format('d/m/Y'),
+                    'serial_no' => $transaction->order?->order_number ?? 'ADJ-' . $transaction->id,
+                    'organization' => 'Customer Order',
+                    'type' => ucfirst(str_replace('_', ' ', $transaction->category)),
+                    'type_label' => $transaction->type === 'credit' ? 'Revenue' : ucfirst(str_replace('_', ' ', $transaction->category)),
+                    'amount' => number_format((float) $transaction->amount, 2),
+                    'raw_amount' => (float) $transaction->amount,
+                    'status' => ucfirst($transaction->status),
+                    'category' => $transaction->type === 'credit' ? 'income' : 'expense',
+                    'balance_after' => number_format((float) $transaction->balance_after, 2),
+                    'description' => $transaction->description,
+                    'metadata' => $transaction->metadata,
+                ];
+            });
+
+        $payrollTransactions = $this->payrollExpenseQuery($vendorId)
+            ->get()
+            ->map(function (Payroll $payroll) {
+                $effectiveAt = $this->payrollEffectiveAt($payroll) ?? $payroll->updated_at ?? now();
+                $employeeName = $payroll->employee?->full_name
+                    ?? $payroll->employee?->name
+                    ?? 'Employee';
+
+                return [
+                    'id' => 'payroll-' . $payroll->id,
+                    'sort_at' => $effectiveAt,
+                    'date' => $effectiveAt->format('d/m/Y'),
+                    'serial_no' => 'PAY-' . $payroll->id,
+                    'organization' => 'Payroll',
+                    'type' => 'Payroll',
+                    'type_label' => 'Payroll',
+                    'amount' => number_format((float) $payroll->net_salary, 2),
+                    'raw_amount' => (float) $payroll->net_salary,
+                    'status' => ucfirst($payroll->status),
+                    'category' => 'expense',
+                    'balance_after' => null,
+                    'description' => "Payroll for {$employeeName}",
+                    'metadata' => [
+                        'source' => 'payroll',
+                        'period_start' => optional($payroll->period_start)->toDateString(),
+                        'period_end' => optional($payroll->period_end)->toDateString(),
+                    ],
+                ];
+            });
+
+        return $ledgerTransactions
+            ->merge($payrollTransactions)
+            ->filter(fn (array $transaction) => $type === 'all'
+                ? true
+                : ($type === 'credit'
+                    ? $transaction['category'] === 'income'
+                    : $transaction['category'] === 'expense'))
+            ->sortByDesc('sort_at')
+            ->values()
+            ->map(function (array $transaction) {
+                unset($transaction['sort_at']);
+
+                return $transaction;
+            });
+    }
+
+    private function buildCashflowData(int $vendorId, Carbon $from, Carbon $to, string $granularity): Collection
+    {
+        $buckets = collect($this->makeBuckets($from, $to, $granularity))
+            ->mapWithKeys(fn (array $bucket) => [
+                $bucket['key'] => [
+                    'month' => $bucket['label'],
+                    'income' => 0,
+                    'expense' => 0,
+                    'incomeAmount' => 0,
+                    'expenseAmount' => 0,
+                    'change' => 0,
+                ],
+            ]);
+
+        $incomeRows = VendorTransaction::forVendor($vendorId)
+            ->whereBetween('created_at', [$from, $to])
+            ->get(['created_at', 'type', 'amount']);
+
+        foreach ($incomeRows as $row) {
+            $key = $this->cashflowBucketKey(Carbon::parse($row->created_at), $granularity, $from);
+
+            if (!$buckets->has($key)) {
+                continue;
+            }
+
+            $entry = $buckets[$key];
+            if ($row->type === 'credit') {
+                $entry['incomeAmount'] += (float) $row->amount;
+            } else {
+                $entry['expenseAmount'] += (float) $row->amount;
+            }
+            $buckets[$key] = $entry;
+        }
+
+        $payrollRows = $this->payrollExpenseQuery($vendorId)->get();
+        foreach ($payrollRows as $payroll) {
+            $effectiveAt = $this->payrollEffectiveAt($payroll);
+            if (!$effectiveAt || !$effectiveAt->between($from, $to)) {
+                continue;
+            }
+
+            $key = $this->cashflowBucketKey($effectiveAt, $granularity, $from);
+            if (!$buckets->has($key)) {
+                continue;
+            }
+
+            $entry = $buckets[$key];
+            $entry['expenseAmount'] += (float) $payroll->net_salary;
+            $buckets[$key] = $entry;
+        }
+
+        $maxValue = $buckets->max(fn (array $row) => max($row['incomeAmount'], $row['expenseAmount'])) ?: 0;
+
+        return $buckets->values()->map(function (array $row) use ($maxValue) {
+            $row['income'] = $maxValue > 0 ? round(($row['incomeAmount'] / $maxValue) * 100, 2) : 0;
+            $row['expense'] = $maxValue > 0 ? round(($row['expenseAmount'] / $maxValue) * 100, 2) : 0;
+
+            return $row;
+        });
+    }
+
+    private function makeBuckets(Carbon $from, Carbon $to, string $granularity): array
+    {
+        if ($granularity === 'month') {
+            $cursor = $from->copy()->startOfMonth();
+            $buckets = [];
+            while ($cursor->lte($to)) {
+                $buckets[] = [
+                    'key' => $cursor->format('Y-m'),
+                    'label' => $cursor->format('M'),
+                ];
+                $cursor->addMonth();
+            }
+
+            return $buckets;
+        }
+
+        if ($granularity === 'week') {
+            $period = CarbonPeriod::create($from->copy()->startOfWeek(), '1 week', $to->copy()->endOfWeek());
+            $index = 1;
+            $buckets = [];
+            foreach ($period as $weekStart) {
+                if ($weekStart->gt($to)) {
+                    break;
+                }
+
+                $buckets[] = [
+                    'key' => $weekStart->format('o-\WW'),
+                    'label' => 'Week ' . $index,
+                ];
+                $index++;
+            }
+
+            return $buckets;
+        }
+
+        $period = CarbonPeriod::create($from->copy()->startOfDay(), '1 day', $to->copy()->startOfDay());
+
+        return collect($period)->map(fn (Carbon $date) => [
+            'key' => $date->format('Y-m-d'),
+            'label' => $date->format('d'),
+        ])->all();
+    }
+
+    private function cashflowBucketKey(Carbon $date, string $granularity, Carbon $rangeStart): string
+    {
+        return match ($granularity) {
+            'month' => $date->copy()->startOfMonth()->format('Y-m'),
+            'week' => $date->copy()->startOfWeek()->format('o-\WW'),
+            default => $date->copy()->startOfDay()->format('Y-m-d'),
+        };
     }
 }

@@ -85,9 +85,22 @@
               />
             </div>
             <div class="action-buttons">
-              <button class="btn-filter">
-                <span>🎯</span><span>Filters</span>
-              </button>
+              <div class="filter-menu">
+                <button class="btn-filter" @click.stop="toggleFilterMenu">
+                  <span>🎯</span><span>{{ activeFilterLabel }}</span>
+                </button>
+                <div v-if="showFilterMenu" class="filter-dropdown-menu">
+                  <button
+                    v-for="option in filterOptions"
+                    :key="option.value"
+                    class="filter-option"
+                    :class="{ active: selectedFilter === option.value }"
+                    @click="selectFilter(option.value)"
+                  >
+                    {{ option.label }}
+                  </button>
+                </div>
+              </div>
               <router-link to="/vendor/add-product" class="btn-new-product">
                 <span>➕</span><span>New Product</span>
               </router-link>
@@ -944,20 +957,6 @@
                       placeholder="Supplier's product code"
                     />
                   </div>
-                  <div class="form-group">
-                    <label class="form-label">Preparation Time (Days Only)</label>
-                    <input
-                      v-model.number="editFormData.preparation_days"
-                      type="number"
-                      min="0"
-                      step="1"
-                      class="form-input"
-                      placeholder="0"
-                    />
-                    <span v-if="editErrors.preparation_days" class="error-text">{{
-                      editErrors.preparation_days
-                    }}</span>
-                  </div>
                 </div>
               </div>
 
@@ -1215,6 +1214,8 @@ const isLoading = ref(false);
 const isLoadingMessage = ref("");
 const isSubmitting = ref(false);
 const activeMenu = ref(null);
+const showFilterMenu = ref(false);
+const selectedFilter = ref("all");
 const selectedProduct = ref(null);
 const editFileInput = ref(null);
 
@@ -1250,7 +1251,6 @@ const editFormData = reactive({
   supplier_name: "",
   supplier_contact: "",
   supplier_sku: "",
-  preparation_days: 0,
   care_instructions: "",
   occasion_tags: [],
   notes: "",
@@ -1402,15 +1402,63 @@ const outOfStock = computed(
       .length,
 );
 
+const filterOptions = [
+  { value: "all", label: "All Products" },
+  { value: "on_sale", label: "On Sale" },
+  { value: "low_stock", label: "Low Stocks" },
+  { value: "high_stock", label: "High Stocks" },
+  { value: "name_asc", label: "A-Z" },
+  { value: "name_desc", label: "Z-A" },
+];
+
+const activeFilterLabel = computed(
+  () =>
+    filterOptions.find((option) => option.value === selectedFilter.value)
+      ?.label || "Filters",
+);
+
 const filteredProducts = computed(() => {
-  if (!tableSearch.value) return products.value;
-  const s = tableSearch.value.toLowerCase();
-  return products.value.filter(
-    (p) =>
-      p.product_name?.toLowerCase().includes(s) ||
-      p.sku?.toLowerCase().includes(s) ||
-      p.category?.toLowerCase().includes(s),
-  );
+  let filtered = [...products.value];
+
+  if (tableSearch.value) {
+    const s = tableSearch.value.toLowerCase();
+    filtered = filtered.filter(
+      (p) =>
+        p.product_name?.toLowerCase().includes(s) ||
+        p.sku?.toLowerCase().includes(s) ||
+        p.category?.toLowerCase().includes(s),
+    );
+  }
+
+  if (selectedFilter.value === "on_sale") {
+    filtered = filtered.filter((product) => isOnSale(product));
+  } else if (selectedFilter.value === "low_stock") {
+    filtered = filtered.filter((product) => {
+      const stock = parseInt(product.quantity_in_stock || 0);
+      const minStock = parseInt(product.min_stock_level || 0);
+      return stock > 0 && stock <= minStock;
+    });
+  } else if (selectedFilter.value === "high_stock") {
+    filtered = filtered.filter((product) => {
+      const stock = parseInt(product.quantity_in_stock || 0);
+      const minStock = parseInt(product.min_stock_level || 0);
+      return stock > minStock;
+    });
+  } else if (selectedFilter.value === "name_asc") {
+    filtered.sort((a, b) =>
+      (a.product_name || "").localeCompare(b.product_name || "", undefined, {
+        sensitivity: "base",
+      }),
+    );
+  } else if (selectedFilter.value === "name_desc") {
+    filtered.sort((a, b) =>
+      (b.product_name || "").localeCompare(a.product_name || "", undefined, {
+        sensitivity: "base",
+      }),
+    );
+  }
+
+  return filtered;
 });
 
 const getStatusClass = (product) => {
@@ -1471,9 +1519,17 @@ const colorDotBg = (color) => {
 const toggleMenu = (id) => {
   activeMenu.value = activeMenu.value === id ? null : id;
 };
+const toggleFilterMenu = () => {
+  showFilterMenu.value = !showFilterMenu.value;
+};
+const selectFilter = (value) => {
+  selectedFilter.value = value;
+  showFilterMenu.value = false;
+};
 const switchTab = (tab) => {
   activeTab.value = tab;
   activeMenu.value = null;
+  showFilterMenu.value = false;
   fetchProducts();
 };
 
@@ -1555,7 +1611,6 @@ const populateEditForm = (p) => {
     supplier_name: p.supplier_name || "",
     supplier_contact: p.supplier_contact || "",
     supplier_sku: p.supplier_sku || "",
-    preparation_days: Number(p.preparation_days ?? p.supplier_lead_time ?? 0),
     care_instructions: p.care_instructions || "",
     occasion_tags: tags,
     notes: p.notes || "",
@@ -1671,16 +1726,6 @@ const validateEditForm = () => {
         "Discount price must be less than selling price";
       isValid = false;
     }
-  }
-
-  if (
-    !Number.isInteger(Number(editFormData.preparation_days)) ||
-    Number(editFormData.preparation_days) < 0 ||
-    Number(editFormData.preparation_days) > 365
-  ) {
-    editErrors.preparation_days =
-      "Preparation time must be a whole number of days between 0 and 365";
-    isValid = false;
   }
 
   if (!isValid) {
@@ -1808,6 +1853,7 @@ const confirmDeleteProduct = async () => {
 
 const handleClickOutside = (e) => {
   if (!e.target.closest(".action-menu")) activeMenu.value = null;
+  if (!e.target.closest(".filter-menu")) showFilterMenu.value = false;
 };
 
 onMounted(() => {
@@ -2087,6 +2133,9 @@ watch(activeTab, () => {
   display: flex;
   gap: 10px;
 }
+.filter-menu {
+  position: relative;
+}
 .btn-filter,
 .btn-new-product {
   padding: 10px 18px;
@@ -2106,6 +2155,41 @@ watch(activeTab, () => {
 .btn-filter:hover {
   border-color: #48bb78;
   color: #48bb78;
+}
+.filter-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 180px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+  padding: 8px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.filter-option {
+  border: none;
+  background: transparent;
+  color: #2d3748;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.filter-option:hover {
+  background: #f0fdf4;
+  color: #2f855a;
+}
+.filter-option.active {
+  background: #48bb78;
+  color: white;
 }
 .btn-new-product {
   background: #48bb78;

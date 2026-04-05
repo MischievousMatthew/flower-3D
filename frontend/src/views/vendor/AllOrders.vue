@@ -181,7 +181,7 @@
             class="empty-state"
           >
             <div class="empty-icon">📦</div>
-            <h3>No {{ activeStatusTab }} orders</h3>
+            <h3>No {{ formatStatus(activeStatusTab) }} orders</h3>
             <p>Orders with this status will appear here</p>
           </div>
 
@@ -1153,9 +1153,11 @@ const activeStatusTab = ref("pending");
 // Status List
 const statusList = ref([
   { value: "pending", label: "Pending" },
-  { value: "processing", label: "Processing" },
-  { value: "delivered", label: "Delivered" },
+  { value: "to_processed", label: "To Process" },
+  { value: "to_ship", label: "To Ship" },
+  { value: "to_received", label: "To Receive" },
   { value: "completed", label: "Completed" },
+  { value: "returned", label: "Returned" },
   { value: "refunded", label: "Refunded" },
   { value: "cancelled", label: "Cancelled" },
 ]);
@@ -1710,9 +1712,11 @@ function formatDate(dateString) {
 function formatStatus(status) {
   const statusMap = {
     pending: "Pending",
-    processing: "Processing",
-    delivered: "Delivered",
+    to_processed: "To Process",
+    to_ship: "To Ship",
+    to_received: "To Receive",
     completed: "Completed",
+    returned: "Returned",
     refunded: "Refunded",
     cancelled: "Cancelled",
   };
@@ -1742,9 +1746,10 @@ function handleImageError(event) {
 
 function updateOrderStatus(orderId, currentStatus) {
   const nextStatusMap = {
-    pending: "processing",
-    processing: "delivered",
-    delivered: "completed",
+    pending: "to_processed",
+    to_processed: "to_ship",
+    to_ship: "to_received",
+    to_received: "completed",
   };
 
   const nextStatus = nextStatusMap[currentStatus];
@@ -1770,16 +1775,30 @@ function updateOrderStatus(orderId, currentStatus) {
         throw new Error(response.data?.message || "Failed to update order");
       }
 
-      const updatedStatus = response.data.data?.new_status || nextStatus;
+      const responseData = response.data.data || {};
+      const updatedStatus = responseData.new_status || nextStatus;
 
       orders.value = orders.value.map((order) =>
-        order.id === orderId ? { ...order, status: updatedStatus } : order,
+        order.id === orderId
+          ? {
+              ...order,
+              status: updatedStatus,
+              order_status: responseData.order_status ?? order.order_status,
+              delivery_status:
+                responseData.delivery_status ?? order.delivery_status,
+            }
+          : order,
       );
 
       if (selectedOrderDetails.value?.id === orderId) {
         selectedOrderDetails.value = {
           ...selectedOrderDetails.value,
           status: updatedStatus,
+          order_status:
+            responseData.order_status ?? selectedOrderDetails.value.order_status,
+          delivery_status:
+            responseData.delivery_status ??
+            selectedOrderDetails.value.delivery_status,
         };
       }
 
@@ -2392,19 +2411,29 @@ onMounted(async () => {
   color: #92400e;
 }
 
-.status-processing {
+.status-to_processed {
   background: #dbeafe;
   color: #1e40af;
 }
 
-.status-delivered {
+.status-to_ship {
   background: #e0e7ff;
   color: #4338ca;
+}
+
+.status-to_received {
+  background: #ede9fe;
+  color: #6d28d9;
 }
 
 .status-completed {
   background: #d1fae5;
   color: #065f46;
+}
+
+.status-returned {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .status-refunded {

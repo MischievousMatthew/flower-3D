@@ -1,22 +1,12 @@
 <template>
   <div class="floor-page">
-    
     <!-- ── Header ── -->
     <div class="page-header">
       <div>
         <h1 class="page-title">Warehouse Floor</h1>
         <p class="page-sub">Live freshness overview of all active batches</p>
       </div>
-      <div class="header-actions">
-        <router-link to="/erp/warehouse/batches/receive" class="btn-primary">
-          <svg viewBox="0 0 20 20" fill="currentColor" width="15">
-            <path
-              d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-            />
-          </svg>
-          Receive Batch
-        </router-link>
-      </div>
+      <div class="header-actions"></div>
     </div>
 
     <!-- ── Summary Strip ───────────────────────────────────────────────── -->
@@ -262,7 +252,6 @@ import {
   daysRemainingClass,
 } from "../../../../../services/warehouseBatchService";
 import BatchDetailDrawer from "./BatchDetailDrawer.vue";
-
 
 const batches = ref([]);
 const summary = ref({});

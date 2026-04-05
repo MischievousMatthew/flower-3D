@@ -41,6 +41,18 @@
           🛒 Cart ({{ cartCount }})
         </router-link>
 
+        <router-link
+          v-if="user?.role === 'customer'"
+          :to="chatRoute"
+          class="btn-chat"
+          :class="{ 'btn-chat--active': isChatRoute }"
+        >
+          <span class="chat-label">Chat</span>
+          <span v-if="unreadChatCount > 0" class="chat-count-badge">
+            {{ unreadChatCount > 9 ? "9+" : unreadChatCount }}
+          </span>
+        </router-link>
+
         <div v-if="user?.role === 'customer'" class="notification-wrapper">
           <button class="btn-notification" @click="toggleNotificationDropdown">
             <span class="notification-bell">Notifications</span>
@@ -175,6 +187,9 @@
             >
               <span class="icons"> 💬 </span>
               <span>Chat</span>
+              <span v-if="unreadChatCount > 0" class="dropdown-badge">
+                {{ unreadChatCount > 9 ? "9+" : unreadChatCount }}
+              </span>
             </router-link>
 
             <div class="dropdown-divider"></div>
@@ -213,12 +228,14 @@ import { ref, onMounted, onUnmounted, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../composables/useAuth";
 import { useCart } from "../composables/useCart";
+import { useChatNotifications } from "../composables/useChatNotifications";
 import api from "../plugins/axios";
 import { toast } from "vue3-toastify";
 import LoadingOverlay from "../layouts/components/LoadingOverlay.vue";
 
 const router = useRouter();
 const { isAuthenticated, logout, isLoggingOut, user } = useAuth();
+const { unreadChatCount, chatRoute } = useChatNotifications();
 
 const showUserDropdown = ref(false);
 const showNotificationDropdown = ref(false);
@@ -245,6 +262,9 @@ const props = defineProps({
 const emit = defineEmits(["scroll-to-section"]);
 
 const cartCount = computed(() => cartStore.count.value);
+const isChatRoute = computed(() =>
+  router.currentRoute.value.path.startsWith(chatRoute.value),
+);
 
 const userName = computed(() => {
   if (userProfile.value?.name && userProfile.value?.surname) {
@@ -673,7 +693,8 @@ onUnmounted(() => {
 }
 
 .btn-register,
-.btn-cart {
+.btn-cart,
+.btn-chat {
   padding: 10px 24px;
   background: #2d3748;
   color: white;
@@ -689,9 +710,40 @@ onUnmounted(() => {
 }
 
 .btn-register:hover,
-.btn-cart:hover {
+.btn-cart:hover,
+.btn-chat:hover {
   background: #1a202c;
   transform: translateY(-1px);
+}
+
+.btn-chat {
+  position: relative;
+}
+
+.btn-chat--active {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.chat-label {
+  display: inline-flex;
+  align-items: center;
+}
+
+.chat-count-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
 }
 
 .btn-cart.cart-pulse {
@@ -1186,6 +1238,7 @@ onUnmounted(() => {
   .btn-login,
   .btn-register,
   .btn-cart,
+  .btn-chat,
   .btn-user {
     padding: 8px 12px;
     font-size: 13px;

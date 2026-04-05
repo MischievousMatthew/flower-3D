@@ -122,6 +122,18 @@
             >
               <span class="nav-icon" v-html="getIcon(item.icon)"></span>
               <span class="nav-label" v-if="!isCollapsed">{{ item.label }}</span>
+              <span
+                v-if="getItemBadgeCount(item) > 0 && !isCollapsed"
+                class="nav-badge"
+              >
+                {{ getItemBadgeCount(item) > 99 ? "99+" : getItemBadgeCount(item) }}
+              </span>
+              <span
+                v-if="getItemBadgeCount(item) > 0 && isCollapsed"
+                class="nav-badge nav-badge-collapsed"
+              >
+                {{ getItemBadgeCount(item) > 99 ? "99+" : getItemBadgeCount(item) }}
+              </span>
             </router-link>
 
             <div v-else class="nav-group">
@@ -207,6 +219,8 @@ import { ref, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import { useAssignment } from "../../composables/useAssignment";
+import { useChatNotifications } from "../../composables/useChatNotifications";
+import { useSupplyChainNotifications } from "../../composables/useSupplyChainNotifications";
 import { useSidebarState } from "../../composables/useSidebarState";
 import { ERP_MODULES } from "../../constants/erpModules";
 import LoadingOverlay from "../components/LoadingOverlay.vue";
@@ -214,6 +228,8 @@ import LoadingOverlay from "../components/LoadingOverlay.vue";
 const route = useRoute();
 const { logout, user } = useAuth();
 const { canView } = useAssignment();
+const { unreadChatCount, chatRoute } = useChatNotifications();
+const { scOrdersBadgeCount } = useSupplyChainNotifications();
 const { isCollapsed, isMobileOpen, closeMobile } = useSidebarState();
 
 const isLoading = ref(false);
@@ -239,6 +255,22 @@ const ICONS = {
 };
 function getIcon(key) {
   return ICONS[key] ?? ICONS.default;
+}
+
+function isChatItem(item) {
+  return item?.moduleKey === "crm" || item?.path === chatRoute.value;
+}
+
+function getItemBadgeCount(item) {
+  if (isChatItem(item)) {
+    return unreadChatCount.value;
+  }
+
+  if (item?.moduleKey === "sc_orders") {
+    return scOrdersBadgeCount.value;
+  }
+
+  return 0;
 }
 
 // ── Build nav from ERP_MODULES, filtered by permissions ──────────────────
@@ -699,6 +731,32 @@ async function handleLogout() {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.nav-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.nav-badge-collapsed {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-size: 10px;
 }
 
 .chevron {

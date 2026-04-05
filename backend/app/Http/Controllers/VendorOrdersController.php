@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use RuntimeException;
 
 class VendorOrdersController extends Controller
 {
@@ -65,6 +66,7 @@ class VendorOrdersController extends Controller
             $query = Order::where('vendor_id', $user->id)
                 ->with([
                     'user:id,name,email,contact_number,address',
+                    'delivery',
                     'items' => function($query) {
                         $query->with(['product' => function($q) {
                             $q->with(['images', 'models']); // Include product images and 3D models
@@ -118,7 +120,10 @@ class VendorOrdersController extends Controller
                     'id' => $order->id,
                     'order_number' => $order->order_number,
                     'reservation_date' => $order->reservation_date,
-                    'status' => $order->status,
+                    'status' => $this->resolveDisplayStatus($order),
+                    'order_status' => $order->status,
+                    'delivery_status' => $order->delivery?->status,
+                    'delivery_id' => $order->delivery?->delivery_id,
                     'payment_status' => $order->payment_status,
                     'payment_method' => $order->payment_method,
                     'subtotal' => (float) $order->subtotal,
@@ -375,6 +380,7 @@ class VendorOrdersController extends Controller
                 ->whereDate('reservation_date', $request->date)
                 ->with([
                     'user:id,name,email,contact_number,address',
+                    'delivery',
                     'items' => function($query) {
                         $query->with(['product' => function($q) {
                             $q->with(['images', 'models']); // Include 3D models
@@ -389,7 +395,10 @@ class VendorOrdersController extends Controller
                     'id' => $order->id,
                     'order_number' => $order->order_number,
                     'reservation_date' => $order->reservation_date,
-                    'status' => $order->status,
+                    'status' => $this->resolveDisplayStatus($order),
+                    'order_status' => $order->status,
+                    'delivery_status' => $order->delivery?->status,
+                    'delivery_id' => $order->delivery?->delivery_id,
                     'payment_status' => $order->payment_status,
                     'payment_method' => $order->payment_method,
                     'total_amount' => (float) $order->total_amount,
@@ -490,6 +499,7 @@ class VendorOrdersController extends Controller
                 ->where('vendor_id', $user->id)
                 ->with([
                     'user:id,name,email,contact_number,address',
+                    'delivery',
                     'items' => function($query) {
                         $query->with(['product' => function($q) {
                             $q->with(['images', 'models']); // Include all images and 3D models
@@ -509,7 +519,10 @@ class VendorOrdersController extends Controller
                 'id' => $order->id,
                 'order_number' => $order->order_number,
                 'reservation_date' => $order->reservation_date,
-                'status' => $order->status,
+                'status' => $this->resolveDisplayStatus($order),
+                'order_status' => $order->status,
+                'delivery_status' => $order->delivery?->status,
+                'delivery_id' => $order->delivery?->delivery_id,
                 'payment_status' => $order->payment_status,
                 'payment_method' => $order->payment_method,
                 'subtotal' => (float) $order->subtotal,
@@ -584,103 +597,106 @@ class VendorOrdersController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'status' => 'required|in:pending,processing,delivered,completed,cancelled,refunded',
+                'status' => 'required|in:pending,to_processed,to_ship,to_received,completed,returned,refunded,cancelled',
             ]);
- 
+
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
                     'errors' => $validator->errors()
                 ], 422);
             }
- 
+
             $user = $request->user();
- 
+
             if ($user->role !== 'vendor') {
                 return response()->json([
                     'success' => false,
                     'message' => 'User is not a vendor'
                 ], 403);
             }
- 
+
             $order = Order::where('id', $orderId)
                 ->where('vendor_id', $user->id)
-                ->with(['items'])
+                ->with(['items', 'delivery'])
                 ->first();
- 
-            if (!$order) {
+
+            if (! $order) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Order not found or you do not have permission to update it'
                 ], 404);
             }
- 
-              $oldStatus = $order->status;
-              $newStatus = $request->status;
 
-              $allowedTransitions = [
-                  'pending' => ['processing', 'cancelled'],
-                  'processing' => ['delivered', 'completed', 'cancelled'],
-                  'delivered' => ['completed', 'refunded'],
-                  'completed' => ['refunded'],
-                  'cancelled' => [],
-                  'refunded' => [],
-              ];
+            $oldStatus = $this->resolveDisplayStatus($order);
+            $newStatus = $request->status;
 
-              if ($oldStatus !== $newStatus) {
-                  $permitted = $allowedTransitions[$oldStatus] ?? [];
+            $allowedTransitions = [
+                'pending' => ['to_processed', 'cancelled'],
+                'to_processed' => ['to_ship', 'cancelled'],
+                'to_ship' => ['to_received'],
+                'to_received' => ['completed'],
+                'completed' => ['returned', 'refunded'],
+                'returned' => [],
+                'cancelled' => [],
+                'refunded' => [],
+            ];
 
-                  if (! in_array($newStatus, $permitted, true)) {
-                      return response()->json([
-                          'success' => false,
-                          'message' => "Cannot update order from {$oldStatus} to {$newStatus}",
-                      ], 422);
-                  }
-              }
+            if ($oldStatus !== $newStatus) {
+                $permitted = $allowedTransitions[$oldStatus] ?? [];
 
-              // Route through model helpers so finance/stock logic fires automatically
-              if ($newStatus === 'completed' && $oldStatus !== 'completed') {
-                  // Deducts stock + credits vendor balance + writes ledger entry
-                  $order->markAsCompleted();
-
-              } elseif ($newStatus === 'delivered' && $oldStatus !== 'delivered') {
-                  $order->delivered_at = now();
-                  $order->status = 'delivered';
-                  $order->save();
-
-              } elseif ($newStatus === 'refunded' && $oldStatus !== 'refunded') {
-                  // Debits vendor balance + writes refund ledger entry
-                  $order->markAsRefunded();
- 
-            } else {
-                // Simple status change — no financial side-effects
-                $order->status = $newStatus;
-                $order->save();
+                if (! in_array($newStatus, $permitted, true)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Cannot update order from {$oldStatus} to {$newStatus}",
+                    ], 422);
+                }
             }
- 
-            $order = $order->fresh(['items']);
-            $this->deliveryService->syncFromVendorOrderStatus($order, $order->status);
+
+            if ($newStatus === 'cancelled') {
+                $order->cancel();
+            } else {
+                $delivery = $order->delivery;
+
+                if (! $delivery) {
+                    $delivery = $this->deliveryService->createForOrder($order->id);
+                }
+
+                if ($delivery->status !== $newStatus) {
+                    $this->deliveryService->advanceStatus($delivery, $newStatus);
+                }
+            }
+
+            $order = $order->fresh(['items', 'delivery']);
+            $resolvedStatus = $this->resolveDisplayStatus($order);
 
             Log::info('Order status updated', [
-                'order_id'   => $order->id,
+                'order_id' => $order->id,
                 'old_status' => $oldStatus,
-                'new_status' => $order->status,
-                'vendor_id'  => $user->id,
+                'new_status' => $resolvedStatus,
+                'vendor_id' => $user->id,
             ]);
- 
+
             return response()->json([
                 'success' => true,
                 'message' => 'Order status updated successfully',
                 'data' => [
-                    'order_id'   => $order->id,
+                    'order_id' => $order->id,
                     'old_status' => $oldStatus,
-                    'new_status' => $order->status,
+                    'new_status' => $resolvedStatus,
+                    'order_status' => $order->status,
+                    'delivery_status' => $order->delivery?->status,
                 ],
             ]);
- 
+
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
         } catch (\Exception $e) {
             Log::error('Error updating order status: ' . $e->getMessage());
- 
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update order status'
@@ -857,5 +873,22 @@ class VendorOrdersController extends Controller
                 'message' => 'Failed to remove closed date'
             ], 500);
         }
+    }
+
+    private function resolveDisplayStatus(Order $order): string
+    {
+        if (in_array($order->status, ['cancelled', 'refunded', 'returned'], true)) {
+            return $order->status;
+        }
+
+        if ($order->delivery?->status) {
+            return $order->delivery->status;
+        }
+
+        return match ($order->status) {
+            'processing' => 'to_processed',
+            'delivered' => 'to_received',
+            default => $order->status,
+        };
     }
 }

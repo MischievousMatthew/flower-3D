@@ -13,7 +13,7 @@
           v-if="selectedIds.length > 0"
           @click="openBulkRejectConfirm"
           class="btn-reject-bulk"
-          :disabled="isProcessing"
+          :disabled="isProcessing || isReadOnlyPayrollRequests"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -33,7 +33,7 @@
           v-if="selectedIds.length > 0"
           @click="openBulkApproveConfirm"
           class="btn-approve-bulk"
-          :disabled="isProcessing"
+          :disabled="isProcessing || isReadOnlyPayrollRequests"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -323,7 +323,9 @@
                 class="custom-checkbox"
                 :checked="isAllPendingSelected"
                 :indeterminate.prop="isSomePendingSelected"
-                :disabled="pendingPayrolls.length === 0"
+                :disabled="
+                  pendingPayrolls.length === 0 || isReadOnlyPayrollRequests
+                "
                 @change="toggleSelectAllPending"
               />
             </th>
@@ -353,7 +355,9 @@
               <input
                 type="checkbox"
                 class="custom-checkbox"
-                :disabled="payroll.status !== 'pending'"
+                :disabled="
+                  payroll.status !== 'pending' || isReadOnlyPayrollRequests
+                "
                 :checked="selectedIds.includes(payroll.id)"
                 @change="toggleSelect(payroll)"
               />
@@ -425,6 +429,7 @@
                   @click="openRejectConfirm([payroll])"
                   class="btn-action reject"
                   title="Reject"
+                  :disabled="isReadOnlyPayrollRequests"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -443,6 +448,7 @@
                   @click="openApproveConfirm([payroll])"
                   class="btn-action approve"
                   title="Approve"
+                  :disabled="isReadOnlyPayrollRequests"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -723,6 +729,7 @@
                 closeDetailsModal();
               "
               class="btn-modal-reject"
+              :disabled="isReadOnlyPayrollRequests"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -744,6 +751,7 @@
                 closeDetailsModal();
               "
               class="btn-modal-approve"
+              :disabled="isReadOnlyPayrollRequests"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -833,7 +841,7 @@
             <button
               @click="confirmApprove"
               class="btn-confirm-approve"
-              :disabled="isProcessing"
+              :disabled="isProcessing || isReadOnlyPayrollRequests"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -898,6 +906,7 @@
               v-model="rejectNotes"
               class="form-textarea"
               rows="4"
+              :disabled="isReadOnlyPayrollRequests"
               placeholder="e.g. Incorrect work hours, missing deductions, needs revision…"
             ></textarea>
           </div>
@@ -909,7 +918,11 @@
             <button
               @click="confirmReject"
               class="btn-confirm-reject"
-              :disabled="!rejectNotes.trim() || isProcessing"
+              :disabled="
+                !rejectNotes.trim() ||
+                isProcessing ||
+                isReadOnlyPayrollRequests
+              "
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -937,6 +950,9 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { toast } from "vue3-toastify";
 import payrollApi from "../../../services/payrollApi";
 import employeeInfoService from "../../../services/employeeInfoService";
+import { useAssignment } from "../../../composables/useAssignment";
+
+const { canEdit, isReadOnly } = useAssignment();
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const isLoading = ref(false);
@@ -995,6 +1011,11 @@ const summary = ref({
 });
 
 // ── Computed ──────────────────────────────────────────────────────────────────
+const canEditPayrollRequests = computed(() => canEdit("payroll_requests"));
+const isReadOnlyPayrollRequests = computed(() =>
+  isReadOnly("payroll_requests"),
+);
+
 const yearOptions = computed(() => {
   const y = new Date().getFullYear();
   return Array.from({ length: 6 }, (_, i) => y - i);
@@ -1119,7 +1140,16 @@ function clearSearch() {
   loadPayrolls(1);
 }
 
+function notifyReadOnly() {
+  toast.info("You have view-only access to payroll requests.");
+}
+
 function toggleSelect(payroll) {
+  if (!canEditPayrollRequests.value) {
+    notifyReadOnly();
+    return;
+  }
+
   if (payroll.status !== "pending") return;
 
   if (selectedIds.value.includes(payroll.id)) {
@@ -1134,6 +1164,11 @@ function toggleSelect(payroll) {
 }
 
 function toggleSelectAllPending() {
+  if (!canEditPayrollRequests.value) {
+    notifyReadOnly();
+    return;
+  }
+
   const pendingIds = pendingPayrolls.value.map((p) => p.id);
 
   if (isAllPendingSelected.value) {
@@ -1163,6 +1198,11 @@ function clearSelection() {
 
 // ── Approve flow ──────────────────────────────────────────────────────────────
 function openApproveConfirm(targets) {
+  if (!canEditPayrollRequests.value) {
+    notifyReadOnly();
+    return;
+  }
+
   actionTargets.value = targets;
   showApproveConfirm.value = true;
 }
@@ -1177,6 +1217,11 @@ function closeApproveConfirm() {
 }
 
 async function confirmApprove() {
+  if (!canEditPayrollRequests.value) {
+    notifyReadOnly();
+    return;
+  }
+
   const ids = actionTargets.value.map((p) => p.id);
   try {
     isProcessing.value = true;
@@ -1198,6 +1243,11 @@ async function confirmApprove() {
 
 // ── Reject flow ───────────────────────────────────────────────────────────────
 function openRejectConfirm(targets) {
+  if (!canEditPayrollRequests.value) {
+    notifyReadOnly();
+    return;
+  }
+
   actionTargets.value = targets;
   rejectNotes.value = "";
   showRejectConfirm.value = true;
@@ -1214,6 +1264,11 @@ function closeRejectConfirm() {
 }
 
 async function confirmReject() {
+  if (!canEditPayrollRequests.value) {
+    notifyReadOnly();
+    return;
+  }
+
   if (!rejectNotes.value.trim()) {
     toast.error("Please provide a reason for rejection.");
     return;

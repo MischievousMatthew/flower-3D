@@ -1,6 +1,11 @@
 <template>
-  <div class="financial-dashboard">
-    <div class="dashboard-content">
+  <div :class="{ 'vendor-finance-shell': isVendorView }">
+    <vendorHeader v-if="isVendorView" title="Finance Overview" />
+    <div :class="{ 'vendor-finance-layout': isVendorView }">
+      <VendorSidebar v-if="isVendorView" />
+      <div :class="{ 'vendor-finance-content': isVendorView }">
+        <div class="financial-dashboard">
+          <div class="dashboard-content">
       <!-- Header -->
       <div class="dashboard-header">
         <div class="header-left">
@@ -312,7 +317,7 @@
                   <td colspan="6" class="empty-state">
                     <div class="empty-icon">📊</div>
                     <p>No transactions yet.</p>
-                    <small>Completed orders will appear here.</small>
+                    <small>Orders, refunds, procurement, and payroll will appear here.</small>
                   </td>
                 </tr>
 
@@ -331,7 +336,7 @@
                       class="type-badge"
                       :class="tx.category === 'income' ? 'receipt' : 'payment'"
                     >
-                      {{ tx.category === "income" ? "Revenue" : "Refund" }}
+                      {{ tx.type_label ?? (tx.category === "income" ? "Revenue" : "Expense") }}
                     </span>
                   </td>
                   <td
@@ -364,13 +369,13 @@
           </div>
         </div>
 
-        <!-- Income & Expense Breakdown (static donut — data is revenue vs refunds) -->
+        <!-- Income & Expense Breakdown -->
         <div class="breakdown-section">
           <div class="card income-card">
             <div class="card-header">
               <h2>Income</h2>
               <select
-                v-model="incomeTimePeriod"
+                v-model="overviewPeriod"
                 class="time-selector"
                 @change="loadOverview"
               >
@@ -398,55 +403,35 @@
                     fill="none"
                     stroke="#4299e1"
                     stroke-width="40"
-                    :stroke-dasharray="`${incomeArc.sales} ${incomeArc.circumference}`"
-                    :stroke-dashoffset="incomeArc.offset1"
-                    transform="rotate(-90 100 100)"
-                  ></circle>
-                  <circle
-                    cx="100"
-                    cy="100"
-                    r="80"
-                    fill="none"
-                    stroke="#ed8936"
-                    stroke-width="40"
-                    :stroke-dasharray="`${incomeArc.other} ${incomeArc.circumference}`"
-                    :stroke-dashoffset="incomeArc.offset2"
+                    :stroke-dasharray="`${incomeArc.revenue} ${incomeArc.circumference}`"
+                    :stroke-dashoffset="incomeArc.offset"
                     transform="rotate(-90 100 100)"
                   ></circle>
                 </svg>
                 <div class="donut-center" v-if="!loading.overview">
                   <span class="donut-value"
-                    >₱{{ shortNumber(overview.total_revenue?.raw ?? 0) }}</span
+                    >PHP {{ shortNumber(overview.total_revenue?.raw ?? 0) }}</span
                   >
-                  <span class="donut-label">Revenue</span>
+                  <span class="donut-label">{{ overviewPeriodLabel }}</span>
                 </div>
               </div>
               <div class="chart-legend">
-                <div class="legend-item">
-                  <span class="legend-dot sales-exp"></span>
-                  <span class="legend-label">Refunds</span>
-                  <span class="legend-value">{{ expenseArc.refundPct }}%</span>
-                </div>
-                <div class="legend-item">
-                  <span class="legend-dot procurement-dot"></span>
-                  <span class="legend-label">Procurement</span>
-                  <span class="legend-value"
-                    >{{ expenseArc.procurementPct }}%</span
-                  >
-                </div>
-                <div class="legend-item">
-                  <span class="legend-dot payroll-dot"></span>
-                  <span class="legend-label">Payroll</span>
-                  <span class="legend-value">{{ expenseArc.payrollPct }}%</span>
+                <div
+                  v-for="item in incomeSummary"
+                  :key="item.label"
+                  class="legend-item"
+                >
+                  <span class="legend-dot" :class="item.dotClass"></span>
+                  <span class="legend-label">{{ item.label }}</span>
+                  <span class="legend-value">{{ item.value }}</span>
                 </div>
               </div>
             </div>
           </div>
-
           <div class="card expense-card">
             <div class="card-header">
-              <h2>Expense</h2>
-              <select v-model="expenseTimePeriod" class="time-selector">
+              <h2>Expense Breakdown</h2>
+              <select v-model="overviewPeriod" class="time-selector" @change="loadOverview">
                 <option value="this_month">This Month</option>
                 <option value="last_month">Last Month</option>
                 <option value="this_quarter">This Quarter</option>
@@ -464,7 +449,6 @@
                     stroke="#e2e8f0"
                     stroke-width="40"
                   ></circle>
-                  <!-- Refunds -->
                   <circle
                     cx="100"
                     cy="100"
@@ -476,7 +460,6 @@
                     :stroke-dashoffset="expenseArc.offset1"
                     transform="rotate(-90 100 100)"
                   ></circle>
-                  <!-- Procurement -->
                   <circle
                     cx="100"
                     cy="100"
@@ -488,7 +471,6 @@
                     :stroke-dashoffset="expenseArc.offset2"
                     transform="rotate(-90 100 100)"
                   ></circle>
-                  <!-- Payroll -->
                   <circle
                     cx="100"
                     cy="100"
@@ -503,25 +485,26 @@
                 </svg>
                 <div class="donut-center" v-if="!loading.overview">
                   <span class="donut-value"
-                    >₱{{
-                      shortNumber(overview.lifetime?.total_withdrawn ?? 0)
-                    }}</span
+                    >PHP {{ shortNumber(overview.expenses?.total ?? 0) }}</span
                   >
-                  <span class="donut-label">Refunds</span>
+                  <span class="donut-label">{{ overviewPeriodLabel }}</span>
                 </div>
               </div>
               <div class="chart-legend">
-                <div class="legend-item">
-                  <span class="legend-dot sales-exp"></span>
-                  <span class="legend-label">Refunds</span>
-                  <span class="legend-value">100%</span>
+                <div
+                  v-for="item in expenseLegendItems"
+                  :key="item.label"
+                  class="legend-item"
+                >
+                  <span class="legend-dot" :class="item.dotClass"></span>
+                  <span class="legend-label">{{ item.label }}</span>
+                  <span class="legend-value">{{ item.value }}</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-
       <!-- Cashflow Report -->
       <div class="card cashflow-card">
         <div class="card-header">
@@ -575,11 +558,11 @@
           <!-- Bar chart -->
           <div v-else class="bar-chart">
             <div class="chart-grid">
-              <div class="grid-line"><span class="grid-label">100%</span></div>
-              <div class="grid-line"><span class="grid-label">75%</span></div>
-              <div class="grid-line"><span class="grid-label">50%</span></div>
-              <div class="grid-line"><span class="grid-label">25%</span></div>
-              <div class="grid-line"><span class="grid-label">0</span></div>
+              <div class="grid-line"><span class="grid-label">{{ cashflowScaleLabels[0] }}</span></div>
+              <div class="grid-line"><span class="grid-label">{{ cashflowScaleLabels[1] }}</span></div>
+              <div class="grid-line"><span class="grid-label">{{ cashflowScaleLabels[2] }}</span></div>
+              <div class="grid-line"><span class="grid-label">{{ cashflowScaleLabels[3] }}</span></div>
+              <div class="grid-line"><span class="grid-label">{{ cashflowScaleLabels[4] }}</span></div>
             </div>
             <div class="chart-bars">
               <div
@@ -634,6 +617,9 @@
           </div>
         </div>
       </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -641,12 +627,17 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from "vue";
 import api from "../../../plugins/axios";
+import vendorHeader from "../../../layouts/vendorHeader.vue";
+import VendorSidebar from "../../../layouts/Sidebar/VendorSidebar.vue";
+import { useAuth } from "../../../composables/useAuth";
+
+const { user } = useAuth();
+const isVendorView = computed(() => user.value?.role === "vendor");
 
 // ── State ──────────────────────────────────────────────────────────────────
 const vendorName = ref("Vendor");
 const transactionFilter = ref("all");
-const incomeTimePeriod = ref("this_month");
-const expenseTimePeriod = ref("this_month");
+const overviewPeriod = ref("this_month");
 const cashflowPeriod = ref("this_month");
 const showIncome = ref(true);
 const showExpense = ref(true);
@@ -654,6 +645,7 @@ const showExpense = ref(true);
 const overview = ref({});
 const transactions = ref([]);
 const cashflowData = ref([]);
+const cashflowMeta = ref({ max_value: 0 });
 
 const txMeta = reactive({
   current_page: 1,
@@ -674,16 +666,22 @@ const errors = reactive({ overview: null, transactions: null, cashflow: null });
 
 const tooltip = ref({ visible: false, x: 0, y: 0, data: {} });
 
+const overviewPeriodLabel = computed(() => {
+  return overview.value.selected_period
+    ? formatPeriodLabel(overview.value.selected_period)
+    : formatPeriodLabel(overviewPeriod.value);
+});
+
 const expenseArc = computed(() => {
   const circumference = 2 * Math.PI * 80;
-  const refund = overview.value.expenses?.refund ?? 0;
-  const procurement = overview.value.expenses?.procurement ?? 0;
-  const payroll = overview.value.expenses?.payroll ?? 0;
-  const total = refund + procurement + payroll || 1;
+  const refund = Number(overview.value.expenses?.refund ?? 0);
+  const procurement = Number(overview.value.expenses?.procurement ?? 0);
+  const payroll = Number(overview.value.expenses?.payroll ?? 0);
+  const total = refund + procurement + payroll;
 
-  const refundPct = Math.round((refund / total) * 100);
-  const procurementPct = Math.round((procurement / total) * 100);
-  const payrollPct = 100 - refundPct - procurementPct;
+  const refundPct = total > 0 ? Math.round((refund / total) * 100) : 0;
+  const procurementPct = total > 0 ? Math.round((procurement / total) * 100) : 0;
+  const payrollPct = Math.max(0, 100 - refundPct - procurementPct);
 
   return {
     circumference,
@@ -699,12 +697,68 @@ const expenseArc = computed(() => {
   };
 });
 
-// ── API calls ──────────────────────────────────────────────────────────────
+const incomeArc = computed(() => {
+  const circumference = 2 * Math.PI * 80;
+  const revenue = Number(overview.value.total_revenue?.raw ?? 0);
+
+  return {
+    circumference,
+    revenue: revenue > 0 ? circumference : 0,
+    offset: 0,
+  };
+});
+
+const incomeSummary = computed(() => [
+  {
+    label: "Revenue",
+    value: formatCurrency(overview.value.total_revenue?.raw ?? 0),
+    dotClass: "sales",
+  },
+  {
+    label: "Net Profit",
+    value: formatCurrency(overview.value.net_profit?.raw ?? 0),
+    dotClass: "service",
+  },
+  {
+    label: "Completed Orders",
+    value: String(overview.value.completed_orders?.count ?? 0),
+    dotClass: "payroll-dot",
+  },
+]);
+
+const expenseLegendItems = computed(() => [
+  {
+    label: "Refunds",
+    value: `${formatCurrency(overview.value.expenses?.refund ?? 0)} (${expenseArc.value.refundPct}%)`,
+    dotClass: "sales-exp",
+  },
+  {
+    label: "Procurement",
+    value: `${formatCurrency(overview.value.expenses?.procurement ?? 0)} (${expenseArc.value.procurementPct}%)`,
+    dotClass: "procurement-dot",
+  },
+  {
+    label: "Payroll",
+    value: `${formatCurrency(overview.value.expenses?.payroll ?? 0)} (${expenseArc.value.payrollPct}%)`,
+    dotClass: "payroll-dot",
+  },
+]);
+
+const cashflowScaleLabels = computed(() => {
+  const maxValue = Number(cashflowMeta.value.max_value ?? 0);
+
+  return [1, 0.75, 0.5, 0.25, 0].map((step) =>
+    formatCompactCurrency(maxValue * step)
+  );
+});
+
 async function loadOverview() {
   loading.overview = true;
   errors.overview = null;
   try {
-    const res = await api.get("vendor/finance/overview");
+    const res = await api.get("vendor/finance/overview", {
+      params: { period: overviewPeriod.value },
+    });
     if (res.data.success) {
       overview.value = res.data.data;
     }
@@ -750,6 +804,7 @@ async function loadCashflow() {
     });
     if (res.data.success) {
       cashflowData.value = res.data.data;
+      cashflowMeta.value = res.data.meta ?? { max_value: 0 };
     }
   } catch (e) {
     errors.cashflow = "Failed to load cashflow data.";
@@ -776,31 +831,13 @@ function loadMoreTransactions() {
   }
 }
 
-// ── Computed ───────────────────────────────────────────────────────────────
-const incomeArc = computed(() => {
-  const circumference = 2 * Math.PI * 80; // ≈ 502.65
-  const revenue = overview.value.total_revenue?.raw ?? 0;
-  const salesPct = revenue > 0 ? 80 : 0;
-  const otherPct = revenue > 0 ? 20 : 0;
-  return {
-    circumference,
-    sales: (salesPct / 100) * circumference,
-    other: (otherPct / 100) * circumference,
-    offset1: (salesPct / 100) * circumference * 0.125,
-    offset2: -((salesPct / 100) * circumference) * 0.875,
-    salesPct,
-    otherPct,
-  };
-});
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 function changeClass(pct) {
   if (pct == null) return "neutral";
   return pct > 0 ? "positive" : pct < 0 ? "negative" : "neutral";
 }
 
 function formatChange(pct) {
-  if (pct == null) return "—";
+  if (pct == null) return "--";
   return (pct > 0 ? "+" : "") + pct + "%";
 }
 
@@ -809,6 +846,30 @@ function shortNumber(n) {
   if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + "M";
   if (num >= 1_000) return (num / 1_000).toFixed(1) + "K";
   return num.toFixed(2);
+}
+
+function formatCurrency(value) {
+  const num = Number(value ?? 0);
+  return `PHP ${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatCompactCurrency(value) {
+  const num = Number(value ?? 0);
+  if (num <= 0) return "PHP 0";
+  return `PHP ${shortNumber(num)}`;
+}
+
+function formatPeriodLabel(period) {
+  switch (period) {
+    case "last_month":
+      return "Last Month";
+    case "this_quarter":
+      return "This Quarter";
+    case "this_year":
+      return "This Year";
+    default:
+      return "This Month";
+  }
 }
 
 function showTooltip(data, event) {
@@ -838,6 +899,26 @@ onMounted(() => {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+.vendor-finance-shell {
+  min-height: 100vh;
+  background: #f7fafc;
+}
+
+.vendor-finance-layout {
+  display: flex;
+  min-height: calc(100vh - 74px);
+}
+
+.vendor-finance-content {
+  margin-left: 260px;
+  flex: 1;
+  padding: 24px;
+}
+
+.vendor-finance-shell .financial-dashboard {
+  min-height: 100%;
 }
 
 .financial-dashboard {
@@ -1616,6 +1697,10 @@ onMounted(() => {
   }
 }
 @media (max-width: 768px) {
+  .vendor-finance-content {
+    margin-left: 0;
+    padding: 16px;
+  }
   .dashboard-content {
     padding: 20px;
   }
@@ -1628,4 +1713,11 @@ onMounted(() => {
     gap: 16px;
   }
 }
+
+@media (max-width: 968px) {
+  .vendor-finance-content {
+    margin-left: 0;
+  }
+}
 </style>
+

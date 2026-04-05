@@ -51,6 +51,17 @@
       <!-- Parent-injected icon buttons -->
       <slot name="actions" />
 
+      <router-link
+        :to="chatRoute"
+        class="chat-pill"
+        :class="{ active: isChatRoute }"
+      >
+        <span>Chat</span>
+        <span v-if="unreadChatCount > 0" class="chat-pill-badge">
+          {{ unreadChatCount > 9 ? "9+" : unreadChatCount }}
+        </span>
+      </router-link>
+
       <!-- Slim divider -->
       <div class="header-divider" />
 
@@ -128,6 +139,43 @@
 
             <!-- Profile link -->
             <div class="drop-body">
+              <router-link
+                :to="chatRoute"
+                class="drop-item"
+                @click="showDropdown = false"
+              >
+                <span class="drop-item-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+                <span>Chat</span>
+                <span v-if="unreadChatCount > 0" class="drop-chat-badge">
+                  {{ unreadChatCount > 9 ? "9+" : unreadChatCount }}
+                </span>
+                <svg
+                  class="item-arrow"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 12 12"
+                  fill="none"
+                >
+                  <path
+                    d="M4.5 2.5L8 6L4.5 9.5"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </router-link>
+
               <router-link
                 to="/vendor/profile"
                 class="drop-item"
@@ -217,6 +265,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../composables/useAuth";
+import { useChatNotifications } from "../composables/useChatNotifications";
 import { useSidebarState } from "../composables/useSidebarState";
 import api from "../plugins/axios";
 import { toast } from "vue3-toastify";
@@ -232,6 +281,7 @@ defineEmits(["update:modelValue"]);
 
 const router = useRouter();
 const { user, logout } = useAuth();
+const { unreadChatCount, chatRoute } = useChatNotifications();
 const { toggleMobile } = useSidebarState();
 
 const showDropdown = ref(false);
@@ -304,6 +354,10 @@ const planClass = computed(() => {
   if (p.includes("biz") || p.includes("business")) return "plan-biz";
   return "plan-free";
 });
+
+const isChatRoute = computed(() =>
+  router.currentRoute.value.path.startsWith(chatRoute.value),
+);
 
 // ── Dropdown ──────────────────────────────────────────────────────────────
 const toggleDropdown = () => {
@@ -413,6 +467,51 @@ const handleLogout = async () => {
   background: #e2e8f0;
   border-radius: 1px;
   margin: 0 2px;
+}
+
+.chat-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1.5px solid #d9efe0;
+  background: #f5fdf8;
+  color: #166534;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.chat-pill:hover,
+.chat-pill.active {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.chat-pill-badge,
+.drop-chat-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.chat-pill-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
 }
 
 /* ── Search ──────────────────────────────────────────── */
@@ -716,6 +815,11 @@ const handleLogout = async () => {
   flex-shrink: 0;
 }
 
+.drop-chat-badge {
+  margin-left: auto;
+  margin-right: 8px;
+}
+
 /* Logout */
 .drop-footer {
   border-top: 1px solid #f1f5f1;
@@ -790,6 +894,11 @@ const handleLogout = async () => {
   }
   .header-divider {
     display: none;
+  }
+  .chat-pill {
+    min-width: 64px;
+    height: 36px;
+    padding: 0 12px;
   }
   .drop-card {
     width: 272px;

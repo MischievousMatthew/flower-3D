@@ -252,6 +252,10 @@ import { toast } from "vue3-toastify";
 const props = defineProps({
   vendorId: { type: Number, required: true },
   modelValue: { type: Object, default: null },
+  closedDates: {
+    type: Array,
+    default: () => [],
+  },
   closureMode: {
     type: Boolean,
     default: false,
@@ -320,8 +324,12 @@ const calendarDays = computed(() => {
   return days;
 });
 
+const closedDateLookup = computed(
+  () => new Set((props.closedDates || []).filter(Boolean)),
+);
+
 const selectedDateInfo = computed(() =>
-  selectedDate.value ? calendarData.value[selectedDate.value] : null,
+  selectedDate.value ? getAvailabilityForDate(selectedDate.value) : null,
 );
 
 const formatSelectedDate = computed(() => {
@@ -349,7 +357,7 @@ const formatSelectedDate = computed(() => {
 // Methods
 function createDayObject(date, isCurrentMonth) {
   const dateString = formatDateString(date);
-  const availability = calendarData.value[dateString] || null;
+  const availability = getAvailabilityForDate(dateString);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -459,6 +467,22 @@ function getColorClass(color) {
     gray: "day-gray",
   };
   return colorMap[color] || "day-white";
+}
+
+function getAvailabilityForDate(dateString) {
+  const availability = calendarData.value[dateString] || null;
+
+  if (closedDateLookup.value.has(dateString)) {
+    return {
+      ...(availability || {}),
+      status: "closed",
+      color: "red",
+      is_disabled: true,
+      available_slots: 0,
+    };
+  }
+
+  return availability;
 }
 
 function formatDateString(date) {
@@ -607,6 +631,16 @@ watch(
       selectedDate.value = val;
     }
   },
+);
+
+watch(
+  () => props.closedDates,
+  () => {
+    if (selectedDate.value) {
+      selectedDate.value = `${selectedDate.value}`;
+    }
+  },
+  { deep: true },
 );
 </script>
 

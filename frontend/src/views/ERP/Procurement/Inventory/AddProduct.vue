@@ -455,17 +455,6 @@
                   class="form-input"
                 />
               </div>
-              <div class="form-group">
-                <label class="form-label">Lead Time (Days)</label>
-                <input
-                  v-model.number="formData.supplier_lead_time"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  class="form-input"
-                />
-                <span class="hint-text">Time to receive from supplier</span>
-              </div>
             </div>
           </div>
 
@@ -722,7 +711,6 @@ const formData = reactive({
   supplier_name: "",
   supplier_contact: "",
   supplier_sku: "",
-  supplier_lead_time: null,
   care_instructions: "",
   occasion_tags: [],
   notes: "",
@@ -1070,7 +1058,6 @@ const submitProduct = async () => {
       "supplier_name",
       "supplier_contact",
       "supplier_sku",
-      "supplier_lead_time",
       "care_instructions",
       "notes",
       "status",

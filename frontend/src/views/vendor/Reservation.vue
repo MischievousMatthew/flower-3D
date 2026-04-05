@@ -44,6 +44,7 @@
             :key="calendarRefreshKey"
             :vendor-id="vendorId"
             :closure-mode="true"
+            :closed-dates="closedDateStrings"
             v-model="selectedDate"
             @date-selected="handleDateSelected"
           />
@@ -406,6 +407,11 @@ const maxCloseDate = computed(() => {
   max.setMonth(max.getMonth() + 3);
   return max.toISOString().split("T")[0];
 });
+const closedDateStrings = computed(() =>
+  closedDates.value
+    .map((item) => item.closed_date || item.date)
+    .filter(Boolean),
+);
 
 const closeDateForm = ref({
   date: "",
