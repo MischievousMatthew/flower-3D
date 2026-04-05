@@ -55,6 +55,12 @@ const routes = [
         name: "Vendor_Register",
         component: () => import("../views/guest/VendorRegistration.vue"),
       },
+      {
+        path: "leaves",
+        name: "PublicLeaveRequest",
+        component: () => import("../views/ERP/HR/Public/LeaveRequest.vue"),
+        meta: { public: true, title: "Leave Request" },
+      },
     ],
   },
 
@@ -517,7 +523,6 @@ const routes = [
               {
                 path: "employee-request",
                 name: "EmployeeLeaveRequest",
-                alias: "/leaves",
                 component: () =>
                   import("../views/ERP/HR/Public/LeaveRequest.vue"),
                 meta: { requiresAuth: false, title: "Leave Request" },
