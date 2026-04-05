@@ -44,15 +44,18 @@ export const ERP_MODULES = [
     ],
   },
   {
-    key: "leave",
+    key: "leave_request",
+    label: "Leave Request",
+    icon: "leave",
+    group: "HR",
+    path: "/erp/hr/leave/employee-request",
+  },
+  {
+    key: "leave_management",
     label: "Leave Management",
     icon: "leave",
     group: "HR",
-    path: "/erp/hr/leave",
-    children: [
-      { label: "Leave requests", path: "/erp/hr/leave/management-requests" },
-      { label: "QR scanner", path: "/erp/hr/leave/qr-request" },
-    ],
+    path: "/erp/hr/leave/management-requests",
   },
 
   {

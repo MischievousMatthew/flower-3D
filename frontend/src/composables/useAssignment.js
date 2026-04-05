@@ -9,6 +9,15 @@
 import { ref, computed } from "vue";
 import { ERP_MODULES, findModule } from "../constants/erpModules";
 
+const LEGACY_MODULE_ALIASES = {
+  leave: ["leave_request", "leave_management"],
+};
+
+function matchesModuleKey(assignedKey, requestedKey) {
+  if (assignedKey === requestedKey) return true;
+  return (LEGACY_MODULE_ALIASES[assignedKey] ?? []).includes(requestedKey);
+}
+
 // ─── Module-level singletons ──────────────────────────────────────────────────
 // Shared across all components that call useAssignment().
 const modulePermissions = ref([]); // Array of { module, access }
@@ -39,7 +48,7 @@ export function useAssignment() {
    * Does the employee have any access (view or edit) to this module?
    */
   function hasAccess(moduleKey) {
-    return modulePermissions.value.some((p) => p.module === moduleKey);
+    return modulePermissions.value.some((p) => matchesModuleKey(p.module, moduleKey));
   }
 
   /**
@@ -47,7 +56,9 @@ export function useAssignment() {
    */
   function canView(moduleKey) {
     return modulePermissions.value.some(
-      (p) => p.module === moduleKey && (p.access === "view" || p.access === "edit"),
+      (p) =>
+        matchesModuleKey(p.module, moduleKey) &&
+        (p.access === "view" || p.access === "edit"),
     );
   }
 
@@ -56,7 +67,7 @@ export function useAssignment() {
    */
   function canEdit(moduleKey) {
     return modulePermissions.value.some(
-      (p) => p.module === moduleKey && p.access === "edit",
+      (p) => matchesModuleKey(p.module, moduleKey) && p.access === "edit",
     );
   }
 
@@ -73,7 +84,9 @@ export function useAssignment() {
    */
   function hasGroupAccess(group) {
     const groupModuleKeys = ERP_MODULES.filter((m) => m.group === group).map((m) => m.key);
-    return modulePermissions.value.some((p) => groupModuleKeys.includes(p.module));
+    return modulePermissions.value.some((p) =>
+      groupModuleKeys.some((moduleKey) => matchesModuleKey(p.module, moduleKey)),
+    );
   }
 
   // ─── Computed helpers ────────────────────────────────────────────────────

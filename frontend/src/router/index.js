@@ -55,12 +55,6 @@ const routes = [
         name: "Vendor_Register",
         component: () => import("../views/guest/VendorRegistration.vue"),
       },
-      {
-        path: "leaves",
-        name: "PublicLeaveRequest",
-        component: () => import("../views/ERP/HR/Public/LeaveRequest.vue"),
-        meta: { public: true, title: "Leave Request" },
-      },
     ],
   },
 
@@ -524,7 +518,7 @@ const routes = [
                 path: "employee-request",
                 name: "EmployeeLeaveRequest",
                 component: () =>
-                  import("../views/ERP/HR/Public/LeaveRequest.vue"),
+                  import("../views/ERP/HR/Leaves/LeaveRequest.vue"),
                 meta: { requiresAuth: false, title: "Leave Request" },
               },
               {
@@ -537,7 +531,7 @@ const routes = [
                 path: "qr-request",
                 name: "LeaveQRRequest",
                 component: () =>
-                  import("../views/ERP/HR/Leaves/LeaveRequestScanner.vue"),
+                  import("../views/ERP/HR/Public/LeaveRequestScanner.vue"),
               },
             ],
           },

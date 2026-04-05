@@ -27,6 +27,25 @@
       <p>Verifying your QR code...</p>
     </div>
 
+    <!-- QR Scanner Fallback -->
+    <div v-else-if="isScanning" class="scanner-state">
+      <div class="scanner-shell">
+        <div class="scanner-header">
+          <h2>Scan Employee QR Code</h2>
+          <p>
+            No leave token was found in the link. Scan the employee QR code to
+            continue.
+          </p>
+        </div>
+
+        <QRScanner
+          @scan-success="handleScanSuccess"
+          @scan-error="handleScanError"
+          @close="stopScanning"
+        />
+      </div>
+    </div>
+
     <!-- Error State -->
     <div v-else-if="verifyError" class="error-container">
       <svg
@@ -269,6 +288,7 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
+import QRScanner from "../../../../layouts/components/QRScanner.vue";
 import leaveApi from "../../../../services/leaveApi";
 
 const route = useRoute();
@@ -277,6 +297,7 @@ const route = useRoute();
 const isVerifying = ref(true);
 const verifyError = ref(null);
 const employeeData = ref(null);
+const isScanning = ref(false);
 const isSubmitting = ref(false);
 const submitSuccess = ref(false);
 const successData = ref(null);
@@ -299,21 +320,49 @@ const minDate = computed(() => {
 
 // Verify QR Token on mount
 onMounted(async () => {
-  const token = route.query.token || route.query.qr;
+  const token = extractTokenFromLocation();
 
   if (!token) {
-    verifyError.value = "No QR token provided. Please scan a valid QR code.";
     isVerifying.value = false;
+    isScanning.value = true;
     return;
   }
 
   await verifyQRToken(token);
 });
 
+function extractTokenFromLocation() {
+  const routeToken = route.query.token || route.query.qr;
+  if (routeToken) return routeToken;
+
+  if (typeof window === "undefined") return null;
+
+  try {
+    const currentUrl = new URL(window.location.href);
+    const searchToken =
+      currentUrl.searchParams.get("token") || currentUrl.searchParams.get("qr");
+
+    if (searchToken) return searchToken;
+
+    if (currentUrl.hash?.includes("?")) {
+      const hashQuery = currentUrl.hash.split("?")[1] || "";
+      const hashParams = new URLSearchParams(hashQuery);
+      const hashToken = hashParams.get("token") || hashParams.get("qr");
+
+      if (hashToken) return hashToken;
+    }
+  } catch (error) {
+    console.error("Failed to extract token from URL:", error);
+  }
+
+  return null;
+}
+
 // Verify QR Token
 async function verifyQRToken(token) {
   try {
     isVerifying.value = true;
+    isScanning.value = false;
     verifyError.value = null;
 
     const response = await leaveApi.verifyQRToken(token);
@@ -330,6 +379,74 @@ async function verifyQRToken(token) {
   } finally {
     isVerifying.value = false;
   }
+}
+
+function stopScanning() {
+  isScanning.value = false;
+
+  if (!employeeData.value && !verifyError.value) {
+    verifyError.value = "QR scanning was closed before a code was verified.";
+  }
+}
+
+function normalizeScannedToken(rawValue) {
+  const value = String(rawValue || "").trim();
+
+  if (!value) return null;
+
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const scannedUrl = new URL(value);
+      const queryToken =
+        scannedUrl.searchParams.get("token") || scannedUrl.searchParams.get("qr");
+
+      if (queryToken) return queryToken;
+
+      if (scannedUrl.hash?.includes("?")) {
+        const hashQuery = scannedUrl.hash.split("?")[1] || "";
+        const hashParams = new URLSearchParams(hashQuery);
+        return hashParams.get("token") || hashParams.get("qr");
+      }
+    } catch (error) {
+      console.error("Failed to parse scanned URL:", error);
+    }
+  }
+
+  if (value.startsWith("{")) {
+    return btoa(value);
+  }
+
+  try {
+    const decoded = atob(value);
+    const parsed = JSON.parse(decoded);
+
+    if (parsed?.employee_id && parsed?.owner_id) {
+      return value;
+    }
+  } catch {
+    // Ignore invalid base64 and continue.
+  }
+
+  return null;
+}
+
+async function handleScanSuccess(qrData) {
+  const token = normalizeScannedToken(qrData);
+
+  if (!token) {
+    verifyError.value =
+      "This QR code does not contain a valid leave request token.";
+    isScanning.value = false;
+    return;
+  }
+
+  await verifyQRToken(token);
+}
+
+function handleScanError(error) {
+  console.error("QR Scan Error:", error);
+  verifyError.value = "Failed to scan QR code. Please try again.";
+  isScanning.value = false;
 }
 
 // Calculate working days
@@ -412,7 +529,9 @@ function resetForm() {
 
 // Retry verification
 function retryVerification() {
-  window.location.reload();
+  verifyError.value = null;
+  employeeData.value = null;
+  isScanning.value = true;
 }
 </script>
 
@@ -494,6 +613,36 @@ function retryVerification() {
 }
 
 /* Error State */
+.scanner-state {
+  width: 100%;
+  max-width: 760px;
+}
+
+.scanner-shell {
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 28px;
+  padding: 28px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+}
+
+.scanner-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.scanner-header h2 {
+  font-size: 30px;
+  font-weight: 700;
+  color: #1f2a44;
+  margin-bottom: 10px;
+}
+
+.scanner-header p {
+  color: #64748b;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
 .error-container {
   background: white;
   border-radius: 20px;
@@ -861,6 +1010,7 @@ function retryVerification() {
     padding: 10px;
   }
 
+  .scanner-shell,
   .form-container {
     padding: 24px;
   }

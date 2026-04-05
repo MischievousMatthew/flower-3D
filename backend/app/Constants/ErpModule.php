@@ -14,7 +14,8 @@ class ErpModule
         'employees',
         'attendance',
         'payroll',
-        'leave',
+        'leave_request',
+        'leave_management',
 
         // Finance
         'finance_dashboard',

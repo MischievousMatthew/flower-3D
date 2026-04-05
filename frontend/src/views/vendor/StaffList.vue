@@ -604,26 +604,35 @@ const resignations = ref([]);
 const leaveApprovals = ref([]);
 const onLeave = ref([]);
 const newJoins = ref([]);
-const EXCLUDED_MODULE_KEYS = ["leave"];
+const LEGACY_MODULE_KEY_MAP = {
+  leave: "leave_management",
+};
+
+function normalizeModuleKey(moduleKey) {
+  return LEGACY_MODULE_KEY_MAP[moduleKey] ?? moduleKey;
+}
 
 // Module helpers
 const modulesByGroup = computed(() => {
-  const groupedModules = getModulesByGroup();
-
-  return Object.fromEntries(
-    Object.entries(groupedModules)
-      .map(([groupName, modules]) => [
-        groupName,
-        modules.filter((module) => !EXCLUDED_MODULE_KEYS.includes(module.key)),
-      ])
-      .filter(([, modules]) => modules.length > 0),
-  );
+  return getModulesByGroup();
 });
 
 function sanitizeModulePermissions(modulePermissions = []) {
-  return modulePermissions.filter(
-    (permission) => !EXCLUDED_MODULE_KEYS.includes(permission.module),
-  );
+  const mergedPermissions = new Map();
+
+  for (const permission of modulePermissions) {
+    const normalizedKey = normalizeModuleKey(permission.module);
+    const existing = mergedPermissions.get(normalizedKey);
+
+    if (!existing || permission.access === "edit") {
+      mergedPermissions.set(normalizedKey, {
+        ...permission,
+        module: normalizedKey,
+      });
+    }
+  }
+
+  return Array.from(mergedPermissions.values());
 }
 
 function getModuleLabel(key) {

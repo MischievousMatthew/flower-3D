@@ -171,6 +171,8 @@ class EmployeeAuthController extends Controller
             'attendance'         => '/erp/hr/attendance/logs',
             'payroll'            => '/erp/hr/payroll/list',
             'leave'              => '/erp/hr/leave/management-requests',
+            'leave_request'      => '/erp/hr/leave/employee-request',
+            'leave_management'   => '/erp/hr/leave/management-requests',
             'finance_dashboard'  => '/erp/finance/dashboard',
             'funding_requests'   => '/erp/finance/funding-requests',
             'payroll_requests'   => '/erp/finance/payroll-requests',
