@@ -20,7 +20,10 @@
     </div>
 
     <!-- Lead Time Notice (Only show for customers) -->
-    <div class="lead-time-notice" v-if="leadTimeDays > 0 && disablePastDates">
+    <div
+      class="lead-time-notice"
+      v-if="!closureMode && leadTimeDays > 0 && disablePastDates"
+    >
       <span class="notice-icon">⏰</span>
       <span class="notice-text">
         Please note: Flowers require {{ leadTimeDays }} days preparation time.
@@ -33,22 +36,22 @@
       <div class="legend-item">
         <span class="legend-dot available"></span> Available
       </div>
-      <div class="legend-item">
+      <div v-if="!closureMode" class="legend-item">
         <span class="legend-dot almost-full"></span> Almost Full
       </div>
-      <div class="legend-item">
+      <div v-if="!closureMode" class="legend-item">
         <span class="legend-dot fully-booked"></span> Fully Booked
       </div>
       <div class="legend-item">
         <span class="legend-dot closed"></span> Closed
       </div>
-      <div v-if="disablePastDates" class="legend-item">
+      <div v-if="!closureMode && disablePastDates" class="legend-item">
         <span class="legend-dot lead-time"></span> Preparation Time
       </div>
-      <div class="legend-item">
+      <div v-if="!closureMode" class="legend-item">
         <span class="legend-dot user-order"></span> Your Order
       </div>
-      <div v-if="!disablePastDates" class="legend-item">
+      <div v-if="!closureMode && !disablePastDates" class="legend-item">
         <span class="legend-dot past-date"></span> Past Date
       </div>
     </div>
@@ -74,7 +77,20 @@
       >
         <div class="day-number">{{ day.day }}</div>
         <div v-if="day.isCurrentMonth" class="day-info">
-          <div v-if="day.availability?.has_user_order" class="user-order-badge">
+          <template v-if="closureMode">
+            <div v-if="day.isPastDate" class="past-date-info">Unavailable</div>
+            <div
+              v-else-if="day.availability?.status === 'closed'"
+              class="closed-badge"
+            >
+              Closed
+            </div>
+            <div v-else class="available-badge">Available</div>
+          </template>
+          <div
+            v-else-if="day.availability?.has_user_order"
+            class="user-order-badge"
+          >
             ✓ Ordered
           </div>
 
@@ -152,7 +168,23 @@
     <div v-if="selectedDateInfo" class="selected-date-info">
       <h4>{{ formatSelectedDate }}</h4>
       <div class="date-details">
-        <div v-if="selectedDateInfo.has_user_order" class="alert-info">
+        <div v-if="closureMode" class="date-availability">
+          <p
+            :class="
+              selectedDateInfo.status === 'closed' ? 'closed-text' : 'available-text'
+            "
+          >
+            <span class="status-icon">
+              {{ selectedDateInfo.status === "closed" ? "🔴" : "✓" }}
+            </span>
+            {{
+              selectedDateInfo.status === "closed"
+                ? "This date is marked as closed."
+                : "This date is available."
+            }}
+          </p>
+        </div>
+        <div v-else-if="selectedDateInfo.has_user_order" class="alert-info">
           <span class="alert-icon">ℹ️</span>
           <p>You already have an order on this date.</p>
         </div>
@@ -220,6 +252,10 @@ import { toast } from "vue3-toastify";
 const props = defineProps({
   vendorId: { type: Number, required: true },
   modelValue: { type: Object, default: null },
+  closureMode: {
+    type: Boolean,
+    default: false,
+  },
   // Add new prop to control past date behavior
   disablePastDates: {
     type: Boolean,
@@ -333,7 +369,7 @@ function createDayObject(date, isCurrentMonth) {
 
   // Calculate lead time days for customers, while honoring same-day availability.
   let isWithinLeadTime = false;
-  if (props.disablePastDates) {
+  if (!props.closureMode && props.disablePastDates) {
     if (isToday) {
       isWithinLeadTime = !sameDayAvailableToday;
     } else if (leadTimeDays.value > 0) {
@@ -361,7 +397,9 @@ function createDayObject(date, isCurrentMonth) {
   // Different disabled logic for customer vs vendor
   let isDisabled = false;
 
-  if (props.disablePastDates) {
+  if (props.closureMode) {
+    isDisabled = isPastDate || isBeyondLimit;
+  } else if (props.disablePastDates) {
     // Customer view: disable past dates, beyond limit, lead time, or API-disabled
     isDisabled =
       isPastDate ||
@@ -380,6 +418,8 @@ function createDayObject(date, isCurrentMonth) {
   if (availability && isCurrentMonth) {
     if (isDisabled) {
       colorClass = "day-disabled";
+    } else if (props.closureMode) {
+      colorClass = availability.status === "closed" ? "day-red" : "day-white";
     } else {
       colorClass = getColorClass(availability.color);
     }
@@ -392,7 +432,7 @@ function createDayObject(date, isCurrentMonth) {
   }
 
   // Special override for lead time days.
-  if (isWithinLeadTime && isCurrentMonth) {
+  if (!props.closureMode && isWithinLeadTime && isCurrentMonth) {
     colorClass = "lead-time-day";
   }
 
@@ -431,6 +471,15 @@ function isSelected(day) {
 
 function selectDate(day) {
   // Different behavior for customer vs vendor view
+  if (props.closureMode && day.isDisabled) {
+    if (day.isPastDate) {
+      toast.error("You cannot close past dates.");
+    } else {
+      toast.error("You can only close dates up to 3 months ahead.");
+    }
+    return;
+  }
+
   if (props.disablePastDates && day.isDisabled) {
     // Customer view - show error for disabled dates
     if (day.isToday) {
@@ -730,6 +779,28 @@ watch(
   background: white;
   padding: 2px 6px;
   border-radius: 10px;
+}
+
+.closed-badge,
+.available-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.closed-badge {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+.available-badge {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.closed-text {
+  color: #b91c1c;
 }
 
 .past-date-view {

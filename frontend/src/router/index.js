@@ -597,13 +597,19 @@ router.beforeEach(async (to, from, next) => {
   const auth = useAuth();
   const userType = getPreferredUserType(to.path);
   const token = getPreferredAuthToken(to.path);
+  const clearStoredAuth = () => {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("employee_token");
+    localStorage.removeItem("vendor_token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("user_type");
+  };
 
   if (to.meta.public) {
     return next();
   }
 
   if (!token) {
-    auth.isAuthenticated.value = false;
     auth.user.value = null;
 
     if (to.meta.requiresAuth) {
@@ -628,10 +634,30 @@ router.beforeEach(async (to, from, next) => {
         await loadAssignments(auth.user.value);
       }
     } catch (err) {
-      console.warn("Auth load failed, forcing logout");
-      localStorage.clear();
-      auth.isAuthenticated.value = false;
-      auth.user.value = null;
+      const status = err?.response?.status;
+      console.warn("Auth load failed", { status, path: to.path });
+
+      if (status === 401) {
+        clearStoredAuth();
+        auth.user.value = null;
+
+        if (
+          to.meta.requiresAuth ||
+          to.meta.requiresAdmin ||
+          to.meta.requiresVendor ||
+          to.meta.requiresDepartment
+        ) {
+          return next("/guest/login");
+        }
+
+        return next();
+      }
+
+      // For transient bootstrap failures, preserve the local session state
+      // instead of forcing a logout on refresh.
+      if (auth.user.value && token) {
+        return next();
+      }
 
       if (
         to.meta.requiresAuth ||

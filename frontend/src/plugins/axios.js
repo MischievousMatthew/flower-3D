@@ -18,6 +18,25 @@ const api = axios.create({
   withCredentials: true,
 });
 
+const clearStoredAuth = () => {
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("employee_token");
+  localStorage.removeItem("vendor_token");
+  localStorage.removeItem("user");
+  localStorage.removeItem("user_type");
+};
+
+const shouldForceLogout = (error) => {
+  if (error.response?.status !== 401) {
+    return false;
+  }
+
+  const url = error.config?.url ?? "";
+  const normalizedUrl = url.startsWith("/") ? url : `/${url}`;
+
+  return ["/auth/me", "/auth/employee-me"].includes(normalizedUrl);
+};
+
 // ================= REQUEST INTERCEPTOR =================
 api.interceptors.request.use(
   (config) => {
@@ -59,14 +78,10 @@ api.interceptors.response.use(
     });
 
     // ================= HANDLE 401 =================
-    if (error.response?.status === 401) {
+    if (shouldForceLogout(error)) {
       console.log("401 Unauthorized - clearing auth");
 
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("employee_token");
-      localStorage.removeItem("vendor_token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("user_type");
+      clearStoredAuth();
 
       // Use replace instead of href (prevents history loop)
       if (!window.location.pathname.includes("/guest/login")) {

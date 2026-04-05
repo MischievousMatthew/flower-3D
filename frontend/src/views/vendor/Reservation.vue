@@ -41,7 +41,9 @@
           </div>
 
           <ReservationCalendar
+            :key="calendarRefreshKey"
             :vendor-id="vendorId"
+            :closure-mode="true"
             v-model="selectedDate"
             @date-selected="handleDateSelected"
           />
@@ -324,8 +326,12 @@
               id="closeDate"
               v-model="closeDateForm.date"
               :min="today"
+              :max="maxCloseDate"
               class="form-input"
             />
+            <small class="form-hint">
+              You can only mark dates as closed from today up to 3 months ahead.
+            </small>
           </div>
 
           <div class="form-group">
@@ -392,8 +398,14 @@ const closedDates = ref([]);
 const showCloseDateModal = ref(false);
 const viewing3DModel = ref(null);
 const current3DModelName = ref("");
+const calendarRefreshKey = ref(0);
 
 const today = computed(() => new Date().toISOString().split("T")[0]);
+const maxCloseDate = computed(() => {
+  const max = new Date();
+  max.setMonth(max.getMonth() + 3);
+  return max.toISOString().split("T")[0];
+});
 
 const closeDateForm = ref({
   date: "",
@@ -473,7 +485,7 @@ async function submitCloseDate() {
       showCloseDateModal.value = false;
       closeDateForm.value = { date: "", reason: "", type: "manual" };
       await loadClosedDates();
-      // Refresh calendar if needed
+      calendarRefreshKey.value += 1;
       selectedDate.value = null;
     }
   } catch (error) {
@@ -499,7 +511,7 @@ async function removeClosedDate(id) {
     if (response.data.success) {
       toast.success("Closed date removed successfully");
       await loadClosedDates();
-      // Refresh calendar if needed
+      calendarRefreshKey.value += 1;
       selectedDate.value = null;
     }
   } catch (error) {
@@ -1119,6 +1131,13 @@ function handleImageError(event) {
   outline: none;
   border-color: #48bb78;
   box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
+}
+
+.form-hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #718096;
 }
 
 .modal-footer {

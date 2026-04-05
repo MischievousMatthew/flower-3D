@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Order;
 use App\Models\VendorBalance;
 use App\Models\VendorTransaction;
-use App\Models\Order;
+use App\Traits\ResolvesOwner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class VendorFinanceDashboardController extends Controller
 {
+    use ResolvesOwner;
+
     /**
      * GET /api/vendor/finance/overview
      *
@@ -24,7 +27,6 @@ class VendorFinanceDashboardController extends Controller
 
             $balance = VendorBalance::forVendor($vendorId);
 
-            // Revenue this month vs last month
             $thisMonthRevenue = VendorTransaction::forVendor($vendorId)
                 ->credits()
                 ->where('category', 'order_revenue')
@@ -43,7 +45,6 @@ class VendorFinanceDashboardController extends Controller
                 ? round((($thisMonthRevenue - $lastMonthRevenue) / $lastMonthRevenue) * 100, 1)
                 : ($thisMonthRevenue > 0 ? 100 : 0);
 
-            // Completed orders this month
             $completedThisMonth = $this->countCompletedOrdersForPeriod(
                 $vendorId,
                 now()->copy()->startOfMonth(),
@@ -60,7 +61,6 @@ class VendorFinanceDashboardController extends Controller
                 ? round((($completedThisMonth - $completedLastMonth) / $completedLastMonth) * 100, 1)
                 : ($completedThisMonth > 0 ? 100 : 0);
 
-            // Total refunds this month
             $expensesByCategory = VendorTransaction::forVendor($vendorId)
                 ->debits()
                 ->whereIn('category', ['refund', 'procurement', 'payroll'])
@@ -70,55 +70,53 @@ class VendorFinanceDashboardController extends Controller
                 ->groupBy('category')
                 ->pluck('total', 'category');
 
-            $refundsThisMonth      = (float) ($expensesByCategory['refund']      ?? 0);
-            $procurementThisMonth  = (float) ($expensesByCategory['procurement']  ?? 0);
-            $payrollThisMonth      = (float) ($expensesByCategory['payroll']      ?? 0);
+            $refundsThisMonth = (float) ($expensesByCategory['refund'] ?? 0);
+            $procurementThisMonth = (float) ($expensesByCategory['procurement'] ?? 0);
+            $payrollThisMonth = (float) ($expensesByCategory['payroll'] ?? 0);
             $totalExpenses = $refundsThisMonth + $procurementThisMonth + $payrollThisMonth;
-
             $netProfit = $thisMonthRevenue - $totalExpenses;
 
             return response()->json([
                 'success' => true,
-                'data'    => [
-                    'cash_balance'   => [
-                        'amount'     => number_format((float) $balance->balance, 2),
-                        'raw'        => (float) $balance->balance,
-                        'change_pct' => null,     // balance doesn't compare month-to-month
-                        'label'      => 'Current Balance',
-                    ],
-                    'total_revenue'  => [
-                        'amount'     => number_format($thisMonthRevenue, 2),
-                        'raw'        => $thisMonthRevenue,
-                        'change_pct' => $revenueChange,
-                        'label'      => 'Total Revenue',
-                        'period'     => 'This Month',
-                    ],
-                    'net_profit'     => [
-                        'amount'     => number_format($netProfit, 2),
-                        'raw'        => $netProfit,
+                'data' => [
+                    'cash_balance' => [
+                        'amount' => number_format((float) $balance->balance, 2),
+                        'raw' => (float) $balance->balance,
                         'change_pct' => null,
-                        'label'      => 'Net Profit',
-                        'period'     => 'This Month',
+                        'label' => 'Current Balance',
+                    ],
+                    'total_revenue' => [
+                        'amount' => number_format($thisMonthRevenue, 2),
+                        'raw' => $thisMonthRevenue,
+                        'change_pct' => $revenueChange,
+                        'label' => 'Total Revenue',
+                        'period' => 'This Month',
+                    ],
+                    'net_profit' => [
+                        'amount' => number_format($netProfit, 2),
+                        'raw' => $netProfit,
+                        'change_pct' => null,
+                        'label' => 'Net Profit',
+                        'period' => 'This Month',
                     ],
                     'completed_orders' => [
-                        'count'      => $completedThisMonth,
+                        'count' => $completedThisMonth,
                         'change_pct' => $ordersChange,
-                        'label'      => 'Completed Orders',
-                        'period'     => 'This Month',
+                        'label' => 'Completed Orders',
+                        'period' => 'This Month',
                     ],
-                    'lifetime'       => [
-                        'total_earned'    => (float) $balance->total_earned,
+                    'lifetime' => [
+                        'total_earned' => (float) $balance->total_earned,
                         'total_withdrawn' => (float) $balance->total_withdrawn,
                     ],
                     'expenses' => [
-                        'refund'      => $refundsThisMonth,
+                        'refund' => $refundsThisMonth,
                         'procurement' => $procurementThisMonth,
-                        'payroll'     => $payrollThisMonth,
-                        'total'       => $totalExpenses,
+                        'payroll' => $payrollThisMonth,
+                        'total' => $totalExpenses,
                     ],
                 ],
             ]);
-
         } catch (\Exception $e) {
             Log::error('VendorFinanceDashboard::overview error: ' . $e->getMessage());
 
@@ -141,7 +139,7 @@ class VendorFinanceDashboardController extends Controller
             $vendorId = $this->resolveVendorId($request);
 
             $request->validate([
-                'type'     => 'nullable|in:all,credit,debit',
+                'type' => 'nullable|in:all,credit,debit',
                 'per_page' => 'nullable|integer|min:5|max:100',
             ]);
 
@@ -156,34 +154,33 @@ class VendorFinanceDashboardController extends Controller
 
             $transactions = $query->paginate($request->input('per_page', 15));
 
-            $formatted = $transactions->map(function (VendorTransaction $t) {
+            $formatted = $transactions->map(function (VendorTransaction $transaction) {
                 return [
-                    'id'             => $t->id,
-                    'date'           => $t->created_at->format('d/m/Y'),
-                    'serial_no'      => $t->order?->order_number ?? 'ADJ-' . $t->id,
-                    'organization'   => 'Customer Order',     // extend if you store buyer name in metadata
-                    'type'           => ucfirst(str_replace('_', ' ', $t->category)),
-                    'amount'         => number_format((float) $t->amount, 2),
-                    'raw_amount'     => (float) $t->amount,
-                    'status'         => ucfirst($t->status),
-                    'category'       => $t->type === 'credit' ? 'income' : 'expense',
-                    'balance_after'  => number_format((float) $t->balance_after, 2),
-                    'description'    => $t->description,
-                    'metadata'       => $t->metadata,
+                    'id' => $transaction->id,
+                    'date' => $transaction->created_at->format('d/m/Y'),
+                    'serial_no' => $transaction->order?->order_number ?? 'ADJ-' . $transaction->id,
+                    'organization' => 'Customer Order',
+                    'type' => ucfirst(str_replace('_', ' ', $transaction->category)),
+                    'amount' => number_format((float) $transaction->amount, 2),
+                    'raw_amount' => (float) $transaction->amount,
+                    'status' => ucfirst($transaction->status),
+                    'category' => $transaction->type === 'credit' ? 'income' : 'expense',
+                    'balance_after' => number_format((float) $transaction->balance_after, 2),
+                    'description' => $transaction->description,
+                    'metadata' => $transaction->metadata,
                 ];
             });
 
             return response()->json([
                 'success' => true,
-                'data'    => $formatted,
-                'meta'    => [
-                    'total'        => $transactions->total(),
-                    'per_page'     => $transactions->perPage(),
+                'data' => $formatted,
+                'meta' => [
+                    'total' => $transactions->total(),
+                    'per_page' => $transactions->perPage(),
                     'current_page' => $transactions->currentPage(),
-                    'last_page'    => $transactions->lastPage(),
+                    'last_page' => $transactions->lastPage(),
                 ],
             ]);
-
         } catch (\Exception $e) {
             Log::error('VendorFinanceDashboard::transactions error: ' . $e->getMessage());
 
@@ -204,7 +201,7 @@ class VendorFinanceDashboardController extends Controller
     {
         try {
             $vendorId = $this->resolveVendorId($request);
-            $period   = $request->input('period', 'this_month');
+            $period = $request->input('period', 'this_month');
 
             [$from, $to, $groupFormat] = $this->periodRange($period);
 
@@ -213,35 +210,34 @@ class VendorFinanceDashboardController extends Controller
                 ->selectRaw("
                     DATE_FORMAT(created_at, '{$groupFormat}') as period_label,
                     SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END) as income,
-                    SUM(CASE WHEN type = 'debit'  THEN amount ELSE 0 END) as expense
+                    SUM(CASE WHEN type = 'debit' THEN amount ELSE 0 END) as expense
                 ")
                 ->groupByRaw("DATE_FORMAT(created_at, '{$groupFormat}')")
-                ->orderByRaw("MIN(created_at)")
+                ->orderByRaw('MIN(created_at)')
                 ->get();
 
-            $maxIncome  = $rows->max('income')  ?: 1;
+            $maxIncome = $rows->max('income') ?: 1;
             $maxExpense = $rows->max('expense') ?: 1;
-            $maxVal     = max($maxIncome, $maxExpense);
+            $maxVal = max($maxIncome, $maxExpense);
 
             $data = $rows->map(function ($row) use ($maxVal) {
-                $income  = (float) $row->income;
+                $income = (float) $row->income;
                 $expense = (float) $row->expense;
 
                 return [
-                    'month'         => $row->period_label,
-                    'income'        => $maxVal > 0 ? round(($income  / $maxVal) * 100) : 0,
-                    'expense'       => $maxVal > 0 ? round(($expense / $maxVal) * 100) : 0,
-                    'incomeAmount'  => $income,
+                    'month' => $row->period_label,
+                    'income' => $maxVal > 0 ? round(($income / $maxVal) * 100) : 0,
+                    'expense' => $maxVal > 0 ? round(($expense / $maxVal) * 100) : 0,
+                    'incomeAmount' => $income,
                     'expenseAmount' => $expense,
-                    'change'        => 0,
+                    'change' => 0,
                 ];
             });
 
             return response()->json([
                 'success' => true,
-                'data'    => $data,
+                'data' => $data,
             ]);
-
         } catch (\Exception $e) {
             Log::error('VendorFinanceDashboard::cashflow error: ' . $e->getMessage());
 
@@ -252,8 +248,6 @@ class VendorFinanceDashboardController extends Controller
         }
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────
-
     /**
      * Returns [from, to, MySQL DATE_FORMAT string] for a named period.
      */
@@ -262,22 +256,22 @@ class VendorFinanceDashboardController extends Controller
         $now = now();
 
         return match ($period) {
-            'last_month'    => [
+            'last_month' => [
                 $now->copy()->subMonth()->startOfMonth(),
                 $now->copy()->subMonth()->endOfMonth(),
-                '%d',   // day of month
+                '%d',
             ],
-            'this_quarter'  => [
+            'this_quarter' => [
                 $now->copy()->startOfQuarter(),
                 $now->copy()->endOfQuarter(),
-                '%u',   // ISO week number
+                '%u',
             ],
-            'this_year'     => [
+            'this_year' => [
                 $now->copy()->startOfYear(),
                 $now->copy()->endOfYear(),
-                '%b',   // abbreviated month name
+                '%b',
             ],
-            default         => [  // this_month
+            default => [
                 $now->copy()->startOfMonth(),
                 $now->copy()->endOfMonth(),
                 '%d',
@@ -287,15 +281,7 @@ class VendorFinanceDashboardController extends Controller
 
     private function resolveVendorId(Request $request): int
     {
-        $user = $request->user();
-
-        // Employee model instance — get vendor via owner_id
-        if ($user instanceof \App\Models\Employee) {
-            return $user->owner_id;
-        }
-
-        // Regular User (vendor logging in directly)
-        return $user->id;
+        return $this->resolveOwnerId($request);
     }
 
     private function countCompletedOrdersForPeriod(int $vendorId, $from, $to): int

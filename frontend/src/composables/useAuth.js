@@ -298,7 +298,9 @@ export function useAuth() {
       setAuthHeader(userType);
     } catch (err) {
       console.error("Fetch user error:", err);
-      clearAuthData();
+      if (err?.response?.status === 401) {
+        clearAuthData();
+      }
       throw err;
     }
   };

@@ -722,6 +722,8 @@ class VendorOrdersController extends Controller
     {
         try {
             $user = $request->user();
+            $today = Carbon::today();
+            $maxCloseDate = Carbon::today()->addMonthsNoOverflow(3)->toDateString();
 
             if ($user->role !== 'vendor') {
                 return response()->json([
@@ -740,6 +742,23 @@ class VendorOrdersController extends Controller
                 return response()->json([
                     'success' => false,
                     'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $date = Carbon::parse($request->date)->startOfDay();
+
+            if ($date->lt($today)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You cannot mark past dates as closed.'
+                ], 422);
+            }
+
+            if ($date->gt(Carbon::parse($maxCloseDate))) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You can only mark dates as closed up to 3 months in advance.',
+                    'max_date' => $maxCloseDate,
                 ], 422);
             }
 
