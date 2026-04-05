@@ -986,7 +986,20 @@ const addToCart = async (
 
 
 
-const chatVendor = () => console.log("Chat with vendor", vendorId.value);
+const chatVendor = () => {
+  if (!isAuthenticated.value) {
+    router.push({ path: "/guest/login", query: { redirect: route.fullPath } });
+    return;
+  }
+
+  router.push({
+    path: "/customer/chat",
+    query: {
+      vendor_id: String(vendorId.value),
+      vendor_name: vendor.value?.store_name || "",
+    },
+  });
+};
 
 const customizeFlowers = () => {
   router.push({

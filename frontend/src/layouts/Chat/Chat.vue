@@ -498,7 +498,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  onUnmounted,
+  nextTick,
+  watch,
+} from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import NavHeader from "../NavHeader.vue";
@@ -527,6 +534,14 @@ const props = defineProps({
   allowNewChat: {
     type: Boolean,
     default: true,
+  },
+  initialVendorId: {
+    type: [Number, String],
+    default: null,
+  },
+  initialVendorName: {
+    type: String,
+    default: "",
   },
 });
 
@@ -557,6 +572,11 @@ const canSendMessages = computed(() => props.canSendMessages);
 const canStartConversation = computed(
   () => props.canSendMessages && props.allowNewChat,
 );
+const normalizedInitialVendorId = computed(() => {
+  const parsedVendorId = Number.parseInt(props.initialVendorId, 10);
+  return Number.isFinite(parsedVendorId) ? parsedVendorId : null;
+});
+const hasHandledInitialVendor = ref(false);
 const headerComponent = computed(() => {
   if (isEmbeddedLayout.value) {
     return null;
@@ -970,6 +990,34 @@ const startNewConversation = async (otherUser) => {
   }
 };
 
+const handleInitialVendorConversation = async () => {
+  if (
+    hasHandledInitialVendor.value ||
+    isVendor.value ||
+    !normalizedInitialVendorId.value ||
+    !canStartConversation.value
+  ) {
+    return;
+  }
+
+  const targetVendorId = normalizedInitialVendorId.value;
+  const existingConversation = conversations.value.find(
+    (conversation) => Number(conversation.vendor?.id) === targetVendorId,
+  );
+
+  hasHandledInitialVendor.value = true;
+
+  if (existingConversation) {
+    await selectConversation(existingConversation);
+    return;
+  }
+
+  await startNewConversation({
+    id: targetVendorId,
+    name: props.initialVendorName,
+  });
+};
+
 const pollNewMessages = async () => {
   if (!selectedConversation.value) return;
 
@@ -1056,7 +1104,12 @@ const fetchConversations = async () => {
         messages: [],
       }));
 
-      if (conversations.value.length > 0 && !selectedConversation.value) {
+      if (normalizedInitialVendorId.value && !isVendor.value) {
+        await handleInitialVendorConversation();
+      } else if (
+        conversations.value.length > 0 &&
+        !selectedConversation.value
+      ) {
         await selectConversation(conversations.value[0]);
       }
     }
@@ -1067,6 +1120,18 @@ const fetchConversations = async () => {
     isLoading.value = false;
   }
 };
+
+watch(
+  () => normalizedInitialVendorId.value,
+  (nextVendorId, previousVendorId) => {
+    if (nextVendorId && nextVendorId !== previousVendorId) {
+      hasHandledInitialVendor.value = false;
+      if (conversations.value.length > 0) {
+        handleInitialVendorConversation();
+      }
+    }
+  },
+);
 
 // Lifecycle
 onMounted(() => {

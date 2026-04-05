@@ -41,18 +41,6 @@
           🛒 Cart ({{ cartCount }})
         </router-link>
 
-        <router-link
-          v-if="user?.role === 'customer'"
-          :to="chatRoute"
-          class="btn-chat"
-          :class="{ 'btn-chat--active': isChatRoute }"
-        >
-          <span class="chat-label">Chat</span>
-          <span v-if="unreadChatCount > 0" class="chat-count-badge">
-            {{ unreadChatCount > 9 ? "9+" : unreadChatCount }}
-          </span>
-        </router-link>
-
         <div v-if="user?.role === 'customer'" class="notification-wrapper">
           <button class="btn-notification" @click="toggleNotificationDropdown">
             <span class="notification-bell">Notifications</span>
