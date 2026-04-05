@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Models\VendorClosedDate;
 use App\Models\ReservationAvailabilityCache;
+use App\Services\DeliveryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
@@ -13,6 +14,11 @@ use Carbon\Carbon;
 
 class VendorOrdersController extends Controller
 {
+    public function __construct(
+        private readonly DeliveryService $deliveryService
+    ) {
+    }
+
     /**
      * Get all orders for the logged-in vendor
      */
@@ -652,10 +658,13 @@ class VendorOrdersController extends Controller
                 $order->save();
             }
  
+            $order = $order->fresh(['items']);
+            $this->deliveryService->syncFromVendorOrderStatus($order, $order->status);
+
             Log::info('Order status updated', [
                 'order_id'   => $order->id,
                 'old_status' => $oldStatus,
-                'new_status' => $newStatus,
+                'new_status' => $order->status,
                 'vendor_id'  => $user->id,
             ]);
  
@@ -665,7 +674,7 @@ class VendorOrdersController extends Controller
                 'data' => [
                     'order_id'   => $order->id,
                     'old_status' => $oldStatus,
-                    'new_status' => $order->fresh()->status,
+                    'new_status' => $order->status,
                 ],
             ]);
  

@@ -483,6 +483,21 @@ const mapOrderToNotification = (order) => {
       message: `Order ${order.order_number} has been completed.`,
       variant: "completed",
     },
+    returned: {
+      title: "Returned",
+      message: `Order ${order.order_number} has a return request in progress.`,
+      variant: "warning",
+    },
+    refunded: {
+      title: "Refunded",
+      message: `Order ${order.order_number} has been refunded.`,
+      variant: "completed",
+    },
+    cancelled: {
+      title: "Cancelled",
+      message: `Order ${order.order_number} was cancelled.`,
+      variant: "warning",
+    },
   };
 
   const config = statusMap[status];

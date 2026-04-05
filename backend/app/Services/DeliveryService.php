@@ -13,6 +13,13 @@ use RuntimeException;
 
 class DeliveryService
 {
+    private const VENDOR_TO_DELIVERY_STATUS_MAP = [
+        'processing' => 'pending',
+        'delivered' => 'to_received',
+        'completed' => 'completed',
+        'refunded' => 'refunded',
+    ];
+
     // ─── Delivery Creation ─────────────────────────────────────────────────
 
     /**
@@ -167,6 +174,46 @@ class DeliveryService
         });
     }
 
+    /**
+     * Mirror a vendor-side order status update onto the delivery lifecycle.
+     * This keeps vendor and supply-chain flows interchangeable.
+     */
+    public function syncFromVendorOrderStatus(Order $order, string $orderStatus): ?Delivery
+    {
+        $deliveryStatus = self::VENDOR_TO_DELIVERY_STATUS_MAP[$orderStatus] ?? null;
+
+        if (! $deliveryStatus) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($order, $deliveryStatus, $orderStatus) {
+            $delivery = Delivery::where('order_id', $order->id)->lockForUpdate()->first();
+
+            if (! $delivery) {
+                $delivery = $this->createForOrder($order->id);
+            }
+
+            if ($delivery->status !== $deliveryStatus) {
+                $delivery->update([
+                    'status' => $deliveryStatus,
+                    'last_scanned_by' => Auth::id(),
+                    'last_scanned_at' => now(),
+                ]);
+
+                DeliveryLog::create([
+                    'owner_id' => $delivery->owner_id,
+                    'delivery_id' => $delivery->id,
+                    'status' => $deliveryStatus,
+                    'scanned_by' => Auth::id(),
+                    'scanned_at' => now(),
+                    'notes' => "Synced from vendor order status [{$orderStatus}]",
+                ]);
+            }
+
+            return $delivery->fresh(['order', 'logs.scanner']);
+        });
+    }
+
     // ─── Private Helpers ───────────────────────────────────────────────────
 
     // resolveTargetStatus removed — logic moved into SCANNER_PAGE_TARGET const on Delivery model
@@ -180,10 +227,29 @@ class DeliveryService
         if (! $orderStatus) return;
 
         try {
-            Order::where('id', $delivery->order_id)->update([
-                'status'     => $orderStatus,
-                'updated_at' => now(),
-            ]);
+            $order = Order::with('items')->find($delivery->order_id);
+            if (! $order) {
+                return;
+            }
+
+            match ($orderStatus) {
+                'processing' => $order->status !== 'processing'
+                    ? $order->markAsProcessing()
+                    : null,
+                'delivered' => $order->status !== 'delivered'
+                    ? $order->update(['status' => 'delivered', 'updated_at' => now()])
+                    : null,
+                'completed' => $order->status !== 'completed'
+                    ? $order->markAsCompleted()
+                    : null,
+                'refunded' => $order->status !== 'refunded'
+                    ? $order->markAsRefunded()
+                    : null,
+                'returned' => $order->status !== 'returned'
+                    ? $order->update(['status' => 'returned', 'updated_at' => now()])
+                    : null,
+                default => $order->update(['status' => $orderStatus, 'updated_at' => now()]),
+            };
         } catch (\Throwable $e) {
             // Non-fatal — log and continue; delivery scan already succeeded
             Log::warning("DeliveryService: failed to sync order status for order {$delivery->order_id}: {$e->getMessage()}");

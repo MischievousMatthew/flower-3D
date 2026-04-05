@@ -1758,7 +1758,7 @@ async function openLogs(delivery) {
   logsModal.value = { open: true, delivery, logs: [], loading: true };
   try {
     const res = await deliveryService.getLogs(delivery.id);
-    logsModal.value.logs = res.logs ?? [];
+    logsModal.value.logs = res?.data?.logs ?? [];
   } catch {
     toast.error("Failed to load logs.", {
       position: toast.POSITION.TOP_RIGHT,

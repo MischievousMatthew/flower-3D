@@ -51,8 +51,8 @@ class Delivery extends Model
     const ORDER_STATUS_MAP = [
         'pending'      => 'processing',
         'to_processed' => 'processing',
-        'to_ship'      => 'shipped',
-        'to_receive'   => 'out_for_delivery',
+        'to_ship'      => 'processing',
+        'to_receive'   => 'delivered',
         'completed'    => 'completed',
         'returned'     => 'returned',
         'refunded'     => 'refunded',
