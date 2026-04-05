@@ -493,7 +493,6 @@ async function submitLeaveRequest() {
   left: 32px;
   font-size: 32px;
   animation: bounce 2s ease-in-out infinite;
-  margin-bottom: 10px;
 }
 
 @keyframes bounce {
@@ -507,6 +506,7 @@ async function submitLeaveRequest() {
 }
 
 .leave-request-scanner {
+  margin-top: 20px;
   display: flex;
   min-height: 100vh;
   background: #f7fafc;
