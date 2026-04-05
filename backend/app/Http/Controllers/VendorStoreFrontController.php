@@ -346,9 +346,11 @@ class VendorStorefrontController extends Controller
      */
     private function formatVendor(VendorApplication $v, bool $full = false): array
     {
+        $resolvedOwnerId = $this->resolveVendorOwnerId($v);
+
         $base = [
             'id'                  => $v->id,
-            'owner_id'            => $v->owner_id,
+            'owner_id'            => $resolvedOwnerId,
             'store_name'          => $v->store_name ?? '',
             'store_description'   => $v->store_description ?? '',
             'store_logo_path'     => $this->storageUrl($v->store_logo_path),

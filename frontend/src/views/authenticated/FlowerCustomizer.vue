@@ -237,7 +237,7 @@ async function loadBouquetModel() {
   isLoading3D.value = true;
   bouquetLoadError.value = "";
   try {
-    const gltf = await loadGltf("/bouquet.glb");
+    const gltf = await loadFirstAvailableGltf(["/bouquet.glb", "/Boquet.glb"]);
     bouquetRoot = gltf.scene || gltf.scenes?.[0];
     if (!bouquetRoot) throw new Error("No scene found inside bouquet.glb.");
 
@@ -278,7 +278,7 @@ async function loadBouquetModel() {
     sceneReady.value = true;
   } catch (error) {
     console.error("Failed to load bouquet base model:", error);
-    bouquetLoadError.value = "Place `bouquet.glb` inside `frontend/public` and make sure it is available at `/bouquet.glb`.";
+    bouquetLoadError.value = "Make sure the bouquet base model exists in `frontend/public` as `/bouquet.glb` or `/Boquet.glb`.";
   } finally {
     isLoading3D.value = false;
   }
@@ -628,6 +628,18 @@ function cleanupScene() {
 
 function loadGltf(url) {
   return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
+}
+
+async function loadFirstAvailableGltf(urls) {
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      return await loadGltf(url);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("Unable to load bouquet model.");
 }
 
 function showToast(message, type = "success") {
