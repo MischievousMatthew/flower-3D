@@ -1,24 +1,9 @@
 <template>
   <div class="leave-request-scanner">
-    
-
     <div class="content">
       <!-- Header -->
       <div class="page-header">
         <div class="header-left">
-          <button @click="goBack" class="btn-back">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <polyline points="15 18 9 12 15 6"></polyline>
-            </svg>
-          </button>
           <div>
             <h1 class="page-title">Request Leave (QR Scan)</h1>
             <p class="page-subtitle">
@@ -339,11 +324,6 @@ const minDate = computed(() => {
   return today.toISOString().split("T")[0];
 });
 
-// Navigation
-function goBack() {
-  router.push("/erp/hr/leave/management-requests");
-}
-
 // Scanner Controls
 function startScanning() {
   isScanning.value = true;
@@ -519,26 +499,6 @@ async function submitLeaveRequest() {
   display: flex;
   align-items: center;
   gap: 16px;
-}
-
-.btn-back {
-  width: 40px;
-  height: 40px;
-  border: 1px solid #e2e8f0;
-  background: white;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: #718096;
-  transition: all 0.2s;
-}
-
-.btn-back:hover {
-  border-color: #48bb78;
-  color: #48bb78;
-  background: #f0fff4;
 }
 
 .page-title {
