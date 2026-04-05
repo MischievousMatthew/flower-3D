@@ -606,6 +606,7 @@ const onLeave = ref([]);
 const newJoins = ref([]);
 const LEGACY_MODULE_KEY_MAP = {
   leave: "leave_management",
+  leave_request: "leave_management",
 };
 
 function normalizeModuleKey(moduleKey) {

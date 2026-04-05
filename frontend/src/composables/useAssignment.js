@@ -10,7 +10,8 @@ import { ref, computed } from "vue";
 import { ERP_MODULES, findModule } from "../constants/erpModules";
 
 const LEGACY_MODULE_ALIASES = {
-  leave: ["leave_request", "leave_management"],
+  leave: ["leave_management"],
+  leave_request: ["leave_management"],
 };
 
 function matchesModuleKey(assignedKey, requestedKey) {

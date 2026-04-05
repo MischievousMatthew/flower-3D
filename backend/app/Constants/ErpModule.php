@@ -14,7 +14,6 @@ class ErpModule
         'employees',
         'attendance',
         'payroll',
-        'leave_request',
         'leave_management',
 
         // Finance

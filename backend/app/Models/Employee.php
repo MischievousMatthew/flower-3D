@@ -18,6 +18,10 @@ class Employee extends Authenticatable
 {
     use BelongsToOwner, HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
+    private const MODULE_ALIASES = [
+        'leave_management' => ['leave', 'leave_request', 'leave_management'],
+    ];
+
     protected $fillable = [
         'owner_id',
         'name',
@@ -82,7 +86,9 @@ class Employee extends Authenticatable
      */
     public function hasModuleAccess(string $module): bool
     {
-        return $this->modulePermissions()->where('module', $module)->exists();
+        return $this->modulePermissions()
+            ->whereIn('module', $this->resolveModuleAliases($module))
+            ->exists();
     }
 
     /**
@@ -91,7 +97,7 @@ class Employee extends Authenticatable
     public function canEditModule(string $module): bool
     {
         return $this->modulePermissions()
-            ->where('module', $module)
+            ->whereIn('module', $this->resolveModuleAliases($module))
             ->where('access', 'edit')
             ->exists();
     }
@@ -102,9 +108,14 @@ class Employee extends Authenticatable
     public function canViewModule(string $module): bool
     {
         return $this->modulePermissions()
-            ->where('module', $module)
+            ->whereIn('module', $this->resolveModuleAliases($module))
             ->whereIn('access', ['view', 'edit'])
             ->exists();
+    }
+
+    private function resolveModuleAliases(string $module): array
+    {
+        return self::MODULE_ALIASES[$module] ?? [$module];
     }
 
     /**

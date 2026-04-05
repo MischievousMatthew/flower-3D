@@ -400,12 +400,12 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::prefix('leaves')->group(function () {
-        Route::middleware('employee.module:leave,view')->group(function () {
+        Route::middleware('employee.module:leave_management,view')->group(function () {
             Route::get('/',            [EmployeeLeaveController::class, 'index']);
             Route::get('/statistics',  [EmployeeLeaveController::class, 'getStatistics']);
         });
 
-        Route::middleware('employee.module:leave,edit')->group(function () {
+        Route::middleware('employee.module:leave_management,edit')->group(function () {
             Route::put('/{id}/status', [EmployeeLeaveController::class, 'updateStatus']);
             Route::delete('/{id}',     [EmployeeLeaveController::class, 'destroy']);
         });
