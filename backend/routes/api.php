@@ -96,6 +96,8 @@ Route::prefix('vendors')->group(function () {
     Route::get('/{vendorId}/products', [VendorStoreFrontController::class, 'getProducts']);
 });
 
+Route::get('/stores/{storeId}/customizable-flowers', [VendorStoreFrontController::class, 'getCustomizableFlowers']);
+
 // ── PUBLIC — Product reviews (no auth required) ───────────────────────────
 Route::get('/products/{productId}/reviews', [ProductReviewController::class, 'index'])
     ->whereNumber('productId');

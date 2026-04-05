@@ -72,6 +72,9 @@
             <!-- Actions -->
             <div class="store-actions">
               <button @click="chatVendor" class="btn-chat">💬 Chat</button>
+              <button @click="customizeFlowers" class="btn-customize">
+                Customize
+              </button>
             </div>
           </div>
 
@@ -985,6 +988,16 @@ const addToCart = async (
 
 const chatVendor = () => console.log("Chat with vendor", vendorId.value);
 
+const customizeFlowers = () => {
+  router.push({
+    path: "/customize/flower",
+    query: {
+      store_id: String(vendorId.value),
+      store_name: vendor.value?.store_name || "",
+    },
+  });
+};
+
 // ── Modal ──────────────────────────────────────────────────────────────────
 
 const openModal = (p) => {
@@ -1215,6 +1228,25 @@ onMounted(async () => {
 }
 
 /* Stat pills — same style as Shop.vue hero ratings row */
+.btn-customize {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: white;
+  color: #2f855a;
+  border: 1px solid #9ae6b4;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    border-color 0.2s;
+}
+.btn-customize:hover {
+  background: #f0fff4;
+  border-color: #68d391;
+}
+
 .store-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

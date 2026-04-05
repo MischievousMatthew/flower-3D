@@ -137,13 +137,7 @@ class VendorStorefrontController extends Controller
             // Resolve the user id that owns the products.
             // Priority 1: vendor_applications.owner_id column (if it exists)
             // Priority 2: match users.email to vendor_applications.email → get users.id
-            $ownerId = $vendor->owner_id ?? null;
-
-            if (!$ownerId && $vendor->email) {
-                $ownerId = DB::table('users')
-                    ->where('email', $vendor->email)
-                    ->value('id');
-            }
+            $ownerId = $this->resolveVendorOwnerId($vendor);
 
             Log::info("VendorStorefront@getProducts", [
                 'vendorId'       => $vendorId,
@@ -202,6 +196,53 @@ class VendorStorefrontController extends Controller
     {
         // Placeholder — implement with a vendor_followers table when ready
         return response()->json(['success' => true, 'message' => 'Following store.']);
+    }
+
+    /**
+     * GET /api/stores/{storeId}/customizable-flowers
+     *
+     * In this codebase, "per piece (customizable)" is stored as
+     * `selling_type = per_piece_customizable`.
+     */
+    public function getCustomizableFlowers(Request $request, $storeId)
+    {
+        try {
+            $vendor = VendorApplication::find($storeId);
+            if (!$vendor || $vendor->status !== 'approved') {
+                return response()->json(['success' => true, 'data' => []]);
+            }
+
+            $ownerId = $this->resolveVendorOwnerId($vendor);
+
+            if (!$ownerId) {
+                Log::warning("VendorStorefront@getCustomizableFlowers: could not resolve owner_id for store id={$storeId}");
+                return response()->json(['success' => true, 'data' => []]);
+            }
+
+            $authOwnerId = $request->user()?->owner_id;
+            if ($authOwnerId && (int) $authOwnerId !== (int) $ownerId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You are not authorized to access this store inventory.',
+                ], 403);
+            }
+
+            $flowers = Product::where('owner_id', $ownerId)
+                ->where('status', 'active')
+                ->where('selling_type', 'per_piece_customizable')
+                ->whereHas('models')
+                ->with(['models'])
+                ->orderBy('product_name')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $flowers->map(fn ($product) => $this->formatCustomizableProduct($product)),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('VendorStorefrontController@getCustomizableFlowers: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -269,6 +310,19 @@ class VendorStorefrontController extends Controller
             return $path;
         }
         return CloudinaryHelper::getUrl($path);
+    }
+
+    private function resolveVendorOwnerId(VendorApplication $vendor): ?int
+    {
+        $ownerId = $vendor->owner_id ?? null;
+
+        if (!$ownerId && $vendor->email) {
+            $ownerId = DB::table('users')
+                ->where('email', $vendor->email)
+                ->value('id');
+        }
+
+        return $ownerId ? (int) $ownerId : null;
     }
 
     /**
@@ -355,6 +409,27 @@ class VendorStorefrontController extends Controller
                 'model_url'  => $m->model_path ? CloudinaryHelper::getUrl($m->model_path, 'raw') : $m->model_url,
                 'model_type' => $m->model_type,
             ])->values()->all(),
+        ];
+    }
+
+    private function formatCustomizableProduct(Product $product): array
+    {
+        $primaryModel = $product->models->first();
+        $modelUrl = $primaryModel?->model_path
+            ? CloudinaryHelper::getUrl($primaryModel->model_path, 'raw')
+            : $primaryModel?->model_url;
+
+        return [
+            'id' => $product->id,
+            'name' => $product->product_name,
+            'product_name' => $product->product_name,
+            'price' => (float) ($product->getRawOriginal('selling_price') ?? $product->getRawOriginal('price') ?? 0),
+            'selling_price' => (float) ($product->getRawOriginal('selling_price') ?? $product->getRawOriginal('price') ?? 0),
+            'stock' => (int) $product->quantity_in_stock,
+            'quantity_in_stock' => (int) $product->quantity_in_stock,
+            'model_3d_url' => $modelUrl,
+            'model_3d_path' => $primaryModel?->model_path,
+            'model_type' => $primaryModel?->model_type,
         ];
     }
 }

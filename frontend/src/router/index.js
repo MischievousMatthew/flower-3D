@@ -21,6 +21,20 @@ const routes = [
         meta: { public: true, onlyCustomerOrGuest: true },
       },
       {
+        path: "customize/flower",
+        name: "FlowerCustomizerStore",
+        component: () =>
+          import("../views/authenticated/FlowerCustomizer.vue"),
+        meta: { public: true, onlyCustomerOrGuest: true },
+      },
+      {
+        path: "customize/:id?",
+        name: "FlowerCustomizer",
+        component: () =>
+          import("../views/authenticated/FlowerCustomizer.vue"),
+        meta: { public: true, onlyCustomerOrGuest: true },
+      },
+      {
         path: "store/:id",
         name: "VendorStorefront",
         component: () => import("../views/authenticated/VendorStoreFront.vue"),
