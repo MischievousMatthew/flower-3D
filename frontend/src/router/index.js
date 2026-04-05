@@ -55,6 +55,13 @@ const routes = [
         name: "Vendor_Register",
         component: () => import("../views/guest/VendorRegistration.vue"),
       },
+      {
+        path: "leaves",
+        name: "PublicLeaveQRRequest",
+        component: () =>
+          import("../views/ERP/HR/Public/LeaveRequestScanner.vue"),
+        meta: { public: true, title: "Leave Request" },
+      },
     ],
   },
 
