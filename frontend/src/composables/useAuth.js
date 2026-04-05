@@ -5,6 +5,7 @@ import { toast } from "vue3-toastify";
 import { useAssignment } from "./useAssignment";
 import { buildLoginContext } from "../utils/loginContext";
 import {
+  clearStoredAuth,
   getPreferredAuthToken,
   getPreferredUserType,
   getStoredEmployeeToken,
@@ -52,11 +53,7 @@ export function useAuth() {
   };
 
   const clearAuthData = () => {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("employee_token");
-    localStorage.removeItem("vendor_token");
-    localStorage.removeItem("user_type");
-    localStorage.removeItem("user");
+    clearStoredAuth();
 
     delete api.defaults.headers.common["Authorization"];
 

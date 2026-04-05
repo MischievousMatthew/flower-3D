@@ -1,6 +1,6 @@
 // frontend/src/plugins/axios.js
 import axios from "axios";
-import { getPreferredAuthToken } from "../utils/authSession";
+import { clearStoredAuth, getPreferredAuthToken } from "../utils/authSession";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL?.trim();
 
@@ -17,14 +17,6 @@ const api = axios.create({
   },
   withCredentials: true,
 });
-
-const clearStoredAuth = () => {
-  localStorage.removeItem("auth_token");
-  localStorage.removeItem("employee_token");
-  localStorage.removeItem("vendor_token");
-  localStorage.removeItem("user");
-  localStorage.removeItem("user_type");
-};
 
 const shouldForceLogout = (error) => {
   if (error.response?.status !== 401) {

@@ -1003,6 +1003,7 @@ import api from "../../../../plugins/axios";
 import { useAuth } from "../../../../composables/useAuth";
 import { useAssignment } from "../../../../composables/useAssignment";
 import { toast } from "vue3-toastify";
+import { clearStoredAuth } from "../../../../utils/authSession";
 
 const router = useRouter();
 const { user } = useAuth();
@@ -1049,7 +1050,7 @@ const fetchProducts = async () => {
     else toast.error("Failed to load products");
   } catch (e) {
     if (e.response?.status === 401) {
-      localStorage.removeItem("auth_token");
+      clearStoredAuth();
       router.push("/guest/login");
     } else toast.error("Failed to load products");
   } finally {

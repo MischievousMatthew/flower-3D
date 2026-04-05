@@ -1,7 +1,11 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuth } from "../composables/useAuth";
 import { useAssignment } from "../composables/useAssignment";
-import { getPreferredAuthToken, getPreferredUserType } from "../utils/authSession";
+import {
+  clearStoredAuth,
+  getPreferredAuthToken,
+  getPreferredUserType,
+} from "../utils/authSession";
 
 const routes = [
   // ===== PUBLIC =====
@@ -604,13 +608,6 @@ router.beforeEach(async (to, from, next) => {
   const auth = useAuth();
   const userType = getPreferredUserType(to.path);
   const token = getPreferredAuthToken(to.path);
-  const clearStoredAuth = () => {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("employee_token");
-    localStorage.removeItem("vendor_token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("user_type");
-  };
 
   if (to.meta.public) {
     return next();

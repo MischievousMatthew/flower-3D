@@ -18,6 +18,17 @@ export const getStoredUserToken = () =>
 export const getStoredEmployeeToken = () =>
   localStorage.getItem("employee_token");
 
+export const clearStoredAuth = () => {
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("employee_token");
+  localStorage.removeItem("vendor_token");
+  localStorage.removeItem("user");
+  localStorage.removeItem("user_type");
+};
+
+export const hasStoredAuthSession = (path = window.location.pathname) =>
+  !!getPreferredAuthToken(path);
+
 export const getRouteAuthContext = (path = window.location.pathname) => {
   const normalizedPath = normalizePath(path);
 

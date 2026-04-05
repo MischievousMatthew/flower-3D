@@ -84,6 +84,11 @@
 import { ref, reactive, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
+import {
+  hasStoredAuthSession,
+  getPreferredAuthToken,
+  getPreferredUserType,
+} from "../../utils/authSession";
 
 const router = useRouter();
 const { combinedLogin, loading } = useAuth();
@@ -119,12 +124,18 @@ const handleLogin = async () => {
 
 onMounted(() => {
   // Check if user is already logged in
-  const token = localStorage.getItem("auth_token");
+  const token = getPreferredAuthToken(window.location.pathname);
+  const userType = getPreferredUserType(window.location.pathname);
   const storedUser = localStorage.getItem("user");
 
-  if (token && storedUser) {
+  if (hasStoredAuthSession(window.location.pathname) && token && storedUser) {
     try {
       const userData = JSON.parse(storedUser);
+      if (userType === "employee") {
+        router.push(userData.default_route || "/erp");
+        return;
+      }
+
       // Redirect based on role
       if (userData.role === "admin") {
         router.push("/admin/vendor-requests");
