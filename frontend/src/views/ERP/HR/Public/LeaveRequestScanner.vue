@@ -4,6 +4,13 @@
       <!-- Header -->
       <div class="page-header">
         <div class="header-left">
+          <router-link to="/" class="logo"
+            ><img
+              src="../../../public/bloomcraft-blankBg.png"
+              alt="Bloomcraft Logo"
+              width="60"
+              height="60"
+          /></router-link>
           <div>
             <h1 class="page-title">Request Leave (QR Scan)</h1>
             <p class="page-subtitle">
@@ -477,6 +484,25 @@ async function submitLeaveRequest() {
   padding: 0;
   box-sizing: border-box;
   font-family: "Poppins", sans-serif;
+}
+
+.logo {
+  text-decoration: none;
+  position: absolute;
+  top: 32px;
+  left: 32px;
+  font-size: 32px;
+  animation: bounce 2s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
 }
 
 .leave-request-scanner {
