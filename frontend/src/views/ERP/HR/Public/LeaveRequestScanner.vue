@@ -1,16 +1,16 @@
 <template>
   <div class="leave-request-scanner">
     <div class="content">
+      <router-link to="/" class="logo"
+        ><img
+          src="../../../../../public/bloomcraft-blankBg.png"
+          alt="Bloomcraft Logo"
+          width="60"
+          height="60"
+      /></router-link>
       <!-- Header -->
       <div class="page-header">
         <div class="header-left">
-          <router-link to="/" class="logo"
-            ><img
-              src="../../../../../public/bloomcraft-blankBg.png"
-              alt="Bloomcraft Logo"
-              width="60"
-              height="60"
-          /></router-link>
           <div>
             <h1 class="page-title">Request Leave (QR Scan)</h1>
             <p class="page-subtitle">
