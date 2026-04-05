@@ -506,7 +506,7 @@ async function submitLeaveRequest() {
 }
 
 .leave-request-scanner {
-  margin-top: 20px;
+  margin-top: 40px;
   display: flex;
   min-height: 100vh;
   background: #f7fafc;
