@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use App\Helpers\CloudinaryHelper;
 
 class VendorStorefrontController extends Controller
@@ -200,9 +201,6 @@ class VendorStorefrontController extends Controller
 
     /**
      * GET /api/stores/{storeId}/customizable-flowers
-     *
-     * In this codebase, "per piece (customizable)" is stored as
-     * `selling_type = per_piece_customizable`.
      */
     public function getCustomizableFlowers(Request $request, $storeId)
     {
@@ -227,17 +225,34 @@ class VendorStorefrontController extends Controller
                 ], 403);
             }
 
+            $hasCustomizableColumn = Schema::hasColumn('products', 'is_customizable');
+            $requestedOwnerId = $request->filled('owner_id') ? (int) $request->owner_id : null;
+
+            if ($requestedOwnerId && $requestedOwnerId !== (int) $ownerId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The requested owner does not match this vendor.',
+                ], 422);
+            }
+
             $flowers = Product::where('owner_id', $ownerId)
                 ->where('status', 'active')
-                ->where('selling_type', 'per_piece_customizable')
-                ->whereHas('models')
+                ->where('selling_type', 'per_piece')
+                ->when($hasCustomizableColumn, fn ($query) => $query->where('is_customizable', true))
+                ->whereHas('models', function ($query) {
+                    $query->whereNotNull('model_path')
+                        ->orWhereNotNull('model_url');
+                })
                 ->with(['models'])
                 ->orderBy('product_name')
                 ->get();
 
             return response()->json([
                 'success' => true,
-                'data' => $flowers->map(fn ($product) => $this->formatCustomizableProduct($product)),
+                'data' => $flowers
+                    ->map(fn ($product) => $this->formatCustomizableProduct($product, $hasCustomizableColumn))
+                    ->filter(fn ($product) => !empty($product['model_3d_url']))
+                    ->values(),
             ]);
         } catch (\Exception $e) {
             Log::error('VendorStorefrontController@getCustomizableFlowers: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
@@ -412,7 +427,7 @@ class VendorStorefrontController extends Controller
         ];
     }
 
-    private function formatCustomizableProduct(Product $product): array
+    private function formatCustomizableProduct(Product $product, bool $hasCustomizableColumn = false): array
     {
         $primaryModel = $product->models->first();
         $modelUrl = $primaryModel?->model_path
@@ -427,6 +442,9 @@ class VendorStorefrontController extends Controller
             'selling_price' => (float) ($product->getRawOriginal('selling_price') ?? $product->getRawOriginal('price') ?? 0),
             'stock' => (int) $product->quantity_in_stock,
             'quantity_in_stock' => (int) $product->quantity_in_stock,
+            'owner_id' => (int) $product->owner_id,
+            'selling_type' => $product->selling_type,
+            'is_customizable' => $hasCustomizableColumn ? (bool) $product->getAttribute('is_customizable') : true,
             'model_3d_url' => $modelUrl,
             'model_3d_path' => $primaryModel?->model_path,
             'model_type' => $primaryModel?->model_type,

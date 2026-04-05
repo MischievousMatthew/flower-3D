@@ -993,6 +993,7 @@ const customizeFlowers = () => {
     path: "/customize/flower",
     query: {
       store_id: String(vendorId.value),
+      owner_id: vendor.value?.owner_id ? String(vendor.value.owner_id) : "",
       store_name: vendor.value?.store_name || "",
     },
   });
