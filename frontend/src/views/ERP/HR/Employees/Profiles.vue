@@ -1258,23 +1258,34 @@ onMounted(async () => {
   const route = useRoute();
   const editId = route.query.id || route.query.edit;
 
-  if (editId) {
-    // If we have an ID to edit, search for it specifically
-    searchQuery.value = editId;
-  }
-
   await loadEmployees();
 
-  // If we came here to edit a specific person, find them in the results and open modal
-  if (editId && employees.value.length > 0) {
-    const employeeToEdit = employees.value.find(
-      (e) => e.id == editId || e.employee_id == editId,
-    );
-    if (employeeToEdit) {
-      openEditModal(employeeToEdit);
-    }
+  if (editId) {
+    await openRequestedEmployeeForEdit(editId);
   }
 });
+
+async function openRequestedEmployeeForEdit(editId) {
+  const employeeToEdit = employees.value.find(
+    (employee) => employee.id == editId || employee.employee_id == editId,
+  );
+
+  if (employeeToEdit) {
+    openEditModal(employeeToEdit);
+    return;
+  }
+
+  try {
+    const response = await employeeInfoService.getById(editId);
+    const requestedEmployee = response?.data;
+
+    if (response?.success && requestedEmployee) {
+      openEditModal(requestedEmployee);
+    }
+  } catch (error) {
+    console.error("Error loading requested employee for edit:", error);
+  }
+}
 
 // Load employees
 async function loadEmployees(page = 1) {

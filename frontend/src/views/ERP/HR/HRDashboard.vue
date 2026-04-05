@@ -589,11 +589,11 @@ const stats = ref([
     subtitle: "Not checked in",
   },
   {
-    label: "Today Leave",
+    label: "Pending Leave",
     value: "00",
     trend: "",
-    trendDirection: "down",
-    subtitle: "Approved leaves",
+    trendDirection: "up",
+    subtitle: "Awaiting review",
   },
 ]);
 
@@ -815,13 +815,10 @@ const fetchDashboardData = async () => {
       allLeaves = leaveResponse.data.data || [];
     }
 
-    const onLeaveToday = allLeaves.filter(
-      (l) =>
-        l.status === "approved" &&
-        l.start_date <= todayStr &&
-        l.end_date >= todayStr,
+    const pendingLeaveRequests = allLeaves.filter(
+      (leave) => leave.status === "pending",
     ).length;
-    stats.value[3].value = onLeaveToday.toString().padStart(2, "0");
+    stats.value[3].value = pendingLeaveRequests.toString().padStart(2, "0");
 
     // --- 4. Calculate trends for Today cards ---
     const calcChange = (current, previous) => {
@@ -844,12 +841,11 @@ const fetchDashboardData = async () => {
       prevPresent = yesterdayAttendance.filter((a) => a.time_in).length;
       prevAbsent = Math.max(0, totalEmployees - prevPresent);
 
-      prevLeave = allLeaves.filter(
-        (l) =>
-          l.status === "approved" &&
-          l.start_date <= yesterdayStr &&
-          l.end_date >= yesterdayStr,
-      ).length;
+      prevLeave = allLeaves.filter((leave) => {
+        if (leave.status !== "pending") return false;
+        if (!leave.submitted_at) return false;
+        return toLocalDate(leave.submitted_at) === yesterdayStr;
+      }).length;
     }
 
     stats.value[1].trend = calcChange(presentToday, prevPresent);
@@ -858,8 +854,9 @@ const fetchDashboardData = async () => {
     stats.value[2].trend = calcChange(absentToday, prevAbsent);
     stats.value[2].trendDirection = absentToday >= prevAbsent ? "up" : "down";
 
-    stats.value[3].trend = calcChange(onLeaveToday, prevLeave);
-    stats.value[3].trendDirection = onLeaveToday >= prevLeave ? "up" : "down";
+    stats.value[3].trend = calcChange(pendingLeaveRequests, prevLeave);
+    stats.value[3].trendDirection =
+      pendingLeaveRequests >= prevLeave ? "up" : "down";
 
     // --- 5. Attendance rate for the period ---
     const periodAttendance = allAttendance.filter((a) => {
@@ -906,16 +903,12 @@ const fetchDashboardData = async () => {
     generateHeatmap(periodAttendance, totalEmployees);
 
     // --- 7. Prepare applications for display ---
-    const periodLeaves = allLeaves.filter((leave) => {
-      const leaveStart = new Date(leave.start_date);
-      const leaveEnd = new Date(leave.end_date);
-      const periodStart = new Date(startDate);
-      const periodEnd = new Date(endDate);
-      return leaveStart <= periodEnd && leaveEnd >= periodStart;
-    });
-
-    applications.value = periodLeaves
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    applications.value = [...allLeaves]
+      .sort(
+        (a, b) =>
+          new Date(b.submitted_at || b.created_at) -
+          new Date(a.submitted_at || a.created_at),
+      )
       .slice(0, 5)
       .map((leave) => {
         const statusInfo = getLeaveStatus(leave.status);
