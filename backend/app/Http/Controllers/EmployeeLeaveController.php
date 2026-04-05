@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 
 class EmployeeLeaveController extends Controller
 {
@@ -233,7 +234,7 @@ class EmployeeLeaveController extends Controller
             $vendorOwnerId = $this->resolveAuthenticatedVendorOwnerId();
             $leaveOwnerEmployeeIds = $this->resolveLeaveOwnerEmployeeIdsForVendor($vendorOwnerId);
 
-            $query = EmployeeLeave::query()
+            $query = $this->leaveQuery()
                 ->whereIn('owner_id', $leaveOwnerEmployeeIds)
                 ->with(['employee', 'reviewer']);
 
@@ -316,7 +317,8 @@ class EmployeeLeaveController extends Controller
             }
 
             // Find the leave request using the correct owner scope
-            $leave = EmployeeLeave::where('id', $id)
+            $leave = $this->leaveQuery()
+                ->where('id', $id)
                 ->whereIn('owner_id', $leaveOwnerEmployeeIds)
                 ->first();
 
@@ -367,18 +369,18 @@ class EmployeeLeaveController extends Controller
             $leaveOwnerEmployeeIds = $this->resolveLeaveOwnerEmployeeIdsForVendor($vendorOwnerId);
 
             $stats = [
-                'pending' => EmployeeLeave::query()->whereIn('owner_id', $leaveOwnerEmployeeIds)->pending()->count(),
-                'approved_this_month' => EmployeeLeave::query()->whereIn('owner_id', $leaveOwnerEmployeeIds)
+                'pending' => $this->leaveQuery()->whereIn('owner_id', $leaveOwnerEmployeeIds)->pending()->count(),
+                'approved_this_month' => $this->leaveQuery()->whereIn('owner_id', $leaveOwnerEmployeeIds)
                     ->approved()
                     ->whereMonth('start_date', now()->month)
                     ->whereYear('start_date', now()->year)
                     ->count(),
-                'total_days_this_month' => EmployeeLeave::query()->whereIn('owner_id', $leaveOwnerEmployeeIds)
+                'total_days_this_month' => $this->leaveQuery()->whereIn('owner_id', $leaveOwnerEmployeeIds)
                     ->approved()
                     ->whereMonth('start_date', now()->month)
                     ->whereYear('start_date', now()->year)
                     ->sum('total_days'),
-                'rejected' => EmployeeLeave::query()->whereIn('owner_id', $leaveOwnerEmployeeIds)->rejected()->count()
+                'rejected' => $this->leaveQuery()->whereIn('owner_id', $leaveOwnerEmployeeIds)->rejected()->count()
             ];
 
             return response()->json([
@@ -404,7 +406,8 @@ class EmployeeLeaveController extends Controller
             $vendorOwnerId = $this->resolveAuthenticatedVendorOwnerId();
             $leaveOwnerEmployeeIds = $this->resolveLeaveOwnerEmployeeIdsForVendor($vendorOwnerId);
 
-            $leave = EmployeeLeave::where('id', $id)
+            $leave = $this->leaveQuery()
+                ->where('id', $id)
                 ->whereIn('owner_id', $leaveOwnerEmployeeIds)
                 ->first();
 
@@ -512,5 +515,10 @@ class EmployeeLeaveController extends Controller
         }
 
         return $employeeIds;
+    }
+
+    private function leaveQuery(): Builder
+    {
+        return EmployeeLeave::query()->withoutGlobalScope('owner');
     }
 }
