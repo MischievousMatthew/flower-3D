@@ -265,6 +265,43 @@
         </div>
       </div>
     </div>
+
+    <div v-if="submitSuccess && successData" class="success-modal-overlay">
+      <div class="success-modal">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="80"
+          height="80"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          class="success-icon"
+        >
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="16 8 10 14 8 12"></polyline>
+        </svg>
+        <h2>Request Submitted!</h2>
+        <p>The leave request has been submitted successfully.</p>
+        <div class="success-details">
+          <div class="detail-row">
+            <span class="label">Reference Number:</span>
+            <span class="value">#{{ successData.reference_number }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Total Days:</span>
+            <span class="value">{{ successData.total_days }} day(s)</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Status:</span>
+            <span class="status-badge pending">Pending Approval</span>
+          </div>
+        </div>
+        <button @click="resetScanner" class="btn-submit">
+          Submit Another Request
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -283,6 +320,8 @@ const router = useRouter();
 const isScanning = ref(false);
 const employeeData = ref(null);
 const isSubmitting = ref(false);
+const submitSuccess = ref(false);
+const successData = ref(null);
 const errors = ref({});
 const calculatedDays = ref(0);
 
@@ -316,6 +355,8 @@ function stopScanning() {
 
 function resetScanner() {
   employeeData.value = null;
+  submitSuccess.value = false;
+  successData.value = null;
   formData.value = {
     leave_type: "",
     start_date: "",
@@ -432,11 +473,8 @@ async function submitLeaveRequest() {
 
     if (response.success) {
       toast.success("Leave request submitted successfully");
-
-      // Reset and go back to list
-      setTimeout(() => {
-        router.push("/erp/hr/leave/management-requests");
-      }, 1500);
+      successData.value = response.data;
+      submitSuccess.value = true;
     }
   } catch (error) {
     console.error("Submission error:", error);
@@ -813,6 +851,88 @@ async function submitLeaveRequest() {
   to {
     transform: rotate(360deg);
   }
+}
+
+.success-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1000;
+}
+
+.success-modal {
+  width: min(100%, 520px);
+  background: white;
+  border-radius: 20px;
+  padding: 40px 32px;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+}
+
+.success-icon {
+  color: #48bb78;
+  margin-bottom: 20px;
+}
+
+.success-modal h2 {
+  font-size: 28px;
+  color: #1a202c;
+  margin-bottom: 12px;
+}
+
+.success-modal > p {
+  font-size: 14px;
+  color: #718096;
+  margin-bottom: 24px;
+}
+
+.success-details {
+  background: #f7fafc;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.label {
+  font-size: 13px;
+  color: #718096;
+  font-weight: 500;
+}
+
+.value {
+  font-size: 14px;
+  color: #1a202c;
+  font-weight: 600;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge.pending {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 /* Responsive */

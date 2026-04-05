@@ -21,7 +21,6 @@ export function useInactivityTimeout(timeoutMinutes = 15) {
   const handleInactivity = async () => {
     if (!isAuthenticated.value) return;
 
-    // Before logging out, double check if another tab was active recently
     const lastActivity = parseInt(
       localStorage.getItem("last_activity") || "0",
       10,
@@ -29,28 +28,22 @@ export function useInactivityTimeout(timeoutMinutes = 15) {
     const now = Date.now();
 
     if (now - lastActivity >= timeoutMs) {
-      // It's definitely expired!
       console.log(
         "User inactive for",
         timeoutMinutes,
         "minutes. Logging out for security.",
       );
 
-      // Clear activity
       localStorage.removeItem("last_activity");
 
-      // We must clear the timer to avoid infinite loops
       if (activityTimer) clearTimeout(activityTimer);
 
-      // Trigger logout universally (this handles tokens and redirection)
       await logout();
 
-      // Show expiration alert
-      toast.warning("Session expired due to inactivity. Please log in again.", {
+      toast.info("Session expired due to inactivity. Please log in again.", {
         autoClose: 6000,
       });
     } else {
-      // Another tab was active! Reset the timer relative to that tab's last activity
       const remainingTime = timeoutMs - (now - lastActivity);
       if (activityTimer) clearTimeout(activityTimer);
       activityTimer = setTimeout(handleInactivity, remainingTime);

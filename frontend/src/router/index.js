@@ -517,6 +517,7 @@ const routes = [
               {
                 path: "employee-request",
                 name: "EmployeeLeaveRequest",
+                alias: "/leaves",
                 component: () =>
                   import("../views/ERP/HR/Public/LeaveRequest.vue"),
                 meta: { requiresAuth: false, title: "Leave Request" },

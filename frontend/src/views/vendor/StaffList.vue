@@ -582,7 +582,6 @@ import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import { toast } from "vue3-toastify";
 import api from "../../plugins/axios";
 import {
-  ERP_MODULES,
   getModulesByGroup,
   findModule,
 } from "../../constants/erpModules";
@@ -605,9 +604,27 @@ const resignations = ref([]);
 const leaveApprovals = ref([]);
 const onLeave = ref([]);
 const newJoins = ref([]);
+const EXCLUDED_MODULE_KEYS = ["leave"];
 
 // Module helpers
-const modulesByGroup = computed(() => getModulesByGroup());
+const modulesByGroup = computed(() => {
+  const groupedModules = getModulesByGroup();
+
+  return Object.fromEntries(
+    Object.entries(groupedModules)
+      .map(([groupName, modules]) => [
+        groupName,
+        modules.filter((module) => !EXCLUDED_MODULE_KEYS.includes(module.key)),
+      ])
+      .filter(([, modules]) => modules.length > 0),
+  );
+});
+
+function sanitizeModulePermissions(modulePermissions = []) {
+  return modulePermissions.filter(
+    (permission) => !EXCLUDED_MODULE_KEYS.includes(permission.module),
+  );
+}
 
 function getModuleLabel(key) {
   return findModule(key)?.label ?? key;
@@ -685,7 +702,7 @@ const filteredEmployees = computed(() => {
       filterStatus.value === "all" || emp.status === filterStatus.value;
     const matchesGroup =
       filterGroup.value === "all" ||
-      (emp.module_permissions || []).some(
+      sanitizeModulePermissions(emp.module_permissions).some(
         (p) => getModuleGroup(p.module) === filterGroup.value,
       );
     return matchesSearch && matchesStatus && matchesGroup;
@@ -699,7 +716,7 @@ const fetchEmployees = async () => {
       ...emp,
       initials: emp.initials,
       joiningDate: emp.formatted_joining_date,
-      module_permissions: emp.module_permissions || [],
+      module_permissions: sanitizeModulePermissions(emp.module_permissions),
     }));
   }
 };
@@ -748,7 +765,7 @@ const editEmployee = (employee) => {
     password: "",
     department: employee.department || "",
     role: employee.role || "",
-    permissions: (employee.module_permissions || []).map((p) => ({
+    permissions: sanitizeModulePermissions(employee.module_permissions).map((p) => ({
       module: p.module,
       access: p.access,
     })),

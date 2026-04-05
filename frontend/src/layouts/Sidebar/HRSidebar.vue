@@ -160,49 +160,6 @@
         </div>
       </div>
 
-      <!-- Leave Management -->
-      <div class="nav-group">
-        <button
-          class="nav-item expandable"
-          :class="{
-            active: expandedModules.includes('leave'),
-            'is-parent-active': activeModule === 'leave',
-          }"
-          @click="toggleModule('leave')"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path
-              d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"
-            />
-          </svg>
-          <span>Leave Management</span>
-          <svg
-            class="chevron"
-            :class="{ rotated: expandedModules.includes('leave') }"
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <polyline points="6 9 12 15 18 9"></polyline>
-          </svg>
-        </button>
-        <div class="sub-menu" v-show="expandedModules.includes('leave')">
-          <router-link to="/erp/hr/leave/management-requests" class="sub-item"
-            >Leave Requests</router-link
-          >
-        </div>
-      </div>
-
       <!-- Payroll -->
       <div class="nav-group">
         <button
@@ -300,7 +257,6 @@ const activeModule = computed(() => {
   const segments = route.path.split("/").filter(Boolean);
   if (segments.includes("employees")) return "employees";
   if (segments.includes("attendance")) return "attendance";
-  if (segments.includes("leave")) return "leave";
   if (segments.includes("payroll")) return "payroll";
   return null;
 });
@@ -328,7 +284,7 @@ watch(
   () => route.path,
   (path) => {
     const seg = path.split("/").filter(Boolean);
-    ["employees", "attendance", "leave", "payroll"].forEach((mod) => {
+    ["employees", "attendance", "payroll"].forEach((mod) => {
       if (seg.includes(mod) && !expandedModules.value.includes(mod)) {
         expandedModules.value.push(mod);
       }

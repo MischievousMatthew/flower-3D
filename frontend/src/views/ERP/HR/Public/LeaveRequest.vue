@@ -47,46 +47,6 @@
       <button @click="retryVerification" class="btn-retry">Try Again</button>
     </div>
 
-    <!-- Success State -->
-    <div v-else-if="submitSuccess" class="success-container">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="80"
-        height="80"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        class="success-icon"
-      >
-        <circle cx="12" cy="12" r="10"></circle>
-        <polyline points="16 8 10 14 8 12"></polyline>
-      </svg>
-      <h2>Request Submitted!</h2>
-      <p>Your leave request has been submitted successfully.</p>
-      <div class="success-details">
-        <div class="detail-row">
-          <span class="label">Reference Number:</span>
-          <span class="value">#{{ successData.reference_number }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">Total Days:</span>
-          <span class="value">{{ successData.total_days }} day(s)</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">Status:</span>
-          <span class="status-badge pending">Pending Approval</span>
-        </div>
-      </div>
-      <p class="info-text">
-        Your request will be reviewed by HR. You'll be notified once it's
-        approved or rejected.
-      </p>
-      <button @click="resetForm" class="btn-another">
-        Submit Another Request
-      </button>
-    </div>
-
     <!-- Leave Request Form -->
     <div v-else-if="employeeData" class="form-container">
       <!-- Employee Info Card -->
@@ -260,6 +220,47 @@
           Your leave request will be reviewed by HR. Please ensure all details
           are correct before submitting.
         </p>
+      </div>
+    </div>
+
+    <div v-if="submitSuccess && successData" class="success-modal-overlay">
+      <div class="success-container">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="80"
+          height="80"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          class="success-icon"
+        >
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="16 8 10 14 8 12"></polyline>
+        </svg>
+        <h2>Request Submitted!</h2>
+        <p>Your leave request has been submitted successfully.</p>
+        <div class="success-details">
+          <div class="detail-row">
+            <span class="label">Reference Number:</span>
+            <span class="value">#{{ successData.reference_number }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Total Days:</span>
+            <span class="value">{{ successData.total_days }} day(s)</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Status:</span>
+            <span class="status-badge pending">Pending Approval</span>
+          </div>
+        </div>
+        <p class="info-text">
+          Your request will be reviewed by HR. You'll be notified once it's
+          approved or rejected.
+        </p>
+        <button @click="resetForm" class="btn-another">
+          Submit Another Request
+        </button>
       </div>
     </div>
   </div>
@@ -538,6 +539,17 @@ function retryVerification() {
 }
 
 /* Success State */
+.success-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1000;
+}
+
 .success-container {
   background: white;
   border-radius: 20px;
