@@ -73,7 +73,7 @@
           <div class="fc-overlay fc-top">
             <div class="fc-status">
               <strong>{{ pendingFlower ? `Ready to place: ${pendingFlower.product_name}` : draggedFlower ? `Drop ${draggedFlower.product_name} on the bouquet` : selectedFlower ? `Selected: ${selectedFlower.product_name}` : "Rotate the bouquet and pick a flower" }}</strong>
-              <span>{{ selectedFlowers.length >= MAX_FLOWERS ? "Maximum of 3 flowers only" : selectedFlower ? "Drag the selected flower on the bouquet to move it, or rotate it from the panel." : "Click directly on the bouquet wrapper to place the model" }}</span>
+              <span>{{ selectedFlowers.length >= MAX_FLOWERS ? "Maximum of 3 flowers only" : selectedFlower ? "Drag anywhere on the bouquet surface to move the selected flower, or rotate it from the panel." : "Click directly on the bouquet wrapper to place the model" }}</span>
             </div>
           </div>
           <div v-if="bouquetLoadError" class="fc-overlay fc-center"><div class="fc-modal"><h3>Unable to load bouquet.glb</h3><p>{{ bouquetLoadError }}</p></div></div>
@@ -440,6 +440,21 @@ function setupCanvasInteractions() {
       event.preventDefault();
       selectPlacedFlower(placedHit.sceneId);
       transformDrag = { sceneId: placedHit.sceneId, pointerId: event.pointerId };
+      if (canvas.setPointerCapture) {
+        canvas.setPointerCapture(event.pointerId);
+      }
+      controls.enabled = false;
+      return;
+    }
+
+    if (
+      selectedSceneId.value &&
+      !pendingFlower.value &&
+      !draggedFlower.value &&
+      getPlacement(event.clientX, event.clientY)
+    ) {
+      event.preventDefault();
+      transformDrag = { sceneId: selectedSceneId.value, pointerId: event.pointerId };
       if (canvas.setPointerCapture) {
         canvas.setPointerCapture(event.pointerId);
       }

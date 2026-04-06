@@ -194,18 +194,7 @@ class VendorApplicationController extends Controller
                 $existingUser = User::where('email', $application->email)->lockForUpdate()->first();
 
                 if ($existingUser) {
-                    $existingUser->forceFill([
-                        'role'              => 'vendor',
-                        'contact_number'    => $existingUser->contact_number ?: $application->contact_number,
-                        'is_verified'       => true,
-                        'email_verified_at' => $existingUser->email_verified_at ?: now(),
-                        'vendor_data'       => array_merge($existingUser->vendor_data ?? [], [
-                            'store_name'            => $application->store_name,
-                            'application_id'        => $application->id,
-                            'approved_at'           => now()->toDateTimeString(),
-                            'needs_password_change' => true,
-                        ]),
-                    ])->save();
+                    $this->syncVendorUser($existingUser, $application);
 
                     return ['user' => $existingUser->fresh(), 'password' => null, 'existing' => true];
                 }
@@ -214,49 +203,23 @@ class VendorApplicationController extends Controller
                 [$name, $surname] = $this->splitOwnerName($application->owner_name);
                 $temporaryPassword = Str::random(12);
 
-                try {
-                    $user = User::create([
-                        'name'              => $name,
-                        'surname'           => $surname,
-                        'username'          => $username,
-                        'email'             => $application->email,
-                        'contact_number'    => $application->contact_number,
-                        'password'          => Hash::make($temporaryPassword),
-                        'is_verified'       => true,
-                        'email_verified_at' => now(),
-                        'role'              => 'vendor',
-                        'vendor_data'       => [
-                            'store_name'            => $application->store_name,
-                            'application_id'        => $application->id,
-                            'approved_at'           => now()->toDateTimeString(),
-                            'needs_password_change' => true,
-                        ],
-                    ]);
-                } catch (QueryException $e) {
-                    if ($e->getCode() !== '23505') {
-                        throw $e;
-                    }
-
-                    $user = User::where('email', $application->email)->first();
-                    if (! $user) {
-                        throw $e;
-                    }
-
-                    $user->forceFill([
-                        'role'              => 'vendor',
-                        'contact_number'    => $user->contact_number ?: $application->contact_number,
-                        'is_verified'       => true,
-                        'email_verified_at' => $user->email_verified_at ?: now(),
-                        'vendor_data'       => array_merge($user->vendor_data ?? [], [
-                            'store_name'            => $application->store_name,
-                            'application_id'        => $application->id,
-                            'approved_at'           => now()->toDateTimeString(),
-                            'needs_password_change' => true,
-                        ]),
-                    ])->save();
-
-                    return ['user' => $user->fresh(), 'password' => null, 'existing' => true];
-                }
+                $user = User::create([
+                    'name'              => $name,
+                    'surname'           => $surname,
+                    'username'          => $username,
+                    'email'             => $application->email,
+                    'contact_number'    => $application->contact_number,
+                    'password'          => Hash::make($temporaryPassword),
+                    'is_verified'       => true,
+                    'email_verified_at' => now(),
+                    'role'              => 'vendor',
+                    'vendor_data'       => [
+                        'store_name'            => $application->store_name,
+                        'application_id'        => $application->id,
+                        'approved_at'           => now()->toDateTimeString(),
+                        'needs_password_change' => true,
+                    ],
+                ]);
 
                 return ['user' => $user, 'password' => $temporaryPassword, 'existing' => false];
             });
@@ -264,6 +227,30 @@ class VendorApplicationController extends Controller
             $this->sendVendorWelcomeEmail($application, $result['password'], $result['existing']);
 
             return $result['user'];
+        } catch (QueryException $e) {
+            if ($e->getCode() !== '23505') {
+                Log::error('Error creating vendor account', [
+                    'application_id' => $application->id,
+                    'error'          => $e->getMessage(),
+                ]);
+                throw $e;
+            }
+
+            $existingUser = User::where('email', $application->email)->first();
+
+            if (! $existingUser) {
+                Log::error('Duplicate vendor account conflict could not be recovered', [
+                    'application_id' => $application->id,
+                    'email'          => $application->email,
+                    'error'          => $e->getMessage(),
+                ]);
+                throw $e;
+            }
+
+            $this->syncVendorUser($existingUser, $application);
+            $this->sendVendorWelcomeEmail($application, null, true);
+
+            return $existingUser->fresh();
         } catch (\Exception $e) {
             Log::error('Error creating vendor account', [
                 'application_id' => $application->id,
@@ -271,6 +258,22 @@ class VendorApplicationController extends Controller
             ]);
             throw $e;
         }
+    }
+
+    private function syncVendorUser(User $user, VendorApplication $application): void
+    {
+        $user->forceFill([
+            'role'              => 'vendor',
+            'contact_number'    => $user->contact_number ?: $application->contact_number,
+            'is_verified'       => true,
+            'email_verified_at' => $user->email_verified_at ?: now(),
+            'vendor_data'       => array_merge($user->vendor_data ?? [], [
+                'store_name'            => $application->store_name,
+                'application_id'        => $application->id,
+                'approved_at'           => now()->toDateTimeString(),
+                'needs_password_change' => true,
+            ]),
+        ])->save();
     }
 
     private function generateUniqueUsername(string $email): string
