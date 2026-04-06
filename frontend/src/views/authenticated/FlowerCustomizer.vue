@@ -10,13 +10,22 @@
         </div>
         <div class="fc-head-actions">
           <span class="fc-pill">{{ selectedFlowers.length }}/{{ MAX_FLOWERS }} selected</span>
+          <button class="fc-btn fc-btn-light" @click="toggleLeftSidebar">
+            {{ isLeftSidebarCollapsed ? "Show Flowers" : "Hide Flowers" }}
+          </button>
+          <button class="fc-btn fc-btn-light" @click="toggleRightSidebar">
+            {{ isRightSidebarCollapsed ? "Show Tools" : "Hide Tools" }}
+          </button>
           <button class="fc-btn fc-btn-light" @click="resetDesign" :disabled="!selectedFlowers.length">Reset</button>
+          <button class="fc-btn fc-btn-light" @click="toggleFullscreen" :disabled="!sceneReady">
+            {{ isFullscreen ? "Exit Fullscreen" : "Fullscreen" }}
+          </button>
           <button class="fc-btn fc-btn-light" @click="takeScreenshot" :disabled="!sceneReady">Screenshot</button>
         </div>
       </header>
 
-      <div class="fc-layout">
-        <aside class="fc-panel">
+      <div class="fc-layout" :class="{ 'left-collapsed': isLeftSidebarCollapsed, 'right-collapsed': isRightSidebarCollapsed }">
+        <aside v-if="!isLeftSidebarCollapsed" class="fc-panel">
           <div class="fc-panel-head">
             <div>
               <h2>Flowers</h2>
@@ -64,11 +73,22 @@
 
         <main
           class="fc-stage"
-          :class="{ over: isDragOver }"
+          :class="{ over: isDragOver, dragging: isTransformDragging }"
           @dragover.prevent="onCanvasDragOver"
           @dragleave="onCanvasDragLeave"
           @drop.prevent="onCanvasDrop"
         >
+          <div class="fc-stage-actions">
+            <button class="fc-icon-btn" @click="toggleLeftSidebar">
+              {{ isLeftSidebarCollapsed ? "◀ Flowers" : "✕ Flowers" }}
+            </button>
+            <button class="fc-icon-btn" @click="toggleFullscreen" :disabled="!sceneReady">
+              {{ isFullscreen ? "🗗 Exit" : "⛶ Full" }}
+            </button>
+            <button class="fc-icon-btn" @click="toggleRightSidebar">
+              {{ isRightSidebarCollapsed ? "Tools ▶" : "Tools ✕" }}
+            </button>
+          </div>
           <div ref="viewerContainer" class="fc-viewer"></div>
           <div class="fc-overlay fc-top">
             <div class="fc-status">
@@ -81,7 +101,7 @@
           <div v-if="dragFeedback" class="fc-overlay fc-bottom"><div class="fc-modal">{{ dragFeedback }}</div></div>
         </main>
 
-        <aside class="fc-panel fc-side">
+        <aside v-if="!isRightSidebarCollapsed" class="fc-panel fc-side">
           <section class="fc-section">
             <div class="fc-panel-head"><h2>Placed Flowers</h2><span>{{ selectedFlowers.length }}/{{ MAX_FLOWERS }}</span></div>
             <div v-if="!selectedFlowers.length" class="fc-empty">No flowers placed yet.</div>
@@ -186,6 +206,10 @@ const draggedFlower = ref(null);
 const selectedFlowers = ref([]);
 const selectedSceneId = ref(null);
 const isDragOver = ref(false);
+const isTransformDragging = ref(false);
+const isLeftSidebarCollapsed = ref(false);
+const isRightSidebarCollapsed = ref(false);
+const isFullscreen = ref(false);
 const dragFeedback = ref("");
 const paperColor = ref("#d3b18f");
 const ribbonColor = ref("#caa6d9");
@@ -224,10 +248,12 @@ onMounted(async () => {
   initScene();
   await Promise.all([loadBouquetModel(), fetchFlowers()]);
   window.addEventListener("resize", handleResize);
+  document.addEventListener("fullscreenchange", syncFullscreenState);
 });
 
 onUnmounted(() => {
   window.removeEventListener("resize", handleResize);
+  document.removeEventListener("fullscreenchange", syncFullscreenState);
   cleanupScene();
   clearTimeout(toastTimer);
 });
@@ -440,6 +466,7 @@ function setupCanvasInteractions() {
       event.preventDefault();
       selectPlacedFlower(placedHit.sceneId);
       transformDrag = { sceneId: placedHit.sceneId, pointerId: event.pointerId };
+      isTransformDragging.value = true;
       if (canvas.setPointerCapture) {
         canvas.setPointerCapture(event.pointerId);
       }
@@ -455,6 +482,7 @@ function setupCanvasInteractions() {
     ) {
       event.preventDefault();
       transformDrag = { sceneId: selectedSceneId.value, pointerId: event.pointerId };
+      isTransformDragging.value = true;
       if (canvas.setPointerCapture) {
         canvas.setPointerCapture(event.pointerId);
       }
@@ -544,6 +572,7 @@ function endTransformDrag(pointerId = null) {
     canvas.releasePointerCapture(pointerId);
   }
   transformDrag = null;
+  isTransformDragging.value = false;
   if (controls) controls.enabled = true;
 }
 
@@ -618,12 +647,11 @@ function fitFlowerModel(model) {
   const size = sourceBox.getSize(new THREE.Vector3());
   const scale = 0.9 / Math.max(size.x, size.y, size.z, 1);
   model.scale.setScalar(scale);
+  model.updateMatrixWorld(true);
   const scaledBox = new THREE.Box3().setFromObject(model);
   const center = scaledBox.getCenter(new THREE.Vector3());
-  const min = scaledBox.min.clone();
   model.position.sub(center);
-  model.position.y -= min.y;
-  model.position.y -= 0.14;
+  model.updateMatrixWorld(true);
 }
 
 function applyPaperColor(color) {
@@ -774,6 +802,43 @@ function takeScreenshot() {
   link.click();
 }
 
+function toggleLeftSidebar() {
+  isLeftSidebarCollapsed.value = !isLeftSidebarCollapsed.value;
+  queueResize();
+}
+
+function toggleRightSidebar() {
+  isRightSidebarCollapsed.value = !isRightSidebarCollapsed.value;
+  queueResize();
+}
+
+async function toggleFullscreen() {
+  const stage = viewerContainer.value?.closest(".fc-stage");
+  if (!stage) return;
+
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else {
+      await stage.requestFullscreen();
+    }
+  } catch (error) {
+    console.error("Failed to toggle fullscreen:", error);
+    showToast("Fullscreen is not available.", "error");
+  }
+}
+
+function syncFullscreenState() {
+  isFullscreen.value = !!document.fullscreenElement;
+  queueResize();
+}
+
+function queueResize() {
+  window.requestAnimationFrame(() => {
+    handleResize();
+  });
+}
+
 function animateScene() {
   animationFrameId = window.requestAnimationFrame(animateScene);
   controls?.update();
@@ -834,6 +899,9 @@ function showToast(message, type = "success") {
 .fc-subtitle { margin: 10px 0 0; color: #6c5b4b; }
 .fc-head-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
 .fc-layout { max-width: 1500px; margin: 0 auto; display: grid; grid-template-columns: 320px minmax(0,1fr) 340px; gap: 18px; min-height: calc(100vh - 160px); }
+.fc-layout.left-collapsed { grid-template-columns: minmax(0,1fr) 340px; }
+.fc-layout.right-collapsed { grid-template-columns: 320px minmax(0,1fr); }
+.fc-layout.left-collapsed.right-collapsed { grid-template-columns: minmax(0,1fr); }
 .fc-panel, .fc-stage { min-height: 0; border-radius: 28px; }
 .fc-panel { background: rgba(255,255,255,.88); border: 1px solid rgba(122,92,60,.12); box-shadow: 0 18px 50px rgba(91,64,41,.08); padding: 20px; display: flex; flex-direction: column; backdrop-filter: blur(16px); }
 .fc-panel-head, .fc-row, .fc-summary, .fc-selection { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
@@ -855,7 +923,13 @@ function showToast(message, type = "success") {
 .fc-tags { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
 .fc-stage { position: relative; overflow: hidden; background: radial-gradient(circle at top, rgba(255,255,255,.24), transparent 40%), linear-gradient(180deg, #b39d83 0%, #aa9278 100%); border: 1px solid rgba(122,92,60,.14); box-shadow: inset 0 1px 0 rgba(255,255,255,.22); }
 .fc-stage.over { box-shadow: inset 0 0 0 2px rgba(255,255,255,.4), 0 0 0 4px rgba(197,137,87,.18); }
-.fc-viewer { width: 100%; height: 100%; min-height: 680px; }
+.fc-stage-actions { position: absolute; top: 18px; right: 18px; z-index: 3; display: flex; gap: 10px; }
+.fc-stage .fc-viewer { width: 100%; height: 100%; min-height: 680px; cursor: grab; }
+.fc-stage.dragging .fc-viewer { cursor: grabbing; }
+.fc-stage:fullscreen { border-radius: 0; width: 100vw; height: 100vh; max-width: none; }
+.fc-stage:fullscreen .fc-viewer { min-height: 100vh; }
+.fc-stage:-webkit-full-screen { border-radius: 0; width: 100vw; height: 100vh; max-width: none; }
+.fc-stage:-webkit-full-screen .fc-viewer { min-height: 100vh; }
 .fc-overlay { position: absolute; left: 20px; right: 20px; pointer-events: none; display: flex; justify-content: center; }
 .fc-top { top: 20px; }
 .fc-center { inset: 0; align-items: center; }
@@ -880,6 +954,8 @@ function showToast(message, type = "success") {
 .fc-summary.total { font-size: 18px; border-bottom: none; }
 .fc-btn { border: none; border-radius: 14px; cursor: pointer; transition: transform .2s ease, opacity .2s ease; padding: 10px 16px; }
 .fc-btn:disabled { opacity: .55; cursor: not-allowed; }
+.fc-icon-btn { border: none; border-radius: 999px; background: rgba(255,255,255,.92); color: #5f4734; font-size: 12px; font-weight: 600; padding: 10px 14px; cursor: pointer; box-shadow: 0 10px 24px rgba(83,55,32,.12); transition: transform .2s ease, opacity .2s ease; }
+.fc-icon-btn:disabled { opacity: .55; cursor: not-allowed; }
 .fc-btn-primary { width: 100%; margin-top: 12px; padding: 14px 16px; background: #8b5e3c; color: #fff; font-weight: 600; }
 .fc-btn-light { background: #fff; color: #60422c; box-shadow: 0 10px 30px rgba(90,60,35,.08); }
 .fc-btn-danger { background: rgba(194,92,79,.12); color: #9b4338; }
@@ -890,7 +966,7 @@ function showToast(message, type = "success") {
 .fc-toast.error { background: #a5564d; }
 .fade-enter-active, .fade-leave-active { transition: opacity .2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
-@media (max-width: 1220px) { .fc-layout { grid-template-columns: 280px minmax(0,1fr) 300px; } }
-@media (max-width: 980px) { .fc-shell { padding-top: 88px; } .fc-topbar, .fc-layout { display: grid; grid-template-columns: 1fr; } .fc-viewer { min-height: 520px; } }
+@media (max-width: 1220px) { .fc-layout { grid-template-columns: 280px minmax(0,1fr) 300px; } .fc-layout.left-collapsed { grid-template-columns: minmax(0,1fr) 300px; } .fc-layout.right-collapsed { grid-template-columns: 280px minmax(0,1fr); } }
+@media (max-width: 980px) { .fc-shell { padding-top: 88px; } .fc-topbar, .fc-layout, .fc-layout.left-collapsed, .fc-layout.right-collapsed, .fc-layout.left-collapsed.right-collapsed { display: grid; grid-template-columns: 1fr; } .fc-viewer { min-height: 520px; } }
 @media (max-width: 640px) { .fc-shell { padding-inline: 14px; } .fc-topbar h1 { font-size: 28px; } .fc-overlay { left: 12px; right: 12px; } }
 </style>
