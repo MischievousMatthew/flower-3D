@@ -4,7 +4,6 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\HandleCors;
-use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,7 +14,6 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->prepend(HandleCors::class);
-        $middleware->statefulApi();
 
         $middleware->validateCsrfTokens(except: [
             'api/*',
@@ -32,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'finance.manager'   => \App\Http\Middleware\CheckFinanceManager::class,
             'assignment'        => \App\Http\Middleware\CheckActiveAssignment::class,
             'employee.module'   => \App\Http\Middleware\EnsureEmployeeModuleAccess::class,
+            'token.auth'        => \App\Http\Middleware\TokenAuth::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

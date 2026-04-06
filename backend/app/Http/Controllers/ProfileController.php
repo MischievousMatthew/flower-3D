@@ -11,7 +11,7 @@ class ProfileController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('auth:sanctum');
+        $this->middleware('token.auth:user');
     }
 
     public function getProfile()

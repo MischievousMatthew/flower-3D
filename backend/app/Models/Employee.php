@@ -12,11 +12,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 
 class Employee extends Authenticatable
 {
-    use BelongsToOwner, HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use BelongsToOwner, HasFactory, Notifiable, SoftDeletes;
 
     private const MODULE_ALIASES = [
         'leave_management' => ['leave', 'leave_request', 'leave_management'],
@@ -34,11 +33,13 @@ class Employee extends Authenticatable
         'status',
         'phone',
         'address',
+        'api_token',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'api_token',
     ];
 
     protected $casts = [

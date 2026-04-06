@@ -119,20 +119,21 @@ Route::prefix('public/leave')->group(function () {
     Route::post('/submit',    [EmployeeLeaveController::class, 'submitLeaveRequest']);
 });
 
-// ============================================================
-// 6. AUTHENTICATED ROUTES (auth:sanctum)
-// ============================================================
-
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('token.auth')->group(function () {
 
     // ----------------------------------------------------------
     // 6a. Auth — session management
     // ----------------------------------------------------------
 
-    Route::get('/auth/me',               [AuthController::class,         'me']);
-    Route::post('/auth/logout',          [AuthController::class,         'logout']);
-    Route::get('/auth/employee-me',      [EmployeeAuthController::class, 'me']);
-    Route::post('/auth/employee-logout', [EmployeeAuthController::class, 'logout']);
+    Route::middleware('token.auth:user')->group(function () {
+        Route::get('/auth/me',      [AuthController::class, 'me']);
+        Route::post('/auth/logout', [AuthController::class, 'logout']);
+    });
+
+    Route::middleware('token.auth:employee')->group(function () {
+        Route::get('/auth/employee-me',      [EmployeeAuthController::class, 'me']);
+        Route::post('/auth/employee-logout', [EmployeeAuthController::class, 'logout']);
+    });
 
     // ----------------------------------------------------------
     // 6b. Profile

@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class TokenAuth
@@ -40,6 +41,7 @@ class TokenAuth
             ], 401);
         }
 
+        Auth::setUser($authenticatable);
         $request->setUserResolver(fn () => $authenticatable);
 
         return $next($request);

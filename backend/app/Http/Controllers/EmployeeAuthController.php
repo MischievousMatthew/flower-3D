@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class EmployeeAuthController extends Controller
 {
@@ -40,11 +41,10 @@ class EmployeeAuthController extends Controller
                 ], 401);
             }
 
-            // Revoke old tokens
-            $employee->tokens()->delete();
-
-            // Create a clean Sanctum token
-            $token = $employee->createToken('employee-token')->plainTextToken;
+            $token = Str::random(80);
+            $employee->forceFill([
+                'api_token' => hash('sha256', $token),
+            ])->save();
             $this->loginAuditService->logEmployeeLogin($employee, $request);
 
             // Load module permissions
@@ -107,8 +107,10 @@ class EmployeeAuthController extends Controller
     {
         $user = $request->user();
 
-        if ($user && $user->currentAccessToken()) {
-            $user->currentAccessToken()->delete();
+        if ($user instanceof Employee) {
+            $user->forceFill([
+                'api_token' => null,
+            ])->save();
         }
 
         return response()->json([

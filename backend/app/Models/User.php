@@ -7,12 +7,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 use App\Helpers\CloudinaryHelper;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasFactory, Notifiable;
 
     public const ROLE_ADMIN = 'admin';
     public const ROLE_VENDOR = 'vendor';
@@ -37,11 +36,13 @@ class User extends Authenticatable
         'profile_picture',
         'plan',
         'email_verified_at',
+        'api_token',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'api_token',
     ];
 
     protected $casts = [

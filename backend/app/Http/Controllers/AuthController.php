@@ -13,12 +13,12 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Exception;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
     public function __construct(private readonly LoginAuditService $loginAuditService)
     {
-        $this->middleware('auth:sanctum')->only(['me', 'logout']);
     }
 
     public function sendOtp(Request $request)
@@ -83,7 +83,10 @@ class AuthController extends Controller
             'role'               => 'customer',
         ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        $token = Str::random(80);
+        $user->forceFill([
+            'api_token' => hash('sha256', $token),
+        ])->save();
 
         return response()->json([
             'message' => 'Registration successful',
@@ -141,8 +144,10 @@ class AuthController extends Controller
                 ]);
             }
 
-            // Create token
-            $token = $user->createToken('auth_token')->plainTextToken;
+            $token = Str::random(80);
+            $user->forceFill([
+                'api_token' => hash('sha256', $token),
+            ])->save();
             $this->loginAuditService->logUserLogin($user, $request);
 
             Log::info('Login successful', [
@@ -306,7 +311,13 @@ class AuthController extends Controller
     public function logout(Request $request)
     {
         try {
-            $request->user()->currentAccessToken()->delete();
+            $user = $request->user();
+
+            if ($user) {
+                $user->forceFill([
+                    'api_token' => null,
+                ])->save();
+            }
             
             Log::info('User logged out successfully');
             
@@ -375,8 +386,10 @@ class AuthController extends Controller
                 ]);
             }
 
-            // Create token
-            $token = $user->createToken('employee_token')->plainTextToken;
+            $token = Str::random(80);
+            \DB::table('users')
+                ->where('id', $user->id)
+                ->update(['api_token' => hash('sha256', $token)]);
 
             $employeeData = [
                 'id' => $employee->id,
@@ -496,7 +509,10 @@ class AuthController extends Controller
                 ]);
             }
             
-            $token = $user->createToken('vendor_token')->plainTextToken;
+            $token = Str::random(80);
+            $user->forceFill([
+                'api_token' => hash('sha256', $token),
+            ])->save();
             $this->loginAuditService->logUserLogin($user, $request);
 
             return response()->json([
