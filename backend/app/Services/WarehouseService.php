@@ -15,7 +15,25 @@ class WarehouseService
 
     public function listWarehouses(int $ownerId): Collection
     {
-        return Warehouse::where('owner_id', $ownerId)->withCount('items')->get();
+        return Warehouse::where('owner_id', $ownerId)
+            ->withSum(['batches as total_units' => fn($q) => $q->where('status', 'active')], 'qty_remaining')
+            ->get()
+            ->each(function ($warehouse) {
+                // Aggregate SKU count (unique products) from active batches in linked storages
+                $warehouse->items_count = \App\Models\WarehouseBatch::whereHas('location', fn($q) => $q->where('warehouse_id', $warehouse->id))
+                    ->where('status', 'active')
+                    ->distinct('product_id')
+                    ->count('product_id');
+                
+                // Calculate low stock: count of SKUs in this warehouse with total units <= 10
+                $warehouse->low_stock = \App\Models\WarehouseBatch::whereHas('location', fn($q) => $q->where('warehouse_id', $warehouse->id))
+                    ->where('status', 'active')
+                    ->select('product_id', \DB::raw('SUM(qty_remaining) as total'))
+                    ->groupBy('product_id')
+                    ->having('total', '<=', 10)
+                    ->get()
+                    ->count();
+            });
     }
 
     public function findWarehouse(int $id, int $ownerId): Warehouse

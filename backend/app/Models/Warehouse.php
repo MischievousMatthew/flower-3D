@@ -24,11 +24,34 @@ class Warehouse extends Model
     // ─── Relationships ────────────────────────────────────────────────────────
 
     /**
-     * A warehouse holds many items.
+     * A warehouse holds many items (SKU summaries).
      */
     public function items(): HasMany
     {
         return $this->hasMany(WarehouseItem::class);
+    }
+
+    /**
+     * A warehouse contains multiple storage locations (Storages/Vaults).
+     */
+    public function locations(): HasMany
+    {
+        return $this->hasMany(WarehouseLocation::class, 'warehouse_id');
+    }
+
+    /**
+     * All flower batches stored in all locations of this warehouse.
+     */
+    public function batches(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            WarehouseBatch::class,
+            WarehouseLocation::class,
+            'warehouse_id',           // Foreign key on locations table
+            'warehouse_location_id', // Foreign key on batches table
+            'id',                     // Local key on warehouses table
+            'id'                      // Local key on locations table
+        );
     }
 
     /**
