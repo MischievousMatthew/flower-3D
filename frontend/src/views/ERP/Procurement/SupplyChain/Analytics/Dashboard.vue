@@ -101,7 +101,7 @@
         <div v-for="warehouse in visibleWarehouseOverview.slice(0, 4)" :key="warehouse.warehouse_id" class="live-ship-row">
           <div class="live-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="14"><path d="M2 8.5 10 3l8 5.5" /><path d="M4 8v8h12V8" /><path d="M8 16v-4h4v4" /></svg></div>
           <div class="live-info">
-            <span class="live-num">{{ warehouse.warehouse_name || "Unnamed Warehouse" }}</span>
+            <span class="live-num">{{ warehouse.warehouse_name || warehouse.warehouse?.name || "Unnamed Warehouse" }}</span>
             <span class="live-type">{{ warehouse.total_units ?? 0 }} units · {{ warehouse.total_skus ?? 0 }} SKUs</span>
           </div>
           <span class="live-badge" :class="warehouseStatusClass(warehouse)">{{ warehouseStatusLabel(warehouse) }}</span>
@@ -232,7 +232,7 @@ const kpis = computed(() => {
   const flowerUnits = Number(inventoryData.value?.total_units ?? 0);
   const lowStock = Number(inventoryData.value?.low_stock_items?.length ?? 0);
   return [
-    { label: "Purchase Orders", emoji: "📦", value: formatBig(orders.total ?? 0), trendText: `${totalSuppliers} suppliers active`, trendClass: "up", color: "#10b981", bg: "#ecfdf5", sparkData: sparkSeed(orders.total ?? 0, 6) },
+    { label: "Purchase Orders", emoji: "✅", value: formatBig(orderCounts.value.completed ?? 0), trendText: "Completed orders", trendClass: "up", color: "#10b981", bg: "#ecfdf5", sparkData: sparkSeed(orderCounts.value.completed ?? 0, 6) },
     { label: "Processing Orders", emoji: "🚚", value: formatBig(orderCounts.value.processing ?? 0), trendText: `${orderCounts.value.pending ?? 0} pending next`, trendClass: "neutral", color: "#3b82f6", bg: "#eff6ff", sparkData: sparkSeed(orderCounts.value.processing ?? 0, 4) },
     { label: "Flower Stocks", emoji: "🌸", value: formatBig(flowerUnits), trendText: `${lowStock} low-stock items`, trendClass: lowStock > 0 ? "down" : "up", color: "#8b5cf6", bg: "#f5f3ff", sparkData: sparkSeed(flowerUnits || 0, 8) },
     { label: "Warehouses", emoji: "🏬", value: formatBig(totalWarehouses), trendText: `${visibleWarehouseOverview.value.length} snapshots live`, trendClass: "neutral", color: "#f59e0b", bg: "#fffbeb", sparkData: sparkSeed(totalWarehouses || 0, 3) },

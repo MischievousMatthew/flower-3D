@@ -34,10 +34,11 @@ class AnalyticsController extends Controller
         $ownerId = $this->getOwnerId();
 
         return response()->json([
-            'orders'    => $this->service->totalOrders($ownerId, $from, $to),
-            'shipments' => $this->service->totalShipments($ownerId, $from, $to),
-            'inventory' => $this->service->inventoryStockSummary($ownerId),
-            'movements' => $this->service->movementSummary($ownerId, $from, $to),
+            'orders'        => $this->service->totalOrders($ownerId, $from, $to),
+            'shipments'     => $this->service->totalShipments($ownerId, $from, $to),
+            'inventory'     => $this->service->inventoryStockSummary($ownerId),
+            'movements'     => $this->service->movementSummary($ownerId, $from, $to),
+            'recent_orders' => $this->service->recentOrders($ownerId, 10),
         ]);
     }
 

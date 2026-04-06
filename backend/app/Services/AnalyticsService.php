@@ -6,6 +6,7 @@ use App\Models\InventoryMovement;
 use App\Models\PurchaseOrder;
 use App\Models\Shipment;
 use App\Models\Supplier;
+use App\Models\WarehouseBatch;
 use App\Models\WarehouseItem;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +44,20 @@ class AnalyticsService
             'avg_order_value' => $total > 0 ? round($totalValue / $total, 2) : 0.0,
             'period'          => ['from' => $from, 'to' => $to],
         ];
+    }
+
+    /**
+     * Fetch the most recent purchase orders for the dashboard list.
+     *
+     * @return Collection
+     */
+    public function recentOrders(int $ownerId, int $limit = 8): Collection
+    {
+        return PurchaseOrder::where('owner_id', $ownerId)
+            ->with('supplier:id,company_name,address,logo_url')
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
     }
 
     // ─── Shipments ────────────────────────────────────────────────────────────
@@ -135,7 +150,11 @@ class AnalyticsService
     public function inventoryStockSummary(int $ownerId, int $lowStockThreshold = 10): array
     {
         $totalSkus  = WarehouseItem::where('owner_id', $ownerId)->count();
-        $totalUnits = WarehouseItem::where('owner_id', $ownerId)->sum('quantity');
+        
+        // Sync with Floor View: Use WarehouseBatch qty_remaining for total units
+        $totalUnits = WarehouseBatch::where('owner_id', $ownerId)
+            ->where('status', '!=', 'depleted')
+            ->sum('qty_remaining');
 
         $lowStock = WarehouseItem::with('warehouse')
             ->where('owner_id', $ownerId)
@@ -147,7 +166,7 @@ class AnalyticsService
                 'item_id'      => $item->id,
                 'sku'          => $item->sku,
                 'product_name' => $item->product_name,
-                'quantity'     => $item->quantity,
+                'quantity'     => (int) $item->quantity,
                 'warehouse'    => $item->warehouse?->name,
             ]);
 
@@ -183,7 +202,7 @@ class AnalyticsService
 
         return [
             'total_skus'         => $totalSkus,
-            'total_units'        => $totalUnits,
+            'total_units'        => (int) $totalUnits,
             'low_stock_items'    => $lowStock,
             'out_of_stock_items' => $outOfStock,
             'by_warehouse'       => $byWarehouse,
