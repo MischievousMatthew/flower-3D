@@ -8,6 +8,7 @@ use App\Models\Shipment;
 use App\Models\Supplier;
 use App\Models\WarehouseBatch;
 use App\Models\WarehouseItem;
+use App\Models\Warehouse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -71,8 +72,8 @@ class AnalyticsService
     {
         $query = Shipment::query()
             ->where('owner_id', $ownerId)
-            ->when($from, fn ($q) => $q->whereDate('id', '>=', $from))
-            ->when($to,   fn ($q) => $q->whereDate('id', '<=', $to));
+            ->when($from, fn ($q) => $q->whereDate('shipped_date', '>=', $from))
+            ->when($to,   fn ($q) => $q->whereDate('shipped_date', '<=', $to));
 
         $total = (clone $query)->count();
 
@@ -90,11 +91,16 @@ class AnalyticsService
             ->map(fn ($c) => (int) $c)
             ->toArray();
 
-        $delivered  = (clone $query)->where('status', 'delivered')->count();
-        $onTime     = (clone $query)
+        $deliveredShipments = (clone $query)
             ->where('status', 'delivered')
-            ->whereRaw('received_date <= DATE_ADD(shipped_date, INTERVAL 30 DAY)')
-            ->count();
+            ->whereNotNull('shipped_date')
+            ->whereNotNull('received_date')
+            ->get(['shipped_date', 'received_date']);
+
+        $delivered = $deliveredShipments->count();
+        $onTime = $deliveredShipments->filter(function ($shipment) {
+            return $shipment->received_date->lte($shipment->shipped_date->copy()->addDays(30));
+        })->count();
 
         return [
             'total'        => $total,
@@ -153,7 +159,8 @@ class AnalyticsService
         
         // Sync with Floor View: Use WarehouseBatch qty_remaining for total units
         $totalUnits = WarehouseBatch::where('owner_id', $ownerId)
-            ->where('status', '!=', 'depleted')
+            ->where('status', 'active')
+            ->where('qty_remaining', '>', 0)
             ->sum('qty_remaining');
 
         $lowStock = WarehouseItem::with('warehouse')
@@ -182,7 +189,7 @@ class AnalyticsService
             ]);
 
         $byWarehouse = Warehouse::where('owner_id', $ownerId)
-            ->with(['batches' => fn ($q) => $q->where('status', 'active')])
+            ->with(['batches' => fn ($q) => $q->where('status', 'active')->where('qty_remaining', '>', 0)])
             ->get()
             ->map(function ($wh) {
                 $totalUnits = $wh->batches->sum('qty_remaining');
