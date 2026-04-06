@@ -8,6 +8,7 @@ use App\Services\EmployeeQRCodeService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use App\Traits\ScopesOwner;
 
 class AttendanceController extends Controller
@@ -77,19 +78,9 @@ class AttendanceController extends Controller
 
     public function timeIn(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'employee_id'     => 'required|integer|exists:employees_info,id',
-            'face_verified'   => 'required|boolean',
-            'liveness_passed' => 'required|boolean',
-            'match_score'     => 'required|integer|min:0|max:100',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
-        }
-
-        if (!$request->boolean('face_verified') || !$request->boolean('liveness_passed')) {
-            return response()->json(['success' => false, 'message' => 'Face verification required'], 403);
+        $validationError = $this->validateFaceVerificationPayload($request);
+        if ($validationError) {
+            return $validationError;
         }
 
         $ownerId = $this->getOwnerId();
@@ -100,25 +91,85 @@ class AttendanceController extends Controller
 
     public function timeOut(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'employee_id'     => 'required|integer|exists:employees_info,id',
-            'face_verified'   => 'required|boolean',
-            'liveness_passed' => 'required|boolean',
-            'match_score'     => 'required|integer|min:0|max:100',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
-        }
-
-        if (!$request->boolean('face_verified') || !$request->boolean('liveness_passed')) {
-            return response()->json(['success' => false, 'message' => 'Face verification required'], 403);
+        $validationError = $this->validateFaceVerificationPayload($request);
+        if ($validationError) {
+            return $validationError;
         }
 
         $ownerId = $this->getOwnerId();
         $result  = $this->attendanceService->timeOut($ownerId, $request->employee_id, $request->all());
 
         return response()->json($result, $result['success'] ? 200 : 400);
+    }
+
+    private function validateFaceVerificationPayload(Request $request): ?JsonResponse
+    {
+        $allowedChallenges = ['blink', 'smile', 'turn_left', 'turn_right', 'nod', 'move_closer', 'move_back'];
+
+        $validator = Validator::make($request->all(), [
+            'employee_id'                           => 'required|integer|exists:employees_info,id',
+            'face_verified'                         => 'required|boolean',
+            'liveness_passed'                       => 'required|boolean',
+            'match_score'                           => 'required|integer|min:70|max:100',
+            'challenges'                            => 'required|array|min:3',
+            'challenges.*'                          => ['required', 'string', Rule::in($allowedChallenges)],
+            'liveness_data'                         => 'required|array',
+            'liveness_data.frames_checked'          => 'required|integer|min:20',
+            'liveness_data.challenge_frames_checked'=> 'required|integer|min:10',
+            'liveness_data.match_frames_checked'    => 'required|integer|min:10',
+            'liveness_data.valid_match_frames'      => 'required|integer|min:10',
+            'liveness_data.suspicious_events'       => 'required|integer|min:0|max:0',
+            'liveness_data.detection_score_min'     => 'required|numeric|min:0.6|max:1',
+            'liveness_data.replay_check_passed'     => 'required|boolean',
+            'liveness_data.camera_source'           => ['required', 'string', Rule::in(['user-media-webcam'])],
+            'liveness_data.challenge_results'       => 'required|array|min:3',
+            'liveness_data.challenge_results.*.id'  => ['required', 'string', Rule::in($allowedChallenges)],
+            'liveness_data.challenge_results.*.passed'          => 'required|boolean',
+            'liveness_data.challenge_results.*.frames_observed' => 'required|integer|min:1',
+            'liveness_data.challenge_results.*.duration_ms'     => 'required|integer|min:1',
+        ]);
+
+        $validator->after(function ($validator) use ($request) {
+            if (!$request->boolean('face_verified') || !$request->boolean('liveness_passed')) {
+                $validator->errors()->add('liveness_passed', 'Liveness check failed.');
+            }
+
+            $challenges = collect($request->input('challenges', []));
+            $results = collect($request->input('liveness_data.challenge_results', []));
+            $passedIds = $results
+                ->filter(fn ($result) => !empty($result['passed']) && !empty($result['id']))
+                ->pluck('id');
+
+            if ($passedIds->count() < 3 || $passedIds->unique()->count() < 3) {
+                $validator->errors()->add('liveness_data.challenge_results', 'At least three liveness challenges must be completed.');
+            }
+
+            if (!$challenges->contains('blink')) {
+                $validator->errors()->add('challenges', 'Blink challenge is required.');
+            }
+
+            if (!$challenges->intersect(['turn_left', 'turn_right', 'nod'])->count()) {
+                $validator->errors()->add('challenges', 'A head movement challenge is required.');
+            }
+
+            if ($results->contains(fn ($result) => empty($result['passed']))) {
+                $validator->errors()->add('liveness_data.challenge_results', 'All liveness challenges must pass.');
+            }
+
+            if (!$request->boolean('liveness_data.replay_check_passed')) {
+                $validator->errors()->add('liveness_data.replay_check_passed', 'Replay detection failed.');
+            }
+        });
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Liveness check failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        return null;
     }
 
     /**

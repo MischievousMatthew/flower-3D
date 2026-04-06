@@ -17,6 +17,9 @@
               {{ attendanceType === "time_in" ? "🟢 Time In" : "🔴 Time Out" }}
             </span>
           </div>
+          <div class="status-line info">
+            <span>{{ securityHint }}</span>
+          </div>
         </div>
         <div class="attempt-counter" v-if="attempts > 0">
           <span
@@ -87,6 +90,24 @@
             </span>
             {{ model.name }}
           </div>
+        </div>
+        <div
+          v-if="false"
+          class="instruction-bar"
+        >
+          <span class="inst-icon">ðŸ”’</span>
+          <span v-if="phase === 'LIVENESS'">
+            Hold the requested action for {{ challengeFrameProgress }}/{{
+              currentChallenge?.id === "blink" || currentChallenge?.id === "nod"
+                ? 1
+                : REQUIRED_CHALLENGE_VALID_FRAMES
+            }} secure frames
+          </span>
+          <span v-else>
+            Collecting secure match frames {{ matchFramesValidated }}/{{
+              REQUIRED_MATCH_VALID_FRAMES
+            }}
+          </span>
         </div>
       </div>
 
@@ -297,6 +318,24 @@
           <span class="inst-icon">📷</span>
           <span>Center your face in the frame and hold still</span>
         </div>
+        <div
+          v-if="['LIVENESS', 'CAPTURING', 'MATCHING'].includes(phase)"
+          class="instruction-bar"
+        >
+          <span class="inst-icon">Secure</span>
+          <span v-if="phase === 'LIVENESS'">
+            Hold the requested action for {{ challengeFrameProgress }}/{{
+              currentChallenge?.id === "blink" || currentChallenge?.id === "nod"
+                ? 1
+                : REQUIRED_CHALLENGE_VALID_FRAMES
+            }} secure frames
+          </span>
+          <span v-else>
+            Collecting secure match frames {{ matchFramesValidated }}/{{
+              REQUIRED_MATCH_VALID_FRAMES
+            }}
+          </span>
+        </div>
       </div>
 
       <!-- PHASE: Success -->
@@ -431,12 +470,16 @@ const MATCH_DISTANCE_THRESHOLD = 0.55;
 const MATCH_DISPLAY_THRESHOLD = 70;
 const REQUIRED_BLINKS = 2;
 const REQUIRED_POSITION_FRAMES = 25; // frames before challenge starts
-const REQUIRED_STABLE_FRAMES = 20;
+const REQUIRED_CHALLENGE_VALID_FRAMES = 6;
+const REQUIRED_MATCH_VALID_FRAMES = 10;
 const DETECTION_INTERVAL_MS = 80;
 const MAX_ATTEMPTS = 3;
-const NUM_CHALLENGES = 3; // chain length (was 2)
+const NUM_CHALLENGES = 3;
 const CHALLENGE_DURATION = 5; // seconds per challenge
 const DEPTH_SCALE_THRESHOLD = 0.08; // 8% size change for depth check
+const MIN_DETECTION_SCORE = 0.6;
+const MAX_STATIC_FRAME_MS = 3000;
+const MIN_TEXTURE_VARIANCE = 60;
 
 // Blink detection
 const BLINK_DROP_THRESHOLD = 0.018;
@@ -510,6 +553,9 @@ const isSending = ref(false);
 const attendanceResult = ref(null);
 const attempts = ref(0);
 const currentChallengeComplete = ref(false);
+const challengeFrameProgress = ref(0);
+const matchFramesValidated = ref(0);
+const securityHint = ref("Use your real face and follow the live challenge.");
 
 // Positioning
 const positionFrames = ref(0);
@@ -552,11 +598,6 @@ let waitingForReopen = false;
 let closedFrameCount = 0;
 let rollingEARWindow = [];
 
-// Calibration
-let baselineEAR = null;
-let calibrationFrames = [];
-let stableFrameCount = 0;
-
 // Depth tracking
 let baselineFaceWidth = null;
 let lastNoseY = null;
@@ -566,8 +607,22 @@ let nodFrames = 0;
 let challengePassed = false;
 let challengeStartTime = 0;
 
-// Screen replay / texture
+// Screen replay / texture / motion
 let lastTextureVar = null;
+let lowTextureFrameCount = 0;
+let currentChallengeFrameStreak = 0;
+let previousMotionSample = null;
+let staticFrameStartedAt = null;
+let minDetectionScoreSeen = 1;
+let totalFramesChecked = 0;
+let challengeFramesChecked = 0;
+let matchFramesChecked = 0;
+let suspiciousEvents = 0;
+let cameraMetadata = {
+  camera_source: "user-media-webcam",
+  camera_label: "",
+};
+let challengeResults = [];
 
 // ── Step Progress ─────────────────────────────────────────────────────────────
 const steps = [
@@ -649,6 +704,7 @@ async function startVerification() {
     await captureAndMatch();
   } catch (err) {
     console.error("[FaceVerifier]", err);
+    cleanup();
     if (err.code === "PHOTO_ERROR") {
       phase.value = "PHOTO_ERROR";
       failureReason.value = err.message;
@@ -809,6 +865,29 @@ async function startWebcam() {
     audio: false,
   });
 
+  const [videoTrack] = stream.getVideoTracks();
+  const settings = videoTrack?.getSettings?.() ?? {};
+  const label = (videoTrack?.label || "").toLowerCase();
+
+  cameraMetadata = {
+    camera_source: settings.displaySurface ? "screen-capture" : "user-media-webcam",
+    camera_label: videoTrack?.label || "",
+  };
+
+  if (settings.displaySurface) {
+    throw Object.assign(
+      new Error("Screen capture streams are not allowed for attendance verification."),
+      { code: "SUSPICIOUS" },
+    );
+  }
+
+  if (["obs", "manycam", "xsplit", "virtual", "snap camera", "iriun", "epoccam"].some((item) => label.includes(item))) {
+    throw Object.assign(
+      new Error("Virtual cameras are not allowed for attendance verification."),
+      { code: "SUSPICIOUS" },
+    );
+  }
+
   await nextTick();
   videoRef.value.srcObject = stream;
   await new Promise((resolve) => {
@@ -850,6 +929,13 @@ async function runPositioningGate() {
         positionFrames.value = 0;
         positionGuideClass.value = "neutral";
         positionLabel.value = "No face detected — move closer";
+        securityHint.value = "Present your live face clearly to the webcam.";
+        return;
+      }
+
+      if (!validateLiveFrame(det)) {
+        positionFrames.value = 0;
+        positionGuideClass.value = "warning";
         return;
       }
 
@@ -868,19 +954,6 @@ async function runPositioningGate() {
         positionFrames.value = 0;
         positionGuideClass.value = "warning";
         positionLabel.value = !bigEnough ? "Move closer" : "Center your face";
-        return;
-      }
-
-      // Check for screen replay via texture variance
-      const textureOk = checkTextureVariance(det);
-      if (!textureOk) {
-        clearInterval(loop);
-        reject(
-          Object.assign(
-            new Error("Screen or photo detected. Please use your real face."),
-            { code: "SUSPICIOUS" },
-          ),
-        );
         return;
       }
 
@@ -935,13 +1008,15 @@ function checkTextureVariance(detection) {
       grays.reduce((s, g) => s + Math.pow(g - mean, 2), 0) / grays.length;
 
     // Screens typically show variance < 80 (very uniform); real skin > 120
-    if (lastTextureVar !== null && variance < 60) {
+    if (variance < MIN_TEXTURE_VARIANCE) {
       console.warn(
         "[FaceVerifier] Low texture variance — possible replay:",
         variance.toFixed(1),
       );
-      return false;
+      lowTextureFrameCount++;
+      return lowTextureFrameCount < 4;
     }
+    lowTextureFrameCount = 0;
     lastTextureVar = variance;
     return true;
   } catch (_) {
@@ -950,6 +1025,82 @@ function checkTextureVariance(detection) {
 }
 
 // ── Environmental Flash ───────────────────────────────────────────────────────
+function trackMotion(det) {
+  const box = det.detection.box;
+  const landmarks = det.landmarks;
+  const nose = landmarks.getNose?.() ?? [];
+  const nosePoint =
+    nose[3] ?? nose[0] ?? { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const current = {
+    centerX: box.x + box.width / 2,
+    centerY: box.y + box.height / 2,
+    width: box.width,
+    noseX: nosePoint.x,
+    noseY: nosePoint.y,
+    ear: computeEAR(landmarks),
+    smile: det.expressions?.happy ?? 0,
+  };
+
+  if (!previousMotionSample) {
+    previousMotionSample = current;
+    staticFrameStartedAt = Date.now();
+    return { staticForMs: 0 };
+  }
+
+  const movementMagnitude =
+    Math.abs(current.centerX - previousMotionSample.centerX) +
+    Math.abs(current.centerY - previousMotionSample.centerY) +
+    Math.abs(current.width - previousMotionSample.width) * 0.7 +
+    Math.abs(current.noseX - previousMotionSample.noseX) * 1.4 +
+    Math.abs(current.noseY - previousMotionSample.noseY) * 1.4 +
+    Math.abs(current.ear - previousMotionSample.ear) * 120 +
+    Math.abs(current.smile - previousMotionSample.smile) * 40;
+
+  if (movementMagnitude >= 3) {
+    staticFrameStartedAt = Date.now();
+  } else {
+    staticFrameStartedAt ??= Date.now();
+  }
+
+  previousMotionSample = current;
+
+  return {
+    staticForMs: staticFrameStartedAt ? Date.now() - staticFrameStartedAt : 0,
+  };
+}
+
+function markSuspicious(reason) {
+  suspiciousEvents++;
+  securityHint.value = reason;
+
+  if (suspiciousEvents >= 2) {
+    throw Object.assign(new Error(reason), { code: "SUSPICIOUS" });
+  }
+}
+
+function validateLiveFrame(det, { requireMovement = false } = {}) {
+  totalFramesChecked++;
+  minDetectionScoreSeen = Math.min(minDetectionScoreSeen, det.detection.score ?? 1);
+
+  if ((det.detection.score ?? 0) < MIN_DETECTION_SCORE) {
+    markSuspicious("Face confidence is too low. Remove screens or glare.");
+    return false;
+  }
+
+  if (!checkTextureVariance(det)) {
+    markSuspicious("Flat display detected. Use your live face in front of the camera.");
+    return false;
+  }
+
+  const motion = trackMotion(det);
+  if (requireMovement && motion.staticForMs > MAX_STATIC_FRAME_MS) {
+    markSuspicious("No live movement detected. Perform the challenge yourself.");
+    return false;
+  }
+
+  return true;
+}
+
 function triggerEnvFlash() {
   const colors = [
     "rgba(255,50,50,0.18)",
@@ -981,7 +1132,23 @@ function pickChallenges() {
 
   // Chain: depth check first → behavioral
   activeChallenges.value = [...depthPair, ...behavioral];
+  if (!activeChallenges.value.some((challenge) => challenge?.id === "blink")) {
+    activeChallenges.value[activeChallenges.value.length - 1] = CHALLENGE_POOL.find(
+      (challenge) => challenge.id === "blink",
+    );
+  }
+  if (
+    !activeChallenges.value.some((challenge) =>
+      ["turn_left", "turn_right", "nod"].includes(challenge?.id),
+    )
+  ) {
+    activeChallenges.value[1] = CHALLENGE_POOL.find(
+      (challenge) => challenge.id === (Math.random() > 0.5 ? "turn_left" : "turn_right"),
+    );
+  }
   challengeIndex.value = 0;
+  challengeResults = [];
+  securityHint.value = "Complete the random actions live. Replays will fail.";
 }
 
 // ── Challenge Chain ───────────────────────────────────────────────────────────
@@ -1013,7 +1180,7 @@ async function runChallengeChain() {
 }
 
 function runSingleChallenge(challenge) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const totalMs = challenge.duration
       ? challenge.duration * 1000
       : CHALLENGE_DURATION * 1000;
@@ -1027,6 +1194,8 @@ function runSingleChallenge(challenge) {
     rollingEARWindow = [];
     lastNoseY = null;
     nodFrames = 0;
+    currentChallengeFrameStreak = 0;
+    challengeFrameProgress.value = 0;
 
     const startWidth = baselineFaceWidth;
 
@@ -1038,6 +1207,12 @@ function runSingleChallenge(challenge) {
       timerDashOffset.value = 113 * (1 - elapsed / totalMs);
 
       if (remaining <= 0 && !challengePassed) {
+        challengeResults.push({
+          id: challenge.id,
+          passed: false,
+          frames_observed: challengeFrameProgress.value,
+          duration_ms: Date.now() - challengeStartTime,
+        });
         clearInterval(challengeTimerLoop);
         clearInterval(detectionLoop);
         resolve(false);
@@ -1065,9 +1240,51 @@ function runSingleChallenge(challenge) {
 
       if (!det) return;
 
+      challengeFramesChecked++;
+
+      try {
+        if (!validateLiveFrame(det, { requireMovement: true })) {
+          currentChallengeFrameStreak = 0;
+          challengeFrameProgress.value = 0;
+          return;
+        }
+      } catch (error) {
+        clearInterval(challengeTimerLoop);
+        clearInterval(detectionLoop);
+        reject(error);
+        return;
+      }
+
       const passed = evaluateChallenge(challenge.id, det, startWidth);
       if (passed) {
+        const requiredFrames =
+          challenge.id === "blink" || challenge.id === "nod"
+            ? 1
+            : REQUIRED_CHALLENGE_VALID_FRAMES;
+        currentChallengeFrameStreak++;
+        challengeFrameProgress.value = Math.min(
+          currentChallengeFrameStreak,
+          requiredFrames,
+        );
+      } else {
+        currentChallengeFrameStreak = 0;
+        challengeFrameProgress.value = 0;
+      }
+
+      if (
+        passed &&
+        currentChallengeFrameStreak >=
+          (challenge.id === "blink" || challenge.id === "nod"
+            ? 1
+            : REQUIRED_CHALLENGE_VALID_FRAMES)
+      ) {
         challengePassed = true;
+        challengeResults.push({
+          id: challenge.id,
+          passed: true,
+          frames_observed: currentChallengeFrameStreak,
+          duration_ms: Date.now() - challengeStartTime,
+        });
         clearInterval(challengeTimerLoop);
         clearInterval(detectionLoop);
         resolve(true);
@@ -1229,8 +1446,10 @@ async function captureAndMatch() {
   stopChallengeLoops();
   await delay(300);
 
-  const CAPTURE_ATTEMPTS = 10;
+  const CAPTURE_ATTEMPTS = 16;
   const results = [];
+  matchFramesValidated.value = 0;
+  securityHint.value = "Hold still while we validate multiple secure frames.";
 
   for (let i = 0; i < CAPTURE_ATTEMPTS; i++) {
     await delay(60);
@@ -1248,14 +1467,34 @@ async function captureAndMatch() {
       .withFaceDescriptor();
 
     if (det) {
+      matchFramesChecked++;
+      try {
+        if (!validateLiveFrame(det)) continue;
+      } catch (error) {
+        setFailure(error.message || "Suspicious camera feed detected.");
+        return;
+      }
+
       const dist = faceapi.euclideanDistance(storedDescriptor, det.descriptor);
-      results.push({ descriptor: det.descriptor, distance: dist });
+      if (dist <= MATCH_DISTANCE_THRESHOLD) {
+        matchFramesValidated.value++;
+      }
+      results.push({
+        descriptor: det.descriptor,
+        distance: dist,
+        score: det.detection.score ?? 0,
+      });
     }
   }
 
-  if (results.length === 0) {
+  if (
+    results.length === 0 ||
+    matchFramesValidated.value < REQUIRED_MATCH_VALID_FRAMES
+  ) {
     attempts.value++;
-    setFailure("Could not detect face at capture time. Please try again.");
+    setFailure(
+      "Not enough secure live frames were captured. Please verify in front of the real camera.",
+    );
     return;
   }
 
@@ -1287,9 +1526,17 @@ async function captureAndMatch() {
 
   await delay(1500);
 
+  if (suspiciousEvents > 0) {
+    attempts.value++;
+    stopWebcam();
+    setFailure("Suspicious replay indicators were detected. Use a live person in front of the webcam.");
+    return;
+  }
+
   if (
     distance <= MATCH_DISTANCE_THRESHOLD &&
-    matchScore.value >= MATCH_DISPLAY_THRESHOLD
+    matchScore.value >= MATCH_DISPLAY_THRESHOLD &&
+    matchFramesValidated.value >= REQUIRED_MATCH_VALID_FRAMES
   ) {
     stopWebcam();
     phase.value = "SUCCESS";
@@ -1336,6 +1583,19 @@ async function sendAttendance() {
       match_score: matchScore.value,
       liveness_passed: true,
       challenges: activeChallenges.value.map((c) => c.id),
+      liveness_data: {
+        frames_checked: totalFramesChecked,
+        challenge_frames_checked: challengeFramesChecked,
+        match_frames_checked: matchFramesChecked,
+        valid_match_frames: matchFramesValidated.value,
+        suspicious_events: suspiciousEvents,
+        detection_score_min:
+          minDetectionScoreSeen === 1 ? MIN_DETECTION_SCORE : Number(minDetectionScoreSeen.toFixed(3)),
+        replay_check_passed: suspiciousEvents === 0,
+        camera_source: cameraMetadata.camera_source,
+        camera_label: cameraMetadata.camera_label,
+        challenge_results: challengeResults,
+      },
     });
 
     if (data.success) {
@@ -1349,18 +1609,17 @@ async function sendAttendance() {
         type: props.attendanceType,
         result: data.data,
       });
+    } else {
+      throw new Error(data.message || "Attendance was rejected by the server.");
     }
   } catch (err) {
     console.error("[FaceVerifier] API error:", err);
-    attendanceResult.value = {
-      time: new Date().toLocaleTimeString(),
-      date: new Date().toLocaleDateString(),
-    };
-    emit("success", {
-      employee: props.employee,
-      type: props.attendanceType,
-      result: null,
-    });
+    attempts.value++;
+    const message =
+      err.response?.data?.message ||
+      "Attendance was rejected because live verification could not be confirmed.";
+    setFailure(message);
+    emit("failure", { reason: "backend_rejected", score: matchScore.value });
   } finally {
     isSending.value = false;
   }
@@ -1387,24 +1646,38 @@ function resetState() {
   positionGuideClass.value = "neutral";
   positionLabel.value = "Looking for face...";
   currentChallengeComplete.value = false;
+  challengeFrameProgress.value = 0;
+  matchFramesValidated.value = 0;
   challengeIndex.value = 0;
   challengeTimeLeft.value = CHALLENGE_DURATION;
   timerDashOffset.value = 0;
   flashActive.value = false;
   activeChallenges.value = [];
+  securityHint.value = "Use your real face and follow the live challenge.";
 
   storedDescriptor = null;
   capturedDescriptor = null;
   baselineFaceWidth = null;
-  baselineEAR = null;
-  calibrationFrames = [];
-  stableFrameCount = 0;
   lastNoseY = null;
   nodFrames = 0;
   waitingForReopen = false;
   closedFrameCount = 0;
   rollingEARWindow = [];
   lastTextureVar = null;
+  lowTextureFrameCount = 0;
+  currentChallengeFrameStreak = 0;
+  previousMotionSample = null;
+  staticFrameStartedAt = null;
+  minDetectionScoreSeen = 1;
+  totalFramesChecked = 0;
+  challengeFramesChecked = 0;
+  matchFramesChecked = 0;
+  suspiciousEvents = 0;
+  challengeResults = [];
+  cameraMetadata = {
+    camera_source: "user-media-webcam",
+    camera_label: "",
+  };
 
   const ctx = overlayCanvasRef.value?.getContext("2d");
   ctx?.clearRect(
@@ -2166,6 +2439,10 @@ onUnmounted(() => cleanup());
 .status-line.warn {
   background: #fef9c3;
   color: #713f12;
+}
+.status-line.info {
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 /* ── Result Phases ───────────────────────────────────────────────────────────── */

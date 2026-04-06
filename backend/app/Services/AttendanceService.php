@@ -9,6 +9,27 @@ use Illuminate\Support\Facades\DB;
 
 class AttendanceService
 {
+    private function buildVerificationNote(array $verificationData, bool $isTimeOut = false): string
+    {
+        $prefix = $isTimeOut ? 'Time out face verified' : 'Face verified';
+        $matchScore = (int) ($verificationData['match_score'] ?? 0);
+        $livenessData = $verificationData['liveness_data'] ?? [];
+        $challengeList = collect($verificationData['challenges'] ?? [])
+            ->filter()
+            ->implode(', ');
+        $frameCount = (int) ($livenessData['frames_checked'] ?? 0);
+        $validMatchFrames = (int) ($livenessData['valid_match_frames'] ?? 0);
+
+        return sprintf(
+            '%s (%d%%, challenges: %s, frames: %d, matched frames: %d)',
+            $prefix,
+            $matchScore,
+            $challengeList !== '' ? $challengeList : 'n/a',
+            $frameCount,
+            $validMatchFrames,
+        );
+    }
+
     public function processQRScan(array $qrData, int $currentOwnerId): array
     {
         try {
@@ -175,7 +196,7 @@ class AttendanceService
                 'year'            => $now->year,
                 'time_in'         => $now->format('H:i:s'),
                 'status'          => 'incomplete',
-                'notes'           => "Face verified ({$verificationData['match_score']}%)",
+                'notes'           => $this->buildVerificationNote($verificationData),
             ]);
 
             DB::commit();
@@ -236,7 +257,7 @@ class AttendanceService
                 'time_out'    => $now->format('H:i:s'),
                 'total_hours' => $totalHours,
                 'status'      => 'complete',
-                'notes'       => ($attendance->notes ?? '') . " | Time out face verified ({$verificationData['match_score']}%)",
+                'notes'       => trim(($attendance->notes ? $attendance->notes . ' | ' : '') . $this->buildVerificationNote($verificationData, true)),
             ]);
 
             DB::commit();
