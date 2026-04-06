@@ -7,13 +7,32 @@
         <p class="page-subtitle">
           Review pending payrolls and approve or reject them
         </p>
+        <div v-if="isReadOnlyPayrollRequests" class="access-banner compact">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 8v4"></path>
+            <path d="M12 16h.01"></path>
+          </svg>
+          <span
+            >View only access. You can open payroll requests but cannot approve
+            or reject them.</span
+          >
+        </div>
       </div>
       <div class="header-right">
         <button
-          v-if="selectedIds.length > 0"
+          v-if="canEditPayrollRequests && selectedIds.length > 0"
           @click="openBulkRejectConfirm"
           class="btn-reject-bulk"
-          :disabled="isProcessing || isReadOnlyPayrollRequests"
+          :disabled="isProcessing || !canEditPayrollRequests"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -30,10 +49,10 @@
           Reject Selected ({{ selectedIds.length }})
         </button>
         <button
-          v-if="selectedIds.length > 0"
+          v-if="canEditPayrollRequests && selectedIds.length > 0"
           @click="openBulkApproveConfirm"
           class="btn-approve-bulk"
-          :disabled="isProcessing || isReadOnlyPayrollRequests"
+          :disabled="isProcessing || !canEditPayrollRequests"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -52,6 +71,31 @@
     </div>
 
     <!-- ───── Filters ───── -->
+    <div v-if="isReadOnlyPayrollRequests" class="access-banner">
+      <div class="access-banner-icon">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 8v4"></path>
+          <path d="M12 16h.01"></path>
+        </svg>
+      </div>
+      <div>
+        <strong>Payroll Requests is view only for this employee.</strong>
+        <p>
+          Approve, reject, and bulk selection controls are disabled until edit
+          access is granted in employee authorization.
+        </p>
+      </div>
+    </div>
+
     <div class="filters-section">
       <!-- Employee Search -->
       <div class="filter-group search-group">
@@ -303,7 +347,7 @@
 
     <!-- ───── Table ───── -->
     <div v-else class="table-container">
-      <div v-if="selectedIds.length > 0" class="bulk-bar">
+      <div v-if="canEditPayrollRequests && selectedIds.length > 0" class="bulk-bar">
         <span>{{ selectedIds.length }} record(s) selected</span>
         <button @click="clearSelection" class="btn-clear-sel">
           Clear selection
@@ -424,12 +468,12 @@
                   <circle cx="12" cy="12" r="3"></circle>
                 </svg>
               </button>
-              <template v-if="payroll.status === 'pending'">
+              <template v-if="payroll.status === 'pending' && canEditPayrollRequests">
                 <button
                   @click="openRejectConfirm([payroll])"
                   class="btn-action reject"
                   title="Reject"
-                  :disabled="isReadOnlyPayrollRequests"
+                  :disabled="!canEditPayrollRequests"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -448,7 +492,7 @@
                   @click="openApproveConfirm([payroll])"
                   class="btn-action approve"
                   title="Approve"
-                  :disabled="isReadOnlyPayrollRequests"
+                  :disabled="!canEditPayrollRequests"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -720,7 +764,7 @@
           </div>
           <!-- Finance actions visible for pending payrolls only -->
           <div
-            v-if="selectedPayroll.status === 'pending'"
+            v-if="selectedPayroll.status === 'pending' && canEditPayrollRequests"
             class="modal-actions"
           >
             <button
@@ -729,7 +773,7 @@
                 closeDetailsModal();
               "
               class="btn-modal-reject"
-              :disabled="isReadOnlyPayrollRequests"
+              :disabled="!canEditPayrollRequests"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -751,7 +795,7 @@
                 closeDetailsModal();
               "
               class="btn-modal-approve"
-              :disabled="isReadOnlyPayrollRequests"
+              :disabled="!canEditPayrollRequests"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -841,7 +885,7 @@
             <button
               @click="confirmApprove"
               class="btn-confirm-approve"
-              :disabled="isProcessing || isReadOnlyPayrollRequests"
+              :disabled="isProcessing || !canEditPayrollRequests"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -906,7 +950,7 @@
               v-model="rejectNotes"
               class="form-textarea"
               rows="4"
-              :disabled="isReadOnlyPayrollRequests"
+              :disabled="!canEditPayrollRequests"
               placeholder="e.g. Incorrect work hours, missing deductions, needs revision…"
             ></textarea>
           </div>
@@ -921,7 +965,7 @@
               :disabled="
                 !rejectNotes.trim() ||
                 isProcessing ||
-                isReadOnlyPayrollRequests
+                !canEditPayrollRequests
               "
             >
               <svg
@@ -952,7 +996,7 @@ import payrollApi from "../../../services/payrollApi";
 import employeeInfoService from "../../../services/employeeInfoService";
 import { useAssignment } from "../../../composables/useAssignment";
 
-const { canEdit, isReadOnly } = useAssignment();
+const { canView, canEdit, isReadOnly } = useAssignment();
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const isLoading = ref(false);
@@ -1012,6 +1056,7 @@ const summary = ref({
 
 // ── Computed ──────────────────────────────────────────────────────────────────
 const canEditPayrollRequests = computed(() => canEdit("payroll_requests"));
+const canViewPayrollRequests = computed(() => canView("payroll_requests"));
 const isReadOnlyPayrollRequests = computed(() =>
   isReadOnly("payroll_requests"),
 );
@@ -1141,7 +1186,12 @@ function clearSearch() {
 }
 
 function notifyReadOnly() {
-  toast.info("You have view-only access to payroll requests.");
+  if (isReadOnlyPayrollRequests.value || canViewPayrollRequests.value) {
+    toast.info("You have view-only access to payroll requests.");
+    return;
+  }
+
+  toast.error("You do not have access to payroll requests.");
 }
 
 function toggleSelect(payroll) {
@@ -1404,6 +1454,47 @@ onUnmounted(() => {
   font-size: 14px;
   color: #718096;
   margin: 0;
+}
+.access-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border: 1px solid #bee3f8;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ebf8ff 0%, #f7fafc 100%);
+  color: #2b6cb0;
+}
+.access-banner.compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  margin-bottom: 0;
+  padding: 8px 12px;
+  border-radius: 999px;
+}
+.access-banner strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+.access-banner p {
+  margin: 0;
+  font-size: 13px;
+  color: #4a5568;
+}
+.access-banner-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: rgba(66, 153, 225, 0.14);
+  color: #2b6cb0;
+  flex-shrink: 0;
 }
 .header-right {
   display: flex;
@@ -1834,6 +1925,11 @@ onUnmounted(() => {
   transition: all 0.2s;
   border-radius: 6px;
 }
+.btn-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .btn-action.view:hover {
   color: #4299e1;
   background: #ebf8ff;
@@ -2113,6 +2209,11 @@ onUnmounted(() => {
 .btn-modal-approve:hover {
   background: #38a169;
 }
+.btn-modal-approve:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .btn-modal-reject {
   flex: 1;
   display: flex;
@@ -2131,6 +2232,11 @@ onUnmounted(() => {
 }
 .btn-modal-reject:hover {
   background: #fff5f5;
+}
+.btn-modal-reject:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* ── Confirm modals ── */
