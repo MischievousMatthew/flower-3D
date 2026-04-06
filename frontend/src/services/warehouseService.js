@@ -1,6 +1,8 @@
 // src/services/warehouseService.js
 import api from "../plugins/axios";
 
+const WAREHOUSE_INVENTORY_EVENT = "warehouse:inventory-changed";
+
 const BASE = "/procurement/supply-chain/warehouses";
 const PRODUCTS = "/procurement/inventory/products/search"; // ← ERP warehouse search (scoped by employee owner_id)
 
@@ -40,3 +42,21 @@ export const warehouseService = {
     api.get(`${BASE}/${warehouseId}/movements`, { params }),
   barcodes: (warehouseId) => api.get(`${BASE}/${warehouseId}/barcodes`),
 };
+
+export function notifyWarehouseInventoryChanged(detail = {}) {
+  if (typeof window === "undefined") return;
+
+  window.dispatchEvent(
+    new CustomEvent(WAREHOUSE_INVENTORY_EVENT, {
+      detail: { ...detail, timestamp: Date.now() },
+    }),
+  );
+}
+
+export function onWarehouseInventoryChanged(handler) {
+  if (typeof window === "undefined") return () => {};
+
+  window.addEventListener(WAREHOUSE_INVENTORY_EVENT, handler);
+
+  return () => window.removeEventListener(WAREHOUSE_INVENTORY_EVENT, handler);
+}

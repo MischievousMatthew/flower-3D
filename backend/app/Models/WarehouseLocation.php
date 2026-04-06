@@ -50,11 +50,22 @@ class WarehouseLocation extends Model
     }
 
     /**
+     * Alias used by the UI/business language: storage -> flowers.
+     * A storage's flowers are the batches currently assigned to it.
+     */
+    public function flowers(): HasMany
+    {
+        return $this->batches();
+    }
+
+    /**
      * Only active (non-depleted) batches in this location.
      */
     public function activeBatches(): HasMany
     {
         return $this->hasMany(WarehouseBatch::class, 'warehouse_location_id')
-                    ->where('status', 'active');
+                    ->where('status', 'active')
+                    ->where('qty_remaining', '>', 0)
+                    ->whereHas('product', fn ($query) => $query->whereNull('deleted_at'));
     }
 }

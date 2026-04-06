@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class WarehouseBatchService
 {
@@ -29,9 +30,13 @@ class WarehouseBatchService
             ->when($filters['location_id'] ?? null, fn ($q, $id) => $q->where('warehouse_location_id', $id))
             ->when($filters['product_id'] ?? null, fn ($q, $id) => $q->where('product_id', $id))
             ->when($filters['search'] ?? null, function ($q, $s) {
-                $q->whereHas('product', fn ($pq) => $pq->where('product_name', 'like', "%{$s}%")
-                    ->orWhere('sku', 'like', "%{$s}%"))
-                  ->orWhere('batch_number', 'like', "%{$s}%");
+                $q->where(function ($searchQuery) use ($s) {
+                    $searchQuery
+                        ->whereHas('product', fn ($pq) => $pq
+                            ->where('product_name', 'like', "%{$s}%")
+                            ->orWhere('sku', 'like', "%{$s}%"))
+                        ->orWhere('batch_number', 'like', "%{$s}%");
+                });
             })
             ->orderBy('expiration_date')
             ->get();
@@ -171,6 +176,13 @@ class WarehouseBatchService
     public function cullBatch(int $batchId, int $qty, int $ownerId, ?string $notes = null): WarehouseBatch
     {
         $batch = WarehouseBatch::where('owner_id', $ownerId)->findOrFail($batchId);
+
+        if ($qty > $batch->qty_remaining) {
+            throw ValidationException::withMessages([
+                'qty' => "Cannot cull {$qty} units. Only {$batch->qty_remaining} remaining in this storage batch.",
+            ]);
+        }
+
         $batch->reduceQuantity($qty, 'CULLED', Auth::id(), $notes);
 
         // ── Sync product stock ─────────────────────────────────────────────

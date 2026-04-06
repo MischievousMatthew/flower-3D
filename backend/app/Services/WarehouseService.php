@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Warehouse;
+use App\Models\WarehouseBatch;
 use App\Models\WarehouseItem;
 use App\Models\InventoryMovement;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -15,28 +16,61 @@ class WarehouseService
 
     public function listWarehouses(int $ownerId): Collection
     {
-        return Warehouse::where('owner_id', $ownerId)
-            ->withSum(['batches as total_units' => fn($q) => $q->where('status', 'active')], 'qty_remaining')
+        $warehouseProductTotals = WarehouseBatch::query()
+            ->join('warehouse_locations', 'warehouse_locations.id', '=', 'warehouse_batches.warehouse_location_id')
+            ->join('products', 'products.id', '=', 'warehouse_batches.product_id')
+            ->where('warehouse_batches.owner_id', $ownerId)
+            ->where('warehouse_locations.owner_id', $ownerId)
+            ->where('warehouse_batches.status', 'active')
+            ->where('warehouse_batches.qty_remaining', '>', 0)
+            ->whereNull('products.deleted_at')
+            ->groupBy('warehouse_locations.warehouse_id', 'warehouse_batches.product_id')
+            ->selectRaw('warehouse_locations.warehouse_id, warehouse_batches.product_id, SUM(warehouse_batches.qty_remaining) as total_qty');
+
+        $skuCounts = DB::query()
+            ->fromSub($warehouseProductTotals, 'warehouse_product_totals')
+            ->selectRaw('warehouse_id, COUNT(*) as items_count')
+            ->groupBy('warehouse_id');
+
+        $lowStockCounts = DB::query()
+            ->fromSub($warehouseProductTotals, 'warehouse_product_totals')
+            ->selectRaw('warehouse_id, SUM(CASE WHEN total_qty <= 10 THEN 1 ELSE 0 END) as low_stock')
+            ->groupBy('warehouse_id');
+
+        return Warehouse::query()
+            ->where('owner_id', $ownerId)
+            ->withCount('locations as storages_count')
+            ->withSum('activeFlowerBatches as total_flowers', 'qty_remaining')
+            ->leftJoinSub($skuCounts, 'sku_counts', fn ($join) => $join->on('sku_counts.warehouse_id', '=', 'warehouses.id'))
+            ->leftJoinSub($lowStockCounts, 'low_stock_counts', fn ($join) => $join->on('low_stock_counts.warehouse_id', '=', 'warehouses.id'))
+            ->select('warehouses.*')
+            ->selectRaw('COALESCE(sku_counts.items_count, 0) as items_count')
+            ->selectRaw('COALESCE(low_stock_counts.low_stock, 0) as low_stock')
+            ->orderBy('warehouses.name')
             ->get()
             ->each(function ($warehouse) {
-                $warehouse->items_count = \App\Models\WarehouseBatch::whereHas('location', fn($q) => $q->where('warehouse_id', $warehouse->id))
-                    ->where('status', 'active')
-                    ->distinct('product_id')
-                    ->count('product_id');
-                
-                $warehouse->low_stock = \App\Models\WarehouseBatch::whereHas('location', fn($q) => $q->where('warehouse_id', $warehouse->id))
-                    ->where('status', 'active')
-                    ->select('product_id', \DB::raw('SUM(qty_remaining) as total'))
-                    ->groupBy('product_id')
-                    ->having('total', '<=', 10)
-                    ->get()
-                    ->count();
+                $warehouse->storages_count = (int) ($warehouse->storages_count ?? 0);
+                $warehouse->items_count = (int) ($warehouse->items_count ?? 0);
+                $warehouse->low_stock = (int) ($warehouse->low_stock ?? 0);
+                $warehouse->total_flowers = (int) ($warehouse->total_flowers ?? 0);
+                $warehouse->total_units = $warehouse->total_flowers;
             });
     }
 
     public function findWarehouse(int $id, int $ownerId): Warehouse
     {
-        return Warehouse::where('owner_id', $ownerId)->with('items')->findOrFail($id);
+        $warehouse = Warehouse::query()
+            ->where('owner_id', $ownerId)
+            ->with('items', 'locations')
+            ->withCount('locations as storages_count')
+            ->withSum('activeFlowerBatches as total_flowers', 'qty_remaining')
+            ->findOrFail($id);
+
+        $warehouse->storages_count = (int) ($warehouse->storages_count ?? 0);
+        $warehouse->total_flowers = (int) ($warehouse->total_flowers ?? 0);
+        $warehouse->total_units = $warehouse->total_flowers;
+
+        return $warehouse;
     }
 
     /** @param array{name: string, location: string, manager: string} $data */

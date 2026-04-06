@@ -339,7 +339,10 @@ import {
   warehouseBatchService,
   warehouseLocationService,
 } from "../../../../../services/warehouseBatchService";
-import { warehouseService } from "../../../../../services/warehouseService";
+import {
+  notifyWarehouseInventoryChanged,
+  warehouseService,
+} from "../../../../../services/warehouseService";
 
 
 const router = useRouter();
@@ -474,6 +477,11 @@ async function submit() {
     // source_order_id is kept when set — backend uses it to complete the order
 
     await warehouseBatchService.receive(payload);
+    notifyWarehouseInventoryChanged({
+      warehouseLocationId: payload.warehouse_location_id ?? null,
+      productId: payload.product_id,
+      reason: "batch-received",
+    });
     submitted.value = true; // lock out further submits
     showToast("Batch received successfully!");
     setTimeout(

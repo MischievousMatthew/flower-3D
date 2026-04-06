@@ -440,7 +440,10 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { warehouseService } from "../../../../../services/warehouseService";
+import {
+  notifyWarehouseInventoryChanged,
+  warehouseService,
+} from "../../../../../services/warehouseService";
 import { warehouseLocationService } from "../../../../../services/warehouseBatchService";
 
 
@@ -663,6 +666,12 @@ async function submit() {
     if (form.notes) payload.notes = form.notes;
 
     await warehouseService.addItem(warehouseId.value, payload);
+    notifyWarehouseInventoryChanged({
+      warehouseId: warehouseId.value,
+      warehouseLocationId: payload.warehouse_location_id,
+      productId: payload.product_id,
+      reason: "warehouse-item-added",
+    });
     showToast("Item added to warehouse!");
     setTimeout(
       () => router.push("/erp/procurement/supply-chain/warehouses"),

@@ -244,6 +244,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
+import { useRoute } from "vue-router";
 import {
   warehouseBatchService,
   warehouseLocationService,
@@ -253,6 +254,7 @@ import {
 } from "../../../../../services/warehouseBatchService";
 import BatchDetailDrawer from "./BatchDetailDrawer.vue";
 
+const route = useRoute();
 const batches = ref([]);
 const summary = ref({});
 const locations = ref([]);
@@ -327,6 +329,7 @@ function onBatchUpdated(updated) {
   const idx = batches.value.findIndex((b) => b.id === updated.id);
   if (idx !== -1) batches.value[idx] = updated;
   activeDrawer.value = updated;
+  fetchFloor();
 }
 
 function freshnessPercent(batch) {
@@ -357,6 +360,12 @@ function formatDate(d) {
 const { conditionMeta: _cm } = { conditionMeta };
 
 onMounted(() => {
+  if (route.query.location_id) {
+    locationFilter.value = String(route.query.location_id);
+  }
+  if (route.query.condition) {
+    conditionFilter.value = String(route.query.condition);
+  }
   fetchFloor();
   fetchLocations();
 });

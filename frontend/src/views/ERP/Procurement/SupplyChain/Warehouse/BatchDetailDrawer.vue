@@ -463,6 +463,7 @@ import {
   daysRemainingClass,
   CONDITIONS,
 } from "../../../../../services/warehouseBatchService";
+import { notifyWarehouseInventoryChanged } from "../../../../../services/warehouseService";
 
 
 const props = defineProps({ batch: Object, locations: Array });
@@ -635,6 +636,11 @@ async function submitCondition() {
     );
     localBatch.value = res.data ?? res;
     emit("updated", localBatch.value);
+    notifyWarehouseInventoryChanged({
+      batchId: localBatch.value.id,
+      warehouseLocationId: localBatch.value.location?.id ?? null,
+      reason: "condition-updated",
+    });
     showToast("Condition updated!");
     activeAction.value = null;
     conditionForm.condition = "";
@@ -674,6 +680,11 @@ async function submitCull() {
     );
     localBatch.value = res.data ?? res;
     emit("updated", localBatch.value);
+    notifyWarehouseInventoryChanged({
+      batchId: localBatch.value.id,
+      warehouseLocationId: localBatch.value.location?.id ?? null,
+      reason: "batch-culled",
+    });
     showToast(`${qty} unit${qty === 1 ? "" : "s"} culled.`);
     activeAction.value = null;
     cullForm.qty = null;
@@ -703,6 +714,11 @@ async function submitTransfer() {
     );
     localBatch.value = res.data ?? res;
     emit("updated", localBatch.value);
+    notifyWarehouseInventoryChanged({
+      batchId: localBatch.value.id,
+      warehouseLocationId: localBatch.value.location?.id ?? null,
+      reason: "batch-transferred",
+    });
     showToast("Batch transferred!");
     activeAction.value = null;
     transferForm.location_id = "";

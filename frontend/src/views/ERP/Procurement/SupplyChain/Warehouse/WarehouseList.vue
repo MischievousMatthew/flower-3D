@@ -63,6 +63,12 @@
               </svg>
               {{ wh.location }}
             </p>
+            <div class="wh-badges">
+              <span class="wh-badge">{{ wh.storages_count ?? 0 }} Storages</span>
+              <span class="wh-badge strong">
+                {{ wh.total_flowers ?? wh.total_units ?? 0 }} Flowers
+              </span>
+            </div>
           </div>
           <button class="wh-menu-btn">&#x22EF;</button>
         </div>
@@ -74,8 +80,10 @@
           </div>
           <div class="wh-stat-div"></div>
           <div class="wh-stat">
-            <span class="wh-stat-num">{{ wh.total_units ?? 0 }}</span>
-            <span class="wh-stat-lbl">Units</span>
+            <span class="wh-stat-num">{{
+              wh.total_flowers ?? wh.total_units ?? 0
+            }}</span>
+            <span class="wh-stat-lbl">Flowers</span>
           </div>
           <div class="wh-stat-div"></div>
           <div class="wh-stat">
@@ -560,9 +568,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from "vue";
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
-import { warehouseService } from "../../../../../services/warehouseService";
+import {
+  onWarehouseInventoryChanged,
+  warehouseService,
+} from "../../../../../services/warehouseService";
 import { warehouseLocationService } from "../../../../../services/warehouseBatchService";
 
 
@@ -639,7 +650,16 @@ async function fetchWarehouses() {
   loading.value = true;
   try {
     const res = await warehouseService.list();
-    warehouses.value = res.data?.data ?? res.data ?? [];
+    warehouses.value = (res.data?.data ?? res.data ?? []).map((warehouse) => ({
+      ...warehouse,
+      total_flowers: Number(
+        warehouse.total_flowers ?? warehouse.total_units ?? 0,
+      ),
+      total_units: Number(
+        warehouse.total_units ?? warehouse.total_flowers ?? 0,
+      ),
+      storages_count: Number(warehouse.storages_count ?? 0),
+    }));
   } finally {
     loading.value = false;
   }
@@ -782,7 +802,18 @@ function showToast(msg, type = "success") {
   setTimeout(() => (toast.value.show = false), 3500);
 }
 
-onMounted(fetchWarehouses);
+let stopInventoryListener = () => {};
+
+onMounted(() => {
+  fetchWarehouses();
+  stopInventoryListener = onWarehouseInventoryChanged(() => {
+    fetchWarehouses();
+  });
+});
+
+onBeforeUnmount(() => {
+  stopInventoryListener();
+});
 </script>
 
 <style scoped>
@@ -932,6 +963,26 @@ onMounted(fetchWarehouses);
   font-size: 12px;
   color: #9ca3af;
   margin-top: 3px;
+}
+.wh-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.wh-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 600;
+}
+.wh-badge.strong {
+  background: #ecfdf5;
+  color: #047857;
 }
 .wh-menu-btn {
   border: none;

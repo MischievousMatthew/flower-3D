@@ -6,6 +6,7 @@ use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough as HasManyThroughRelation;
 
 class Warehouse extends Model
 {
@@ -40,6 +41,14 @@ class Warehouse extends Model
     }
 
     /**
+     * Alias used by the UI/business language: warehouse -> storages.
+     */
+    public function storages(): HasMany
+    {
+        return $this->locations();
+    }
+
+    /**
      * All flower batches stored in all locations of this warehouse.
      */
     public function batches(): HasManyThrough
@@ -52,6 +61,26 @@ class Warehouse extends Model
             'id',                     // Local key on warehouses table
             'id'                      // Local key on locations table
         );
+    }
+
+    /**
+     * Alias used by the UI/business language: warehouse -> flowers.
+     * Backed by physical flower batches stored across linked locations.
+     */
+    public function flowers(): HasManyThroughRelation
+    {
+        return $this->batches();
+    }
+
+    /**
+     * Only valid, countable flower inventory for warehouse totals.
+     */
+    public function activeFlowerBatches(): HasManyThroughRelation
+    {
+        return $this->batches()
+            ->where('warehouse_batches.status', 'active')
+            ->where('warehouse_batches.qty_remaining', '>', 0)
+            ->whereHas('product', fn ($query) => $query->whereNull('deleted_at'));
     }
 
     /**
