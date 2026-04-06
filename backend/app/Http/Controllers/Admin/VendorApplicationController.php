@@ -10,9 +10,11 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
 use App\Mail\VendorAccountCreated;
 use Illuminate\Support\Str;
 use App\Helpers\CloudinaryHelper;
+use Illuminate\Database\QueryException;
 
 class VendorApplicationController extends Controller
 {
@@ -188,58 +190,80 @@ class VendorApplicationController extends Controller
     private function createVendorAccount(VendorApplication $application): User
     {
         try {
-            $existingUser = User::where('email', $application->email)->first();
+            $result = DB::transaction(function () use ($application) {
+                $existingUser = User::where('email', $application->email)->lockForUpdate()->first();
 
-            if ($existingUser) {
-                $existingUser->role = 'vendor';
-                $existingUser->save();
-                $this->sendVendorWelcomeEmail($application, null, true);
-                return $existingUser;
-            }
+                if ($existingUser) {
+                    $existingUser->forceFill([
+                        'role'              => 'vendor',
+                        'contact_number'    => $existingUser->contact_number ?: $application->contact_number,
+                        'is_verified'       => true,
+                        'email_verified_at' => $existingUser->email_verified_at ?: now(),
+                        'vendor_data'       => array_merge($existingUser->vendor_data ?? [], [
+                            'store_name'            => $application->store_name,
+                            'application_id'        => $application->id,
+                            'approved_at'           => now()->toDateTimeString(),
+                            'needs_password_change' => true,
+                        ]),
+                    ])->save();
 
-            // Build unique username
-            $baseUsername = explode('@', $application->email)[0];
-            $username     = $baseUsername;
-            $counter      = 1;
-            while (User::where('username', $username)->exists()) {
-                $username = $baseUsername . $counter++;
-            }
+                    return ['user' => $existingUser->fresh(), 'password' => null, 'existing' => true];
+                }
 
-            // Split name / surname
-            $nameParts = explode(' ', trim($application->owner_name));
-            if (count($nameParts) >= 2) {
-                $surname = array_pop($nameParts);
-                $name    = implode(' ', $nameParts);
-            } else {
-                $name    = $application->owner_name;
-                $surname = '';
-            }
+                $username = $this->generateUniqueUsername($application->email);
+                [$name, $surname] = $this->splitOwnerName($application->owner_name);
+                $temporaryPassword = Str::random(12);
 
-            $temporaryPassword = Str::random(12);
+                try {
+                    $user = User::create([
+                        'name'              => $name,
+                        'surname'           => $surname,
+                        'username'          => $username,
+                        'email'             => $application->email,
+                        'contact_number'    => $application->contact_number,
+                        'password'          => Hash::make($temporaryPassword),
+                        'is_verified'       => true,
+                        'email_verified_at' => now(),
+                        'role'              => 'vendor',
+                        'vendor_data'       => [
+                            'store_name'            => $application->store_name,
+                            'application_id'        => $application->id,
+                            'approved_at'           => now()->toDateTimeString(),
+                            'needs_password_change' => true,
+                        ],
+                    ]);
+                } catch (QueryException $e) {
+                    if ($e->getCode() !== '23505') {
+                        throw $e;
+                    }
 
-            // ✅ Only columns that exist in users table
-            $user = User::create([
-                'name'              => $name,
-                'surname'           => $surname,
-                'username'          => $username,
-                'email'             => $application->email,
-                'contact_number'    => $application->contact_number,
-                'password'          => Hash::make($temporaryPassword),
-                'is_verified'       => true,
-                'email_verified_at' => now(),
-                'role'              => 'vendor',
-                'vendor_data'       => [
-                    'store_name'            => $application->store_name,
-                    'application_id'        => $application->id,
-                    'approved_at'           => now()->toDateTimeString(),
-                    'needs_password_change' => true,
-                ],
-            ]);
+                    $user = User::where('email', $application->email)->first();
+                    if (! $user) {
+                        throw $e;
+                    }
 
-            $this->sendVendorWelcomeEmail($application, $temporaryPassword, false);
+                    $user->forceFill([
+                        'role'              => 'vendor',
+                        'contact_number'    => $user->contact_number ?: $application->contact_number,
+                        'is_verified'       => true,
+                        'email_verified_at' => $user->email_verified_at ?: now(),
+                        'vendor_data'       => array_merge($user->vendor_data ?? [], [
+                            'store_name'            => $application->store_name,
+                            'application_id'        => $application->id,
+                            'approved_at'           => now()->toDateTimeString(),
+                            'needs_password_change' => true,
+                        ]),
+                    ])->save();
 
-            return $user;
+                    return ['user' => $user->fresh(), 'password' => null, 'existing' => true];
+                }
 
+                return ['user' => $user, 'password' => $temporaryPassword, 'existing' => false];
+            });
+
+            $this->sendVendorWelcomeEmail($application, $result['password'], $result['existing']);
+
+            return $result['user'];
         } catch (\Exception $e) {
             Log::error('Error creating vendor account', [
                 'application_id' => $application->id,
@@ -247,6 +271,32 @@ class VendorApplicationController extends Controller
             ]);
             throw $e;
         }
+    }
+
+    private function generateUniqueUsername(string $email): string
+    {
+        $baseUsername = explode('@', $email)[0];
+        $username = $baseUsername;
+        $counter = 1;
+
+        while (User::where('username', $username)->exists()) {
+            $username = $baseUsername . $counter++;
+        }
+
+        return $username;
+    }
+
+    private function splitOwnerName(string $ownerName): array
+    {
+        $nameParts = explode(' ', trim($ownerName));
+
+        if (count($nameParts) >= 2) {
+            $surname = array_pop($nameParts);
+            $name = implode(' ', $nameParts);
+            return [$name, $surname];
+        }
+
+        return [$ownerName, ''];
     }
 
     /**
@@ -297,6 +347,13 @@ class VendorApplicationController extends Controller
     {
         try {
             $application = VendorApplication::findOrFail($id);
+
+            if ($application->status === 'approved') {
+                return response()->json([
+                    'message' => 'Application is already approved.',
+                    'application' => $application,
+                ]);
+            }
 
             if ($application->status !== 'pending') {
                 return response()->json([

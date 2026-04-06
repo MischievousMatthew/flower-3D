@@ -989,6 +989,24 @@ const fetchStatistics = async () => {
   }
 };
 
+const getApiErrorMessage = (error, fallback) => {
+  const data = error?.response?.data;
+
+  if (typeof data?.message === "string" && data.message.trim()) {
+    return data.message.trim();
+  }
+
+  if (typeof data?.error === "string" && data.error.trim()) {
+    return data.error.trim();
+  }
+
+  if (typeof error?.message === "string" && error.message.trim()) {
+    return error.message.trim();
+  }
+
+  return fallback;
+};
+
 const setTab = (tab) => {
   activeTab.value = tab;
 };
@@ -1108,7 +1126,7 @@ const confirmApprove = async () => {
     fetchStatistics();
   } catch (error) {
     console.error("Error approving application:", error);
-    toast.error("Failed to approve application: " + error.message);
+    toast.error(getApiErrorMessage(error, "Failed to approve application"));
   } finally {
     isProcessingAction.value = false;
   }
@@ -1165,7 +1183,7 @@ const confirmReject = async () => {
     fetchStatistics();
   } catch (error) {
     console.error("Error rejecting application:", error);
-    toast.error("Failed to reject application: " + error.message);
+    toast.error(getApiErrorMessage(error, "Failed to reject application"));
   } finally {
     isProcessingAction.value = false;
   }

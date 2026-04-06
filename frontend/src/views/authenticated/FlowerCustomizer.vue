@@ -72,8 +72,8 @@
           <div ref="viewerContainer" class="fc-viewer"></div>
           <div class="fc-overlay fc-top">
             <div class="fc-status">
-              <strong>{{ pendingFlower ? `Ready to place: ${pendingFlower.product_name}` : draggedFlower ? `Drop ${draggedFlower.product_name} on the bouquet` : "Rotate the bouquet and pick a flower" }}</strong>
-              <span>{{ selectedFlowers.length >= MAX_FLOWERS ? "Maximum of 3 flowers only" : "Click directly on the bouquet wrapper to place the model" }}</span>
+              <strong>{{ pendingFlower ? `Ready to place: ${pendingFlower.product_name}` : draggedFlower ? `Drop ${draggedFlower.product_name} on the bouquet` : selectedFlower ? `Selected: ${selectedFlower.product_name}` : "Rotate the bouquet and pick a flower" }}</strong>
+              <span>{{ selectedFlowers.length >= MAX_FLOWERS ? "Maximum of 3 flowers only" : selectedFlower ? "Drag the selected flower on the bouquet to move it, or rotate it from the panel." : "Click directly on the bouquet wrapper to place the model" }}</span>
             </div>
           </div>
           <div v-if="bouquetLoadError" class="fc-overlay fc-center"><div class="fc-modal"><h3>Unable to load bouquet.glb</h3><p>{{ bouquetLoadError }}</p></div></div>
@@ -437,29 +437,32 @@ function setupCanvasInteractions() {
     pointerDown = { x: event.clientX, y: event.clientY };
     const placedHit = getPlacedFlowerHit(event.clientX, event.clientY);
     if (placedHit?.sceneId) {
+      event.preventDefault();
       selectPlacedFlower(placedHit.sceneId);
-      transformDrag = { sceneId: placedHit.sceneId };
+      transformDrag = { sceneId: placedHit.sceneId, pointerId: event.pointerId };
+      if (canvas.setPointerCapture) {
+        canvas.setPointerCapture(event.pointerId);
+      }
       controls.enabled = false;
     }
   });
   canvas.addEventListener("pointermove", (event) => {
     if (transformDrag?.sceneId) {
+      event.preventDefault();
       moveSelectedFlower(event.clientX, event.clientY, transformDrag.sceneId);
       return;
     }
     if (pendingFlower.value || draggedFlower.value) updateHoverMarker(event.clientX, event.clientY);
   });
   canvas.addEventListener("pointerleave", () => {
-    transformDrag = null;
-    if (controls) controls.enabled = true;
+    endTransformDrag();
     hideHoverMarker();
   });
   canvas.addEventListener("pointerup", async (event) => {
     if (!pointerDown || event.button !== 0) return;
     const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y) > 6;
     if (transformDrag?.sceneId) {
-      transformDrag = null;
-      if (controls) controls.enabled = true;
+      endTransformDrag(event.pointerId);
       pointerDown = null;
       return;
     }
@@ -476,6 +479,10 @@ function setupCanvasInteractions() {
     await placeFlowerOnBouquet(pendingFlower.value, placement);
     pendingFlower.value = null;
     hideHoverMarker();
+  });
+  canvas.addEventListener("pointercancel", (event) => {
+    endTransformDrag(event.pointerId);
+    pointerDown = null;
   });
 }
 
@@ -514,6 +521,15 @@ function updateHoverMarker(clientX, clientY) {
 
 function hideHoverMarker() {
   if (hoverMarker) hoverMarker.visible = false;
+}
+
+function endTransformDrag(pointerId = null) {
+  const canvas = renderer?.domElement;
+  if (canvas && pointerId !== null && canvas.hasPointerCapture?.(pointerId)) {
+    canvas.releasePointerCapture(pointerId);
+  }
+  transformDrag = null;
+  if (controls) controls.enabled = true;
 }
 
 async function placeFlowerOnBouquet(flower, placement) {
