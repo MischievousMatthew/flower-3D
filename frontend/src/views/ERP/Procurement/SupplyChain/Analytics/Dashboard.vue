@@ -250,7 +250,14 @@ function getStoredUserName() {
 }
 function isShipDone(current, step) { return SHIP_ORDER.indexOf(step) <= SHIP_ORDER.indexOf(current); }
 function orderLabel(order) { return order?.order_number || `PO-${String(order?.id ?? "").padStart(5, "0")}`; }
-function orderAddress(order) { return order?.supplier?.address || order?.supplier?.company_name || "No supplier address"; }
+function orderAddress(order) {
+  return (
+    order?.supplier?.address ||
+    order?.supplier?.location ||
+    order?.supplier?.company_name ||
+    "No supplier address"
+  );
+}
 function orderDateLabel(value) { return value ? new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "No date"; }
 function formatBig(value) { return Number(value || 0).toLocaleString("en-US"); }
 function formatCompactNumber(value) {

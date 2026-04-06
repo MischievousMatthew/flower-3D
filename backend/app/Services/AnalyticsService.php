@@ -55,10 +55,23 @@ class AnalyticsService
     public function recentOrders(int $ownerId, int $limit = 8): Collection
     {
         return PurchaseOrder::where('owner_id', $ownerId)
-            ->with('supplier:id,company_name,address,logo_url')
+            ->with('supplier:id,company_name,logo')
             ->orderByDesc('created_at')
             ->limit($limit)
-            ->get();
+            ->get()
+            ->map(function ($order) {
+                if ($order->supplier) {
+                    $supplier = $order->supplier;
+                    $supplier->setAttribute(
+                        'address',
+                        $supplier->getAttribute('address')
+                            ?? $supplier->getAttribute('location')
+                            ?? null
+                    );
+                }
+
+                return $order;
+            });
     }
 
     // ─── Shipments ────────────────────────────────────────────────────────────
