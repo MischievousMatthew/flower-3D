@@ -15,7 +15,7 @@ const api = axios.create({
     "Content-Type": "application/json",
     "X-Requested-With": "XMLHttpRequest",
   },
-  withCredentials: true,
+  withCredentials: false,
 });
 
 const shouldForceLogout = (error) => {
