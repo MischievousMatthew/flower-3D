@@ -11,14 +11,14 @@
         <div class="fc-head-actions">
           <span class="fc-pill">{{ selectedFlowers.length }}/{{ MAX_FLOWERS }} selected</span>
           <button class="fc-btn fc-btn-light" @click="toggleLeftSidebar">
-            {{ isLeftSidebarCollapsed ? "Show Flowers" : "Hide Flowers" }}
+            {{ isLeftSidebarCollapsed ? "Open Flowers" : "Hide Flowers" }}
           </button>
           <button class="fc-btn fc-btn-light" @click="toggleRightSidebar">
-            {{ isRightSidebarCollapsed ? "Show Tools" : "Hide Tools" }}
+            {{ isRightSidebarCollapsed ? "Open Tools" : "Hide Tools" }}
           </button>
           <button class="fc-btn fc-btn-light" @click="resetDesign" :disabled="!selectedFlowers.length">Reset</button>
           <button class="fc-btn fc-btn-light" @click="toggleFullscreen" :disabled="!sceneReady">
-            {{ isFullscreen ? "Exit Fullscreen" : "Fullscreen" }}
+            {{ isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen" }}
           </button>
           <button class="fc-btn fc-btn-light" @click="takeScreenshot" :disabled="!sceneReady">Screenshot</button>
         </div>
@@ -57,7 +57,7 @@
               </div>
               <div class="fc-row">
                 <strong>{{ flower.product_name }}</strong>
-                <span>Ã¢â€šÂ±{{ flower.price.toFixed(2) }}</span>
+                <span>PHP {{ flower.price.toFixed(2) }}</span>
               </div>
               <div class="fc-tags">
                 <span class="fc-tag">{{ flower.quantity_in_stock }} in stock</span>
@@ -80,13 +80,13 @@
         >
           <div class="fc-stage-actions">
             <button class="fc-icon-btn" @click="toggleLeftSidebar">
-              {{ isLeftSidebarCollapsed ? "Ã¢â€”â‚¬ Flowers" : "Ã¢Å“â€¢ Flowers" }}
+              {{ isLeftSidebarCollapsed ? "Open Flowers" : "Hide Flowers" }}
             </button>
             <button class="fc-icon-btn" @click="toggleFullscreen" :disabled="!sceneReady">
-              {{ isFullscreen ? "Ã°Å¸â€”â€” Exit" : "Ã¢â€ºÂ¶ Full" }}
+              {{ isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen" }}
             </button>
             <button class="fc-icon-btn" @click="toggleRightSidebar">
-              {{ isRightSidebarCollapsed ? "Tools Ã¢â€“Â¶" : "Tools Ã¢Å“â€¢" }}
+              {{ isRightSidebarCollapsed ? "Open Tools" : "Hide Tools" }}
             </button>
           </div>
           <div ref="viewerContainer" class="fc-viewer"></div>
@@ -113,8 +113,26 @@
                 :class="{ active: selectedSceneId === selection.sceneId }"
                 @click="selectPlacedFlower(selection.sceneId)"
               >
-                <div><strong>{{ selection.product_name }}</strong><p>Ã¢â€šÂ±{{ selection.price.toFixed(2) }}</p></div>
-                <button class="fc-btn fc-btn-danger" @click.stop="removeFlower(selection.sceneId)">Remove</button>
+                <div class="fc-selection-copy">
+                  <div class="fc-selection-title">
+                    <strong>{{ selection.product_name }}</strong>
+                    <span class="fc-lock-chip" :class="{ locked: selection.locked }">
+                      <span v-if="selection.locked">&#128274;</span>
+                      <span v-else>&#128275;</span>
+                      {{ selection.locked ? "Locked" : "Unlocked" }}
+                    </span>
+                  </div>
+                  <p>PHP {{ selection.price.toFixed(2) }}</p>
+                </div>
+                <div class="fc-selection-actions">
+                  <button class="fc-icon-action" :class="{ locked: selection.locked }" @click.stop="toggleFlowerLock(selection.sceneId)">
+                    <span v-if="selection.locked">&#128274;</span>
+                    <span v-else>&#128275;</span>
+                  </button>
+                  <button class="fc-icon-action danger" @click.stop="removeFlower(selection.sceneId)">
+                    <span>&#128465;</span>
+                  </button>
+                </div>
               </div>
             </div>
           </section>
@@ -143,19 +161,19 @@
               </div>
               <label class="fc-transform-row">
                 <span>Rotate X</span>
-                <strong>{{ Math.round(selectedFlower.rotation.xDeg) }}Ã‚Â°</strong>
+                <strong>{{ Math.round(selectedFlower.rotation.xDeg) }}&deg;</strong>
               </label>
               <input class="fc-range" type="range" min="-180" max="180" :value="selectedFlower.rotation.xDeg" @input="updateSelectedRotation('x', Number($event.target.value))" />
               <label class="fc-transform-row">
                 <span>Rotate Y</span>
-                <strong>{{ Math.round(selectedFlower.rotation.yDeg) }}Ã‚Â°</strong>
+                <strong>{{ Math.round(selectedFlower.rotation.yDeg) }}&deg;</strong>
               </label>
               <input class="fc-range" type="range" min="-180" max="180" :value="selectedFlower.rotation.yDeg" @input="updateSelectedRotation('y', Number($event.target.value))" />
               <div class="fc-transform-actions">
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('x', -15)">X -15Ã‚Â°</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('x', 15)">X +15Ã‚Â°</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('y', -15)">Y -15Ã‚Â°</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('y', 15)">Y +15Ã‚Â°</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('x', -15)">X -15&deg;</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('x', 15)">X +15&deg;</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('y', -15)">Y -15&deg;</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('y', 15)">Y +15&deg;</button>
               </div>
               <div class="fc-transform-grid">
                 <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('up')">Up</button>
@@ -180,7 +198,7 @@
             <div class="fc-summary"><span>Store</span><strong>{{ storeName || "Not set" }}</strong></div>
             <div class="fc-summary"><span>Owner ID</span><strong>{{ vendorOwnerId || "Missing" }}</strong></div>
             <div class="fc-summary"><span>Flowers</span><strong>{{ selectedFlowers.length }}/{{ MAX_FLOWERS }}</strong></div>
-            <div class="fc-summary total"><span>Total</span><strong>Ã¢â€šÂ±{{ totalPrice.toFixed(2) }}</strong></div>
+            <div class="fc-summary total"><span>Total</span><strong>PHP {{ totalPrice.toFixed(2) }}</strong></div>
             <button class="fc-btn fc-btn-primary" @click="checkout" :disabled="!selectedFlowers.length || isCheckingOut">{{ isCheckingOut ? "Processing..." : "Proceed to Checkout" }}</button>
             <button class="fc-btn fc-btn-light full" @click="addCart" :disabled="!selectedFlowers.length">Add to Cart</button>
           </section>
@@ -758,6 +776,12 @@ function toggleSelectedLock() {
   updateFlowerState(flower.sceneId, { locked: !flower.locked });
 }
 
+function toggleFlowerLock(sceneId) {
+  const flower = selectedFlowers.value.find((entry) => entry.sceneId === sceneId);
+  if (!flower) return;
+  updateFlowerState(sceneId, { locked: !flower.locked });
+}
+
 function nudgeSelectedPosition(direction) {
   const flower = selectedFlower.value;
   const object = flower ? placedObjects.get(flower.sceneId) : null;
@@ -985,11 +1009,20 @@ function showToast(message, type = "success") {
 .fc-status { display: grid; gap: 4px; }
 .fc-status span, .fc-modal p { color: #6d5847; font-size: 13px; }
 .fc-section { border: 1px solid rgba(122,92,60,.1); border-radius: 20px; padding: 16px; background: rgba(255,252,247,.86); }
-.fc-side { gap: 16px; }
-.fc-selection { padding: 12px 14px; border-radius: 16px; background: #fff; border: 1px solid rgba(122,92,60,.08); cursor: pointer; transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.fc-side { gap: 16px; overflow-y: auto; padding-right: 8px; }
+.fc-selection { padding: 12px 14px; border-radius: 16px; background: #fff; border: 1px solid rgba(122,92,60,.08); cursor: pointer; transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; align-items: flex-start; }
 .fc-selection:hover { transform: translateY(-1px); border-color: rgba(139,94,60,.28); }
 .fc-selection.active { border-color: #8b5e3c; box-shadow: 0 0 0 3px rgba(139,94,60,.12); }
 .fc-selection p, .fc-card p { margin: 4px 0 0; color: #8a5b35; font-weight: 600; }
+.fc-selection-copy { min-width: 0; flex: 1; }
+.fc-selection-title { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.fc-selection-title strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fc-selection-actions { display: flex; gap: 8px; align-items: center; }
+.fc-lock-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: rgba(108, 159, 83, 0.12); color: #4c6d3d; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.fc-lock-chip.locked { background: rgba(182, 82, 69, 0.12); color: #8a2f22; }
+.fc-icon-action { width: 42px; height: 42px; border: none; border-radius: 14px; background: rgba(95, 136, 111, 0.12); color: #476653; font-size: 18px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 10px 24px rgba(83,55,32,.08); }
+.fc-icon-action.locked { background: rgba(182, 82, 69, 0.12); color: #8a2f22; }
+.fc-icon-action.danger { background: rgba(194,92,79,.12); color: #9b4338; }
 .fc-transform { display: grid; gap: 12px; }
 .fc-transform-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #6c5a4c; }
 .fc-range { width: 100%; accent-color: #8b5e3c; }
