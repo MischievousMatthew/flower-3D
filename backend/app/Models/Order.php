@@ -38,6 +38,7 @@ class Order extends Model
         'store_address',
         'customer_notes',
         'paid_at',
+        'stock_deducted_at',
         'delivered_at',
         'cancelled_at',
         'reservation_date',
@@ -52,6 +53,7 @@ class Order extends Model
         'total_amount'      => 'decimal:2',
         'paymongo_response' => 'array',
         'paid_at'           => 'datetime',
+        'stock_deducted_at' => 'datetime',
         'delivered_at'      => 'datetime',
         'cancelled_at'      => 'datetime',
         'reservation_date'  => 'date',
@@ -128,6 +130,9 @@ class Order extends Model
     public function markAsProcessing(): void
     {
         $this->update(['status' => 'processing']);
+
+        $fresh = $this->fresh(['items']);
+        app(VendorFinanceService::class)->handleOrderVendorReceipt($fresh);
     }
 
     public function markAsOutForDelivery(): void
@@ -139,10 +144,9 @@ class Order extends Model
      * Mark order as completed and trigger finance + stock logic.
      *
      * This is the single source of truth for order completion.
-     * VendorFinanceService handles:
-     *   - Deducting product stock (quantity_in_stock)
-     *   - Crediting vendor balance
-     *   - Writing the finance ledger entry (vendor_transactions)
+     * VendorFinanceService now ensures stock was already deducted when the
+     * vendor received the order, and backfills it here only if that earlier
+     * transition was skipped.
      */
     public function markAsCompleted(): void
     {

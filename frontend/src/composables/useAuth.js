@@ -21,6 +21,7 @@ const isLoggingOut = ref(false);
 export function useAuth() {
   const router = useRouter();
   const isAuthenticated = computed(() => !!user.value);
+  const isUnauthorizedError = (err) => err?.response?.status === 401;
 
   // ==================== Helpers ====================
   const setAuthHeader = (type = getPreferredUserType(window.location.pathname)) => {
@@ -332,13 +333,29 @@ export function useAuth() {
     const token = getPreferredAuthToken(path);
     const storedUser = localStorage.getItem("user");
 
-    if (token && storedUser) {
+    if (storedUser) {
       try {
         user.value = JSON.parse(storedUser);
-        setAuthHeader(userType);
+      } catch (err) {
+        console.error("Failed to parse stored user during init:", err);
+      }
+    }
+
+    if (token) {
+      setAuthHeader(userType);
+
+      try {
         await fetchUser(path);
-      } catch {
-        clearAuthData();
+      } catch (err) {
+        if (isUnauthorizedError(err)) {
+          clearAuthData();
+        } else {
+          console.warn("Auth bootstrap failed, preserving stored session.", {
+            path,
+            status: err?.response?.status,
+            message: err?.message,
+          });
+        }
       }
     }
 

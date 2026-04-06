@@ -12,6 +12,23 @@ use Illuminate\Support\Facades\Log;
 class VendorFinanceService
 {
     /**
+     * Called when the vendor accepts / receives the order for processing.
+     * Deducts stock once so inventory reflects committed customer orders
+     * before the order reaches completion.
+     */
+    public function handleOrderVendorReceipt(Order $order): void
+    {
+        DB::transaction(function () use ($order) {
+            $this->ensureOrderStockDeducted($order);
+        });
+
+        Log::info('VendorFinanceService: stock deduction checked on vendor receipt', [
+            'order_id'  => $order->id,
+            'vendor_id' => $order->vendor_id,
+        ]);
+    }
+
+    /**
      * Called when an order is marked as completed.
      *
      * Performs three things atomically:
@@ -86,19 +103,13 @@ class VendorFinanceService
 
     public function handleOrderCompletion(Order $order): void
     {
-        if ($order->payment_status !== 'paid') {
-            Log::warning('VendorFinanceService: skipping non-paid order', [
-                'order_id' => $order->id,
-            ]);
-            return;
-        }
-
         DB::transaction(function () use ($order) {
-            // Only deduct stock on completion — balance was already credited on payment
-            $this->deductProductStock($order);
+            // Keep completion idempotent so older orders still get their stock
+            // deducted if they reached completion without the vendor-receipt step.
+            $this->ensureOrderStockDeducted($order);
         });
 
-        Log::info('VendorFinanceService: stock deducted on completion', [
+        Log::info('VendorFinanceService: stock deduction checked on completion', [
             'order_id'  => $order->id,
             'vendor_id' => $order->vendor_id,
         ]);
@@ -184,6 +195,34 @@ class VendorFinanceService
                 'order_id'   => $order->id,
             ]);
         }
+    }
+
+    /**
+     * Deduct stock once per order.
+     */
+    private function ensureOrderStockDeducted(Order $order): void
+    {
+        $lockedOrder = Order::query()
+            ->whereKey($order->id)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $lockedOrder) {
+            throw new \RuntimeException("Order [{$order->id}] not found for stock deduction.");
+        }
+
+        if ($lockedOrder->stock_deducted_at) {
+            Log::info('VendorFinanceService: stock already deducted', [
+                'order_id' => $lockedOrder->id,
+            ]);
+            return;
+        }
+
+        $lockedOrder->loadMissing('items');
+        $this->deductProductStock($lockedOrder);
+        $lockedOrder->update([
+            'stock_deducted_at' => now(),
+        ]);
     }
 
     /**
