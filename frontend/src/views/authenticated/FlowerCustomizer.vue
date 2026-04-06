@@ -42,6 +42,10 @@
               @dragend="onDragEnd"
               @click="selectFlower(flower)"
             >
+              <div class="fc-card-media">
+                <img v-if="flower.image" :src="flower.image" :alt="flower.product_name" class="fc-card-image" />
+                <div v-else class="fc-card-placeholder">No Photo</div>
+              </div>
               <div class="fc-row">
                 <strong>{{ flower.product_name }}</strong>
                 <span>₱{{ flower.price.toFixed(2) }}</span>
@@ -350,6 +354,7 @@ function normalizeFlower(flower) {
     quantity_in_stock: Number(flower.quantity_in_stock ?? flower.stock ?? 0),
     selling_type: flower.selling_type || "per_piece",
     is_customizable: flower.is_customizable === undefined ? true : Boolean(flower.is_customizable),
+    image: flower.primary_image_url || flower.primary_image?.image_url || flower.images?.[0]?.image_url || null,
     model,
     model_3d_url: model,
   };
@@ -813,6 +818,9 @@ function showToast(message, type = "success") {
 .fc-card.active { border-color: #8b5e3c; box-shadow: 0 0 0 3px rgba(139,94,60,.12); }
 .fc-card.disabled { opacity: .45; cursor: not-allowed; }
 .fc-card.dragging { transform: scale(.98); }
+.fc-card-media { width: 100%; aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; margin-bottom: 12px; background: linear-gradient(135deg, rgba(243,233,220,.9), rgba(214,195,176,.8)); display: flex; align-items: center; justify-content: center; }
+.fc-card-image { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fc-card-placeholder { font-size: 12px; font-weight: 600; letter-spacing: .04em; color: #8a6c52; text-transform: uppercase; }
 .fc-tags { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
 .fc-stage { position: relative; overflow: hidden; background: radial-gradient(circle at top, rgba(255,255,255,.24), transparent 40%), linear-gradient(180deg, #b39d83 0%, #aa9278 100%); border: 1px solid rgba(122,92,60,.14); box-shadow: inset 0 1px 0 rgba(255,255,255,.22); }
 .fc-stage.over { box-shadow: inset 0 0 0 2px rgba(255,255,255,.4), 0 0 0 4px rgba(197,137,87,.18); }

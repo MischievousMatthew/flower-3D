@@ -243,7 +243,7 @@ class VendorStorefrontController extends Controller
                     $query->whereNotNull('model_path')
                         ->orWhereNotNull('model_url');
                 })
-                ->with(['models'])
+                ->with(['models', 'primaryImage', 'images'])
                 ->orderBy('product_name')
                 ->get();
 
@@ -435,6 +435,7 @@ class VendorStorefrontController extends Controller
         $modelUrl = $primaryModel?->model_path
             ? CloudinaryHelper::getUrl($primaryModel->model_path, 'raw')
             : $primaryModel?->model_url;
+        $primaryImage = $product->primaryImage ?? $product->images->first();
 
         return [
             'id' => $product->id,
@@ -450,6 +451,7 @@ class VendorStorefrontController extends Controller
             'model_3d_url' => $modelUrl,
             'model_3d_path' => $primaryModel?->model_path,
             'model_type' => $primaryModel?->model_type,
+            'primary_image_url' => $primaryImage?->image_url,
         ];
     }
 }
