@@ -65,6 +65,7 @@
             <tr>
               <th>Request Info</th>
               <th>Submitted By</th>
+              <th>Approver</th>
               <th>Product Details</th>
               <th>Financial Summary</th>
               <th>Decision Brief</th>
@@ -97,6 +98,20 @@
                   <span class="submitter-email">{{
                     request.submitted_by_email
                   }}</span>
+                </div>
+              </td>
+              <td class="approver-cell">
+                <div class="approver-info">
+                  <span class="approver-name">{{
+                    request.approver_name || "Unassigned"
+                  }}</span>
+                  <span class="approver-meta">
+                    {{
+                      isAssignedApprover(request)
+                        ? "You are the approver"
+                        : "Assigned finance approver"
+                    }}
+                  </span>
                 </div>
               </td>
               <td class="product-cell">
@@ -168,7 +183,12 @@
                   v-if="request.request_status === 'Pending'"
                   class="review-btn"
                   @click="openReviewModal(request)"
-                  :disabled="!canEditFunding"
+                  :disabled="!canReviewRequest(request)"
+                  :title="
+                    canReviewRequest(request)
+                      ? 'Review request'
+                      : 'Only the assigned approver can review this request'
+                  "
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -207,7 +227,7 @@
               </td>
             </tr>
             <tr v-if="filteredRequests.length === 0">
-              <td colspan="7" class="empty-state">
+              <td colspan="8" class="empty-state">
                 <p>No funding requests found</p>
               </td>
             </tr>
@@ -247,6 +267,12 @@
                 <span class="summary-label">Requested By</span>
                 <span class="summary-value">{{
                   reviewForm.submitted_by_name
+                }}</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">Approver</span>
+                <span class="summary-value">{{
+                  reviewForm.approver_name || "Unassigned"
                 }}</span>
               </div>
               <div class="summary-item">
@@ -460,7 +486,7 @@
           <button
             class="btn-submit"
             @click="submitDecision"
-            :disabled="!reviewForm.decision || submitting || !canEditFunding"
+            :disabled="!reviewForm.decision || submitting || !canSubmitDecision"
           >
             {{
               submitting
@@ -482,9 +508,11 @@ import { useRouter } from "vue-router";
 import api from "../../../plugins/axios";
 import { toast } from "vue3-toastify";
 import { useAssignment } from "../../../composables/useAssignment";
+import { useAuth } from "../../../composables/useAuth";
 
 const router = useRouter();
 const { canEdit } = useAssignment();
+const { user } = useAuth();
 
 const searchQuery = ref("");
 const activeStatusTab = ref("all");
@@ -495,6 +523,12 @@ const requests = ref([]);
 const showReviewModal = ref(false);
 const submitting = ref(false);
 const canEditFunding = computed(() => canEdit("funding_requests"));
+const currentEmployeeId = computed(() => Number(user.value?.id || 0));
+const canSubmitDecision = computed(
+  () =>
+    canEditFunding.value &&
+    Number(reviewForm.value.approver_id || 0) === currentEmployeeId.value,
+);
 
 const reviewForm = ref({
   id: null,
@@ -539,6 +573,12 @@ const getStatusCount = (status) => {
   if (status === "all") return requests.value.length;
   return requests.value.filter((r) => r.request_status === status).length;
 };
+
+const isAssignedApprover = (request) =>
+  Number(request?.approver_id || 0) === currentEmployeeId.value;
+
+const canReviewRequest = (request) =>
+  canEditFunding.value && isAssignedApprover(request);
 
 const getMarginClass = (margin) => {
   if (margin >= 30) return "text-success";
@@ -615,9 +655,15 @@ const openReviewModal = (request) => {
     toast.error("You do not have permission to review funding requests");
     return;
   }
+  if (!isAssignedApprover(request)) {
+    toast.error("Only the assigned approver can review this request");
+    return;
+  }
   reviewForm.value = {
     id: request.id,
     finance_request_id: request.finance_request_id,
+    approver_id: request.approver_id,
+    approver_name: request.approver_name,
     product_name: request.product_name,
     submitted_by_name: request.submitted_by_name,
     requested_qty: request.requested_qty,
@@ -647,6 +693,8 @@ const closeReviewModal = () => {
   reviewForm.value = {
     id: null,
     decision: null,
+    approver_id: null,
+    approver_name: "",
     approved_quantity: 0,
     approved_amount: 0,
     finance_remarks: "",
@@ -658,6 +706,10 @@ const closeReviewModal = () => {
 const submitDecision = async () => {
   if (!canEditFunding.value) {
     toast.error("You do not have permission to review funding requests");
+    return;
+  }
+  if (!canSubmitDecision.value) {
+    toast.error("Only the assigned approver can submit a decision");
     return;
   }
   if (!reviewForm.value.decision) {
@@ -1029,6 +1081,27 @@ onMounted(() => {
 }
 
 .submitter-email {
+  font-size: 12px;
+  color: #718096;
+}
+
+.approver-cell {
+  min-width: 170px;
+}
+
+.approver-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.approver-name {
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 14px;
+}
+
+.approver-meta {
   font-size: 12px;
   color: #718096;
 }

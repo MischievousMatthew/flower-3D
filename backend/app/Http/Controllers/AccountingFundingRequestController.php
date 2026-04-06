@@ -3,11 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
+use App\Models\FundingRequest;
+use App\Models\VendorBalance;
+use App\Models\VendorTransaction;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Throwable;
 
 class AccountingFundingRequestController extends Controller
 {
@@ -52,13 +56,15 @@ class AccountingFundingRequestController extends Controller
 
             $requests = DB::table('funding_requests as fr')
                 ->leftJoin('employees as requester', 'fr.requester_id', '=', 'requester.id')
+                ->leftJoin('employees as approver', 'fr.approver_id', '=', 'approver.id')
                 ->leftJoin('employees as reviewer', 'fr.reviewed_by_employee_id', '=', 'reviewer.id')
                 ->where('fr.owner_id', $employee->owner_id)
-                ->where('fr.approver_id', $employee->id)
                 ->select(
                     'fr.*',
                     'requester.name as submitted_by_name',
                     'requester.email as submitted_by_email',
+                    'approver.name as approver_name',
+                    'approver.email as approver_email',
                     'reviewer.name as reviewed_by_name'
                 )
                 ->orderBy('fr.created_at', 'desc')
@@ -99,71 +105,139 @@ class AccountingFundingRequestController extends Controller
                 return response()->json(['message' => 'Unauthenticated'], 401);
             }
 
-            $fundingRequest = DB::table('funding_requests')
+            $fundingRequest = FundingRequest::query()
                 ->where('id', $id)
                 ->where('owner_id', $ownerId)
-                ->where('approver_id', $employee->id)
                 ->first();
 
             if (!$fundingRequest) {
                 return response()->json(['message' => 'Funding request not found'], 404);
             }
 
-            if ($fundingRequest->request_status !== 'Pending') {
+            if ((int) $fundingRequest->owner_id !== (int) $employee->owner_id) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            if ((int) $fundingRequest->approver_id !== (int) $employee->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only the assigned approver can approve this request',
+                ], 403);
+            }
+
+            if ($fundingRequest->request_status === FundingRequest::STATUS_APPROVED) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Funding request already approved',
+                    'data' => $fundingRequest,
+                ], 400);
+            }
+
+            if ($fundingRequest->request_status !== FundingRequest::STATUS_PENDING) {
                 return response()->json(['message' => 'Only pending requests can be approved'], 400);
             }
 
-            DB::transaction(function () use ($id, $request, $employee, $ownerId, $fundingRequest) {
-                DB::table('funding_requests')
+            $fundingRequest = DB::transaction(function () use ($id, $request, $employee, $ownerId) {
+                /** @var FundingRequest $lockedFundingRequest */
+                $lockedFundingRequest = FundingRequest::query()
                     ->where('id', $id)
-                    ->update([
-                        'request_status' => 'Approved',
-                        'payment_status' => 'paid',
-                        'paid_at' => now(),
-                        'reviewed_by_employee_id' => $employee->id,
-                        'accounting_decision_at' => now(),
-                        'approved_quantity' => $request->approved_quantity,
-                        'approved_amount' => $request->approved_amount,
-                        'accounting_remarks' => $request->finance_remarks,
-                        'rejection_reason' => null,
-                        'rejection_notes' => null,
-                        'updated_at' => now(),
-                    ]);
+                    ->where('owner_id', $ownerId)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-                $vendorBalance = \App\Models\VendorBalance::forVendor($ownerId);
-                $balanceBefore = (float) $vendorBalance->balance;
+                if ($lockedFundingRequest->request_status !== FundingRequest::STATUS_PENDING) {
+                    throw new \RuntimeException('Only pending requests can be approved');
+                }
+
+                if ((int) $lockedFundingRequest->approver_id !== (int) $employee->id) {
+                    throw new \Symfony\Component\HttpKernel\Exception\HttpException(
+                        403,
+                        'Only the assigned approver can approve this request'
+                    );
+                }
+
+                $decisionAt = now();
                 $amount = (float) $request->approved_amount;
+                $approvedQuantity = (float) $request->approved_quantity;
+
+                $lockedFundingRequest->update([
+                    'request_status' => FundingRequest::STATUS_APPROVED,
+                    'payment_status' => 'paid',
+                    'paid_at' => $decisionAt,
+                    'reviewed_by_employee_id' => $employee->id,
+                    'accounting_decision_at' => $decisionAt,
+                    'approved_quantity' => $approvedQuantity,
+                    'approved_amount' => $amount,
+                    'accounting_remarks' => $request->finance_remarks,
+                    'rejection_reason' => null,
+                    'rejection_notes' => null,
+                ]);
+
+                $vendorBalance = VendorBalance::query()
+                    ->lockForUpdate()
+                    ->firstOrCreate(
+                        ['vendor_id' => $ownerId],
+                        ['balance' => 0, 'total_earned' => 0, 'total_withdrawn' => 0]
+                    );
+
+                $balanceBefore = (float) $vendorBalance->balance;
                 $balanceAfter = max(0, $balanceBefore - $amount);
 
                 $vendorBalance->update([
                     'balance' => $balanceAfter,
-                    'total_withdrawn' => $vendorBalance->total_withdrawn + $amount,
+                    'total_withdrawn' => (float) $vendorBalance->total_withdrawn + $amount,
                 ]);
 
-                \App\Models\VendorTransaction::create([
+                VendorTransaction::create([
                     'vendor_id' => $ownerId,
                     'order_id' => null,
                     'type' => 'debit',
-                    'category' => 'procurement',
+                    'category' => 'adjustment',
                     'amount' => $amount,
                     'balance_before' => $balanceBefore,
                     'balance_after' => $balanceAfter,
-                    'description' => "Procurement: {$fundingRequest->product_name} ({$request->approved_quantity} {$fundingRequest->uom})",
-                    'status' => 'paid',
+                    'description' => "Funding request approved: {$lockedFundingRequest->product_name} ({$approvedQuantity} {$lockedFundingRequest->uom})",
+                    'status' => 'completed',
                     'metadata' => [
-                        'funding_request_id' => $fundingRequest->finance_request_id,
-                        'product_name' => $fundingRequest->product_name,
-                        'approved_quantity' => $request->approved_quantity,
+                        'funding_request_id' => $lockedFundingRequest->id,
+                        'finance_request_id' => $lockedFundingRequest->finance_request_id,
+                        'product_name' => $lockedFundingRequest->product_name,
+                        'approved_quantity' => $approvedQuantity,
                         'approved_amount' => $amount,
-                        'approved_by' => $employee->name,
-                        'approved_at' => now()->toIso8601String(),
+                        'approved_by_employee_id' => $employee->id,
+                        'approved_by_employee_name' => $employee->name,
+                        'approved_at' => $decisionAt->toIso8601String(),
                     ],
                 ]);
+
+                return $lockedFundingRequest->fresh();
             });
 
-            return response()->json(['success' => true, 'message' => 'Funding request approved successfully'], 200);
-        } catch (Exception $e) {
-            Log::error('Approve funding request error: ' . $e->getMessage());
+            return response()->json([
+                'success' => true,
+                'message' => 'Funding request approved successfully',
+                'data' => $fundingRequest,
+            ], 200);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], $e->getStatusCode());
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 400);
+        } catch (Throwable $e) {
+            Log::error('Approve funding request error', [
+                'funding_request_id' => $id,
+                'employee_id' => $request->user()?->id,
+                'owner_id' => $this->getOwnerId($request),
+                'payload' => $request->all(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json(['message' => 'Failed to approve request'], 500);
         }
     }
@@ -196,14 +270,24 @@ class AccountingFundingRequestController extends Controller
                 return response()->json(['message' => 'Unauthenticated'], 401);
             }
 
-            $fundingRequest = DB::table('funding_requests')
+            $fundingRequest = FundingRequest::query()
                 ->where('id', $id)
                 ->where('owner_id', $ownerId)
-                ->where('approver_id', $employee->id)
                 ->first();
 
             if (!$fundingRequest) {
                 return response()->json(['message' => 'Funding request not found'], 404);
+            }
+
+            if ((int) $fundingRequest->owner_id !== (int) $employee->owner_id) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            if ((int) $fundingRequest->approver_id !== (int) $employee->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only the assigned approver can reject this request',
+                ], 403);
             }
 
             if ($fundingRequest->request_status !== 'Pending') {
