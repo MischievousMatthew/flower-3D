@@ -15,7 +15,7 @@
           <input type="date" v-model="dateTo" @change="reload" />
         </div>
         <router-link
-          to="/erp/procurement/supply-chain/orders/create"
+          to="/erp/procurement/supply-chain/deliveries"
           class="btn-primary"
         >
           <svg viewBox="0 0 20 20" fill="currentColor" width="14">
@@ -295,7 +295,7 @@
       <div class="chart-card">
         <div class="chart-header">
           <h3>Supplier Performance</h3>
-          <router-link to="/erp/suppliers" class="view-all"
+          <router-link v-if="false" to="/erp/suppliers" class="view-all"
             >View All →</router-link
           >
         </div>
@@ -321,11 +321,24 @@
               <td class="rank-num">{{ i + 1 }}</td>
               <td>
                 <div class="perf-sup">
-                  <div
-                    class="perf-ava"
-                    :style="{ background: avatarBg(sup.company_name) }"
-                  >
-                    {{ sup.company_name?.[0] }}
+                  <div class="perf-ava-wrap">
+                    <img
+                      v-if="
+                        getSupplierLogo(sup) &&
+                        !brokenSupplierLogos.has(sup.supplier_id)
+                      "
+                      :src="getSupplierLogo(sup)"
+                      :alt="sup.company_name"
+                      class="perf-ava-img"
+                      @error="markSupplierLogoBroken(sup.supplier_id)"
+                    />
+                    <div
+                      v-else
+                      class="perf-ava"
+                      :style="{ background: avatarBg(sup.company_name) }"
+                    >
+                      {{ sup.company_name?.[0] }}
+                    </div>
                   </div>
                   <div>
                     <div class="perf-name">{{ sup.company_name }}</div>
@@ -334,7 +347,7 @@
                 </div>
               </td>
               <td class="center">{{ sup.total_orders ?? 0 }}</td>
-              <td class="amount">${{ formatAmount(sup.total_gmv) }}</td>
+              <td class="amount">â‚±{{ formatAmount(sup.total_gmv) }}</td>
               <td>
                 <div class="completion-wrap">
                   <div class="comp-bar">
@@ -430,6 +443,7 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { analyticsService } from "../../../../../services/analyticsService";
+import { deliveryService } from "../../../../../services/deliveryService";
 
 
 const loading = ref(true);
@@ -439,6 +453,8 @@ const summary = ref({});
 const inventoryData = ref({});
 const supplierPerf = ref([]);
 const recentShipments = ref([]);
+const scOrderStatusCounts = ref({});
+const brokenSupplierLogos = ref(new Set());
 
 const visibleSupplierPerf = computed(() =>
   Array.isArray(supplierPerf.value) ? supplierPerf.value : [],
@@ -469,8 +485,8 @@ const todayLabel = computed(() =>
 // ── KPI Cards ────────────────────────────────────────────────────────────────
 
 const kpis = computed(() => {
-  const o = summary.value.orders || {};
   const s = summary.value.shipments || {};
+  const sc = scOrderStatusCounts.value || {};
   return [
     {
       label: "Total Shipments",
@@ -500,9 +516,9 @@ const kpis = computed(() => {
       sparkData: [20, 16, 22, 18, 25, 21, 27, 23, 29, 26],
     },
     {
-      label: "Pending",
+      label: "New Orders",
       emoji: "🕐",
-      value: formatBig(o.by_status?.pending ?? 0),
+      value: formatBig(sc.pending ?? 0),
       trend: -2.5,
       color: "#f59e0b",
       bg: "#fffbeb",
@@ -529,25 +545,28 @@ const inventoryArc = computed(() => {
 // ── Orders ───────────────────────────────────────────────────────────────────
 
 const orderStatusConfig = [
-  { status: "pending", label: "Pending", color: "#f59e0b" },
-  { status: "processing", label: "Processing", color: "#3b82f6" },
-  { status: "shipped", label: "Shipped", color: "#8b5cf6" },
-  { status: "received", label: "Received", color: "#06b6d4" },
-  { status: "completed", label: "Completed", color: "#10b981" },
+  { status: "pending", sourceKey: "pending", label: "New Orders", color: "#f59e0b" },
+  { status: "processing", sourceKey: "to_processed", label: "Processing", color: "#3b82f6" },
+  { status: "shipped", sourceKey: "to_ship", label: "Shipped", color: "#8b5cf6" },
+  { status: "received", sourceKey: "to_received", label: "Received", color: "#06b6d4" },
+  { status: "completed", sourceKey: "completed", label: "Completed", color: "#10b981" },
 ];
 
 const totalOrders = computed(() => {
-  const byStatus = summary.value.orders?.by_status || {};
-  return Object.values(byStatus).reduce((a, b) => a + b, 0);
+  return orderStatuses.value.reduce((sum, status) => sum + status.count, 0);
 });
 
 const orderStatuses = computed(() => {
-  const byStatus = summary.value.orders?.by_status || {};
-  const total = totalOrders.value || 1;
+  const sc = scOrderStatusCounts.value || {};
+  const total =
+    orderStatusConfig.reduce(
+      (sum, cfg) => sum + Number(sc[cfg.sourceKey] ?? 0),
+      0,
+    ) || 1;
   return orderStatusConfig.map((cfg) => ({
     ...cfg,
-    count: byStatus[cfg.status] ?? 0,
-    pct: Math.round(((byStatus[cfg.status] ?? 0) / total) * 100),
+    count: Number(sc[cfg.sourceKey] ?? 0),
+    pct: Math.round((Number(sc[cfg.sourceKey] ?? 0) / total) * 100),
   }));
 });
 
@@ -583,10 +602,24 @@ function formatBig(n) {
   return Number(n).toLocaleString("en-US");
 }
 function formatAmount(n) {
-  return Number(n || 0).toLocaleString("en-US", {
+  return Number(n || 0).toLocaleString("en-PH", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+function getSupplierLogo(supplier) {
+  return (
+    supplier?.logo_url ||
+    supplier?.logo ||
+    supplier?.company_logo ||
+    supplier?.image_url ||
+    ""
+  );
+}
+function markSupplierLogoBroken(supplierId) {
+  const next = new Set(brokenSupplierLogos.value);
+  next.add(supplierId);
+  brokenSupplierLogos.value = next;
 }
 function formatStatus(s) {
   return (s || "").replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
@@ -659,18 +692,23 @@ async function reload() {
     if (dateFrom.value) params.from = dateFrom.value;
     if (dateTo.value) params.to = dateTo.value;
 
-    const [sumRes, invRes, supRes] = await Promise.all([
+    const [sumRes, invRes, supRes, scOrdersRes] = await Promise.all([
       analyticsService.summary(params),
       analyticsService.inventory(params),
       analyticsService.supplierPerformance(params),
+      deliveryService.scOrders({ page: 1, per_page: 1, ...params }),
     ]);
 
     const summaryPayload = sumRes?.data ?? sumRes ?? {};
     const inventoryPayload = invRes?.data ?? invRes ?? {};
     const supplierPayload = supRes?.data ?? supRes ?? {};
+    const scStatusCounts =
+      scOrdersRes?.status_counts ?? scOrdersRes?.data?.status_counts ?? {};
 
     summary.value = summaryPayload;
     inventoryData.value = inventoryPayload;
+    scOrderStatusCounts.value = scStatusCounts;
+    brokenSupplierLogos.value = new Set();
     supplierPerf.value = Array.isArray(supplierPayload)
       ? supplierPayload
       : Array.isArray(supplierPayload.suppliers)
@@ -688,6 +726,7 @@ async function reload() {
     // Fallback to mock data for demo
     summary.value = mockSummary();
     inventoryData.value = mockInventory();
+    scOrderStatusCounts.value = mockScOrderStatusCounts();
     supplierPerf.value = mockSuppliers();
     recentShipments.value = generateMockShipments();
   } finally {
@@ -718,6 +757,16 @@ function mockSummary() {
         delivered: 14000,
       },
     },
+  };
+}
+
+function mockScOrderStatusCounts() {
+  return {
+    pending: 156,
+    to_processed: 231,
+    to_ship: 188,
+    to_received: 94,
+    completed: 174,
   };
 }
 
@@ -1379,6 +1428,22 @@ onMounted(reload);
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.perf-ava-wrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+.perf-ava-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #fff;
 }
 .perf-ava {
   width: 32px;

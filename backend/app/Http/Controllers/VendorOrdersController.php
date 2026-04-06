@@ -663,7 +663,7 @@ class VendorOrdersController extends Controller
                 }
 
                 if ($delivery->status !== $newStatus) {
-                    $this->deliveryService->advanceStatus($delivery, $newStatus);
+                    $this->deliveryService->advanceStatus($delivery, $newStatus, false);
                 }
             }
 

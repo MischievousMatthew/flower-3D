@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Delivery;
 use App\Models\DeliveryLog;
+use App\Models\Employee;
 use App\Models\Order;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -82,24 +83,21 @@ class DeliveryService
             $this->assertSequentialScan($delivery, $targetStatus);
 
             // ── 4. Apply the transition ────────────────────────────────────────
-            $scannedBy = Auth::id();
-            $now       = now();
+            $now = now();
 
-            $delivery->update([
-                'status'          => $targetStatus,
-                'last_scanned_by' => $scannedBy,
-                'last_scanned_at' => $now,
-            ]);
+            $delivery->update(array_merge(
+                ['status' => $targetStatus],
+                $this->scanAuditAttributes($now)
+            ));
 
             // ── 5. Append audit log entry ──────────────────────────────────────
-            DeliveryLog::create([
+            DeliveryLog::create(array_merge([
                 'owner_id'    => $delivery->owner_id,
                 'delivery_id' => $delivery->id,
                 'status'      => $targetStatus,
-                'scanned_by'  => $scannedBy,
                 'scanned_at'  => $now,
                 'notes'       => "Scanned via [{$scannerPage}] page",
-            ]);
+            ], $this->scanLogActorAttributes()));
 
             // ── 6. Mirror status onto the linked Order ─────────────────────────
             $this->syncOrderStatus($delivery);
@@ -143,7 +141,7 @@ class DeliveryService
     /**
      * Advance delivery to a specific status directly (admin / override use).
      */
-    public function advanceStatus(Delivery $delivery, string $targetStatus): Delivery
+    public function advanceStatus(Delivery $delivery, string $targetStatus, bool $recordScanContext = true): Delivery
     {
         if (! $delivery->canTransitionTo($targetStatus)) {
             throw new RuntimeException(
@@ -151,22 +149,19 @@ class DeliveryService
             );
         }
 
-        return DB::transaction(function () use ($delivery, $targetStatus) {
-            $scannedBy = Auth::id();
-            $now       = now();
+        return DB::transaction(function () use ($delivery, $targetStatus, $recordScanContext) {
+            $now = now();
 
-            $delivery->update([
-                'status'          => $targetStatus,
-                'last_scanned_by' => $scannedBy,
-                'last_scanned_at' => $now,
-            ]);
+            $delivery->update(array_merge(
+                ['status' => $targetStatus],
+                $recordScanContext ? $this->scanAuditAttributes($now) : []
+            ));
 
-            DeliveryLog::create([
+            DeliveryLog::create(array_merge([
                 'delivery_id' => $delivery->id,
                 'status'      => $targetStatus,
-                'scanned_by'  => $scannedBy,
                 'scanned_at'  => $now,
-            ]);
+            ], $recordScanContext ? $this->scanLogActorAttributes() : []));
 
             $this->syncOrderStatus($delivery);
 
@@ -196,15 +191,12 @@ class DeliveryService
             if ($delivery->status !== $deliveryStatus) {
                 $delivery->update([
                     'status' => $deliveryStatus,
-                    'last_scanned_by' => Auth::id(),
-                    'last_scanned_at' => now(),
                 ]);
 
                 DeliveryLog::create([
                     'owner_id' => $delivery->owner_id,
                     'delivery_id' => $delivery->id,
                     'status' => $deliveryStatus,
-                    'scanned_by' => Auth::id(),
                     'scanned_at' => now(),
                     'notes' => "Synced from vendor order status [{$orderStatus}]",
                 ]);
@@ -407,5 +399,27 @@ class DeliveryService
         $counts['all'] = array_sum($counts);
 
         return $counts;
+    }
+
+    private function scanAuditAttributes($timestamp): array
+    {
+        return [
+            'last_scanned_by' => $this->resolveEmployeeScannerId(),
+            'last_scanned_at' => $timestamp,
+        ];
+    }
+
+    private function scanLogActorAttributes(): array
+    {
+        return [
+            'scanned_by' => $this->resolveEmployeeScannerId(),
+        ];
+    }
+
+    private function resolveEmployeeScannerId(): ?int
+    {
+        $user = Auth::user();
+
+        return $user instanceof Employee ? $user->id : null;
     }
 }
