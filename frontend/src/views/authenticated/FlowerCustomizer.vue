@@ -57,7 +57,7 @@
               </div>
               <div class="fc-row">
                 <strong>{{ flower.product_name }}</strong>
-                <span>₱{{ flower.price.toFixed(2) }}</span>
+                <span>Ã¢â€šÂ±{{ flower.price.toFixed(2) }}</span>
               </div>
               <div class="fc-tags">
                 <span class="fc-tag">{{ flower.quantity_in_stock }} in stock</span>
@@ -80,13 +80,13 @@
         >
           <div class="fc-stage-actions">
             <button class="fc-icon-btn" @click="toggleLeftSidebar">
-              {{ isLeftSidebarCollapsed ? "◀ Flowers" : "✕ Flowers" }}
+              {{ isLeftSidebarCollapsed ? "Ã¢â€”â‚¬ Flowers" : "Ã¢Å“â€¢ Flowers" }}
             </button>
             <button class="fc-icon-btn" @click="toggleFullscreen" :disabled="!sceneReady">
-              {{ isFullscreen ? "🗗 Exit" : "⛶ Full" }}
+              {{ isFullscreen ? "Ã°Å¸â€”â€” Exit" : "Ã¢â€ºÂ¶ Full" }}
             </button>
             <button class="fc-icon-btn" @click="toggleRightSidebar">
-              {{ isRightSidebarCollapsed ? "Tools ▶" : "Tools ✕" }}
+              {{ isRightSidebarCollapsed ? "Tools Ã¢â€“Â¶" : "Tools Ã¢Å“â€¢" }}
             </button>
           </div>
           <div ref="viewerContainer" class="fc-viewer"></div>
@@ -113,7 +113,7 @@
                 :class="{ active: selectedSceneId === selection.sceneId }"
                 @click="selectPlacedFlower(selection.sceneId)"
               >
-                <div><strong>{{ selection.product_name }}</strong><p>₱{{ selection.price.toFixed(2) }}</p></div>
+                <div><strong>{{ selection.product_name }}</strong><p>Ã¢â€šÂ±{{ selection.price.toFixed(2) }}</p></div>
                 <button class="fc-btn fc-btn-danger" @click.stop="removeFlower(selection.sceneId)">Remove</button>
               </div>
             </div>
@@ -132,31 +132,36 @@
             <div v-if="!selectedFlower" class="fc-empty">Select a placed flower, then drag it on the bouquet or rotate it here.</div>
             <div v-else class="fc-transform">
               <div class="fc-transform-actions single">
-                <button class="fc-btn fc-btn-light" @click="toggleSelectedLock">
-                  {{ selectedFlower.locked ? "Unlock Movement" : "Lock Movement" }}
+                <button class="fc-btn fc-btn-lock" :class="{ locked: selectedFlower.locked }" @click="toggleSelectedLock">
+                  {{ selectedFlower.locked ? "Unlock Flower Position" : "Lock Flower Position" }}
                 </button>
+              </div>
+              <div class="fc-lock-status" :class="{ locked: selectedFlower.locked }">
+                <span class="fc-lock-dot"></span>
+                <strong>{{ selectedFlower.locked ? "Movement locked" : "Movement unlocked" }}</strong>
+                <span>{{ selectedFlower.locked ? "Drag and arrow controls are disabled." : "Drag the flower or nudge it with the arrows below." }}</span>
               </div>
               <label class="fc-transform-row">
                 <span>Rotate X</span>
-                <strong>{{ Math.round(selectedFlower.rotation.xDeg) }}°</strong>
+                <strong>{{ Math.round(selectedFlower.rotation.xDeg) }}Ã‚Â°</strong>
               </label>
               <input class="fc-range" type="range" min="-180" max="180" :value="selectedFlower.rotation.xDeg" @input="updateSelectedRotation('x', Number($event.target.value))" />
               <label class="fc-transform-row">
                 <span>Rotate Y</span>
-                <strong>{{ Math.round(selectedFlower.rotation.yDeg) }}°</strong>
+                <strong>{{ Math.round(selectedFlower.rotation.yDeg) }}Ã‚Â°</strong>
               </label>
               <input class="fc-range" type="range" min="-180" max="180" :value="selectedFlower.rotation.yDeg" @input="updateSelectedRotation('y', Number($event.target.value))" />
               <div class="fc-transform-actions">
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('x', -15)">X -15°</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('x', 15)">X +15°</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('y', -15)">Y -15°</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('y', 15)">Y +15°</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('x', -15)">X -15Ã‚Â°</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('x', 15)">X +15Ã‚Â°</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('y', -15)">Y -15Ã‚Â°</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('y', 15)">Y +15Ã‚Â°</button>
               </div>
               <div class="fc-transform-grid">
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('forward')">↑</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('left')">←</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('backward')">↓</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('right')">→</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('up')">Up</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('left')">Left</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('down')">Down</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('right')">Right</button>
               </div>
               <button class="fc-btn fc-btn-light full" @click="resetSelectedTransform">Reset Selected Flower</button>
             </div>
@@ -175,7 +180,7 @@
             <div class="fc-summary"><span>Store</span><strong>{{ storeName || "Not set" }}</strong></div>
             <div class="fc-summary"><span>Owner ID</span><strong>{{ vendorOwnerId || "Missing" }}</strong></div>
             <div class="fc-summary"><span>Flowers</span><strong>{{ selectedFlowers.length }}/{{ MAX_FLOWERS }}</strong></div>
-            <div class="fc-summary total"><span>Total</span><strong>₱{{ totalPrice.toFixed(2) }}</strong></div>
+            <div class="fc-summary total"><span>Total</span><strong>Ã¢â€šÂ±{{ totalPrice.toFixed(2) }}</strong></div>
             <button class="fc-btn fc-btn-primary" @click="checkout" :disabled="!selectedFlowers.length || isCheckingOut">{{ isCheckingOut ? "Processing..." : "Proceed to Checkout" }}</button>
             <button class="fc-btn fc-btn-light full" @click="addCart" :disabled="!selectedFlowers.length">Add to Cart</button>
           </section>
@@ -767,8 +772,8 @@ function nudgeSelectedPosition(direction) {
 
   if (direction === "left") nextPosition.x -= step;
   if (direction === "right") nextPosition.x += step;
-  if (direction === "forward") nextPosition.z -= step;
-  if (direction === "backward") nextPosition.z += step;
+  if (direction === "up") nextPosition.y += step;
+  if (direction === "down") nextPosition.y -= step;
 
   object.position.set(nextPosition.x, nextPosition.y, nextPosition.z);
   updateFlowerState(flower.sceneId, { position: nextPosition });
@@ -990,6 +995,13 @@ function showToast(message, type = "success") {
 .fc-range { width: 100%; accent-color: #8b5e3c; }
 .fc-transform-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .fc-transform-actions.single { grid-template-columns: 1fr; }
+.fc-btn-lock { border: 1px solid rgba(139, 94, 60, 0.22); background: linear-gradient(180deg, #fffaf6 0%, #f7ece1 100%); color: #6d4528; font-weight: 800; box-shadow: 0 10px 24px rgba(83,55,32,.08); }
+.fc-btn-lock.locked { border-color: rgba(126, 43, 31, 0.35); background: linear-gradient(180deg, #fff2ef 0%, #f6ddd7 100%); color: #8a2f22; }
+.fc-lock-status { display: grid; gap: 4px; padding: 12px 14px; border-radius: 16px; background: rgba(247, 236, 225, 0.8); color: #6d543f; font-size: 12px; }
+.fc-lock-status strong { display: flex; align-items: center; gap: 8px; color: #3f2b1d; font-size: 13px; }
+.fc-lock-status.locked { background: rgba(246, 221, 215, 0.9); color: #7a4036; }
+.fc-lock-dot { width: 10px; height: 10px; border-radius: 999px; background: #6c9f53; box-shadow: 0 0 0 4px rgba(108, 159, 83, 0.14); }
+.fc-lock-status.locked .fc-lock-dot { background: #b65245; box-shadow: 0 0 0 4px rgba(182, 82, 69, 0.14); }
 .fc-transform-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .fc-swatches { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 .fc-swatch { width: 34px; height: 34px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; box-shadow: 0 8px 20px rgba(57,36,17,.14); }
