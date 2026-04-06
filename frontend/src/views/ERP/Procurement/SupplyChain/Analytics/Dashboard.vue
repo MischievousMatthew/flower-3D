@@ -178,11 +178,12 @@ const brokenSupplierLogos = ref(new Set());
 
 const deliveryStatusConfig = [
   { status: "pending", label: "Pending", color: "#f59e0b" },
-  { status: "in_transit", label: "In Transit", color: "#3b82f6" },
-  { status: "out_for_delivery", label: "Out for Delivery", color: "#8b5cf6" },
-  { status: "delivered", label: "Delivered", color: "#10b981" },
-  { status: "failed", label: "Failed", color: "#ef4444" },
+  { status: "to_processed", label: "To Process", color: "#3b82f6" },
+  { status: "to_ship", label: "To Ship", color: "#8b5cf6" },
+  { status: "to_received", label: "To Receive", color: "#06b6d4" },
+  { status: "completed", label: "Completed", color: "#10b981" },
   { status: "returned", label: "Returned", color: "#6b7280" },
+  { status: "refunded", label: "Refunded", color: "#ef4444" },
 ];
 const shipSteps = [
   { status: "pending", label: "Pending", color: "#f59e0b" },

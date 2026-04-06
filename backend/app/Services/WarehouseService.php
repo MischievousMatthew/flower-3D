@@ -18,9 +18,10 @@ class WarehouseService
     {
         $warehouseProductTotals = WarehouseBatch::query()
             ->join('warehouse_locations', 'warehouse_locations.id', '=', 'warehouse_batches.warehouse_location_id')
+            ->join('warehouses', 'warehouses.id', '=', 'warehouse_locations.warehouse_id')
             ->join('products', 'products.id', '=', 'warehouse_batches.product_id')
             ->where('warehouse_batches.owner_id', $ownerId)
-            ->where('warehouse_locations.owner_id', $ownerId)
+            ->where('warehouses.owner_id', $ownerId)
             ->where('warehouse_batches.status', 'active')
             ->where('warehouse_batches.qty_remaining', '>', 0)
             ->whereNull('products.deleted_at')
@@ -40,11 +41,19 @@ class WarehouseService
         return Warehouse::query()
             ->where('owner_id', $ownerId)
             ->withCount('locations as storages_count')
-            ->withSum('activeFlowerBatches as total_flowers', 'qty_remaining')
             ->leftJoinSub($skuCounts, 'sku_counts', fn ($join) => $join->on('sku_counts.warehouse_id', '=', 'warehouses.id'))
+            ->leftJoinSub(
+                DB::query()
+                    ->fromSub($warehouseProductTotals, 'warehouse_product_totals')
+                    ->selectRaw('warehouse_id, SUM(total_qty) as total_flowers')
+                    ->groupBy('warehouse_id'),
+                'flower_totals',
+                fn ($join) => $join->on('flower_totals.warehouse_id', '=', 'warehouses.id')
+            )
             ->leftJoinSub($lowStockCounts, 'low_stock_counts', fn ($join) => $join->on('low_stock_counts.warehouse_id', '=', 'warehouses.id'))
             ->select('warehouses.*')
             ->selectRaw('COALESCE(sku_counts.items_count, 0) as items_count')
+            ->selectRaw('COALESCE(flower_totals.total_flowers, 0) as total_flowers')
             ->selectRaw('COALESCE(low_stock_counts.low_stock, 0) as low_stock')
             ->orderBy('warehouses.name')
             ->get()
@@ -63,11 +72,17 @@ class WarehouseService
             ->where('owner_id', $ownerId)
             ->with('items', 'locations')
             ->withCount('locations as storages_count')
-            ->withSum('activeFlowerBatches as total_flowers', 'qty_remaining')
             ->findOrFail($id);
 
+        $warehouse->total_flowers = (int) WarehouseBatch::query()
+            ->join('warehouse_locations', 'warehouse_locations.id', '=', 'warehouse_batches.warehouse_location_id')
+            ->where('warehouse_locations.warehouse_id', $warehouse->id)
+            ->where('warehouse_batches.owner_id', $ownerId)
+            ->where('warehouse_batches.status', 'active')
+            ->where('warehouse_batches.qty_remaining', '>', 0)
+            ->sum('warehouse_batches.qty_remaining');
+
         $warehouse->storages_count = (int) ($warehouse->storages_count ?? 0);
-        $warehouse->total_flowers = (int) ($warehouse->total_flowers ?? 0);
         $warehouse->total_units = $warehouse->total_flowers;
 
         return $warehouse;

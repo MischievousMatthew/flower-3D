@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\InventoryMovement;
 use App\Models\PurchaseOrder;
-use App\Models\Shipment;
+use App\Models\Delivery;
 use App\Models\Supplier;
 use App\Models\WarehouseBatch;
 use App\Models\WarehouseItem;
@@ -77,16 +77,16 @@ class AnalyticsService
     // ─── Shipments ────────────────────────────────────────────────────────────
 
     /**
-     * Shipment statistics grouped by status and carrier.
+     * Delivery statistics grouped by status.
      *
      * @return array{total: int, by_status: array, by_carrier: array, on_time_rate: float, period: array}
      */
     public function totalShipments(int $ownerId, ?string $from = null, ?string $to = null): array
     {
-        $query = Shipment::query()
+        $query = Delivery::query()
             ->where('owner_id', $ownerId)
-            ->when($from, fn ($q) => $q->whereDate('shipped_date', '>=', $from))
-            ->when($to,   fn ($q) => $q->whereDate('shipped_date', '<=', $to));
+            ->when($from, fn ($q) => $q->whereDate('created_at', '>=', $from))
+            ->when($to, fn ($q) => $q->whereDate('created_at', '<=', $to));
 
         $total = (clone $query)->count();
 
@@ -97,29 +97,11 @@ class AnalyticsService
             ->map(fn ($c) => (int) $c)
             ->toArray();
 
-        $byCarrier = (clone $query)
-            ->select('carrier', DB::raw('COUNT(*) as count'))
-            ->groupBy('carrier')
-            ->pluck('count', 'carrier')
-            ->map(fn ($c) => (int) $c)
-            ->toArray();
-
-        $deliveredShipments = (clone $query)
-            ->where('status', 'delivered')
-            ->whereNotNull('shipped_date')
-            ->whereNotNull('received_date')
-            ->get(['shipped_date', 'received_date']);
-
-        $delivered = $deliveredShipments->count();
-        $onTime = $deliveredShipments->filter(function ($shipment) {
-            return $shipment->received_date->lte($shipment->shipped_date->copy()->addDays(30));
-        })->count();
-
         return [
             'total'        => $total,
             'by_status'    => $byStatus,
-            'by_carrier'   => $byCarrier,
-            'on_time_rate' => $delivered > 0 ? round(($onTime / $delivered) * 100, 2) : 0.0,
+            'by_carrier'   => [],
+            'on_time_rate' => 0.0,
             'period'       => ['from' => $from, 'to' => $to],
         ];
     }
@@ -204,9 +186,10 @@ class AnalyticsService
 
         $warehouseProductTotals = WarehouseBatch::query()
             ->join('warehouse_locations', 'warehouse_locations.id', '=', 'warehouse_batches.warehouse_location_id')
+            ->join('warehouses', 'warehouses.id', '=', 'warehouse_locations.warehouse_id')
             ->join('products', 'products.id', '=', 'warehouse_batches.product_id')
             ->where('warehouse_batches.owner_id', $ownerId)
-            ->where('warehouse_locations.owner_id', $ownerId)
+            ->where('warehouses.owner_id', $ownerId)
             ->where('warehouse_batches.status', 'active')
             ->where('warehouse_batches.qty_remaining', '>', 0)
             ->whereNull('products.deleted_at')
