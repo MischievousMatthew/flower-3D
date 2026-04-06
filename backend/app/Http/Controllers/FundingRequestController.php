@@ -99,6 +99,24 @@ class FundingRequestController extends Controller
         ], 422);
     }
 
+    private function generateFinanceRequestId(int $year): string
+    {
+        $prefix = sprintf('FR-%s-', $year);
+        $sequence = DB::table('funding_requests')
+            ->where('finance_request_id', 'like', $prefix . '%')
+            ->count() + 1;
+
+        do {
+            $candidate = sprintf('%s%03d', $prefix, $sequence);
+            $exists = DB::table('funding_requests')
+                ->where('finance_request_id', $candidate)
+                ->exists();
+            $sequence++;
+        } while ($exists);
+
+        return $candidate;
+    }
+
     public function getEligibleApprovers(Request $request)
     {
         try {
@@ -285,12 +303,8 @@ class FundingRequestController extends Controller
                 return $response;
             }
 
-            $year = date('Y');
-            $count = DB::table('funding_requests')
-                ->where('owner_id', $ownerId)
-                ->whereYear('created_at', $year)
-                ->count() + 1;
-            $financeRequestId = sprintf('FR-%s-%03d', $year, $count);
+            $year = (int) date('Y');
+            $financeRequestId = $this->generateFinanceRequestId($year);
 
             $currentStock = (float) $request->input('current_stock', 0);
             $reservedStock = (float) $request->input('reserved_stock', 0);

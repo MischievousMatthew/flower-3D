@@ -6,18 +6,39 @@ use Illuminate\Http\Request;
 use App\Models\PurchaseOrder;
 use App\Models\Shipment;
 use App\Models\WarehouseItem;
+use App\Models\Warehouse;
 use App\Models\Supplier;
+use App\Models\Employee;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class SupplyChainAnalyticsController extends Controller
 {
+    private function resolveOwnerId(): ?int
+    {
+        $authUser = Auth::user();
+
+        if ($authUser instanceof Employee) {
+            return $authUser->owner_id;
+        }
+
+        if ($authUser && property_exists($authUser, 'owner_id') && $authUser->owner_id) {
+            return $authUser->owner_id;
+        }
+
+        return $authUser?->id;
+    }
+
     /**
      * Get high-level summary of orders and shipments
      */
-    public function summary(Request $request)
+    public function summary(Request $request): JsonResponse
     {
+        $ownerId = $this->resolveOwnerId();
+
         // 1. Orders breakdown
-        $orders = PurchaseOrder::query();
+        $orders = PurchaseOrder::query()->where('owner_id', $ownerId);
         if ($request->has('from')) {
             $orders->whereDate('created_at', '>=', $request->from);
         }
@@ -32,7 +53,7 @@ class SupplyChainAnalyticsController extends Controller
                                  ->toArray();
 
         // 2. Shipments breakdown
-        $shipments = Shipment::query();
+        $shipments = Shipment::query()->where('owner_id', $ownerId);
         if ($request->has('from')) {
             $shipments->whereDate('shipped_date', '>=', $request->from);
         }
@@ -46,11 +67,34 @@ class SupplyChainAnalyticsController extends Controller
                                        ->pluck('count', 'status')
                                        ->toArray();
 
-        // 3. Recent shipments for Live Overview
-        $recentShipments = Shipment::with('purchaseOrder.supplier')
-                                   ->orderBy('id', 'desc')
-                                   ->take(10)
-                                   ->get();
+        // 3. Recent purchase orders for the dashboard timeline
+        $recentOrders = PurchaseOrder::query()
+            ->where('owner_id', $ownerId)
+            ->with('supplier')
+            ->latest('created_at')
+            ->take(10)
+            ->get()
+            ->map(fn ($order) => [
+                'id' => $order->id,
+                'order_number' => $order->order_number,
+                'status' => $order->status,
+                'total_amount' => (float) $order->total_amount,
+                'created_at' => $order->created_at?->toIso8601String(),
+                'supplier' => $order->supplier ? [
+                    'id' => $order->supplier->id,
+                    'company_name' => $order->supplier->company_name,
+                    'address' => $order->supplier->address,
+                    'logo_url' => $order->supplier->logo_url,
+                ] : null,
+            ]);
+
+        $supplierCount = Supplier::query()
+            ->where('owner_id', $ownerId)
+            ->count();
+
+        $warehouseCount = Warehouse::query()
+            ->where('owner_id', $ownerId)
+            ->count();
 
         return response()->json([
             'orders' => [
@@ -72,30 +116,59 @@ class SupplyChainAnalyticsController extends Controller
                     'delivered' => $shipmentsByStatus['delivered'] ?? 0,
                 ],
             ],
-            'recent_shipments' => $recentShipments,
+            'suppliers' => [
+                'total' => $supplierCount,
+            ],
+            'warehouses' => [
+                'total' => $warehouseCount,
+            ],
+            'recent_orders' => $recentOrders,
         ]);
     }
 
     /**
      * Get real-time warehouse inventory metrics
      */
-    public function inventory(Request $request)
+    public function inventory(Request $request): JsonResponse
     {
+        $ownerId = $this->resolveOwnerId();
+
         // For actual inventory, we look at WarehouseItem quantities
-        $skuCount = WarehouseItem::distinct('sku')->count('sku');
-        $totalUnits = WarehouseItem::sum('quantity');
+        $warehouseItems = WarehouseItem::query()->where('owner_id', $ownerId);
+        $skuCount = (clone $warehouseItems)->distinct('sku')->count('sku');
+        $totalUnits = (clone $warehouseItems)->sum('quantity');
 
         // Low stock: Assume low stock is strictly below 15 for demo
         $lowStockItems = WarehouseItem::with('warehouse')
+            ->where('owner_id', $ownerId)
             ->where('quantity', '>', 0)
             ->where('quantity', '<=', 15)
             ->take(10)
             ->get();
 
         $outOfStockItems = WarehouseItem::with('warehouse')
+            ->where('owner_id', $ownerId)
             ->where('quantity', '<=', 0)
             ->take(10)
             ->get();
+
+        $warehouseSummary = Warehouse::query()
+            ->where('owner_id', $ownerId)
+            ->withCount(['items as total_skus'])
+            ->withSum('items as total_units', 'quantity')
+            ->withCount([
+                'items as out_of_stock_count' => fn ($query) => $query->where('quantity', '<=', 0),
+            ])
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($warehouse) => [
+                'warehouse_id' => $warehouse->id,
+                'warehouse_name' => $warehouse->name,
+                'warehouse_location' => $warehouse->location,
+                'total_skus' => (int) ($warehouse->total_skus ?? 0),
+                'total_units' => (int) ($warehouse->total_units ?? 0),
+                'out_of_stock_count' => (int) ($warehouse->out_of_stock_count ?? 0),
+            ]);
 
         return response()->json([
             'total_skus' => $skuCount,
@@ -112,17 +185,23 @@ class SupplyChainAnalyticsController extends Controller
                 'sku' => $item->sku ?? 'UNKNOWN',
                 'product_name' => $item->product_name ?? 'Unknown Product',
                 'warehouse' => $item->warehouse->name ?? 'Main DC'
-            ])
+            ]),
+            'by_warehouse' => $warehouseSummary,
         ]);
     }
 
     /**
      * Calculate supplier performance metrics based on POs and GMV
      */
-    public function supplierPerformance(Request $request)
+    public function supplierPerformance(Request $request): JsonResponse
     {
+        $ownerId = $this->resolveOwnerId();
+
         // Supplier efficiency: GMV = sum of PO totals, Completion = (completed POs / total POs)
-        $suppliers = Supplier::with('purchaseOrders')->get();
+        $suppliers = Supplier::query()
+            ->where('owner_id', $ownerId)
+            ->with('purchaseOrders')
+            ->get();
 
         $performance = $suppliers->map(function ($supplier) {
             $totalOrders = $supplier->purchaseOrders->count();
@@ -137,6 +216,8 @@ class SupplyChainAnalyticsController extends Controller
                 'supplier_id' => $supplier->id,
                 'company_name' => $supplier->company_name ?? 'Unknown',
                 'location' => $supplier->address ?? 'N/A',
+                'logo' => $supplier->logo,
+                'logo_url' => $supplier->logo_url,
                 'total_orders' => $totalOrders,
                 'total_gmv' => (float) $gmv,
                 'completion_rate' => $completionRate,
