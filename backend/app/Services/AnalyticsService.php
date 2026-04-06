@@ -168,63 +168,120 @@ class AnalyticsService
      */
     public function inventoryStockSummary(int $ownerId, int $lowStockThreshold = 10): array
     {
-        $totalSkus  = WarehouseItem::where('owner_id', $ownerId)->count();
-        
-        // Sync with Floor View: Use WarehouseBatch qty_remaining for total units
-        $totalUnits = WarehouseBatch::where('owner_id', $ownerId)
+        $activeBatches = WarehouseBatch::query()
+            ->with(['location.warehouse:id,name,location', 'product:id'])
+            ->where('owner_id', $ownerId)
             ->where('status', 'active')
             ->where('qty_remaining', '>', 0)
-            ->sum('qty_remaining');
+            ->get();
 
-        $lowStock = WarehouseItem::with('warehouse')
+        $totalSkus = (int) $activeBatches->unique('product_id')->count();
+        $totalUnits = (int) $activeBatches->sum('qty_remaining');
+
+        $floorSummary = [
+            'fresh'          => 0,
+            'aging'          => 0,
+            'wilting'        => 0,
+            'spoiled'        => 0,
+            'expiring_today' => 0,
+        ];
+
+        foreach ($activeBatches as $batch) {
+            $batchQuantity = (int) $batch->qty_remaining;
+            $condition = $this->resolveBatchCondition($batch);
+            if (isset($floorSummary[$condition])) {
+                $floorSummary[$condition] += $batchQuantity;
+            }
+
+            $daysRemaining = $batch->expiration_date
+                ? now()->startOfDay()->diffInDays($batch->expiration_date, false)
+                : null;
+
+            if ($daysRemaining !== null && $daysRemaining <= 1) {
+                $floorSummary['expiring_today'] += $batchQuantity;
+            }
+        }
+
+        $warehouseProductTotals = WarehouseBatch::query()
+            ->join('warehouse_locations', 'warehouse_locations.id', '=', 'warehouse_batches.warehouse_location_id')
+            ->join('products', 'products.id', '=', 'warehouse_batches.product_id')
+            ->where('warehouse_batches.owner_id', $ownerId)
+            ->where('warehouse_locations.owner_id', $ownerId)
+            ->where('warehouse_batches.status', 'active')
+            ->where('warehouse_batches.qty_remaining', '>', 0)
+            ->whereNull('products.deleted_at')
+            ->groupBy('warehouse_locations.warehouse_id', 'warehouse_batches.product_id')
+            ->selectRaw('warehouse_locations.warehouse_id, warehouse_batches.product_id, SUM(warehouse_batches.qty_remaining) as total_qty');
+
+        $skuCounts = DB::query()
+            ->fromSub($warehouseProductTotals, 'warehouse_product_totals')
+            ->selectRaw('warehouse_id, COUNT(*) as total_skus')
+            ->groupBy('warehouse_id');
+
+        $flowerTotals = DB::query()
+            ->fromSub($warehouseProductTotals, 'warehouse_product_totals')
+            ->selectRaw('warehouse_id, SUM(total_qty) as total_flowers')
+            ->groupBy('warehouse_id');
+
+        $byWarehouse = Warehouse::query()
             ->where('owner_id', $ownerId)
-            ->where('quantity', '>', 0)
-            ->where('quantity', '<=', $lowStockThreshold)
-            ->orderBy('quantity')
+            ->leftJoinSub($skuCounts, 'sku_counts', fn ($join) => $join->on('sku_counts.warehouse_id', '=', 'warehouses.id'))
+            ->leftJoinSub($flowerTotals, 'flower_totals', fn ($join) => $join->on('flower_totals.warehouse_id', '=', 'warehouses.id'))
+            ->select('warehouses.id', 'warehouses.name', 'warehouses.location')
+            ->selectRaw('COALESCE(sku_counts.total_skus, 0) as total_skus')
+            ->selectRaw('COALESCE(flower_totals.total_flowers, 0) as total_flowers')
+            ->orderBy('warehouses.name')
             ->get()
-            ->map(fn ($item) => [
-                'item_id'      => $item->id,
-                'sku'          => $item->sku,
-                'product_name' => $item->product_name,
-                'quantity'     => (int) $item->quantity,
-                'warehouse'    => $item->warehouse?->name,
+            ->map(fn ($wh) => [
+                'warehouse_id'       => $wh->id,
+                'warehouse_name'     => $wh->name,
+                'warehouse_location' => $wh->location,
+                'total_skus'         => (int) $wh->total_skus,
+                'total_units'        => (int) $wh->total_flowers,
+                'total_flowers'      => (int) $wh->total_flowers,
+                'out_of_stock_count' => 0,
             ]);
-
-        $outOfStock = WarehouseItem::with('warehouse')
-            ->where('owner_id', $ownerId)
-            ->where('quantity', '<=', 0)
-            ->get()
-            ->map(fn ($item) => [
-                'item_id'      => $item->id,
-                'sku'          => $item->sku,
-                'product_name' => $item->product_name,
-                'warehouse'    => $item->warehouse?->name,
-            ]);
-
-        $byWarehouse = Warehouse::where('owner_id', $ownerId)
-            ->with(['batches' => fn ($q) => $q->where('status', 'active')->where('qty_remaining', '>', 0)])
-            ->get()
-            ->map(function ($wh) {
-                $totalUnits = $wh->batches->sum('qty_remaining');
-                $totalSkus  = $wh->batches->unique('product_id')->count();
-                
-                return [
-                    'warehouse_id'       => $wh->id,
-                    'warehouse_name'     => $wh->name,
-                    'warehouse_location' => $wh->location,
-                    'total_skus'         => (int) $totalSkus,
-                    'total_units'        => (int) $totalUnits,
-                    'out_of_stock_count' => 0, // Simplified for now
-                ];
-            });
 
         return [
             'total_skus'         => $totalSkus,
-            'total_units'        => (int) $totalUnits,
-            'low_stock_items'    => $lowStock,
-            'out_of_stock_items' => $outOfStock,
+            'total_units'        => $totalUnits,
+            'total_flowers'      => $totalUnits,
+            'low_stock_items'    => collect(),
+            'out_of_stock_items' => collect(),
+            'floor_summary'      => $floorSummary,
             'by_warehouse'       => $byWarehouse,
         ];
+    }
+
+    private function resolveBatchCondition(WarehouseBatch $batch): string
+    {
+        if (! $batch->expiration_date) {
+            return $batch->condition_status ?: 'fresh';
+        }
+
+        $daysRemaining = now()->startOfDay()->diffInDays($batch->expiration_date, false);
+
+        if ($daysRemaining < 0) {
+            return 'spoiled';
+        }
+
+        if ($batch->freshness_days) {
+            $ratio = $daysRemaining / $batch->freshness_days;
+
+            return match (true) {
+                $ratio > 0.60 => 'fresh',
+                $ratio > 0.40 => 'aging',
+                $ratio > 0.20 => 'wilting',
+                default => 'spoiled',
+            };
+        }
+
+        return match (true) {
+            $daysRemaining > 5 => 'fresh',
+            $daysRemaining > 2 => 'aging',
+            $daysRemaining > 0 => 'wilting',
+            default => 'spoiled',
+        };
     }
 
     /**

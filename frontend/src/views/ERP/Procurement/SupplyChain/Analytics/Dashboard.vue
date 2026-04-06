@@ -46,7 +46,7 @@
     <div class="charts-row">
       <div class="chart-card wide">
         <div class="chart-header">
-          <h3>Recent Shipments</h3>
+          <h3>Recent Orders</h3>
           <router-link to="/erp/procurement/supply-chain/orders" class="view-all">View All →</router-link>
         </div>
         <div v-if="visibleRecentOrders.length === 0" class="empty-chart">No recent supply-chain orders yet</div>
@@ -82,18 +82,20 @@
       </div>
 
       <div class="chart-card narrow">
-        <div class="chart-header"><h3>Live Overview</h3></div>
+        <div class="chart-header"><h3>Warehouse Floor Overview</h3></div>
         <div class="inv-ring-wrap">
           <svg viewBox="0 0 120 120" width="110">
             <circle cx="60" cy="60" r="46" fill="none" stroke="#f3f4f6" stroke-width="12" />
             <circle cx="60" cy="60" r="46" fill="none" stroke="#10b981" stroke-width="12" :stroke-dasharray="`${inventoryArc} ${289 - inventoryArc}`" stroke-dashoffset="72" stroke-linecap="round" />
-            <text x="60" y="55" text-anchor="middle" font-size="20" font-weight="800" fill="#111827">{{ formatCompactNumber(inventoryData.total_units ?? 0) }}</text>
+            <text x="60" y="55" text-anchor="middle" font-size="20" font-weight="800" fill="#111827">{{ formatCompactNumber(inventoryData.total_flowers ?? inventoryData.total_units ?? 0) }}</text>
             <text x="60" y="68" text-anchor="middle" font-size="8" fill="#9ca3af">Flower Units</text>
           </svg>
           <div class="ring-legend">
-            <div class="rl-item"><span class="rl-dot ok"></span>In Stock <strong>{{ inStockCount }}</strong></div>
-            <div class="rl-item"><span class="rl-dot warn"></span>Low Stock <strong>{{ inventoryData.low_stock_items?.length ?? 0 }}</strong></div>
-            <div class="rl-item"><span class="rl-dot danger"></span>Out of Stock <strong>{{ inventoryData.out_of_stock_items?.length ?? 0 }}</strong></div>
+            <div class="rl-item"><span class="rl-dot ok"></span>Fresh <strong>{{ floorSummary.fresh }}</strong></div>
+            <div class="rl-item"><span class="rl-dot warn"></span>Aging <strong>{{ floorSummary.aging }}</strong></div>
+            <div class="rl-item"><span class="rl-dot warn-red"></span>Wilting <strong>{{ floorSummary.wilting }}</strong></div>
+            <div class="rl-item"><span class="rl-dot danger"></span>Spoiled <strong>{{ floorSummary.spoiled }}</strong></div>
+            <div class="rl-item"><span class="rl-dot alert"></span>Expired Today <strong>{{ floorSummary.expiring_today }}</strong></div>
           </div>
         </div>
         <div class="divider"></div>
@@ -102,7 +104,7 @@
           <div class="live-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="14"><path d="M2 8.5 10 3l8 5.5" /><path d="M4 8v8h12V8" /><path d="M8 16v-4h4v4" /></svg></div>
           <div class="live-info">
             <span class="live-num">{{ warehouse.warehouse_name || warehouse.warehouse?.name || "Unnamed Warehouse" }}</span>
-            <span class="live-type">{{ warehouse.total_units ?? 0 }} units · {{ warehouse.total_skus ?? 0 }} SKUs</span>
+            <span class="live-type">{{ warehouse.total_flowers ?? warehouse.total_units ?? 0 }} flowers · {{ warehouse.total_skus ?? 0 }} SKUs</span>
           </div>
           <span class="live-badge" :class="warehouseStatusClass(warehouse)">{{ warehouseStatusLabel(warehouse) }}</span>
         </div>
@@ -140,17 +142,17 @@
       </div>
 
       <div class="chart-card narrow-card">
-        <div class="chart-header"><h3>Orders by Status</h3></div>
+        <div class="chart-header"><h3>Deliveries by Status</h3></div>
         <div class="status-donut">
           <svg viewBox="0 0 120 120" width="100">
             <circle cx="60" cy="60" r="46" fill="none" stroke="#f3f4f6" stroke-width="18" />
             <circle v-for="segment in orderSegments" :key="segment.status" cx="60" cy="60" r="46" fill="none" :stroke="segment.color" stroke-width="18" :stroke-dasharray="`${segment.arc} 289`" :stroke-dashoffset="segment.offset" stroke-linecap="butt" />
-            <text x="60" y="55" text-anchor="middle" font-size="18" font-weight="800" fill="#111827">{{ totalOrders }}</text>
-            <text x="60" y="68" text-anchor="middle" font-size="8" fill="#9ca3af">Total Orders</text>
+            <text x="60" y="55" text-anchor="middle" font-size="18" font-weight="800" fill="#111827">{{ totalShipments }}</text>
+            <text x="60" y="68" text-anchor="middle" font-size="8" fill="#9ca3af">Total Deliveries</text>
           </svg>
         </div>
         <div class="status-breakdown">
-          <div v-for="status in orderStatuses" :key="status.status" class="sb-row">
+          <div v-for="status in deliveryStatuses" :key="status.status" class="sb-row">
             <span class="sb-dot" :style="{ background: status.color }"></span>
             <span class="sb-label">{{ status.label }}</span>
             <div class="sb-track"><div class="sb-fill" :style="{ width: `${status.pct}%`, background: status.color }"></div></div>
@@ -174,14 +176,21 @@ const inventoryData = ref({});
 const supplierPerf = ref([]);
 const brokenSupplierLogos = ref(new Set());
 
-const orderStatusConfig = [
+const deliveryStatusConfig = [
+  { status: "pending", label: "Pending", color: "#f59e0b" },
+  { status: "in_transit", label: "In Transit", color: "#3b82f6" },
+  { status: "out_for_delivery", label: "Out for Delivery", color: "#8b5cf6" },
+  { status: "delivered", label: "Delivered", color: "#10b981" },
+  { status: "failed", label: "Failed", color: "#ef4444" },
+  { status: "returned", label: "Returned", color: "#6b7280" },
+];
+const shipSteps = [
   { status: "pending", label: "Pending", color: "#f59e0b" },
   { status: "processing", label: "Processing", color: "#3b82f6" },
   { status: "shipped", label: "Shipped", color: "#8b5cf6" },
   { status: "received", label: "Received", color: "#06b6d4" },
   { status: "completed", label: "Completed", color: "#10b981" },
 ];
-const shipSteps = [...orderStatusConfig];
 const SHIP_ORDER = shipSteps.map((step) => step.status);
 
 const userName = computed(() => getStoredUserName());
@@ -189,7 +198,7 @@ const visibleSupplierPerf = computed(() => (Array.isArray(supplierPerf.value) ? 
 const visibleRecentOrders = computed(() => (Array.isArray(summary.value?.recent_orders) ? summary.value.recent_orders : []));
 const visibleWarehouseOverview = computed(() => {
   const warehouses = Array.isArray(inventoryData.value?.by_warehouse) ? inventoryData.value.by_warehouse : [];
-  return [...warehouses].sort((a, b) => Number(b.total_units ?? 0) - Number(a.total_units ?? 0));
+  return [...warehouses].sort((a, b) => Number(b.total_flowers ?? b.total_units ?? 0) - Number(a.total_flowers ?? a.total_units ?? 0));
 });
 const greeting = computed(() => {
   const hour = new Date().getHours();
@@ -208,47 +217,61 @@ const orderCounts = computed(() => {
     }),
   );
 });
+const shipmentCounts = computed(() => {
+  const raw = summary.value?.shipments?.by_status ?? {};
+  return Object.fromEntries(
+    Object.entries(raw).map(([status, value]) => [status, Number(value ?? 0)]),
+  );
+});
 function statusCount(status) {
   const raw = orderCounts.value?.[status];
   if (typeof raw === "number") return raw;
   if (raw && typeof raw === "object") return Number(raw.count ?? 0);
   return Number(raw ?? 0);
 }
-const orderStatuses = computed(() => {
-  const total = orderStatusConfig.reduce((sum, cfg) => sum + statusCount(cfg.status), 0) || 1;
-  return orderStatusConfig.map((cfg) => ({ ...cfg, count: statusCount(cfg.status), pct: Math.round((statusCount(cfg.status) / total) * 100) }));
+const deliveryStatuses = computed(() => {
+  const total = deliveryStatusConfig.reduce((sum, cfg) => sum + Number(shipmentCounts.value?.[cfg.status] ?? 0), 0) || 1;
+  return deliveryStatusConfig.map((cfg) => {
+    const count = Number(shipmentCounts.value?.[cfg.status] ?? 0);
+    return { ...cfg, count, pct: Math.round((count / total) * 100) };
+  });
 });
-const totalOrders = computed(() => orderStatuses.value.reduce((sum, status) => sum + status.count, 0));
+const totalShipments = computed(() => deliveryStatuses.value.reduce((sum, status) => sum + status.count, 0));
 const orderSegments = computed(() => {
-  const total = totalOrders.value || 1;
+  const total = totalShipments.value || 1;
   let offset = 72;
-  return orderStatuses.value.map((status) => {
+  return deliveryStatuses.value.map((status) => {
     const arc = Math.round((status.count / total) * 289);
     const segment = { ...status, arc, offset };
     offset -= arc;
     return segment;
   });
 });
+const floorSummary = computed(() => ({
+  fresh: Number(inventoryData.value?.floor_summary?.fresh ?? 0),
+  aging: Number(inventoryData.value?.floor_summary?.aging ?? 0),
+  wilting: Number(inventoryData.value?.floor_summary?.wilting ?? 0),
+  spoiled: Number(inventoryData.value?.floor_summary?.spoiled ?? 0),
+  expiring_today: Number(inventoryData.value?.floor_summary?.expiring_today ?? 0),
+}));
 const inStockCount = computed(() => {
-  const total = Number(inventoryData.value.total_skus ?? 0);
-  const low = Number(inventoryData.value.low_stock_items?.length ?? 0);
-  const out = Number(inventoryData.value.out_of_stock_items?.length ?? 0);
-  return Math.max(0, total - low - out);
+  return floorSummary.value.fresh
+    + floorSummary.value.aging
+    + floorSummary.value.wilting
+    + floorSummary.value.spoiled;
 });
 const inventoryArc = computed(() => {
-  const total = Number(inventoryData.value.total_skus ?? 0) || 1;
+  const total = inStockCount.value || 1;
   return Math.round((inStockCount.value / total) * 289);
 });
 const kpis = computed(() => {
-  const totalSuppliers = Number(summary.value?.suppliers?.total ?? 0);
-  const totalWarehouses = Number(summary.value?.warehouses?.total ?? 0);
-  const orders = summary.value?.orders ?? {};
-  const flowerUnits = Number(inventoryData.value?.total_units ?? 0);
-  const lowStock = Number(inventoryData.value?.low_stock_items?.length ?? 0);
+  const totalWarehouses = visibleWarehouseOverview.value.length;
+  const flowerUnits = Number(inventoryData.value?.total_flowers ?? inventoryData.value?.total_units ?? 0);
+  const atRiskFlowers = floorSummary.value.spoiled + floorSummary.value.expiring_today;
   return [
     { label: "Purchase Orders", emoji: "✅", value: formatBig(orderCounts.value.completed ?? 0), trendText: "Completed orders", trendClass: "up", color: "#10b981", bg: "#ecfdf5", sparkData: sparkSeed(orderCounts.value.completed ?? 0, 6) },
     { label: "Processing Orders", emoji: "🚚", value: formatBig(orderCounts.value.processing ?? 0), trendText: `${orderCounts.value.pending ?? 0} pending next`, trendClass: "neutral", color: "#3b82f6", bg: "#eff6ff", sparkData: sparkSeed(orderCounts.value.processing ?? 0, 4) },
-    { label: "Flower Stocks", emoji: "🌸", value: formatBig(flowerUnits), trendText: `${lowStock} low-stock items`, trendClass: lowStock > 0 ? "down" : "up", color: "#8b5cf6", bg: "#f5f3ff", sparkData: sparkSeed(flowerUnits || 0, 8) },
+    { label: "Flower Stocks", emoji: "🌸", value: formatBig(flowerUnits), trendText: atRiskFlowers > 0 ? `${atRiskFlowers} at risk today` : `${floorSummary.value.fresh} fresh on floor`, trendClass: atRiskFlowers > 0 ? "down" : "up", color: "#8b5cf6", bg: "#f5f3ff", sparkData: sparkSeed(flowerUnits || 0, 8) },
     { label: "Warehouses", emoji: "🏬", value: formatBig(totalWarehouses), trendText: `${visibleWarehouseOverview.value.length} snapshots live`, trendClass: "neutral", color: "#f59e0b", bg: "#fffbeb", sparkData: sparkSeed(totalWarehouses || 0, 3) },
   ];
 });
@@ -281,16 +304,15 @@ function formatCompactNumber(value) {
 function formatAmount(value) { return Number(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function getSupplierLogo(supplier) { return supplier?.logo_url || supplier?.logo || supplier?.company_logo || supplier?.image_url || ""; }
 function warehouseStatusLabel(warehouse) {
-  const outOfStockCount = Number(warehouse?.out_of_stock_count ?? 0);
-  const totalUnits = Number(warehouse?.total_units ?? 0);
-  if (totalUnits <= 0) return "Empty";
-  if (outOfStockCount > 0) return "Needs Restock";
-  return "Healthy";
+  const totalFlowers = Number(warehouse?.total_flowers ?? warehouse?.total_units ?? 0);
+  if (totalFlowers <= 0) return "Empty";
+  if (totalFlowers < 25) return "Low Volume";
+  return "Stocked";
 }
 function warehouseStatusClass(warehouse) {
   const label = warehouseStatusLabel(warehouse);
   if (label === "Empty") return "pending";
-  if (label === "Needs Restock") return "received";
+  if (label === "Low Volume") return "received";
   return "completed";
 }
 function markSupplierLogoBroken(supplierId) {
@@ -381,10 +403,16 @@ function mockSummary() {
 }
 function mockInventory() {
   return {
-    total_skus: 32, total_units: 840,
-    low_stock_items: [{ item_id: 1, sku: "ROSE-RED", product_name: "Red Rose", quantity: 5, warehouse: "Main Warehouse" }, { item_id: 2, sku: "TULIP-WHT", product_name: "White Tulip", quantity: 4, warehouse: "North Warehouse" }],
-    out_of_stock_items: [{ item_id: 3, sku: "LILY-PNK", product_name: "Pink Lily", warehouse: "Main Warehouse" }],
-    by_warehouse: [{ warehouse_id: 1, warehouse_name: "Main Warehouse", total_units: 540, total_skus: 20, out_of_stock_count: 1 }, { warehouse_id: 2, warehouse_name: "North Warehouse", total_units: 300, total_skus: 12, out_of_stock_count: 0 }],
+    total_skus: 32,
+    total_units: 840,
+    total_flowers: 840,
+    floor_summary: { fresh: 18, aging: 7, wilting: 4, spoiled: 2, expiring_today: 3 },
+    low_stock_items: [],
+    out_of_stock_items: [],
+    by_warehouse: [
+      { warehouse_id: 1, warehouse_name: "Main Warehouse", total_units: 540, total_flowers: 540, total_skus: 20, out_of_stock_count: 0 },
+      { warehouse_id: 2, warehouse_name: "North Warehouse", total_units: 300, total_flowers: 300, total_skus: 12, out_of_stock_count: 0 },
+    ],
   };
 }
 function mockSuppliers() {
