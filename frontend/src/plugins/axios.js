@@ -26,7 +26,24 @@ const shouldForceLogout = (error) => {
   const url = error.config?.url ?? "";
   const normalizedUrl = url.startsWith("/") ? url : `/${url}`;
 
-  return ["/auth/me", "/auth/employee-me"].includes(normalizedUrl);
+  // Only identity endpoints should trigger a full local data wipe.
+  const isIdentityEndpoint = ["/auth/me", "/auth/employee-me"].some(
+    (ep) => normalizedUrl === ep || normalizedUrl === `/api${ep}`
+  );
+
+  if (!isIdentityEndpoint) {
+    return false;
+  }
+
+  // If we are currently navigating and don't even have a user in memory yet, 
+  // we should be more cautious about wiping localStorage, as it might be 
+  // a transient context mismatch during page load.
+  const hasToken = !!error.config?.headers?.Authorization;
+  if (!hasToken) {
+    return false;
+  }
+
+  return true;
 };
 
 // ================= REQUEST INTERCEPTOR =================

@@ -47,23 +47,20 @@ export const getPreferredAuthToken = (path = window.location.pathname) => {
   const routeContext = getRouteAuthContext(path);
   const userToken = getStoredUserToken();
   const employeeToken = getStoredEmployeeToken();
+  const storedUserType = localStorage.getItem("user_type");
 
-  if (routeContext === "user") {
-    return userToken;
-  }
-
-  if (routeContext === "employee") {
+  // During a direct refresh on a specific route, strictly follow that route's context.
+  if (routeContext === "employee" && employeeToken) {
     return employeeToken;
   }
 
-  const userType = localStorage.getItem("user_type");
-
-  if (userType === "employee") {
-    return employeeToken || userToken || null;
+  if (routeContext === "user" && userToken) {
+    return userToken;
   }
 
-  if (userType === "user") {
-    return userToken || employeeToken || null;
+  // Fallback to the stored user type if path context is neutral (e.g. public pages or root)
+  if (storedUserType === "employee") {
+    return employeeToken || userToken || null;
   }
 
   return userToken || employeeToken || null;
@@ -71,27 +68,26 @@ export const getPreferredAuthToken = (path = window.location.pathname) => {
 
 export const getPreferredUserType = (path = window.location.pathname) => {
   const routeContext = getRouteAuthContext(path);
+  const storedUserType = localStorage.getItem("user_type");
 
-  if (routeContext === "user") {
-    return getStoredUserToken() ? "user" : null;
+  if (routeContext === "employee" && getStoredEmployeeToken()) {
+    return "employee";
   }
 
-  if (routeContext === "employee") {
-    return getStoredEmployeeToken() ? "employee" : null;
-  }
-
-  const userType = localStorage.getItem("user_type");
-
-  if (userType === "employee" || userType === "user") {
-    return userType;
-  }
-
-  if (getStoredUserToken()) {
+  if (routeContext === "user" && getStoredUserToken()) {
     return "user";
+  }
+
+  if (storedUserType === "employee" || storedUserType === "user") {
+    return storedUserType;
   }
 
   if (getStoredEmployeeToken()) {
     return "employee";
+  }
+
+  if (getStoredUserToken()) {
+    return "user";
   }
 
   return null;

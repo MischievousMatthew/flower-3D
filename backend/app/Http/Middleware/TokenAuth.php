@@ -13,7 +13,7 @@ class TokenAuth
 {
     public function handle(Request $request, Closure $next, ?string $type = null): Response
     {
-        $plainToken = $request->bearerToken();
+        $plainToken = trim((string) $request->bearerToken());
 
         if (!$plainToken) {
             return response()->json([
@@ -26,12 +26,12 @@ class TokenAuth
         $authenticatable = null;
 
         if ($type === 'employee') {
-            $authenticatable = Employee::where('api_token', $hashedToken)->first();
+            $authenticatable = $this->resolveByToken(Employee::query(), $plainToken, $hashedToken);
         } elseif ($type === 'user') {
-            $authenticatable = User::where('api_token', $hashedToken)->first();
+            $authenticatable = $this->resolveByToken(User::query(), $plainToken, $hashedToken);
         } else {
-            $authenticatable = User::where('api_token', $hashedToken)->first()
-                ?? Employee::where('api_token', $hashedToken)->first();
+            $authenticatable = $this->resolveByToken(User::query(), $plainToken, $hashedToken)
+                ?? $this->resolveByToken(Employee::query(), $plainToken, $hashedToken);
         }
 
         if (!$authenticatable) {
@@ -45,5 +45,15 @@ class TokenAuth
         $request->setUserResolver(fn () => $authenticatable);
 
         return $next($request);
+    }
+
+    private function resolveByToken($query, string $plainToken, string $hashedToken)
+    {
+        return $query
+            ->where(function ($tokenQuery) use ($plainToken, $hashedToken) {
+                $tokenQuery->where('api_token', $hashedToken)
+                    ->orWhere('api_token', $plainToken);
+            })
+            ->first();
     }
 }
