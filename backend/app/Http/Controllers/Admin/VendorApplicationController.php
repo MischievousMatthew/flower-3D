@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
 use App\Mail\VendorAccountCreated;
+use App\Mail\VendorApplicationRejected;
 use Illuminate\Support\Str;
 use App\Helpers\CloudinaryHelper;
 use Illuminate\Database\QueryException;
@@ -165,6 +166,10 @@ class VendorApplicationController extends Controller
             }
 
             $application->update($updateData);
+
+            if ($validated['status'] === 'rejected' && !empty($validated['rejection_reason'])) {
+                $this->sendVendorRejectionEmail($application->fresh(), $validated['rejection_reason']);
+            }
 
             return response()->json([
                 'message' => 'Application status updated successfully',
@@ -416,6 +421,8 @@ class VendorApplicationController extends Controller
                 'reviewed_by'      => auth()->id(),
             ]);
 
+            $this->sendVendorRejectionEmail($application->fresh(), $validated['rejection_reason']);
+
             return response()->json([
                 'message'     => 'Vendor application rejected successfully!',
                 'application' => $application->fresh(),
@@ -431,6 +438,27 @@ class VendorApplicationController extends Controller
                 'error'   => 'Failed to reject application',
                 'message' => $e->getMessage(),
             ], 500);
+        }
+    }
+
+    /**
+     * Send rejection email to vendor applicant (in background, don't block rejection)
+     */
+    private function sendVendorRejectionEmail(VendorApplication $application, string $rejectionReason): void
+    {
+        try {
+            (new VendorApplicationRejected($application, $rejectionReason))->send();
+
+            Log::info('Vendor rejection email sent', [
+                'application_id' => $application->id,
+                'email'          => $application->email,
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('Vendor rejection email failed (application still rejected)', [
+                'application_id' => $application->id,
+                'email'          => $application->email,
+                'error'          => $e->getMessage(),
+            ]);
         }
     }
 

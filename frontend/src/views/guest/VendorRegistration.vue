@@ -1437,6 +1437,137 @@ const fileObjects = reactive({
 const errors = reactive({});
 const fileInfo = reactive({});
 
+const hasStoredFileInfo = (fieldName) => {
+  if (fieldName === "portfolio_photos") {
+    return Array.isArray(fileInfo[fieldName]) && fileInfo[fieldName].length > 0;
+  }
+
+  return !!fileInfo[fieldName];
+};
+
+const hasLiveFileObject = (fieldName) => {
+  if (fieldName === "portfolio_photos") {
+    return (
+      Array.isArray(fileObjects[fieldName]) &&
+      fileObjects[fieldName].some((file) => file instanceof File)
+    );
+  }
+
+  return fileObjects[fieldName] instanceof File;
+};
+
+const hasSelectedFile = (fieldName) =>
+  hasLiveFileObject(fieldName) || hasStoredFileInfo(fieldName);
+
+const toCamelCase = (value) =>
+  value.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+
+const getStepForErrorField = (field) => {
+  if (
+    [
+      "storeName",
+      "storeDescription",
+      "businessType",
+      "storeAddress",
+      "serviceAreas",
+      "operatingHours",
+    ].includes(field)
+  ) {
+    return 1;
+  }
+
+  if (
+    [
+      "ownerName",
+      "position",
+      "contactNumber",
+      "email",
+      "governmentId",
+      "governmentIdNumber",
+      "selfieWithId",
+      "proofOfAddress",
+      "government_id",
+      "selfie_with_id",
+      "proof_of_address",
+    ].includes(field)
+  ) {
+    return 2;
+  }
+
+  if (
+    [
+      "dtiNumber",
+      "secNumber",
+      "birTin",
+      "barangayClearanceNumber",
+      "mayorPermitNumber",
+      "barangayClearance",
+      "mayorPermit",
+      "barangay_clearance",
+      "mayor_permit",
+    ].includes(field)
+  ) {
+    return 3;
+  }
+
+  if (
+    [
+      "acceptTerms",
+      "acceptVendorAgreement",
+      "acceptDataPrivacy",
+      "storeLogo",
+      "portfolioPhotos",
+      "facebookPage",
+      "instagramPage",
+      "store_logo",
+      "portfolio_photos",
+    ].includes(field)
+  ) {
+    return 4;
+  }
+
+  if (["confirmAccuracy"].includes(field)) {
+    return 5;
+  }
+
+  return null;
+};
+
+const applyBackendErrors = (backendErrors = {}) => {
+  Object.keys(errors).forEach((key) => delete errors[key]);
+
+  const errorFields = Object.keys(backendErrors);
+
+  errorFields.forEach((errorKey) => {
+    const camelKey = toCamelCase(errorKey);
+    const messages = backendErrors[errorKey];
+    const firstMessage = Array.isArray(messages) ? messages[0] : messages;
+
+    errors[camelKey] = firstMessage;
+
+    if (camelKey !== errorKey && !errors[errorKey]) {
+      errors[errorKey] = firstMessage;
+    }
+  });
+
+  const firstErrorField = errorFields[0];
+  if (!firstErrorField) return null;
+
+  const mappedStep =
+    getStepForErrorField(toCamelCase(firstErrorField)) ??
+    getStepForErrorField(firstErrorField);
+
+  if (mappedStep) {
+    currentStep.value = mappedStep;
+  }
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  return Array.isArray(backendErrors[firstErrorField])
+    ? backendErrors[firstErrorField][0]
+    : backendErrors[firstErrorField];
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Legal Content (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1904,15 +2035,15 @@ const validateStep = (step) => {
         errors.governmentIdNumber = "Government ID number is required";
         isValid = false;
       }
-      if (!fileObjects.government_id) {
+      if (!hasSelectedFile("government_id")) {
         errors.government_id = "Government ID is required";
         isValid = false;
       }
-      if (!fileObjects.selfie_with_id) {
+      if (!hasSelectedFile("selfie_with_id")) {
         errors.selfie_with_id = "Selfie with ID is required";
         isValid = false;
       }
-      if (!fileObjects.proof_of_address) {
+      if (!hasSelectedFile("proof_of_address")) {
         errors.proof_of_address = "Proof of address is required";
         isValid = false;
       }
@@ -1931,7 +2062,7 @@ const validateStep = (step) => {
         errors.barangayClearanceNumber = "Barangay Clearance number is required";
         isValid = false;
       }
-      if (!fileObjects.barangay_clearance) {
+      if (!hasSelectedFile("barangay_clearance")) {
         errors.barangay_clearance = "Barangay Clearance document is required";
         isValid = false;
       }
@@ -1939,7 +2070,7 @@ const validateStep = (step) => {
         errors.mayorPermitNumber = "Mayor's Permit number is required";
         isValid = false;
       }
-      if (!fileObjects.mayor_permit) {
+      if (!hasSelectedFile("mayor_permit")) {
         errors.mayor_permit = "Mayor's Permit document is required";
         isValid = false;
       }
@@ -2145,6 +2276,35 @@ const handleSubmit = async () => {
     return;
   }
 
+  const requiredUploadFields = [
+    ["government_id", "Government ID"],
+    ["selfie_with_id", "Selfie with ID"],
+    ["proof_of_address", "Proof of Address"],
+    ["barangay_clearance", "Barangay Clearance"],
+    ["mayor_permit", "Mayor's Permit"],
+  ];
+
+  const staleUpload = requiredUploadFields.find(
+    ([fieldName]) => hasStoredFileInfo(fieldName) && !hasLiveFileObject(fieldName),
+  );
+
+  if (staleUpload) {
+    const [fieldName, label] = staleUpload;
+    const step = getStepForErrorField(fieldName) ?? getStepForErrorField(toCamelCase(fieldName));
+
+    if (step) {
+      currentStep.value = step;
+    }
+
+    errors[fieldName] = `${label} needs to be uploaded again before submitting.`;
+    errors[toCamelCase(fieldName)] = errors[fieldName];
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    toast.error(`${label} needs to be uploaded again before submitting.`, {
+      autoClose: 5000,
+    });
+    return;
+  }
+
   isSubmitting.value = true;
 
   try {
@@ -2237,77 +2397,10 @@ const handleSubmit = async () => {
       localStorage.setItem("lastVendorApplicationEmail", formData.email);
     } else {
       if (data.errors) {
-        Object.keys(errors).forEach((key) => delete errors[key]);
-
-        Object.keys(data.errors).forEach((errorKey) => {
-          const camelKey = errorKey.replace(/_([a-z])/g, (_, letter) =>
-            letter.toUpperCase(),
-          );
-          errors[camelKey] = data.errors[errorKey][0];
-        });
-
-        const errorFields = Object.keys(data.errors);
-        if (errorFields.length > 0) {
-          const firstError = errorFields[0];
-          const camelFirstError = firstError.replace(/_([a-z])/g, (_, letter) =>
-            letter.toUpperCase(),
-          );
-
-          if (
-            [
-              "storeName",
-              "storeDescription",
-              "businessType",
-              "storeAddress",
-              "serviceAreas",
-              "operatingHours",
-            ].includes(camelFirstError)
-          ) {
-            currentStep.value = 1;
-          } else if (
-            [
-              "ownerName",
-              "position",
-              "contactNumber",
-              "email",
-              "governmentId",
-              "governmentIdNumber",
-              "selfie_with_id",
-              "proof_of_address",
-            ].includes(camelFirstError)
-          ) {
-            currentStep.value = 2;
-          } else if (
-            [
-              "dtiNumber",
-              "secNumber",
-              "birTin",
-              "barangayClearanceNumber",
-              "mayorPermitNumber",
-              "barangay_clearance",
-              "mayor_permit",
-            ].includes(camelFirstError)
-          ) {
-            currentStep.value = 3;
-          } else if (
-            [
-              "acceptTerms",
-              "acceptVendorAgreement",
-              "acceptDataPrivacy",
-              "store_logo",
-              "portfolio_photos",
-              "facebookPage",
-              "instagramPage",
-            ].includes(camelFirstError)
-          ) {
-            currentStep.value = 4;
-          } else if (["confirmAccuracy"].includes(camelFirstError)) {
-            currentStep.value = 5;
-          }
-
-          window.scrollTo({ top: 0, behavior: "smooth" });
-          toast.error("Please fix the errors highlighted in the form.", {
-            autoClose: 3500,
+        const firstMessage = applyBackendErrors(data.errors);
+        if (firstMessage) {
+          toast.error(firstMessage, {
+            autoClose: 4500,
           });
         }
       } else {
@@ -2318,10 +2411,21 @@ const handleSubmit = async () => {
     }
   } catch (error) {
     console.error("Registration error:", error);
-    toast.error(
-      "An error occurred during registration. Please check your connection and try again.",
-      { autoClose: 4000 },
-    );
+    const responseData = error?.response?.data;
+
+    if (responseData?.errors) {
+      const firstMessage = applyBackendErrors(responseData.errors);
+      toast.error(
+        firstMessage || responseData.message || "Please fix the highlighted fields and try again.",
+        { autoClose: 5000 },
+      );
+    } else {
+      toast.error(
+        responseData?.message ||
+          "An error occurred during registration. Please check your connection and try again.",
+        { autoClose: 4000 },
+      );
+    }
   } finally {
     isSubmitting.value = false;
   }

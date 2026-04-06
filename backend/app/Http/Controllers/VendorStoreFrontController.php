@@ -153,6 +153,7 @@ class VendorStorefrontController extends Controller
 
             $query = Product::where('owner_id', $ownerId)
                 ->where('status', 'active')
+                ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->with([
                     'primaryImage',
                     'images'  => fn ($q) => $q->orderBy('display_order')->orderBy('id'),
@@ -237,8 +238,17 @@ class VendorStorefrontController extends Controller
 
             $flowers = Product::where('owner_id', $ownerId)
                 ->where('status', 'active')
-                ->where('selling_type', 'per_piece')
-                ->when($hasCustomizableColumn, fn ($query) => $query->where('is_customizable', true))
+                ->where(function ($query) use ($hasCustomizableColumn) {
+                    $query->where('selling_type', 'per_piece_customizable');
+
+                    if ($hasCustomizableColumn) {
+                        $query->orWhere(function ($legacyQuery) {
+                            $legacyQuery
+                                ->where('selling_type', 'per_piece')
+                                ->where('is_customizable', true);
+                        });
+                    }
+                })
                 ->whereHas('models', function ($query) {
                     $query->whereNotNull('model_path')
                         ->orWhereNotNull('model_url');

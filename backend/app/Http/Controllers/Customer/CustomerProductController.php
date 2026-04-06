@@ -43,6 +43,7 @@ class CustomerProductController extends Controller
             }
 
             $query = Product::where('status', 'active')
+                ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->with([
                     'primaryImage',
                     'images'  => fn ($q) => $q->orderBy('display_order')->orderBy('id'),
@@ -136,18 +137,22 @@ class CustomerProductController extends Controller
     {
         try {
             $categories = Product::where('status', 'active')
+                ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->distinct()->orderBy('category')->pluck('category')
                 ->filter()->values();
 
             $flowerTypes = Product::where('status', 'active')
+                ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->distinct()->orderBy('flower_type')->pluck('flower_type')
                 ->filter()->values();
 
             $colors = Product::where('status', 'active')
+                ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->distinct()->orderBy('color')->pluck('color')
                 ->filter()->values();
 
             $occasions = Product::where('status', 'active')
+                ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->whereNotNull('occasion_tags')
                 ->pluck('occasion_tags')
                 ->flatten()
@@ -157,6 +162,7 @@ class CustomerProductController extends Controller
                 ->values();
 
             $priceRow = Product::where('status', 'active')
+                ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->selectRaw('MIN(selling_price) as min_price, MAX(selling_price) as max_price')
                 ->first();
 
@@ -189,6 +195,7 @@ class CustomerProductController extends Controller
     {
         try {
             $product = Product::where('status', 'active')
+                ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->with(['primaryImage', 'images', 'models', 'owner'])
                 ->findOrFail($id);
 

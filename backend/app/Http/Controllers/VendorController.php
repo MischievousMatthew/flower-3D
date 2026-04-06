@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use App\Helpers\CloudinaryHelper;
 
 class VendorController extends Controller
@@ -28,7 +29,13 @@ class VendorController extends Controller
             'owner_name'                => 'required|string|max:255',
             'position'                  => 'required|string|max:255',
             'contact_number'            => 'required|string|max:20',
-            'email'                     => 'required|email|unique:vendor_applications,email',
+            'email'                     => [
+                'required',
+                'email',
+                Rule::unique('vendor_applications', 'email')->where(function ($query) {
+                    return $query->whereIn('status', ['pending', 'approved', 'under_review']);
+                }),
+            ],
             'government_id_number'      => 'required|string|max:255',
             'government_id'             => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
             'selfie_with_id'            => 'required|file|mimes:jpg,jpeg,png|max:5120',
@@ -51,7 +58,7 @@ class VendorController extends Controller
             'instagram_page'            => 'nullable|url',
             'application_date'          => 'required|date',
         ], [
-            'email.unique'                    => 'This email is already registered. Please use a different email.',
+            'email.unique'                    => 'This email already has a pending or approved vendor application. You can only register again if the previous application was rejected.',
             'government_id_number.required'   => 'Government ID number is required.',
             'accept_terms.required'           => 'You must accept the Terms & Conditions.',
             'accept_vendor_agreement.required'=> 'You must accept the Vendor Agreement.',
