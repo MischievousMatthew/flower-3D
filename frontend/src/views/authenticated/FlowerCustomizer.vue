@@ -24,7 +24,7 @@
         </div>
       </header>
 
-      <div class="fc-layout" :class="{ 'left-collapsed': isLeftSidebarCollapsed, 'right-collapsed': isRightSidebarCollapsed }">
+      <div ref="layoutContainer" class="fc-layout" :class="{ 'left-collapsed': isLeftSidebarCollapsed, 'right-collapsed': isRightSidebarCollapsed, fullscreen: isFullscreen }">
         <aside v-if="!isLeftSidebarCollapsed" class="fc-panel">
           <div class="fc-panel-head">
             <div>
@@ -131,6 +131,11 @@
             <div class="fc-panel-head"><h2>Transform</h2><span>{{ selectedFlower ? selectedFlower.product_name : "Select a flower" }}</span></div>
             <div v-if="!selectedFlower" class="fc-empty">Select a placed flower, then drag it on the bouquet or rotate it here.</div>
             <div v-else class="fc-transform">
+              <div class="fc-transform-actions single">
+                <button class="fc-btn fc-btn-light" @click="toggleSelectedLock">
+                  {{ selectedFlower.locked ? "Unlock Movement" : "Lock Movement" }}
+                </button>
+              </div>
               <label class="fc-transform-row">
                 <span>Rotate X</span>
                 <strong>{{ Math.round(selectedFlower.rotation.xDeg) }}°</strong>
@@ -146,6 +151,12 @@
                 <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('x', 15)">X +15°</button>
                 <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('y', -15)">Y -15°</button>
                 <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('y', 15)">Y +15°</button>
+              </div>
+              <div class="fc-transform-grid">
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('forward')">↑</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('left')">←</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('backward')">↓</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('right')">→</button>
               </div>
               <button class="fc-btn fc-btn-light full" @click="resetSelectedTransform">Reset Selected Flower</button>
             </div>
@@ -198,6 +209,7 @@ const { isAuthenticated } = useAuth();
 const cartStore = useCart();
 
 const viewerContainer = ref(null);
+const layoutContainer = ref(null);
 const flowers = ref([]);
 const loadingFlowers = ref(false);
 const search = ref("");
@@ -619,6 +631,7 @@ async function placeFlowerOnBouquet(flower, placement) {
       model_3d_url: flower.model,
       position: { x: placement.point.x, y: placement.point.y, z: placement.point.z },
       rotation: initialRotation,
+      locked: false,
     });
     selectedSceneId.value = sceneId;
     showToast(`${flower.product_name} placed on bouquet.`, "success");
@@ -696,7 +709,8 @@ function selectPlacedFlower(sceneId) {
 function moveSelectedFlower(clientX, clientY, sceneId = selectedSceneId.value) {
   const placement = getPlacement(clientX, clientY);
   const object = sceneId ? placedObjects.get(sceneId) : null;
-  if (!placement || !object) return;
+  const flower = selectedFlowers.value.find((entry) => entry.sceneId === sceneId);
+  if (!placement || !object || flower?.locked) return;
   object.position.copy(placement.point);
   updateFlowerState(sceneId, {
     position: { x: placement.point.x, y: placement.point.y, z: placement.point.z },
@@ -731,6 +745,33 @@ function resetSelectedTransform() {
     THREE.MathUtils.degToRad(resetRotation.zDeg),
   );
   updateFlowerState(flower.sceneId, { rotation: resetRotation });
+}
+
+function toggleSelectedLock() {
+  const flower = selectedFlower.value;
+  if (!flower) return;
+  updateFlowerState(flower.sceneId, { locked: !flower.locked });
+}
+
+function nudgeSelectedPosition(direction) {
+  const flower = selectedFlower.value;
+  const object = flower ? placedObjects.get(flower.sceneId) : null;
+  if (!flower || !object || flower.locked) return;
+
+  const step = 0.08;
+  const nextPosition = {
+    x: flower.position.x,
+    y: flower.position.y,
+    z: flower.position.z,
+  };
+
+  if (direction === "left") nextPosition.x -= step;
+  if (direction === "right") nextPosition.x += step;
+  if (direction === "forward") nextPosition.z -= step;
+  if (direction === "backward") nextPosition.z += step;
+
+  object.position.set(nextPosition.x, nextPosition.y, nextPosition.z);
+  updateFlowerState(flower.sceneId, { position: nextPosition });
 }
 
 function updateFlowerState(sceneId, patch) {
@@ -813,14 +854,14 @@ function toggleRightSidebar() {
 }
 
 async function toggleFullscreen() {
-  const stage = viewerContainer.value?.closest(".fc-stage");
-  if (!stage) return;
+  const layout = layoutContainer.value;
+  if (!layout) return;
 
   try {
     if (document.fullscreenElement) {
       await document.exitFullscreen();
     } else {
-      await stage.requestFullscreen();
+      await layout.requestFullscreen();
     }
   } catch (error) {
     console.error("Failed to toggle fullscreen:", error);
@@ -899,6 +940,7 @@ function showToast(message, type = "success") {
 .fc-subtitle { margin: 10px 0 0; color: #6c5b4b; }
 .fc-head-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
 .fc-layout { max-width: 1500px; margin: 0 auto; display: grid; grid-template-columns: 320px minmax(0,1fr) 340px; gap: 18px; min-height: calc(100vh - 160px); }
+.fc-layout.fullscreen { max-width: none; width: 100vw; min-height: 100vh; padding: 18px; background: radial-gradient(circle at top left, rgba(255,255,255,.18), transparent 34%), linear-gradient(135deg, #f5efe5 0%, #e9ded0 100%); }
 .fc-layout.left-collapsed { grid-template-columns: minmax(0,1fr) 340px; }
 .fc-layout.right-collapsed { grid-template-columns: 320px minmax(0,1fr); }
 .fc-layout.left-collapsed.right-collapsed { grid-template-columns: minmax(0,1fr); }
@@ -926,10 +968,10 @@ function showToast(message, type = "success") {
 .fc-stage-actions { position: absolute; top: 18px; right: 18px; z-index: 3; display: flex; gap: 10px; }
 .fc-stage .fc-viewer { width: 100%; height: 100%; min-height: 680px; cursor: grab; }
 .fc-stage.dragging .fc-viewer { cursor: grabbing; }
-.fc-stage:fullscreen { border-radius: 0; width: 100vw; height: 100vh; max-width: none; }
-.fc-stage:fullscreen .fc-viewer { min-height: 100vh; }
-.fc-stage:-webkit-full-screen { border-radius: 0; width: 100vw; height: 100vh; max-width: none; }
-.fc-stage:-webkit-full-screen .fc-viewer { min-height: 100vh; }
+.fc-layout:fullscreen { max-width: none; width: 100vw; height: 100vh; }
+.fc-layout:fullscreen .fc-viewer { min-height: calc(100vh - 36px); }
+.fc-layout:-webkit-full-screen { max-width: none; width: 100vw; height: 100vh; }
+.fc-layout:-webkit-full-screen .fc-viewer { min-height: calc(100vh - 36px); }
 .fc-overlay { position: absolute; left: 20px; right: 20px; pointer-events: none; display: flex; justify-content: center; }
 .fc-top { top: 20px; }
 .fc-center { inset: 0; align-items: center; }
@@ -947,6 +989,8 @@ function showToast(message, type = "success") {
 .fc-transform-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #6c5a4c; }
 .fc-range { width: 100%; accent-color: #8b5e3c; }
 .fc-transform-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.fc-transform-actions.single { grid-template-columns: 1fr; }
+.fc-transform-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .fc-swatches { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 .fc-swatch { width: 34px; height: 34px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; box-shadow: 0 8px 20px rgba(57,36,17,.14); }
 .fc-swatch.active { border-color: #5e3f2a; }
