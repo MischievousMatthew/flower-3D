@@ -82,9 +82,15 @@
             <div class="fc-panel-head"><h2>Placed Flowers</h2><span>{{ selectedFlowers.length }}/{{ MAX_FLOWERS }}</span></div>
             <div v-if="!selectedFlowers.length" class="fc-empty">No flowers placed yet.</div>
             <div v-else class="fc-list">
-              <div v-for="selection in selectedFlowers" :key="selection.sceneId" class="fc-selection">
+              <div
+                v-for="selection in selectedFlowers"
+                :key="selection.sceneId"
+                class="fc-selection"
+                :class="{ active: selectedSceneId === selection.sceneId }"
+                @click="selectPlacedFlower(selection.sceneId)"
+              >
                 <div><strong>{{ selection.product_name }}</strong><p>₱{{ selection.price.toFixed(2) }}</p></div>
-                <button class="fc-btn fc-btn-danger" @click="removeFlower(selection.sceneId)">Remove</button>
+                <button class="fc-btn fc-btn-danger" @click.stop="removeFlower(selection.sceneId)">Remove</button>
               </div>
             </div>
           </section>
@@ -95,6 +101,30 @@
               <button v-for="color in paperPresets" :key="color" class="fc-swatch" :class="{ active: paperColor === color }" :style="{ background: color }" @click="applyPaperColor(color)"></button>
             </div>
             <input v-model="paperColor" class="fc-input" type="color" @input="applyPaperColor(paperColor)" />
+          </section>
+
+          <section class="fc-section">
+            <div class="fc-panel-head"><h2>Transform</h2><span>{{ selectedFlower ? selectedFlower.product_name : "Select a flower" }}</span></div>
+            <div v-if="!selectedFlower" class="fc-empty">Select a placed flower, then drag it on the bouquet or rotate it here.</div>
+            <div v-else class="fc-transform">
+              <label class="fc-transform-row">
+                <span>Rotate X</span>
+                <strong>{{ Math.round(selectedFlower.rotation.xDeg) }}°</strong>
+              </label>
+              <input class="fc-range" type="range" min="-180" max="180" :value="selectedFlower.rotation.xDeg" @input="updateSelectedRotation('x', Number($event.target.value))" />
+              <label class="fc-transform-row">
+                <span>Rotate Y</span>
+                <strong>{{ Math.round(selectedFlower.rotation.yDeg) }}°</strong>
+              </label>
+              <input class="fc-range" type="range" min="-180" max="180" :value="selectedFlower.rotation.yDeg" @input="updateSelectedRotation('y', Number($event.target.value))" />
+              <div class="fc-transform-actions">
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('x', -15)">X -15°</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('x', 15)">X +15°</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('y', -15)">Y -15°</button>
+                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('y', 15)">Y +15°</button>
+              </div>
+              <button class="fc-btn fc-btn-light full" @click="resetSelectedTransform">Reset Selected Flower</button>
+            </div>
           </section>
 
           <section class="fc-section">
@@ -150,6 +180,7 @@ const search = ref("");
 const pendingFlower = ref(null);
 const draggedFlower = ref(null);
 const selectedFlowers = ref([]);
+const selectedSceneId = ref(null);
 const isDragOver = ref(false);
 const dragFeedback = ref("");
 const paperColor = ref("#d3b18f");
@@ -169,8 +200,9 @@ const filteredFlowers = computed(() => {
   return flowers.value.filter((flower) => !term || flower.product_name.toLowerCase().includes(term));
 });
 const totalPrice = computed(() => selectedFlowers.value.reduce((sum, flower) => sum + flower.price, 0));
+const selectedFlower = computed(() => selectedFlowers.value.find((flower) => flower.sceneId === selectedSceneId.value) || null);
 
-let scene, camera, renderer, controls, bouquetRoot, flowerLayer, hoverMarker, animationFrameId = 0, pointerDown = null, toastTimer;
+let scene, camera, renderer, controls, bouquetRoot, flowerLayer, hoverMarker, animationFrameId = 0, pointerDown = null, transformDrag = null, toastTimer;
 const loader = new GLTFLoader();
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -398,14 +430,40 @@ function setupCanvasInteractions() {
   canvas.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
     pointerDown = { x: event.clientX, y: event.clientY };
+    const placedHit = getPlacedFlowerHit(event.clientX, event.clientY);
+    if (placedHit?.sceneId) {
+      selectPlacedFlower(placedHit.sceneId);
+      transformDrag = { sceneId: placedHit.sceneId };
+      controls.enabled = false;
+    }
   });
   canvas.addEventListener("pointermove", (event) => {
+    if (transformDrag?.sceneId) {
+      moveSelectedFlower(event.clientX, event.clientY, transformDrag.sceneId);
+      return;
+    }
     if (pendingFlower.value || draggedFlower.value) updateHoverMarker(event.clientX, event.clientY);
   });
-  canvas.addEventListener("pointerleave", hideHoverMarker);
+  canvas.addEventListener("pointerleave", () => {
+    transformDrag = null;
+    if (controls) controls.enabled = true;
+    hideHoverMarker();
+  });
   canvas.addEventListener("pointerup", async (event) => {
     if (!pointerDown || event.button !== 0) return;
     const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y) > 6;
+    if (transformDrag?.sceneId) {
+      transformDrag = null;
+      if (controls) controls.enabled = true;
+      pointerDown = null;
+      return;
+    }
+    const placedHit = getPlacedFlowerHit(event.clientX, event.clientY);
+    if (!moved && placedHit?.sceneId) {
+      selectPlacedFlower(placedHit.sceneId);
+      pointerDown = null;
+      return;
+    }
     pointerDown = null;
     if (moved || !pendingFlower.value) return;
     const placement = getPlacement(event.clientX, event.clientY);
@@ -427,6 +485,19 @@ function getPlacement(clientX, clientY) {
   const hit = intersections[0];
   const normal = hit.face?.normal ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() : new THREE.Vector3(0, 1, 0);
   return { point: hit.point.clone().add(normal.clone().multiplyScalar(0.05)), normal };
+}
+
+function getPlacedFlowerHit(clientX, clientY) {
+  if (!viewerContainer.value || !camera || !placedObjects.size) return null;
+  const bounds = viewerContainer.value.getBoundingClientRect();
+  pointer.x = ((clientX - bounds.left) / bounds.width) * 2 - 1;
+  pointer.y = -((clientY - bounds.top) / bounds.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const intersections = raycaster.intersectObjects(Array.from(placedObjects.values()), true);
+  if (!intersections.length) return null;
+  let current = intersections[0].object;
+  while (current && !current.userData?.sceneId) current = current.parent;
+  return current?.userData?.sceneId ? { sceneId: current.userData.sceneId, object: current } : null;
 }
 
 function updateHoverMarker(clientX, clientY) {
@@ -458,13 +529,20 @@ async function placeFlowerOnBouquet(flower, placement) {
     const instance = SkeletonUtils.clone(template);
     const wrapper = new THREE.Group();
     const sceneId = `${flower.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const initialRotation = {
+      xDeg: -5,
+      yDeg: 180,
+      zDeg: THREE.MathUtils.radToDeg((Math.random() - 0.5) * 0.14),
+    };
     fitFlowerModel(instance);
     wrapper.add(instance);
     wrapper.position.copy(placement.point);
-    wrapper.lookAt(new THREE.Vector3(0, placement.point.y + 0.35, 0));
-    wrapper.rotateY(Math.PI);
-    wrapper.rotateX(-0.08);
-    wrapper.rotateZ((Math.random() - 0.5) * 0.14);
+    wrapper.rotation.set(
+      THREE.MathUtils.degToRad(initialRotation.xDeg),
+      THREE.MathUtils.degToRad(initialRotation.yDeg),
+      THREE.MathUtils.degToRad(initialRotation.zDeg),
+    );
+    wrapper.userData.sceneId = sceneId;
     flowerLayer.add(wrapper);
     placedObjects.set(sceneId, wrapper);
     selectedFlowers.value.push({
@@ -475,7 +553,9 @@ async function placeFlowerOnBouquet(flower, placement) {
       price: Number(flower.price || 0),
       model_3d_url: flower.model,
       position: { x: placement.point.x, y: placement.point.y, z: placement.point.z },
+      rotation: initialRotation,
     });
+    selectedSceneId.value = sceneId;
     showToast(`${flower.product_name} placed on bouquet.`, "success");
   } catch (error) {
     console.error("Failed to place flower model:", error);
@@ -522,6 +602,9 @@ function applyRibbonColor(color) {
 
 function removeFlower(sceneId) {
   selectedFlowers.value = selectedFlowers.value.filter((flower) => flower.sceneId !== sceneId);
+  if (selectedSceneId.value === sceneId) {
+    selectedSceneId.value = selectedFlowers.value[0]?.sceneId ?? null;
+  }
   const object = placedObjects.get(sceneId);
   if (object) {
     flowerLayer.remove(object);
@@ -535,10 +618,61 @@ function resetDesign() {
     if (object) flowerLayer.remove(object);
   });
   selectedFlowers.value = [];
+  selectedSceneId.value = null;
   placedObjects.clear();
   pendingFlower.value = null;
   draggedFlower.value = null;
   hideHoverMarker();
+}
+
+function selectPlacedFlower(sceneId) {
+  selectedSceneId.value = sceneId;
+}
+
+function moveSelectedFlower(clientX, clientY, sceneId = selectedSceneId.value) {
+  const placement = getPlacement(clientX, clientY);
+  const object = sceneId ? placedObjects.get(sceneId) : null;
+  if (!placement || !object) return;
+  object.position.copy(placement.point);
+  updateFlowerState(sceneId, {
+    position: { x: placement.point.x, y: placement.point.y, z: placement.point.z },
+  });
+}
+
+function updateSelectedRotation(axis, degrees) {
+  const sceneId = selectedSceneId.value;
+  const object = sceneId ? placedObjects.get(sceneId) : null;
+  const flower = selectedFlower.value;
+  if (!sceneId || !object || !flower) return;
+  const nextRotation = { ...flower.rotation, [`${axis}Deg`]: degrees };
+  if (axis === "x") object.rotation.x = THREE.MathUtils.degToRad(degrees);
+  if (axis === "y") object.rotation.y = THREE.MathUtils.degToRad(degrees);
+  updateFlowerState(sceneId, { rotation: nextRotation });
+}
+
+function nudgeSelectedRotation(axis, delta) {
+  const flower = selectedFlower.value;
+  if (!flower) return;
+  updateSelectedRotation(axis, flower.rotation[`${axis}Deg`] + delta);
+}
+
+function resetSelectedTransform() {
+  const flower = selectedFlower.value;
+  const object = flower ? placedObjects.get(flower.sceneId) : null;
+  if (!flower || !object) return;
+  const resetRotation = { xDeg: -5, yDeg: 180, zDeg: 0 };
+  object.rotation.set(
+    THREE.MathUtils.degToRad(resetRotation.xDeg),
+    THREE.MathUtils.degToRad(resetRotation.yDeg),
+    THREE.MathUtils.degToRad(resetRotation.zDeg),
+  );
+  updateFlowerState(flower.sceneId, { rotation: resetRotation });
+}
+
+function updateFlowerState(sceneId, patch) {
+  selectedFlowers.value = selectedFlowers.value.map((flower) =>
+    flower.sceneId === sceneId ? { ...flower, ...patch } : flower,
+  );
 }
 
 function enforceFlowerLimit(flower) {
@@ -692,8 +826,14 @@ function showToast(message, type = "success") {
 .fc-status span, .fc-modal p { color: #6d5847; font-size: 13px; }
 .fc-section { border: 1px solid rgba(122,92,60,.1); border-radius: 20px; padding: 16px; background: rgba(255,252,247,.86); }
 .fc-side { gap: 16px; }
-.fc-selection { padding: 12px 14px; border-radius: 16px; background: #fff; border: 1px solid rgba(122,92,60,.08); }
+.fc-selection { padding: 12px 14px; border-radius: 16px; background: #fff; border: 1px solid rgba(122,92,60,.08); cursor: pointer; transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.fc-selection:hover { transform: translateY(-1px); border-color: rgba(139,94,60,.28); }
+.fc-selection.active { border-color: #8b5e3c; box-shadow: 0 0 0 3px rgba(139,94,60,.12); }
 .fc-selection p, .fc-card p { margin: 4px 0 0; color: #8a5b35; font-weight: 600; }
+.fc-transform { display: grid; gap: 12px; }
+.fc-transform-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #6c5a4c; }
+.fc-range { width: 100%; accent-color: #8b5e3c; }
+.fc-transform-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .fc-swatches { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 .fc-swatch { width: 34px; height: 34px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; box-shadow: 0 8px 20px rgba(57,36,17,.14); }
 .fc-swatch.active { border-color: #5e3f2a; }
