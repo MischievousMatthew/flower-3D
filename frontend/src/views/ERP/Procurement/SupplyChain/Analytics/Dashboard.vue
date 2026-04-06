@@ -1,6 +1,5 @@
 <template>
   <div class="dashboard">
-    
     <div class="dash-header">
       <div>
         <h1 class="dash-title">Dashboard</h1>
@@ -15,7 +14,7 @@
           <input type="date" v-model="dateTo" @change="reload" />
         </div>
         <router-link
-          to="/erp/procurement/supply-chain/deliveries"
+          to="/erp/procurement/supply-chain/orders"
           class="btn-primary"
         >
           <svg viewBox="0 0 20 20" fill="currentColor" width="14">
@@ -445,7 +444,6 @@ import { ref, computed, onMounted } from "vue";
 import { analyticsService } from "../../../../../services/analyticsService";
 import { deliveryService } from "../../../../../services/deliveryService";
 
-
 const loading = ref(true);
 const dateFrom = ref("");
 const dateTo = ref("");
@@ -545,11 +543,36 @@ const inventoryArc = computed(() => {
 // ── Orders ───────────────────────────────────────────────────────────────────
 
 const orderStatusConfig = [
-  { status: "pending", sourceKey: "pending", label: "New Orders", color: "#f59e0b" },
-  { status: "processing", sourceKey: "to_processed", label: "Processing", color: "#3b82f6" },
-  { status: "shipped", sourceKey: "to_ship", label: "Shipped", color: "#8b5cf6" },
-  { status: "received", sourceKey: "to_received", label: "Received", color: "#06b6d4" },
-  { status: "completed", sourceKey: "completed", label: "Completed", color: "#10b981" },
+  {
+    status: "pending",
+    sourceKey: "pending",
+    label: "New Orders",
+    color: "#f59e0b",
+  },
+  {
+    status: "processing",
+    sourceKey: "to_processed",
+    label: "Processing",
+    color: "#3b82f6",
+  },
+  {
+    status: "shipped",
+    sourceKey: "to_ship",
+    label: "Shipped",
+    color: "#8b5cf6",
+  },
+  {
+    status: "received",
+    sourceKey: "to_received",
+    label: "Received",
+    color: "#06b6d4",
+  },
+  {
+    status: "completed",
+    sourceKey: "completed",
+    label: "Completed",
+    color: "#10b981",
+  },
 ];
 
 const totalOrders = computed(() => {
