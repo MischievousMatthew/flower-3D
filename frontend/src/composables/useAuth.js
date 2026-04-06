@@ -295,8 +295,9 @@ export function useAuth() {
       localStorage.setItem("user", JSON.stringify(user.value));
       setAuthHeader(userType);
     } catch (err) {
-      console.error("Fetch user error:", err);
+      console.warn("Fetch user error (ignored if transient):", err?.message);
       if (err?.response?.status === 401) {
+        console.warn("Unauthorized during fetchUser - clearing local auth state");
         clearAuthData();
       }
       throw err;
@@ -311,18 +312,30 @@ export function useAuth() {
 
     if (!token) throw new Error("No token found");
 
-    // Important: Set the auth header in axios before fetching from API!
+    // Set the auth header in axios so the fetch call below works
     setAuthHeader(userType);
 
-    if (storedUser) {
+    // CRITICAL: Hydrate in-memory state before any async calls to prevent 
+    // router guards from seeing a null user during navigation.
+    if (storedUser && !user.value) {
       try {
         user.value = JSON.parse(storedUser);
       } catch (err) {
-        console.error("Failed to parse stored user:", err);
+        console.warn("Failed to parse stored user during loadUser:", err);
       }
     }
 
-    await fetchUser(path);
+    try {
+      await fetchUser(path);
+    } catch (err) {
+      // If we already have a user in memory from localStorage, don't crash
+      // the navigation just because the background fetch failed (unless it was a 401).
+      if (user.value && err?.response?.status !== 401) {
+        console.warn("Fetch user failed, but continuing with stored data.", err?.message);
+        return;
+      }
+      throw err;
+    }
   };
 
   // ================= INIT AUTH =================
@@ -333,7 +346,7 @@ export function useAuth() {
     const token = getPreferredAuthToken(path);
     const storedUser = localStorage.getItem("user");
 
-    if (storedUser) {
+    if (storedUser && !user.value) {
       try {
         user.value = JSON.parse(storedUser);
       } catch (err) {

@@ -2,6 +2,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import { useAuth } from "./useAuth";
+import { useAssignment } from "./useAssignment";
 import api from "../plugins/axios";
 
 const unreadChatCount = ref(0);
@@ -16,7 +17,12 @@ let notificationPermissionRequested = false;
 
 const shouldEnableChatNotifications = (user) => {
   if (!user) return false;
-  if (user.type === "employee") return true;
+
+  if (user.type === "employee") {
+    // We check if the employee has CRM module access before polling
+    const { canView } = useAssignment();
+    return canView("crm");
+  }
 
   return ["customer", "vendor"].includes(user.role);
 };

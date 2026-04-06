@@ -626,53 +626,39 @@ router.beforeEach(async (to, from, next) => {
     return next();
   }
 
-  // Load user if not in memory
+  // Load user if not in memory (happens on refresh)
   if (!auth.user.value) {
     try {
       await auth.loadUser(to.path);
-
-      // Bootstrap assignments from user data if it's an employee
-      if (userType === "employee") {
-        const { loadAssignments } = useAssignment();
-        // Since loadUser populates auth.user.value:
-        await loadAssignments(auth.user.value);
-      }
+      // Wait for loadUser to complete, which now hydrates auth.user.value 
+      // from localStorage immediately.
     } catch (err) {
       const status = err?.response?.status;
-      console.warn("Auth load failed", { status, path: to.path });
-
+      
+      // If it's a definitive 401, clear and redirect
       if (status === 401) {
         clearStoredAuth();
         auth.user.value = null;
-
-        if (
-          to.meta.requiresAuth ||
-          to.meta.requiresAdmin ||
-          to.meta.requiresVendor ||
-          to.meta.requiresDepartment
-        ) {
+        if (to.meta.requiresAuth || to.meta.requiresAdmin || to.meta.requiresVendor) {
           return next("/guest/login");
         }
-
         return next();
       }
 
-      // For transient bootstrap failures, preserve the local session state
-      // instead of forcing a logout on refresh.
-      if (auth.user.value && token) {
-        return next();
-      }
-
-      if (
-        to.meta.requiresAuth ||
-        to.meta.requiresAdmin ||
-        to.meta.requiresVendor ||
-        to.meta.requiresDepartment
-      ) {
+      // For other errors (network timeout, 500), if we have a user in memory 
+      // from localStorage, we permit the navigation to proceed rather than 
+      // forcing a logout.
+      if (!auth.user.value && (to.meta.requiresAuth || to.meta.requiresAdmin || to.meta.requiresVendor)) {
         return next("/guest/login");
       }
+    }
+  }
 
-      return next();
+  // After loading attempt, check if we need to bootstrap assignments for employees
+  if (auth.user.value && userType === "employee") {
+    const assignment = useAssignment();
+    if (!assignment.hasAnyPermission.value) {
+      await assignment.loadAssignments(auth.user.value);
     }
   }
 
