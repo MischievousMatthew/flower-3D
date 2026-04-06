@@ -198,11 +198,25 @@ const greeting = computed(() => {
   return "Good evening";
 });
 const todayLabel = computed(() => new Date().toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
-const orderCounts = computed(() => summary.value?.orders?.by_status ?? {});
+const orderCounts = computed(() => {
+  const raw = summary.value?.orders?.by_status ?? {};
+  return Object.fromEntries(
+    Object.entries(raw).map(([status, value]) => {
+      if (typeof value === "number") return [status, value];
+      if (value && typeof value === "object") return [status, Number(value.count ?? 0)];
+      return [status, Number(value ?? 0)];
+    }),
+  );
+});
+function statusCount(status) {
+  const raw = orderCounts.value?.[status];
+  if (typeof raw === "number") return raw;
+  if (raw && typeof raw === "object") return Number(raw.count ?? 0);
+  return Number(raw ?? 0);
+}
 const orderStatuses = computed(() => {
-  const counts = orderCounts.value;
-  const total = orderStatusConfig.reduce((sum, cfg) => sum + Number(counts?.[cfg.status] ?? 0), 0) || 1;
-  return orderStatusConfig.map((cfg) => ({ ...cfg, count: Number(counts?.[cfg.status] ?? 0), pct: Math.round((Number(counts?.[cfg.status] ?? 0) / total) * 100) }));
+  const total = orderStatusConfig.reduce((sum, cfg) => sum + statusCount(cfg.status), 0) || 1;
+  return orderStatusConfig.map((cfg) => ({ ...cfg, count: statusCount(cfg.status), pct: Math.round((statusCount(cfg.status) / total) * 100) }));
 });
 const totalOrders = computed(() => orderStatuses.value.reduce((sum, status) => sum + status.count, 0));
 const orderSegments = computed(() => {
@@ -292,13 +306,20 @@ function avatarBg(name) {
 }
 function compColor(rate) { if (rate >= 80) return "#10b981"; if (rate >= 50) return "#f59e0b"; return "#ef4444"; }
 function sparkSeed(value, variance) {
-  const base = Math.max(1, Number(value || 0));
-  return Array.from({ length: 10 }, (_, index) => Math.max(1, Math.round(base * (0.45 + index * 0.05) + variance * ((index % 3) + 1))));
+  const numericValue = Number(value);
+  const numericVariance = Number(variance);
+  const base = Number.isFinite(numericValue) ? Math.max(1, numericValue) : 1;
+  const spread = Number.isFinite(numericVariance) ? numericVariance : 0;
+  return Array.from({ length: 10 }, (_, index) => Math.max(1, Math.round(base * (0.45 + index * 0.05) + spread * ((index % 3) + 1))));
 }
 function sparkPoints(data) {
   if (!data?.length) return "";
-  const max = Math.max(...data); const min = Math.min(...data); const range = max - min || 1;
-  return data.map((value, index) => {
+  const safe = data.map((value) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+  });
+  const max = Math.max(...safe); const min = Math.min(...safe); const range = max - min || 1;
+  return safe.map((value, index) => {
     const x = (index / (data.length - 1)) * 80;
     const y = 26 - ((value - min) / range) * 24;
     return `${x},${y}`;
@@ -306,8 +327,12 @@ function sparkPoints(data) {
 }
 function sparkArea(data) {
   if (!data?.length) return "";
-  const max = Math.max(...data); const min = Math.min(...data); const range = max - min || 1;
-  const points = data.map((value, index) => {
+  const safe = data.map((value) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+  });
+  const max = Math.max(...safe); const min = Math.min(...safe); const range = max - min || 1;
+  const points = safe.map((value, index) => {
     const x = (index / (data.length - 1)) * 80;
     const y = 26 - ((value - min) / range) * 24;
     return `${x},${y}`;
