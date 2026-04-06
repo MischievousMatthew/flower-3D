@@ -109,9 +109,13 @@ class AnalyticsService
         ->map(fn ($supplier) => [
             'supplier_id'      => $supplier->id,
             'company_name'     => $supplier->company_name,
+            'location'         => $supplier->address,
+            'logo'             => $supplier->logo,
+            'logo_url'         => $supplier->logo_url,
             'status'           => $supplier->status,
             'total_orders'     => (int)   $supplier->total_orders,
             'total_value'      => (float) $supplier->total_value,
+            'total_gmv'        => (float) $supplier->total_value,
             'completed_orders' => (int)   $supplier->completed_orders,
             'completion_rate'  => $supplier->total_orders > 0
                 ? round(($supplier->completed_orders / $supplier->total_orders) * 100, 2)

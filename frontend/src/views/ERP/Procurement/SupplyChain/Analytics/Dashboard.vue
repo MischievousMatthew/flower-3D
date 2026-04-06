@@ -256,11 +256,11 @@
 
         <div class="divider"></div>
 
-        <!-- Live shipment list -->
-        <div class="section-label">Active Shipments</div>
+        <!-- Live warehouse list -->
+        <div class="section-label">Warehouse Snapshot</div>
         <div
-          v-for="ship in visibleRecentShipments.slice(0, 4)"
-          :key="ship.id"
+          v-for="warehouse in visibleWarehouseOverview.slice(0, 4)"
+          :key="warehouse.warehouse_id"
           class="live-ship-row"
         >
           <div class="live-icon">
@@ -271,19 +271,32 @@
               stroke-width="1.5"
               width="14"
             >
-              <rect x="1" y="5" width="10" height="10" rx="1" />
-              <path d="M11 8h5l2 3v4h-7V8z" />
-              <circle cx="4" cy="15" r="2" />
-              <circle cx="15" cy="15" r="2" />
+              <path d="M2 8.5 10 3l8 5.5" />
+              <path d="M4 8v8h12V8" />
+              <path d="M8 16v-4h4v4" />
             </svg>
           </div>
           <div class="live-info">
-            <span class="live-num">#{{ ship.tracking_number?.slice(-7) }}</span>
-            <span class="live-type">Food Materials</span>
+            <span class="live-num">{{
+              warehouse.warehouse_name || "Unnamed Warehouse"
+            }}</span>
+            <span class="live-type">
+              {{ warehouse.total_units ?? 0 }} units •
+              {{ warehouse.total_skus ?? 0 }} SKUs
+            </span>
           </div>
-          <span class="live-badge" :class="ship.status">{{
-            formatStatus(ship.status)
-          }}</span>
+          <span
+            class="live-badge"
+            :class="warehouseStatusClass(warehouse)"
+          >
+            {{ warehouseStatusLabel(warehouse) }}
+          </span>
+        </div>
+        <div
+          v-if="!visibleWarehouseOverview.length"
+          class="empty-chart live-overview-empty"
+        >
+          No warehouse data yet
         </div>
       </div>
     </div>
@@ -462,6 +475,12 @@ const visibleRecentShipments = computed(() =>
   Array.isArray(recentShipments.value) ? recentShipments.value : [],
 );
 
+const visibleWarehouseOverview = computed(() =>
+  Array.isArray(inventoryData.value?.by_warehouse)
+    ? inventoryData.value.by_warehouse
+    : [],
+);
+
 const userName = "Daniel";
 
 const greeting = computed(() => {
@@ -638,6 +657,23 @@ function getSupplierLogo(supplier) {
     supplier?.image_url ||
     ""
   );
+}
+
+function warehouseStatusLabel(warehouse) {
+  const outOfStockCount = Number(warehouse?.out_of_stock_count ?? 0);
+  const totalUnits = Number(warehouse?.total_units ?? 0);
+
+  if (totalUnits <= 0) return "Empty";
+  if (outOfStockCount > 0) return "Needs Restock";
+  return "Healthy";
+}
+
+function warehouseStatusClass(warehouse) {
+  const label = warehouseStatusLabel(warehouse);
+
+  if (label === "Empty") return "pending";
+  if (label === "Needs Restock") return "out_for_delivery";
+  return "delivered";
 }
 function markSupplierLogoBroken(supplierId) {
   const next = new Set(brokenSupplierLogos.value);
