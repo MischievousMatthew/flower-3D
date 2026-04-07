@@ -38,7 +38,7 @@
 
           <div v-if="!storeId" class="fc-empty">Open this page from a vendor storefront so the customizer can load that vendor's flowers.</div>
           <div v-else-if="loadingFlowers" class="fc-empty">Loading flowers...</div>
-          <div v-else-if="!filteredFlowers.length" class="fc-empty">No valid customizable flowers were found for this vendor.</div>
+          <div v-else-if="!filteredFlowers.length" class="fc-empty">No valid per-piece flowers were found for this vendor.</div>
 
           <div v-else class="fc-list">
             <article
