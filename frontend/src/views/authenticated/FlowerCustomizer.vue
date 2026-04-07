@@ -385,13 +385,10 @@ async function fetchFlowers() {
   if (!storeId.value) return;
   loadingFlowers.value = true;
   try {
-    const response = await api.get(`/stores/${storeId.value}/customizable-flowers`, {
-      params: vendorOwnerId.value ? { owner_id: vendorOwnerId.value } : {},
-    });
+    const response = await api.get(`/stores/${storeId.value}/customizable-flowers`);
     const rawItems = Array.isArray(response.data?.data) ? response.data.data : [];
     flowers.value = rawItems.map(normalizeFlower).filter((flower) => {
       if (!flower.model) return false;
-      if (vendorOwnerId.value && flower.owner_id !== vendorOwnerId.value) return false;
       return true;
     });
   } catch (error) {
