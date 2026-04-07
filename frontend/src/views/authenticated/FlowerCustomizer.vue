@@ -388,14 +388,36 @@ async function fetchFlowers() {
     const response = await api.get(`/stores/${storeId.value}/customizable-flowers`, {
       params: vendorOwnerId.value ? { owner_id: vendorOwnerId.value } : {},
     });
+    console.log("[FlowerCustomizer] API Response:", response.data);
     const rawItems = Array.isArray(response.data?.data) ? response.data.data : [];
+    console.log("[FlowerCustomizer] Raw items count:", rawItems.length);
+    
     flowers.value = rawItems.map(normalizeFlower).filter((flower) => {
-      if (!flower.model) return false;
-      if (!["per_piece", "per_piece_customizable"].includes(flower.selling_type)) return false;
-      if (!flower.is_customizable) return false;
-      if (vendorOwnerId.value && flower.owner_id !== vendorOwnerId.value) return false;
-      return true;
+      const hasModel = !!flower.model;
+      const isCorrectType = ["per_piece", "per_piece_customizable"].includes(flower.selling_type);
+      const isCustomizable = !!flower.is_customizable;
+      const belongsToVendor = !vendorOwnerId.value || flower.owner_id === vendorOwnerId.value;
+      
+      const ok = hasModel && isCorrectType && isCustomizable && belongsToVendor;
+      
+      if (!ok) {
+        console.log("[FlowerCustomizer] Filtered out flower:", flower.product_name, {
+          hasModel,
+          isCorrectType,
+          isCustomizable,
+          belongsToVendor,
+          selling_type: flower.selling_type,
+          owner_id: flower.owner_id,
+          expected_owner: vendorOwnerId.value
+        });
+      }
+      
+      return ok;
     });
+    console.log("[FlowerCustomizer] Final flowers count:", flowers.value.length);
+    if (flowers.value.length === 0 && rawItems.length > 0) {
+      console.warn("[FlowerCustomizer] All items were filtered out!");
+    }
   } catch (error) {
     console.error("Failed to fetch customizable flowers:", error);
     flowers.value = [];
@@ -408,12 +430,15 @@ async function fetchFlowers() {
 function normalizeFlower(flower) {
   const model = resolveModelUrl(flower);
   const sellingType = flower.selling_type || "per_piece";
+
+  // Force true for per_piece_customizable
+  // For others, check truthiness of is_customizable (supporting 1, "1", true, "true")
   const isCustomizable =
-    sellingType === "per_piece_customizable"
-      ? true
-      : flower.is_customizable === undefined
-        ? true
-        : Boolean(flower.is_customizable);
+    sellingType === "per_piece_customizable" ||
+    flower.is_customizable === true ||
+    flower.is_customizable === 1 ||
+    flower.is_customizable === "1" ||
+    flower.is_customizable === "true";
 
   return {
     id: Number(flower.id),
@@ -423,7 +448,11 @@ function normalizeFlower(flower) {
     quantity_in_stock: Number(flower.quantity_in_stock ?? flower.stock ?? 0),
     selling_type: sellingType,
     is_customizable: isCustomizable,
-    image: flower.primary_image_url || flower.primary_image?.image_url || flower.images?.[0]?.image_url || null,
+    image:
+      flower.primary_image_url ||
+      flower.primary_image?.image_url ||
+      flower.images?.[0]?.image_url ||
+      null,
     model,
     model_3d_url: model,
   };

@@ -236,6 +236,13 @@ class VendorStorefrontController extends Controller
                 ], 422);
             }
 
+            \Log::info("getCustomizableFlowers for store $storeId", [
+                'owner_id' => $ownerId,
+                'user_id' => $request->user()?->id,
+            ]);
+
+            $hasCustomizableColumn = Schema::hasColumn('products', 'is_customizable');
+
             $flowers = Product::where('owner_id', $ownerId)
                 ->where('status', 'active')
                 ->where(function ($query) use ($hasCustomizableColumn) {
@@ -250,12 +257,17 @@ class VendorStorefrontController extends Controller
                     }
                 })
                 ->whereHas('models', function ($query) {
-                    $query->whereNotNull('model_path')
-                        ->orWhereNotNull('model_url');
+                    $query->where(function ($q) {
+                        $q->whereNotNull('model_path')->where('model_path', '!=', '');
+                    })->orWhere(function ($q) {
+                        $q->whereNotNull('model_url')->where('model_url', '!=', '');
+                    });
                 })
                 ->with(['models', 'primaryImage', 'images'])
                 ->orderBy('product_name')
                 ->get();
+
+            \Log::info("Found " . $flowers->count() . " customizable flowers");
 
             return response()->json([
                 'success' => true,
