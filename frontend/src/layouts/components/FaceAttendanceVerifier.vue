@@ -58,7 +58,7 @@
       </div>
 
       <div
-        v-if="phase === 'POSITIONING' || ['LIVENESS', 'CAPTURING', 'MATCHING'].includes(phase)"
+        v-if="false && (phase === 'POSITIONING' || ['LIVENESS', 'CAPTURING', 'MATCHING'].includes(phase))"
         class="instruction-bar instruction-bar-top"
       >
         <span class="inst-icon">{{ phase === "POSITIONING" ? "📷" : "Secure" }}</span>
@@ -239,8 +239,89 @@
           </div>
         </div>
 
+        <div
+          v-if="phase === 'POSITIONING' || ['LIVENESS', 'CAPTURING', 'MATCHING'].includes(phase)"
+          class="instruction-side"
+        >
+          <div class="instruction-side-card">
+            <div class="instruction-side-kicker">Instruction</div>
+            <div class="instruction-side-title" v-if="phase === 'POSITIONING'">
+              Center your face in the frame
+            </div>
+            <div class="instruction-side-title" v-else-if="phase === 'LIVENESS'">
+              {{ currentChallenge?.label || "Follow the prompt" }}
+            </div>
+            <div class="instruction-side-title" v-else-if="phase === 'CAPTURING'">
+              Hold still for capture
+            </div>
+            <div class="instruction-side-title" v-else>
+              Matching your face
+            </div>
+            <p class="instruction-side-copy" v-if="phase === 'POSITIONING'">
+              Hold still until the position bar completes.
+            </p>
+            <p class="instruction-side-copy" v-else-if="phase === 'LIVENESS'">
+              {{ currentChallenge?.hint }}
+            </p>
+            <p class="instruction-side-copy" v-else-if="phase === 'CAPTURING'">
+              We are capturing a stable live frame from your webcam.
+            </p>
+            <p class="instruction-side-copy" v-else>
+              Collecting secure match frames {{ matchFramesValidated }}/{{
+                REQUIRED_MATCH_VALID_FRAMES
+              }}.
+            </p>
+
+            <div v-if="phase === 'LIVENESS'" class="instruction-progress">
+              <strong>{{ challengeFrameProgress }}/{{
+                currentChallenge?.id === "blink" || currentChallenge?.id === "nod"
+                  ? 1
+                  : REQUIRED_CHALLENGE_VALID_FRAMES
+              }}</strong>
+              <span>secure frames</span>
+            </div>
+
+            <div v-if="phase === 'LIVENESS'" class="chain-progress side-chain">
+              <div
+                v-for="(ch, i) in activeChallenges"
+                :key="i"
+                class="chain-dot"
+                :class="{
+                  done: i < challengeIndex,
+                  active: i === challengeIndex,
+                  pending: i > challengeIndex,
+                }"
+              >
+                <span>{{ i < challengeIndex ? "✓" : (ch?.icon || "•") }}</span>
+              </div>
+            </div>
+
+            <div
+              v-if="phase === 'LIVENESS' && currentChallenge?.id === 'blink'"
+              class="blink-indicators"
+            >
+              <div
+                v-for="n in REQUIRED_BLINKS"
+                :key="n"
+                class="blink-dot"
+                :class="{ filled: blinkCount >= n }"
+              >
+                {{ blinkCount >= n ? "👁️" : "○" }}
+              </div>
+            </div>
+
+            <div class="status-line" :class="faceDetected ? 'ok' : 'warn'">
+              <span>{{
+                faceDetected
+                  ? "Face detected"
+                  : "No face detected. Look at the camera."
+              }}</span>
+            </div>
+          </div>
+        </div>
+
         <!-- LIVENESS Challenge Panel -->
-        <div v-if="phase === 'LIVENESS'" class="liveness-panel">
+        <div v-if="false && phase === 'LIVENESS'" class="liveness-panel">
           <!-- Challenge timer ring + instruction -->
           <div
             class="challenge-card"
@@ -467,7 +548,7 @@ const emit = defineEmits(["update:isOpen", "success", "failure"]);
 // ── Constants ─────────────────────────────────────────────────────────────────
 const MATCH_DISTANCE_THRESHOLD = 0.55;
 const MATCH_DISPLAY_THRESHOLD = 70;
-const REQUIRED_BLINKS = 2;
+const REQUIRED_BLINKS = 1;
 const REQUIRED_POSITION_FRAMES = 25; // frames before challenge starts
 const REQUIRED_CHALLENGE_VALID_FRAMES = 6;
 const REQUIRED_MATCH_VALID_FRAMES = 10;
@@ -481,9 +562,9 @@ const MAX_STATIC_FRAME_MS = 3000;
 const MIN_TEXTURE_VARIANCE = 60;
 
 // Blink detection
-const BLINK_DROP_THRESHOLD = 0.018;
+const BLINK_DROP_THRESHOLD = 0.01;
 const ROLLING_WINDOW_SIZE = 8;
-const MIN_CLOSED_FRAMES = 2;
+const MIN_CLOSED_FRAMES = 1;
 const VIRTUAL_CAMERA_HINTS = [
   "obs",
   "manycam",
@@ -1836,7 +1917,7 @@ onUnmounted(() => cleanup());
 .face-verifier-modal {
   background: #fff;
   border-radius: 20px;
-  width: min(680px, 95vw);
+  width: min(980px, 95vw);
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
@@ -2144,6 +2225,60 @@ onUnmounted(() => cleanup());
   overflow: hidden;
   background: #111;
   aspect-ratio: 4/3;
+}
+.webcam-phase {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 18px;
+  align-items: start;
+}
+.instruction-side {
+  width: 100%;
+  position: sticky;
+  top: 16px;
+}
+.instruction-side-card {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef6ff 100%);
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+.instruction-side-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.instruction-side-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}
+.instruction-side-copy {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #475569;
+}
+.instruction-progress {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: #1d4ed8;
+}
+.instruction-progress strong {
+  font-size: 22px;
+  font-weight: 800;
+}
+.side-chain {
+  justify-content: flex-start;
+  flex-wrap: wrap;
 }
 .webcam-video {
   width: 100%;
@@ -2731,6 +2866,15 @@ onUnmounted(() => cleanup());
     border-radius: 16px 16px 0 0;
     position: fixed;
     bottom: 0;
+  }
+  .webcam-phase {
+    grid-template-columns: 1fr;
+  }
+  .instruction-side {
+    position: static;
+  }
+  .instruction-side-card {
+    margin-top: 12px;
   }
   .step-label {
     display: none;
