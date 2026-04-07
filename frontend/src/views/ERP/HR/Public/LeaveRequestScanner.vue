@@ -195,7 +195,10 @@
               </div>
 
               <!-- Days Calculation -->
-              <div v-if="calculatedDays > 0" class="days-info full-width">
+              <div
+                v-if="formData.start_date && formData.end_date"
+                class="days-info full-width"
+              >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="18"
@@ -208,7 +211,7 @@
                   <circle cx="12" cy="12" r="10"></circle>
                   <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
-                <span>Total Working Days: {{ calculatedDays }} day(s)</span>
+                <span>Total Days Requested: {{ calculatedDays }} day(s)</span>
               </div>
 
               <!-- Reason -->
@@ -421,19 +424,8 @@ function calculateDays() {
     return;
   }
 
-  let days = 0;
-  let current = new Date(start);
-
-  while (current <= end) {
-    const dayOfWeek = current.getDay();
-    // Count weekdays only (exclude Saturday=6, Sunday=0)
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      days++;
-    }
-    current.setDate(current.getDate() + 1);
-  }
-
-  calculatedDays.value = days;
+  const diffMs = end.getTime() - start.getTime();
+  calculatedDays.value = Math.floor(diffMs / 86400000) + 1;
 }
 
 // Submit Leave Request
