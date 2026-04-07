@@ -79,13 +79,13 @@
               <img
                 v-if="employeeData.avatar_url"
                 :src="employeeData.avatar_url"
-                :alt="employeeData.full_name"
+                :alt="employeeData.employee_name"
               />
-              <span v-else>{{ employeeData.full_name.charAt(0) }}</span>
+              <span v-else>{{ employeeData.employee_name.charAt(0) }}</span>
             </div>
             <div class="employee-details">
-              <h3>{{ employeeData.full_name }}</h3>
-              <p class="employee-id">{{ employeeData.employee_id }}</p>
+              <h3>{{ employeeData.employee_name }}</h3>
+              <p class="employee-id">{{ employeeData.employee_number }}</p>
               <div class="employee-meta">
                 <span class="meta-item">
                   <svg
@@ -299,14 +299,10 @@
 
 <script setup>
 import { ref, computed } from "vue";
-import { useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 
 import QRScanner from "../../../../layouts/components/QRScanner.vue";
-import employeeInfoService from "../../../../services/employeeInfoService";
 import leaveApi from "../../../../services/leaveApi";
-
-const router = useRouter();
 
 // State
 const isScanning = ref(false);
@@ -355,47 +351,46 @@ function resetScanner() {
   isScanning.value = false;
 }
 
+function normalizeScannedToken(rawValue) {
+  const value = String(rawValue || "").trim();
+
+  if (!value) return null;
+
+  if (value.startsWith("{")) {
+    return btoa(value);
+  }
+
+  try {
+    const decoded = atob(value);
+    const parsed = JSON.parse(decoded);
+
+    if (parsed?.employee_id && parsed?.owner_id) {
+      return value;
+    }
+  } catch {
+    // Ignore invalid base64 and continue.
+  }
+
+  return null;
+}
+
 // Handle QR Scan Success
 async function handleScanSuccess(qrData) {
   try {
     console.log("QR Scanned:", qrData);
 
-    // Parse QR data (handle both JSON and base64 formats)
-    let parsedData;
-    try {
-      // Check if it's already JSON (starts with '{')
-      if (qrData.trim().startsWith("{")) {
-        parsedData = JSON.parse(qrData);
-      } else {
-        // Try base64 decode first
-        const decoded = atob(qrData);
-        parsedData = JSON.parse(decoded);
-      }
-    } catch (e) {
-      console.error("Failed to parse QR data:", e);
-      toast.error("Invalid QR code format");
+    const token = normalizeScannedToken(qrData);
+    if (!token) {
+      toast.error("This QR code does not contain a valid leave request token");
       return;
     }
 
-    // Validate QR code has required fields
-    if (!parsedData.employee_id || !parsedData.owner_id) {
-      toast.error("Invalid employee QR code");
-      return;
-    }
-
-    // Check if it's an attendance QR (we accept it for leave too)
-    if (parsedData.type && parsedData.type !== "employee_attendance") {
-      toast.error("This QR code is not valid for leave requests");
-      return;
-    }
-
-    // Fetch employee details
-    const response = await employeeInfoService.getById(parsedData.employee_id);
+    const response = await leaveApi.verifyQRToken(token);
 
     if (response.success) {
       employeeData.value = response.data;
       stopScanning();
-      toast.success(`Employee loaded: ${response.data.full_name}`);
+      toast.success(`Employee loaded: ${response.data.employee_name}`);
     } else {
       toast.error("Employee not found");
     }
@@ -448,7 +443,7 @@ async function submitLeaveRequest() {
     errors.value = {};
 
     const payload = {
-      employee_id: employeeData.value.id,
+      employee_id: employeeData.value.employee_id,
       owner_id: employeeData.value.owner_id,
       start_date: formData.value.start_date,
       end_date: formData.value.end_date,

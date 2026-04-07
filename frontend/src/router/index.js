@@ -524,10 +524,20 @@ const routes = [
             name: "LeaveManagement",
             children: [
               {
+                path: "employee-request",
+                name: "EmployeeLeaveRequest",
+                redirect: "/leaves",
+              },
+              {
                 path: "management-requests",
                 name: "LeaveRequests",
                 component: () =>
                   import("../views/ERP/HR/Leaves/LeaveManagement.vue"),
+              },
+              {
+                path: "qr-request",
+                name: "LeaveQRRequest",
+                redirect: "/leaves",
               },
             ],
           },
