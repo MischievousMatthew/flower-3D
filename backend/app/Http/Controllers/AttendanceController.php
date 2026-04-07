@@ -144,8 +144,8 @@ class AttendanceController extends Controller
                 $validator->errors()->add('liveness_data.challenge_results', 'At least three liveness challenges must be completed.');
             }
 
-            if (!$challenges->contains('blink')) {
-                $validator->errors()->add('challenges', 'Blink challenge is required.');
+            if (!$challenges->intersect(['blink', 'smile'])->count()) {
+                $validator->errors()->add('challenges', 'An expression challenge is required.');
             }
 
             if (!$challenges->intersect(['turn_left', 'turn_right', 'nod'])->count()) {
@@ -162,10 +162,13 @@ class AttendanceController extends Controller
         });
 
         if ($validator->fails()) {
+            $errors = $validator->errors();
+            $firstError = $errors->all()[0] ?? 'Liveness check failed';
+
             return response()->json([
                 'success' => false,
-                'message' => 'Liveness check failed',
-                'errors' => $validator->errors(),
+                'message' => $firstError,
+                'errors' => $errors,
             ], 422);
         }
 

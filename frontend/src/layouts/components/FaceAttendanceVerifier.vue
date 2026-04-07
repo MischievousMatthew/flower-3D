@@ -1775,7 +1775,12 @@ async function sendAttendance() {
   } catch (err) {
     console.error("[FaceVerifier] API error:", err);
     attempts.value++;
+    const apiErrors = err.response?.data?.errors;
+    const firstDetailedError = apiErrors
+      ? Object.values(apiErrors).flat().find(Boolean)
+      : null;
     const message =
+      firstDetailedError ||
       err.response?.data?.message ||
       "Attendance was rejected because live verification could not be confirmed.";
     setFailure(message);
