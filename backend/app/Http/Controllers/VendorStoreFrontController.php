@@ -153,8 +153,7 @@ class VendorStorefrontController extends Controller
                 return response()->json(['success' => true, 'data' => []]);
             }
 
-            $hasVendorIdColumn = Schema::hasColumn('products', 'vendor_id');
-            $query = $this->storefrontProductsQuery($ownerId, $hasVendorIdColumn)
+            $query = $this->storefrontProductsQuery($ownerId)
                 ->where('status', 'active')
                 ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->with([
@@ -216,8 +215,7 @@ class VendorStorefrontController extends Controller
             }
 
             $hasCustomizableColumn = Schema::hasColumn('products', 'is_customizable');
-            $hasVendorIdColumn = Schema::hasColumn('products', 'vendor_id');
-            $flowers = $this->storefrontProductsQuery($ownerId, $hasVendorIdColumn)
+            $flowers = $this->storefrontProductsQuery($ownerId)
                 ->where('status', 'active')
                 ->where(function ($query) use ($hasCustomizableColumn) {
                     $query->where('selling_type', 'per_piece_customizable');
@@ -363,7 +361,7 @@ class VendorStorefrontController extends Controller
         return $requestedOwnerId > 0 ? $requestedOwnerId : null;
     }
 
-    private function storefrontProductsQuery(int $ownerId, bool $hasVendorIdColumn): Builder
+    private function storefrontProductsQuery(int $ownerId): Builder
     {
         $query = Product::query();
 
@@ -371,13 +369,7 @@ class VendorStorefrontController extends Controller
             $query->withoutGlobalScope(SoftDeletingScope::class);
         }
 
-        return $query->where(function ($productQuery) use ($ownerId, $hasVendorIdColumn) {
-            $productQuery->where('owner_id', $ownerId);
-
-            if ($hasVendorIdColumn) {
-                $productQuery->orWhere('vendor_id', $ownerId);
-            }
-        });
+        return $query->where('owner_id', $ownerId);
     }
 
     /**
