@@ -67,6 +67,7 @@ class VendorOrdersController extends Controller
                 ->with([
                     'user:id,name,email,contact_number,address',
                     'delivery',
+                    'orderRequests',
                     'items' => function($query) {
                         $query->with(['product' => function($q) {
                             $q->with(['images', 'models']); // Include product images and 3D models
@@ -131,6 +132,8 @@ class VendorOrdersController extends Controller
                     'total_amount' => (float) $order->total_amount,
                     'customer_notes' => $order->customer_notes,
                     'created_at' => $order->created_at->format('Y-m-d H:i:s'),
+                    'return_request' => $this->formatLatestOrderRequest($order, 'return'),
+                    'refund_request' => $this->formatLatestOrderRequest($order, 'refund'),
                     'user' => [
                         'id' => $order->user->id,
                         'name' => $order->user->name,
@@ -381,6 +384,7 @@ class VendorOrdersController extends Controller
                 ->with([
                     'user:id,name,email,contact_number,address',
                     'delivery',
+                    'orderRequests',
                     'items' => function($query) {
                         $query->with(['product' => function($q) {
                             $q->with(['images', 'models']); // Include 3D models
@@ -404,6 +408,8 @@ class VendorOrdersController extends Controller
                     'total_amount' => (float) $order->total_amount,
                     'customer_notes' => $order->customer_notes,
                     'created_at' => $order->created_at->format('Y-m-d H:i:s'),
+                    'return_request' => $this->formatLatestOrderRequest($order, 'return'),
+                    'refund_request' => $this->formatLatestOrderRequest($order, 'refund'),
                     'user' => [
                         'name' => $order->user->name,
                         'email' => $order->user->email,
@@ -500,6 +506,7 @@ class VendorOrdersController extends Controller
                 ->with([
                     'user:id,name,email,contact_number,address',
                     'delivery',
+                    'orderRequests',
                     'items' => function($query) {
                         $query->with(['product' => function($q) {
                             $q->with(['images', 'models']); // Include all images and 3D models
@@ -530,6 +537,8 @@ class VendorOrdersController extends Controller
                 'total_amount' => (float) $order->total_amount,
                 'customer_notes' => $order->customer_notes,
                 'created_at' => $order->created_at->format('Y-m-d H:i:s'),
+                'return_request' => $this->formatLatestOrderRequest($order, 'return'),
+                'refund_request' => $this->formatLatestOrderRequest($order, 'refund'),
                 'customer' => [
                     'id' => $order->user->id,
                     'name' => $order->user->name,
@@ -890,5 +899,28 @@ class VendorOrdersController extends Controller
             'delivered' => 'to_received',
             default => $order->status,
         };
+    }
+
+    private function formatLatestOrderRequest(Order $order, string $type): ?array
+    {
+        $request = $order->orderRequests
+            ?->where('type', $type)
+            ->sortByDesc('created_at')
+            ->first();
+
+        if (! $request) {
+            return null;
+        }
+
+        return [
+            'id' => $request->id,
+            'type' => $request->type,
+            'status' => $request->status,
+            'reason' => $request->reason,
+            'media_url' => $request->media_url,
+            'media_type' => $request->media_type,
+            'admin_notes' => $request->admin_notes,
+            'created_at' => $request->created_at?->toIso8601String(),
+        ];
     }
 }

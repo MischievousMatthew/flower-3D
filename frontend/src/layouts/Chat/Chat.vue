@@ -561,7 +561,7 @@ const isVendor = computed(() => {
 });
 const counterpartLabel = computed(() => {
   if (props.counterpartLabel) return props.counterpartLabel;
-  return isVendor.value ? "customers" : "vendors";
+  return isVendor.value ? "customers" : "stores";
 });
 const counterpartLabelSingular = computed(() =>
   counterpartLabel.value.endsWith("s")

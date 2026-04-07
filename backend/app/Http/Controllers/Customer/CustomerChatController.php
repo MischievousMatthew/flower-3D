@@ -7,6 +7,7 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\SharedFile;
 use App\Models\User;
+use App\Models\VendorApplication;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -56,11 +57,7 @@ class CustomerChatController extends Controller
                             'online' => $conv->vendor->is_online,
                             'contact_number' => $conv->vendor->contact_number,
                             'username' => $conv->vendor->username,
-                            'store_name' => data_get(
-                                $conv->vendor->vendor_data,
-                                'store_name',
-                                'Vendor Store'
-                            ),
+                            'store_name' => $this->resolveVendorStoreName($conv->vendor),
                         ],
                         'last_message' => $conv->last_message
                             ? Str::limit($conv->last_message, 50)
@@ -127,7 +124,7 @@ class CustomerChatController extends Controller
                     'avatar' => $vendor->avatar_url,
                     'online' => $vendor->is_online,
                     'address' => $vendor->address . ', ' . $vendor->city,
-                    'store_name' => $vendor->vendor_data['store_name'] ?? 'Vendor Store',
+                    'store_name' => $this->resolveVendorStoreName($vendor),
                     'shared_files' => $sharedFiles,
                 ]
             ]);
@@ -203,12 +200,20 @@ class CustomerChatController extends Controller
     {
         try {
             $search = $request->input('search', '');
+            $matchingVendorEmails = VendorApplication::query()
+                ->where('store_name', 'like', "%{$search}%")
+                ->pluck('email')
+                ->filter()
+                ->values()
+                ->all();
+
             $vendors = User::where('role', User::ROLE_VENDOR)
                 ->where('is_verified', true)
                 ->where(fn($q) => $q->where('name', 'like', "%{$search}%")
                     ->orWhere('surname', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('username', 'like', "%{$search}%"))
+                    ->orWhere('username', 'like', "%{$search}%")
+                    ->orWhereIn('email', $matchingVendorEmails))
                 ->select('id', 'name', 'surname', 'email', 'profile_picture', 'contact_number', 'username', 'vendor_data')
                 ->limit(20)
                 ->get()
@@ -219,7 +224,8 @@ class CustomerChatController extends Controller
                     'contact_number' => $vendor->contact_number,
                     'avatar' => $vendor->avatar_url,
                     'username' => $vendor->username,
-                    'store_name' => $vendor->vendor_data['store_name'] ?? 'Vendor Store',
+                    'store_name' => $this->resolveVendorStoreName($vendor),
+                    'display_name' => $this->resolveVendorStoreName($vendor),
                 ]);
             
             return response()->json(['success' => true, 'vendors' => $vendors]);
@@ -248,5 +254,23 @@ class CustomerChatController extends Controller
             $bytes /= 1024;
         }
         return round($bytes, 2) . ' ' . $units[$i];
+    }
+
+    private function resolveVendorStoreName(User $vendor): string
+    {
+        $storeName = data_get($vendor->vendor_data, 'store_name');
+        if (is_string($storeName) && trim($storeName) !== '') {
+            return trim($storeName);
+        }
+
+        $applicationStoreName = VendorApplication::query()
+            ->where('email', $vendor->email)
+            ->value('store_name');
+
+        if (is_string($applicationStoreName) && trim($applicationStoreName) !== '') {
+            return trim($applicationStoreName);
+        }
+
+        return 'Vendor Store';
     }
 }

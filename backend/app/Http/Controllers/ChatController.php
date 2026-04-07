@@ -79,9 +79,12 @@ class ChatController extends Controller
                         'display_name' => $otherUser->full_name,
                     ];
 
-                    if (!$isVendorContext && isset($otherUser->vendor_data['store_name'])) {
-                        $userData['store_name'] = $otherUser->vendor_data['store_name'];
-                        $userData['display_name'] = $otherUser->vendor_data['store_name'];
+                    if (!$isVendorContext && $otherUser->isVendor()) {
+                        $storeName = $this->resolveVendorStoreName($otherUser);
+                        if ($storeName) {
+                            $userData['store_name'] = $storeName;
+                            $userData['display_name'] = $storeName;
+                        }
                     }
 
                     return [
@@ -414,8 +417,11 @@ class ChatController extends Controller
                 'shared_files' => $sharedFiles,
             ];
 
-            if ($otherUser->isVendor() && isset($otherUser->vendor_data['store_name'])) {
-                $userData['store_name'] = $otherUser->vendor_data['store_name'];
+            if ($otherUser->isVendor()) {
+                $storeName = $this->resolveVendorStoreName($otherUser);
+                if ($storeName) {
+                    $userData['store_name'] = $storeName;
+                }
             }
 
             $responseKey = $otherUser->isVendor() ? 'vendor' : 'customer';
@@ -507,13 +513,27 @@ class ChatController extends Controller
 
             $targetRole = $isVendorContext ? User::ROLE_CUSTOMER : User::ROLE_VENDOR;
 
+            $matchingVendorEmails = [];
+            if ($targetRole === User::ROLE_VENDOR && $search !== '') {
+                $matchingVendorEmails = VendorApplication::query()
+                    ->where('store_name', 'like', "%{$search}%")
+                    ->pluck('email')
+                    ->filter()
+                    ->values()
+                    ->all();
+            }
+
             $users = User::where('role', $targetRole)
                 ->when($targetRole === User::ROLE_VENDOR, fn ($q) => $q->where('is_verified', true))
-                ->where(function ($q) use ($search) {
+                ->where(function ($q) use ($search, $targetRole, $matchingVendorEmails) {
                     $q->where('name', 'like', "%{$search}%")
                         ->orWhere('surname', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
                         ->orWhere('username', 'like', "%{$search}%");
+
+                    if ($targetRole === User::ROLE_VENDOR && !empty($matchingVendorEmails)) {
+                        $q->orWhereIn('email', $matchingVendorEmails);
+                    }
                 })
                 ->select('id', 'name', 'surname', 'email', 'profile_picture', 'contact_number', 'username', 'vendor_data')
                 ->limit(20)
@@ -529,9 +549,12 @@ class ChatController extends Controller
                         'display_name' => $user->full_name,
                     ];
 
-                    if ($user->isVendor() && isset($user->vendor_data['store_name'])) {
-                        $data['store_name'] = $user->vendor_data['store_name'];
-                        $data['display_name'] = $user->vendor_data['store_name'];
+                    if ($user->isVendor()) {
+                        $storeName = $this->resolveVendorStoreName($user);
+                        if ($storeName) {
+                            $data['store_name'] = $storeName;
+                            $data['display_name'] = $storeName;
+                        }
                     }
 
                     return $data;
@@ -634,6 +657,22 @@ class ChatController extends Controller
         }
 
         return 'User';
+    }
+
+    private function resolveVendorStoreName(User $user): ?string
+    {
+        $storeName = data_get($user->vendor_data, 'store_name');
+        if (is_string($storeName) && trim($storeName) !== '') {
+            return trim($storeName);
+        }
+
+        $applicationStoreName = VendorApplication::query()
+            ->where('email', $user->email)
+            ->value('store_name');
+
+        return is_string($applicationStoreName) && trim($applicationStoreName) !== ''
+            ? trim($applicationStoreName)
+            : null;
     }
 
     private function getFileIcon(string $fileType): string

@@ -212,8 +212,8 @@
                 </span>
               </div>
               <div class="order-info-right">
-                <span class="order-status" :class="`status-${order.status}`">
-                  {{ formatStatus(order.status) }}
+                <span class="order-status" :class="`status-${getDisplayStatus(order)}`">
+                  {{ formatStatus(getDisplayStatus(order)) }}
                 </span>
                 <span class="order-total"
                   >₱{{ formatPrice(order.total_amount) }}</span
@@ -366,10 +366,11 @@
                   </svg>
                   View Details
                 </button>
-                <button
-                  class="btn-action btn-update"
-                  @click="updateOrderStatus(order.id, order.status)"
-                >
+	                <button
+	                  v-if="canUpdateOrderStatus(order)"
+	                  class="btn-action btn-update"
+	                  @click="updateOrderStatus(order.id, getDisplayStatus(order))"
+	                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="16"
@@ -381,10 +382,38 @@
                       d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
                     />
                   </svg>
-                  Update Status
-                </button>
-              </div>
-              <div class="order-meta">
+	                  Update Status
+	                </button>
+	              </div>
+	              <div
+	                v-if="getPendingRefundRequest(order)"
+	                class="request-action-panel"
+	              >
+	                <div class="request-copy">
+	                  <span class="request-chip">Refund Request</span>
+	                  <p>
+	                    {{
+	                      getPendingRefundRequest(order).reason ||
+	                      "Customer requested a refund."
+	                    }}
+	                  </p>
+	                </div>
+	                <div class="request-buttons">
+	                  <button
+	                    class="btn-action btn-reject"
+	                    @click="rejectRefundRequest(order)"
+	                  >
+	                    Reject Refund
+	                  </button>
+	                  <button
+	                    class="btn-action btn-approve"
+	                    @click="approveRefundRequest(order)"
+	                  >
+	                    Accept Refund
+	                  </button>
+	                </div>
+	              </div>
+	              <div class="order-meta">
                 <span class="payment-method">
                   {{
                     order.payment_method === "online"
@@ -519,8 +548,8 @@
                 </span>
               </div>
               <div class="order-info-right">
-                <span class="order-status" :class="`status-${order.status}`">
-                  {{ formatStatus(order.status) }}
+                <span class="order-status" :class="`status-${getDisplayStatus(order)}`">
+                  {{ formatStatus(getDisplayStatus(order)) }}
                 </span>
                 <span class="order-total"
                   >₱{{ formatPrice(order.total_amount) }}</span
@@ -667,10 +696,11 @@
                   </svg>
                   View Details
                 </button>
-                <button
-                  class="btn-action btn-update"
-                  @click="updateOrderStatus(order.id, order.status)"
-                >
+	                <button
+	                  v-if="canUpdateOrderStatus(order)"
+	                  class="btn-action btn-update"
+	                  @click="updateOrderStatus(order.id, getDisplayStatus(order))"
+	                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="16"
@@ -682,10 +712,38 @@
                       d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
                     />
                   </svg>
-                  Update Status
-                </button>
-              </div>
-              <div class="order-meta">
+	                  Update Status
+	                </button>
+	              </div>
+	              <div
+	                v-if="getPendingRefundRequest(order)"
+	                class="request-action-panel"
+	              >
+	                <div class="request-copy">
+	                  <span class="request-chip">Refund Request</span>
+	                  <p>
+	                    {{
+	                      getPendingRefundRequest(order).reason ||
+	                      "Customer requested a refund."
+	                    }}
+	                  </p>
+	                </div>
+	                <div class="request-buttons">
+	                  <button
+	                    class="btn-action btn-reject"
+	                    @click="rejectRefundRequest(order)"
+	                  >
+	                    Reject Refund
+	                  </button>
+	                  <button
+	                    class="btn-action btn-approve"
+	                    @click="approveRefundRequest(order)"
+	                  >
+	                    Accept Refund
+	                  </button>
+	                </div>
+	              </div>
+	              <div class="order-meta">
                 <span class="payment-method">
                   {{
                     order.payment_method === "online"
@@ -746,9 +804,9 @@
             <h3>Order #{{ selectedOrderDetails?.order_number }}</h3>
             <span
               class="order-status-badge"
-              :class="`status-${selectedOrderDetails?.status}`"
+              :class="`status-${getDisplayStatus(selectedOrderDetails)}`"
             >
-              {{ formatStatus(selectedOrderDetails?.status) }}
+              {{ formatStatus(getDisplayStatus(selectedOrderDetails)) }}
             </span>
           </div>
           <button @click="closeOrderDetailsModal" class="btn-close">
@@ -964,12 +1022,44 @@
                 </svg>
                 Customer Notes
               </h4>
-              <div class="notes-box">
-                <p>{{ selectedOrderDetails.customer_notes }}</p>
-              </div>
-            </div>
+	            <div class="notes-box">
+	                <p>{{ selectedOrderDetails.customer_notes }}</p>
+	              </div>
+	            </div>
 
-            <!-- Pricing Summary -->
+	            <div
+	              v-if="selectedOrderDetails.refund_request"
+	              class="details-section"
+	            >
+	              <h4 class="section-title">Refund Request</h4>
+	              <div class="request-detail-box">
+	                <div class="request-detail-head">
+	                  <span
+	                    class="request-chip"
+	                    :class="`request-${selectedOrderDetails.refund_request.status}`"
+	                  >
+	                    {{ selectedOrderDetails.refund_request.status }}
+	                  </span>
+	                  <span class="request-date">
+	                    {{
+	                      formatDate(selectedOrderDetails.refund_request.created_at)
+	                    }}
+	                  </span>
+	                </div>
+	                <p>{{ selectedOrderDetails.refund_request.reason }}</p>
+	                <a
+	                  v-if="selectedOrderDetails.refund_request.media_url"
+	                  :href="selectedOrderDetails.refund_request.media_url"
+	                  class="request-link"
+	                  target="_blank"
+	                  rel="noopener noreferrer"
+	                >
+	                  View proof
+	                </a>
+	              </div>
+	            </div>
+
+	            <!-- Pricing Summary -->
             <div class="details-section">
               <h4 class="section-title">
                 <svg
@@ -1007,15 +1097,19 @@
           </div>
         </div>
 
-        <div class="modal-footer">
-          <button @click="closeOrderDetailsModal" class="btn-secondary">
-            Close
-          </button>
-          <button
-            @click="
-              updateOrderStatus(
-                selectedOrderDetails.id,
-                selectedOrderDetails.status,
+	        <div class="modal-footer">
+	          <button @click="closeOrderDetailsModal" class="btn-secondary">
+	            Close
+	          </button>
+	          <button
+	            v-if="
+	              selectedOrderDetails &&
+	              canUpdateOrderStatus(selectedOrderDetails)
+	            "
+	            @click="
+	              updateOrderStatus(
+	                selectedOrderDetails.id,
+                getDisplayStatus(selectedOrderDetails),
               )
             "
             class="btn-primary"
@@ -1030,10 +1124,24 @@
                 fill="currentColor"
                 d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
               />
-            </svg>
-            Update Status
-          </button>
-        </div>
+	            </svg>
+	            Update Status
+	          </button>
+	          <template v-if="getPendingRefundRequest(selectedOrderDetails)">
+	            <button
+	              class="btn-secondary btn-reject-modal"
+	              @click="rejectRefundRequest(selectedOrderDetails)"
+	            >
+	              Reject Refund
+	            </button>
+	            <button
+	              class="btn-primary btn-approve-modal"
+	              @click="approveRefundRequest(selectedOrderDetails)"
+	            >
+	              Accept Refund
+	            </button>
+	          </template>
+	        </div>
       </div>
     </div>
 
@@ -1200,7 +1308,7 @@ const generateNotifications = () => {
     const today = new Date();
     const diffTime = reservationDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays <= 2 && diffDays >= 0 && order.status === "pending";
+    return diffDays <= 2 && diffDays >= 0 && getDisplayStatus(order) === "pending";
   });
 
   if (urgentOrders.length > 0) {
@@ -1213,7 +1321,7 @@ const generateNotifications = () => {
 
   // Check for pending orders that need processing
   const pendingCount = orders.value.filter(
-    (o) => o.status === "pending",
+    (o) => getDisplayStatus(o) === "pending",
   ).length;
   if (pendingCount > 5) {
     newNotifications.push({
@@ -1231,7 +1339,9 @@ const filteredOrdersByTab = computed(() => {
   let filtered = orders.value;
 
   // Filter by active status tab
-  filtered = filtered.filter((order) => order.status === activeStatusTab.value);
+  filtered = filtered.filter(
+    (order) => getDisplayStatus(order) === activeStatusTab.value,
+  );
 
   // Apply search filter
   if (searchQuery.value) {
@@ -1259,7 +1369,7 @@ const filteredOrdersByDate = computed(() => {
 
 // Computed - Order Count by Status
 const getOrderCountByStatus = (status) => {
-  return orders.value.filter((order) => order.status === status).length;
+  return orders.value.filter((order) => getDisplayStatus(order) === status).length;
 };
 
 // Calendar computed
@@ -1350,6 +1460,25 @@ function formatPaymentStatus(status) {
     failed: "❌ Failed",
   };
   return statusMap[status] || status;
+}
+
+function getDisplayStatus(order) {
+  if (!order) return "";
+
+  if (order.order_status === "pending") {
+    return "pending";
+  }
+
+  return order.status || order.order_status || "";
+}
+
+function getPendingRefundRequest(order) {
+  if (!order?.refund_request) return null;
+  return order.refund_request.status === "pending" ? order.refund_request : null;
+}
+
+function canUpdateOrderStatus(order) {
+  return !!order && !getPendingRefundRequest(order);
 }
 
 function formatCalendarDate(dateString) {
@@ -1563,14 +1692,7 @@ async function viewOrderDetails(orderId) {
     loadingOrderDetails.value = true;
     showOrderDetailsModal.value = true;
 
-    const response = await api.get(`/vendor/orders/${orderId}`);
-
-    if (response.data.success) {
-      selectedOrderDetails.value = response.data.data;
-    } else {
-      toast.error("Failed to load order details");
-      closeOrderDetailsModal();
-    }
+    await fetchOrderDetails(orderId);
   } catch (error) {
     console.error("Error loading order details:", error);
     toast.error("Failed to load order details");
@@ -1578,6 +1700,16 @@ async function viewOrderDetails(orderId) {
   } finally {
     loadingOrderDetails.value = false;
   }
+}
+
+async function fetchOrderDetails(orderId) {
+  const response = await api.get(`/vendor/orders/${orderId}`);
+
+  if (!response.data.success) {
+    throw new Error("Failed to load order details");
+  }
+
+  selectedOrderDetails.value = response.data.data;
 }
 
 function close3DModal() {
@@ -1818,6 +1950,76 @@ function updateOrderStatus(orderId, currentStatus) {
       isLoading.value = false;
       loadingMessage.value = "";
     });
+}
+
+async function approveRefundRequest(order) {
+  const request = getPendingRefundRequest(order);
+
+  if (!request) {
+    toast.info("No pending refund request for this order");
+    return;
+  }
+
+  if (!window.confirm("Accept this refund request?")) {
+    return;
+  }
+
+  try {
+    isLoading.value = true;
+    loadingMessage.value = "Accepting refund request...";
+
+    await api.post(`/sc/order-requests/${request.id}/approve`);
+    await loadOrders(pagination.value.current_page);
+
+    if (selectedOrderDetails.value?.id === order.id) {
+      await fetchOrderDetails(order.id);
+    }
+
+    toast.success("Refund request accepted");
+  } catch (error) {
+    console.error("Error approving refund request:", error);
+    toast.error(
+      error.response?.data?.message || "Failed to accept refund request",
+    );
+  } finally {
+    isLoading.value = false;
+    loadingMessage.value = "";
+  }
+}
+
+async function rejectRefundRequest(order) {
+  const request = getPendingRefundRequest(order);
+
+  if (!request) {
+    toast.info("No pending refund request for this order");
+    return;
+  }
+
+  if (!window.confirm("Reject this refund request?")) {
+    return;
+  }
+
+  try {
+    isLoading.value = true;
+    loadingMessage.value = "Rejecting refund request...";
+
+    await api.post(`/sc/order-requests/${request.id}/reject`);
+    await loadOrders(pagination.value.current_page);
+
+    if (selectedOrderDetails.value?.id === order.id) {
+      await fetchOrderDetails(order.id);
+    }
+
+    toast.success("Refund request rejected");
+  } catch (error) {
+    console.error("Error rejecting refund request:", error);
+    toast.error(
+      error.response?.data?.message || "Failed to reject refund request",
+    );
+  } finally {
+    isLoading.value = false;
+    loadingMessage.value = "";
+  }
 }
 
 onMounted(async () => {
@@ -2623,6 +2825,48 @@ onMounted(async () => {
   gap: 8px;
 }
 
+.request-action-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  margin-top: 12px;
+}
+
+.request-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.request-copy p {
+  margin: 0;
+  color: #1e3a8a;
+  font-size: 13px;
+}
+
+.request-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.request-buttons {
+  display: flex;
+  gap: 8px;
+}
+
 .btn-action {
   display: flex;
   align-items: center;
@@ -2652,6 +2896,24 @@ onMounted(async () => {
 
 .btn-update:hover {
   background: #fde68a;
+}
+
+.btn-approve {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.btn-approve:hover {
+  background: #bbf7d0;
+}
+
+.btn-reject {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.btn-reject:hover {
+  background: #fecaca;
 }
 
 .order-meta {
@@ -2975,6 +3237,53 @@ onMounted(async () => {
   font-size: 14px;
   color: #2d3748;
   line-height: 1.6;
+}
+
+.request-detail-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.request-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.request-date {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.request-link {
+  display: inline-flex;
+  margin-top: 10px;
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.request-link:hover {
+  text-decoration: underline;
+}
+
+.request-approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.request-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.request-pending {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 /* Pricing Summary */
