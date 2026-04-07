@@ -1,5 +1,6 @@
 <?php
 
+// Fixed syntax error and added breakdown fields.
 namespace App\Models;
 
 use App\Traits\BelongsToOwner;
@@ -18,6 +19,8 @@ class Payroll extends Model
         'paid_leave_days', 'unpaid_leave_days', 'absent_days',
         'deduction_amount', 'net_salary', 'notes', 'status', 'paid_at',
         'finance_notes',
+        'actual_work_amount',
+        'paid_leave_amount',
         // Government contributions
         'include_contributions',
         'sss_contribution',
@@ -38,6 +41,8 @@ class Payroll extends Model
         'sss_contribution'            => 'decimal:2',
         'philhealth_contribution'     => 'decimal:2',
         'pagibig_contribution'        => 'decimal:2',
+        'actual_work_amount'         => 'decimal:2',
+        'paid_leave_amount'          => 'decimal:2',
         'include_contributions'       => 'boolean',
         'paid_at'                     => 'datetime',
         'created_at'                  => 'datetime',

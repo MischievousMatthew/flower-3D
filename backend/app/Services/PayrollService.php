@@ -73,7 +73,9 @@ class PayrollService
                 'attendance_records_count'    => $calculation['actualWorkDays'],
                 'expected_work_days'          => $calculation['expectedWorkingDays'],
                 'actual_work_days'            => $calculation['actualWorkDays'],
+                'actual_work_amount'         => round($calculation['actualWorkAmount'], 2),
                 'paid_leave_days'             => $calculation['paidLeaveDaysCount'],
+                'paid_leave_amount'          => round($calculation['paidLeaveAmount'], 2),
                 'unpaid_leave_days'           => $calculation['unpaidLeaveDaysCount'],
                 'absent_days'                 => $calculation['absentDays'],
                 'deduction_amount'            => $totalDeductions,
@@ -416,11 +418,17 @@ class PayrollService
         $payableDays          = $actualWorkDays + $paidLeaveDaysCount;
         $actualWorkAmount     = $actualWorkDays * $dailyRate;
         $paidLeaveAmount      = $paidLeaveDaysCount * $dailyRate;
-        $grossSalary          = $expectedWorkingDays * $dailyRate;
+        
+        // Gross Salary is the sum of earnings
+        $grossSalary          = $actualWorkAmount + $paidLeaveAmount;
+        
         $absentDeduction      = $absentDays * $dailyRate;
         $unpaidLeaveDeduction = $unpaidLeaveDaysCount * $dailyRate;
-        $totalDeductions      = $absentDeduction + $unpaidLeaveDeduction;
-        $netSalary            = max(0, $grossSalary - $totalDeductions);
+        
+        // Deduction Amount in the breakdown should be taxes/contributions.
+        // However, we can keep the separate calculation of "net earnings" before contributions.
+        $totalDeductions      = 0; // These will be added in generatePayroll/preview (contributions)
+        $netSalary            = $grossSalary; // Before contributions
 
         return compact(
             'expectedWorkingDays', 'actualWorkDays', 'paidLeaveDaysCount',

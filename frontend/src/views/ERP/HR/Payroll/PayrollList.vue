@@ -611,12 +611,34 @@
               >
             </div>
             <div
+              v-if="selectedPayroll.actual_work_amount > 0"
+              class="detail-row"
+            >
+              <span class="label">Actual Work Pay</span>
+              <span class="value"
+                >₱{{
+                  Number(selectedPayroll.actual_work_amount).toLocaleString()
+                }}</span
+              >
+            </div>
+            <div
               v-if="selectedPayroll.paid_leave_days > 0"
               class="detail-row success"
             >
               <span class="label">Paid Leave Days</span>
               <span class="value success-text"
                 >+{{ selectedPayroll.paid_leave_days }} days</span
+              >
+            </div>
+            <div
+              v-if="selectedPayroll.paid_leave_amount > 0"
+              class="detail-row success"
+            >
+              <span class="label">Paid Leave Pay</span>
+              <span class="value success-text"
+                >+₱{{
+                  Number(selectedPayroll.paid_leave_amount).toLocaleString()
+                }}</span
               >
             </div>
             <div
