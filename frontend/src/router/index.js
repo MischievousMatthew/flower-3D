@@ -528,9 +528,7 @@ const routes = [
               {
                 path: "employee-request",
                 name: "EmployeeLeaveRequest",
-                component: () =>
-                  import("../views/ERP/HR/Leaves/LeaveRequest.vue"),
-                meta: { requiresAuth: false, title: "Leave Request" },
+                redirect: "/leaves",
               },
               {
                 path: "management-requests",
@@ -541,8 +539,7 @@ const routes = [
               {
                 path: "qr-request",
                 name: "LeaveQRRequest",
-                component: () =>
-                  import("../views/ERP/HR/Public/LeaveRequestScanner.vue"),
+                redirect: "/leaves",
               },
             ],
           },
