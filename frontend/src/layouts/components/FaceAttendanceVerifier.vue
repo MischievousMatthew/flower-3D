@@ -1917,7 +1917,7 @@ onUnmounted(() => cleanup());
 .face-verifier-modal {
   background: #fff;
   border-radius: 20px;
-  width: min(980px, 95vw);
+  width: min(1120px, 96vw);
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
@@ -2220,7 +2220,7 @@ onUnmounted(() => cleanup());
 .video-wrapper {
   position: relative;
   width: 100%;
-  max-width: 480px;
+  max-width: 760px;
   border-radius: 14px;
   overflow: hidden;
   background: #111;
@@ -2228,8 +2228,8 @@ onUnmounted(() => cleanup());
 }
 .webcam-phase {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 18px;
+  grid-template-columns: minmax(0, 2.2fr) minmax(260px, 1fr);
+  gap: 24px;
   align-items: start;
 }
 .instruction-side {
@@ -2241,7 +2241,7 @@ onUnmounted(() => cleanup());
   background: linear-gradient(180deg, #f8fafc 0%, #eef6ff 100%);
   border: 1px solid #dbeafe;
   border-radius: 16px;
-  padding: 16px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;

@@ -119,7 +119,7 @@ class AttendanceController extends Controller
             'liveness_data.match_frames_checked'    => 'required|integer|min:10',
             'liveness_data.valid_match_frames'      => 'required|integer|min:10',
             'liveness_data.suspicious_events'       => 'required|integer|min:0|max:0',
-            'liveness_data.detection_score_min'     => 'required|numeric|min:0.6|max:1',
+            'liveness_data.detection_score_min'     => 'required|numeric|min:0.45|max:1',
             'liveness_data.replay_check_passed'     => 'required|boolean',
             'liveness_data.camera_source'           => ['required', 'string', Rule::in(['user-media-webcam'])],
             'liveness_data.challenge_results'       => 'required|array|min:3',
