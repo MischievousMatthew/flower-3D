@@ -388,38 +388,12 @@ async function fetchFlowers() {
     const response = await api.get(`/stores/${storeId.value}/customizable-flowers`, {
       params: vendorOwnerId.value ? { owner_id: vendorOwnerId.value } : {},
     });
-    console.log("[FlowerCustomizer] API Response:", response.data);
     const rawItems = Array.isArray(response.data?.data) ? response.data.data : [];
-    console.log("[FlowerCustomizer] Raw items count:", rawItems.length);
-    
     flowers.value = rawItems.map(normalizeFlower).filter((flower) => {
-      // 1. Must have a valid 3D model
-      const hasModel = !!flower.model;
-      
-      // 2. Must be a customizable piece (trust backend for category details)
-      const isCorrectType = ["per_piece", "per_piece_customizable"].includes(flower.selling_type);
-      
-      // 3. Must be active/customizable
-      const isCustomizable = !!flower.is_customizable;
-      
-      const ok = hasModel && isCorrectType && isCustomizable;
-      
-      if (!ok) {
-        console.log("[FlowerCustomizer] Filtered out flower:", flower.product_name, {
-          hasModel,
-          isCorrectType,
-          isCustomizable,
-          selling_type: flower.selling_type,
-          model: flower.model
-        });
-      }
-      
-      return ok;
+      if (!flower.model) return false;
+      if (vendorOwnerId.value && flower.owner_id !== vendorOwnerId.value) return false;
+      return true;
     });
-    console.log("[FlowerCustomizer] Final flowers count:", flowers.value.length);
-    if (flowers.value.length === 0 && rawItems.length > 0) {
-      console.warn("[FlowerCustomizer] All items were filtered out!");
-    }
   } catch (error) {
     console.error("Failed to fetch customizable flowers:", error);
     flowers.value = [];
