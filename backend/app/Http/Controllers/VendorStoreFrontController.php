@@ -457,7 +457,9 @@ class VendorStorefrontController extends Controller
             'quantity_in_stock' => (int) $product->quantity_in_stock,
             'owner_id' => (int) $product->owner_id,
             'selling_type' => $product->selling_type,
-            'is_customizable' => $hasCustomizableColumn ? (bool) $product->getAttribute('is_customizable') : true,
+            'is_customizable' => $product->selling_type === 'per_piece_customizable'
+                ? true
+                : ($hasCustomizableColumn ? (bool) $product->getAttribute('is_customizable') : true),
             'model_3d_url' => $modelUrl,
             'model_3d_path' => $primaryModel?->model_path,
             'model_type' => $primaryModel?->model_type,
