@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\VendorApplication;
 use App\Models\Product;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -206,44 +206,18 @@ class VendorStorefrontController extends Controller
     public function getCustomizableFlowers(Request $request, $storeId)
     {
         try {
-            $vendor = VendorApplication::find($storeId);
-            if (!$vendor || $vendor->status !== 'approved') {
-                return response()->json(['success' => true, 'data' => []]);
-            }
-
-            $ownerId = $this->resolveVendorOwnerId($vendor);
+            $ownerId = $this->resolveCustomizableOwnerId($storeId, $request);
 
             if (!$ownerId) {
-                Log::warning("VendorStorefront@getCustomizableFlowers: could not resolve owner_id for store id={$storeId}");
                 return response()->json(['success' => true, 'data' => []]);
             }
 
-            $authOwnerId = $request->user()?->owner_id;
-            if ($authOwnerId && (int) $authOwnerId !== (int) $ownerId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'You are not authorized to access this store inventory.',
-                ], 403);
-            }
-
             $hasCustomizableColumn = Schema::hasColumn('products', 'is_customizable');
-            $requestedOwnerId = $request->filled('owner_id') ? (int) $request->owner_id : null;
-
-            if ($requestedOwnerId && $requestedOwnerId !== (int) $ownerId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'The requested owner does not match this vendor.',
-                ], 422);
-            }
-
-            \Log::info("getCustomizableFlowers for store $storeId", [
-                'owner_id' => $ownerId,
-                'user_id' => $request->user()?->id,
-            ]);
-
-            $hasCustomizableColumn = Schema::hasColumn('products', 'is_customizable');
-
-            $flowers = Product::where('owner_id', $ownerId)
+            $flowers = Product::query()
+                ->where(function ($query) use ($ownerId) {
+                    $query->where('owner_id', $ownerId)
+                        ->orWhere('vendor_id', $ownerId);
+                })
                 ->where('status', 'active')
                 ->where(function ($query) use ($hasCustomizableColumn) {
                     $query->where('selling_type', 'per_piece_customizable');
@@ -263,11 +237,13 @@ class VendorStorefrontController extends Controller
                         $q->whereNotNull('model_url')->where('model_url', '!=', '');
                     });
                 })
-                ->with(['models', 'primaryImage', 'images'])
+                ->with([
+                    'models' => fn ($query) => $query->orderByDesc('id'),
+                    'primaryImage',
+                    'images',
+                ])
                 ->orderBy('product_name')
                 ->get();
-
-            \Log::info("Found " . $flowers->count() . " customizable flowers");
 
             return response()->json([
                 'success' => true,
@@ -362,6 +338,32 @@ class VendorStorefrontController extends Controller
         return $ownerId ? (int) $ownerId : null;
     }
 
+    private function resolveCustomizableOwnerId(mixed $storeId, Request $request): ?int
+    {
+        $vendor = VendorApplication::find($storeId);
+
+        if ($vendor && $vendor->status === 'approved') {
+            return $this->resolveVendorOwnerId($vendor);
+        }
+
+        $requestedOwnerId = $request->integer('owner_id');
+        if ($requestedOwnerId > 0) {
+            return $requestedOwnerId;
+        }
+
+        $numericStoreId = is_numeric($storeId) ? (int) $storeId : 0;
+        if ($numericStoreId <= 0) {
+            return null;
+        }
+
+        $vendorUser = User::query()
+            ->whereKey($numericStoreId)
+            ->where('role', User::ROLE_VENDOR)
+            ->first();
+
+        return $vendorUser?->id;
+    }
+
     /**
      * Format a VendorApplication for the storefront.
      * All array-cast fields default to [] so the frontend never crashes.
@@ -453,7 +455,9 @@ class VendorStorefrontController extends Controller
 
     private function formatCustomizableProduct(Product $product, bool $hasCustomizableColumn = false): array
     {
-        $primaryModel = $product->models->first();
+        $primaryModel = $product->models->first(function ($model) {
+            return filled($model->model_path) || filled($model->model_url);
+        });
         $modelUrl = $primaryModel?->model_path
             ? CloudinaryHelper::getUrl($primaryModel->model_path, 'raw')
             : $primaryModel?->model_url;
