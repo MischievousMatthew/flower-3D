@@ -487,6 +487,62 @@ const MIN_TEXTURE_VARIANCE = 60;
 const BLINK_DROP_THRESHOLD = 0.018;
 const ROLLING_WINDOW_SIZE = 8;
 const MIN_CLOSED_FRAMES = 2;
+const VIRTUAL_CAMERA_HINTS = [
+  "obs",
+  "manycam",
+  "xsplit",
+  "snap camera",
+  "virtual",
+  "fake",
+  "droid",
+  "iriun",
+  "epoccam",
+];
+
+function isVirtualCameraLabel(label) {
+  const normalized = (label || "").toLowerCase();
+  return VIRTUAL_CAMERA_HINTS.some((hint) => normalized.includes(hint));
+}
+
+async function getPreferredCameraDeviceId() {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const videoInputs = devices.filter((device) => device.kind === "videoinput");
+  const realInputs = videoInputs.filter(
+    (device) => !isVirtualCameraLabel(device.label),
+  );
+
+  if (!realInputs.length) return null;
+
+  const preferred =
+    realInputs.find((device) =>
+      /(integrated|webcam|hd webcam|front|built-in|builtin)/i.test(device.label || ""),
+    ) || realInputs[0];
+
+  return preferred.deviceId || null;
+}
+
+async function ensureRealCameraAvailable() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoInputs = devices.filter((device) => device.kind === "videoinput");
+    const labeledInputs = videoInputs.filter((device) => (device.label || "").trim());
+
+    if (!labeledInputs.length) return;
+
+    const hasRealCamera = labeledInputs.some(
+      (device) => !isVirtualCameraLabel(device.label),
+    );
+
+    if (!hasRealCamera) {
+      throw Object.assign(
+        new Error("Only virtual cameras were detected. Use or connect your real webcam."),
+        { code: "SUSPICIOUS" },
+      );
+    }
+  } catch (err) {
+    if (err.code === "SUSPICIOUS") throw err;
+  }
+}
 
 // ── Challenge Pool ────────────────────────────────────────────────────────────
 const CHALLENGE_POOL = [
@@ -676,8 +732,8 @@ watch(
 // ── Main Flow ─────────────────────────────────────────────────────────────────
 async function startVerification() {
   try {
-    // 1. Virtual camera check
-    await detectVirtualCamera();
+    // 1. Confirm a real webcam is available
+    await ensureRealCameraAvailable();
 
     // 2. Load models
     phase.value = "LOADING_MODELS";
@@ -861,22 +917,49 @@ function loadImageFromUrl(url) {
 
 // ── Webcam ────────────────────────────────────────────────────────────────────
 async function startWebcam() {
+  const preferredDeviceId = await getPreferredCameraDeviceId();
+
   stream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      width: { ideal: 640 },
-      height: { ideal: 480 },
-      facingMode: "user",
-    },
+    video: preferredDeviceId
+      ? {
+          deviceId: { exact: preferredDeviceId },
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+        }
+      : {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: "user",
+        },
     audio: false,
   });
 
-  const [videoTrack] = stream.getVideoTracks();
-  const settings = videoTrack?.getSettings?.() ?? {};
-  const label = (videoTrack?.label || "").toLowerCase();
+  let [videoTrack] = stream.getVideoTracks();
+  let settings = videoTrack?.getSettings?.() ?? {};
+  let label = videoTrack?.label || "";
+
+  if (isVirtualCameraLabel(label)) {
+    const fallbackDeviceId = await getPreferredCameraDeviceId();
+    if (fallbackDeviceId && fallbackDeviceId !== settings.deviceId) {
+      stopWebcam();
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: { exact: fallbackDeviceId },
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+        },
+        audio: false,
+      });
+
+      [videoTrack] = stream.getVideoTracks();
+      settings = videoTrack?.getSettings?.() ?? {};
+      label = videoTrack?.label || "";
+    }
+  }
 
   cameraMetadata = {
     camera_source: settings.displaySurface ? "screen-capture" : "user-media-webcam",
-    camera_label: videoTrack?.label || "",
+    camera_label: label,
   };
 
   if (settings.displaySurface) {
@@ -886,9 +969,9 @@ async function startWebcam() {
     );
   }
 
-  if (["obs", "manycam", "xsplit", "virtual", "snap camera", "iriun", "epoccam"].some((item) => label.includes(item))) {
+  if (isVirtualCameraLabel(label)) {
     throw Object.assign(
-      new Error("Virtual cameras are not allowed for attendance verification."),
+      new Error(`Virtual camera detected (${label || "unknown device"}). Use your real webcam.`),
       { code: "SUSPICIOUS" },
     );
   }
