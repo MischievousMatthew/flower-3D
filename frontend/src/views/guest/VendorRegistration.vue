@@ -1191,9 +1191,6 @@
           <p>Please save this ID for future reference.</p>
           <p>You will receive an email confirmation shortly.</p>
           <div class="modal-actions">
-            <button @click="goToStatusPage" class="action-btn">
-              Check Status
-            </button>
             <button @click="closeModal" class="action-btn secondary">
               Close
             </button>
@@ -2059,7 +2056,8 @@ const validateStep = (step) => {
         isValid = false;
       }
       if (!formData.barangayClearanceNumber.trim()) {
-        errors.barangayClearanceNumber = "Barangay Clearance number is required";
+        errors.barangayClearanceNumber =
+          "Barangay Clearance number is required";
         isValid = false;
       }
       if (!hasSelectedFile("barangay_clearance")) {
@@ -2285,18 +2283,22 @@ const handleSubmit = async () => {
   ];
 
   const staleUpload = requiredUploadFields.find(
-    ([fieldName]) => hasStoredFileInfo(fieldName) && !hasLiveFileObject(fieldName),
+    ([fieldName]) =>
+      hasStoredFileInfo(fieldName) && !hasLiveFileObject(fieldName),
   );
 
   if (staleUpload) {
     const [fieldName, label] = staleUpload;
-    const step = getStepForErrorField(fieldName) ?? getStepForErrorField(toCamelCase(fieldName));
+    const step =
+      getStepForErrorField(fieldName) ??
+      getStepForErrorField(toCamelCase(fieldName));
 
     if (step) {
       currentStep.value = step;
     }
 
-    errors[fieldName] = `${label} needs to be uploaded again before submitting.`;
+    errors[fieldName] =
+      `${label} needs to be uploaded again before submitting.`;
     errors[toCamelCase(fieldName)] = errors[fieldName];
     window.scrollTo({ top: 0, behavior: "smooth" });
     toast.error(`${label} needs to be uploaded again before submitting.`, {
@@ -2416,7 +2418,9 @@ const handleSubmit = async () => {
     if (responseData?.errors) {
       const firstMessage = applyBackendErrors(responseData.errors);
       toast.error(
-        firstMessage || responseData.message || "Please fix the highlighted fields and try again.",
+        firstMessage ||
+          responseData.message ||
+          "Please fix the highlighted fields and try again.",
         { autoClose: 5000 },
       );
     } else {
@@ -2429,10 +2433,6 @@ const handleSubmit = async () => {
   } finally {
     isSubmitting.value = false;
   }
-};
-
-const goToStatusPage = () => {
-  router.push(`/vendor/status?email=${encodeURIComponent(formData.email)}`);
 };
 
 const closeModal = () => {

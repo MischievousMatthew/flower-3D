@@ -130,13 +130,19 @@ class PayrollService
                     'salary_type'               => $employee->salary_type,
                     'basic_salary'              => number_format($employee->basic_salary, 2),
                     'hourly_rate'               => number_format($c['hourlyRate'], 2),
+                    'daily_rate'                => number_format($c['dailyRate'], 2),
                     'expected_work_days'        => $c['expectedWorkingDays'],
                     'actual_work_days'          => $c['actualWorkDays'],
                     'attendance_records_count'  => $c['actualWorkDays'],
+                    'payable_days'              => $c['payableDays'],
                     'paid_leave_days'           => $c['paidLeaveDaysCount'],
                     'unpaid_leave_days'         => $c['unpaidLeaveDaysCount'],
                     'absent_days'               => $c['absentDays'],
+                    'actual_work_hours'         => number_format($c['actualWorkHours'], 2),
+                    'paid_leave_hours'          => number_format($c['paidLeaveHours'], 2),
                     'total_hours_worked'        => number_format($c['totalHoursWorked'], 2),
+                    'actual_work_amount'        => number_format($c['actualWorkAmount'], 2),
+                    'paid_leave_amount'         => number_format($c['paidLeaveAmount'], 2),
                     'gross_salary'              => number_format($c['grossSalary'], 2),
                     'absent_deduction'          => number_format($c['absentDeduction'], 2),
                     'unpaid_leave_deduction'    => number_format($c['unpaidLeaveDeduction'], 2),
@@ -406,16 +412,21 @@ class PayrollService
             $employee->working_days_per_month,
         );
 
-        $grossSalary          = $expectedWorkingDays * $hourlyRate * $employee->standard_work_hours_per_day;
-        $absentDeduction      = $absentDays * ($hourlyRate * $employee->standard_work_hours_per_day);
-        $unpaidLeaveDeduction = $unpaidLeaveDaysCount * ($hourlyRate * $employee->standard_work_hours_per_day);
+        $dailyRate            = $hourlyRate * $employee->standard_work_hours_per_day;
+        $payableDays          = $actualWorkDays + $paidLeaveDaysCount;
+        $actualWorkAmount     = $actualWorkDays * $dailyRate;
+        $paidLeaveAmount      = $paidLeaveDaysCount * $dailyRate;
+        $grossSalary          = $expectedWorkingDays * $dailyRate;
+        $absentDeduction      = $absentDays * $dailyRate;
+        $unpaidLeaveDeduction = $unpaidLeaveDaysCount * $dailyRate;
         $totalDeductions      = $absentDeduction + $unpaidLeaveDeduction;
         $netSalary            = max(0, $grossSalary - $totalDeductions);
 
         return compact(
             'expectedWorkingDays', 'actualWorkDays', 'paidLeaveDaysCount',
             'unpaidLeaveDaysCount', 'absentDays', 'actualWorkHours',
-            'paidLeaveHours', 'totalHoursWorked', 'hourlyRate',
+            'paidLeaveHours', 'totalHoursWorked', 'hourlyRate', 'dailyRate',
+            'payableDays', 'actualWorkAmount', 'paidLeaveAmount',
             'grossSalary', 'absentDeduction', 'unpaidLeaveDeduction',
             'totalDeductions', 'netSalary',
         );

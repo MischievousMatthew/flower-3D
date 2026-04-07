@@ -22,7 +22,7 @@ class CustomerProductController extends Controller
         'min_price'     => 'nullable|numeric|min:0',
         'max_price'     => 'nullable|numeric|min:0',
         'in_stock_only' => 'nullable',
-        'sort_by'       => 'nullable|string|in:created_at_desc,price_low,price_high,name_asc,name_desc',
+        'sort_by'       => 'nullable|string|in:created_at_desc,price_low,price_high,name_asc,name_desc,popular_desc',
         'page'          => 'nullable|integer|min:1',
         'per_page'      => 'nullable|integer|min:1|max:100',
     ];
@@ -87,15 +87,22 @@ class CustomerProductController extends Controller
                 $query->where('quantity_in_stock', '>', 0);
             }
 
-            $sortMap = [
-                'created_at_desc' => ['created_at',   'desc'],
-                'price_low'       => ['selling_price', 'asc'],
-                'price_high'      => ['selling_price', 'desc'],
-                'name_asc'        => ['product_name',  'asc'],
-                'name_desc'       => ['product_name',  'desc'],
-            ];
-            [$col, $dir] = $sortMap[$request->get('sort_by', 'created_at_desc')] ?? ['created_at', 'desc'];
-            $query->orderBy($col, $dir);
+            $sortBy = $request->get('sort_by', 'created_at_desc');
+
+            if ($sortBy === 'popular_desc') {
+                $query->orderByRaw($this->soldCountSubquery() . ' DESC')
+                    ->orderBy('created_at', 'desc');
+            } else {
+                $sortMap = [
+                    'created_at_desc' => ['created_at', 'desc'],
+                    'price_low' => ['selling_price', 'asc'],
+                    'price_high' => ['selling_price', 'desc'],
+                    'name_asc' => ['product_name', 'asc'],
+                    'name_desc' => ['product_name', 'desc'],
+                ];
+                [$col, $dir] = $sortMap[$sortBy] ?? ['created_at', 'desc'];
+                $query->orderBy($col, $dir);
+            }
 
             $perPage  = min((int) $request->get('per_page', 12), 100);
             $products = $query->paginate($perPage);
@@ -322,6 +329,32 @@ class CustomerProductController extends Controller
             ->where('status', 'approved')
             ->pluck('store_name', 'email')
             ->all();
+    }
+
+    private function soldCountSubquery(): string
+    {
+        return <<<'SQL'
+(
+    SELECT COALESCE(SUM(oi.quantity), 0)
+    FROM order_items oi
+    INNER JOIN orders o ON o.id = oi.order_id
+    WHERE oi.product_id = products.id
+      AND (
+        o.status = 'completed'
+        OR o.id IN (
+            SELECT d.order_id
+            FROM deliveries d
+            WHERE d.status = 'completed'
+        )
+      )
+      AND o.id NOT IN (
+        SELECT orq.order_id
+        FROM order_requests orq
+        WHERE orq.status = 'approved'
+          AND orq.type IN ('return', 'refund')
+      )
+)
+SQL;
     }
 
     private function formatProduct(Product $product, ?array $stats = null, ?string $vendorName = null): array

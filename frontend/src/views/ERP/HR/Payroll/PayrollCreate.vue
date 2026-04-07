@@ -305,7 +305,6 @@
           </span>
         </div>
 
-        <
         <div class="calculation-breakdown">
           <div class="breakdown-item">
             <div class="item-label">
@@ -371,6 +370,29 @@
             </div>
             <div class="item-value success-text">
               +{{ previewData.paid_leave_days }} days
+            </div>
+          </div>
+
+          <div class="breakdown-item success">
+            <div class="item-label">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M3 7h18"></path>
+                <path d="M6 3v8"></path>
+                <path d="M18 3v8"></path>
+                <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+              </svg>
+              Payable Days
+            </div>
+            <div class="item-value success-text">
+              {{ previewData.payable_days }} days
             </div>
           </div>
 
@@ -460,9 +482,74 @@
                   d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
                 ></path>
               </svg>
+              Daily Rate
+            </div>
+            <div class="item-value">₱{{ previewData.daily_rate }}</div>
+          </div>
+
+          <div class="breakdown-item">
+            <div class="item-label">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <line x1="12" y1="1" x2="12" y2="23"></line>
+                <path
+                  d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
+                ></path>
+              </svg>
               Hourly Rate
             </div>
             <div class="item-value">₱{{ previewData.hourly_rate }}</div>
+          </div>
+
+          <div class="breakdown-item success">
+            <div class="item-label">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Actual Work Pay
+            </div>
+            <div class="item-value success-text">
+              ₱{{ previewData.actual_work_amount }}
+            </div>
+          </div>
+
+          <div
+            v-if="previewData.paid_leave_days > 0"
+            class="breakdown-item info"
+          >
+            <div class="item-label">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              Paid Leave Pay
+            </div>
+            <div class="item-value success-text">
+              ₱{{ previewData.paid_leave_amount }}
+            </div>
           </div>
 
           <div class="breakdown-item highlight">
@@ -582,30 +669,19 @@
             <div class="step">
               <span class="step-number">1</span>
               <span class="step-text"
-                >Actual work hours: {{ previewData.actual_work_days }} days ×
-                {{ selectedEmployee.standard_work_hours_per_day }} hrs =
-                {{
-                  (
-                    previewData.actual_work_days *
-                    selectedEmployee.standard_work_hours_per_day
-                  ).toFixed(2)
-                }}
-                hrs</span
+                >Actual work pay: {{ previewData.actual_work_days }} day(s) ×
+                ₱{{ previewData.daily_rate }} = ₱{{
+                  previewData.actual_work_amount
+                }}</span
               >
             </div>
             <div v-if="previewData.paid_leave_days > 0" class="step success">
               <span class="step-number">2</span>
               <span class="step-text"
-                >✅ Paid leave hours added:
-                {{ previewData.paid_leave_days }} days ×
-                {{ selectedEmployee.standard_work_hours_per_day }} hrs =
-                {{
-                  (
-                    previewData.paid_leave_days *
-                    selectedEmployee.standard_work_hours_per_day
-                  ).toFixed(2)
-                }}
-                hrs</span
+                >Paid leave pay added: {{ previewData.paid_leave_days }} day(s)
+                × ₱{{ previewData.daily_rate }} = ₱{{
+                  previewData.paid_leave_amount
+                }}</span
               >
             </div>
             <div class="step">
@@ -613,8 +689,16 @@
                 previewData.paid_leave_days > 0 ? "3" : "2"
               }}</span>
               <span class="step-text"
-                >Total paid hours: {{ previewData.total_hours_worked }} hrs ×
-                ₱{{ previewData.hourly_rate }}/hr = ₱{{
+                >Payable work covered: {{ previewData.payable_days }} day(s) or
+                {{ previewData.total_hours_worked }} paid hour(s)</span
+              >
+            </div>
+            <div class="step success">
+              <span class="step-number">{{
+                previewData.paid_leave_days > 0 ? "4" : "3"
+              }}</span>
+              <span class="step-text"
+                >Gross salary before deductions = ₱{{
                   previewData.gross_salary
                 }}</span
               >
@@ -624,11 +708,12 @@
               class="step error"
             >
               <span class="step-number">{{
-                previewData.paid_leave_days > 0 ? "4" : "3"
+                previewData.paid_leave_days > 0 ? "5" : "4"
               }}</span>
               <span class="step-text"
-                >❌ Deductions ({{ previewData.unpaid_leave_days }} unpaid leave
-                + {{ previewData.absent_days }} absent) = -₱{{
+                >Deductions for {{ previewData.unpaid_leave_days }} unpaid
+                leave day(s), {{ previewData.absent_days }} absent day(s), and
+                selected contributions = -₱{{
                   previewData.deduction_amount
                 }}</span
               >
@@ -642,8 +727,12 @@
           </div>
         </div>
 
-        <!-- NEW: Leave Days Notice -->
-        <div v-if="previewData.leave_days > 0" class="leave-notice">
+        <div
+          v-if="
+            previewData.paid_leave_days > 0 || previewData.unpaid_leave_days > 0
+          "
+          class="leave-notice"
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="16"
@@ -658,9 +747,12 @@
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
           </svg>
           <p>
-            <strong>{{ previewData.leave_days }} approved leave day(s)</strong>
-            during this period. Employee is only paid for
-            {{ previewData.attendance_records_count }} day(s) of actual work.
+            <strong>
+              {{ previewData.paid_leave_days }} paid leave day(s)
+            </strong>
+            are included in salary and
+            <strong>{{ previewData.unpaid_leave_days }} unpaid leave day(s)</strong>
+            are deducted for this payroll period.
           </p>
         </div>
 
@@ -668,18 +760,22 @@
           <h4>Calculation Formula:</h4>
           <div class="formula">
             <span class="formula-part"
-              >Hourly Rate (₱{{ previewData.hourly_rate }})</span
+              >Actual Work (₱{{ previewData.actual_work_amount }})</span
             >
-            <span class="operator">×</span>
+            <span class="operator">+</span>
             <span class="formula-part"
-              >Total Hours ({{ previewData.total_hours_worked }})</span
+              >Paid Leave (₱{{ previewData.paid_leave_amount }})</span
+            >
+            <span class="operator">-</span>
+            <span class="formula-part"
+              >Deductions (₱{{ previewData.deduction_amount }})</span
             >
             <span class="operator">=</span>
-            <span class="formula-result">₱{{ previewData.gross_salary }}</span>
+            <span class="formula-result">₱{{ previewData.net_salary }}</span>
           </div>
           <p class="formula-note">
-            * Salary calculated based on actual hours worked. Leave days are not
-            paid.
+            * Approved paid leave is included in salary. Unpaid leave and
+            absences are deducted.
           </p>
         </div>
 

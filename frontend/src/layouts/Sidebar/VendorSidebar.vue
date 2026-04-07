@@ -1,12 +1,8 @@
 <template>
   <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
-  
+
   <!-- Backdrop for mobile -->
-  <div 
-    v-if="isMobileOpen" 
-    class="sidebar-backdrop" 
-    @click="closeMobile"
-  ></div>
+  <div v-if="isMobileOpen" class="sidebar-backdrop" @click="closeMobile"></div>
 
   <aside class="sidebar" :class="{ 'mobile-open': isMobileOpen }">
     <div class="logo-section">
@@ -39,10 +35,10 @@
     </div>
 
     <nav class="nav-menu">
-      <router-link to="/vendor/products" class="nav-item" active-class="active">
+      <!-- <router-link to="/vendor/products" class="nav-item" active-class="active">
         <span class="nav-icon">📊</span>
         <span>Dashboard</span>
-      </router-link>
+      </router-link> -->
 
       <div class="nav-section">
         <div class="section-label">SHOP</div>
@@ -52,11 +48,13 @@
           active-class="active"
         >
           <span class="nav-icon">🛍️</span>
-            <span>Orders</span>
-            <span v-if="notificationCounts.orders > 0" class="nav-badge">
-              {{ notificationCounts.orders > 99 ? "99+" : notificationCounts.orders }}
-            </span>
-          </router-link>
+          <span>Orders</span>
+          <span v-if="notificationCounts.orders > 0" class="nav-badge">
+            {{
+              notificationCounts.orders > 99 ? "99+" : notificationCounts.orders
+            }}
+          </span>
+        </router-link>
         <router-link
           to="/vendor/calendar"
           class="nav-item"
@@ -85,7 +83,11 @@
 
       <div class="nav-section">
         <div class="section-label">FINANCE</div>
-        <router-link to="/vendor/finance-dashboard" class="nav-item" active-class="active">
+        <router-link
+          to="/vendor/finance-dashboard"
+          class="nav-item"
+          active-class="active"
+        >
           <span class="nav-icon">📈</span>
           <span>Finance Overview</span>
         </router-link>
@@ -117,13 +119,13 @@
       </router-link> -->
     </nav>
 
-    <div class="sidebar-footer">
+    <!-- <div class="sidebar-footer">
       <button @click="handleLogout" class="logout-btn" :disabled="isLoading">
         <span class="logout-icon">🚪</span>
         <span>Logout</span>
         <span v-if="isLoading" class="logout-spinner"></span>
       </button>
-    </div>
+    </div> -->
   </aside>
 </template>
 
@@ -140,7 +142,10 @@ const { logout } = useAuth();
 const router = useRouter();
 const route = useRoute();
 const { isMobileOpen, closeMobile } = useSidebarState();
-const { vendorProfile, fetchProfile } = useVendorProfile({ autoFetch: false, showToast: false });
+const { vendorProfile, fetchProfile } = useVendorProfile({
+  autoFetch: false,
+  showToast: false,
+});
 
 const isLoading = ref(null);
 const isLoadingMessage = ref("");
@@ -279,9 +284,12 @@ onUnmounted(() => {
 });
 
 // Close sidebar on route change (mobile)
-watch(() => route.path, () => {
-  if (isMobileOpen.value) closeMobile();
-});
+watch(
+  () => route.path,
+  () => {
+    if (isMobileOpen.value) closeMobile();
+  },
+);
 
 watch(
   () => vendorProfile.value?.store_logo_url,

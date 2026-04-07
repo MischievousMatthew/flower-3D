@@ -471,12 +471,54 @@
                 @change="onSortChange"
                 class="sort-select"
               >
+                <option value="popular_desc">Most Popular</option>
                 <option value="created_at_desc">Newest First</option>
                 <option value="price_low">Price: Low to High</option>
                 <option value="price_high">Price: High to Low</option>
                 <option value="name_asc">Name: A to Z</option>
                 <option value="name_desc">Name: Z to A</option>
               </select>
+            </div>
+          </div>
+          <div
+            v-if="!selectedVendor && popularProducts.length > 0"
+            class="popular-products-panel"
+          >
+            <div class="popular-products-head">
+              <div>
+                <p class="section-subtitle">Most Popular</p>
+                <h3>Best-selling flowers right now</h3>
+              </div>
+              <button
+                class="btn-show-popular"
+                @click="applyPopularSort"
+              >
+                Show Full Ranking
+              </button>
+            </div>
+            <div class="popular-products-grid">
+              <button
+                v-for="(product, index) in popularProducts"
+                :key="`popular-${product.id}`"
+                class="popular-product-card"
+                @click="openProductModal(product)"
+              >
+                <span class="popular-rank">#{{ index + 1 }}</span>
+                <img
+                  :src="getProductImage(product)"
+                  :alt="product.product_name"
+                  class="popular-image"
+                  @error="handleImageError"
+                />
+                <div class="popular-copy">
+                  <h4>{{ product.product_name }}</h4>
+                  <p>{{ product.vendor_name }}</p>
+                </div>
+                <div class="popular-stats">
+                  <span>{{ product.sold_count || 0 }} sold</span>
+                  <strong>&#x20B1;{{ formatPrice(product.selling_price) }}</strong>
+                </div>
+              </button>
             </div>
           </div>
           <div v-if="products.length === 0 && !isLoading" class="no-results">
@@ -841,6 +883,7 @@ const sortBy = ref("created_at_desc");
 const isLoading = ref(false);
 const isLoadingMessage = ref("");
 const products = ref([]);
+const popularProducts = ref([]);
 
 // Live stats for the open product modal
 const productStats = ref({
@@ -1073,6 +1116,12 @@ const onSliderChange = () => {
   fetchProducts();
 };
 const onSortChange = () => fetchProducts();
+const applyPopularSort = () => {
+  sortBy.value = "popular_desc";
+  pagination.value.current_page = 1;
+  fetchProducts();
+  document.getElementById("products")?.scrollIntoView({ behavior: "smooth" });
+};
 
 const isShopVisibleProduct = (product) =>
   ["per_piece", "bouquet", "", null, undefined].includes(product?.selling_type);
@@ -1153,6 +1202,24 @@ const fetchProducts = async () => {
     pagination.value.total = products.value.length;
   } finally {
     isLoading.value = false;
+  }
+};
+
+const fetchPopularProducts = async () => {
+  try {
+    const response = await productService.getAllProducts({
+      sort_by: "popular_desc",
+      per_page: 4,
+      page: 1,
+      in_stock_only: 1,
+    });
+
+    if (response.success) {
+      popularProducts.value = response.data.data || [];
+    }
+  } catch (error) {
+    console.error("fetchPopularProducts:", error);
+    popularProducts.value = [];
   }
 };
 
@@ -1471,7 +1538,12 @@ const updateCountdown = () => {
 
 onMounted(async () => {
   countdownInterval = setInterval(updateCountdown, 1000);
-  await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors()]);
+  await Promise.all([
+    fetchFilterOptions(),
+    fetchProducts(),
+    fetchVendors(),
+    fetchPopularProducts(),
+  ]);
   if (isAuthenticated.value) {
     await loadCart();
   } else {
@@ -2291,6 +2363,113 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.popular-products-panel {
+  margin: 0 0 24px;
+  padding: 24px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(72, 187, 120, 0.16), transparent 38%),
+    linear-gradient(135deg, #ffffff 0%, #f0fff4 100%);
+  border: 1px solid #d1fae5;
+  box-shadow: 0 18px 40px rgba(72, 187, 120, 0.08);
+}
+
+.popular-products-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.popular-products-head h3 {
+  margin: 4px 0 0;
+  font-size: 24px;
+  color: #1f2937;
+}
+
+.btn-show-popular {
+  padding: 12px 18px;
+  border: none;
+  border-radius: 999px;
+  background: #1f2937;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.popular-products-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.popular-product-card {
+  position: relative;
+  text-align: left;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.popular-product-card:hover {
+  transform: translateY(-3px);
+  border-color: #86efac;
+  box-shadow: 0 16px 30px rgba(31, 41, 55, 0.08);
+}
+
+.popular-rank {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #14532d;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.popular-image {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+
+.popular-copy h4 {
+  margin: 0 0 6px;
+  font-size: 17px;
+  color: #111827;
+}
+
+.popular-copy p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.popular-stats {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #166534;
+  font-size: 13px;
+}
+
+.popular-stats strong {
+  color: #111827;
+  font-size: 15px;
 }
 .results-count {
   font-size: 14px;
@@ -3220,6 +3399,12 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: flex-start;
   }
+  .popular-products-panel {
+    padding: 18px;
+  }
+  .popular-products-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @media (max-width: 640px) {
   .hero-content h1 {
@@ -3229,6 +3414,9 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
   .vendors-grid {
+    grid-template-columns: 1fr;
+  }
+  .popular-products-grid {
     grid-template-columns: 1fr;
   }
   .modal-cart-row {

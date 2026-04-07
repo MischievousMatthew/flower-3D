@@ -369,6 +369,13 @@ class VendorApplicationController extends Controller
                 ], 422);
             }
 
+            if ($conflictMessage = $this->detectApprovalConflict($application)) {
+                return response()->json([
+                    'error' => 'Failed to approve application',
+                    'message' => $conflictMessage,
+                ], 422);
+            }
+
             $this->createVendorAccount($application);
 
             $application->update([
@@ -383,6 +390,19 @@ class VendorApplicationController extends Controller
                 'application' => $application->fresh(),
             ]);
 
+        } catch (QueryException $e) {
+            $friendlyMessage = $this->humanizeApprovalException($e, null);
+
+            Log::error('Error approving application', [
+                'id' => $id,
+                'error' => $e->getMessage(),
+                'friendly_message' => $friendlyMessage,
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to approve application',
+                'message' => $friendlyMessage,
+            ], 422);
         } catch (\Exception $e) {
             Log::error('Error approving application', [
                 'id'    => $id,
@@ -391,7 +411,7 @@ class VendorApplicationController extends Controller
 
             return response()->json([
                 'error'   => 'Failed to approve application',
-                'message' => $e->getMessage(),
+                'message' => $this->humanizeApprovalException($e, null),
             ], 500);
         }
     }
@@ -502,6 +522,62 @@ class VendorApplicationController extends Controller
     public function test()
     {
         return response()->json(['message' => 'API is working']);
+    }
+
+    private function detectApprovalConflict(VendorApplication $application): ?string
+    {
+        $email = trim((string) $application->email);
+        $contactNumber = trim((string) $application->contact_number);
+
+        if ($email !== '' && User::where('email', $email)->exists()) {
+            return 'Email already exists.';
+        }
+
+        if ($contactNumber !== '' && User::where('contact_number', $contactNumber)->exists()) {
+            return 'Contact number already exists.';
+        }
+
+        if ($email !== '' && VendorApplication::where('email', $email)
+            ->where('id', '!=', $application->id)
+            ->whereIn('status', ['pending', 'approved', 'under_review'])
+            ->exists()) {
+            return 'This email already has another active vendor application.';
+        }
+
+        return null;
+    }
+
+    private function humanizeApprovalException(\Throwable $e, ?VendorApplication $application): string
+    {
+        $message = strtolower($e->getMessage());
+
+        if (str_contains($message, 'users_email_unique') || str_contains($message, '"users"."email"') || str_contains($message, '(email)')) {
+            return 'Email already exists.';
+        }
+
+        if (str_contains($message, 'users_contact_number_unique') || str_contains($message, '"users"."contact_number"') || str_contains($message, '(contact_number)')) {
+            return 'Contact number already exists.';
+        }
+
+        if (str_contains($message, 'users_username_unique') || str_contains($message, '"users"."username"') || str_contains($message, '(username)')) {
+            return 'Username already exists. Please try approving again.';
+        }
+
+        if (str_contains($message, 'vendor_applications_email_unique')) {
+            return 'This email already has a vendor application.';
+        }
+
+        if ($application) {
+            if ($application->email && str_contains($message, strtolower($application->email))) {
+                return 'Email already exists.';
+            }
+
+            if ($application->contact_number && str_contains($message, strtolower($application->contact_number))) {
+                return 'Contact number already exists.';
+            }
+        }
+
+        return 'Unable to approve this vendor application because some account details already exist.';
     }
 
     /**

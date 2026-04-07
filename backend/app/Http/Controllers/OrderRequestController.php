@@ -98,9 +98,17 @@ class OrderRequestController extends Controller
         }
 
         if ($orderRequest->status !== 'pending') {
+            if ($orderRequest->status === 'approved') {
+                return response()->json([
+                    'success' => true,
+                    'message' => ucfirst($orderRequest->type) . ' request is already approved.',
+                    'data' => $this->formatRequest($orderRequest->fresh(['order.delivery', 'user'])),
+                ]);
+            }
+
             return response()->json([
                 'success' => false,
-                'message' => "Request is already {$orderRequest->status}.",
+                'message' => ucfirst($orderRequest->type) . ' request was already rejected and can no longer be approved.',
             ], 422);
         }
 
@@ -163,9 +171,17 @@ class OrderRequestController extends Controller
         }
 
         if ($orderRequest->status !== 'pending') {
+            if ($orderRequest->status === 'rejected') {
+                return response()->json([
+                    'success' => true,
+                    'message' => ucfirst($orderRequest->type) . ' request is already rejected.',
+                    'data' => $this->formatRequest($orderRequest->fresh(['order', 'user'])),
+                ]);
+            }
+
             return response()->json([
                 'success' => false,
-                'message' => "Request is already {$orderRequest->status}.",
+                'message' => ucfirst($orderRequest->type) . ' request was already approved and can no longer be rejected.',
             ], 422);
         }
 
