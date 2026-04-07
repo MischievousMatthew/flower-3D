@@ -57,6 +57,26 @@
         <div class="step-line" :style="{ width: stepLineWidth }"></div>
       </div>
 
+      <div
+        v-if="phase === 'POSITIONING' || ['LIVENESS', 'CAPTURING', 'MATCHING'].includes(phase)"
+        class="instruction-bar instruction-bar-top"
+      >
+        <span class="inst-icon">{{ phase === "POSITIONING" ? "📷" : "Secure" }}</span>
+        <span v-if="phase === 'POSITIONING'">Center your face in the frame and hold still</span>
+        <span v-else-if="phase === 'LIVENESS'">
+          Hold the requested action for {{ challengeFrameProgress }}/{{
+            currentChallenge?.id === "blink" || currentChallenge?.id === "nod"
+              ? 1
+              : REQUIRED_CHALLENGE_VALID_FRAMES
+          }} secure frames
+        </span>
+        <span v-else>
+          Collecting secure match frames {{ matchFramesValidated }}/{{
+            REQUIRED_MATCH_VALID_FRAMES
+          }}
+        </span>
+      </div>
+
       <!-- PHASE: Loading Models -->
       <div
         v-if="phase === 'LOADING_MODELS'"
@@ -315,29 +335,6 @@
           </div>
         </div>
 
-        <!-- Positioning instruction -->
-        <div v-if="phase === 'POSITIONING'" class="instruction-bar">
-          <span class="inst-icon">📷</span>
-          <span>Center your face in the frame and hold still</span>
-        </div>
-        <div
-          v-if="['LIVENESS', 'CAPTURING', 'MATCHING'].includes(phase)"
-          class="instruction-bar"
-        >
-          <span class="inst-icon">Secure</span>
-          <span v-if="phase === 'LIVENESS'">
-            Hold the requested action for {{ challengeFrameProgress }}/{{
-              currentChallenge?.id === "blink" || currentChallenge?.id === "nod"
-                ? 1
-                : REQUIRED_CHALLENGE_VALID_FRAMES
-            }} secure frames
-          </span>
-          <span v-else>
-            Collecting secure match frames {{ matchFramesValidated }}/{{
-              REQUIRED_MATCH_VALID_FRAMES
-            }}
-          </span>
-        </div>
       </div>
 
       <!-- PHASE: Success -->
@@ -476,7 +473,7 @@ const REQUIRED_CHALLENGE_VALID_FRAMES = 6;
 const REQUIRED_MATCH_VALID_FRAMES = 10;
 const DETECTION_INTERVAL_MS = 80;
 const MAX_ATTEMPTS = 3;
-const NUM_CHALLENGES = 3;
+const NUM_CHALLENGES = 4;
 const CHALLENGE_DURATION = 5; // seconds per challenge
 const DEPTH_SCALE_THRESHOLD = 0.05; // 5% size change for depth check
 const MIN_DETECTION_SCORE = 0.45;
@@ -1211,47 +1208,26 @@ function pickChallenges() {
   const depthPair = [moveCloserChallenge, moveBackChallenge].filter(Boolean);
 
   // Shuffle behavioral challenges
-  const behavioral = CHALLENGE_POOL.filter(
-    (c) => !["move_closer", "move_back"].includes(c.id),
-  )
-    .sort(() => Math.random() - 0.5)
-    .slice(0, Math.max(0, NUM_CHALLENGES - depthPair.length)); // fill remaining slots
+  const expressionPool = CHALLENGE_POOL.filter((challenge) =>
+    ["smile", "blink"].includes(challenge.id),
+  );
+  const movementPool = CHALLENGE_POOL.filter((challenge) =>
+    ["turn_left", "turn_right", "nod"].includes(challenge.id),
+  );
 
   // Chain: depth check first → behavioral
-  const blinkChallenge = CHALLENGE_POOL.find((challenge) => challenge.id === "blink");
-  const turnChallenge =
-    CHALLENGE_POOL.find(
-      (challenge) => challenge.id === (Math.random() > 0.5 ? "turn_left" : "turn_right"),
-    ) || CHALLENGE_POOL.find((challenge) => ["turn_left", "turn_right", "nod"].includes(challenge.id));
+  const randomExpression = expressionPool.sort(() => Math.random() - 0.5)[0] || null;
+  const randomMovement = movementPool.sort(() => Math.random() - 0.5)[0] || null;
 
-  activeChallenges.value = [...depthPair, ...behavioral].filter(Boolean);
-  if (blinkChallenge && !activeChallenges.value.some((challenge) => challenge?.id === "blink")) {
-    if (activeChallenges.value.length < NUM_CHALLENGES) {
-      activeChallenges.value.push(blinkChallenge);
-    } else {
-      activeChallenges.value[activeChallenges.value.length - 1] = blinkChallenge;
-    }
-  }
-  if (
-    !activeChallenges.value.some((challenge) =>
-      ["turn_left", "turn_right", "nod"].includes(challenge?.id),
-    )
-  ) {
-    if (turnChallenge) {
-      if (activeChallenges.value.length < NUM_CHALLENGES) {
-        activeChallenges.value.push(turnChallenge);
-      } else {
-        const replaceIndex = activeChallenges.value.findIndex(
-          (challenge) => !["move_closer", "move_back"].includes(challenge?.id),
-        );
-        activeChallenges.value[Math.max(replaceIndex, 0)] = turnChallenge;
-      }
-    }
-  }
+  activeChallenges.value = [
+    ...depthPair,
+    randomExpression,
+    randomMovement,
+  ].filter(Boolean);
   activeChallenges.value = activeChallenges.value.filter(Boolean).slice(0, NUM_CHALLENGES);
   challengeIndex.value = 0;
   challengeResults = [];
-  securityHint.value = "Complete the random actions live. Replays will fail.";
+  securityHint.value = "Challenges are randomized each run. Follow the live prompts naturally.";
 }
 
 // ── Challenge Chain ───────────────────────────────────────────────────────────
@@ -1411,20 +1387,20 @@ function evaluateChallenge(type, det, startWidth) {
     }
 
     case "smile":
-      return (expr.happy ?? 0) > 0.65;
+      return (expr.happy ?? 0) > 0.45;
 
     case "turn_left": {
       const nose = landmarks.getNose?.() ?? [];
       const noseX = nose[3]?.x ?? 0;
       const centerX = box.x + box.width / 2;
-      return noseX < centerX - box.width * 0.12;
+      return noseX < centerX - box.width * 0.08;
     }
 
     case "turn_right": {
       const nose = landmarks.getNose?.() ?? [];
       const noseX = nose[3]?.x ?? 0;
       const centerX = box.x + box.width / 2;
-      return noseX > centerX + box.width * 0.12;
+      return noseX > centerX + box.width * 0.08;
     }
 
     case "nod": {
@@ -2390,6 +2366,14 @@ onUnmounted(() => cleanup());
   color: #4a5568;
   font-weight: 500;
   width: 100%;
+}
+.instruction-bar-top {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin: 0 24px;
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
 .inst-icon {
   font-size: 18px;
