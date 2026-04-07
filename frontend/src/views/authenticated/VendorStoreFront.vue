@@ -849,6 +849,9 @@ const filteredProducts = computed(() => {
   return list;
 });
 
+const isStorefrontVisibleProduct = (product) =>
+  ["per_piece", "bouquet", "", null, undefined].includes(product?.selling_type);
+
 // ── API ────────────────────────────────────────────────────────────────────
 
 const fetchVendor = async () => {
@@ -876,7 +879,9 @@ const fetchProducts = async () => {
     // Use the vendor's owner_id (user id) to fetch products via our storefront endpoint
     const { data } = await api.get(`vendors/${vendorId.value}/products`);
     if (data.success) {
-      products.value = Array.isArray(data.data) ? data.data : [];
+      products.value = (Array.isArray(data.data) ? data.data : []).filter(
+        isStorefrontVisibleProduct,
+      );
     } else {
       products.value = [];
     }

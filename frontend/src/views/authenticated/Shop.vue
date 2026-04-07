@@ -1074,6 +1074,9 @@ const onSliderChange = () => {
 };
 const onSortChange = () => fetchProducts();
 
+const isShopVisibleProduct = (product) =>
+  ["per_piece", "bouquet", "", null, undefined].includes(product?.selling_type);
+
 const buildQueryParams = () => {
   const p = {
     page: pagination.value.current_page,
@@ -1123,15 +1126,19 @@ const fetchProducts = async () => {
     const r = await api.get(endpoint, { params });
     if (r.data.success) {
       if (selectedVendor.value) {
-        products.value = r.data.data;
+        products.value = (Array.isArray(r.data.data) ? r.data.data : []).filter(
+          isShopVisibleProduct,
+        );
         pagination.value = {
           current_page: 1,
           last_page: 1,
-          per_page: r.data.data.length,
-          total: r.data.data.length,
+          per_page: products.value.length,
+          total: products.value.length,
         };
       } else {
-        products.value = r.data.data.data;
+        products.value = (
+          Array.isArray(r.data.data.data) ? r.data.data.data : []
+        ).filter(isShopVisibleProduct);
         pagination.value = {
           current_page: r.data.data.current_page,
           last_page: r.data.data.last_page,

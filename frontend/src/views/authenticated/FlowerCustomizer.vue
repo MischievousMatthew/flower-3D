@@ -391,7 +391,7 @@ async function fetchFlowers() {
     const rawItems = Array.isArray(response.data?.data) ? response.data.data : [];
     flowers.value = rawItems.map(normalizeFlower).filter((flower) => {
       if (!flower.model) return false;
-      if (flower.selling_type !== "per_piece") return false;
+      if (!["per_piece", "per_piece_customizable"].includes(flower.selling_type)) return false;
       if (!flower.is_customizable) return false;
       if (vendorOwnerId.value && flower.owner_id !== vendorOwnerId.value) return false;
       return true;
