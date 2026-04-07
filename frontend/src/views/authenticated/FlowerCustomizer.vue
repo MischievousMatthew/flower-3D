@@ -407,14 +407,22 @@ async function fetchFlowers() {
 
 function normalizeFlower(flower) {
   const model = resolveModelUrl(flower);
+  const sellingType = flower.selling_type || "per_piece";
+  const isCustomizable =
+    sellingType === "per_piece_customizable"
+      ? true
+      : flower.is_customizable === undefined
+        ? true
+        : Boolean(flower.is_customizable);
+
   return {
     id: Number(flower.id),
     owner_id: Number(flower.owner_id || vendorOwnerId.value || 0) || null,
     product_name: flower.product_name || flower.name || "Unnamed Flower",
     price: Number(flower.price ?? flower.selling_price ?? 0),
     quantity_in_stock: Number(flower.quantity_in_stock ?? flower.stock ?? 0),
-    selling_type: flower.selling_type || "per_piece",
-    is_customizable: flower.is_customizable === undefined ? true : Boolean(flower.is_customizable),
+    selling_type: sellingType,
+    is_customizable: isCustomizable,
     image: flower.primary_image_url || flower.primary_image?.image_url || flower.images?.[0]?.image_url || null,
     model,
     model_3d_url: model,
