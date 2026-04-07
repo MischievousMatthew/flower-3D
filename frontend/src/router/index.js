@@ -27,15 +27,13 @@ const routes = [
       {
         path: "customize/flower",
         name: "FlowerCustomizerStore",
-        component: () =>
-          import("../views/authenticated/FlowerCustomizer.vue"),
+        component: () => import("../views/authenticated/FlowerCustomizer.vue"),
         meta: { public: true, onlyCustomerOrGuest: true },
       },
       {
         path: "customize/:id?",
         name: "FlowerCustomizer",
-        component: () =>
-          import("../views/authenticated/FlowerCustomizer.vue"),
+        component: () => import("../views/authenticated/FlowerCustomizer.vue"),
         meta: { public: true, onlyCustomerOrGuest: true },
       },
       {
@@ -526,20 +524,10 @@ const routes = [
             name: "LeaveManagement",
             children: [
               {
-                path: "employee-request",
-                name: "EmployeeLeaveRequest",
-                redirect: "/leaves",
-              },
-              {
                 path: "management-requests",
                 name: "LeaveRequests",
                 component: () =>
                   import("../views/ERP/HR/Leaves/LeaveManagement.vue"),
-              },
-              {
-                path: "qr-request",
-                name: "LeaveQRRequest",
-                redirect: "/leaves",
               },
             ],
           },
@@ -627,25 +615,34 @@ router.beforeEach(async (to, from, next) => {
   if (!auth.user.value) {
     try {
       await auth.loadUser(to.path);
-      // Wait for loadUser to complete, which now hydrates auth.user.value 
+      // Wait for loadUser to complete, which now hydrates auth.user.value
       // from localStorage immediately.
     } catch (err) {
       const status = err?.response?.status;
-      
+
       // If it's a definitive 401, clear and redirect
       if (status === 401) {
         clearStoredAuth();
         auth.user.value = null;
-        if (to.meta.requiresAuth || to.meta.requiresAdmin || to.meta.requiresVendor) {
+        if (
+          to.meta.requiresAuth ||
+          to.meta.requiresAdmin ||
+          to.meta.requiresVendor
+        ) {
           return next("/guest/login");
         }
         return next();
       }
 
-      // For other errors (network timeout, 500), if we have a user in memory 
-      // from localStorage, we permit the navigation to proceed rather than 
+      // For other errors (network timeout, 500), if we have a user in memory
+      // from localStorage, we permit the navigation to proceed rather than
       // forcing a logout.
-      if (!auth.user.value && (to.meta.requiresAuth || to.meta.requiresAdmin || to.meta.requiresVendor)) {
+      if (
+        !auth.user.value &&
+        (to.meta.requiresAuth ||
+          to.meta.requiresAdmin ||
+          to.meta.requiresVendor)
+      ) {
         return next("/guest/login");
       }
     }
@@ -672,10 +669,7 @@ router.beforeEach(async (to, from, next) => {
     }
 
     // If employee is trying to access a non-ERP path, send them home
-    if (
-      !to.path.startsWith("/erp") &&
-      to.path !== "/guest/login"
-    ) {
+    if (!to.path.startsWith("/erp") && to.path !== "/guest/login") {
       return next(assignment.getDefaultRoute());
     }
 
