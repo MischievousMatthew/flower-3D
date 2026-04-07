@@ -44,10 +44,12 @@
             completed: stepIndex > index,
             active: stepIndex === index,
             upcoming: stepIndex < index,
+            failed: isFailurePhase && stepIndex === index,
           }"
         >
           <div class="step-circle">
-            <span v-if="stepIndex > index">✓</span>
+            <span v-if="isFailurePhase && stepIndex === index">!</span>
+            <span v-else-if="stepIndex > index">✓</span>
             <span v-else>{{ index + 1 }}</span>
           </div>
           <span class="step-label">{{ step.label }}</span>
@@ -641,12 +643,15 @@ const PHASE_TO_STEP = {
   CAPTURING: 3,
   MATCHING: 3,
   SUCCESS: 4,
-  FAILURE: 4,
-  PHOTO_ERROR: 4,
-  SUSPICIOUS: 4,
+  FAILURE: 3,
+  PHOTO_ERROR: 3,
+  SUSPICIOUS: 3,
 };
 
 const stepIndex = computed(() => PHASE_TO_STEP[phase.value] ?? 0);
+const isFailurePhase = computed(() =>
+  ["FAILURE", "PHOTO_ERROR", "SUSPICIOUS"].includes(phase.value),
+);
 const stepLineWidth = computed(
   () => `${(stepIndex.value / (steps.length - 1)) * 100}%`,
 );
@@ -1914,6 +1919,11 @@ onUnmounted(() => cleanup());
   color: white;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
 }
+.step.failed .step-circle {
+  background: #ef4444;
+  color: white;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
 .step.upcoming .step-circle {
   background: #e5e7eb;
   color: #6b7280;
@@ -1926,6 +1936,10 @@ onUnmounted(() => cleanup());
 }
 .step.active .step-label {
   color: #3b82f6;
+  font-weight: 700;
+}
+.step.failed .step-label {
+  color: #ef4444;
   font-weight: 700;
 }
 .step.completed .step-label {
