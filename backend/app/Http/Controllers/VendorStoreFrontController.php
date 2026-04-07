@@ -7,6 +7,8 @@ use App\Models\VendorApplication;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -151,7 +153,8 @@ class VendorStorefrontController extends Controller
                 return response()->json(['success' => true, 'data' => []]);
             }
 
-            $query = Product::where('owner_id', $ownerId)
+            $hasVendorIdColumn = Schema::hasColumn('products', 'vendor_id');
+            $query = $this->storefrontProductsQuery($ownerId, $hasVendorIdColumn)
                 ->where('status', 'active')
                 ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->with([
@@ -213,11 +216,8 @@ class VendorStorefrontController extends Controller
             }
 
             $hasCustomizableColumn = Schema::hasColumn('products', 'is_customizable');
-            $flowers = Product::query()
-                ->where(function ($query) use ($ownerId) {
-                    $query->where('owner_id', $ownerId)
-                        ->orWhere('vendor_id', $ownerId);
-                })
+            $hasVendorIdColumn = Schema::hasColumn('products', 'vendor_id');
+            $flowers = $this->storefrontProductsQuery($ownerId, $hasVendorIdColumn)
                 ->where('status', 'active')
                 ->where(function ($query) use ($hasCustomizableColumn) {
                     $query->where('selling_type', 'per_piece_customizable');
@@ -362,6 +362,23 @@ class VendorStorefrontController extends Controller
             ->first();
 
         return $vendorUser?->id;
+    }
+
+    private function storefrontProductsQuery(int $ownerId, bool $hasVendorIdColumn): Builder
+    {
+        $query = Product::query();
+
+        if (!Schema::hasColumn('products', 'deleted_at')) {
+            $query->withoutGlobalScope(SoftDeletingScope::class);
+        }
+
+        return $query->where(function ($productQuery) use ($ownerId, $hasVendorIdColumn) {
+            $productQuery->where('owner_id', $ownerId);
+
+            if ($hasVendorIdColumn) {
+                $productQuery->orWhere('vendor_id', $ownerId);
+            }
+        });
     }
 
     /**
