@@ -104,7 +104,7 @@ class AttendanceController extends Controller
 
     private function validateFaceVerificationPayload(Request $request): ?JsonResponse
     {
-        $allowedChallenges = ['blink', 'smile', 'turn_left', 'turn_right', 'nod', 'move_closer', 'move_back'];
+        $allowedChallenges = ['blink', 'smile', 'nod', 'move_closer', 'move_back'];
 
         $validator = Validator::make($request->all(), [
             'employee_id'                           => 'required|integer|exists:employees_info,id',
@@ -148,8 +148,8 @@ class AttendanceController extends Controller
                 $validator->errors()->add('challenges', 'An expression challenge is required.');
             }
 
-            if (!$challenges->intersect(['turn_left', 'turn_right', 'nod'])->count()) {
-                $validator->errors()->add('challenges', 'A head movement challenge is required.');
+            if (!$challenges->intersect(['blink', 'smile', 'nod'])->count()) {
+                $validator->errors()->add('challenges', 'A facial action challenge is required.');
             }
 
             if ($results->contains(fn ($result) => empty($result['passed']))) {

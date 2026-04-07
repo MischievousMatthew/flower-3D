@@ -240,12 +240,15 @@
         </div>
 
         <div
-          v-if="phase === 'POSITIONING' || ['LIVENESS', 'CAPTURING', 'MATCHING'].includes(phase)"
+          v-if="['STARTING_WEBCAM', 'POSITIONING', 'LIVENESS', 'CAPTURING', 'MATCHING'].includes(phase)"
           class="instruction-side"
         >
           <div class="instruction-side-card">
             <div class="instruction-side-kicker">Instruction</div>
-            <div class="instruction-side-title" v-if="phase === 'POSITIONING'">
+            <div class="instruction-side-title" v-if="phase === 'STARTING_WEBCAM'">
+              Starting your camera
+            </div>
+            <div class="instruction-side-title" v-else-if="phase === 'POSITIONING'">
               Center your face in the frame
             </div>
             <div class="instruction-side-title" v-else-if="phase === 'LIVENESS'">
@@ -257,7 +260,10 @@
             <div class="instruction-side-title" v-else>
               Matching your face
             </div>
-            <p class="instruction-side-copy" v-if="phase === 'POSITIONING'">
+            <p class="instruction-side-copy" v-if="phase === 'STARTING_WEBCAM'">
+              Stay in front of the screen while we connect to your real webcam.
+            </p>
+            <p class="instruction-side-copy" v-else-if="phase === 'POSITIONING'">
               Hold still until the position bar completes.
             </p>
             <p class="instruction-side-copy" v-else-if="phase === 'LIVENESS'">
@@ -1284,28 +1290,42 @@ function triggerEnvFlash() {
 // ── Challenge Setup ───────────────────────────────────────────────────────────
 function pickChallenges() {
   // Always include depth (move_closer → move_back) as first two for Z-axis verification
-  const moveCloserChallenge = CHALLENGE_POOL.find((challenge) => challenge.id === "move_closer");
-  const moveBackChallenge = CHALLENGE_POOL.find((challenge) => challenge.id === "move_back");
-  const depthPair = [moveCloserChallenge, moveBackChallenge].filter(Boolean);
+  const shuffled = (list) => [...list].sort(() => Math.random() - 0.5);
+  const expressions = shuffled(
+    CHALLENGE_POOL.filter((challenge) => ["smile", "blink"].includes(challenge.id)),
+  );
+  const depthChallenges = shuffled(
+    CHALLENGE_POOL.filter((challenge) => ["move_closer", "move_back"].includes(challenge.id)),
+  );
+  const extraPool = shuffled(
+    CHALLENGE_POOL.filter((challenge) =>
+      ["smile", "blink", "nod", "move_closer", "move_back"].includes(challenge.id),
+    ),
+  );
 
   // Shuffle behavioral challenges
-  const expressionPool = CHALLENGE_POOL.filter((challenge) =>
-    ["smile", "blink"].includes(challenge.id),
-  );
-  const movementPool = CHALLENGE_POOL.filter((challenge) =>
-    ["turn_left", "turn_right", "nod"].includes(challenge.id),
-  );
+  const targetCount = 3 + Math.floor(Math.random() * 3);
+  const selected = [];
+  const selectedIds = new Set();
+  const addChallenge = (challenge) => {
+    if (!challenge || selectedIds.has(challenge.id)) return;
+    selected.push(challenge);
+    selectedIds.add(challenge.id);
+  };
 
   // Chain: depth check first → behavioral
-  const randomExpression = expressionPool.sort(() => Math.random() - 0.5)[0] || null;
-  const randomMovement = movementPool.sort(() => Math.random() - 0.5)[0] || null;
+  
 
-  activeChallenges.value = [
-    ...depthPair,
-    randomExpression,
-    randomMovement,
-  ].filter(Boolean);
-  activeChallenges.value = activeChallenges.value.filter(Boolean).slice(0, NUM_CHALLENGES);
+  addChallenge(expressions[0]);
+  addChallenge(depthChallenges[0]);
+  if (Math.random() > 0.4) addChallenge(depthChallenges[1]);
+
+  for (const challenge of extraPool) {
+    if (selected.length >= targetCount) break;
+    addChallenge(challenge);
+  }
+
+  activeChallenges.value = shuffled(selected).slice(0, NUM_CHALLENGES);
   challengeIndex.value = 0;
   challengeResults = [];
   securityHint.value = "Challenges are randomized each run. Follow the live prompts naturally.";
