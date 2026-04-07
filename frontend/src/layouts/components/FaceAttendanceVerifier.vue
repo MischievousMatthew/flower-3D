@@ -478,8 +478,8 @@ const DETECTION_INTERVAL_MS = 80;
 const MAX_ATTEMPTS = 3;
 const NUM_CHALLENGES = 3;
 const CHALLENGE_DURATION = 5; // seconds per challenge
-const DEPTH_SCALE_THRESHOLD = 0.08; // 8% size change for depth check
-const MIN_DETECTION_SCORE = 0.6;
+const DEPTH_SCALE_THRESHOLD = 0.05; // 5% size change for depth check
+const MIN_DETECTION_SCORE = 0.45;
 const MAX_STATIC_FRAME_MS = 3000;
 const MIN_TEXTURE_VARIANCE = 60;
 
@@ -1171,7 +1171,7 @@ function validateLiveFrame(det, { requireMovement = false } = {}) {
   minDetectionScoreSeen = Math.min(minDetectionScoreSeen, det.detection.score ?? 1);
 
   if ((det.detection.score ?? 0) < MIN_DETECTION_SCORE) {
-    markSuspicious("Face confidence is too low. Remove screens or glare.");
+    securityHint.value = "Face confidence is low. Move closer to the camera and improve lighting.";
     return false;
   }
 
@@ -1206,34 +1206,49 @@ function triggerEnvFlash() {
 // ── Challenge Setup ───────────────────────────────────────────────────────────
 function pickChallenges() {
   // Always include depth (move_closer → move_back) as first two for Z-axis verification
-  const depthPair = [
-    CHALLENGE_POOL.find((c) => c.id === "move_closer"),
-    CHALLENGE_POOL.find((c) => c.id === "move_back"),
-  ];
+  const moveCloserChallenge = CHALLENGE_POOL.find((challenge) => challenge.id === "move_closer");
+  const moveBackChallenge = CHALLENGE_POOL.find((challenge) => challenge.id === "move_back");
+  const depthPair = [moveCloserChallenge, moveBackChallenge].filter(Boolean);
 
   // Shuffle behavioral challenges
   const behavioral = CHALLENGE_POOL.filter(
     (c) => !["move_closer", "move_back"].includes(c.id),
   )
     .sort(() => Math.random() - 0.5)
-    .slice(0, NUM_CHALLENGES - 2); // fill remaining slots
+    .slice(0, Math.max(0, NUM_CHALLENGES - depthPair.length)); // fill remaining slots
 
   // Chain: depth check first → behavioral
-  activeChallenges.value = [...depthPair, ...behavioral];
-  if (!activeChallenges.value.some((challenge) => challenge?.id === "blink")) {
-    activeChallenges.value[activeChallenges.value.length - 1] = CHALLENGE_POOL.find(
-      (challenge) => challenge.id === "blink",
-    );
+  const blinkChallenge = CHALLENGE_POOL.find((challenge) => challenge.id === "blink");
+  const turnChallenge =
+    CHALLENGE_POOL.find(
+      (challenge) => challenge.id === (Math.random() > 0.5 ? "turn_left" : "turn_right"),
+    ) || CHALLENGE_POOL.find((challenge) => ["turn_left", "turn_right", "nod"].includes(challenge.id));
+
+  activeChallenges.value = [...depthPair, ...behavioral].filter(Boolean);
+  if (blinkChallenge && !activeChallenges.value.some((challenge) => challenge?.id === "blink")) {
+    if (activeChallenges.value.length < NUM_CHALLENGES) {
+      activeChallenges.value.push(blinkChallenge);
+    } else {
+      activeChallenges.value[activeChallenges.value.length - 1] = blinkChallenge;
+    }
   }
   if (
     !activeChallenges.value.some((challenge) =>
       ["turn_left", "turn_right", "nod"].includes(challenge?.id),
     )
   ) {
-    activeChallenges.value[1] = CHALLENGE_POOL.find(
-      (challenge) => challenge.id === (Math.random() > 0.5 ? "turn_left" : "turn_right"),
-    );
+    if (turnChallenge) {
+      if (activeChallenges.value.length < NUM_CHALLENGES) {
+        activeChallenges.value.push(turnChallenge);
+      } else {
+        const replaceIndex = activeChallenges.value.findIndex(
+          (challenge) => !["move_closer", "move_back"].includes(challenge?.id),
+        );
+        activeChallenges.value[Math.max(replaceIndex, 0)] = turnChallenge;
+      }
+    }
   }
+  activeChallenges.value = activeChallenges.value.filter(Boolean).slice(0, NUM_CHALLENGES);
   challengeIndex.value = 0;
   challengeResults = [];
   securityHint.value = "Complete the random actions live. Replays will fail.";
