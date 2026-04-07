@@ -393,22 +393,24 @@ async function fetchFlowers() {
     console.log("[FlowerCustomizer] Raw items count:", rawItems.length);
     
     flowers.value = rawItems.map(normalizeFlower).filter((flower) => {
+      // 1. Must have a valid 3D model
       const hasModel = !!flower.model;
-      const isCorrectType = ["per_piece", "per_piece_customizable"].includes(flower.selling_type);
-      const isCustomizable = !!flower.is_customizable;
-      const belongsToVendor = !vendorOwnerId.value || flower.owner_id === vendorOwnerId.value;
       
-      const ok = hasModel && isCorrectType && isCustomizable && belongsToVendor;
+      // 2. Must be a customizable piece (trust backend for category details)
+      const isCorrectType = ["per_piece", "per_piece_customizable"].includes(flower.selling_type);
+      
+      // 3. Must be active/customizable
+      const isCustomizable = !!flower.is_customizable;
+      
+      const ok = hasModel && isCorrectType && isCustomizable;
       
       if (!ok) {
         console.log("[FlowerCustomizer] Filtered out flower:", flower.product_name, {
           hasModel,
           isCorrectType,
           isCustomizable,
-          belongsToVendor,
           selling_type: flower.selling_type,
-          owner_id: flower.owner_id,
-          expected_owner: vendorOwnerId.value
+          model: flower.model
         });
       }
       
