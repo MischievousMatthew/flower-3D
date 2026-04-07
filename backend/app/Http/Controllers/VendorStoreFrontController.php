@@ -340,28 +340,27 @@ class VendorStorefrontController extends Controller
 
     private function resolveCustomizableOwnerId(mixed $storeId, Request $request): ?int
     {
+        $requestedOwnerId = $request->integer('owner_id');
         $vendor = VendorApplication::find($storeId);
 
         if ($vendor && $vendor->status === 'approved') {
-            return $this->resolveVendorOwnerId($vendor);
-        }
-
-        $requestedOwnerId = $request->integer('owner_id');
-        if ($requestedOwnerId > 0) {
-            return $requestedOwnerId;
+            return $this->resolveVendorOwnerId($vendor)
+                ?: ($requestedOwnerId > 0 ? $requestedOwnerId : null);
         }
 
         $numericStoreId = is_numeric($storeId) ? (int) $storeId : 0;
-        if ($numericStoreId <= 0) {
-            return null;
+        if ($numericStoreId > 0) {
+            $vendorUser = User::query()
+                ->whereKey($numericStoreId)
+                ->where('role', User::ROLE_VENDOR)
+                ->first();
+
+            if ($vendorUser) {
+                return $vendorUser->id;
+            }
         }
 
-        $vendorUser = User::query()
-            ->whereKey($numericStoreId)
-            ->where('role', User::ROLE_VENDOR)
-            ->first();
-
-        return $vendorUser?->id;
+        return $requestedOwnerId > 0 ? $requestedOwnerId : null;
     }
 
     private function storefrontProductsQuery(int $ownerId, bool $hasVendorIdColumn): Builder

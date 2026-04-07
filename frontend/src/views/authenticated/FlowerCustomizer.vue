@@ -385,7 +385,9 @@ async function fetchFlowers() {
   if (!storeId.value) return;
   loadingFlowers.value = true;
   try {
-    const response = await api.get(`/stores/${storeId.value}/customizable-flowers`);
+    const response = await api.get(`/stores/${storeId.value}/customizable-flowers`, {
+      params: vendorOwnerId.value ? { owner_id: vendorOwnerId.value } : {},
+    });
     const rawItems = Array.isArray(response.data?.data) ? response.data.data : [];
     flowers.value = rawItems.map(normalizeFlower).filter((flower) => {
       if (!flower.model) return false;
