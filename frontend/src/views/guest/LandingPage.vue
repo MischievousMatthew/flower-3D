@@ -38,7 +38,8 @@
     </nav>
 
     <!-- Hero Section -->
-    <section class="hero">
+    <section class="hero" ref="heroSection">
+      <div class="hero-glow" aria-hidden="true"></div>
       <div class="hero-content">
         <h1>
           Create your perfect bouquet
@@ -53,9 +54,11 @@
         >
       </div>
       <div class="hero-image">
-        <!-- Replace with actual hero image: 1200x800px -->
-        <!-- Image should show: 3D flower customization interface or beautiful flower arrangements -->
-        <img src="../../../public/1st.jpg" alt="Bloomcraft Image" />
+        <div class="flower-podium" aria-hidden="true"></div>
+        <span class="drift-petal petal-a" aria-hidden="true"></span>
+        <span class="drift-petal petal-b" aria-hidden="true"></span>
+        <span class="drift-petal petal-c" aria-hidden="true"></span>
+        <canvas ref="flowerCanvas" class="flower-canvas"></canvas>
       </div>
     </section>
 
@@ -250,10 +253,20 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
+import * as THREE from "three";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import Lenis from "lenis";
+
+gsap.registerPlugin(ScrollTrigger);
 
 const router = useRouter();
+
+// ---- Hero 3D flower refs ----
+const heroSection = ref(null);
+const flowerCanvas = ref(null);
 
 // Reactive Data
 const stats = ref({
@@ -359,6 +372,252 @@ const readBlog = (postId) => {
 const handleFooterLink = (url) => {
   console.log("Footer link clicked:", url);
 };
+
+// ==========================================================
+// Hero 3D flower: scene, scroll animation, pointer interaction
+// (Hero section visuals/animations only — no routes, links,
+// or structure elsewhere on the page are affected.)
+// ==========================================================
+let renderer = null;
+let scene = null;
+let camera = null;
+let rig = null; // controlled by scroll (position.x, rotation.y)
+let flowerGroup = null; // controlled by pointer tilt + idle bob
+let particles = null;
+let rafId = null;
+let lenis = null;
+let lenisRafId = null;
+let scrollTween = null;
+
+let isScrolling = false;
+let scrollIdleTimeout = null;
+const pointer = { x: 0, y: 0 };
+const tilt = { x: 0, z: 0 };
+
+function petalMaterial(color) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.55,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+  });
+}
+
+function buildFlower() {
+  const group = new THREE.Group();
+
+  const rings = [
+    { count: 6, spin: 0.0, tilt: 0.3, length: 0.9, color: 0xf7ddd4 },
+    { count: 8, spin: 0.35, tilt: 0.7, length: 1.25, color: 0xefbdb3 },
+    { count: 10, spin: 0.18, tilt: 1.1, length: 1.55, color: 0xe4988f },
+  ];
+
+  rings.forEach(({ count, spin, tilt: ringTilt, length, color }) => {
+    const material = petalMaterial(color);
+    const petalGeo = new THREE.SphereGeometry(1, 20, 20);
+
+    for (let i = 0; i < count; i++) {
+      const pivot = new THREE.Object3D();
+      pivot.rotation.y = (i / count) * Math.PI * 2 + spin;
+
+      const petal = new THREE.Mesh(petalGeo, material);
+      petal.scale.set(0.42, length, 0.1);
+      petal.position.set(0, length * 0.42, 0);
+      petal.rotation.x = ringTilt;
+
+      pivot.add(petal);
+      group.add(pivot);
+    }
+  });
+
+  // Flower center
+  const center = new THREE.Mesh(
+    new THREE.SphereGeometry(0.3, 24, 24),
+    new THREE.MeshStandardMaterial({ color: 0xf2c879, roughness: 0.6 }),
+  );
+  group.add(center);
+
+  // Leaves
+  const leafMaterial = new THREE.MeshStandardMaterial({
+    color: 0x8fae82,
+    roughness: 0.6,
+    side: THREE.DoubleSide,
+  });
+  const leafGeo = new THREE.SphereGeometry(1, 16, 16);
+  for (let i = 0; i < 3; i++) {
+    const pivot = new THREE.Object3D();
+    pivot.rotation.y = (i / 3) * Math.PI * 2 + 0.4;
+
+    const leaf = new THREE.Mesh(leafGeo, leafMaterial);
+    leaf.scale.set(0.3, 0.9, 0.06);
+    leaf.position.set(0, -0.85, 0);
+    leaf.rotation.x = -1.3;
+
+    pivot.add(leaf);
+    group.add(pivot);
+  }
+
+  group.scale.setScalar(1.1);
+  return group;
+}
+
+function buildParticles() {
+  const count = 50;
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 6;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 5;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 4;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const material = new THREE.PointsMaterial({
+    color: 0xf5c6c0,
+    size: 0.05,
+    transparent: true,
+    opacity: 0.6,
+  });
+  return new THREE.Points(geometry, material);
+}
+
+function initThreeScene() {
+  const canvas = flowerCanvas.value;
+  if (!canvas) return;
+
+  const width = canvas.clientWidth || 1;
+  const height = canvas.clientHeight || 1;
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
+  camera.position.set(0, 0.4, 6);
+
+  renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setSize(width, height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  scene.add(new THREE.AmbientLight(0xfff2ec, 0.9));
+
+  const key = new THREE.DirectionalLight(0xffffff, 1.1);
+  key.position.set(3, 4, 5);
+  scene.add(key);
+
+  const rimLight = new THREE.PointLight(0xffd9c9, 0.8, 10);
+  rimLight.position.set(-3, 1, -2);
+  scene.add(rimLight);
+
+  flowerGroup = buildFlower();
+
+  rig = new THREE.Group();
+  rig.add(flowerGroup);
+  scene.add(rig);
+
+  particles = buildParticles();
+  scene.add(particles);
+
+  animateFrame();
+}
+
+function animateFrame() {
+  rafId = requestAnimationFrame(animateFrame);
+  if (!renderer || !scene || !camera) return;
+
+  if (flowerGroup) {
+    flowerGroup.position.y = Math.sin(Date.now() * 0.0006) * 0.08;
+
+    if (!isScrolling) {
+      tilt.x += (pointer.y * 0.22 - tilt.x) * 0.04;
+      tilt.z += (pointer.x * -0.18 - tilt.z) * 0.04;
+      flowerGroup.rotation.x = tilt.x;
+      flowerGroup.rotation.z = tilt.z;
+    }
+  }
+
+  if (particles) {
+    particles.rotation.y += 0.0006;
+  }
+
+  renderer.render(scene, camera);
+}
+
+function setupScrollAnimation() {
+  if (!heroSection.value || !rig || !camera) return;
+
+  scrollTween = gsap.timeline({
+    scrollTrigger: {
+      trigger: heroSection.value,
+      start: "top top",
+      end: "bottom top",
+      scrub: 0.6,
+      onUpdate: () => {
+        isScrolling = true;
+        clearTimeout(scrollIdleTimeout);
+        scrollIdleTimeout = setTimeout(() => {
+          isScrolling = false;
+        }, 250);
+      },
+    },
+  });
+
+  scrollTween
+    .to(rig.position, { x: 1.5, ease: "none" }, 0)
+    .to(rig.rotation, { y: Math.PI * 0.65, ease: "none" }, 0)
+    .to(camera.position, { z: 5.1, ease: "none" }, 0);
+}
+
+function handlePointerMove(event) {
+  const canvas = flowerCanvas.value;
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = ((event.clientY - rect.top) / rect.height) * 2 - 1;
+}
+
+function handleResize() {
+  const canvas = flowerCanvas.value;
+  if (!canvas || !renderer || !camera) return;
+  const width = canvas.clientWidth || 1;
+  const height = canvas.clientHeight || 1;
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(width, height);
+}
+
+function initSmoothScroll() {
+  lenis = new Lenis({
+    duration: 1.1,
+    easing: (t) => 1 - Math.pow(1 - t, 3),
+  });
+
+  const raf = (time) => {
+    lenis.raf(time);
+    ScrollTrigger.update();
+    lenisRafId = requestAnimationFrame(raf);
+  };
+  lenisRafId = requestAnimationFrame(raf);
+  lenis.on("scroll", ScrollTrigger.update);
+}
+
+onMounted(() => {
+  initThreeScene();
+  setupScrollAnimation();
+  initSmoothScroll();
+  window.addEventListener("mousemove", handlePointerMove, { passive: true });
+  window.addEventListener("resize", handleResize);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("mousemove", handlePointerMove);
+  window.removeEventListener("resize", handleResize);
+  clearTimeout(scrollIdleTimeout);
+
+  if (rafId) cancelAnimationFrame(rafId);
+  if (lenisRafId) cancelAnimationFrame(lenisRafId);
+  if (lenis) lenis.destroy();
+  if (scrollTween && scrollTween.scrollTrigger)
+    scrollTween.scrollTrigger.kill();
+  ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
+  if (renderer) renderer.dispose();
+});
 </script>
 
 <style scoped>
@@ -464,7 +723,10 @@ body {
 }
 
 /* Hero Section */
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&display=swap");
+
 .hero {
+  position: relative;
   margin-top: 80px;
   padding: 80px 5% 60px;
   display: grid;
@@ -472,17 +734,43 @@ body {
   gap: 60px;
   align-items: center;
   min-height: calc(100vh - 80px);
+  overflow: hidden;
+}
+
+.hero-glow {
+  position: absolute;
+  inset: -10% -10% -10% -10%;
+  background:
+    radial-gradient(
+      60% 55% at 78% 45%,
+      rgba(244, 197, 187, 0.35) 0%,
+      rgba(244, 197, 187, 0) 70%
+    ),
+    radial-gradient(
+      40% 40% at 8% 15%,
+      rgba(143, 174, 130, 0.12) 0%,
+      rgba(143, 174, 130, 0) 70%
+    );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
 }
 
 .hero-content h1 {
-  font-size: 48px;
-  font-weight: 400;
-  line-height: 1.2;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 50px;
+  font-weight: 500;
+  line-height: 1.22;
+  letter-spacing: -0.01em;
   margin-bottom: 20px;
 }
 
 .hero-content h1 .highlight {
-  color: #48bb78;
+  color: #c97b6f;
   font-weight: 600;
 }
 
@@ -495,8 +783,9 @@ body {
 
 .hero-image {
   position: relative;
+  z-index: 1;
   height: 500px;
-  background: #f7fafc;
+  background: transparent;
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -504,19 +793,88 @@ body {
   overflow: hidden;
 }
 
-/* .hero-image::before {
-  content: "📸 Hero Image";
-  font-size: 18px;
-  color: #a0aec0;
-  position: absolute;
-} */
+.flower-canvas {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+}
 
-.hero-image::after {
-  /* content: "1200 x 800px"; */
-  font-size: 14px;
-  color: #cbd5e0;
+.flower-podium {
   position: absolute;
-  bottom: 20px;
+  left: 50%;
+  bottom: 6%;
+  width: 68%;
+  height: 60px;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    50% 100% at 50% 50%,
+    rgba(233, 209, 200, 0.55) 0%,
+    rgba(233, 209, 200, 0) 75%
+  );
+  filter: blur(2px);
+  z-index: 1;
+}
+
+.drift-petal {
+  position: absolute;
+  width: 14px;
+  height: 20px;
+  border-radius: 60% 0 60% 0;
+  background: linear-gradient(135deg, #f3c8bd, #e4988f);
+  opacity: 0.7;
+  z-index: 3;
+  animation: petalDrift 9s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.petal-a {
+  top: 12%;
+  left: 8%;
+  animation-delay: 0s;
+}
+
+.petal-b {
+  top: 60%;
+  right: 12%;
+  animation-delay: 2.4s;
+  transform: rotate(30deg);
+}
+
+.petal-c {
+  top: 30%;
+  right: 30%;
+  animation-delay: 4.8s;
+  transform: rotate(-20deg);
+}
+
+@keyframes petalDrift {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 0.15;
+  }
+  20% {
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate(-12px, 22px) rotate(20deg);
+  }
+  80% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translate(6px, 48px) rotate(45deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drift-petal {
+    animation: none;
+    opacity: 0.3;
+  }
 }
 
 /* Clients Section */
