@@ -1,7 +1,11 @@
 <template>
   <div class="landing-page">
+    <div class="bg-blob blob-rose" aria-hidden="true"></div>
+    <div class="bg-blob blob-sage" aria-hidden="true"></div>
+    <div class="grain-overlay" aria-hidden="true"></div>
+
     <!-- Navigation -->
-    <nav class="navbar">
+    <nav class="navbar" :class="{ 'navbar--scrolled': navScrolled }">
       <router-link to="/" class="logo">
         <span
           ><img
@@ -40,47 +44,63 @@
     <!-- Hero Section -->
     <section class="hero" ref="heroSection">
       <div class="hero-glow" aria-hidden="true"></div>
-      <div class="hero-content">
+
+      <div class="hero-copy hero-copy--top reveal-hero">
+        <span class="eyebrow">Bespoke florals, built by you</span>
         <h1>
-          Create your perfect bouquet
-          <span class="highlight">with AI & 3D customization</span>
+          Create your perfect
+          <span class="highlight">bouquet</span>
         </h1>
-        <p>
-          Where vendors meet creativity. Design custom flower arrangements in 3D
-          or let our AI suggest the perfect bloom for every occasion.
-        </p>
-        <router-link to="/guest/register" class="btn-register"
-          >Get Started</router-link
-        >
       </div>
-      <div class="hero-image">
+
+      <div class="hero-stage">
         <div class="flower-podium" aria-hidden="true"></div>
         <span class="drift-petal petal-a" aria-hidden="true"></span>
         <span class="drift-petal petal-b" aria-hidden="true"></span>
         <span class="drift-petal petal-c" aria-hidden="true"></span>
         <canvas ref="flowerCanvas" class="flower-canvas"></canvas>
       </div>
+
+      <div class="hero-copy hero-copy--bottom reveal-hero">
+        <p>
+          Where vendors meet creativity. Design custom flower arrangements in 3D
+          or let our AI suggest the perfect bloom for every occasion.
+        </p>
+        <router-link to="/guest/register" class="btn-register btn-hero"
+          >Get Started</router-link
+        >
+        <span class="scroll-cue">Scroll to explore</span>
+      </div>
     </section>
 
     <!-- Clients/Partners Section -->
     <section class="clients">
-      <h2>Trusted by Flower Lovers</h2>
-      <p>Join {{ stats.vendors }}+ vendors and thousands of happy customers</p>
+      <h2 class="reveal">Trusted by Flower Lovers</h2>
+      <p class="reveal">
+        Join {{ stats.vendors }}+ vendors and thousands of happy customers
+      </p>
       <div class="clients-grid">
-        <div v-for="n in 5" :key="n" class="client-logo">Logo {{ n }}</div>
+        <div v-for="n in 5" :key="n" class="client-logo reveal">
+          Logo {{ n }}
+        </div>
       </div>
     </section>
 
     <!-- Features Section -->
     <section id="features" class="features">
       <div class="features-header">
-        <h2>Everything you need to bloom</h2>
-        <p>
+        <span class="eyebrow reveal">Why BloomCraft</span>
+        <h2 class="reveal">Everything you need to bloom</h2>
+        <p class="reveal">
           Powerful features for vendors and delightful experiences for customers
         </p>
       </div>
       <div class="features-grid">
-        <div v-for="feature in features" :key="feature.id" class="feature-card">
+        <div
+          v-for="feature in features"
+          :key="feature.id"
+          class="feature-card reveal"
+        >
           <div class="feature-icon">{{ feature.icon }}</div>
           <h3>{{ feature.title }}</h3>
           <p>{{ feature.description }}</p>
@@ -90,7 +110,8 @@
 
     <!-- Content Section 1 -->
     <section class="content-section">
-      <div class="content-text">
+      <div class="content-text reveal">
+        <span class="eyebrow">3D Design Studio</span>
         <h2>Design in 3D, deliver with love</h2>
         <p>
           Our revolutionary 3D customization tool lets you become the designer.
@@ -102,7 +123,7 @@
           Explore 3D Designer
         </button>
       </div>
-      <div class="content-image">
+      <div class="content-image reveal">
         <img
           src="../../../public/3d flower.png"
           alt="Bloomcraft Logo"
@@ -115,7 +136,11 @@
     <!-- Stats Section -->
     <section id="vendors" class="stats">
       <div class="stats-grid">
-        <div v-for="stat in statsData" :key="stat.label" class="stat-item">
+        <div
+          v-for="stat in statsData"
+          :key="stat.label"
+          class="stat-item reveal"
+        >
           <div class="stat-icon">{{ stat.icon }}</div>
           <div class="stat-number">{{ stat.number }}</div>
           <div class="stat-label">{{ stat.label }}</div>
@@ -125,7 +150,8 @@
 
     <!-- Content Section 2 -->
     <section id="how-it-works" class="content-section">
-      <div class="content-text">
+      <div class="content-text reveal">
+        <span class="eyebrow">AI Concierge</span>
         <h2>AI-powered recommendations</h2>
         <p>
           Don't know where to start? Our intelligent AI analyzes the occasion,
@@ -140,7 +166,7 @@
           Try AI Designer
         </button>
       </div>
-      <div class="content-image">
+      <div class="content-image reveal">
         <img
           src="../../../public/ai power.jpg"
           alt="Bloomcraft Logo"
@@ -153,11 +179,14 @@
     <!-- Blog Section -->
     <section id="blog" class="blog">
       <div class="blog-header">
-        <h2>Fresh insights from our garden</h2>
-        <p>Tips, trends, and stories from the world of flowers</p>
+        <span class="eyebrow reveal">The Journal</span>
+        <h2 class="reveal">Fresh insights from our garden</h2>
+        <p class="reveal">
+          Tips, trends, and stories from the world of flowers
+        </p>
       </div>
       <div class="blog-grid">
-        <div v-for="post in blogPosts" :key="post.id" class="blog-card">
+        <div v-for="post in blogPosts" :key="post.id" class="blog-card reveal">
           <div class="blog-image">Blog Image {{ post.id }}<br />400x250px</div>
           <div class="blog-content">
             <h3>{{ post.title }}</h3>
@@ -171,8 +200,8 @@
 
     <!-- CTA Section -->
     <section class="cta">
-      <h2>Ready to create something beautiful?</h2>
-      <router-link to="/guest/register" class="btn-cta"
+      <h2 class="reveal">Ready to create something beautiful?</h2>
+      <router-link to="/guest/register" class="btn-cta reveal"
         >Start Designing Now</router-link
       >
     </section>
@@ -267,6 +296,7 @@ const router = useRouter();
 // ---- Hero 3D flower refs ----
 const heroSection = ref(null);
 const flowerCanvas = ref(null);
+const navScrolled = ref(false);
 
 // Reactive Data
 const stats = ref({
@@ -383,11 +413,14 @@ let scene = null;
 let camera = null;
 let rig = null; // controlled by scroll (position.x, rotation.y)
 let flowerGroup = null; // controlled by pointer tilt + idle bob
+let flowerRings = []; // independent ring rotation for scroll parallax
 let particles = null;
 let rafId = null;
 let lenis = null;
 let lenisRafId = null;
 let scrollTween = null;
+let prefersReducedMotion = false;
+let isTouchDevice = false;
 
 let isScrolling = false;
 let scrollIdleTimeout = null;
@@ -405,16 +438,18 @@ function petalMaterial(color) {
 
 function buildFlower() {
   const group = new THREE.Group();
+  const rings = [];
 
-  const rings = [
+  const ringConfigs = [
     { count: 6, spin: 0.0, tilt: 0.3, length: 0.9, color: 0xf7ddd4 },
     { count: 8, spin: 0.35, tilt: 0.7, length: 1.25, color: 0xefbdb3 },
     { count: 10, spin: 0.18, tilt: 1.1, length: 1.55, color: 0xe4988f },
   ];
 
-  rings.forEach(({ count, spin, tilt: ringTilt, length, color }) => {
+  ringConfigs.forEach(({ count, spin, tilt: ringTilt, length, color }) => {
     const material = petalMaterial(color);
     const petalGeo = new THREE.SphereGeometry(1, 20, 20);
+    const ringGroup = new THREE.Group();
 
     for (let i = 0; i < count; i++) {
       const pivot = new THREE.Object3D();
@@ -426,8 +461,11 @@ function buildFlower() {
       petal.rotation.x = ringTilt;
 
       pivot.add(petal);
-      group.add(pivot);
+      ringGroup.add(pivot);
     }
+
+    group.add(ringGroup);
+    rings.push(ringGroup);
   });
 
   // Flower center
@@ -457,8 +495,56 @@ function buildFlower() {
     group.add(pivot);
   }
 
-  group.scale.setScalar(1.1);
-  return group;
+  group.scale.setScalar(1.35);
+  return { group, rings };
+}
+
+function radialTexture(innerColor, outerColor) {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  const gradient = ctx.createRadialGradient(
+    size / 2,
+    size / 2,
+    0,
+    size / 2,
+    size / 2,
+    size / 2,
+  );
+  gradient.addColorStop(0, innerColor);
+  gradient.addColorStop(1, outerColor);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function buildGroundShadow() {
+  const texture = radialTexture("rgba(30,20,18,0.35)", "rgba(30,20,18,0)");
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false,
+  });
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 2.6), material);
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = -1.9;
+  return shadow;
+}
+
+function buildBloomGlow() {
+  const texture = radialTexture("rgba(255,225,210,0.9)", "rgba(255,225,210,0)");
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(5.5, 5.5, 1);
+  sprite.position.set(0, 0.2, -0.6);
+  return sprite;
 }
 
 function buildParticles() {
@@ -484,6 +570,11 @@ function initThreeScene() {
   const canvas = flowerCanvas.value;
   if (!canvas) return;
 
+  prefersReducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+
   const width = canvas.clientWidth || 1;
   const height = canvas.clientHeight || 1;
 
@@ -494,18 +585,25 @@ function initThreeScene() {
   renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   renderer.setSize(width, height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
 
   scene.add(new THREE.AmbientLight(0xfff2ec, 0.9));
 
-  const key = new THREE.DirectionalLight(0xffffff, 1.1);
+  const key = new THREE.DirectionalLight(0xffffff, 1.2);
   key.position.set(3, 4, 5);
   scene.add(key);
 
-  const rimLight = new THREE.PointLight(0xffd9c9, 0.8, 10);
+  const rimLight = new THREE.PointLight(0xffd9c9, 0.9, 10);
   rimLight.position.set(-3, 1, -2);
   scene.add(rimLight);
 
-  flowerGroup = buildFlower();
+  scene.add(buildBloomGlow());
+  scene.add(buildGroundShadow());
+
+  const built = buildFlower();
+  flowerGroup = built.group;
+  flowerRings = built.rings;
 
   rig = new THREE.Group();
   rig.add(flowerGroup);
@@ -525,11 +623,23 @@ function animateFrame() {
     flowerGroup.position.y = Math.sin(Date.now() * 0.0006) * 0.08;
 
     if (!isScrolling) {
-      tilt.x += (pointer.y * 0.22 - tilt.x) * 0.04;
-      tilt.z += (pointer.x * -0.18 - tilt.z) * 0.04;
+      // slow idle spin
+      flowerGroup.userData.idleY = (flowerGroup.userData.idleY || 0) + 0.0009;
+
+      if (!isTouchDevice) {
+        tilt.x += (pointer.y * 0.22 - tilt.x) * 0.04;
+        tilt.z += (pointer.x * -0.18 - tilt.z) * 0.04;
+      }
       flowerGroup.rotation.x = tilt.x;
       flowerGroup.rotation.z = tilt.z;
+      flowerGroup.rotation.y = flowerGroup.userData.idleY;
     }
+  }
+
+  if (flowerRings.length) {
+    flowerRings.forEach((ringGroup, i) => {
+      ringGroup.rotation.y += 0.0004 * (i + 1) * (i % 2 === 0 ? 1 : -1);
+    });
   }
 
   if (particles) {
@@ -540,13 +650,26 @@ function animateFrame() {
 }
 
 function setupScrollAnimation() {
-  if (!heroSection.value || !rig || !camera) return;
+  if (!heroSection.value || !rig || !camera || prefersReducedMotion) return;
+
+  const vw = window.innerWidth;
+  const isMobile = vw < 640;
+  const isTablet = vw >= 640 && vw < 1024;
+  const travel = isMobile ? 0.6 : isTablet ? 1.1 : 1.7;
+  const spin = isMobile
+    ? Math.PI * 0.5
+    : isTablet
+      ? Math.PI * 0.9
+      : Math.PI * 1.4;
+  const zoom = isMobile ? 5.6 : 4.7;
+
+  const heroTextEls = heroSection.value.querySelectorAll(".hero-copy");
 
   scrollTween = gsap.timeline({
     scrollTrigger: {
       trigger: heroSection.value,
       start: "top top",
-      end: "bottom top",
+      end: "+=140%",
       scrub: 0.6,
       onUpdate: () => {
         isScrolling = true;
@@ -559,9 +682,63 @@ function setupScrollAnimation() {
   });
 
   scrollTween
-    .to(rig.position, { x: 1.5, ease: "none" }, 0)
-    .to(rig.rotation, { y: Math.PI * 0.65, ease: "none" }, 0)
-    .to(camera.position, { z: 5.1, ease: "none" }, 0);
+    // flower moves left -> right, then eases back toward center
+    .to(rig.position, { x: travel, ease: "power1.inOut" }, 0)
+    .to(rig.position, { x: 0, ease: "power1.inOut" }, 0.55)
+    // slow continuous 3D rotation across the whole scroll
+    .to(rig.rotation, { y: spin, ease: "none" }, 0)
+    // subtle camera dolly-in
+    .to(camera.position, { z: zoom, ease: "none" }, 0)
+    // hero copy fades + slides away as the flower takes over
+    .to(heroTextEls, { autoAlpha: 0, y: -26, ease: "none" }, 0.1);
+}
+
+function setupBackgroundParallax() {
+  if (prefersReducedMotion) return;
+  gsap.to(".blob-rose", {
+    yPercent: 35,
+    ease: "none",
+    scrollTrigger: {
+      trigger: ".landing-page",
+      start: "top top",
+      end: "bottom bottom",
+      scrub: 0.8,
+    },
+  });
+  gsap.to(".blob-sage", {
+    yPercent: -25,
+    ease: "none",
+    scrollTrigger: {
+      trigger: ".landing-page",
+      start: "top top",
+      end: "bottom bottom",
+      scrub: 0.8,
+    },
+  });
+}
+
+function setupSectionReveals() {
+  gsap.utils.toArray(".reveal").forEach((el) => {
+    gsap.fromTo(
+      el,
+      { autoAlpha: 0, y: 36 },
+      {
+        autoAlpha: 1,
+        y: 0,
+        duration: 0.9,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: el,
+          start: "top 88%",
+          toggleActions: "play none none reverse",
+        },
+      },
+    );
+  });
+}
+
+function handleWindowScroll() {
+  navScrolled.value = window.scrollY > 24;
 }
 
 function handlePointerMove(event) {
@@ -600,14 +777,19 @@ function initSmoothScroll() {
 onMounted(() => {
   initThreeScene();
   setupScrollAnimation();
+  setupBackgroundParallax();
+  setupSectionReveals();
   initSmoothScroll();
   window.addEventListener("mousemove", handlePointerMove, { passive: true });
   window.addEventListener("resize", handleResize);
+  window.addEventListener("scroll", handleWindowScroll, { passive: true });
+  handleWindowScroll();
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("mousemove", handlePointerMove);
   window.removeEventListener("resize", handleResize);
+  window.removeEventListener("scroll", handleWindowScroll);
   clearTimeout(scrollIdleTimeout);
 
   if (rafId) cancelAnimationFrame(rafId);
@@ -621,19 +803,98 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap");
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-body {
+.landing-page {
+  --ivory: #f8f4ef;
+  --ivory-deep: #f1eae2;
+  --ink: #1c1917;
+  --ink-soft: #6f6a64;
+  --rosewood: #a5584c;
+  --rosewood-dark: #7f4238;
+  --gold: #c9a66b;
+  --espresso: #16130f;
+  --line: rgba(28, 25, 23, 0.08);
+
+  position: relative;
+  background: var(--ivory);
+  color: var(--ink);
   font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu",
-    "Cantarell", sans-serif;
-  color: #2d3748;
-  line-height: 1.6;
+    "Poppins",
+    -apple-system,
+    sans-serif;
+  font-weight: 300;
+  line-height: 1.7;
   overflow-x: hidden;
+}
+
+.landing-page h1,
+.landing-page h2,
+.landing-page h3,
+.landing-page .stat-number {
+  font-family: "Montserrat", sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.eyebrow {
+  display: inline-block;
+  font-family: "Poppins", sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--rosewood);
+  margin-bottom: 14px;
+}
+
+/* Ambient background: blurred glows + grain, sits behind everything */
+.bg-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.blob-rose {
+  top: -10%;
+  right: -8%;
+  width: 46vw;
+  height: 46vw;
+  background: radial-gradient(
+    circle,
+    rgba(197, 130, 118, 0.28),
+    transparent 70%
+  );
+}
+
+.blob-sage {
+  top: 55%;
+  left: -12%;
+  width: 38vw;
+  height: 38vw;
+  background: radial-gradient(
+    circle,
+    rgba(143, 174, 130, 0.18),
+    transparent 70%
+  );
+}
+
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* Navigation */
@@ -642,155 +903,208 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  padding: 1rem 5%;
+  background: rgba(248, 244, 239, 0.7);
+  backdrop-filter: blur(14px);
+  padding: 1.5rem 5%;
   display: flex;
   justify-content: space-between;
   align-items: center;
   z-index: 1000;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  border-bottom: 1px solid transparent;
+  transition:
+    padding 0.4s ease,
+    background 0.4s ease,
+    border-color 0.4s ease,
+    box-shadow 0.4s ease;
+}
+
+.navbar--scrolled {
+  padding: 0.85rem 5%;
+  background: rgba(248, 244, 239, 0.92);
+  border-bottom-color: var(--line);
+  box-shadow: 0 8px 30px rgba(28, 25, 23, 0.06);
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 24px;
-  font-weight: 600;
-  color: #2d3748;
+  gap: 10px;
+  font-family: "Montserrat", sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
   text-decoration: none;
+  letter-spacing: -0.01em;
 }
 
 .nav-links {
   display: flex;
-  gap: 32px;
+  gap: 40px;
   align-items: center;
 }
 
 .nav-links a {
-  color: #4a5568;
+  position: relative;
+  color: var(--ink);
   text-decoration: none;
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 500;
+  padding-bottom: 4px;
   transition: color 0.3s;
 }
 
+.nav-links a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 1px;
+  background: var(--rosewood);
+  transition: width 0.35s ease;
+}
+
 .nav-links a:hover {
-  color: #2d3748;
+  color: var(--rosewood);
+}
+
+.nav-links a:hover::after {
+  width: 100%;
 }
 
 .nav-buttons {
   display: flex;
-  gap: 12px;
+  gap: 14px;
 }
 
 .btn-login {
-  padding: 10px 24px;
+  padding: 11px 26px;
   background: transparent;
-  color: #2d3748;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: "Poppins", sans-serif;
+  font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
   text-decoration: none;
   display: inline-block;
 }
 
 .btn-login:hover {
-  background: #f7fafc;
-  border-color: #cbd5e0;
+  border-color: var(--ink);
+  transform: translateY(-2px);
 }
 
 .btn-register {
-  padding: 10px 24px;
-  background: #2d3748;
-  color: white;
+  padding: 11px 26px;
+  background: var(--ink);
+  color: var(--ivory);
   border: none;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: 999px;
+  font-family: "Poppins", sans-serif;
+  font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
   text-decoration: none;
   display: inline-block;
 }
 
 .btn-register:hover {
-  background: #1a202c;
-  transform: translateY(-1px);
+  background: var(--rosewood-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(127, 66, 56, 0.28);
 }
 
 /* Hero Section */
-@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&display=swap");
-
 .hero {
   position: relative;
-  margin-top: 80px;
-  padding: 80px 5% 60px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 60px;
+  margin-top: 0;
+  padding: 190px 5% 100px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  min-height: calc(100vh - 80px);
+  gap: 0;
+  min-height: 100vh;
   overflow: hidden;
+  text-align: center;
 }
 
 .hero-glow {
   position: absolute;
-  inset: -10% -10% -10% -10%;
+  inset: -10%;
   background:
     radial-gradient(
-      60% 55% at 78% 45%,
-      rgba(244, 197, 187, 0.35) 0%,
-      rgba(244, 197, 187, 0) 70%
+      55% 50% at 50% 40%,
+      rgba(197, 130, 118, 0.22) 0%,
+      rgba(197, 130, 118, 0) 70%
     ),
     radial-gradient(
-      40% 40% at 8% 15%,
-      rgba(143, 174, 130, 0.12) 0%,
+      40% 40% at 12% 85%,
+      rgba(143, 174, 130, 0.14) 0%,
       rgba(143, 174, 130, 0) 70%
     );
   pointer-events: none;
   z-index: 0;
 }
 
-.hero-content {
+.hero-copy {
   position: relative;
-  z-index: 1;
+  z-index: 2;
+  max-width: 640px;
 }
 
-.hero-content h1 {
-  font-family: "Playfair Display", Georgia, serif;
-  font-size: 50px;
+.hero-copy--top h1 {
+  font-size: clamp(40px, 6vw, 76px);
+  line-height: 1.05;
+  margin-bottom: 0;
+}
+
+.hero-copy--top h1 .highlight {
+  color: var(--rosewood);
+}
+
+.hero-copy--bottom {
+  margin-top: 8px;
+}
+
+.hero-copy--bottom p {
+  font-size: 17px;
+  color: var(--ink-soft);
+  margin-bottom: 28px;
+  max-width: 460px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.btn-hero {
+  padding: 15px 40px;
+  font-size: 14px;
+}
+
+.scroll-cue {
+  display: block;
+  margin-top: 40px;
+  font-size: 11px;
   font-weight: 500;
-  line-height: 1.22;
-  letter-spacing: -0.01em;
-  margin-bottom: 20px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  opacity: 0.7;
 }
 
-.hero-content h1 .highlight {
-  color: #c97b6f;
-  font-weight: 600;
-}
-
-.hero-content p {
-  font-size: 18px;
-  color: #718096;
-  margin-bottom: 32px;
-  max-width: 500px;
-}
-
-.hero-image {
+.hero-stage {
   position: relative;
   z-index: 1;
-  height: 500px;
-  background: transparent;
-  border-radius: 12px;
+  width: min(100%, 900px);
+  height: min(58vh, 560px);
+  margin: -10px 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .flower-canvas {
@@ -805,13 +1119,13 @@ body {
 .flower-podium {
   position: absolute;
   left: 50%;
-  bottom: 6%;
-  width: 68%;
+  bottom: 4%;
+  width: 60%;
   height: 60px;
   transform: translateX(-50%);
   background: radial-gradient(
     50% 100% at 50% 50%,
-    rgba(233, 209, 200, 0.55) 0%,
+    rgba(233, 209, 200, 0.6) 0%,
     rgba(233, 209, 200, 0) 75%
   );
   filter: blur(2px);
@@ -832,20 +1146,20 @@ body {
 
 .petal-a {
   top: 12%;
-  left: 8%;
+  left: 10%;
   animation-delay: 0s;
 }
 
 .petal-b {
-  top: 60%;
-  right: 12%;
+  top: 55%;
+  right: 10%;
   animation-delay: 2.4s;
   transform: rotate(30deg);
 }
 
 .petal-c {
-  top: 30%;
-  right: 30%;
+  top: 25%;
+  right: 22%;
   animation-delay: 4.8s;
   transform: rotate(-20deg);
 }
@@ -877,22 +1191,43 @@ body {
   }
 }
 
+.reveal-hero {
+  animation: heroIntro 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.hero-copy--bottom.reveal-hero {
+  animation-delay: 0.15s;
+}
+
+@keyframes heroIntro {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Clients Section */
 .clients {
-  padding: 60px 5%;
+  position: relative;
+  z-index: 1;
+  padding: 90px 5%;
   text-align: center;
-  background: #f7fafc;
+  background: var(--ivory-deep);
 }
 
 .clients h2 {
-  font-size: 32px;
-  font-weight: 400;
+  font-size: 30px;
   margin-bottom: 12px;
 }
 
 .clients p {
-  color: #718096;
-  margin-bottom: 48px;
+  color: var(--ink-soft);
+  margin-bottom: 52px;
+  font-size: 15px;
 }
 
 .clients-grid {
@@ -906,85 +1241,119 @@ body {
 .client-logo {
   width: 120px;
   height: 60px;
-  background: white;
+  background: var(--ivory);
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #cbd5e0;
+  color: #c3bcb3;
   font-size: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line);
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.client-logo:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px rgba(28, 25, 23, 0.06);
 }
 
 /* Features Section */
 .features {
-  padding: 80px 5%;
+  position: relative;
+  z-index: 1;
+  padding: 140px 5%;
 }
 
 .features-header {
   text-align: center;
-  margin-bottom: 60px;
+  max-width: 640px;
+  margin: 0 auto 80px;
 }
 
 .features-header h2 {
-  font-size: 36px;
-  font-weight: 400;
-  margin-bottom: 12px;
+  font-size: clamp(30px, 3.6vw, 42px);
+  margin-bottom: 14px;
 }
 
 .features-header p {
-  color: #718096;
+  color: var(--ink-soft);
   font-size: 16px;
 }
 
 .features-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 40px;
+  gap: 32px;
   max-width: 1200px;
   margin: 0 auto;
 }
 
 .feature-card {
-  text-align: center;
-  padding: 32px;
+  text-align: left;
+  padding: 44px 32px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--ivory);
+  transition:
+    transform 0.4s ease,
+    box-shadow 0.4s ease,
+    border-color 0.4s ease;
+}
+
+.feature-card:nth-child(2) {
+  transform: translateY(-18px);
+}
+
+.feature-card:hover {
+  transform: translateY(-8px);
+  border-color: rgba(165, 88, 76, 0.25);
+  box-shadow: 0 24px 48px rgba(28, 25, 23, 0.08);
+}
+
+.feature-card:nth-child(2):hover {
+  transform: translateY(-26px);
 }
 
 .feature-icon {
-  width: 80px;
-  height: 80px;
-  background: #f0fff4;
-  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+  background: var(--ivory-deep);
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 24px;
-  font-size: 32px;
+  margin-bottom: 24px;
+  font-size: 28px;
 }
 
 .feature-card h3 {
-  font-size: 20px;
-  font-weight: 500;
+  font-size: 19px;
+  font-weight: 700;
   margin-bottom: 12px;
 }
 
 .feature-card p {
-  color: #718096;
-  font-size: 15px;
-  line-height: 1.6;
+  color: var(--ink-soft);
+  font-size: 14.5px;
+  line-height: 1.7;
 }
 
 /* Content Section */
 .content-section {
-  padding: 80px 5%;
+  position: relative;
+  z-index: 1;
+  padding: 140px 5%;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 80px;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 100px;
   align-items: center;
 }
 
 .content-section:nth-child(even) {
-  background: #f7fafc;
+  background: var(--ivory-deep);
+  grid-template-columns: 1.1fr 0.9fr;
 }
 
 .content-section:nth-child(even) .content-image {
@@ -992,15 +1361,27 @@ body {
 }
 
 .content-image {
-  height: 400px;
-  background: #e2e8f0;
-  border-radius: 12px;
+  height: 440px;
+  background: var(--line);
+  border-radius: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-direction: column;
   gap: 12px;
-  color: #a0aec0;
+  color: #b7afa6;
+  overflow: hidden;
+}
+
+.content-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+
+.content-image:hover img {
+  transform: scale(1.04);
 }
 
 /* .content-image::before {
@@ -1015,40 +1396,44 @@ body {
 } */
 
 .content-text h2 {
-  font-size: 32px;
-  font-weight: 400;
-  margin-bottom: 20px;
+  font-size: clamp(28px, 3.2vw, 38px);
+  margin-bottom: 22px;
 }
 
 .content-text p {
-  color: #718096;
+  color: var(--ink-soft);
   font-size: 16px;
-  line-height: 1.8;
+  line-height: 1.85;
   margin-bottom: 24px;
+  max-width: 460px;
 }
 
 .btn-learn-more {
-  padding: 12px 32px;
-  background: #48bb78;
-  color: white;
+  padding: 14px 34px;
+  background: var(--ink);
+  color: var(--ivory);
   border: none;
-  border-radius: 6px;
-  font-size: 15px;
+  border-radius: 999px;
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
 }
 
 .btn-learn-more:hover {
-  background: #38a169;
+  background: var(--rosewood-dark);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+  box-shadow: 0 14px 28px rgba(127, 66, 56, 0.24);
 }
 
 /* Stats Section */
 .stats {
-  padding: 60px 5%;
-  background: #f0fff4;
+  position: relative;
+  z-index: 1;
+  padding: 100px 5%;
+  background: var(--espresso);
+  color: var(--ivory);
 }
 
 .stats-grid {
@@ -1061,23 +1446,35 @@ body {
 
 .stat-item {
   text-align: center;
+  position: relative;
+}
+
+.stat-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: -20px;
+  top: 10%;
+  height: 80%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .stat-icon {
-  font-size: 32px;
-  margin-bottom: 12px;
+  font-size: 30px;
+  margin-bottom: 14px;
+  opacity: 0.9;
 }
 
 .stat-number {
-  font-size: 32px;
-  font-weight: 600;
-  color: #2d3748;
-  margin-bottom: 4px;
+  font-size: 34px;
+  color: var(--ivory);
+  margin-bottom: 6px;
 }
 
 .stat-label {
-  color: #718096;
-  font-size: 14px;
+  color: rgba(248, 244, 239, 0.6);
+  font-size: 13px;
+  letter-spacing: 0.04em;
 }
 
 .highlight-vendor {
@@ -1086,7 +1483,7 @@ body {
 
 @keyframes vendorGlow {
   0% {
-    background-color: rgba(255, 255, 255, 0.4);
+    background-color: rgba(201, 166, 107, 0.25);
   }
   100% {
     background-color: transparent;
@@ -1095,22 +1492,24 @@ body {
 
 /* Blog Section */
 .blog {
-  padding: 80px 5%;
+  position: relative;
+  z-index: 1;
+  padding: 140px 5%;
 }
 
 .blog-header {
   text-align: center;
-  margin-bottom: 60px;
+  max-width: 560px;
+  margin: 0 auto 64px;
 }
 
 .blog-header h2 {
-  font-size: 36px;
-  font-weight: 400;
+  font-size: clamp(30px, 3.6vw, 40px);
   margin-bottom: 12px;
 }
 
 .blog-header p {
-  color: #718096;
+  color: var(--ink-soft);
   font-size: 16px;
 }
 
@@ -1123,42 +1522,46 @@ body {
 }
 
 .blog-card {
-  background: white;
-  border-radius: 12px;
+  background: var(--ivory);
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s;
+  border: 1px solid var(--line);
+  transition:
+    transform 0.4s ease,
+    box-shadow 0.4s ease,
+    border-color 0.4s ease;
 }
 
 .blog-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-6px);
+  border-color: rgba(165, 88, 76, 0.25);
+  box-shadow: 0 24px 48px rgba(28, 25, 23, 0.08);
 }
 
 .blog-image {
   width: 100%;
   height: 200px;
-  background: #e2e8f0;
+  background: var(--ivory-deep);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #a0aec0;
-  font-size: 14px;
+  color: #b7afa6;
+  font-size: 13px;
 }
 
 .blog-content {
-  padding: 24px;
+  padding: 28px;
 }
 
 .blog-content h3 {
   font-size: 18px;
-  font-weight: 500;
-  margin-bottom: 12px;
+  font-weight: 700;
+  margin-bottom: 14px;
 }
 
 .blog-link {
-  color: #48bb78;
-  font-size: 14px;
+  color: var(--rosewood);
+  font-size: 13.5px;
   font-weight: 500;
   text-decoration: none;
   display: inline-flex;
@@ -1172,40 +1575,56 @@ body {
 }
 
 .cta {
-  padding: 80px 5%;
+  position: relative;
+  z-index: 1;
+  padding: 140px 5%;
   text-align: center;
-  background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+  background:
+    radial-gradient(
+      70% 120% at 50% 0%,
+      rgba(197, 130, 118, 0.16) 0%,
+      rgba(197, 130, 118, 0) 60%
+    ),
+    var(--ivory-deep);
+  overflow: hidden;
 }
 
 .cta h2 {
-  font-size: 40px;
-  font-weight: 400;
-  margin-bottom: 32px;
+  font-size: clamp(30px, 4.4vw, 46px);
+  margin-bottom: 36px;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .btn-cta {
-  padding: 16px 48px;
-  background: #48bb78;
-  color: white;
+  padding: 18px 52px;
+  background: var(--ink);
+  color: var(--ivory);
   border: none;
-  border-radius: 6px;
-  font-size: 16px;
+  border-radius: 999px;
+  font-family: "Poppins", sans-serif;
+  font-size: 15px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
+  display: inline-block;
+  text-decoration: none;
 }
 
 .btn-cta:hover {
-  background: #38a169;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(72, 187, 120, 0.4);
+  background: var(--rosewood-dark);
+  transform: translateY(-3px);
+  box-shadow: 0 20px 40px rgba(127, 66, 56, 0.28);
 }
 
 /* Footer */
 .footer {
-  background: #2d3748;
-  color: white;
-  padding: 60px 5% 32px;
+  position: relative;
+  z-index: 1;
+  background: var(--espresso);
+  color: var(--ivory);
+  padding: 80px 5% 32px;
 }
 
 .footer-content {
@@ -1213,30 +1632,35 @@ body {
   grid-template-columns: 2fr 1fr 1fr 1fr;
   gap: 60px;
   max-width: 1200px;
-  margin: 0 auto 40px;
+  margin: 0 auto 48px;
 }
 
 .footer-brand {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .footer-brand .logo {
-  color: white;
-  font-size: 24px;
+  color: var(--ivory);
+  font-size: 22px;
 }
 
 .footer-brand p {
-  color: #cbd5e0;
+  color: rgba(248, 244, 239, 0.55);
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.7;
+  max-width: 320px;
 }
 
 .footer-section h4 {
-  font-size: 16px;
-  margin-bottom: 16px;
-  font-weight: 500;
+  font-family: "Poppins", sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  font-weight: 600;
+  color: rgba(248, 244, 239, 0.9);
 }
 
 .footer-section ul {
@@ -1244,50 +1668,50 @@ body {
 }
 
 .footer-section ul li {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .footer-section ul li a {
-  color: #cbd5e0;
+  color: rgba(248, 244, 239, 0.6);
   text-decoration: none;
   font-size: 14px;
   transition: color 0.3s;
 }
 
 .footer-section ul li a:hover {
-  color: white;
+  color: var(--ivory);
 }
 
 .footer-bottom {
   text-align: center;
   padding-top: 32px;
-  border-top: 1px solid #4a5568;
-  color: #cbd5e0;
-  font-size: 14px;
+  border-top: 1px solid rgba(248, 244, 239, 0.1);
+  color: rgba(248, 244, 239, 0.45);
+  font-size: 13px;
 }
 
 .social-links {
   display: flex;
-  gap: 16px;
-  margin-top: 16px;
+  gap: 14px;
+  margin-top: 6px;
 }
 
 .social-link {
   width: 36px;
   height: 36px;
-  background: #4a5568;
+  background: rgba(248, 244, 239, 0.08);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--ivory);
   text-decoration: none;
   transition: all 0.3s;
 }
 
 .social-link:hover {
-  background: #48bb78;
-  transform: translateY(-2px);
+  background: var(--rosewood);
+  transform: translateY(-3px);
 }
 
 /* Responsive */
@@ -1297,25 +1721,30 @@ body {
   }
 
   .hero {
-    grid-template-columns: 1fr;
-    padding: 60px 5% 40px;
+    padding: 140px 5% 60px;
   }
 
-  .hero-content h1 {
-    font-size: 36px;
+  .hero-copy--top h1 {
+    font-size: 34px;
   }
 
-  .hero-image {
-    height: 400px;
+  .hero-stage {
+    height: 46vh;
   }
 
   .features-grid {
     grid-template-columns: 1fr;
   }
 
+  .feature-card:nth-child(2),
+  .feature-card:nth-child(2):hover {
+    transform: none;
+  }
+
   .content-section {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
     gap: 40px;
+    padding: 90px 5%;
   }
 
   .content-section:nth-child(even) .content-image {
@@ -1324,6 +1753,11 @@ body {
 
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
+    row-gap: 40px;
+  }
+
+  .stat-item:nth-child(2)::after {
+    display: none;
   }
 
   .blog-grid {
@@ -1341,17 +1775,24 @@ body {
     padding: 1rem 4%;
   }
 
+  .navbar--scrolled {
+    padding: 0.7rem 4%;
+  }
+
   .hero {
-    padding: 40px 4%;
-    margin-top: 70px;
+    padding: 120px 4% 50px;
   }
 
-  .hero-content h1 {
-    font-size: 28px;
+  .hero-copy--top h1 {
+    font-size: 26px;
   }
 
-  .hero-content p {
+  .hero-copy--bottom p {
     font-size: 16px;
+  }
+
+  .hero-stage {
+    height: 38vh;
   }
 
   .nav-buttons {
