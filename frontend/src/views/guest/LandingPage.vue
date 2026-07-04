@@ -4,6 +4,20 @@
     <div class="bg-blob blob-sage" aria-hidden="true"></div>
     <div class="grain-overlay" aria-hidden="true"></div>
 
+    <!-- ============================================================
+         PERSISTENT 3D FLOWER LAYER
+         Fixed, full-viewport, travels the entire page via GSAP
+         ScrollTrigger. Never unmounted, never disappears.
+    ============================================================= -->
+    <div class="flower-stage-fixed" aria-hidden="true">
+      <span class="drift-petal petal-a" aria-hidden="true"></span>
+      <span class="drift-petal petal-b" aria-hidden="true"></span>
+      <span class="drift-petal petal-c" aria-hidden="true"></span>
+      <span class="drift-petal petal-d" aria-hidden="true"></span>
+      <span class="drift-petal petal-e" aria-hidden="true"></span>
+      <canvas ref="flowerCanvas" class="flower-canvas"></canvas>
+    </div>
+
     <!-- Navigation -->
     <nav class="navbar" :class="{ 'navbar--scrolled': navScrolled }">
       <router-link to="/" class="logo">
@@ -53,12 +67,10 @@
         </h1>
       </div>
 
-      <div class="hero-stage">
-        <div class="flower-podium" aria-hidden="true"></div>
-        <span class="drift-petal petal-a" aria-hidden="true"></span>
-        <span class="drift-petal petal-b" aria-hidden="true"></span>
-        <span class="drift-petal petal-c" aria-hidden="true"></span>
-        <canvas ref="flowerCanvas" class="flower-canvas"></canvas>
+      <!-- Spacer only: keeps original hero height/rhythm.
+           The actual flower now lives in .flower-stage-fixed above. -->
+      <div class="hero-stage" aria-hidden="true">
+        <div class="flower-podium"></div>
       </div>
 
       <div class="hero-copy hero-copy--bottom reveal-hero">
@@ -74,7 +86,7 @@
     </section>
 
     <!-- Clients/Partners Section -->
-    <section class="clients">
+    <section class="clients" ref="clientsSection">
       <h2 class="reveal">Trusted by Flower Lovers</h2>
       <p class="reveal">
         Join {{ stats.vendors }}+ vendors and thousands of happy customers
@@ -87,7 +99,7 @@
     </section>
 
     <!-- Features Section -->
-    <section id="features" class="features">
+    <section id="features" class="features" ref="featuresSection">
       <div class="features-header">
         <span class="eyebrow reveal">Why BloomCraft</span>
         <h2 class="reveal">Everything you need to bloom</h2>
@@ -109,7 +121,7 @@
     </section>
 
     <!-- Content Section 1 -->
-    <section class="content-section">
+    <section class="content-section" ref="contentSection1">
       <div class="content-text reveal">
         <span class="eyebrow">3D Design Studio</span>
         <h2>Design in 3D, deliver with love</h2>
@@ -123,7 +135,7 @@
           Explore 3D Designer
         </button>
       </div>
-      <div class="content-image reveal">
+      <div class="content-image content-image--ghost reveal">
         <img
           src="../../../public/3d flower.png"
           alt="Bloomcraft Logo"
@@ -134,7 +146,7 @@
     </section>
 
     <!-- Stats Section -->
-    <section id="vendors" class="stats">
+    <section id="vendors" class="stats" ref="statsSection">
       <div class="stats-grid">
         <div
           v-for="stat in statsData"
@@ -149,7 +161,11 @@
     </section>
 
     <!-- Content Section 2 -->
-    <section id="how-it-works" class="content-section">
+    <section
+      id="how-it-works"
+      class="content-section content-section--reverse"
+      ref="contentSection2"
+    >
       <div class="content-text reveal">
         <span class="eyebrow">AI Concierge</span>
         <h2>AI-powered recommendations</h2>
@@ -166,7 +182,7 @@
           Try AI Designer
         </button>
       </div>
-      <div class="content-image reveal">
+      <div class="content-image content-image--ghost reveal">
         <img
           src="../../../public/ai power.jpg"
           alt="Bloomcraft Logo"
@@ -177,7 +193,7 @@
     </section>
 
     <!-- Blog Section -->
-    <section id="blog" class="blog">
+    <section id="blog" class="blog" ref="blogSection">
       <div class="blog-header">
         <span class="eyebrow reveal">The Journal</span>
         <h2 class="reveal">Fresh insights from our garden</h2>
@@ -199,7 +215,7 @@
     </section>
 
     <!-- CTA Section -->
-    <section class="cta">
+    <section class="cta" ref="ctaSection">
       <h2 class="reveal">Ready to create something beautiful?</h2>
       <router-link to="/guest/register" class="btn-cta reveal"
         >Start Designing Now</router-link
@@ -207,7 +223,7 @@
     </section>
 
     <!-- Footer -->
-    <footer class="footer">
+    <footer class="footer" ref="footerSection">
       <div class="footer-content">
         <div class="footer-brand">
           <div class="logo">
@@ -293,8 +309,18 @@ gsap.registerPlugin(ScrollTrigger);
 
 const router = useRouter();
 
-// ---- Hero 3D flower refs ----
+// ---- Section refs (used only to anchor ScrollTriggers — no
+// structural/functional changes to the sections themselves) ----
 const heroSection = ref(null);
+const clientsSection = ref(null);
+const featuresSection = ref(null);
+const contentSection1 = ref(null);
+const statsSection = ref(null);
+const contentSection2 = ref(null);
+const blogSection = ref(null);
+const ctaSection = ref(null);
+const footerSection = ref(null);
+
 const flowerCanvas = ref(null);
 const navScrolled = ref(false);
 
@@ -367,7 +393,7 @@ const supportLinks = ref([
 // Computed
 const currentYear = computed(() => new Date().getFullYear());
 
-// Methods
+// Methods (unchanged — same routes, same behavior)
 const scrollToSection = (sectionId) => {
   const element = document.getElementById(sectionId);
   if (element) {
@@ -391,7 +417,6 @@ const scrollAndHighlight = (sectionId) => {
 
 const handleLearnMore = (type) => {
   console.log("Learn more about:", type);
-  // You can add navigation or modal logic here
   router.push("/guest/register");
 };
 
@@ -404,21 +429,19 @@ const handleFooterLink = (url) => {
 };
 
 // ==========================================================
-// Hero 3D flower: scene, scroll animation, pointer interaction
-// (Hero section visuals/animations only — no routes, links,
-// or structure elsewhere on the page are affected.)
+// PERSISTENT 3D FLOWER — scene, journey across the whole page,
+// pointer interaction. No routes/links/structure touched.
 // ==========================================================
 let renderer = null;
 let scene = null;
 let camera = null;
-let rig = null; // controlled by scroll (position.x, rotation.y)
-let flowerGroup = null; // controlled by pointer tilt + idle bob
-let flowerRings = []; // independent ring rotation for scroll parallax
+let rig = null; // outer group — position/rotation driven by scroll journey
+let flowerGroup = null; // inner group — idle bob + pointer tilt + slow spin
+let flowerRings = [];
 let particles = null;
 let rafId = null;
 let lenis = null;
 let lenisRafId = null;
-let scrollTween = null;
 let prefersReducedMotion = false;
 let isTouchDevice = false;
 
@@ -426,6 +449,7 @@ let isScrolling = false;
 let scrollIdleTimeout = null;
 const pointer = { x: 0, y: 0 };
 const tilt = { x: 0, z: 0 };
+const journeyTriggers = [];
 
 function petalMaterial(color) {
   return new THREE.MeshStandardMaterial({
@@ -468,14 +492,12 @@ function buildFlower() {
     rings.push(ringGroup);
   });
 
-  // Flower center
   const center = new THREE.Mesh(
     new THREE.SphereGeometry(0.3, 24, 24),
     new THREE.MeshStandardMaterial({ color: 0xf2c879, roughness: 0.6 }),
   );
   group.add(center);
 
-  // Leaves
   const leafMaterial = new THREE.MeshStandardMaterial({
     color: 0x8fae82,
     roughness: 0.6,
@@ -548,11 +570,11 @@ function buildBloomGlow() {
 }
 
 function buildParticles() {
-  const count = 50;
+  const count = 70;
   const positions = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
-    positions[i * 3] = (Math.random() - 0.5) * 6;
-    positions[i * 3 + 1] = (Math.random() - 0.5) * 5;
+    positions[i * 3] = (Math.random() - 0.5) * 7;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 5.5;
     positions[i * 3 + 2] = (Math.random() - 0.5) * 4;
   }
   const geometry = new THREE.BufferGeometry();
@@ -575,12 +597,12 @@ function initThreeScene() {
   ).matches;
   isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
 
-  const width = canvas.clientWidth || 1;
-  const height = canvas.clientHeight || 1;
+  const width = window.innerWidth;
+  const height = window.innerHeight;
 
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
-  camera.position.set(0, 0.4, 6);
+  camera.position.set(1.1, 0.4, 6);
 
   renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   renderer.setSize(width, height);
@@ -606,6 +628,7 @@ function initThreeScene() {
   flowerRings = built.rings;
 
   rig = new THREE.Group();
+  rig.position.set(1.1, 0, 0); // hero start: center-right
   rig.add(flowerGroup);
   scene.add(rig);
 
@@ -623,7 +646,6 @@ function animateFrame() {
     flowerGroup.position.y = Math.sin(Date.now() * 0.0006) * 0.08;
 
     if (!isScrolling) {
-      // slow idle spin
       flowerGroup.userData.idleY = (flowerGroup.userData.idleY || 0) + 0.0009;
 
       if (!isTouchDevice) {
@@ -649,23 +671,140 @@ function animateFrame() {
   renderer.render(scene, camera);
 }
 
-function setupScrollAnimation() {
-  if (!heroSection.value || !rig || !camera || prefersReducedMotion) return;
+/**
+ * The flower's journey down the page. Each stage nudges the rig
+ * (position/rotation/scale), the camera (subtle zoom), and the
+ * canvas opacity (recede during non-focal sections) using a GSAP
+ * scrub tween tied to that section's own entrance window. Because
+ * each tween starts from whatever the rig's current value is,
+ * consecutive stages chain into one continuous, smooth path with
+ * no snapping — exactly the "flower travels down the page while
+ * alternating sides" behavior requested.
+ */
+function stage(
+  trigger,
+  { x, y = 0, scaleAll = 1, rotY, camZ, canvasOpacity = 1 },
+) {
+  if (!trigger) return;
+  const tl = gsap.timeline({
+    scrollTrigger: {
+      trigger,
+      start: "top 78%",
+      end: "top 22%",
+      scrub: 0.7,
+    },
+  });
+  journeyTriggers.push(tl.scrollTrigger);
+
+  tl.to(rig.position, { x, y, ease: "none" }, 0);
+  tl.to(rig.scale, { x: scaleAll, y: scaleAll, z: scaleAll, ease: "none" }, 0);
+  if (rotY !== undefined) {
+    tl.to(rig.rotation, { y: rotY, ease: "none" }, 0);
+  }
+  if (camera) {
+    tl.to(camera.position, { z: camZ, ease: "none" }, 0);
+  }
+  if (flowerCanvas.value) {
+    tl.to(flowerCanvas.value, { opacity: canvasOpacity, ease: "none" }, 0);
+  }
+}
+
+function setupFlowerJourney() {
+  if (!rig || !camera || prefersReducedMotion) return;
 
   const vw = window.innerWidth;
   const isMobile = vw < 640;
   const isTablet = vw >= 640 && vw < 1024;
-  const travel = isMobile ? 0.6 : isTablet ? 1.1 : 1.7;
-  const spin = isMobile
-    ? Math.PI * 0.5
-    : isTablet
-      ? Math.PI * 0.9
-      : Math.PI * 1.4;
-  const zoom = isMobile ? 5.6 : 4.7;
+  const spread = isMobile ? 0.9 : isTablet ? 1.4 : 1.9;
+  const spreadNear = spread * 0.68; // for stages where flower sits behind real photos
+
+  // Hero — handled by its own dedicated timeline below (start position +
+  // text fade). Everything after hero continues the same rig from there.
+
+  stage(clientsSection.value, {
+    x: spread,
+    y: -0.15,
+    scaleAll: 0.55,
+    rotY: Math.PI * 0.35,
+    camZ: 6.3,
+    canvasOpacity: 0.32,
+  });
+
+  stage(featuresSection.value, {
+    x: -spread,
+    y: 0.1,
+    scaleAll: 0.5,
+    rotY: Math.PI * 0.75,
+    camZ: 6.3,
+    canvasOpacity: 0.26,
+  });
+
+  stage(contentSection1.value, {
+    x: spreadNear,
+    y: 0,
+    scaleAll: 0.9,
+    rotY: Math.PI * 1.15,
+    camZ: 5.6,
+    canvasOpacity: 0.55,
+  });
+
+  stage(statsSection.value, {
+    x: -spread,
+    y: 0.05,
+    scaleAll: 1.15,
+    rotY: Math.PI * 1.6,
+    camZ: 4.9,
+    canvasOpacity: 0.9,
+  });
+
+  stage(contentSection2.value, {
+    x: -spreadNear,
+    y: 0,
+    scaleAll: 0.9,
+    rotY: Math.PI * 2.05,
+    camZ: 5.6,
+    canvasOpacity: 0.55,
+  });
+
+  stage(blogSection.value, {
+    x: spread,
+    y: -0.1,
+    scaleAll: 0.5,
+    rotY: Math.PI * 2.5,
+    camZ: 6.3,
+    canvasOpacity: 0.28,
+  });
+
+  stage(ctaSection.value, {
+    x: 0,
+    y: 0,
+    scaleAll: 1.2,
+    rotY: Math.PI * 2.9,
+    camZ: 4.7,
+    canvasOpacity: 0.85,
+  });
+
+  // Fade the flower out gently as the footer arrives
+  if (footerSection.value && flowerCanvas.value) {
+    const footTl = gsap.timeline({
+      scrollTrigger: {
+        trigger: footerSection.value,
+        start: "top 85%",
+        end: "top 35%",
+        scrub: 0.7,
+      },
+    });
+    footTl.to(flowerCanvas.value, { opacity: 0, ease: "none" }, 0);
+    journeyTriggers.push(footTl.scrollTrigger);
+  }
+}
+
+function setupHeroTimeline() {
+  if (!heroSection.value || !rig || !camera || prefersReducedMotion) return;
 
   const heroTextEls = heroSection.value.querySelectorAll(".hero-copy");
 
-  scrollTween = gsap.timeline({
+  const tl = gsap.timeline({
     scrollTrigger: {
       trigger: heroSection.value,
       start: "top top",
@@ -680,16 +819,11 @@ function setupScrollAnimation() {
       },
     },
   });
+  journeyTriggers.push(tl.scrollTrigger);
 
-  scrollTween
-    // flower moves left -> right, then eases back toward center
-    .to(rig.position, { x: travel, ease: "power1.inOut" }, 0)
-    .to(rig.position, { x: 0, ease: "power1.inOut" }, 0.55)
-    // slow continuous 3D rotation across the whole scroll
-    .to(rig.rotation, { y: spin, ease: "none" }, 0)
-    // subtle camera dolly-in
-    .to(camera.position, { z: zoom, ease: "none" }, 0)
-    // hero copy fades + slides away as the flower takes over
+  tl.to(rig.position, { x: 1.1, y: 0, ease: "power1.inOut" }, 0)
+    .to(rig.rotation, { y: Math.PI * 0.3, ease: "none" }, 0)
+    .to(camera.position, { z: 5.4, ease: "none" }, 0)
     .to(heroTextEls, { autoAlpha: 0, y: -26, ease: "none" }, 0.1);
 }
 
@@ -742,18 +876,14 @@ function handleWindowScroll() {
 }
 
 function handlePointerMove(event) {
-  const canvas = flowerCanvas.value;
-  if (!canvas) return;
-  const rect = canvas.getBoundingClientRect();
-  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  pointer.y = ((event.clientY - rect.top) / rect.height) * 2 - 1;
+  pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+  pointer.y = (event.clientY / window.innerHeight) * 2 - 1;
 }
 
 function handleResize() {
-  const canvas = flowerCanvas.value;
-  if (!canvas || !renderer || !camera) return;
-  const width = canvas.clientWidth || 1;
-  const height = canvas.clientHeight || 1;
+  if (!renderer || !camera) return;
+  const width = window.innerWidth;
+  const height = window.innerHeight;
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height);
@@ -776,7 +906,8 @@ function initSmoothScroll() {
 
 onMounted(() => {
   initThreeScene();
-  setupScrollAnimation();
+  setupHeroTimeline();
+  setupFlowerJourney();
   setupBackgroundParallax();
   setupSectionReveals();
   initSmoothScroll();
@@ -795,8 +926,7 @@ onBeforeUnmount(() => {
   if (rafId) cancelAnimationFrame(rafId);
   if (lenisRafId) cancelAnimationFrame(lenisRafId);
   if (lenis) lenis.destroy();
-  if (scrollTween && scrollTween.scrollTrigger)
-    scrollTween.scrollTrigger.kill();
+  journeyTriggers.forEach((st) => st && st.kill());
   ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
   if (renderer) renderer.dispose();
 });
@@ -821,6 +951,11 @@ onBeforeUnmount(() => {
   --gold: #c9a66b;
   --espresso: #16130f;
   --line: rgba(28, 25, 23, 0.08);
+
+  /* glass variants so the fixed flower layer can show through */
+  --ivory-glass: rgba(248, 244, 239, 0.86);
+  --ivory-deep-glass: rgba(241, 234, 226, 0.86);
+  --espresso-glass: rgba(22, 19, 15, 0.86);
 
   position: relative;
   background: var(--ivory);
@@ -895,6 +1030,25 @@ onBeforeUnmount(() => {
   opacity: 0.05;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ============================================================
+   PERSISTENT FLOWER LAYER — fixed full-viewport, travels the
+   whole page. Sits above section backgrounds, below section
+   copy (which gets z-index below) and below the nav.
+============================================================= */
+.flower-stage-fixed {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.flower-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 /* Navigation */
@@ -1030,6 +1184,7 @@ onBeforeUnmount(() => {
   min-height: 100vh;
   overflow: hidden;
   text-align: center;
+  z-index: 1;
 }
 
 .hero-glow {
@@ -1052,7 +1207,7 @@ onBeforeUnmount(() => {
 
 .hero-copy {
   position: relative;
-  z-index: 2;
+  z-index: 20;
   max-width: 640px;
 }
 
@@ -1095,25 +1250,14 @@ onBeforeUnmount(() => {
   opacity: 0.7;
 }
 
+/* Spacer that preserves hero rhythm — the flower itself now
+   renders in the fixed layer, not inside this box. */
 .hero-stage {
   position: relative;
   z-index: 1;
   width: min(100%, 900px);
   height: min(58vh, 560px);
   margin: -10px 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: visible;
-}
-
-.flower-canvas {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  height: 100%;
-  display: block;
-  cursor: grab;
 }
 
 .flower-podium {
@@ -1140,7 +1284,7 @@ onBeforeUnmount(() => {
   background: linear-gradient(135deg, #f3c8bd, #e4988f);
   opacity: 0.7;
   z-index: 3;
-  animation: petalDrift 9s ease-in-out infinite;
+  animation: petalDrift 11s ease-in-out infinite;
   pointer-events: none;
 }
 
@@ -1164,22 +1308,36 @@ onBeforeUnmount(() => {
   transform: rotate(-20deg);
 }
 
+.petal-d {
+  top: 70%;
+  left: 20%;
+  animation-delay: 6.6s;
+  transform: rotate(12deg);
+}
+
+.petal-e {
+  top: 40%;
+  left: 65%;
+  animation-delay: 8.2s;
+  transform: rotate(-8deg);
+}
+
 @keyframes petalDrift {
   0% {
     transform: translate(0, 0) rotate(0deg);
     opacity: 0.15;
   }
   20% {
-    opacity: 0.7;
+    opacity: 0.6;
   }
   50% {
-    transform: translate(-12px, 22px) rotate(20deg);
+    transform: translate(-12px, 26vh) rotate(20deg);
   }
   80% {
-    opacity: 0.4;
+    opacity: 0.35;
   }
   100% {
-    transform: translate(6px, 48px) rotate(45deg);
+    transform: translate(6px, 52vh) rotate(45deg);
     opacity: 0;
   }
 }
@@ -1213,10 +1371,11 @@ onBeforeUnmount(() => {
 /* Clients Section */
 .clients {
   position: relative;
-  z-index: 1;
+  z-index: 10;
   padding: 90px 5%;
   text-align: center;
-  background: var(--ivory-deep);
+  background: var(--ivory-deep-glass);
+  backdrop-filter: blur(10px) saturate(120%);
 }
 
 .clients h2 {
@@ -1262,8 +1421,10 @@ onBeforeUnmount(() => {
 /* Features Section */
 .features {
   position: relative;
-  z-index: 1;
+  z-index: 10;
   padding: 140px 5%;
+  background: var(--ivory-glass);
+  backdrop-filter: blur(10px) saturate(120%);
 }
 
 .features-header {
@@ -1295,7 +1456,8 @@ onBeforeUnmount(() => {
   padding: 44px 32px;
   border-radius: 20px;
   border: 1px solid var(--line);
-  background: var(--ivory);
+  background: var(--ivory-glass);
+  backdrop-filter: blur(6px);
   transition:
     transform 0.4s ease,
     box-shadow 0.4s ease,
@@ -1343,21 +1505,26 @@ onBeforeUnmount(() => {
 /* Content Section */
 .content-section {
   position: relative;
-  z-index: 1;
+  z-index: 10;
   padding: 140px 5%;
   display: grid;
   grid-template-columns: 0.9fr 1.1fr;
   gap: 100px;
   align-items: center;
+  background: transparent;
 }
 
-.content-section:nth-child(even) {
-  background: var(--ivory-deep);
+.content-section--reverse {
   grid-template-columns: 1.1fr 0.9fr;
 }
 
-.content-section:nth-child(even) .content-image {
+.content-section--reverse .content-image {
   order: 2;
+}
+
+.content-section:nth-child(even) {
+  background: var(--ivory-deep-glass);
+  backdrop-filter: blur(10px) saturate(120%);
 }
 
 .content-image {
@@ -1373,6 +1540,20 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
+/* The flower now occupies the visual weight beside the text, so
+   the original photo becomes a soft, translucent accent that the
+   flower's glow can bleed around — element is preserved, not
+   removed, just re-tuned for the new composition. */
+.content-image--ghost {
+  background: transparent;
+  box-shadow: 0 30px 60px rgba(28, 25, 23, 0.1);
+}
+
+.content-image--ghost img {
+  opacity: 0.82;
+  border-radius: 20px;
+}
+
 .content-image img {
   width: 100%;
   height: 100%;
@@ -1383,17 +1564,6 @@ onBeforeUnmount(() => {
 .content-image:hover img {
   transform: scale(1.04);
 }
-
-/* .content-image::before {
-  content: "📸 Content Image";
-  font-size: 16px;
-}
-
-.content-image::after {
-  content: "800 x 600px";
-  font-size: 13px;
-  color: #cbd5e0;
-} */
 
 .content-text h2 {
   font-size: clamp(28px, 3.2vw, 38px);
@@ -1430,9 +1600,10 @@ onBeforeUnmount(() => {
 /* Stats Section */
 .stats {
   position: relative;
-  z-index: 1;
+  z-index: 10;
   padding: 100px 5%;
-  background: var(--espresso);
+  background: var(--espresso-glass);
+  backdrop-filter: blur(10px);
   color: var(--ivory);
 }
 
@@ -1493,8 +1664,10 @@ onBeforeUnmount(() => {
 /* Blog Section */
 .blog {
   position: relative;
-  z-index: 1;
+  z-index: 10;
   padding: 140px 5%;
+  background: var(--ivory-glass);
+  backdrop-filter: blur(10px) saturate(120%);
 }
 
 .blog-header {
@@ -1522,7 +1695,8 @@ onBeforeUnmount(() => {
 }
 
 .blog-card {
-  background: var(--ivory);
+  background: var(--ivory-glass);
+  backdrop-filter: blur(6px);
   border-radius: 18px;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -1576,7 +1750,7 @@ onBeforeUnmount(() => {
 
 .cta {
   position: relative;
-  z-index: 1;
+  z-index: 10;
   padding: 140px 5%;
   text-align: center;
   background:
@@ -1585,7 +1759,8 @@ onBeforeUnmount(() => {
       rgba(197, 130, 118, 0.16) 0%,
       rgba(197, 130, 118, 0) 60%
     ),
-    var(--ivory-deep);
+    var(--ivory-deep-glass);
+  backdrop-filter: blur(10px) saturate(120%);
   overflow: hidden;
 }
 
@@ -1621,7 +1796,7 @@ onBeforeUnmount(() => {
 /* Footer */
 .footer {
   position: relative;
-  z-index: 1;
+  z-index: 10;
   background: var(--espresso);
   color: var(--ivory);
   padding: 80px 5% 32px;
@@ -1741,13 +1916,14 @@ onBeforeUnmount(() => {
     transform: none;
   }
 
-  .content-section {
+  .content-section,
+  .content-section--reverse {
     grid-template-columns: 1fr !important;
     gap: 40px;
     padding: 90px 5%;
   }
 
-  .content-section:nth-child(even) .content-image {
+  .content-section--reverse .content-image {
     order: 1;
   }
 
