@@ -47,7 +47,7 @@ EXPOSE 10000
 
 # Start: clear cache, migrate, seed, then start Apache
 CMD php artisan config:clear \
-    && php artisan cache:clear \
     && APP_DEBUG=true php artisan migrate --force \
     && php artisan db:seed --class=AdminSeeder --force \
+    && php artisan cache:clear \
     && apache2-foreground
