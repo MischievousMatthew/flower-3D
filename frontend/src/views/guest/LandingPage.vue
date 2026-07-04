@@ -21,219 +21,224 @@
     <!-- Navigation -->
     <nav class="navbar" :class="{ 'navbar--scrolled': navScrolled }">
       <router-link to="/" class="logo">
-        <span
-          ><img
+        <span>
+          <img
             src="../../../public/bloomcraft-blankBg.png"
             alt="Bloomcraft Logo"
             width="50"
             height="50"
-        /></span>
+          />
+        </span>
         <span>BloomCraft</span>
       </router-link>
       <div class="nav-links">
         <router-link to="/shop">Shop</router-link>
-        <a href="#features" @click.prevent="scrollToSection('features')"
-          >Features</a
-        >
-        <a href="#how-it-works" @click.prevent="scrollToSection('how-it-works')"
-          >How It Works</a
-        >
-        <a
-          href="#vendors"
-          @click.prevent="scrollAndHighlight('register-vendor')"
-          >For Vendors</a
-        >
+        <a href="#features" @click.prevent="scrollToSection('features')">Features</a>
+        <a href="#how-it-works" @click.prevent="scrollToSection('how-it-works')">How It Works</a>
+        <a href="#vendors" @click.prevent="scrollAndHighlight('register-vendor')">For Vendors</a>
         <a href="#blog" @click.prevent="scrollToSection('blog')">Blog</a>
       </div>
       <div class="nav-buttons">
         <template v-if="!isAuthenticated">
           <router-link to="/guest/login" class="btn-login">Login</router-link>
-          <router-link to="/guest/register" class="btn-register"
-            >Register</router-link
-          >
+          <router-link to="/guest/register" class="btn-register">Register</router-link>
         </template>
       </div>
     </nav>
 
-    <!-- Hero Section -->
-    <section class="hero" ref="heroSection">
-      <div class="hero-glow" aria-hidden="true"></div>
-
-      <div class="hero-copy hero-copy--top reveal-hero">
-        <span class="eyebrow">Bespoke florals, built by you</span>
-        <h1>
-          Create your perfect
-          <span class="highlight">bouquet</span>
-        </h1>
-      </div>
-
-      <!-- Spacer only: keeps original hero height/rhythm.
-           The actual flower now lives in .flower-stage-fixed above. -->
-      <div class="hero-stage" aria-hidden="true">
-        <div class="flower-podium"></div>
-      </div>
-
-      <div class="hero-copy hero-copy--bottom reveal-hero">
-        <p>
-          Where vendors meet creativity. Design custom flower arrangements in 3D
-          or let our AI suggest the perfect bloom for every occasion.
-        </p>
-        <router-link to="/guest/register" class="btn-register btn-hero"
-          >Get Started</router-link
-        >
-        <span class="scroll-cue">Scroll to explore</span>
-      </div>
-    </section>
-
-    <!-- Clients/Partners Section -->
-    <section class="clients" ref="clientsSection">
-      <h2 class="reveal">Trusted by Flower Lovers</h2>
-      <p class="reveal">
-        Join {{ stats.vendors }}+ vendors and thousands of happy customers
-      </p>
-      <div class="clients-grid">
-        <div v-for="n in 5" :key="n" class="client-logo reveal">
-          Logo {{ n }}
+    <!-- Scroll Panels Story -->
+    <div class="scroll-story-container">
+      
+      <!-- Panel 1: Hero Section -->
+      <section class="panel-section hero-panel" ref="heroSection">
+        <div class="panel-container">
+          <div class="panel-content text-left-side">
+            <span class="eyebrow reveal-fade-up">Bespoke florals, built by you</span>
+            <h1 class="hero-title reveal-fade-up">
+              Create your perfect
+              <span class="highlight">bouquet</span>
+            </h1>
+            <p class="hero-desc reveal-fade-up">
+              Where vendors meet creativity. Design custom flower arrangements in 3D
+              or let our AI suggest the perfect bloom for every occasion.
+            </p>
+            <div class="hero-cta-wrap reveal-fade-up">
+              <router-link to="/guest/register" class="btn-register btn-hero">
+                Get Started
+              </router-link>
+            </div>
+            <span class="scroll-cue reveal-fade-up">Scroll to explore</span>
+          </div>
+          <div class="panel-visual spacer-right" aria-hidden="true"></div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Features Section -->
-    <section id="features" class="features" ref="featuresSection">
-      <div class="features-header">
-        <span class="eyebrow reveal">Why BloomCraft</span>
-        <h2 class="reveal">Everything you need to bloom</h2>
-        <p class="reveal">
-          Powerful features for vendors and delightful experiences for customers
-        </p>
-      </div>
-      <div class="features-grid">
-        <div
-          v-for="feature in features"
-          :key="feature.id"
-          class="feature-card reveal"
-        >
-          <div class="feature-icon">{{ feature.icon }}</div>
-          <h3>{{ feature.title }}</h3>
-          <p>{{ feature.description }}</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Content Section 1 -->
-    <section class="content-section" ref="contentSection1">
-      <div class="content-text reveal">
-        <span class="eyebrow">3D Design Studio</span>
-        <h2>Design in 3D, deliver with love</h2>
-        <p>
-          Our revolutionary 3D customization tool lets you become the designer.
-          Choose flowers, arrange them in real-time, adjust colors and sizes,
-          and visualize your perfect bouquet before placing your order.
-        </p>
-        <p>Every arrangement is unique, just like your story.</p>
-        <button class="btn-learn-more" @click="handleLearnMore('3d-designer')">
-          Explore 3D Designer
-        </button>
-      </div>
-      <div class="content-image content-image--ghost reveal">
-        <img
-          src="../../../public/3d flower.png"
-          alt="Bloomcraft Logo"
-          width="800"
-          height="500"
-        />
-      </div>
-    </section>
-
-    <!-- Stats Section -->
-    <section id="vendors" class="stats" ref="statsSection">
-      <div class="stats-grid">
-        <div
-          v-for="stat in statsData"
-          :key="stat.label"
-          class="stat-item reveal"
-        >
-          <div class="stat-icon">{{ stat.icon }}</div>
-          <div class="stat-number">{{ stat.number }}</div>
-          <div class="stat-label">{{ stat.label }}</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Content Section 2 -->
-    <section
-      id="how-it-works"
-      class="content-section content-section--reverse"
-      ref="contentSection2"
-    >
-      <div class="content-text reveal">
-        <span class="eyebrow">AI Concierge</span>
-        <h2>AI-powered recommendations</h2>
-        <p>
-          Don't know where to start? Our intelligent AI analyzes the occasion,
-          season, recipient preferences, and current trends to suggest the
-          perfect arrangement.
-        </p>
-        <p>
-          Get inspired by thousands of beautiful combinations, or let our AI
-          create something uniquely yours.
-        </p>
-        <button class="btn-learn-more" @click="handleLearnMore('ai-designer')">
-          Try AI Designer
-        </button>
-      </div>
-      <div class="content-image content-image--ghost reveal">
-        <img
-          src="../../../public/ai power.jpg"
-          alt="Bloomcraft Logo"
-          width="800"
-          height="500"
-        />
-      </div>
-    </section>
-
-    <!-- Blog Section -->
-    <section id="blog" class="blog" ref="blogSection">
-      <div class="blog-header">
-        <span class="eyebrow reveal">The Journal</span>
-        <h2 class="reveal">Fresh insights from our garden</h2>
-        <p class="reveal">
-          Tips, trends, and stories from the world of flowers
-        </p>
-      </div>
-      <div class="blog-grid">
-        <div v-for="post in blogPosts" :key="post.id" class="blog-card reveal">
-          <div class="blog-image">Blog Image {{ post.id }}<br />400x250px</div>
-          <div class="blog-content">
-            <h3>{{ post.title }}</h3>
-            <a href="#" @click.prevent="readBlog(post.id)" class="blog-link"
-              >Read more →</a
-            >
+      <!-- Panel 2: Clients Section -->
+      <section class="panel-section clients-panel" ref="clientsSection">
+        <div class="panel-container">
+          <div class="panel-visual spacer-left" aria-hidden="true"></div>
+          <div class="panel-content text-right-side">
+            <h2 class="reveal-fade-up">Trusted by Flower Lovers</h2>
+            <p class="reveal-fade-up">
+              Join {{ stats.vendors }}+ vendors and thousands of happy customers
+            </p>
+            <div class="clients-grid">
+              <div v-for="n in 5" :key="n" class="client-logo reveal-card">
+                Logo {{ n }}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- CTA Section -->
-    <section class="cta" ref="ctaSection">
-      <h2 class="reveal">Ready to create something beautiful?</h2>
-      <router-link to="/guest/register" class="btn-cta reveal"
-        >Start Designing Now</router-link
-      >
-    </section>
+      <!-- Panel 3: Content Section 1 (3D Design Studio) -->
+      <section class="panel-section content-panel" ref="contentSection1">
+        <div class="panel-container">
+          <div class="panel-content text-left-side">
+            <span class="eyebrow reveal-fade-up">3D Design Studio</span>
+            <h2 class="reveal-fade-up">Design in 3D, deliver with love</h2>
+            <p class="reveal-fade-up">
+              Our revolutionary 3D customization tool lets you become the designer.
+              Choose flowers, arrange them in real-time, adjust colors and sizes,
+              and visualize your perfect bouquet before placing your order.
+            </p>
+            <p class="reveal-fade-up">Every arrangement is unique, just like your story.</p>
+            <div class="reveal-fade-up">
+              <button class="btn-learn-more" @click="handleLearnMore('3d-designer')">
+                Explore 3D Designer
+              </button>
+            </div>
+          </div>
+          <div class="panel-visual spacer-right" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <!-- Panel 4: Features Section -->
+      <section class="panel-section features-panel" id="features" ref="featuresSection">
+        <div class="panel-container">
+          <div class="panel-visual spacer-left" aria-hidden="true"></div>
+          <div class="panel-content text-right-side">
+            <span class="eyebrow reveal-fade-up">Why BloomCraft</span>
+            <h2 class="reveal-fade-up">Everything you need to bloom</h2>
+            <p class="reveal-fade-up features-header-desc">
+              Powerful features for vendors and delightful experiences for customers
+            </p>
+            <div class="features-stacked-grid">
+              <div
+                v-for="feature in features"
+                :key="feature.id"
+                class="feature-card-item reveal-card"
+              >
+                <div class="feature-icon">{{ feature.icon }}</div>
+                <div class="feature-info">
+                  <h3>{{ feature.title }}</h3>
+                  <p>{{ feature.description }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 5: Content Section 2 (AI Concierge) -->
+      <section class="panel-section content-panel" id="how-it-works" ref="contentSection2">
+        <div class="panel-container">
+          <div class="panel-content text-left-side">
+            <span class="eyebrow reveal-fade-up">AI Concierge</span>
+            <h2 class="reveal-fade-up">AI-powered recommendations</h2>
+            <p class="reveal-fade-up">
+              Don't know where to start? Our intelligent AI analyzes the occasion,
+              season, recipient preferences, and current trends to suggest the
+              perfect arrangement.
+            </p>
+            <p class="reveal-fade-up">
+              Get inspired by thousands of beautiful combinations, or let our AI
+              create something uniquely yours.
+            </p>
+            <div class="reveal-fade-up">
+              <button class="btn-learn-more" @click="handleLearnMore('ai-designer')">
+                Try AI Designer
+              </button>
+            </div>
+          </div>
+          <div class="panel-visual spacer-right" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <!-- Panel 6: Stats Section -->
+      <section class="panel-section stats-panel" id="vendors" ref="statsSection">
+        <div class="panel-container">
+          <div class="panel-visual spacer-left" aria-hidden="true"></div>
+          <div class="panel-content text-right-side">
+            <div class="stats-stacked-grid">
+              <div
+                v-for="stat in statsData"
+                :key="stat.label"
+                class="stat-card-item reveal-card"
+              >
+                <div class="stat-icon">{{ stat.icon }}</div>
+                <div class="stat-number">{{ stat.number }}</div>
+                <div class="stat-label">{{ stat.label }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 7: Blog Section -->
+      <section class="panel-section blog-panel" id="blog" ref="blogSection">
+        <div class="panel-container">
+          <div class="panel-content text-left-side">
+            <span class="eyebrow reveal-fade-up">The Journal</span>
+            <h2 class="reveal-fade-up">Fresh insights from our garden</h2>
+            <p class="reveal-fade-up blog-header-desc">
+              Tips, trends, and stories from the world of flowers
+            </p>
+            <div class="blog-stacked-grid">
+              <div v-for="post in blogPosts" :key="post.id" class="blog-card-item reveal-card">
+                <div class="blog-image">Blog Image {{ post.id }}<br />400x250px</div>
+                <div class="blog-content">
+                  <h3>{{ post.title }}</h3>
+                  <a href="#" @click.prevent="readBlog(post.id)" class="blog-link">
+                    Read more →
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="panel-visual spacer-right" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <!-- Panel 8: CTA Section -->
+      <section class="panel-section cta-panel" ref="ctaSection">
+        <div class="panel-container cta-container">
+          <div class="cta-content">
+            <h2 class="reveal-fade-up">Ready to create something beautiful?</h2>
+            <div class="reveal-fade-up">
+              <router-link to="/guest/register" class="btn-cta">
+                Start Designing Now
+              </router-link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
 
     <!-- Footer -->
     <footer class="footer" ref="footerSection">
       <div class="footer-content">
         <div class="footer-brand">
           <div class="logo">
-            <span
-              ><img
+            <span>
+              <img
                 src="../../../public/bloomcraft-darkmode-removebg.png"
                 alt="Bloomcraft Logo"
                 width="60"
                 height="60"
-            /></span>
+              />
+            </span>
             <span>BloomCraft</span>
           </div>
           <p>
@@ -256,9 +261,9 @@
           <h4>Company</h4>
           <ul>
             <li v-for="link in companyLinks" :key="link.name">
-              <a :href="link.url" @click.prevent="handleFooterLink(link.url)">{{
-                link.name
-              }}</a>
+              <a :href="link.url" @click.prevent="handleFooterLink(link.url)">
+                {{ link.name }}
+              </a>
             </li>
           </ul>
         </div>
@@ -266,9 +271,9 @@
           <h4>Support</h4>
           <ul>
             <li v-for="link in supportLinks" :key="link.name">
-              <a :href="link.url" @click.prevent="handleFooterLink(link.url)">{{
-                link.name
-              }}</a>
+              <a :href="link.url" @click.prevent="handleFooterLink(link.url)">
+                {{ link.name }}
+              </a>
             </li>
           </ul>
         </div>
@@ -278,14 +283,10 @@
             <li><router-link to="/guest/register">Sign Up</router-link></li>
             <li><router-link to="/guest/login">Login</router-link></li>
             <li id="register-vendor">
-              <router-link to="/guest/vendor_register"
-                >Become a Vendor</router-link
-              >
+              <router-link to="/guest/vendor_register">Become a Vendor</router-link>
             </li>
             <li>
-              <a href="#" @click.prevent="handleFooterLink('#pricing')"
-                >Pricing</a
-              >
+              <a href="#" @click.prevent="handleFooterLink('#pricing')">Pricing</a>
             </li>
           </ul>
         </div>
@@ -309,8 +310,10 @@ gsap.registerPlugin(ScrollTrigger);
 
 const router = useRouter();
 
-// ---- Section refs (used only to anchor ScrollTriggers — no
-// structural/functional changes to the sections themselves) ----
+// Auth check placeholder (preserved and declared to prevent template warning)
+const isAuthenticated = ref(false);
+
+// Panel section refs
 const heroSection = ref(null);
 const clientsSection = ref(null);
 const featuresSection = ref(null);
@@ -393,7 +396,7 @@ const supportLinks = ref([
 // Computed
 const currentYear = computed(() => new Date().getFullYear());
 
-// Methods (unchanged — same routes, same behavior)
+// Methods (unchanged)
 const scrollToSection = (sectionId) => {
   const element = document.getElementById(sectionId);
   if (element) {
@@ -403,12 +406,9 @@ const scrollToSection = (sectionId) => {
 
 const scrollAndHighlight = (sectionId) => {
   const element = document.getElementById(sectionId);
-
   if (element) {
     element.scrollIntoView({ behavior: "smooth" });
-
     element.classList.add("highlight-vendor");
-
     setTimeout(() => {
       element.classList.remove("highlight-vendor");
     }, 2000);
@@ -430,7 +430,7 @@ const handleFooterLink = (url) => {
 
 // ==========================================================
 // PERSISTENT 3D FLOWER — scene, journey across the whole page,
-// pointer interaction. No routes/links/structure touched.
+// pointer interaction.
 // ==========================================================
 let renderer = null;
 let scene = null;
@@ -454,8 +454,8 @@ const journeyTriggers = [];
 function petalMaterial(color) {
   return new THREE.MeshStandardMaterial({
     color,
-    roughness: 0.55,
-    metalness: 0.05,
+    roughness: 0.45,
+    metalness: 0.1,
     side: THREE.DoubleSide,
   });
 }
@@ -483,6 +483,9 @@ function buildFlower() {
       petal.scale.set(0.42, length, 0.1);
       petal.position.set(0, length * 0.42, 0);
       petal.rotation.x = ringTilt;
+      
+      petal.castShadow = true;
+      petal.receiveShadow = true;
 
       pivot.add(petal);
       ringGroup.add(pivot);
@@ -494,13 +497,15 @@ function buildFlower() {
 
   const center = new THREE.Mesh(
     new THREE.SphereGeometry(0.3, 24, 24),
-    new THREE.MeshStandardMaterial({ color: 0xf2c879, roughness: 0.6 }),
+    new THREE.MeshStandardMaterial({ color: 0xf2c879, roughness: 0.5, metalness: 0.1 }),
   );
+  center.castShadow = true;
+  center.receiveShadow = true;
   group.add(center);
 
   const leafMaterial = new THREE.MeshStandardMaterial({
     color: 0x8fae82,
-    roughness: 0.6,
+    roughness: 0.5,
     side: THREE.DoubleSide,
   });
   const leafGeo = new THREE.SphereGeometry(1, 16, 16);
@@ -512,6 +517,9 @@ function buildFlower() {
     leaf.scale.set(0.3, 0.9, 0.06);
     leaf.position.set(0, -0.85, 0);
     leaf.rotation.x = -1.3;
+    
+    leaf.castShadow = true;
+    leaf.receiveShadow = true;
 
     pivot.add(leaf);
     group.add(pivot);
@@ -543,7 +551,7 @@ function radialTexture(innerColor, outerColor) {
 }
 
 function buildGroundShadow() {
-  const texture = radialTexture("rgba(30,20,18,0.35)", "rgba(30,20,18,0)");
+  const texture = radialTexture("rgba(30,20,18,0.25)", "rgba(30,20,18,0)");
   const material = new THREE.MeshBasicMaterial({
     map: texture,
     transparent: true,
@@ -556,7 +564,7 @@ function buildGroundShadow() {
 }
 
 function buildBloomGlow() {
-  const texture = radialTexture("rgba(255,225,210,0.9)", "rgba(255,225,210,0)");
+  const texture = radialTexture("rgba(255,225,210,0.8)", "rgba(255,225,210,0)");
   const material = new THREE.SpriteMaterial({
     map: texture,
     transparent: true,
@@ -602,21 +610,33 @@ function initThreeScene() {
 
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
-  camera.position.set(1.1, 0.4, 6);
+  camera.position.set(0, 0, 6);
 
   renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   renderer.setSize(width, height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.15;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-  scene.add(new THREE.AmbientLight(0xfff2ec, 0.9));
+  scene.add(new THREE.AmbientLight(0xfff2ec, 0.7));
 
-  const key = new THREE.DirectionalLight(0xffffff, 1.2);
+  const key = new THREE.DirectionalLight(0xffffff, 1.4);
   key.position.set(3, 4, 5);
+  key.castShadow = true;
+  key.shadow.mapSize.width = 1024;
+  key.shadow.mapSize.height = 1024;
+  key.shadow.camera.near = 0.5;
+  key.shadow.camera.far = 15;
+  key.shadow.camera.left = -3;
+  key.shadow.camera.right = 3;
+  key.shadow.camera.top = 3;
+  key.shadow.camera.bottom = -3;
+  key.shadow.bias = -0.0005;
   scene.add(key);
 
-  const rimLight = new THREE.PointLight(0xffd9c9, 0.9, 10);
+  const rimLight = new THREE.PointLight(0xffd9c9, 0.8, 10);
   rimLight.position.set(-3, 1, -2);
   scene.add(rimLight);
 
@@ -628,7 +648,6 @@ function initThreeScene() {
   flowerRings = built.rings;
 
   rig = new THREE.Group();
-  rig.position.set(1.1, 0, 0); // hero start: center-right
   rig.add(flowerGroup);
   scene.add(rig);
 
@@ -643,6 +662,7 @@ function animateFrame() {
   if (!renderer || !scene || !camera) return;
 
   if (flowerGroup) {
+    // Gentle floating
     flowerGroup.position.y = Math.sin(Date.now() * 0.0006) * 0.08;
 
     if (!isScrolling) {
@@ -655,6 +675,9 @@ function animateFrame() {
       flowerGroup.rotation.x = tilt.x;
       flowerGroup.rotation.z = tilt.z;
       flowerGroup.rotation.y = flowerGroup.userData.idleY;
+    } else {
+      // Gentle spin response during scroll
+      flowerGroup.rotation.y += 0.005;
     }
   }
 
@@ -671,160 +694,176 @@ function animateFrame() {
   renderer.render(scene, camera);
 }
 
-/**
- * The flower's journey down the page. Each stage nudges the rig
- * (position/rotation/scale), the camera (subtle zoom), and the
- * canvas opacity (recede during non-focal sections) using a GSAP
- * scrub tween tied to that section's own entrance window. Because
- * each tween starts from whatever the rig's current value is,
- * consecutive stages chain into one continuous, smooth path with
- * no snapping — exactly the "flower travels down the page while
- * alternating sides" behavior requested.
- */
-function stage(
-  trigger,
-  { x, y = 0, scaleAll = 1, rotY, camZ, canvasOpacity = 1 },
-) {
-  if (!trigger) return;
-  const tl = gsap.timeline({
-    scrollTrigger: {
-      trigger,
-      start: "top 78%",
-      end: "top 22%",
-      scrub: 0.7,
-    },
-  });
-  journeyTriggers.push(tl.scrollTrigger);
-
-  tl.to(rig.position, { x, y, ease: "none" }, 0);
-  tl.to(rig.scale, { x: scaleAll, y: scaleAll, z: scaleAll, ease: "none" }, 0);
-  if (rotY !== undefined) {
-    tl.to(rig.rotation, { y: rotY, ease: "none" }, 0);
-  }
-  if (camera) {
-    tl.to(camera.position, { z: camZ, ease: "none" }, 0);
-  }
-  if (flowerCanvas.value) {
-    tl.to(flowerCanvas.value, { opacity: canvasOpacity, ease: "none" }, 0);
-  }
+// Calculate the precise X coordinate for aligning with left/right column
+function getSpreadX() {
+  if (!camera) return 1.5;
+  const vw = window.innerWidth;
+  if (vw < 968) return 0; // Stack layout: center
+  const aspect = vw / window.innerHeight;
+  const halfVisibleWidth = Math.tan((camera.fov * Math.PI) / 360) * 6 * aspect;
+  return halfVisibleWidth * 0.42; // Perfect horizontal column alignment
 }
 
 function setupFlowerJourney() {
   if (!rig || !camera || prefersReducedMotion) return;
 
-  const vw = window.innerWidth;
-  const isMobile = vw < 640;
-  const isTablet = vw >= 640 && vw < 1024;
-  const spread = isMobile ? 0.9 : isTablet ? 1.4 : 1.9;
-  const spreadNear = spread * 0.68; // for stages where flower sits behind real photos
+  // Clear existing triggers to make it perfectly resize-proof
+  journeyTriggers.forEach((st) => st && st.kill());
+  journeyTriggers.length = 0;
 
-  // Hero — handled by its own dedicated timeline below (start position +
-  // text fade). Everything after hero continues the same rig from there.
+  const spread = getSpreadX();
+  const isMobile = window.innerWidth < 968;
+  const scaleBase = isMobile ? 0.7 : 1.15;
 
-  stage(clientsSection.value, {
-    x: spread,
-    y: -0.15,
-    scaleAll: 0.55,
-    rotY: Math.PI * 0.35,
-    camZ: 6.3,
-    canvasOpacity: 0.32,
+  // Setup scroll behavior to record scrolling state
+  const scrollUpdateTrigger = ScrollTrigger.create({
+    trigger: ".scroll-story-container",
+    start: "top top",
+    end: "bottom bottom",
+    onUpdate: () => {
+      isScrolling = true;
+      clearTimeout(scrollIdleTimeout);
+      scrollIdleTimeout = setTimeout(() => {
+        isScrolling = false;
+      }, 150);
+    }
   });
+  journeyTriggers.push(scrollUpdateTrigger);
 
-  stage(featuresSection.value, {
-    x: -spread,
-    y: 0.1,
-    scaleAll: 0.5,
-    rotY: Math.PI * 0.75,
-    camZ: 6.3,
-    canvasOpacity: 0.26,
-  });
+  // Set initial Hero Section position
+  gsap.set(rig.position, { x: spread, y: isMobile ? -0.2 : 0, z: 0 });
+  gsap.set(rig.scale, { x: scaleBase, y: scaleBase, z: scaleBase });
+  gsap.set(rig.rotation, { x: 0, y: Math.PI * 0.15, z: 0 });
+  if (flowerCanvas.value) {
+    gsap.set(flowerCanvas.value, { opacity: 1 });
+  }
 
-  stage(contentSection1.value, {
-    x: spreadNear,
-    y: 0,
-    scaleAll: 0.9,
-    rotY: Math.PI * 1.15,
-    camZ: 5.6,
-    canvasOpacity: 0.55,
-  });
+  // Helper for adding timeline scrolls
+  const addScrollJourney = (trigger, toX, toRotY, toScaleMul = 1.0) => {
+    if (!trigger) return;
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger,
+        start: "top 90%",
+        end: "top 20%",
+        scrub: 1.0,
+      }
+    });
 
-  stage(statsSection.value, {
-    x: -spread,
-    y: 0.05,
-    scaleAll: 1.15,
-    rotY: Math.PI * 1.6,
-    camZ: 4.9,
-    canvasOpacity: 0.9,
-  });
+    tl.to(rig.position, { x: toX, ease: "power2.inOut" }, 0);
+    tl.to(rig.rotation, { y: toRotY, ease: "power2.inOut" }, 0);
+    tl.to(rig.scale, { 
+      x: scaleBase * toScaleMul, 
+      y: scaleBase * toScaleMul, 
+      z: scaleBase * toScaleMul, 
+      ease: "power2.inOut" 
+    }, 0);
 
-  stage(contentSection2.value, {
-    x: -spreadNear,
-    y: 0,
-    scaleAll: 0.9,
-    rotY: Math.PI * 2.05,
-    camZ: 5.6,
-    canvasOpacity: 0.55,
-  });
+    journeyTriggers.push(tl.scrollTrigger);
+  };
 
-  stage(blogSection.value, {
-    x: spread,
-    y: -0.1,
-    scaleAll: 0.5,
-    rotY: Math.PI * 2.5,
-    camZ: 6.3,
-    canvasOpacity: 0.28,
-  });
+  // Journey Steps mapping: alternates left/right side columns
+  // Panel 2: Clients (Left)
+  addScrollJourney(clientsSection.value, -spread, Math.PI * 0.6, 0.9);
+  
+  // Panel 3: Content Section 1 (Right)
+  addScrollJourney(contentSection1.value, spread, Math.PI * 1.1, 1.05);
 
-  stage(ctaSection.value, {
-    x: 0,
-    y: 0,
-    scaleAll: 1.2,
-    rotY: Math.PI * 2.9,
-    camZ: 4.7,
-    canvasOpacity: 0.85,
-  });
+  // Panel 4: Features Section (Left)
+  addScrollJourney(featuresSection.value, -spread, Math.PI * 1.6, 0.95);
 
-  // Fade the flower out gently as the footer arrives
+  // Panel 5: Content Section 2 (Right)
+  addScrollJourney(contentSection2.value, spread, Math.PI * 2.1, 1.05);
+
+  // Panel 6: Stats Section (Left)
+  addScrollJourney(statsSection.value, -spread, Math.PI * 2.6, 0.9);
+
+  // Panel 7: Blog Section (Right)
+  addScrollJourney(blogSection.value, spread, Math.PI * 3.1, 1.05);
+
+  // Panel 8: CTA Section (Center / Showcased)
+  if (ctaSection.value) {
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: ctaSection.value,
+        start: "top 90%",
+        end: "top 25%",
+        scrub: 1.0,
+      }
+    });
+    tl.to(rig.position, { x: 0, y: isMobile ? 0.35 : 0.45, ease: "power2.inOut" }, 0);
+    tl.to(rig.rotation, { y: Math.PI * 3.75, ease: "power2.inOut" }, 0);
+    tl.to(rig.scale, { 
+      x: scaleBase * 1.35, 
+      y: scaleBase * 1.35, 
+      z: scaleBase * 1.35, 
+      ease: "power2.inOut" 
+    }, 0);
+    journeyTriggers.push(tl.scrollTrigger);
+  }
+
+  // Footer Section: Fades out
   if (footerSection.value && flowerCanvas.value) {
-    const footTl = gsap.timeline({
+    const tl = gsap.timeline({
       scrollTrigger: {
         trigger: footerSection.value,
-        start: "top 85%",
-        end: "top 35%",
-        scrub: 0.7,
-      },
+        start: "top 95%",
+        end: "top 45%",
+        scrub: 1.0,
+      }
     });
-    footTl.to(flowerCanvas.value, { opacity: 0, ease: "none" }, 0);
-    journeyTriggers.push(footTl.scrollTrigger);
+    tl.to(flowerCanvas.value, { opacity: 0, ease: "none" }, 0);
+    journeyTriggers.push(tl.scrollTrigger);
   }
 }
 
-function setupHeroTimeline() {
-  if (!heroSection.value || !rig || !camera || prefersReducedMotion) return;
+function setupSectionReveals() {
+  const panels = gsap.utils.toArray('.panel-section');
+  
+  panels.forEach((panel) => {
+    // Fade in + slide up header details
+    const revealElements = panel.querySelectorAll('.reveal-fade-up');
+    if (revealElements.length) {
+      gsap.fromTo(
+        revealElements,
+        { autoAlpha: 0, y: 35 },
+        {
+          autoAlpha: 1,
+          y: 0,
+          duration: 0.95,
+          ease: "power3.out",
+          stagger: 0.12,
+          scrollTrigger: {
+            trigger: panel,
+            start: "top 78%",
+            toggleActions: "play none none reverse",
+          }
+        }
+      );
+    }
 
-  const heroTextEls = heroSection.value.querySelectorAll(".hero-copy");
-
-  const tl = gsap.timeline({
-    scrollTrigger: {
-      trigger: heroSection.value,
-      start: "top top",
-      end: "+=140%",
-      scrub: 0.6,
-      onUpdate: () => {
-        isScrolling = true;
-        clearTimeout(scrollIdleTimeout);
-        scrollIdleTimeout = setTimeout(() => {
-          isScrolling = false;
-        }, 250);
-      },
-    },
+    // Stagger child cards/items
+    const cards = panel.querySelectorAll('.reveal-card');
+    if (cards.length) {
+      gsap.fromTo(
+        cards,
+        { autoAlpha: 0, y: 45, scale: 0.96 },
+        {
+          autoAlpha: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.85,
+          ease: "power2.out",
+          stagger: 0.08,
+          scrollTrigger: {
+            trigger: panel,
+            start: "top 72%",
+            toggleActions: "play none none reverse",
+          }
+        }
+      );
+    }
   });
-  journeyTriggers.push(tl.scrollTrigger);
-
-  tl.to(rig.position, { x: 1.1, y: 0, ease: "power1.inOut" }, 0)
-    .to(rig.rotation, { y: Math.PI * 0.3, ease: "none" }, 0)
-    .to(camera.position, { z: 5.4, ease: "none" }, 0)
-    .to(heroTextEls, { autoAlpha: 0, y: -26, ease: "none" }, 0.1);
 }
 
 function setupBackgroundParallax() {
@@ -851,26 +890,6 @@ function setupBackgroundParallax() {
   });
 }
 
-function setupSectionReveals() {
-  gsap.utils.toArray(".reveal").forEach((el) => {
-    gsap.fromTo(
-      el,
-      { autoAlpha: 0, y: 36 },
-      {
-        autoAlpha: 1,
-        y: 0,
-        duration: 0.9,
-        ease: "power3.out",
-        scrollTrigger: {
-          trigger: el,
-          start: "top 88%",
-          toggleActions: "play none none reverse",
-        },
-      },
-    );
-  });
-}
-
 function handleWindowScroll() {
   navScrolled.value = window.scrollY > 24;
 }
@@ -887,11 +906,15 @@ function handleResize() {
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height);
+
+  // Recalculate GSAP coordinates dynamically
+  setupFlowerJourney();
+  ScrollTrigger.refresh();
 }
 
 function initSmoothScroll() {
   lenis = new Lenis({
-    duration: 1.1,
+    duration: 1.2,
     easing: (t) => 1 - Math.pow(1 - t, 3),
   });
 
@@ -906,10 +929,9 @@ function initSmoothScroll() {
 
 onMounted(() => {
   initThreeScene();
-  setupHeroTimeline();
   setupFlowerJourney();
-  setupBackgroundParallax();
   setupSectionReveals();
+  setupBackgroundParallax();
   initSmoothScroll();
   window.addEventListener("mousemove", handlePointerMove, { passive: true });
   window.addEventListener("resize", handleResize);
@@ -942,28 +964,25 @@ onBeforeUnmount(() => {
 }
 
 .landing-page {
-  --ivory: #f8f4ef;
-  --ivory-deep: #f1eae2;
-  --ink: #1c1917;
-  --ink-soft: #6f6a64;
-  --rosewood: #a5584c;
-  --rosewood-dark: #7f4238;
-  --gold: #c9a66b;
-  --espresso: #16130f;
-  --line: rgba(28, 25, 23, 0.08);
+  --ivory: #faf8f5;
+  --ivory-deep: #f2ede7;
+  --ink: #1e1b18;
+  --ink-soft: #6e6761;
+  --rosewood: #b86558;
+  --rosewood-dark: #8e443a;
+  --gold: #d4b27a;
+  --espresso: #1b1612;
+  --line: rgba(30, 27, 24, 0.06);
 
-  /* glass variants so the fixed flower layer can show through */
-  --ivory-glass: rgba(248, 244, 239, 0.86);
-  --ivory-deep-glass: rgba(241, 234, 226, 0.86);
-  --espresso-glass: rgba(22, 19, 15, 0.86);
+  /* Glassmorphism templates */
+  --ivory-glass: rgba(250, 248, 245, 0.7);
+  --ivory-deep-glass: rgba(242, 237, 231, 0.7);
+  --espresso-glass: rgba(27, 22, 18, 0.85);
 
   position: relative;
   background: var(--ivory);
   color: var(--ink);
-  font-family:
-    "Poppins",
-    -apple-system,
-    sans-serif;
+  font-family: "Poppins", -apple-system, sans-serif;
   font-weight: 300;
   line-height: 1.7;
   overflow-x: hidden;
@@ -975,49 +994,49 @@ onBeforeUnmount(() => {
 .landing-page .stat-number {
   font-family: "Montserrat", sans-serif;
   font-weight: 800;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 .eyebrow {
   display: inline-block;
   font-family: "Poppins", sans-serif;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--rosewood);
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
-/* Ambient background: blurred glows + grain, sits behind everything */
+/* Ambient dynamic background */
 .bg-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(70px);
+  filter: blur(80px);
   pointer-events: none;
   z-index: 0;
 }
 
 .blob-rose {
-  top: -10%;
-  right: -8%;
-  width: 46vw;
-  height: 46vw;
+  top: -8%;
+  right: -5%;
+  width: 48vw;
+  height: 48vw;
   background: radial-gradient(
     circle,
-    rgba(197, 130, 118, 0.28),
+    rgba(184, 101, 88, 0.22),
     transparent 70%
   );
 }
 
 .blob-sage {
-  top: 55%;
-  left: -12%;
-  width: 38vw;
-  height: 38vw;
+  top: 50%;
+  left: -10%;
+  width: 42vw;
+  height: 42vw;
   background: radial-gradient(
     circle,
-    rgba(143, 174, 130, 0.18),
+    rgba(156, 181, 145, 0.16),
     transparent 70%
   );
 }
@@ -1027,15 +1046,13 @@ onBeforeUnmount(() => {
   inset: 0;
   z-index: 2000;
   pointer-events: none;
-  opacity: 0.05;
+  opacity: 0.04;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* ============================================================
-   PERSISTENT FLOWER LAYER — fixed full-viewport, travels the
-   whole page. Sits above section backgrounds, below section
-   copy (which gets z-index below) and below the nav.
+   PERSISTENT FLOWER CANVAS LAYER
 ============================================================= */
 .flower-stage-fixed {
   position: fixed;
@@ -1057,43 +1074,43 @@ onBeforeUnmount(() => {
   top: 0;
   left: 0;
   right: 0;
-  background: rgba(248, 244, 239, 0.7);
-  backdrop-filter: blur(14px);
-  padding: 1.5rem 5%;
+  background: rgba(250, 248, 245, 0.7);
+  backdrop-filter: blur(16px);
+  padding: 1.6rem 6%;
   display: flex;
   justify-content: space-between;
   align-items: center;
   z-index: 1000;
   border-bottom: 1px solid transparent;
   transition:
-    padding 0.4s ease,
-    background 0.4s ease,
-    border-color 0.4s ease,
-    box-shadow 0.4s ease;
+    padding 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    border-bottom-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .navbar--scrolled {
-  padding: 0.85rem 5%;
-  background: rgba(248, 244, 239, 0.92);
+  padding: 0.95rem 6%;
+  background: rgba(250, 248, 245, 0.9);
   border-bottom-color: var(--line);
-  box-shadow: 0 8px 30px rgba(28, 25, 23, 0.06);
+  box-shadow: 0 8px 30px rgba(30, 27, 24, 0.04);
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-family: "Montserrat", sans-serif;
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 700;
   color: var(--ink);
   text-decoration: none;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 .nav-links {
   display: flex;
-  gap: 40px;
+  gap: 44px;
   align-items: center;
 }
 
@@ -1101,7 +1118,7 @@ onBeforeUnmount(() => {
   position: relative;
   color: var(--ink);
   text-decoration: none;
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 500;
   padding-bottom: 4px;
   transition: color 0.3s;
@@ -1113,9 +1130,9 @@ onBeforeUnmount(() => {
   left: 0;
   bottom: 0;
   width: 0;
-  height: 1px;
+  height: 1.5px;
   background: var(--rosewood);
-  transition: width 0.35s ease;
+  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .nav-links a:hover {
@@ -1128,20 +1145,20 @@ onBeforeUnmount(() => {
 
 .nav-buttons {
   display: flex;
-  gap: 14px;
+  gap: 16px;
 }
 
 .btn-login {
-  padding: 11px 26px;
+  padding: 10px 28px;
   background: transparent;
   color: var(--ink);
   border: 1px solid var(--line);
   border-radius: 999px;
   font-family: "Poppins", sans-serif;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   text-decoration: none;
   display: inline-block;
 }
@@ -1152,130 +1169,458 @@ onBeforeUnmount(() => {
 }
 
 .btn-register {
-  padding: 11px 26px;
+  padding: 10px 28px;
   background: var(--ink);
   color: var(--ivory);
   border: none;
   border-radius: 999px;
   font-family: "Poppins", sans-serif;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   text-decoration: none;
   display: inline-block;
 }
 
 .btn-register:hover {
-  background: var(--rosewood-dark);
+  background: var(--rosewood);
   transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(127, 66, 56, 0.28);
+  box-shadow: 0 10px 24px rgba(184, 101, 88, 0.25);
 }
 
-/* Hero Section */
-.hero {
+/* ============================================================
+   PANELS SCROLL STORY LAYOUT
+============================================================= */
+.scroll-story-container {
   position: relative;
-  margin-top: 0;
-  padding: 190px 5% 100px;
+  z-index: 10;
+  width: 100%;
+}
+
+.panel-section {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 120px 6%;
+  overflow: hidden;
+  background: transparent;
+}
+
+.panel-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+  z-index: 15;
+}
+
+.panel-content {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0;
-  min-height: 100vh;
-  overflow: hidden;
-  text-align: center;
-  z-index: 1;
+  justify-content: center;
 }
 
-.hero-glow {
-  position: absolute;
-  inset: -10%;
-  background:
-    radial-gradient(
-      55% 50% at 50% 40%,
-      rgba(197, 130, 118, 0.22) 0%,
-      rgba(197, 130, 118, 0) 70%
-    ),
-    radial-gradient(
-      40% 40% at 12% 85%,
-      rgba(143, 174, 130, 0.14) 0%,
-      rgba(143, 174, 130, 0) 70%
-    );
+.text-left-side {
+  grid-column: 1;
+}
+
+.text-right-side {
+  grid-column: 2;
+}
+
+.spacer-left {
+  grid-column: 1;
+}
+
+.spacer-right {
+  grid-column: 2;
+}
+
+.panel-visual {
+  height: 100%;
+  min-height: 380px;
   pointer-events: none;
-  z-index: 0;
 }
 
-.hero-copy {
-  position: relative;
-  z-index: 20;
-  max-width: 640px;
+/* Hero Panel */
+.hero-panel {
+  padding-top: 180px;
 }
 
-.hero-copy--top h1 {
-  font-size: clamp(40px, 6vw, 76px);
-  line-height: 1.05;
-  margin-bottom: 0;
+.hero-title {
+  font-size: clamp(44px, 5.8vw, 78px);
+  line-height: 1.08;
+  margin-bottom: 24px;
+  color: var(--ink);
 }
 
-.hero-copy--top h1 .highlight {
+.hero-title .highlight {
   color: var(--rosewood);
+  background: linear-gradient(120deg, var(--rosewood) 30%, var(--gold) 90%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.hero-copy--bottom {
-  margin-top: 8px;
-}
-
-.hero-copy--bottom p {
-  font-size: 17px;
+.hero-desc {
+  font-size: 18px;
   color: var(--ink-soft);
-  margin-bottom: 28px;
-  max-width: 460px;
-  margin-left: auto;
-  margin-right: auto;
+  margin-bottom: 36px;
+  max-width: 520px;
+  line-height: 1.8;
 }
 
 .btn-hero {
-  padding: 15px 40px;
-  font-size: 14px;
+  padding: 16px 44px;
+  font-size: 15px;
 }
 
 .scroll-cue {
   display: block;
-  margin-top: 40px;
-  font-size: 11px;
-  font-weight: 500;
+  margin-top: 48px;
+  font-size: 11.5px;
+  font-weight: 600;
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--ink-soft);
-  opacity: 0.7;
+  opacity: 0.65;
+  animation: pulseCue 2s infinite ease-in-out;
 }
 
-/* Spacer that preserves hero rhythm — the flower itself now
-   renders in the fixed layer, not inside this box. */
-.hero-stage {
-  position: relative;
-  z-index: 1;
-  width: min(100%, 900px);
-  height: min(58vh, 560px);
-  margin: -10px 0;
+@keyframes pulseCue {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translateY(6px);
+    opacity: 0.8;
+  }
 }
 
-.flower-podium {
-  position: absolute;
-  left: 50%;
-  bottom: 4%;
-  width: 60%;
-  height: 60px;
-  transform: translateX(-50%);
-  background: radial-gradient(
-    50% 100% at 50% 50%,
-    rgba(233, 209, 200, 0.6) 0%,
-    rgba(233, 209, 200, 0) 75%
-  );
-  filter: blur(2px);
-  z-index: 1;
+/* Clients Panel */
+.clients-panel h2 {
+  font-size: clamp(28px, 3.2vw, 38px);
+  margin-bottom: 12px;
 }
 
+.clients-panel p {
+  color: var(--ink-soft);
+  margin-bottom: 40px;
+  font-size: 16px;
+}
+
+.clients-grid {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.client-logo {
+  padding: 14px 24px;
+  background: rgba(250, 248, 245, 0.5);
+  border-radius: 12px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--line);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(6px);
+}
+
+.client-logo:hover {
+  background: rgba(250, 248, 245, 0.85);
+  border-color: var(--rosewood);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.03);
+}
+
+/* Content Panels */
+.content-panel h2 {
+  font-size: clamp(30px, 3.5vw, 40px);
+  margin-bottom: 24px;
+  line-height: 1.2;
+}
+
+.content-panel p {
+  color: var(--ink-soft);
+  font-size: 16.5px;
+  line-height: 1.85;
+  margin-bottom: 28px;
+  max-width: 500px;
+}
+
+.btn-learn-more {
+  padding: 14px 38px;
+  background: var(--ink);
+  color: var(--ivory);
+  border: none;
+  border-radius: 999px;
+  font-family: "Poppins", sans-serif;
+  font-size: 14.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-learn-more:hover {
+  background: var(--rosewood);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(184, 101, 88, 0.25);
+}
+
+/* Features Panel */
+.features-panel h2 {
+  font-size: clamp(30px, 3.5vw, 40px);
+  margin-bottom: 14px;
+}
+
+.features-header-desc {
+  color: var(--ink-soft);
+  font-size: 16.5px;
+  margin-bottom: 48px;
+}
+
+.features-stacked-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+.feature-card-item {
+  display: flex;
+  gap: 24px;
+  padding: 28px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: rgba(250, 248, 245, 0.5);
+  backdrop-filter: blur(8px);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.feature-card-item:hover {
+  border-color: rgba(184, 101, 88, 0.25);
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.04);
+  background: rgba(250, 248, 245, 0.8);
+}
+
+.feature-icon {
+  width: 58px;
+  height: 58px;
+  background: var(--ivory-deep);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.feature-info {
+  text-align: left;
+}
+
+.feature-info h3 {
+  font-size: 18.5px;
+  margin-bottom: 8px;
+}
+
+.feature-info p {
+  color: var(--ink-soft);
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+
+/* Stats Panel */
+.stats-stacked-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 28px;
+}
+
+.stat-card-item {
+  background: rgba(250, 248, 245, 0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 34px 28px;
+  text-align: center;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stat-card-item:hover {
+  transform: translateY(-4px);
+  border-color: rgba(184, 101, 88, 0.25);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.04);
+  background: rgba(250, 248, 245, 0.8);
+}
+
+.stat-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.stat-number {
+  font-size: 36px;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.stat-label {
+  color: var(--ink-soft);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+.highlight-vendor {
+  animation: vendorGlow 2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes vendorGlow {
+  0% {
+    background-color: rgba(212, 178, 122, 0.25);
+    border-color: var(--gold);
+  }
+  100% {
+    background-color: rgba(250, 248, 245, 0.5);
+    border-color: var(--line);
+  }
+}
+
+/* Blog Panel */
+.blog-panel h2 {
+  font-size: clamp(30px, 3.5vw, 40px);
+  margin-bottom: 14px;
+}
+
+.blog-header-desc {
+  color: var(--ink-soft);
+  font-size: 16.5px;
+  margin-bottom: 48px;
+}
+
+.blog-stacked-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.blog-card-item {
+  background: rgba(250, 248, 245, 0.5);
+  backdrop-filter: blur(8px);
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  display: flex;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.blog-card-item:hover {
+  transform: translateY(-4px);
+  border-color: rgba(184, 101, 88, 0.25);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.04);
+  background: rgba(250, 248, 245, 0.8);
+}
+
+.blog-image {
+  width: 180px;
+  background: var(--ivory-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #b7afa6;
+  font-size: 12px;
+  text-align: center;
+  padding: 20px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--line);
+}
+
+.blog-content {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.blog-content h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  line-height: 1.35;
+}
+
+.blog-link {
+  color: var(--rosewood);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: gap 0.3s;
+}
+
+.blog-link:hover {
+  gap: 10px;
+}
+
+/* CTA Panel */
+.cta-panel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 160px 6%;
+}
+
+.cta-container {
+  display: flex;
+  justify-content: center;
+}
+
+.cta-content {
+  max-width: 680px;
+}
+
+.cta-panel h2 {
+  font-size: clamp(34px, 4.6vw, 54px);
+  margin-bottom: 40px;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.btn-cta {
+  padding: 18px 56px;
+  background: var(--ink);
+  color: var(--ivory);
+  border: none;
+  border-radius: 999px;
+  font-family: "Poppins", sans-serif;
+  font-size: 15.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-block;
+  text-decoration: none;
+}
+
+.btn-cta:hover {
+  background: var(--rosewood);
+  transform: translateY(-3px);
+  box-shadow: 0 20px 40px rgba(184, 101, 88, 0.3);
+}
+
+/* Petal drifts (fixed layer decorative) */
 .drift-petal {
   position: absolute;
   width: 14px;
@@ -1349,457 +1694,13 @@ onBeforeUnmount(() => {
   }
 }
 
-.reveal-hero {
-  animation: heroIntro 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.hero-copy--bottom.reveal-hero {
-  animation-delay: 0.15s;
-}
-
-@keyframes heroIntro {
-  from {
-    opacity: 0;
-    transform: translateY(26px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* Clients Section */
-.clients {
-  position: relative;
-  z-index: 10;
-  padding: 90px 5%;
-  text-align: center;
-  background: var(--ivory-deep-glass);
-  backdrop-filter: blur(10px) saturate(120%);
-}
-
-.clients h2 {
-  font-size: 30px;
-  margin-bottom: 12px;
-}
-
-.clients p {
-  color: var(--ink-soft);
-  margin-bottom: 52px;
-  font-size: 15px;
-}
-
-.clients-grid {
-  display: flex;
-  justify-content: center;
-  gap: 48px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.client-logo {
-  width: 120px;
-  height: 60px;
-  background: var(--ivory);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #c3bcb3;
-  font-size: 12px;
-  border: 1px solid var(--line);
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
-}
-
-.client-logo:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 24px rgba(28, 25, 23, 0.06);
-}
-
-/* Features Section */
-.features {
-  position: relative;
-  z-index: 10;
-  padding: 140px 5%;
-  background: var(--ivory-glass);
-  backdrop-filter: blur(10px) saturate(120%);
-}
-
-.features-header {
-  text-align: center;
-  max-width: 640px;
-  margin: 0 auto 80px;
-}
-
-.features-header h2 {
-  font-size: clamp(30px, 3.6vw, 42px);
-  margin-bottom: 14px;
-}
-
-.features-header p {
-  color: var(--ink-soft);
-  font-size: 16px;
-}
-
-.features-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 32px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.feature-card {
-  text-align: left;
-  padding: 44px 32px;
-  border-radius: 20px;
-  border: 1px solid var(--line);
-  background: var(--ivory-glass);
-  backdrop-filter: blur(6px);
-  transition:
-    transform 0.4s ease,
-    box-shadow 0.4s ease,
-    border-color 0.4s ease;
-}
-
-.feature-card:nth-child(2) {
-  transform: translateY(-18px);
-}
-
-.feature-card:hover {
-  transform: translateY(-8px);
-  border-color: rgba(165, 88, 76, 0.25);
-  box-shadow: 0 24px 48px rgba(28, 25, 23, 0.08);
-}
-
-.feature-card:nth-child(2):hover {
-  transform: translateY(-26px);
-}
-
-.feature-icon {
-  width: 64px;
-  height: 64px;
-  background: var(--ivory-deep);
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 24px;
-  font-size: 28px;
-}
-
-.feature-card h3 {
-  font-size: 19px;
-  font-weight: 700;
-  margin-bottom: 12px;
-}
-
-.feature-card p {
-  color: var(--ink-soft);
-  font-size: 14.5px;
-  line-height: 1.7;
-}
-
-/* Content Section */
-.content-section {
-  position: relative;
-  z-index: 10;
-  padding: 140px 5%;
-  display: grid;
-  grid-template-columns: 0.9fr 1.1fr;
-  gap: 100px;
-  align-items: center;
-  background: transparent;
-}
-
-.content-section--reverse {
-  grid-template-columns: 1.1fr 0.9fr;
-}
-
-.content-section--reverse .content-image {
-  order: 2;
-}
-
-.content-section:nth-child(even) {
-  background: var(--ivory-deep-glass);
-  backdrop-filter: blur(10px) saturate(120%);
-}
-
-.content-image {
-  height: 440px;
-  background: var(--line);
-  border-radius: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 12px;
-  color: #b7afa6;
-  overflow: hidden;
-}
-
-/* The flower now occupies the visual weight beside the text, so
-   the original photo becomes a soft, translucent accent that the
-   flower's glow can bleed around — element is preserved, not
-   removed, just re-tuned for the new composition. */
-.content-image--ghost {
-  background: transparent;
-  box-shadow: 0 30px 60px rgba(28, 25, 23, 0.1);
-}
-
-.content-image--ghost img {
-  opacity: 0.82;
-  border-radius: 20px;
-}
-
-.content-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.6s ease;
-}
-
-.content-image:hover img {
-  transform: scale(1.04);
-}
-
-.content-text h2 {
-  font-size: clamp(28px, 3.2vw, 38px);
-  margin-bottom: 22px;
-}
-
-.content-text p {
-  color: var(--ink-soft);
-  font-size: 16px;
-  line-height: 1.85;
-  margin-bottom: 24px;
-  max-width: 460px;
-}
-
-.btn-learn-more {
-  padding: 14px 34px;
-  background: var(--ink);
-  color: var(--ivory);
-  border: none;
-  border-radius: 999px;
-  font-family: "Poppins", sans-serif;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-learn-more:hover {
-  background: var(--rosewood-dark);
-  transform: translateY(-2px);
-  box-shadow: 0 14px 28px rgba(127, 66, 56, 0.24);
-}
-
-/* Stats Section */
-.stats {
-  position: relative;
-  z-index: 10;
-  padding: 100px 5%;
-  background: var(--espresso-glass);
-  backdrop-filter: blur(10px);
-  color: var(--ivory);
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 40px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.stat-item {
-  text-align: center;
-  position: relative;
-}
-
-.stat-item:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  right: -20px;
-  top: 10%;
-  height: 80%;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.stat-icon {
-  font-size: 30px;
-  margin-bottom: 14px;
-  opacity: 0.9;
-}
-
-.stat-number {
-  font-size: 34px;
-  color: var(--ivory);
-  margin-bottom: 6px;
-}
-
-.stat-label {
-  color: rgba(248, 244, 239, 0.6);
-  font-size: 13px;
-  letter-spacing: 0.04em;
-}
-
-.highlight-vendor {
-  animation: vendorGlow 2s ease-in-out;
-}
-
-@keyframes vendorGlow {
-  0% {
-    background-color: rgba(201, 166, 107, 0.25);
-  }
-  100% {
-    background-color: transparent;
-  }
-}
-
-/* Blog Section */
-.blog {
-  position: relative;
-  z-index: 10;
-  padding: 140px 5%;
-  background: var(--ivory-glass);
-  backdrop-filter: blur(10px) saturate(120%);
-}
-
-.blog-header {
-  text-align: center;
-  max-width: 560px;
-  margin: 0 auto 64px;
-}
-
-.blog-header h2 {
-  font-size: clamp(30px, 3.6vw, 40px);
-  margin-bottom: 12px;
-}
-
-.blog-header p {
-  color: var(--ink-soft);
-  font-size: 16px;
-}
-
-.blog-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 32px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.blog-card {
-  background: var(--ivory-glass);
-  backdrop-filter: blur(6px);
-  border-radius: 18px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  transition:
-    transform 0.4s ease,
-    box-shadow 0.4s ease,
-    border-color 0.4s ease;
-}
-
-.blog-card:hover {
-  transform: translateY(-6px);
-  border-color: rgba(165, 88, 76, 0.25);
-  box-shadow: 0 24px 48px rgba(28, 25, 23, 0.08);
-}
-
-.blog-image {
-  width: 100%;
-  height: 200px;
-  background: var(--ivory-deep);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #b7afa6;
-  font-size: 13px;
-}
-
-.blog-content {
-  padding: 28px;
-}
-
-.blog-content h3 {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 14px;
-}
-
-.blog-link {
-  color: var(--rosewood);
-  font-size: 13.5px;
-  font-weight: 500;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  transition: gap 0.3s;
-}
-
-.blog-link:hover {
-  gap: 8px;
-}
-
-.cta {
-  position: relative;
-  z-index: 10;
-  padding: 140px 5%;
-  text-align: center;
-  background:
-    radial-gradient(
-      70% 120% at 50% 0%,
-      rgba(197, 130, 118, 0.16) 0%,
-      rgba(197, 130, 118, 0) 60%
-    ),
-    var(--ivory-deep-glass);
-  backdrop-filter: blur(10px) saturate(120%);
-  overflow: hidden;
-}
-
-.cta h2 {
-  font-size: clamp(30px, 4.4vw, 46px);
-  margin-bottom: 36px;
-  max-width: 640px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.btn-cta {
-  padding: 18px 52px;
-  background: var(--ink);
-  color: var(--ivory);
-  border: none;
-  border-radius: 999px;
-  font-family: "Poppins", sans-serif;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: inline-block;
-  text-decoration: none;
-}
-
-.btn-cta:hover {
-  background: var(--rosewood-dark);
-  transform: translateY(-3px);
-  box-shadow: 0 20px 40px rgba(127, 66, 56, 0.28);
-}
-
 /* Footer */
 .footer {
   position: relative;
-  z-index: 10;
+  z-index: 15;
   background: var(--espresso);
   color: var(--ivory);
-  padding: 80px 5% 32px;
+  padding: 90px 6% 36px;
 }
 
 .footer-content {
@@ -1807,35 +1708,35 @@ onBeforeUnmount(() => {
   grid-template-columns: 2fr 1fr 1fr 1fr;
   gap: 60px;
   max-width: 1200px;
-  margin: 0 auto 48px;
+  margin: 0 auto 54px;
 }
 
 .footer-brand {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 
 .footer-brand .logo {
   color: var(--ivory);
-  font-size: 22px;
+  font-size: 23px;
 }
 
 .footer-brand p {
-  color: rgba(248, 244, 239, 0.55);
-  font-size: 14px;
-  line-height: 1.7;
+  color: rgba(250, 248, 245, 0.55);
+  font-size: 14.5px;
+  line-height: 1.75;
   max-width: 320px;
 }
 
 .footer-section h4 {
   font-family: "Poppins", sans-serif;
-  font-size: 13px;
+  font-size: 13.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
   font-weight: 600;
-  color: rgba(248, 244, 239, 0.9);
+  color: rgba(250, 248, 245, 0.9);
 }
 
 .footer-section ul {
@@ -1847,9 +1748,9 @@ onBeforeUnmount(() => {
 }
 
 .footer-section ul li a {
-  color: rgba(248, 244, 239, 0.6);
+  color: rgba(250, 248, 245, 0.6);
   text-decoration: none;
-  font-size: 14px;
+  font-size: 14.5px;
   transition: color 0.3s;
 }
 
@@ -1859,22 +1760,22 @@ onBeforeUnmount(() => {
 
 .footer-bottom {
   text-align: center;
-  padding-top: 32px;
-  border-top: 1px solid rgba(248, 244, 239, 0.1);
-  color: rgba(248, 244, 239, 0.45);
-  font-size: 13px;
+  padding-top: 36px;
+  border-top: 1px solid rgba(250, 248, 245, 0.1);
+  color: rgba(250, 248, 245, 0.45);
+  font-size: 13.5px;
 }
 
 .social-links {
   display: flex;
-  gap: 14px;
-  margin-top: 6px;
+  gap: 16px;
+  margin-top: 8px;
 }
 
 .social-link {
-  width: 36px;
-  height: 36px;
-  background: rgba(248, 244, 239, 0.08);
+  width: 38px;
+  height: 38px;
+  background: rgba(250, 248, 245, 0.08);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1889,55 +1790,94 @@ onBeforeUnmount(() => {
   transform: translateY(-3px);
 }
 
-/* Responsive */
+/* ============================================================
+   RESPONSIVE DESIGN STYLES
+============================================================= */
 @media (max-width: 968px) {
+  .navbar {
+    padding: 1.2rem 5%;
+  }
+
+  .navbar--scrolled {
+    padding: 0.85rem 5%;
+  }
+
   .nav-links {
     display: none;
   }
 
-  .hero {
-    padding: 140px 5% 60px;
+  .panel-section {
+    padding: 100px 5%;
   }
 
-  .hero-copy--top h1 {
-    font-size: 34px;
-  }
-
-  .hero-stage {
-    height: 46vh;
-  }
-
-  .features-grid {
+  .panel-container {
     grid-template-columns: 1fr;
-  }
-
-  .feature-card:nth-child(2),
-  .feature-card:nth-child(2):hover {
-    transform: none;
-  }
-
-  .content-section,
-  .content-section--reverse {
-    grid-template-columns: 1fr !important;
     gap: 40px;
-    padding: 90px 5%;
   }
 
-  .content-section--reverse .content-image {
-    order: 1;
+  .panel-content {
+    max-width: 100%;
+    text-align: center;
+    padding: 44px 32px;
+    background: rgba(250, 248, 245, 0.88);
+    border-radius: 28px;
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--line);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.015);
   }
 
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-    row-gap: 40px;
+  .hero-panel {
+    padding-top: 140px;
   }
 
-  .stat-item:nth-child(2)::after {
+  .hero-title {
+    font-size: 38px;
+  }
+
+  .hero-desc {
+    max-width: 100%;
+  }
+
+  .panel-visual {
     display: none;
   }
 
-  .blog-grid {
-    grid-template-columns: 1fr;
+  .clients-grid {
+    justify-content: center;
+  }
+
+  .features-stacked-grid,
+  .blog-stacked-grid {
+    gap: 20px;
+  }
+
+  .feature-card-item,
+  .blog-card-item {
+    background: rgba(250, 248, 245, 0.4);
+    padding: 20px;
+  }
+
+  .blog-card-item {
+    flex-direction: column;
+  }
+
+  .blog-image {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    padding: 15px;
+  }
+
+  .blog-content {
+    padding: 20px;
+  }
+
+  .stats-stacked-grid {
+    gap: 20px;
+  }
+
+  .stat-card-item {
+    padding: 24px 18px;
   }
 
   .footer-content {
@@ -1952,37 +1892,42 @@ onBeforeUnmount(() => {
   }
 
   .navbar--scrolled {
-    padding: 0.7rem 4%;
+    padding: 0.75rem 4%;
   }
 
-  .hero {
-    padding: 120px 4% 50px;
+  .panel-section {
+    padding: 80px 4%;
   }
 
-  .hero-copy--top h1 {
-    font-size: 26px;
+  .panel-content {
+    padding: 32px 22px;
   }
 
-  .hero-copy--bottom p {
+  .hero-title {
+    font-size: 32px;
+  }
+
+  .hero-desc {
     font-size: 16px;
   }
 
-  .hero-stage {
-    height: 38vh;
+  .btn-hero {
+    padding: 14px 34px;
+    width: 100%;
+  }
+
+  .stats-stacked-grid {
+    grid-template-columns: 1fr;
   }
 
   .nav-buttons {
-    gap: 8px;
+    gap: 10px;
   }
 
   .btn-login,
   .btn-register {
-    padding: 8px 16px;
+    padding: 8px 18px;
     font-size: 13px;
-  }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
   }
 }
 </style>
