@@ -1136,32 +1136,43 @@ onBeforeUnmount(() => {
   display: block;
 }
 
-/* Navigation */
+/* Navigation — floating pill */
 .navbar {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  background: rgba(250, 248, 245, 0.7);
-  backdrop-filter: blur(16px);
-  padding: 1.6rem 6%;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 48px);
+  max-width: 1240px;
+  background: rgba(250, 248, 245, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 1rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   z-index: 1000;
-  border-bottom: 1px solid transparent;
+  border-radius: 999px;
+  border: 1px solid rgba(30, 27, 24, 0.08);
+  box-shadow:
+    0 4px 24px rgba(30, 27, 24, 0.06),
+    0 1px 4px rgba(30, 27, 24, 0.04);
   transition:
     padding 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    border-bottom-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    top 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .navbar--scrolled {
-  padding: 0.95rem 6%;
-  background: rgba(250, 248, 245, 0.9);
-  border-bottom-color: var(--line);
-  box-shadow: 0 8px 30px rgba(30, 27, 24, 0.04);
+  top: 12px;
+  padding: 0.72rem 2rem;
+  background: rgba(250, 248, 245, 0.92);
+  border-color: rgba(30, 27, 24, 0.12);
+  box-shadow:
+    0 8px 40px rgba(30, 27, 24, 0.1),
+    0 2px 8px rgba(30, 27, 24, 0.06);
 }
 
 .logo {
@@ -1881,11 +1892,14 @@ onBeforeUnmount(() => {
 ============================================================= */
 @media (max-width: 968px) {
   .navbar {
-    padding: 1.2rem 5%;
+    top: 14px;
+    width: calc(100% - 32px);
+    padding: 0.85rem 1.4rem;
   }
 
   .navbar--scrolled {
-    padding: 0.85rem 5%;
+    top: 8px;
+    padding: 0.65rem 1.4rem;
   }
 
   .nav-links {
@@ -1974,11 +1988,15 @@ onBeforeUnmount(() => {
 
 @media (max-width: 640px) {
   .navbar {
-    padding: 1rem 4%;
+    top: 10px;
+    width: calc(100% - 24px);
+    padding: 0.7rem 1.1rem;
+    border-radius: 20px;
   }
 
   .navbar--scrolled {
-    padding: 0.75rem 4%;
+    top: 6px;
+    padding: 0.55rem 1.1rem;
   }
 
   .panel-section {
