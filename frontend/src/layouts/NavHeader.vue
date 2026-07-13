@@ -625,10 +625,10 @@ onUnmounted(() => {
   transform: translateX(-50%);
   width: 100%;
   max-width: 9999px;           /* unrestricted at top */
-  background: rgba(255, 255, 255, 0.85);
+  background: #ffffff;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  padding: 1rem 5%;
+  padding: 1.6rem 6%;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -654,7 +654,7 @@ onUnmounted(() => {
   max-width: 1240px;
   padding: 0.72rem 2rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.95);
+  background: #ffffff;
   border-color: rgba(0, 0, 0, 0.08);
   box-shadow:
     0 8px 40px rgba(0, 0, 0, 0.1),
@@ -664,42 +664,66 @@ onUnmounted(() => {
 .logo {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 24px;
-  font-weight: 600;
+  gap: 12px;
+  font-family: "Montserrat", sans-serif;
+  font-size: 23px;
+  font-weight: 700;
   color: #2d3748;
   text-decoration: none;
+  letter-spacing: -0.02em;
 }
 
 .nav-links {
   display: flex;
-  gap: 24px;
+  gap: 44px;
   align-items: center;
 }
 
 .nav-links a {
+  position: relative;
   color: #4a5568;
   text-decoration: none;
-  font-size: 15px;
+  font-size: 14.5px;
+  font-weight: 500;
+  padding-bottom: 4px;
   transition: color 0.3s;
   cursor: pointer;
   white-space: nowrap;
 }
 
-.nav-links a:hover,
+.nav-links a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 1.5px;
+  background: #48bb78;
+  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-links a:hover {
+  color: #48bb78;
+}
+
 .nav-links a.router-link-active {
-  color: #2d3748;
-  font-weight: 500;
+  color: #48bb78;
+  font-weight: 600;
+}
+
+.nav-links a:hover::after,
+.nav-links a.router-link-active::after {
+  width: 100%;
 }
 
 .nav-buttons {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   align-items: center;
 }
 
 .btn-login {
-  padding: 10px 24px;
+  padding: 10px 28px;
   background: transparent;
   color: #2d3748;
   border: 1px solid #e2e8f0;
@@ -721,7 +745,7 @@ onUnmounted(() => {
 .btn-register,
 .btn-cart,
 .btn-chat {
-  padding: 10px 24px;
+  padding: 10px 28px;
   background: #2d3748;
   color: white;
   border: none;

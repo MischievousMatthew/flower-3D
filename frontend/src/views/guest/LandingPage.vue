@@ -802,8 +802,8 @@ function setupFlowerJourney() {
     journeyTriggers.push(tl.scrollTrigger);
   }
 
-  // Footer Section: Fades out
-  if (footerSection.value && flowerCanvas.value) {
+  // Footer Section: Fades out flower canvas and transitions background to dark theme
+  if (footerSection.value) {
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger: footerSection.value,
@@ -812,7 +812,12 @@ function setupFlowerJourney() {
         scrub: 1.0,
       }
     });
-    tl.to(flowerCanvas.value, { opacity: 0, ease: "none" }, 0);
+    if (flowerCanvas.value) {
+      tl.to(flowerCanvas.value, { opacity: 0, ease: "none" }, 0);
+    }
+    tl.to(".landing-page", { backgroundColor: "#1b1612", ease: "none" }, 0);
+    tl.to(".cta-panel h2", { color: "#faf8f5", ease: "none" }, 0);
+    tl.to(".btn-cta", { backgroundColor: "#faf8f5", color: "#1b1612", ease: "none" }, 0);
     journeyTriggers.push(tl.scrollTrigger);
   }
 }
@@ -1145,7 +1150,7 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
   width: 100%;
   max-width: 9999px;          /* effectively unrestricted at top */
-  background: rgba(250, 248, 245, 0.7);
+  background: #ffffff;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   padding: 1.6rem 6%;
@@ -1174,7 +1179,7 @@ onBeforeUnmount(() => {
   max-width: 1240px;
   padding: 0.72rem 2rem;
   border-radius: 999px;
-  background: rgba(250, 248, 245, 0.92);
+  background: #ffffff;
   border-color: rgba(30, 27, 24, 0.12);
   box-shadow:
     0 8px 40px rgba(30, 27, 24, 0.1),

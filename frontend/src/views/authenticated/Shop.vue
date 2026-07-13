@@ -1708,7 +1708,7 @@ onUnmounted(() => {
 
 /* Hero */
 .hero {
-  margin-top: 80px;
+  margin-top: 96px;
   padding: 60px 5%;
   display: grid;
   grid-template-columns: 1fr 1fr;
