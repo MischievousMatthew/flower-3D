@@ -802,7 +802,7 @@ function setupFlowerJourney() {
     journeyTriggers.push(tl.scrollTrigger);
   }
 
-  // Footer Section: Fades out flower canvas and transitions background to dark theme
+  // Footer Section: Fades out flower canvas and transitions background & navbar to dark theme
   if (footerSection.value) {
     const tl = gsap.timeline({
       scrollTrigger: {
@@ -818,6 +818,11 @@ function setupFlowerJourney() {
     tl.to(".landing-page", { backgroundColor: "#1b1612", ease: "none" }, 0);
     tl.to(".cta-panel h2", { color: "#faf8f5", ease: "none" }, 0);
     tl.to(".btn-cta", { backgroundColor: "#faf8f5", color: "#1b1612", ease: "none" }, 0);
+    // Navbar Transitions
+    tl.to(".navbar", { backgroundColor: "#1b1612", borderColor: "rgba(250, 248, 245, 0.15)", ease: "none" }, 0);
+    tl.to(".navbar .logo, .navbar .nav-links a", { color: "#faf8f5", ease: "none" }, 0);
+    tl.to(".navbar .btn-login", { color: "#faf8f5", borderColor: "rgba(250, 248, 245, 0.35)", ease: "none" }, 0);
+    tl.to(".navbar .btn-register", { backgroundColor: "#faf8f5", color: "#1b1612", ease: "none" }, 0);
     journeyTriggers.push(tl.scrollTrigger);
   }
 }
