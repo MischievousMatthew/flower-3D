@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\VendorApplicationController;
 use App\Http\Controllers\Admin\LoginAuditLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VendorController;
+use App\Http\Controllers\VendorApplicationResubmissionController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CartController;
@@ -68,6 +69,8 @@ Route::post('/auth/employee-login', [EmployeeAuthController::class, 'login']);
 
 Route::post('/vendor/register', [VendorController::class, 'register']);
 Route::get('/vendor/status',    [VendorController::class, 'checkStatus']);
+Route::get('/vendor/resubmission/{token}', [VendorApplicationResubmissionController::class, 'showForVendor']);
+Route::post('/vendor/resubmission/{token}', [VendorApplicationResubmissionController::class, 'submitForVendor']);
 
 // ============================================================
 // 3. PUBLIC — CUSTOMER STOREFRONT
@@ -628,6 +631,11 @@ Route::prefix('admin')->group(function () {
     Route::get('/vendor-applications/{id}',        [VendorApplicationController::class, 'show']);
     Route::post('/vendor-applications/{id}/approve', [VendorApplicationController::class, 'approve']);
     Route::post('/vendor-applications/{id}/reject',  [VendorApplicationController::class, 'reject']);
+    Route::get('/vendor-resubmission-fields', [VendorApplicationResubmissionController::class, 'availableFields']);
+    Route::get('/vendor-applications/{id}/resubmissions', [VendorApplicationResubmissionController::class, 'indexForApplication']);
+    Route::post('/vendor-applications/{id}/resubmission-requests', [VendorApplicationResubmissionController::class, 'requestResubmission']);
+    Route::post('/vendor-application-resubmissions/{id}/approve', [VendorApplicationResubmissionController::class, 'approveItem']);
+    Route::post('/vendor-application-resubmissions/{id}/request-again', [VendorApplicationResubmissionController::class, 'requestAgain']);
     Route::get('/test',                            [VendorApplicationController::class, 'test']);
     Route::get('/reports',                   [ProductReportController::class, 'index']);   // ← NEW
     Route::post('/reports/{id}/review',      [ProductReportController::class, 'review']); // ← NEW

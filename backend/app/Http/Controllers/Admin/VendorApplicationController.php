@@ -159,6 +159,12 @@ class VendorApplicationController extends Controller
             }
 
             if ($validated['status'] === 'approved') {
+                if ($application->hasOutstandingResubmissions()) {
+                    return response()->json([
+                        'message' => 'Approve each resubmitted requirement before approving the application.',
+                    ], 422);
+                }
+
                 $updateData['verification_level'] = 'verified';
                 
                 // Create user account for the vendor
@@ -366,6 +372,12 @@ class VendorApplicationController extends Controller
             if ($application->status !== 'pending') {
                 return response()->json([
                     'message' => 'Application is not in pending status.'
+                ], 422);
+            }
+
+            if ($application->hasOutstandingResubmissions()) {
+                return response()->json([
+                    'message' => 'Approve each resubmitted requirement before approving the application.',
                 ], 422);
             }
 

@@ -58,6 +58,12 @@ const routes = [
         component: () => import("../views/guest/VendorRegistration.vue"),
       },
       {
+        path: "vendor/resubmission/:token",
+        name: "VendorResubmission",
+        component: () => import("../views/guest/VendorResubmission.vue"),
+        meta: { public: true },
+      },
+      {
         path: "leaves",
         name: "PublicLeaveQRRequest",
         component: () =>

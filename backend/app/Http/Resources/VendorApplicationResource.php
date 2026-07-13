@@ -51,6 +51,7 @@ class VendorApplicationResource extends JsonResource
             'facebook_page' => $this->facebook_page,
             'instagram_page' => $this->instagram_page,
             'status' => $this->status,
+            'resubmission_status' => $this->resubmission_status,
             'formatted_status' => $this->formatted_status,
             'verification_level' => $this->verification_level,
             'admin_notes' => $this->admin_notes,

@@ -34,6 +34,7 @@ class VendorApplication extends Model
         'delivery_handled_by', 'max_orders_per_day', 'lead_time',
         'cancellation_policy', 'store_logo_path', 'portfolio_photos_paths',
         'facebook_page', 'instagram_page', 'status', 'verification_level',
+        'resubmission_status',
         'admin_notes', 'rejection_reason', 'submitted_at', 'reviewed_at',
         'reviewed_by', 'payment_details_completed', 'product_details_completed',
         'delivery_details_completed', 'profile_fully_completed',
@@ -263,6 +264,15 @@ class VendorApplication extends Model
     /* Relationships */
     public function notes(): HasMany      { return $this->hasMany(VendorApplicationNote::class); }
     public function reviewer(): BelongsTo { return $this->belongsTo(User::class, 'reviewed_by'); }
+    public function resubmissionRequests(): HasMany { return $this->hasMany(VendorApplicationResubmissionRequest::class); }
+    public function resubmissions(): HasMany { return $this->hasMany(VendorApplicationResubmission::class); }
+
+    public function hasOutstandingResubmissions(): bool
+    {
+        return $this->resubmissions()
+            ->whereIn('status', [VendorApplicationResubmission::PENDING, VendorApplicationResubmission::RESUBMITTED])
+            ->exists();
+    }
 
     // ── Document / logo URL accessors ─────────────────────────────────────
 

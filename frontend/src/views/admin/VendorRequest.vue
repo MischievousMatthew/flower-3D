@@ -167,7 +167,7 @@
                 class="status-badge"
                 :class="application.status.toLowerCase()"
               >
-                {{ formatStatus(application.status) }}
+                {{ formatStatus(application.resubmission_status || application.status) }}
               </span>
             </div>
             <div class="td" style="width: 100px">
@@ -187,6 +187,14 @@
                   title="Reject"
                 >
                   ✕
+                </button>
+                <button
+                  v-if="application.status === 'pending' && !['needs_resubmission', 'pending_review'].includes(application.resubmission_status)"
+                  class="btn-action-sm btn-resubmit-sm"
+                  @click.stop="showResubmissionModal(application)"
+                  title="Request resubmission"
+                >
+                  ↻
                 </button>
                 <button class="btn-more" @click.stop="viewDetails(application)">
                   ⋯
@@ -681,6 +689,31 @@
                 </div>
               </div>
             </section>
+
+            <section v-if="resubmissionItems.length" class="detail-section">
+              <h3 class="section-heading">Resubmitted Requirements</h3>
+              <div class="resubmission-list">
+                <article v-for="item in resubmissionItems" :key="item.id" class="resubmission-card">
+                  <div class="resubmission-card-header">
+                    <strong>{{ item.label }}</strong>
+                    <span class="status-badge" :class="item.status">{{ formatStatus(item.status) }}</span>
+                  </div>
+                  <p v-if="item.rejection_reason"><strong>Reason:</strong> {{ item.rejection_reason }}</p>
+                  <div v-if="item.type === 'file'" class="resubmission-values">
+                    <button v-if="item.original_url" class="btn-link" @click="viewDocument(item.original_url)">View original</button>
+                    <button v-if="item.resubmitted_url" class="btn-link" @click="viewDocument(item.resubmitted_url)">View updated</button>
+                  </div>
+                  <div v-else class="resubmission-values">
+                    <p><strong>Original:</strong> {{ item.original_value || '—' }}</p>
+                    <p v-if="item.resubmitted_value"><strong>Updated:</strong> {{ item.resubmitted_value }}</p>
+                  </div>
+                  <div v-if="item.status === 'resubmitted'" class="resubmission-actions">
+                    <button class="btn-action btn-approve" @click="approveResubmission(item)">Approve</button>
+                    <button class="btn-action btn-deny" @click="requestResubmissionAgain(item)">Request Again</button>
+                  </div>
+                </article>
+              </div>
+            </section>
           </div>
         </div>
 
@@ -693,6 +726,13 @@
             @click="showRejectModal(selectedApplication)"
           >
             Deny Request
+          </button>
+          <button
+            v-if="!['needs_resubmission', 'pending_review'].includes(selectedApplication.resubmission_status)"
+            class="btn-action btn-resubmit"
+            @click="showResubmissionModal(selectedApplication)"
+          >
+            Request Resubmission
           </button>
           <button
             class="btn-action btn-approve"
@@ -783,6 +823,29 @@
       </div>
     </div>
 
+    <div v-if="showResubmissionRequestModal" class="modal-overlay confirmation-modal" @click="closeResubmissionModal">
+      <div class="modal-content confirmation-content" @click.stop>
+        <div class="modal-header">
+          <h2>Request Resubmission</h2>
+          <button class="btn-close" @click="closeResubmissionModal">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="confirmation-text">Select only the requirements that need to be corrected.</p>
+          <div v-for="field in resubmissionFields" :key="field.field_name" class="resubmission-select-row">
+            <label class="resubmission-checkbox">
+              <input type="checkbox" v-model="selectedResubmissionFields" :value="field.field_name" />
+              <span>{{ field.label }}</span>
+            </label>
+            <textarea v-if="selectedResubmissionFields.includes(field.field_name)" v-model="resubmissionReasons[field.field_name]" class="form-input" rows="2" :placeholder="`Optional reason for ${field.label}`"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-action btn-cancel" @click="closeResubmissionModal" :disabled="isProcessingAction">Cancel</button>
+          <button class="btn-action btn-resubmit" @click="submitResubmissionRequest" :disabled="isProcessingAction || !selectedResubmissionFields.length">{{ isProcessingAction ? 'Sending...' : 'Send Request' }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Document Viewer Modal -->
     <div
       v-if="showDocumentViewer"
@@ -846,6 +909,7 @@ const showDocumentViewer = ref(false);
 const showFilters = ref(false);
 const showApproveModal = ref(false);
 const showRejectReasonModal = ref(false);
+const showResubmissionRequestModal = ref(false);
 const isProcessingAction = ref(false);
 const isLoading = ref(false);
 const isLoadingMessage = ref("");
@@ -854,6 +918,10 @@ const currentDocument = ref(null);
 const pendingAction = ref(null);
 const rejectionReason = ref("");
 const rejectionReasonError = ref("");
+const resubmissionFields = ref([]);
+const selectedResubmissionFields = ref([]);
+const resubmissionReasons = ref({});
+const resubmissionItems = ref([]);
 const vendorApplications = ref([]);
 const stats = ref({
   pending: 0,
@@ -1069,6 +1137,7 @@ const exportData = async () => {
 
 const viewDetails = (application) => {
   selectedApplication.value = application;
+  loadResubmissions(application.id);
   showDetailModal.value = true;
   document.body.style.overflow = "hidden";
 };
@@ -1076,7 +1145,87 @@ const viewDetails = (application) => {
 const closeModal = () => {
   showDetailModal.value = false;
   selectedApplication.value = null;
+  resubmissionItems.value = [];
   document.body.style.overflow = "auto";
+};
+
+const loadResubmissions = async (applicationId) => {
+  try {
+    const { data } = await api.get(`/admin/vendor-applications/${applicationId}/resubmissions`);
+    resubmissionItems.value = data.items || [];
+  } catch (error) {
+    console.error("Error loading resubmissions:", error);
+    resubmissionItems.value = [];
+  }
+};
+
+const showResubmissionModal = async (application) => {
+  pendingAction.value = application;
+  selectedResubmissionFields.value = [];
+  resubmissionReasons.value = {};
+  try {
+    const { data } = await api.get('/admin/vendor-resubmission-fields');
+    resubmissionFields.value = data.fields || [];
+    showResubmissionRequestModal.value = true;
+    document.body.style.overflow = "hidden";
+  } catch (error) {
+    toast.error(getApiErrorMessage(error, "Unable to load resubmission fields"));
+  }
+};
+
+const closeResubmissionModal = () => {
+  showResubmissionRequestModal.value = false;
+  pendingAction.value = null;
+  selectedResubmissionFields.value = [];
+  resubmissionReasons.value = {};
+  document.body.style.overflow = "auto";
+};
+
+const submitResubmissionRequest = async () => {
+  if (!pendingAction.value || !selectedResubmissionFields.value.length || isProcessingAction.value) return;
+  isProcessingAction.value = true;
+  try {
+    const { data } = await api.post(`/admin/vendor-applications/${pendingAction.value.id}/resubmission-requests`, {
+      fields: selectedResubmissionFields.value.map((field_name) => ({
+        field_name,
+        rejection_reason: resubmissionReasons.value[field_name]?.trim() || null,
+      })),
+    });
+    toast.success(data.message || "Resubmission request sent.");
+    closeResubmissionModal();
+    if (showDetailModal.value) closeModal();
+    fetchApplications();
+  } catch (error) {
+    toast.error(getApiErrorMessage(error, "Unable to send resubmission request"));
+  } finally {
+    isProcessingAction.value = false;
+  }
+};
+
+const approveResubmission = async (item) => {
+  try {
+    const { data } = await api.post(`/admin/vendor-application-resubmissions/${item.id}/approve`);
+    toast.success(data.message || "Requirement approved.");
+    await loadResubmissions(selectedApplication.value.id);
+    fetchApplications();
+  } catch (error) {
+    toast.error(getApiErrorMessage(error, "Unable to approve requirement"));
+  }
+};
+
+const requestResubmissionAgain = async (item) => {
+  const reason = window.prompt(`Optional updated reason for ${item.label}:`, item.rejection_reason || "");
+  if (reason === null) return;
+  try {
+    const { data } = await api.post(`/admin/vendor-application-resubmissions/${item.id}/request-again`, {
+      rejection_reason: reason.trim() || null,
+    });
+    toast.success(data.message || "Vendor notified to resubmit again.");
+    await loadResubmissions(selectedApplication.value.id);
+    fetchApplications();
+  } catch (error) {
+    toast.error(getApiErrorMessage(error, "Unable to request another submission"));
+  }
 };
 
 const viewDocument = (url) => {
@@ -1205,6 +1354,11 @@ const formatStatus = (status) => {
     approved: "Approved",
     rejected: "Rejected",
     under_review: "Under Review",
+    needs_resubmission: "Needs Resubmission",
+    pending_review: "Pending Review",
+    pending_resubmission: "Pending Resubmission",
+    resubmitted: "Resubmitted",
+    completed: "Pending Approval",
   };
   return statuses[status] || status;
 };
@@ -2060,6 +2214,37 @@ function debounce(func, wait) {
   background: #38a169;
   transform: translateY(-1px);
 }
+
+.btn-resubmit,
+.btn-resubmit-sm {
+  background: #9e7250;
+  color: white;
+}
+
+.btn-resubmit:hover,
+.btn-resubmit-sm:hover {
+  background: #805939;
+}
+
+.btn-resubmit-sm { font-size: 15px; }
+
+.resubmission-select-row,
+.resubmission-card {
+  border: 1px solid #eadfd5;
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 10px;
+  text-align: left;
+}
+
+.resubmission-checkbox { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.resubmission-select-row textarea { width: 100%; margin-top: 10px; }
+.resubmission-card-header, .resubmission-actions, .resubmission-values { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.resubmission-card-header { justify-content: space-between; }
+.resubmission-card p { margin: 8px 0; }
+.resubmission-actions { margin-top: 12px; }
+.resubmission-actions .btn-action { padding: 8px 12px; }
+.btn-link { border: 0; background: transparent; color: #9e7250; padding: 0; cursor: pointer; text-decoration: underline; }
 
 .btn-cancel {
   background: white;
