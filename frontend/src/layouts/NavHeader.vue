@@ -1,6 +1,6 @@
 <template>
   <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
-  <nav class="navbar">
+  <nav class="navbar" :class="{ 'navbar--scrolled': navScrolled }">
     <router-link to="/" class="logo">
       <span
         ><img
@@ -578,8 +578,17 @@ defineExpose({
   triggerCartPulse,
 });
 
+// ── Scroll-driven floating pill ────────────────────────────────
+const navScrolled = ref(false);
+
+const handleNavScroll = () => {
+  navScrolled.value = window.scrollY > 24;
+};
+
 onMounted(() => {
   document.addEventListener("click", handleClickOutside);
+  window.addEventListener("scroll", handleNavScroll, { passive: true });
+  handleNavScroll(); // set correct state on initial render
 
   if (isAuthenticated.value) {
     if (user.value?.role === "customer") {
@@ -596,6 +605,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener("click", handleClickOutside);
+  window.removeEventListener("scroll", handleNavScroll);
   if (notificationInterval) {
     window.clearInterval(notificationInterval);
   }
@@ -607,20 +617,48 @@ onUnmounted(() => {
   font-family: "Poppins", "sans-serif";
 }
 
-/* Navbar */
+/* Navbar — full-width at top, floating pill when scrolled */
 .navbar {
   position: fixed;
   top: 0;
-  left: 0;
-  right: 0;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 9999px;           /* unrestricted at top */
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   padding: 1rem 5%;
   display: flex;
   justify-content: space-between;
   align-items: center;
   z-index: 1000;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 0;            /* flat at top */
+  border: 1px solid transparent;
+  box-shadow: none;
+  transition:
+    top           0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    width         0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    max-width     0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    padding       0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    border-radius 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color  0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    background    0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow    0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Scrolled state — floating pill */
+.navbar--scrolled {
+  top: 20px;
+  width: calc(100% - 48px);
+  max-width: 1240px;
+  padding: 0.72rem 2rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.1),
+    0 2px 8px  rgba(0, 0, 0, 0.06);
 }
 
 .logo {
