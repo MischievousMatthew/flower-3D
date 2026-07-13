@@ -51,8 +51,8 @@
       
       <!-- Panel 1: Hero Section -->
       <section class="panel-section hero-panel" ref="heroSection">
-        <div class="panel-container">
-          <div class="panel-content text-left-side">
+        <div class="panel-container hero-collapse-container">
+          <div class="panel-content text-left-side hero-collapse-content">
             <span class="eyebrow reveal-fade-up">Bespoke florals, built by you</span>
             <h1 class="hero-title reveal-fade-up">
               Create your perfect
@@ -67,7 +67,7 @@
                 Get Started
               </router-link>
             </div>
-            <span class="scroll-cue reveal-fade-up">Scroll to explore</span>
+            <span class="scroll-cue reveal-fade-up hero-scroll-cue">Scroll to explore</span>
           </div>
           <div class="panel-visual spacer-right" aria-hidden="true"></div>
         </div>
@@ -909,6 +909,7 @@ function handleResize() {
 
   // Recalculate GSAP coordinates dynamically
   setupFlowerJourney();
+  setupHeroCollapse();
   ScrollTrigger.refresh();
 }
 
@@ -927,11 +928,77 @@ function initSmoothScroll() {
   lenis.on("scroll", ScrollTrigger.update);
 }
 
+// ============================================================
+// HERO COLLAPSE — scroll-driven shrink of the hero panel
+// No content is removed; layout compresses proportionally.
+// ============================================================
+let heroCollapseTrigger = null;
+
+function setupHeroCollapse() {
+  if (!heroSection.value || prefersReducedMotion) return;
+
+  // Kill any previous instance on resize
+  if (heroCollapseTrigger) {
+    heroCollapseTrigger.kill();
+    heroCollapseTrigger = null;
+  }
+
+  const panel     = heroSection.value;
+  const container = panel.querySelector('.hero-collapse-container');
+  const content   = panel.querySelector('.hero-collapse-content');
+  const cue       = panel.querySelector('.hero-scroll-cue');
+
+  if (!container || !content) return;
+
+  const isMobile = window.innerWidth < 968;
+
+  // Animate hero panel padding (top/bottom) and content scale
+  const tl = gsap.timeline({
+    scrollTrigger: {
+      trigger: panel,
+      start: 'top top',
+      // End when the hero has scrolled 65vh — feels natural for a banner collapse
+      end: isMobile ? '+=55vh' : '+=65vh',
+      scrub: 1.2,
+      // Do NOT pin — let the page scroll naturally while the hero compresses
+    },
+  });
+
+  // Shrink hero panel top-padding (pushes content up toward navbar)
+  tl.fromTo(
+    panel,
+    { paddingTop: isMobile ? '140px' : '180px', paddingBottom: '120px' },
+    { paddingTop: isMobile ? '90px' : '96px',  paddingBottom: isMobile ? '40px' : '48px', ease: 'none' },
+    0
+  );
+
+  // Scale down and fade-shift the content block
+  tl.fromTo(
+    content,
+    { scale: 1, transformOrigin: 'left center' },
+    { scale: isMobile ? 0.78 : 0.72, transformOrigin: 'left center', ease: 'none' },
+    0
+  );
+
+  // Fade out the scroll cue
+  if (cue) {
+    tl.fromTo(
+      cue,
+      { autoAlpha: 0.65 },
+      { autoAlpha: 0, ease: 'none' },
+      0
+    );
+  }
+
+  heroCollapseTrigger = tl.scrollTrigger;
+}
+
 onMounted(() => {
   initThreeScene();
   setupFlowerJourney();
   setupSectionReveals();
   setupBackgroundParallax();
+  setupHeroCollapse();
   initSmoothScroll();
   window.addEventListener("mousemove", handlePointerMove, { passive: true });
   window.addEventListener("resize", handleResize);
@@ -948,6 +1015,7 @@ onBeforeUnmount(() => {
   if (rafId) cancelAnimationFrame(rafId);
   if (lenisRafId) cancelAnimationFrame(lenisRafId);
   if (lenis) lenis.destroy();
+  if (heroCollapseTrigger) heroCollapseTrigger.kill();
   journeyTriggers.forEach((st) => st && st.kill());
   ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
   if (renderer) renderer.dispose();
@@ -1251,6 +1319,19 @@ onBeforeUnmount(() => {
 /* Hero Panel */
 .hero-panel {
   padding-top: 180px;
+  will-change: padding;
+}
+
+/* Hero collapse content wrapper — GSAP will scale this */
+.hero-collapse-content {
+  transform-origin: left center;
+  will-change: transform;
+}
+
+@media (max-width: 968px) {
+  .hero-collapse-content {
+    transform-origin: center center;
+  }
 }
 
 .hero-title {
@@ -1290,6 +1371,11 @@ onBeforeUnmount(() => {
   color: var(--ink-soft);
   opacity: 0.65;
   animation: pulseCue 2s infinite ease-in-out;
+}
+
+/* When GSAP is fading the scroll cue out, keep its animation playing */
+.hero-scroll-cue {
+  will-change: opacity;
 }
 
 @keyframes pulseCue {
