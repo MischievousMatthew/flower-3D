@@ -1136,43 +1136,49 @@ onBeforeUnmount(() => {
   display: block;
 }
 
-/* Navigation — floating pill */
+/* Navigation — full-width at top, floating pill when scrolled */
 .navbar {
   position: fixed;
-  top: 20px;
+  /* Always centred so width/radius can animate without jumping */
+  top: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: calc(100% - 48px);
-  max-width: 1240px;
-  background: rgba(250, 248, 245, 0.72);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  padding: 1rem 2rem;
+  width: 100%;
+  max-width: 9999px;          /* effectively unrestricted at top */
+  background: rgba(250, 248, 245, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 1.6rem 6%;
   display: flex;
   justify-content: space-between;
   align-items: center;
   z-index: 1000;
-  border-radius: 999px;
-  border: 1px solid rgba(30, 27, 24, 0.08);
-  box-shadow:
-    0 4px 24px rgba(30, 27, 24, 0.06),
-    0 1px 4px rgba(30, 27, 24, 0.04);
+  border-radius: 0;           /* flat at top */
+  border: 1px solid transparent;
+  box-shadow: none;
   transition:
-    padding 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    top 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    background 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    top           0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    width         0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    max-width     0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    padding       0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    border-radius 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color  0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    background    0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow    0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Scrolled state — floating pill */
 .navbar--scrolled {
-  top: 12px;
+  top: 20px;
+  width: calc(100% - 48px);
+  max-width: 1240px;
   padding: 0.72rem 2rem;
+  border-radius: 999px;
   background: rgba(250, 248, 245, 0.92);
   border-color: rgba(30, 27, 24, 0.12);
   box-shadow:
     0 8px 40px rgba(30, 27, 24, 0.1),
-    0 2px 8px rgba(30, 27, 24, 0.06);
+    0 2px 8px  rgba(30, 27, 24, 0.06);
 }
 
 .logo {
@@ -1891,14 +1897,15 @@ onBeforeUnmount(() => {
    RESPONSIVE DESIGN STYLES
 ============================================================= */
 @media (max-width: 968px) {
+  /* At top: still full width, just less padding */
   .navbar {
-    top: 14px;
-    width: calc(100% - 32px);
-    padding: 0.85rem 1.4rem;
+    padding: 1.2rem 5%;
   }
 
+  /* Scrolled: floating pill, narrower margin */
   .navbar--scrolled {
-    top: 8px;
+    top: 14px;
+    width: calc(100% - 32px);
     padding: 0.65rem 1.4rem;
   }
 
@@ -1987,16 +1994,17 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
+  /* At top: full width, compact padding */
   .navbar {
-    top: 10px;
-    width: calc(100% - 24px);
-    padding: 0.7rem 1.1rem;
-    border-radius: 20px;
+    padding: 1rem 4%;
   }
 
+  /* Scrolled: pill with very slight rounding on small screens */
   .navbar--scrolled {
-    top: 6px;
+    top: 10px;
+    width: calc(100% - 24px);
     padding: 0.55rem 1.1rem;
+    border-radius: 20px;
   }
 
   .panel-section {
