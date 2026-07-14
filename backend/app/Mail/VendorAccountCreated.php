@@ -30,7 +30,8 @@ class VendorAccountCreated
             'application' => $this->application,
             'password' => $this->password,
             'isExistingUser' => $this->isExistingUser,
-            'loginUrl'       => config('app.frontend_url', 'https://bloomcraft-app.vercel.app/') . '/guest/login',
+            'loginUrl'       => rtrim(config('app.frontend_url', 'https://bloomcraft-app.vercel.app/'), '/')
+                . config('frontend_routes.login_path'),
         ])->render();
 
         return $brevo->send(

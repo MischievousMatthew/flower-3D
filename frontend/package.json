@@ -4,7 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "routes:sync": "node scripts/sync-opaque-route-tokens.mjs",
+    "predev": "npm run routes:sync",
     "dev": "vite",
+    "prebuild": "npm run routes:sync",
     "build": "vite build",
     "preview": "vite preview"
   },

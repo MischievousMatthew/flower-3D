@@ -235,7 +235,9 @@ class VendorApplicationResubmissionController extends Controller
     private function sendRequestEmail(VendorApplication $application, string $token): void
     {
         try {
-            $url = rtrim(config('app.frontend_url'), '/') . '/vendor/resubmission/' . $token;
+            $url = rtrim(config('app.frontend_url'), '/')
+                . config('frontend_routes.vendor_resubmission_path')
+                . '/' . $token;
             (new VendorApplicationResubmissionRequested($application, $url))->send();
         } catch (\Throwable $e) {
             Log::warning('Vendor resubmission email failed; request remains active.', ['application_id' => $application->id, 'error' => $e->getMessage()]);

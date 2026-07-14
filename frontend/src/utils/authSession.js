@@ -30,6 +30,11 @@ export const hasStoredAuthSession = (path = window.location.pathname) =>
   !!getPreferredAuthToken(path);
 
 export const getRouteAuthContext = (path = window.location.pathname) => {
+  // Vue Router passes this explicit context for opaque URLs before navigation.
+  if (path === "employee" || path === "user") {
+    return path;
+  }
+
   const normalizedPath = normalizePath(path);
 
   if (EMPLOYEE_ROUTE_PREFIXES.some((prefix) => pathMatchesPrefix(normalizedPath, prefix))) {

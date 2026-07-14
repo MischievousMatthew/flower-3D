@@ -6,6 +6,7 @@ import {
   getPreferredAuthToken,
   getPreferredUserType,
 } from "../utils/authSession";
+import { opaquePathFor, opaqueRouteTokens } from "./opaqueRoutes";
 
 const routes = [
   // ===== PUBLIC =====
@@ -594,21 +595,115 @@ const routes = [
   },
 ];
 
+const joinRoutePath = (parentPath, childPath) => {
+  if (childPath.startsWith("/")) return childPath;
+  if (!parentPath || parentPath === "/") return childPath ? `/${childPath}` : "/";
+  return childPath ? `${parentPath.replace(/\/$/, "")}/${childPath}` : parentPath;
+};
+
+const parameterSuffix = (path) =>
+  path.split("/").filter((segment) => segment.startsWith(":")).join("/");
+
+const routeAuthContext = (canonicalPath) => {
+  if (canonicalPath === "/erp" || canonicalPath.startsWith("/erp/")) return "employee";
+  if (
+    ["/admin", "/vendor", "/customer"].some(
+      (prefix) => canonicalPath === prefix || canonicalPath.startsWith(`${prefix}/`),
+    )
+  ) {
+    return "user";
+  }
+  return null;
+};
+
+// Parent layouts are never linked directly. Their opaque paths only prevent a
+// readable parent URL from being exposed when a legacy parent URL is opened.
+const opaqueLayoutPath = (canonicalPath, index) =>
+  `/L${Math.abs([...canonicalPath].reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) | 0, 17)).toString(36)}${index.toString(36)}z9Qk7Wm2Vr8Hf4Xc6P`;
+
+const legacyAliases = new Map();
+
+const buildOpaqueRoutes = (records, parentPath = "", parentIndex = 0) =>
+  records.map((record, index) => {
+    const canonicalPath = joinRoutePath(parentPath, record.path);
+    const isCatchAll = record.name === "NotFound";
+    const clone = {
+      ...record,
+      meta: {
+        ...record.meta,
+        canonicalPath,
+        authContext: routeAuthContext(canonicalPath),
+      },
+    };
+
+    if (!isCatchAll && record.name && opaqueRouteTokens[record.name]) {
+      clone.path = opaquePathFor(record.name, parameterSuffix(canonicalPath) ? `/${parameterSuffix(canonicalPath)}` : "");
+      legacyAliases.set(canonicalPath, {
+        path: canonicalPath,
+        name: `Legacy_${record.name}`,
+        redirect: (to) => ({ name: record.name, params: to.params, query: to.query, hash: to.hash }),
+      });
+    } else if (!isCatchAll) {
+      clone.path = opaqueLayoutPath(canonicalPath, parentIndex + index);
+      if (record.redirect) {
+        legacyAliases.set(canonicalPath, {
+          path: canonicalPath,
+          name: `LegacyLayout_${parentIndex}_${index}`,
+          redirect: record.redirect,
+        });
+      }
+    }
+
+    if (record.children) {
+      clone.children = buildOpaqueRoutes(record.children, canonicalPath, (parentIndex + 1) * 31 + index);
+    }
+
+    return clone;
+  });
+
+const catchAllRoute = routes.find((route) => route.name === "NotFound");
+const applicationRoutes = routes.filter((route) => route.name !== "NotFound");
+const opaqueRoutes = buildOpaqueRoutes(applicationRoutes);
+
 const router = createRouter({
   history: createWebHistory(),
-  routes,
+  routes: [...opaqueRoutes, ...legacyAliases.values(), catchAllRoute],
   scrollBehavior() {
     return { top: 0 };
   },
 });
+
+// Existing components can continue to use their current string paths. Router
+// links, push(), and replace() are normalized before the browser sees them.
+const rawResolve = router.resolve.bind(router);
+const resolveOpaqueTarget = (location) => {
+  let target = location;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const resolved = rawResolve(target);
+    const redirect = resolved.matched.at(-1)?.redirect;
+    if (!redirect) return target;
+    target = typeof redirect === "function" ? redirect(resolved) : redirect;
+  }
+
+  return target;
+};
+
+const rawPush = router.push.bind(router);
+const rawReplace = router.replace.bind(router);
+router.resolve = (location, currentLocation) => rawResolve(resolveOpaqueTarget(location), currentLocation);
+router.push = (location) => rawPush(resolveOpaqueTarget(location));
+router.replace = (location) => rawReplace(resolveOpaqueTarget(location));
 
 /**
  * Global Route Guard
  */
 router.beforeEach(async (to, from, next) => {
   const auth = useAuth();
-  const userType = getPreferredUserType(to.path);
-  const token = getPreferredAuthToken(to.path);
+  const canonicalPath = to.meta.canonicalPath || to.path;
+  const authContext = to.meta.authContext || canonicalPath;
+  const userType = getPreferredUserType(authContext);
+  const token = getPreferredAuthToken(authContext);
 
   if (to.meta.public) {
     return next();
@@ -618,7 +713,7 @@ router.beforeEach(async (to, from, next) => {
     auth.user.value = null;
 
     if (to.meta.requiresAuth) {
-      if (to.path !== "/guest/login") {
+      if (canonicalPath !== "/guest/login") {
         localStorage.setItem("redirectAfterLogin", to.fullPath);
       }
       return next("/guest/login");
@@ -685,33 +780,33 @@ router.beforeEach(async (to, from, next) => {
     }
 
     // If employee is trying to access a non-ERP path, send them home
-    if (!to.path.startsWith("/erp") && to.path !== "/guest/login") {
+    if (!canonicalPath.startsWith("/erp") && canonicalPath !== "/guest/login") {
       return next(assignment.getDefaultRoute());
     }
 
     // Enforce module-based access per ERP section
-    if (to.path.startsWith("/erp/hr") && !assignment.hasGroupAccess("HR")) {
+    if (canonicalPath.startsWith("/erp/hr") && !assignment.hasGroupAccess("HR")) {
       return next(assignment.getDefaultRoute());
     }
     if (
-      to.path.startsWith("/erp/finance") &&
+      canonicalPath.startsWith("/erp/finance") &&
       !assignment.hasGroupAccess("Finance")
     ) {
       return next(assignment.getDefaultRoute());
     }
     if (
-      to.path.startsWith("/erp/procurement/inventory") &&
+      canonicalPath.startsWith("/erp/procurement/inventory") &&
       !assignment.hasGroupAccess("Procurement")
     ) {
       return next(assignment.getDefaultRoute());
     }
     if (
-      to.path.startsWith("/erp/procurement/supply-chain") &&
+      canonicalPath.startsWith("/erp/procurement/supply-chain") &&
       !assignment.hasGroupAccess("Supply Chain")
     ) {
       return next(assignment.getDefaultRoute());
     }
-    if (to.path.startsWith("/erp/crm") && !assignment.canView("crm")) {
+    if (canonicalPath.startsWith("/erp/crm") && !assignment.canView("crm")) {
       return next(assignment.getDefaultRoute());
     }
 
@@ -720,7 +815,7 @@ router.beforeEach(async (to, from, next) => {
   }
 
   // ── Non-employee routing (owner, admin, customer) ─────────────────────
-  if (to.path.startsWith("/erp")) {
+  if (canonicalPath.startsWith("/erp")) {
     if (role === "admin") return next("/admin/vendor-requests");
     if (role === "vendor") return next("/vendor/products");
     if (role === "customer") return next("/shop");
@@ -731,8 +826,8 @@ router.beforeEach(async (to, from, next) => {
   const needsPasswordChange = user?.vendor_data?.needs_password_change === true;
   if (role === "vendor" && needsPasswordChange) {
     if (
-      to.path !== "/vendor/force-change-password" &&
-      to.path !== "/guest/login"
+      canonicalPath !== "/vendor/force-change-password" &&
+      canonicalPath !== "/guest/login"
     ) {
       return next("/vendor/force-change-password");
     }
