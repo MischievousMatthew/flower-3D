@@ -28,10 +28,14 @@ class CheckoutController extends Controller
             $user = $request->user();
 
             $validator = Validator::make($request->all(), [
-                'cart_item_ids' => 'required_without:product_id|array|min:1',
+                'cart_item_ids' => 'required_without_all:product_id,custom_items|array|min:1',
                 'cart_item_ids.*' => 'required|integer|exists:carts,id',
-                'product_id' => 'required_without:cart_item_ids|integer|exists:products,id',
+                'product_id' => 'required_without_all:cart_item_ids,custom_items|integer|exists:products,id',
                 'quantity' => 'required_with:product_id|integer|min:1',
+                'custom_items' => 'required_without_all:cart_item_ids,product_id|array|min:1|max:3',
+                'custom_items.*.product_id' => 'required|integer|exists:products,id',
+                'custom_items.*.quantity' => 'nullable|integer|min:1',
+                'custom_items.*.customizations' => 'nullable|array',
             ]);
 
             if ($validator->fails()) {
@@ -49,7 +53,31 @@ class CheckoutController extends Controller
                 ], 400);
             }
 
-            if ($request->filled('product_id')) {
+            if ($request->filled('custom_items')) {
+                // Custom bouquets use the same checkout flow, with the design saved on each order item.
+                $customItems = collect($request->input('custom_items'));
+                $products = Product::with(['primaryImage', 'images', 'owner', 'models'])
+                    ->whereIn('id', $customItems->pluck('product_id')->unique())
+                    ->get()
+                    ->keyBy('id');
+
+                $cartItems = $customItems->map(function ($customItem) use ($products) {
+                    $product = $products->get($customItem['product_id']);
+
+                    return (object) [
+                        'id' => null,
+                        'product_id' => $product->id,
+                        'product' => $product,
+                        'quantity' => (int) ($customItem['quantity'] ?? 1),
+                        'price' => $product->selling_price,
+                        'is_available' => true,
+                        'color' => null,
+                        'size' => null,
+                        'notes' => null,
+                        'customizations' => $customItem['customizations'] ?? [],
+                    ];
+                });
+            } elseif ($request->filled('product_id')) {
                 // Direct Checkout
                 $product = Product::with(['primaryImage', 'images', 'owner', 'models'])->findOrFail($request->product_id);
                 $cartItems = collect([
@@ -215,9 +243,13 @@ class CheckoutController extends Controller
                 'delivery_notes' => 'nullable|string',
                 'customer_notes' => 'nullable|string',
                 'reservation_date' => 'required|date_format:Y-m-d',
-                'cart_item_ids' => 'required_without:product_id|array|min:1',
-                'product_id' => 'required_without:cart_item_ids|integer|exists:products,id',
+                'cart_item_ids' => 'required_without_all:product_id,custom_items|array|min:1',
+                'product_id' => 'required_without_all:cart_item_ids,custom_items|integer|exists:products,id',
                 'quantity' => 'required_with:product_id|integer|min:1',
+                'custom_items' => 'required_without_all:cart_item_ids,product_id|array|min:1|max:3',
+                'custom_items.*.product_id' => 'required|integer|exists:products,id',
+                'custom_items.*.quantity' => 'nullable|integer|min:1',
+                'custom_items.*.customizations' => 'nullable|array',
             ]);
 
             if ($validator->fails()) {
@@ -233,7 +265,30 @@ class CheckoutController extends Controller
                 VendorApplication::RESERVATION_TIMEZONE
             )->startOfDay();
 
-            if ($request->filled('product_id')) {
+            if ($request->filled('custom_items')) {
+                // Keep custom bouquets inside the normal order/payment pipeline.
+                $customItems = collect($request->input('custom_items'));
+                $products = Product::with(['owner', 'primaryImage', 'images', 'models'])
+                    ->whereIn('id', $customItems->pluck('product_id')->unique())
+                    ->get()
+                    ->keyBy('id');
+
+                $cartItems = $customItems->map(function ($customItem) use ($products) {
+                    $product = $products->get($customItem['product_id']);
+
+                    return (object) [
+                        'id' => null,
+                        'product_id' => $product->id,
+                        'product' => $product,
+                        'quantity' => (int) ($customItem['quantity'] ?? 1),
+                        'price' => $product->selling_price,
+                        'color' => null,
+                        'size' => null,
+                        'notes' => null,
+                        'customizations' => $customItem['customizations'] ?? [],
+                    ];
+                });
+            } elseif ($request->filled('product_id')) {
                 // Direct Order
                 $product = Product::with(['owner', 'primaryImage', 'images', 'models'])->findOrFail($request->product_id);
                 $cartItems = collect([

@@ -251,8 +251,8 @@
                 <h3>Order Items</h3>
                 <div class="order-items-list">
                   <div
-                    v-for="item in checkoutData.items"
-                    :key="item.id"
+                    v-for="(item, index) in checkoutData.items"
+                    :key="item.cart_item_id ?? `${item.product_id}-${index}`"
                     class="order-item"
                   >
                     <div class="item-image-small">
@@ -512,8 +512,8 @@
             <!-- Item List -->
             <div class="summary-items-list">
               <div
-                v-for="item in checkoutData.items"
-                :key="item.id"
+                v-for="(item, index) in checkoutData.items"
+                :key="item.cart_item_id ?? `${item.product_id}-${index}`"
                 class="summary-item"
               >
                 <div class="summary-item-img">
@@ -1046,10 +1046,13 @@ async function loadCheckoutData() {
       isDirectCheckout.value = true;
       directCheckoutData.value = JSON.parse(directData);
 
-      const response = await api.post("/checkout/initialize", {
-        product_id: directCheckoutData.value.items[0].product_id,
-        quantity: directCheckoutData.value.items[0].quantity,
-      });
+      const directCheckoutPayload = directCheckoutData.value.custom_items
+        ? { custom_items: directCheckoutData.value.custom_items }
+        : {
+            product_id: directCheckoutData.value.items[0].product_id,
+            quantity: directCheckoutData.value.items[0].quantity,
+          };
+      const response = await api.post("/checkout/initialize", directCheckoutPayload);
 
       if (response.data.success) {
         checkoutData.value = response.data.data;
@@ -1129,10 +1132,12 @@ async function placeOrder() {
       customer_notes: customerNotes.value,
 
       ...(isDirectCheckout.value
-        ? {
-            product_id: directCheckoutData.value.items[0].product_id,
-            quantity: directCheckoutData.value.items[0].quantity,
-          }
+        ? directCheckoutData.value.custom_items
+          ? { custom_items: directCheckoutData.value.custom_items }
+          : {
+              product_id: directCheckoutData.value.items[0].product_id,
+              quantity: directCheckoutData.value.items[0].quantity,
+            }
         : {
             cart_item_ids:
               JSON.parse(localStorage.getItem("checkout_data"))

@@ -842,26 +842,46 @@ async function checkout() {
   if (!selectedFlowers.value.length) return;
   isCheckingOut.value = true;
   try {
-    const response = await api.post("custom-orders", {
-      store_id: storeId.value,
-      owner_id: vendorOwnerId.value,
-      flowers: selectedFlowers.value.map((flower) => ({
-        id: flower.id,
-        name: flower.product_name,
-        price: flower.price,
-        model_3d_url: flower.model_3d_url,
-        position: flower.position,
-      })),
-      total_price: totalPrice.value,
-      paper_color: paperColor.value,
-      ribbon_color: ribbonColor.value,
+    sessionStorage.setItem(
+      "directCheckout",
+      JSON.stringify({
+        items: selectedFlowers.value.map((flower) => ({
+          product_id: flower.id,
+          quantity: 1,
+          product_name: flower.product_name,
+          price: flower.price,
+        })),
+        custom_items: selectedFlowers.value.map((flower) => ({
+          product_id: flower.id,
+          quantity: 1,
+          vendor_id: flower.owner_id,
+          product_name: flower.product_name,
+          price: flower.price,
+          customizations: {
+            type: "custom_flower_bouquet",
+            store_id: storeId.value,
+            vendor_id: vendorOwnerId.value,
+            paper_color: paperColor.value,
+            ribbon_color: ribbonColor.value,
+            placement: {
+              scene_id: flower.sceneId,
+              position: flower.position,
+              rotation: flower.rotation,
+              locked: flower.locked,
+              model_3d_url: flower.model_3d_url,
+            },
+          },
+        })),
+        total: totalPrice.value,
+        isDirectCheckout: true,
+      }),
+    );
+    await router.push({
+      path: "/customer/checkout",
+      query: { direct: "true", custom: "flower_bouquet" },
     });
-    if (response.data?.success) {
-      showToast("Custom bouquet submitted.", "success");
-      router.push("/customer/orders");
-    }
   } catch (error) {
-    showToast(error?.response?.data?.message || "Failed to submit custom bouquet.", "error");
+    showToast(error?.response?.data?.message || "Failed to start checkout.", "error");
   } finally {
     isCheckingOut.value = false;
   }
