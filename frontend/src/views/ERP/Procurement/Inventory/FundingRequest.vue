@@ -35,7 +35,8 @@
           <button
             class="create-btn"
             @click="goToCreate"
-            :disabled="!canEditFunding"
+            :disabled="!canCreateFunding"
+            :title="canCreateFunding ? '' : permissionMessages.create"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -208,6 +209,7 @@
                     v-if="request.request_status === 'Draft'"
                     @click="editRequest(request.id)"
                     :disabled="!canEditFunding"
+                    :title="canEditFunding ? '' : permissionMessages.edit"
                   >
                     Edit Request
                   </button>
@@ -215,13 +217,15 @@
                     v-if="request.request_status === 'Draft'"
                     @click="submitRequest(request.id)"
                     :disabled="!canEditFunding"
+                    :title="canEditFunding ? '' : permissionMessages.edit"
                   >
                     Submit to Finance
                   </button>
                   <button
                     class="delete-btn"
                     @click="deleteRequest(request.id)"
-                    :disabled="!canEditFunding"
+                    :disabled="!canDeleteFunding"
+                    :title="canDeleteFunding ? '' : permissionMessages.delete"
                   >
                     Delete
                   </button>
@@ -245,11 +249,11 @@ import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../../plugins/axios";
 import { toast } from "vue3-toastify";
-import { useAssignment } from "../../../../composables/useAssignment";
+import { PERMISSION_TOOLTIPS, useAssignment } from "../../../../composables/useAssignment";
 
 
 const router = useRouter();
-const { canEdit } = useAssignment();
+const { can } = useAssignment();
 
 const searchQuery = ref("");
 const activeStatusTab = ref("all");
@@ -258,7 +262,10 @@ const openMenuId = ref(null);
 const loading = ref(false);
 const error = ref(null);
 const requests = ref([]);
-const canEditFunding = computed(() => canEdit("inventory_funding"));
+const canCreateFunding = computed(() => can("inventory_funding", "create"));
+const canEditFunding = computed(() => can("inventory_funding", "edit"));
+const canDeleteFunding = computed(() => can("inventory_funding", "delete"));
+const permissionMessages = PERMISSION_TOOLTIPS;
 
 const statusTabs = [
   { label: "All Requests", value: "all" },
@@ -334,7 +341,7 @@ const fetchRequests = async () => {
 };
 
 const goToCreate = () =>
-  canEditFunding.value
+  canCreateFunding.value
     ? router.push("/erp/procurement/inventory/funding-request/create")
     : toast.error("You do not have permission to create funding requests");
 
@@ -380,7 +387,7 @@ const submitRequest = async (id) => {
 };
 
 const deleteRequest = async (id) => {
-  if (!canEditFunding.value) {
+  if (!canDeleteFunding.value) {
     toast.error("You do not have permission to delete funding requests");
     return;
   }

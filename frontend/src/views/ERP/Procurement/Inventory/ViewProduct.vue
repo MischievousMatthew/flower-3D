@@ -45,11 +45,11 @@
           <router-link
             to="/erp/procurement/inventory/funding-request/create"
             class="btn-ghost"
-            :class="{ 'btn-disabled-link': !canEditInventoryProducts }"
-            :aria-disabled="!canEditInventoryProducts"
+            :class="{ 'btn-disabled-link': !canCreateFunding }"
+            :aria-disabled="!canCreateFunding"
+            :title="canCreateFunding ? '' : permissionMessages.create"
             @click.prevent="
-              !canEditInventoryProducts &&
-              toast.error('You do not have permission to create funding requests.')
+              !canCreateFunding && toast.error(permissionMessages.create)
             "
           >
             <svg
@@ -72,11 +72,11 @@
           <router-link
             to="/erp/procurement/inventory/add-product"
             class="btn-primary"
-            :class="{ 'btn-disabled-link': !canEditInventoryProducts }"
-            :aria-disabled="!canEditInventoryProducts"
+            :class="{ 'btn-disabled-link': !canCreateInventoryProducts }"
+            :aria-disabled="!canCreateInventoryProducts"
+            :title="canCreateInventoryProducts ? '' : permissionMessages.create"
             @click.prevent="
-              !canEditInventoryProducts &&
-              toast.error('You do not have permission to create inventory products.')
+              !canCreateInventoryProducts && toast.error(permissionMessages.create)
             "
           >
             <svg
@@ -312,11 +312,11 @@
             <router-link
               to="/erp/procurement/inventory/add-product"
               class="btn-primary"
-              :class="{ 'btn-disabled-link': !canEditInventoryProducts }"
-              :aria-disabled="!canEditInventoryProducts"
+              :class="{ 'btn-disabled-link': !canCreateInventoryProducts }"
+              :aria-disabled="!canCreateInventoryProducts"
+              :title="canCreateInventoryProducts ? '' : permissionMessages.create"
               @click.prevent="
-                !canEditInventoryProducts &&
-                toast.error('You do not have permission to create inventory products.')
+                !canCreateInventoryProducts && toast.error(permissionMessages.create)
               "
             >
               <svg
@@ -434,11 +434,11 @@
                 <div class="menu-wrap">
                   <button
                     class="menu-btn"
-                    :disabled="!canEditInventoryProducts"
+                    :disabled="!canViewInventoryProducts"
                     :title="
-                      canEditInventoryProducts
+                      canViewInventoryProducts
                         ? 'Open product actions'
-                        : 'You do not have permission to edit inventory products.'
+                        : permissionMessages.view
                     "
                     @click.stop="toggleMenu(product.id)"
                   >
@@ -478,6 +478,7 @@
                         v-if="activeTab !== 'approved'"
                         class="menu-item"
                         :disabled="!canEditInventoryProducts"
+                        :title="canEditInventoryProducts ? '' : permissionMessages.edit"
                         @click="goEdit(product.id)"
                       >
                         <svg
@@ -501,6 +502,7 @@
                         v-if="activeTab === 'draft'"
                         class="menu-item"
                         :disabled="!canEditInventoryProducts"
+                        :title="canEditInventoryProducts ? '' : permissionMessages.edit"
                         @click="openSubmitModal(product)"
                       >
                         <svg
@@ -520,6 +522,7 @@
                         v-if="activeTab === 'approved'"
                         class="menu-item"
                         :disabled="!canEditInventoryProducts"
+                        :title="canEditInventoryProducts ? '' : permissionMessages.edit"
                         @click="openUpdateStockModal(product)"
                       >
                         <svg
@@ -538,7 +541,8 @@
                       <div class="menu-sep"></div>
                       <button
                         class="menu-item danger"
-                        :disabled="!canEditInventoryProducts"
+                        :disabled="!canDeleteInventoryProducts"
+                        :title="canDeleteInventoryProducts ? '' : permissionMessages.delete"
                         @click="openDeleteModal(product)"
                       >
                         <svg
@@ -840,6 +844,7 @@
               v-if="activeTab === 'approved'"
               class="btn-primary"
               :disabled="!canEditInventoryProducts"
+              :title="canEditInventoryProducts ? '' : permissionMessages.edit"
               @click="openUpdateStockModal(selectedProduct)"
             >
               Update Stock
@@ -986,7 +991,7 @@
             <button class="btn-ghost-sm" @click="closeDeleteModal">
               Cancel
             </button>
-            <button class="btn-danger" @click="confirmDeleteProduct">
+            <button class="btn-danger" @click="confirmDeleteProduct" :disabled="!canDeleteInventoryProducts" :title="canDeleteInventoryProducts ? '' : permissionMessages.delete">
               Delete Product
             </button>
           </div>
@@ -1001,13 +1006,13 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../../plugins/axios";
 import { useAuth } from "../../../../composables/useAuth";
-import { useAssignment } from "../../../../composables/useAssignment";
+import { PERMISSION_TOOLTIPS, useAssignment } from "../../../../composables/useAssignment";
 import { toast } from "vue3-toastify";
 import { clearStoredAuth } from "../../../../utils/authSession";
 
 const router = useRouter();
 const { user } = useAuth();
-const { canEdit, isReadOnly } = useAssignment();
+const { can } = useAssignment();
 
 const tableSearch = ref("");
 const activeTab = ref("approved");
@@ -1022,10 +1027,15 @@ const showViewDetailsModal = ref(false);
 const showUpdateStockModal = ref(false);
 const showSubmitModal = ref(false);
 const showDeleteModal = ref(false);
-const canEditInventoryProducts = computed(() => canEdit("inventory_products"));
+const canViewInventoryProducts = computed(() => can("inventory_products", "view"));
+const canCreateInventoryProducts = computed(() => can("inventory_products", "create"));
+const canEditInventoryProducts = computed(() => can("inventory_products", "edit"));
+const canDeleteInventoryProducts = computed(() => can("inventory_products", "delete"));
+const canCreateFunding = computed(() => can("inventory_funding", "create"));
 const isReadOnlyInventoryProducts = computed(() =>
-  isReadOnly("inventory_products"),
+  canViewInventoryProducts.value && !canEditInventoryProducts.value,
 );
+const permissionMessages = PERMISSION_TOOLTIPS;
 
 const colorPalette = [
   "#dcfce7",
@@ -1245,8 +1255,8 @@ const closeSubmitModal = () => {
   selectedProduct.value = null;
 };
 const openDeleteModal = (p) => {
-  if (!canEditInventoryProducts.value) {
-    toast.error("You do not have permission to delete inventory products.");
+  if (!canDeleteInventoryProducts.value) {
+    toast.error(permissionMessages.delete);
     activeMenu.value = null;
     return;
   }
@@ -1304,8 +1314,8 @@ const confirmSubmitForApproval = async () => {
   }
 };
 const confirmDeleteProduct = async () => {
-  if (!canEditInventoryProducts.value) {
-    toast.error("You do not have permission to delete inventory products.");
+  if (!canDeleteInventoryProducts.value) {
+    toast.error(permissionMessages.delete);
     return;
   }
 

@@ -375,6 +375,8 @@
                 class="decision-btn approve"
                 :class="{ active: reviewForm.decision === 'approve' }"
                 @click="reviewForm.decision = 'approve'"
+                :disabled="!canApproveFunding"
+                :title="canApproveFunding ? '' : permissionMessages.approve"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -393,6 +395,8 @@
                 class="decision-btn reject"
                 :class="{ active: reviewForm.decision === 'reject' }"
                 @click="reviewForm.decision = 'reject'"
+                :disabled="!canRejectFunding"
+                :title="canRejectFunding ? '' : permissionMessages.reject"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -487,6 +491,7 @@
             class="btn-submit"
             @click="submitDecision"
             :disabled="!reviewForm.decision || submitting || !canSubmitDecision"
+            :title="decisionPermissionTooltip"
           >
             {{
               submitting
@@ -507,11 +512,11 @@ import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../plugins/axios";
 import { toast } from "vue3-toastify";
-import { useAssignment } from "../../../composables/useAssignment";
+import { PERMISSION_TOOLTIPS, useAssignment } from "../../../composables/useAssignment";
 import { useAuth } from "../../../composables/useAuth";
 
 const router = useRouter();
-const { canEdit } = useAssignment();
+const { can } = useAssignment();
 const { user } = useAuth();
 
 const searchQuery = ref("");
@@ -522,13 +527,22 @@ const error = ref(null);
 const requests = ref([]);
 const showReviewModal = ref(false);
 const submitting = ref(false);
-const canEditFunding = computed(() => canEdit("funding_requests"));
+const canApproveFunding = computed(() => can("funding_requests", "approve"));
+const canRejectFunding = computed(() => can("funding_requests", "reject"));
+const permissionMessages = PERMISSION_TOOLTIPS;
 const currentEmployeeId = computed(() => Number(user.value?.id || 0));
 const canSubmitDecision = computed(
   () =>
-    canEditFunding.value &&
-    Number(reviewForm.value.approver_id || 0) === currentEmployeeId.value,
+    Number(reviewForm.value.approver_id || 0) === currentEmployeeId.value &&
+    (reviewForm.value.decision === "approve"
+      ? canApproveFunding.value
+      : reviewForm.value.decision === "reject" && canRejectFunding.value),
 );
+const decisionPermissionTooltip = computed(() => {
+  if (reviewForm.value.decision === "approve" && !canApproveFunding.value) return permissionMessages.approve;
+  if (reviewForm.value.decision === "reject" && !canRejectFunding.value) return permissionMessages.reject;
+  return "";
+});
 
 const reviewForm = ref({
   id: null,
@@ -578,7 +592,7 @@ const isAssignedApprover = (request) =>
   Number(request?.approver_id || 0) === currentEmployeeId.value;
 
 const canReviewRequest = (request) =>
-  canEditFunding.value && isAssignedApprover(request);
+  (canApproveFunding.value || canRejectFunding.value) && isAssignedApprover(request);
 
 const getMarginClass = (margin) => {
   if (margin >= 30) return "text-success";
@@ -651,7 +665,7 @@ const viewRequest = (id) => {
 };
 
 const openReviewModal = (request) => {
-  if (!canEditFunding.value) {
+  if (!canApproveFunding.value && !canRejectFunding.value) {
     toast.error("You do not have permission to review funding requests");
     return;
   }
@@ -704,8 +718,9 @@ const closeReviewModal = () => {
 };
 
 const submitDecision = async () => {
-  if (!canEditFunding.value) {
-    toast.error("You do not have permission to review funding requests");
+  const requiredPermission = reviewForm.value.decision;
+  if (!requiredPermission || !can("funding_requests", requiredPermission)) {
+    toast.error(PERMISSION_TOOLTIPS[requiredPermission] || "You do not have permission to review funding requests");
     return;
   }
   if (!canSubmitDecision.value) {

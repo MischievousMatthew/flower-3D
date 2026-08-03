@@ -524,13 +524,13 @@ const props = defineProps({
 
 const router = useRouter();
 const route = useRoute();
-const { canEdit } = useAssignment();
+const { can } = useAssignment();
 
 const financeApprovers = ref([]);
 const loading = ref(false);
 const error = ref(null);
 const submitting = ref(false);
-const canEditFunding = computed(() => canEdit("inventory_funding"));
+const canEditFunding = computed(() => can("inventory_funding", "edit"));
 const requestId = computed(
   () => props.id ?? route.params.id ?? window.history.state?.requestId,
 );

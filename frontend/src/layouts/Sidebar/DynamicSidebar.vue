@@ -117,8 +117,10 @@
               v-if="item.path"
               :to="item.path"
               class="nav-item"
+              :class="{ 'is-restricted': !canView(item.moduleKey) }"
               :exact-active-class="'active'"
-              :title="isCollapsed ? `${section.group}: ${item.label}` : undefined"
+              :title="!canView(item.moduleKey) ? permissionTooltip : (isCollapsed ? `${section.group}: ${item.label}` : undefined)"
+              @click.prevent="!canView(item.moduleKey)"
             >
               <span class="nav-icon" v-html="getIcon(item.icon)"></span>
               <span class="nav-label" v-if="!isCollapsed">{{ item.label }}</span>
@@ -228,6 +230,7 @@ import LoadingOverlay from "../components/LoadingOverlay.vue";
 const route = useRoute();
 const { logout, user } = useAuth();
 const { canView } = useAssignment();
+const permissionTooltip = "You don't have permission to view this information.";
 const { unreadChatCount, chatRoute } = useChatNotifications();
 const { scOrdersBadgeCount } = useSupplyChainNotifications();
 const { isCollapsed, isMobileOpen, closeMobile } = useSidebarState();
@@ -279,8 +282,6 @@ const currentConfig = computed(() => {
   const groupedSections = new Map();
 
   for (const mod of ERP_MODULES) {
-    if (!canView(mod.key)) continue;
-
     const matchedChildren = mod.children?.filter((child) =>
       child.label.toLowerCase().includes(query),
     );
@@ -731,6 +732,14 @@ async function handleLogout() {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.nav-item.is-restricted {
+  opacity: .48;
+  cursor: not-allowed;
+}
+.nav-item.is-restricted:hover {
+  background: transparent;
+  color: inherit;
 }
 
 .nav-badge {

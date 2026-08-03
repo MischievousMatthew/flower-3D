@@ -52,8 +52,8 @@
           chat-role="vendor"
           layout-mode="embedded"
           counterpart-label="customers"
-          :can-send-messages="canEditCRM"
-          :allow-new-chat="canEditCRM"
+          :can-send-messages="canCreateCRM"
+          :allow-new-chat="canCreateCRM"
         />
       </div>
     </div>
@@ -67,7 +67,7 @@ import DynamicSidebar from "../../../layouts/Sidebar/DynamicSidebar.vue";
 import { useAssignment } from "../../../composables/useAssignment";
 import { useSidebarState } from "../../../composables/useSidebarState";
 
-const { canEdit } = useAssignment();
+const { can } = useAssignment();
 const { isCollapsed, toggleMobile } = useSidebarState();
 
 const width = ref(window.innerWidth);
@@ -78,7 +78,7 @@ onUnmounted(() => window.removeEventListener("resize", updateWidth));
 
 const isMobile = computed(() => width.value <= 968);
 const sidebarWidth = computed(() => (isCollapsed.value ? "66px" : "250px"));
-const canEditCRM = computed(() => canEdit("crm"));
+const canCreateCRM = computed(() => can("crm", "create"));
 </script>
 
 <style scoped>

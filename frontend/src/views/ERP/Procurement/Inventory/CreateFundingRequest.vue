@@ -725,14 +725,14 @@ import { useAssignment } from "../../../../composables/useAssignment";
 
 
 const router = useRouter();
-const { canEdit } = useAssignment();
+const { can } = useAssignment();
 const financeApprovers = ref([]);
 const products = ref([]);
 const selectedProductId = ref("");
 const submitting = ref(false);
 const loadingProducts = ref(false);
 const quantityError = ref("");
-const canEditFunding = computed(() => canEdit("inventory_funding"));
+const canEditFunding = computed(() => can("inventory_funding", "create"));
 
 const formData = ref({
   approver_id: "",

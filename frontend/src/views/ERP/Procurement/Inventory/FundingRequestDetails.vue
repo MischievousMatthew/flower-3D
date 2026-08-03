@@ -554,7 +554,7 @@ const props = defineProps({
 
 const router = useRouter();
 const route = useRoute();
-const { canEdit } = useAssignment();
+const { can } = useAssignment();
 
 const request = ref(null);
 const loading = ref(false);
@@ -564,7 +564,7 @@ const error = ref(null);
 
 /** Convenience flag used in the template */
 const isInventoryContext = computed(() => props.context === "inventory");
-const canEditFunding = computed(() => canEdit("inventory_funding"));
+const canEditFunding = computed(() => can("inventory_funding", "edit"));
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 

@@ -98,6 +98,7 @@
                 class="btn-primary"
                 @click="showNewChatModal = true"
                 :disabled="!canStartConversation"
+                :title="canStartConversation ? '' : permissionTooltip"
               >
                 Start New Chat
               </button>
@@ -118,9 +119,10 @@
               start chatting
             </p>
             <button
-              class="btn-primary"
-              @click="showNewChatModal = true"
-              :disabled="!canStartConversation"
+                class="btn-primary"
+                @click="showNewChatModal = true"
+                :disabled="!canStartConversation"
+                :title="canStartConversation ? '' : permissionTooltip"
             >
               Start New Chat
             </button>
@@ -334,6 +336,7 @@
                   @keyup.enter="sendMessage"
                   @input="handleTyping"
                   :disabled="!canSendMessages || isSending"
+                  :title="canSendMessages ? '' : permissionTooltip"
                   class="message-input"
                 />
 
@@ -343,7 +346,7 @@
                   class="send-btn"
                   @click="sendMessage"
                   :disabled="!canSend"
-                  title="Send message"
+                  :title="canSend ? 'Send message' : permissionTooltip"
                 >
                   ➤
                 </button>
@@ -544,6 +547,8 @@ const props = defineProps({
     default: "",
   },
 });
+
+const permissionTooltip = "You don't have permission to create new records.";
 
 const router = useRouter();
 const { user, isAuthenticated } = useAuth();

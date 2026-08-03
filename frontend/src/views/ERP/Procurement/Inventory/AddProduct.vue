@@ -12,6 +12,7 @@
             @click="saveDraft"
             class="btn-secondary"
             :disabled="isReadOnlyInventoryProducts || isSubmitting"
+            :title="isReadOnlyInventoryProducts ? permissionTooltip : ''"
           >
             <span>📝</span><span>Save as Draft</span>
           </button>
@@ -19,6 +20,7 @@
             @click="publishProduct"
             class="btn-primary"
             :disabled="isReadOnlyInventoryProducts || isSubmitting"
+            :title="isReadOnlyInventoryProducts ? permissionTooltip : ''"
           >
             <span>✅</span
             ><span>{{
@@ -645,6 +647,7 @@
                 @click="saveDraft"
                 class="btn-secondary"
                 :disabled="isReadOnlyInventoryProducts || isSubmitting"
+                :title="isReadOnlyInventoryProducts ? permissionTooltip : ''"
               >
                 <span v-if="isSubmitting && isDraft">Saving...</span>
                 <span v-else>📝 Save as Draft</span>
@@ -653,6 +656,7 @@
                 type="submit"
                 class="btn-primary"
                 :disabled="isReadOnlyInventoryProducts || isSubmitting"
+                :title="isReadOnlyInventoryProducts ? permissionTooltip : ''"
               >
                 <span v-if="isSubmitting && !isDraft">Publishing...</span>
                 <span v-else>✅ Publish Product</span>
@@ -670,7 +674,7 @@
 import { ref, computed, onMounted, reactive } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../../../composables/useAuth";
-import { useAssignment } from "../../../../composables/useAssignment";
+import { PERMISSION_TOOLTIPS, useAssignment } from "../../../../composables/useAssignment";
 
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
@@ -678,17 +682,18 @@ import api from "../../../../plugins/axios";
 
 const router = useRouter();
 const { user } = useAuth();
-const { canEdit, isReadOnly } = useAssignment();
+const { can } = useAssignment();
 const fileInput = ref(null);
 const modelFileInput = ref(null);
 const isSubmitting = ref(false);
 const isDraft = ref(false);
 const product3DModel = ref(null);
 const errors = reactive({});
-const canEditInventoryProducts = computed(() => canEdit("inventory_products"));
+const canCreateInventoryProducts = computed(() => can("inventory_products", "create"));
 const isReadOnlyInventoryProducts = computed(() =>
-  isReadOnly("inventory_products"),
+  !canCreateInventoryProducts.value,
 );
+const permissionTooltip = PERMISSION_TOOLTIPS.create;
 
 const formData = reactive({
   owner_id: null,
@@ -787,16 +792,16 @@ const isTagDisabled = (tag) =>
 
 // 3D model
 const trigger3DFileInput = () => {
-  if (!canEditInventoryProducts.value) return;
+  if (!canCreateInventoryProducts.value) return;
   modelFileInput.value?.click();
 };
 const handle3DFileSelect = (e) => {
-  if (!canEditInventoryProducts.value) return;
+  if (!canCreateInventoryProducts.value) return;
   const file = e.target.files[0];
   if (file) validate3DModel(file);
 };
 const handle3DFileDrop = (e) => {
-  if (!canEditInventoryProducts.value) return;
+  if (!canCreateInventoryProducts.value) return;
   e.preventDefault();
   const file = e.dataTransfer.files[0];
   if (file) validate3DModel(file);
@@ -818,7 +823,7 @@ const validate3DModel = (file) => {
   toast.success("3D model uploaded successfully!");
 };
 const remove3DModel = () => {
-  if (!canEditInventoryProducts.value) return;
+  if (!canCreateInventoryProducts.value) return;
   product3DModel.value = null;
   if (modelFileInput.value) modelFileInput.value.value = "";
 };
@@ -832,17 +837,17 @@ const formatFileSize = (bytes) => {
 
 // Images
 const triggerFileInput = () => {
-  if (!canEditInventoryProducts.value) return;
+  if (!canCreateInventoryProducts.value) return;
   fileInput.value?.click();
 };
 const handleFileSelect = (e) => addImages(Array.from(e.target.files));
 const handleDrop = (e) => {
-  if (!canEditInventoryProducts.value) return;
+  if (!canCreateInventoryProducts.value) return;
   e.preventDefault();
   addImages(Array.from(e.dataTransfer.files));
 };
 const addImages = (files) => {
-  if (!canEditInventoryProducts.value) return;
+  if (!canCreateInventoryProducts.value) return;
   const imageFiles = files.filter((f) => f.type.startsWith("image/"));
   const remaining = 5 - productImages.value.length;
   if (imageFiles.length > remaining) {
@@ -858,7 +863,7 @@ const addImages = (files) => {
   if (fileInput.value) fileInput.value.value = "";
 };
 const removeImage = (index) => {
-  if (!canEditInventoryProducts.value) return;
+  if (!canCreateInventoryProducts.value) return;
   productImages.value.splice(index, 1);
 };
 const clearError = (field) => {
@@ -993,8 +998,8 @@ const validateForm = () => {
 };
 
 const saveDraft = async () => {
-  if (!canEditInventoryProducts.value) {
-    toast.error("You do not have permission to create inventory products.");
+  if (!canCreateInventoryProducts.value) {
+    toast.error(permissionTooltip);
     return;
   }
   isDraft.value = true;
@@ -1002,8 +1007,8 @@ const saveDraft = async () => {
   await submitProduct();
 };
 const publishProduct = async () => {
-  if (!canEditInventoryProducts.value) {
-    toast.error("You do not have permission to create inventory products.");
+  if (!canCreateInventoryProducts.value) {
+    toast.error(permissionTooltip);
     return;
   }
   isDraft.value = false;
@@ -1012,8 +1017,8 @@ const publishProduct = async () => {
 };
 
 const submitProduct = async () => {
-  if (!canEditInventoryProducts.value) {
-    toast.error("You do not have permission to create inventory products.");
+  if (!canCreateInventoryProducts.value) {
+    toast.error(permissionTooltip);
     return;
   }
   if (isSubmitting.value) return;

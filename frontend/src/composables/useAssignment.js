@@ -24,6 +24,18 @@ function matchesModuleKey(assignedKey, requestedKey) {
 const modulePermissions = ref([]); // Array of { module, permission }
 const defaultRoute = ref("/erp/dashboard");
 
+export const PERMISSION_TOOLTIPS = {
+  view: "You don't have permission to view this information.",
+  create: "You don't have permission to create new records.",
+  edit: "You don't have permission to edit this information.",
+  delete: "You don't have permission to delete this record.",
+  approve: "You don't have permission to approve this request.",
+  reject: "You don't have permission to reject this request.",
+  export: "You don't have permission to export this data.",
+  print: "You don't have permission to print this information.",
+  manage: "You don't have permission to manage this module.",
+};
+
 export function useAssignment() {
   // ─── Bootstrap ─────────────────────────────────────────────────────────────
   // Called once after login, passing the user object from /auth/employee-me.

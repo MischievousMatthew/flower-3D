@@ -832,7 +832,7 @@ import payrollApi from "../../../../services/payrollApi";
 import { useAssignment } from "../../../../composables/useAssignment";
 
 const router = useRouter();
-const { canEdit, isReadOnly } = useAssignment();
+const { can, canView } = useAssignment();
 
 // State
 const employees = ref([]);
@@ -851,8 +851,8 @@ const formData = ref({
   include_contributions: false,
 });
 
-const canEditPayroll = computed(() => canEdit("payroll"));
-const isReadOnlyPayroll = computed(() => isReadOnly("payroll"));
+const canEditPayroll = computed(() => can("payroll", "create"));
+const isReadOnlyPayroll = computed(() => canView("payroll") && !canEditPayroll.value);
 
 // Computed
 const canPreview = computed(() => {
