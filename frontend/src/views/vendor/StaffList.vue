@@ -10,7 +10,6 @@
         <p class="subtitle">Manage your team members and their roles</p>
       </div>
     </div>
-    x``
     <!-- Recent Activity Cards -->
     <div class="activity-section">
       <h2>Recent Activity</h2>
