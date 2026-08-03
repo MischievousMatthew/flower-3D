@@ -52,7 +52,7 @@ class EmployeeAuthController extends Controller
                 ->get()
                 ->map(fn ($p) => [
                     'module' => $p->module,
-                    'access' => $p->access,
+                    'permission' => $p->permission,
                 ]);
 
             // Compute default route from first module permission
@@ -137,7 +137,7 @@ class EmployeeAuthController extends Controller
             ->get()
             ->map(fn ($p) => [
                 'module' => $p->module,
-                'access' => $p->access,
+                'permission' => $p->permission,
             ]);
 
         $defaultRoute = '/erp/dashboard';

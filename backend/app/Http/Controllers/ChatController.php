@@ -191,7 +191,7 @@ class ChatController extends Controller
 
     public function sendMessage(Request $request): JsonResponse
     {
-        $accessResponse = $this->ensureChatAccess($request, 'edit');
+        $accessResponse = $this->ensureChatAccess($request, 'create');
         if ($accessResponse) {
             return $accessResponse;
         }
@@ -439,7 +439,7 @@ class ChatController extends Controller
 
     public function startConversation(Request $request): JsonResponse
     {
-        $accessResponse = $this->ensureChatAccess($request, 'edit');
+        $accessResponse = $this->ensureChatAccess($request, 'create');
         if ($accessResponse) {
             return $accessResponse;
         }
@@ -499,7 +499,7 @@ class ChatController extends Controller
     {
         $accessResponse = $this->ensureChatAccess(
             $request,
-            $request->user() instanceof Employee ? 'edit' : 'view'
+            $request->user() instanceof Employee ? 'create' : 'view'
         );
         if ($accessResponse) {
             return $accessResponse;
@@ -579,9 +579,7 @@ class ChatController extends Controller
                 return response()->json(['success' => false, 'message' => 'CRM chat is not configured for this employee'], 403);
             }
 
-            $allowed = $requiredAccess === 'edit'
-                ? $authUser->canEditModule('crm')
-                : $authUser->canViewModule('crm');
+            $allowed = $authUser->hasModulePermission('crm', $requiredAccess);
 
             if (!$allowed) {
                 return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);

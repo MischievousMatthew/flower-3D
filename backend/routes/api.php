@@ -215,7 +215,7 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/vendor/{id}/details',            [ChatController::class, 'getUserDetails']);
         });
 
-        Route::middleware('employee.module:crm,edit')->group(function () {
+        Route::middleware('employee.module:crm,create')->group(function () {
             Route::post('/messages/send',                 [ChatController::class, 'sendMessage']);
             Route::post('/conversations/start',           [ChatController::class, 'startConversation']);
             Route::get('/search-users',                   [ChatController::class, 'searchUsers']);
@@ -313,12 +313,12 @@ Route::middleware('token.auth')->group(function () {
     // ----------------------------------------------------------
 
     Route::prefix('sc')->group(function () {
-        Route::get('/orders',                   [DeliveryController::class,        'scOrders']);
-        Route::post('/barcode/scan',            [DeliveryController::class,        'scan']);
-        Route::get('/orders/{orderId}/barcode', [DeliveryBarcodeController::class, 'show']);
-        Route::get('/order-requests',                        [OrderRequestController::class, 'index']);
-        Route::post('/order-requests/{id}/approve',          [OrderRequestController::class, 'approve']);
-        Route::post('/order-requests/{id}/reject',           [OrderRequestController::class, 'reject']);
+        Route::get('/orders', [DeliveryController::class, 'scOrders'])->middleware('employee.module:deliveries,view');
+        Route::post('/barcode/scan', [DeliveryController::class, 'scan'])->middleware('employee.module:order_scan,edit');
+        Route::get('/orders/{orderId}/barcode', [DeliveryBarcodeController::class, 'show'])->middleware('employee.module:deliveries,view');
+        Route::get('/order-requests', [OrderRequestController::class, 'index'])->middleware('employee.module:deliveries,view');
+        Route::post('/order-requests/{id}/approve', [OrderRequestController::class, 'approve'])->middleware('employee.module:deliveries,approve');
+        Route::post('/order-requests/{id}/reject', [OrderRequestController::class, 'reject'])->middleware('employee.module:deliveries,reject');
     });
 
     // ----------------------------------------------------------
@@ -326,8 +326,8 @@ Route::middleware('token.auth')->group(function () {
     // ----------------------------------------------------------
 
     Route::prefix('deliveries')->group(function () {
-        Route::patch('/{id}/status', [DeliveryController::class, 'updateStatus']);
-        Route::get('/{id}/logs',     [DeliveryController::class, 'logs']);
+        Route::patch('/{id}/status', [DeliveryController::class, 'updateStatus'])->middleware('employee.module:deliveries,edit');
+        Route::get('/{id}/logs',     [DeliveryController::class, 'logs'])->middleware('employee.module:deliveries,view');
     });
 
     // ----------------------------------------------------------
@@ -341,12 +341,10 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/{id}',          [EmployeeInfoController::class, 'show']);
         });
 
-        Route::middleware('employee.module:employees,edit')->group(function () {
-            Route::post('/',             [EmployeeInfoController::class, 'store']);
-            Route::put('/{id}',          [EmployeeInfoController::class, 'update']);
-            Route::patch('/{id}/status', [EmployeeInfoController::class, 'updateStatus']);
-            Route::delete('/{id}',       [EmployeeInfoController::class, 'destroy']);
-        });
+        Route::post('/', [EmployeeInfoController::class, 'store'])->middleware('employee.module:employees,create');
+        Route::put('/{id}', [EmployeeInfoController::class, 'update'])->middleware('employee.module:employees,edit');
+        Route::patch('/{id}/status', [EmployeeInfoController::class, 'updateStatus'])->middleware('employee.module:employees,edit');
+        Route::delete('/{id}', [EmployeeInfoController::class, 'destroy'])->middleware('employee.module:employees,delete');
     });
 
     Route::prefix('attendance')->group(function () {
@@ -355,24 +353,26 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/summary', [AttendanceController::class, 'summary']);
         });
 
-        Route::middleware('employee.module:attendance,edit')->group(function () {
+        Route::middleware('employee.module:attendance,create')->group(function () {
             Route::post('/scan',     [AttendanceController::class, 'scanQR']);
             Route::post('/',         [AttendanceController::class, 'store']);
-            Route::put('/{id}',      [AttendanceController::class, 'update']);
-            Route::delete('/{id}',   [AttendanceController::class, 'destroy']);
             Route::post('/time-in',  [AttendanceController::class, 'timeIn']);
             Route::post('/time-out', [AttendanceController::class, 'timeOut']);
         });
+        Route::put('/{id}', [AttendanceController::class, 'update'])->middleware('employee.module:attendance,edit');
+        Route::delete('/{id}', [AttendanceController::class, 'destroy'])->middleware('employee.module:attendance,delete');
     });
 
-    Route::prefix('employees/{employeeId}/qr-code')->group(function () {
-        Route::middleware('employee.module:employees,view')->group(function () {
-            Route::get('/svg',       [EmployeeQRController::class, 'getSVG']);
-            Route::get('/base64',    [EmployeeQRController::class, 'getBase64']);
-            Route::get('/download',  [EmployeeQRController::class, 'download']);
-        });
+        Route::prefix('employees/{employeeId}/qr-code')->group(function () {
+            Route::middleware('employee.module:employees,view')->group(function () {
+                Route::get('/svg',       [EmployeeQRController::class, 'getSVG']);
+                Route::get('/base64',    [EmployeeQRController::class, 'getBase64']);
+            });
 
-        Route::middleware('employee.module:employees,edit')->group(function () {
+            Route::get('/download', [EmployeeQRController::class, 'download'])
+                ->middleware('employee.module:employees,export');
+
+        Route::middleware('employee.module:employees,create')->group(function () {
             Route::post('/generate', [EmployeeQRController::class, 'generate']);
         });
     });
@@ -383,11 +383,9 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/finance-summary',  [PayrollController::class, 'financeSummary']);
         });
 
-        Route::middleware('employee.module:payroll_requests,edit')->group(function () {
-            Route::post('/finance-approve', [PayrollController::class, 'financeApprove']);
-            Route::post('/finance-reject',  [PayrollController::class, 'financeReject']);
-            Route::post('/mark-paid',       [PayrollController::class, 'markAsPaid']);
-        });
+        Route::post('/finance-approve', [PayrollController::class, 'financeApprove'])->middleware('employee.module:payroll_requests,approve');
+        Route::post('/finance-reject', [PayrollController::class, 'financeReject'])->middleware('employee.module:payroll_requests,reject');
+        Route::post('/mark-paid', [PayrollController::class, 'markAsPaid'])->middleware('employee.module:payroll_requests,edit');
 
         Route::middleware('employee.module:payroll,view')->group(function () {
             Route::get('/',                 [PayrollController::class, 'index']);
@@ -395,12 +393,12 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/{id}',             [PayrollController::class, 'show'])->whereNumber('id');
         });
 
-        Route::middleware('employee.module:payroll,edit')->group(function () {
+        Route::middleware('employee.module:payroll,create')->group(function () {
             Route::post('/',                [PayrollController::class, 'store']);
             Route::post('/preview',         [PayrollController::class, 'preview']);
-            Route::post('/hr-approve',      [PayrollController::class, 'hrApprove']);
-            Route::delete('/{id}',          [PayrollController::class, 'destroy'])->whereNumber('id');
         });
+        Route::post('/hr-approve', [PayrollController::class, 'hrApprove'])->middleware('employee.module:payroll,approve');
+        Route::delete('/{id}', [PayrollController::class, 'destroy'])->whereNumber('id')->middleware('employee.module:payroll,delete');
     });
 
     Route::prefix('leaves')->group(function () {
@@ -409,10 +407,10 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/statistics',  [EmployeeLeaveController::class, 'getStatistics']);
         });
 
-        Route::middleware('employee.module:leave_management,edit')->group(function () {
-            Route::put('/{id}/status', [EmployeeLeaveController::class, 'updateStatus']);
-            Route::delete('/{id}',     [EmployeeLeaveController::class, 'destroy']);
-        });
+        // Approval versus rejection is selected from the request status and is
+        // authorized independently inside EmployeeLeaveController.
+        Route::put('/{id}/status', [EmployeeLeaveController::class, 'updateStatus']);
+        Route::delete('/{id}', [EmployeeLeaveController::class, 'destroy'])->middleware('employee.module:leave_management,delete');
     });
 
     // ----------------------------------------------------------
@@ -431,18 +429,18 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/products/{id}',     [ProductController::class, 'show']);
         });
 
+        Route::post('/products', [ProductController::class, 'store'])->middleware('employee.module:inventory_products,create');
         Route::middleware('employee.module:inventory_products,edit')->group(function () {
-            Route::post('/products',         [ProductController::class, 'store']);
             Route::put('/products/{id}',     [ProductController::class, 'update']);
             Route::patch('/products/{id}',   [ProductController::class, 'update']);
-            Route::delete('/products/{id}',  [ProductController::class, 'destroy']);
             Route::post('/products/{id}/toggle-status',             [ProductController::class, 'toggleStatus']);
             Route::post('/products/{id}/status',                    [ProductController::class, 'updateStatus']);
             Route::patch('/products/{id}/stock',                    [ProductController::class, 'updateStock']);
             Route::post('/products/{id}/update-stock',              [ProductController::class, 'updateStock']);
-            Route::delete('/products/{productId}/images/{imageId}', [ProductController::class, 'deleteImage']);
-            Route::delete('/products/{productId}/model',            [ProductController::class, 'deleteModel']);
         });
+        Route::delete('/products/{id}', [ProductController::class, 'destroy'])->middleware('employee.module:inventory_products,delete');
+        Route::delete('/products/{productId}/images/{imageId}', [ProductController::class, 'deleteImage'])->middleware('employee.module:inventory_products,delete');
+        Route::delete('/products/{productId}/model', [ProductController::class, 'deleteModel'])->middleware('employee.module:inventory_products,delete');
 
         Route::middleware('employee.module:inventory_funding,view')->group(function () {
             Route::get('eligible-approvers',            [FundingRequestController::class, 'getEligibleApprovers']);
@@ -451,12 +449,14 @@ Route::middleware('token.auth')->group(function () {
             Route::get('funding-requests/{id}',         [FundingRequestController::class, 'show']);
         });
 
-        Route::middleware('employee.module:inventory_funding,edit')->group(function () {
+        Route::middleware('employee.module:inventory_funding,create')->group(function () {
             Route::post('funding-requests',             [FundingRequestController::class, 'store']);
-            Route::put('funding-requests/{id}',         [FundingRequestController::class, 'update']);
-            Route::delete('funding-requests/{id}',      [FundingRequestController::class, 'destroy']);
             Route::post('funding-requests/{id}/submit', [FundingRequestController::class, 'submitToAccounting']);
         });
+        Route::middleware('employee.module:inventory_funding,edit')->group(function () {
+            Route::put('funding-requests/{id}',         [FundingRequestController::class, 'update']);
+        });
+        Route::delete('funding-requests/{id}', [FundingRequestController::class, 'destroy'])->middleware('employee.module:inventory_funding,delete');
     });
 
     // ----------------------------------------------------------
@@ -472,18 +472,18 @@ Route::middleware('token.auth')->group(function () {
                 Route::get('/{supplierId}/contacts',         [SupplierController::class, 'contacts']);
             });
 
+            Route::post('/', [SupplierController::class, 'store'])->middleware('employee.module:suppliers,create');
+            Route::post('/{supplierId}/contacts', [SupplierController::class, 'storeContact'])->middleware('employee.module:suppliers,create');
             Route::middleware('employee.module:suppliers,edit')->group(function () {
-                Route::post('/',              [SupplierController::class, 'store']);
                 Route::put('/{id}',           [SupplierController::class, 'update']);
                 Route::patch('/{id}',         [SupplierController::class, 'update']);
-                Route::delete('/{id}',        [SupplierController::class, 'destroy']);
                 Route::patch('/{id}/activate',   [SupplierController::class, 'activate']);
                 Route::patch('/{id}/deactivate', [SupplierController::class, 'deactivate']);
                 Route::patch('/{id}/blacklist',  [SupplierController::class, 'blacklist']);
-                Route::post('/{supplierId}/contacts',        [SupplierController::class, 'storeContact']);
                 Route::put('/{supplierId}/contacts/{id}',    [SupplierController::class, 'updateContact']);
-                Route::delete('/{supplierId}/contacts/{id}', [SupplierController::class, 'destroyContact']);
             });
+            Route::delete('/{id}', [SupplierController::class, 'destroy'])->middleware('employee.module:suppliers,delete');
+            Route::delete('/{supplierId}/contacts/{id}', [SupplierController::class, 'destroyContact'])->middleware('employee.module:suppliers,delete');
         });
 
         Route::prefix('warehouses')->group(function () {
@@ -495,15 +495,15 @@ Route::middleware('token.auth')->group(function () {
                 Route::get('/{warehouseId}/barcodes',           [WarehouseController::class, 'barcodes']);
             });
 
+            Route::post('/', [WarehouseController::class, 'store'])->middleware('employee.module:warehouse,create');
+            Route::post('/{warehouseId}/items', [WarehouseController::class, 'addItem'])->middleware('employee.module:warehouse,create');
             Route::middleware('employee.module:warehouse,edit')->group(function () {
-                Route::post('/',       [WarehouseController::class, 'store']);
                 Route::put('/{id}',    [WarehouseController::class, 'update']);
                 Route::patch('/{id}',  [WarehouseController::class, 'update']);
-                Route::delete('/{id}', [WarehouseController::class, 'destroy']);
-                Route::post('/{warehouseId}/items',             [WarehouseController::class, 'addItem']);
                 Route::put('/{warehouseId}/items/{id}',         [WarehouseController::class, 'updateItem']);
                 Route::patch('/{warehouseId}/items/{id}/stock', [WarehouseController::class, 'adjustStock']);
             });
+            Route::delete('/{id}', [WarehouseController::class, 'destroy'])->middleware('employee.module:warehouse,delete');
         });
 
         Route::prefix('warehouse/batches')->group(function () {
@@ -513,8 +513,8 @@ Route::middleware('token.auth')->group(function () {
                 Route::get('/{id}/logs',           [WarehouseBatchController::class, 'logs']);
             });
 
+            Route::post('/', [WarehouseBatchController::class, 'receive'])->middleware('employee.module:warehouse,create');
             Route::middleware('employee.module:warehouse,edit')->group(function () {
-                Route::post('/',                   [WarehouseBatchController::class, 'receive']);
                 Route::post('/{id}/cull',          [WarehouseBatchController::class, 'cull']);
                 Route::patch('/{id}/condition',    [WarehouseBatchController::class, 'updateCondition']);
                 Route::patch('/{id}/transfer',     [WarehouseBatchController::class, 'transfer']);
@@ -527,12 +527,12 @@ Route::middleware('token.auth')->group(function () {
                 Route::get('/{id}',          [WarehouseLocationController::class, 'show']);
             });
 
+            Route::post('/', [WarehouseLocationController::class, 'store'])->middleware('employee.module:warehouse,create');
             Route::middleware('employee.module:warehouse,edit')->group(function () {
-                Route::post('/',             [WarehouseLocationController::class, 'store']);
                 Route::patch('/{id}',        [WarehouseLocationController::class, 'update']);
-                Route::delete('/{id}',       [WarehouseLocationController::class, 'destroy']);
                 Route::patch('/{id}/toggle', [WarehouseLocationController::class, 'toggle']);
             });
+            Route::delete('/{id}', [WarehouseLocationController::class, 'destroy'])->middleware('employee.module:warehouse,delete');
         });
 
         Route::prefix('orders')->group(function () {
@@ -542,17 +542,19 @@ Route::middleware('token.auth')->group(function () {
                 Route::get('/{id}',                             [OrderController::class, 'show']);
             });
 
-            Route::middleware('employee.module:sc_orders,edit')->group(function () {
+            Route::middleware('employee.module:sc_orders,create')->group(function () {
                 Route::post('/',                                [OrderController::class, 'store']);
                 Route::post('/from-funding/{fundingRequestId}', [OrderController::class, 'createFromFunding']);
+                Route::post('/{id}/items', [OrderController::class, 'attachItems']);
+            });
+            Route::middleware('employee.module:sc_orders,edit')->group(function () {
                 Route::put('/{id}',                             [OrderController::class, 'update']);
                 Route::patch('/{id}',                           [OrderController::class, 'update']);
-                Route::delete('/{id}',                          [OrderController::class, 'destroy']);
                 Route::patch('/{id}/status',                    [OrderController::class, 'updateStatus']);
-                Route::post('/{id}/items',                      [OrderController::class, 'attachItems']);
-                Route::delete('/{id}/items/{itemId}',           [OrderController::class, 'removeItem']);
                 Route::post('/{id}/recalculate',                [OrderController::class, 'recalculateTotals']);
             });
+            Route::delete('/{id}', [OrderController::class, 'destroy'])->middleware('employee.module:sc_orders,delete');
+            Route::delete('/{id}/items/{itemId}', [OrderController::class, 'removeItem'])->middleware('employee.module:sc_orders,delete');
         });
 
         Route::prefix('shipments')->group(function () {
@@ -561,16 +563,16 @@ Route::middleware('token.auth')->group(function () {
                 Route::get('/{id}',            [ShipmentController::class, 'show']);
             });
 
+            Route::post('/', [ShipmentController::class, 'store'])->middleware('employee.module:deliveries,edit');
             Route::middleware('employee.module:deliveries,edit')->group(function () {
-                Route::post('/',               [ShipmentController::class, 'store']);
                 Route::put('/{id}',            [ShipmentController::class, 'update']);
                 Route::patch('/{id}',          [ShipmentController::class, 'update']);
-                Route::delete('/{id}',         [ShipmentController::class, 'destroy']);
                 Route::patch('/{id}/status',   [ShipmentController::class, 'updateStatus']);
                 Route::patch('/{id}/tracking', [ShipmentController::class, 'updateTracking']);
                 Route::patch('/{id}/ship',     [ShipmentController::class, 'markShipped']);
                 Route::patch('/{id}/receive',  [ShipmentController::class, 'markReceived']);
             });
+            Route::delete('/{id}', [ShipmentController::class, 'destroy'])->middleware('employee.module:deliveries,edit');
         });
 
         Route::prefix('barcode')->group(function () {
@@ -605,10 +607,8 @@ Route::middleware('token.auth')->group(function () {
             Route::get('funding-requests',               [AccountingFundingRequestController::class, 'index']);
         });
 
-        Route::middleware('employee.module:funding_requests,edit')->group(function () {
-            Route::post('funding-requests/{id}/approve', [AccountingFundingRequestController::class, 'approve']);
-            Route::post('funding-requests/{id}/reject',  [AccountingFundingRequestController::class, 'reject']);
-        });
+        Route::post('funding-requests/{id}/approve', [AccountingFundingRequestController::class, 'approve'])->middleware('employee.module:funding_requests,approve');
+        Route::post('funding-requests/{id}/reject', [AccountingFundingRequestController::class, 'reject'])->middleware('employee.module:funding_requests,reject');
     });
 
     Route::prefix('admin')->group(function () {

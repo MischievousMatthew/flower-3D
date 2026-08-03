@@ -147,7 +147,7 @@
           </button>
           <div class="dropdown-menu export-menu" v-if="showExportOptions">
             <div class="menu-label">EXPORT CATEGORY</div>
-            <button @click="exportData('employee_list')">
+            <button @click="exportData('employee_list')" :disabled="!canExportEmployees" :title="exportTooltip">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="14"
@@ -458,7 +458,7 @@
             />
           </div>
 
-          <button class="export-btn" @click="exportEmployees">
+          <button class="export-btn" @click="exportEmployees" :disabled="!canExportEmployees" :title="exportTooltip">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -544,8 +544,12 @@ import { toast } from "vue3-toastify";
 import LoadingOverlay from "../../../layouts/components/LoadingOverlay.vue";
 import api from "../../../plugins/axios";
 import attendanceApi from "../../../services/attendanceApi";
+import { useAssignment } from "../../../composables/useAssignment";
 
 const router = useRouter();
+const { can } = useAssignment();
+const canExportEmployees = computed(() => can("employees", "export"));
+const exportTooltip = computed(() => canExportEmployees.value ? "" : "You don't have permission to export this data.");
 
 // State
 const searchQuery = ref("");
@@ -995,6 +999,10 @@ const refreshData = async () => {
 };
 
 const exportData = async (category = "all") => {
+  if (category === "employee_list" && !canExportEmployees.value) {
+    toast.error("You don't have permission to export this data.");
+    return;
+  }
   showExportOptions.value = false;
   isLoading.value = true;
   isLoadingMessage.value = `Exporting ${category}...`;

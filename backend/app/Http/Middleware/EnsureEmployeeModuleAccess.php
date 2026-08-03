@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureEmployeeModuleAccess
 {
-    public function handle(Request $request, Closure $next, string $module, string $level = 'view'): Response
+    public function handle(Request $request, Closure $next, string $module, string $permission = 'view'): Response
     {
         $user = $request->user();
 
@@ -17,11 +17,7 @@ class EnsureEmployeeModuleAccess
             return $next($request);
         }
 
-        $allowed = match ($level) {
-            'edit' => $user->canEditModule($module),
-            'view' => $user->canViewModule($module),
-            default => false,
-        };
+        $allowed = $user->hasModulePermission($module, $permission);
 
         if (! $allowed) {
             return response()->json([

@@ -83,8 +83,8 @@
           <button
             class="add-employee-btn"
             @click="openAddModal"
-            :disabled="isReadOnlyEmployees"
-            :title="isReadOnlyEmployees ? 'You do not have permission to add employees' : 'Add employee'"
+            :disabled="!canCreateEmployees"
+            :title="canCreateEmployees ? '' : permissionMessages.create"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -100,8 +100,8 @@
             </svg>
           </button>
         </div>
-        <p v-if="isReadOnlyEmployees" class="permission-banner">
-          Read-only mode. You can review employee records, but only employees with edit access can create or update profiles.
+        <p v-if="isEmployeeReadOnly" class="permission-banner">
+          Read-only mode. You can review employee records, but cannot create, edit, or delete profiles.
         </p>
       </div>
 
@@ -154,8 +154,8 @@
                 <button
                   class="action-btn"
                   @click="toggleMenu(employee.id)"
-                  :disabled="isReadOnlyEmployees"
-                  :title="isReadOnlyEmployees ? 'You do not have permission to modify employees' : 'Open actions'"
+                  :disabled="!canManageEmployee"
+                  :title="canManageEmployee ? 'Open actions' : permissionMessages.edit"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -173,17 +173,17 @@
                   <button @click="selectEmployee(employee)">
                     View Details
                   </button>
-                  <button :disabled="isReadOnlyEmployees" @click="openEditModal(employee)">Edit</button>
-                  <button :disabled="isReadOnlyEmployees" @click="updateEmployeeStatus(employee, 'Regular')">
+                  <button :disabled="!canEditEmployees" :title="canEditEmployees ? '' : permissionMessages.edit" @click="openEditModal(employee)">Edit</button>
+                  <button :disabled="!canEditEmployees" :title="canEditEmployees ? '' : permissionMessages.edit" @click="updateEmployeeStatus(employee, 'Regular')">
                     Mark as Regular
                   </button>
                   <button
-                    :disabled="isReadOnlyEmployees"
+                    :disabled="!canEditEmployees"
                     @click="updateEmployeeStatus(employee, 'Probationary')"
                   >
                     Mark as Probationary
                   </button>
-                  <button class="delete-btn" :disabled="isReadOnlyEmployees" @click="deleteEmployee(employee)">
+                  <button class="delete-btn" :disabled="!canDeleteEmployees" :title="canDeleteEmployees ? '' : permissionMessages.delete" @click="deleteEmployee(employee)">
                     Delete
                   </button>
                 </div>
@@ -193,7 +193,7 @@
               <td colspan="6" class="no-data">
                 <div class="no-data-message">
                   <p>No employees found</p>
-                  <button @click="openAddModal" class="btn-add-first" :disabled="isReadOnlyEmployees">
+                  <button @click="openAddModal" class="btn-add-first" :disabled="!canCreateEmployees" :title="canCreateEmployees ? '' : permissionMessages.create">
                     Add First Employee
                   </button>
                 </div>
@@ -589,10 +589,10 @@
         </div>
 
         <form @submit.prevent="saveEmployee" class="modal-body">
-          <p v-if="isReadOnlyEmployees" class="permission-banner">
+          <p v-if="isEmployeeReadOnly" class="permission-banner">
             Read-only mode. Form fields are disabled because you only have view access to Employees.
           </p>
-          <fieldset :disabled="isReadOnlyEmployees" class="permission-fieldset">
+          <fieldset :disabled="isEditMode ? !canEditEmployees : !canCreateEmployees" class="permission-fieldset">
           <!-- Profile Picture -->
           <div class="form-section">
             <h3 class="section-title">Profile Photo</h3>
@@ -1108,7 +1108,7 @@
             <button type="button" class="btn-cancel" @click="closeModal">
               Cancel
             </button>
-            <button type="submit" class="btn-submit" :disabled="isReadOnlyEmployees || isSaving">
+            <button type="submit" class="btn-submit" :disabled="(isEditMode ? !canEditEmployees : !canCreateEmployees) || isSaving">
               {{
                 isSaving
                   ? "Saving..."
@@ -1144,7 +1144,7 @@ import {
 
 // State
 const searchQuery = ref("");
-const { canEdit, isReadOnly } = useAssignment();
+const { can } = useAssignment();
 const selectedEmployee = ref(null);
 const activeTab = ref("basic");
 const showModal = ref(false);
@@ -1156,8 +1156,13 @@ const isSaving = ref(false);
 const employees = ref([]);
 const validationErrors = ref({});
 const showDayPicker = ref(false);
-const canEditEmployees = computed(() => canEdit("employees"));
-const isReadOnlyEmployees = computed(() => isReadOnly("employees"));
+const canCreateEmployees = computed(() => can("employees", "create"));
+const canEditEmployees = computed(() => can("employees", "edit"));
+const canDeleteEmployees = computed(() => can("employees", "delete"));
+const canViewEmployees = computed(() => can("employees", "view"));
+const canManageEmployee = computed(() => canEditEmployees.value || canDeleteEmployees.value);
+const isEmployeeReadOnly = computed(() => canViewEmployees.value && !canCreateEmployees.value && !canEditEmployees.value && !canDeleteEmployees.value);
+const permissionMessages = { create: "You don't have permission to create new records.", edit: "You don't have permission to edit this information.", delete: "You don't have permission to delete this record." };
 
 const allWeekDays = [
   "Monday",
@@ -1345,7 +1350,7 @@ const selectEmployee = (employee) => {
 };
 
 const toggleMenu = (id) => {
-  if (!canEditEmployees.value) {
+  if (!canManageEmployee.value) {
     openMenuId.value = null;
     return;
   }
@@ -1382,7 +1387,7 @@ async function updateEmployeeStatus(employee, status) {
 }
 
 async function deleteEmployee(employee) {
-  if (!canEditEmployees.value) {
+  if (!canDeleteEmployees.value) {
     toast.error("You do not have permission to delete employees.");
     return;
   }
@@ -1415,7 +1420,7 @@ async function deleteEmployee(employee) {
 
 // Open modal
 const openAddModal = () => {
-  if (!canEditEmployees.value) {
+  if (!canCreateEmployees.value) {
     toast.error("You do not have permission to add employees.");
     return;
   }
@@ -1538,7 +1543,7 @@ const closeModal = () => {
 
 // File upload with preview
 const handleFileUpload = async (event) => {
-  if (!canEditEmployees.value) {
+  if (!(isEditMode.value ? canEditEmployees.value : canCreateEmployees.value)) {
     return;
   }
 

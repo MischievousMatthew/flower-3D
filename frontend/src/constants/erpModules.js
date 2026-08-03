@@ -203,6 +203,70 @@ export const ERP_MODULES = [
 
 export const MODULE_KEYS = ERP_MODULES.map((m) => m.key);
 
+// Permissions are intentionally limited to actions implemented by each module.
+export const MODULE_PERMISSIONS = {
+  hr_dashboard: ["view", "export"],
+  employees: ["view", "create", "edit", "delete", "export", "print"],
+  attendance: ["view", "create", "edit", "delete"],
+  payroll: ["view", "create", "delete", "approve"],
+  leave_management: ["view", "approve", "reject", "delete"],
+  finance_dashboard: ["view"],
+  funding_requests: ["view", "approve", "reject"],
+  payroll_requests: ["view", "edit", "approve", "reject"],
+  crm: ["view", "create"],
+  inventory_products: ["view", "create", "edit", "delete"],
+  inventory_funding: ["view", "create", "edit", "delete"],
+  sc_dashboard: ["view"],
+  suppliers: ["view", "create", "edit", "delete"],
+  warehouse: ["view", "create", "edit", "delete"],
+  sc_orders: ["view", "create", "edit", "delete"],
+  deliveries: ["view", "edit", "approve", "reject", "export", "print"],
+  order_scan: ["view", "edit"],
+};
+
+export const PERMISSION_DETAILS = {
+  view: {
+    label: "View",
+    description: "Allows the employee to view this information.",
+  },
+  create: {
+    label: "Create",
+    description: "Allows the employee to create new records.",
+  },
+  edit: {
+    label: "Edit",
+    description: "Allows the employee to modify existing records.",
+  },
+  delete: {
+    label: "Delete",
+    description: "Allows the employee to delete records.",
+  },
+  approve: {
+    label: "Approve",
+    description: "Allows the employee to approve requests or transactions.",
+  },
+  reject: {
+    label: "Reject",
+    description: "Allows the employee to reject requests or transactions.",
+  },
+  export: {
+    label: "Export",
+    description: "Allows the employee to export data.",
+  },
+  print: {
+    label: "Print",
+    description: "Allows the employee to print records or reports.",
+  },
+  manage: {
+    label: "Manage",
+    description: "Allows the employee to manage this module and its settings.",
+  },
+};
+
+export function getModulePermissions(moduleKey) {
+  return MODULE_PERMISSIONS[moduleKey] ?? [];
+}
+
 export function getModulesByGroup() {
   const groups = {};
   for (const mod of ERP_MODULES) {

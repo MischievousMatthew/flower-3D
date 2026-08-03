@@ -35,7 +35,7 @@ class EmployeeController extends Controller
                     // Flatten module_permissions for the frontend table
                     $employeeArray['module_permissions'] = $employee->modulePermissions->map(fn ($p) => [
                         'module' => $p->module,
-                        'access' => $p->access,
+                        'permission' => $p->permission,
                     ])->toArray();
                     return $employeeArray;
                 });
@@ -140,12 +140,20 @@ class EmployeeController extends Controller
                 'status'       => 'required|in:Active,On Leave,Resign',
                 'phone'        => 'nullable|string|max:20',
                 'address'      => 'nullable|string|max:500',
-                'department'   => 'nullable|string|max:255',
                 'role'         => 'nullable|string|max:255',
                 'permissions'             => 'required|array|min:1',
                 'permissions.*.module'    => 'required|string|' . ErpModule::validKeysRule(),
-                'permissions.*.access'    => 'required|string|' . ErpModule::validAccessRule(),
+                'permissions.*.permission' => 'required|string|' . ErpModule::validAccessRule(),
             ]);
+
+            $validator->after(function ($validator) use ($request): void {
+                foreach ($request->input('permissions', []) as $index => $permission) {
+                    if (isset($permission['module'], $permission['permission'])
+                        && ! ErpModule::isPermissionValidForModule($permission['module'], $permission['permission'])) {
+                        $validator->errors()->add("permissions.$index.permission", 'This permission is not available for the selected module.');
+                    }
+                }
+            });
 
             if ($validator->fails()) {
                 return response()->json([
@@ -164,23 +172,23 @@ class EmployeeController extends Controller
                 'status'       => $request->status,
                 'phone'        => $request->phone,
                 'address'      => $request->address,
-                'department'   => $request->department,
                 'role'         => $request->role,
             ]);
 
             // Create module permissions
             $createdCount = 0;
-            $seenModules = [];
+            $seenPermissions = [];
 
             foreach ($request->permissions as $perm) {
-                // Skip duplicates within the request
-                if (in_array($perm['module'], $seenModules, true)) continue;
-                $seenModules[] = $perm['module'];
+                $key = $perm['module'] . ':' . $perm['permission'];
+                if (in_array($key, $seenPermissions, true)) continue;
+                $seenPermissions[] = $key;
 
                 EmployeeModulePermission::create([
                     'employee_id' => $employee->id,
                     'module'      => $perm['module'],
-                    'access'      => $perm['access'],
+                    'permission'  => $perm['permission'],
+                    'access'      => 'granular',
                 ]);
                 $createdCount++;
             }
@@ -273,12 +281,20 @@ class EmployeeController extends Controller
                 'status'       => 'nullable|in:Active,On Leave,Resign',
                 'phone'        => 'nullable|string|max:20',
                 'address'      => 'nullable|string|max:500',
-                'department'   => 'nullable|string|max:255',
                 'role'         => 'nullable|string|max:255',
                 'permissions'             => 'nullable|array|min:1',
                 'permissions.*.module'    => 'required_with:permissions|string|' . ErpModule::validKeysRule(),
-                'permissions.*.access'    => 'required_with:permissions|string|' . ErpModule::validAccessRule(),
+                'permissions.*.permission' => 'required_with:permissions|string|' . ErpModule::validAccessRule(),
             ]);
+
+            $validator->after(function ($validator) use ($request): void {
+                foreach ($request->input('permissions', []) as $index => $permission) {
+                    if (isset($permission['module'], $permission['permission'])
+                        && ! ErpModule::isPermissionValidForModule($permission['module'], $permission['permission'])) {
+                        $validator->errors()->add("permissions.$index.permission", 'This permission is not available for the selected module.');
+                    }
+                }
+            });
 
             if ($validator->fails()) {
                 return response()->json([
@@ -306,15 +322,17 @@ class EmployeeController extends Controller
                 // Clear old permissions
                 $employee->modulePermissions()->delete();
 
-                $seenModules = [];
+                $seenPermissions = [];
                 foreach ($request->permissions as $perm) {
-                    if (in_array($perm['module'], $seenModules, true)) continue;
-                    $seenModules[] = $perm['module'];
+                    $key = $perm['module'] . ':' . $perm['permission'];
+                    if (in_array($key, $seenPermissions, true)) continue;
+                    $seenPermissions[] = $key;
 
                     EmployeeModulePermission::create([
                         'employee_id' => $employee->id,
                         'module'      => $perm['module'],
-                        'access'      => $perm['access'],
+                        'permission'  => $perm['permission'],
+                        'access'      => 'granular',
                     ]);
                 }
             }

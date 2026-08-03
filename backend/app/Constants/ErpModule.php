@@ -37,7 +37,30 @@ class ErpModule
         'order_scan',
     ];
 
-    public const ACCESS_LEVELS = ['view', 'edit'];
+    public const PERMISSIONS = [
+        'view', 'create', 'edit', 'delete', 'approve', 'reject', 'export', 'print', 'manage',
+    ];
+
+    /** Permissions that are implemented for each ERP module. */
+    public const MODULE_PERMISSIONS = [
+        'hr_dashboard'       => ['view', 'export'],
+        'employees'          => ['view', 'create', 'edit', 'delete', 'export', 'print'],
+        'attendance'         => ['view', 'create', 'edit', 'delete'],
+        'payroll'            => ['view', 'create', 'delete', 'approve'],
+        'leave_management'   => ['view', 'approve', 'reject', 'delete'],
+        'finance_dashboard'  => ['view'],
+        'funding_requests'   => ['view', 'approve', 'reject'],
+        'payroll_requests'   => ['view', 'edit', 'approve', 'reject'],
+        'crm'                => ['view', 'create'],
+        'inventory_products' => ['view', 'create', 'edit', 'delete'],
+        'inventory_funding'  => ['view', 'create', 'edit', 'delete'],
+        'sc_dashboard'       => ['view'],
+        'suppliers'          => ['view', 'create', 'edit', 'delete'],
+        'warehouse'          => ['view', 'create', 'edit', 'delete'],
+        'sc_orders'          => ['view', 'create', 'edit', 'delete'],
+        'deliveries'         => ['view', 'edit', 'approve', 'reject', 'export', 'print'],
+        'order_scan'         => ['view', 'edit'],
+    ];
 
     /**
      * Comma-separated list for Laravel "in:" validation rule.
@@ -52,7 +75,17 @@ class ErpModule
      */
     public static function validAccessRule(): string
     {
-        return 'in:' . implode(',', self::ACCESS_LEVELS);
+        return 'in:' . implode(',', self::PERMISSIONS);
+    }
+
+    public static function permissionsFor(string $module): array
+    {
+        return self::MODULE_PERMISSIONS[$module] ?? [];
+    }
+
+    public static function isPermissionValidForModule(string $module, string $permission): bool
+    {
+        return in_array($permission, self::permissionsFor($module), true);
     }
 
     /**

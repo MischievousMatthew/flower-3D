@@ -20,7 +20,7 @@ class ProductController extends Controller
 
     private const INVENTORY_PRODUCTS_MODULE = 'inventory_products';
 
-    private function requireInventoryProductAccess(Request $request, string $access = 'view')
+    private function requireInventoryProductAccess(Request $request, string $permission = 'view')
     {
         $user = $request->user();
 
@@ -28,9 +28,7 @@ class ProductController extends Controller
             return null;
         }
 
-        $allowed = $access === 'edit'
-            ? $user->canEditModule(self::INVENTORY_PRODUCTS_MODULE)
-            : $user->canViewModule(self::INVENTORY_PRODUCTS_MODULE);
+        $allowed = $user->hasModulePermission(self::INVENTORY_PRODUCTS_MODULE, $permission);
 
         if (!$allowed) {
             return response()->json([
@@ -137,7 +135,7 @@ class ProductController extends Controller
     public function store(Request $request)
     {
         try {
-            if ($response = $this->requireInventoryProductAccess($request, 'edit')) {
+            if ($response = $this->requireInventoryProductAccess($request, 'create')) {
                 return $response;
             }
 
@@ -387,7 +385,7 @@ class ProductController extends Controller
     public function destroy(Request $request, $id)
     {
         try {
-            if ($response = $this->requireInventoryProductAccess($request, 'edit')) {
+            if ($response = $this->requireInventoryProductAccess($request, 'delete')) {
                 return $response;
             }
 
@@ -517,7 +515,7 @@ class ProductController extends Controller
     public function deleteImage(Request $request, $productId, $imageId)
     {
         try {
-            if ($response = $this->requireInventoryProductAccess($request, 'edit')) {
+            if ($response = $this->requireInventoryProductAccess($request, 'delete')) {
                 return $response;
             }
 
@@ -549,7 +547,7 @@ class ProductController extends Controller
     public function deleteModel(Request $request, $productId)
     {
         try {
-            if ($response = $this->requireInventoryProductAccess($request, 'edit')) {
+            if ($response = $this->requireInventoryProductAccess($request, 'delete')) {
                 return $response;
             }
 

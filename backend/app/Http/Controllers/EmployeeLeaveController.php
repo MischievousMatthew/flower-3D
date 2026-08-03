@@ -109,6 +109,16 @@ class EmployeeLeaveController extends Controller
             ], 422);
         }
 
+        $employee = $request->user();
+        $requiredPermission = $request->input('status') === 'approved' ? 'approve' : 'reject';
+        if ($employee instanceof \App\Models\Employee
+            && ! $employee->hasModulePermission('leave_management', $requiredPermission)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden',
+            ], 403);
+        }
+
         try {
             DB::beginTransaction();
 

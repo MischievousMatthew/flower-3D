@@ -82,9 +82,16 @@ class Employee extends Authenticatable
         return $this->hasMany(EmployeeModulePermission::class);
     }
 
-    /**
-     * Does this employee have any access to the given module?
-     */
+    /** Does this employee have a directly assigned granular permission? */
+    public function hasModulePermission(string $module, string $permission): bool
+    {
+        return $this->modulePermissions()
+            ->whereIn('module', $this->resolveModuleAliases($module))
+            ->where('permission', $permission)
+            ->exists();
+    }
+
+    /** Does this employee have any permission for the given module? */
     public function hasModuleAccess(string $module): bool
     {
         return $this->modulePermissions()
@@ -97,10 +104,7 @@ class Employee extends Authenticatable
      */
     public function canEditModule(string $module): bool
     {
-        return $this->modulePermissions()
-            ->whereIn('module', $this->resolveModuleAliases($module))
-            ->where('access', 'edit')
-            ->exists();
+        return $this->hasModulePermission($module, 'edit');
     }
 
     /**
@@ -108,10 +112,7 @@ class Employee extends Authenticatable
      */
     public function canViewModule(string $module): bool
     {
-        return $this->modulePermissions()
-            ->whereIn('module', $this->resolveModuleAliases($module))
-            ->whereIn('access', ['view', 'edit'])
-            ->exists();
+        return $this->hasModulePermission($module, 'view');
     }
 
     private function resolveModuleAliases(string $module): array

@@ -37,9 +37,7 @@ class FundingRequestController extends Controller
             return response()->json(['message' => 'Only employees can access this endpoint'], 403);
         }
 
-        $allowed = $access === 'edit'
-            ? $employee->canEditModule($module)
-            : $employee->canViewModule($module);
+        $allowed = $employee->hasModulePermission($module, $access);
 
         if (!$allowed) {
             return response()->json(['message' => 'You do not have permission to perform this action'], 403);
@@ -57,9 +55,7 @@ class FundingRequestController extends Controller
         }
 
         foreach ($modules as $module) {
-            $allowed = $access === 'edit'
-                ? $employee->canEditModule($module)
-                : $employee->canViewModule($module);
+            $allowed = $employee->hasModulePermission($module, $access);
 
             if ($allowed) {
                 return null;
@@ -76,7 +72,7 @@ class FundingRequestController extends Controller
             ->where('status', 'Active')
             ->whereHas('modulePermissions', function ($query) {
                 $query->where('module', self::FINANCE_APPROVER_MODULE)
-                    ->where('access', 'edit');
+                    ->where('permission', 'approve');
             });
     }
 
@@ -239,7 +235,7 @@ class FundingRequestController extends Controller
     public function store(Request $request)
     {
         try {
-            if ($response = $this->requireModuleAccess($request, self::INVENTORY_MODULE, 'edit')) {
+            if ($response = $this->requireModuleAccess($request, self::INVENTORY_MODULE, 'create')) {
                 return $response;
             }
 
@@ -525,7 +521,7 @@ class FundingRequestController extends Controller
     public function destroy(Request $request, $id)
     {
         try {
-            if ($response = $this->requireModuleAccess($request, self::INVENTORY_MODULE, 'edit')) {
+            if ($response = $this->requireModuleAccess($request, self::INVENTORY_MODULE, 'delete')) {
                 return $response;
             }
 
@@ -549,7 +545,7 @@ class FundingRequestController extends Controller
     public function submitToAccounting(Request $request, $id)
     {
         try {
-            if ($response = $this->requireModuleAccess($request, self::INVENTORY_MODULE, 'edit')) {
+            if ($response = $this->requireModuleAccess($request, self::INVENTORY_MODULE, 'create')) {
                 return $response;
             }
 

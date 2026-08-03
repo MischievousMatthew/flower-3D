@@ -33,9 +33,7 @@ class AccountingFundingRequestController extends Controller
             return response()->json(['message' => 'Only employees can access this endpoint'], 403);
         }
 
-        $allowed = $access === 'edit'
-            ? $employee->canEditModule(self::FINANCE_MODULE)
-            : $employee->canViewModule(self::FINANCE_MODULE);
+        $allowed = $employee->hasModulePermission(self::FINANCE_MODULE, $access);
 
         if (!$allowed) {
             return response()->json(['message' => 'You do not have permission to perform this action'], 403);
@@ -83,7 +81,7 @@ class AccountingFundingRequestController extends Controller
     public function approve(Request $request, $id)
     {
         try {
-            if ($response = $this->requireFinanceAccess($request, 'edit')) {
+            if ($response = $this->requireFinanceAccess($request, 'approve')) {
                 return $response;
             }
 
@@ -245,7 +243,7 @@ class AccountingFundingRequestController extends Controller
     public function reject(Request $request, $id)
     {
         try {
-            if ($response = $this->requireFinanceAccess($request, 'edit')) {
+            if ($response = $this->requireFinanceAccess($request, 'reject')) {
                 return $response;
             }
 

@@ -3,7 +3,7 @@
 // Module-based RBAC composable.
 // Replaces the old department/role assignment system with direct module permissions.
 //
-// Each employee has a flat array of { module, access } objects.
+// Each employee has a flat array of { module, permission } objects.
 // The composable provides helpers to check access per module.
 
 import { ref, computed } from "vue";
@@ -21,7 +21,7 @@ function matchesModuleKey(assignedKey, requestedKey) {
 
 // ─── Module-level singletons ──────────────────────────────────────────────────
 // Shared across all components that call useAssignment().
-const modulePermissions = ref([]); // Array of { module, access }
+const modulePermissions = ref([]); // Array of { module, permission }
 const defaultRoute = ref("/erp/dashboard");
 
 export function useAssignment() {
@@ -45,31 +45,28 @@ export function useAssignment() {
   }
 
   // ─── Permission helpers ──────────────────────────────────────────────────
-  /**
-   * Does the employee have any access (view or edit) to this module?
-   */
+  /** Does the employee have any assigned permission for this module? */
   function hasAccess(moduleKey) {
     return modulePermissions.value.some((p) => matchesModuleKey(p.module, moduleKey));
   }
 
-  /**
-   * Does the employee have at least view access?
-   */
-  function canView(moduleKey) {
+  /** Does the employee have a specific granular permission? */
+  function can(moduleKey, permission) {
     return modulePermissions.value.some(
-      (p) =>
-        matchesModuleKey(p.module, moduleKey) &&
-        (p.access === "view" || p.access === "edit"),
+      (p) => matchesModuleKey(p.module, moduleKey) && p.permission === permission,
     );
+  }
+
+  /** Does the employee have view access? */
+  function canView(moduleKey) {
+    return can(moduleKey, "view");
   }
 
   /**
    * Does the employee have edit access?
    */
   function canEdit(moduleKey) {
-    return modulePermissions.value.some(
-      (p) => matchesModuleKey(p.module, moduleKey) && p.access === "edit",
-    );
+    return can(moduleKey, "edit");
   }
 
   /**
@@ -116,7 +113,6 @@ export function useAssignment() {
   function switchAssignment() {}
   function isRole() { return false; }
   function isDept() { return false; }
-  function can() { return false; }
   function hasModule(moduleKey) { return hasAccess(moduleKey); }
 
   return {
@@ -125,6 +121,7 @@ export function useAssignment() {
     accessibleModules,
     hasAnyPermission,
     hasAccess,
+    can,
     canView,
     canEdit,
     isReadOnly,

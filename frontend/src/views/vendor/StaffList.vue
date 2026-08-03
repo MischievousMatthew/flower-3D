@@ -220,7 +220,7 @@
                     :title="
                       employee.module_permissions[0].module +
                       ' (' +
-                      employee.module_permissions[0].access +
+                      employee.module_permissions[0].permission +
                       ')'
                     "
                     >{{
@@ -407,14 +407,6 @@
               >
             </div>
             <div class="form-group">
-              <label>Department</label>
-              <input
-                type="text"
-                v-model="formData.department"
-                placeholder="Enter department"
-              />
-            </div>
-            <div class="form-group">
               <label>Role</label>
               <input
                 type="text"
@@ -428,146 +420,30 @@
               <div class="permissions-header">
                 <div>
                   <h3>Module Permissions *</h3>
-                  <p class="permissions-hint">
-                    Grant access to specific ERP modules
-                  </p>
-                </div>
-                <div class="perm-legend">
-                  <span class="legend-item"
-                    ><span class="legend-dot blue"></span>View only</span
-                  >
-                  <span class="legend-item"
-                    ><span class="legend-dot violet"></span>Can edit</span
-                  >
+                  <p class="permissions-hint">Choose only the actions this employee may perform.</p>
                 </div>
               </div>
-
-              <div class="perm-table-wrapper">
-                <table class="perm-table">
-                  <thead>
-                    <tr class="perm-col-header">
-                      <th>Module</th>
-                      <th class="center">View</th>
-                      <th class="center">Edit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <template
-                      v-for="(group, groupName) in modulesByGroup"
-                      :key="groupName"
-                    >
-                      <tr class="perm-group-row">
-                        <td colspan="3">{{ groupName }}</td>
-                      </tr>
-                      <tr
-                        v-for="mod in group"
-                        :key="mod.key"
-                        class="perm-mod-row"
-                      >
-                        <td class="mod-name-cell">
-                          <div class="mod-name-wrapper">
-                            <span>{{ mod.label }}</span>
-                            <div
-                              v-if="mod.description"
-                              class="info-tooltip-wrapper"
-                              @click.stop="toggleTooltip(mod.key)"
-                            >
-                              <button
-                                type="button"
-                                class="info-icon-btn"
-                                :aria-label="'Info about ' + mod.label"
-                              >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  stroke-width="2"
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                >
-                                  <circle cx="12" cy="12" r="10"></circle>
-                                  <line x1="12" y1="16" x2="12" y2="12"></line>
-                                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                                </svg>
-                              </button>
-                              <div
-                                class="info-tooltip"
-                                :class="{
-                                  'is-active': activeTooltipKey === mod.key,
-                                }"
-                              >
-                                {{ mod.description }}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td class="perm-toggle-cell">
-                          <button
-                            type="button"
-                            class="perm-btn"
-                            :class="{
-                              'perm-btn--view':
-                                isModuleEnabled(mod.key) &&
-                                getModuleAccess(mod.key) === 'view',
-                              'perm-btn--locked':
-                                isModuleEnabled(mod.key) &&
-                                getModuleAccess(mod.key) === 'edit',
-                            }"
-                            @click="handleViewClick(mod.key)"
-                          >
-                            <svg
-                              v-if="isModuleEnabled(mod.key)"
-                              viewBox="0 0 12 12"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <polyline
-                                points="2,6.5 5,9.5 10,2.5"
-                                stroke="white"
-                                stroke-width="2.2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                              />
-                            </svg>
+              <div class="permission-groups">
+                <section v-for="(group, groupName) in modulesByGroup" :key="groupName" class="permission-group">
+                  <h4>{{ groupName }}</h4>
+                  <article v-for="mod in group" :key="mod.key" class="permission-accordion" :class="{ 'is-open': isModuleExpanded(mod.key) }">
+                    <button type="button" class="permission-accordion__header" @click="toggleModuleAccordion(mod.key)" :aria-expanded="isModuleExpanded(mod.key)">
+                      <span>{{ mod.label }}</span><span class="accordion-chevron">⌄</span>
+                    </button>
+                    <transition name="accordion">
+                      <div v-if="isModuleExpanded(mod.key)" class="permission-accordion__body">
+                        <p class="permission-module-description">{{ mod.description }}</p>
+                        <div v-for="permission in getModulePermissions(mod.key)" :key="permission" class="permission-row">
+                          <span>{{ permissionDetails[permission].label }}</span>
+                          <span class="permission-row__help" :title="permissionDetails[permission].description">ⓘ</span>
+                          <button type="button" class="permission-circle" :class="{ 'is-allowed': hasPermission(mod.key, permission) }" @click="togglePermission(mod.key, permission)" :aria-label="`${hasPermission(mod.key, permission) ? 'Remove' : 'Allow'} ${permissionDetails[permission].label} permission for ${mod.label}`">
+                            <span v-if="hasPermission(mod.key, permission)">●</span><span v-else>○</span>
                           </button>
-                        </td>
-                        <td class="perm-toggle-cell">
-                          <button
-                            type="button"
-                            class="perm-btn"
-                            :class="{
-                              'perm-btn--edit':
-                                isModuleEnabled(mod.key) &&
-                                getModuleAccess(mod.key) === 'edit',
-                            }"
-                            @click="handleEditClick(mod.key)"
-                          >
-                            <svg
-                              v-if="
-                                isModuleEnabled(mod.key) &&
-                                getModuleAccess(mod.key) === 'edit'
-                              "
-                              viewBox="0 0 12 12"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <polyline
-                                points="2,6.5 5,9.5 10,2.5"
-                                stroke="white"
-                                stroke-width="2.2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                              />
-                            </svg>
-                          </button>
-                        </td>
-                      </tr>
-                    </template>
-                  </tbody>
-                </table>
+                        </div>
+                      </div>
+                    </transition>
+                  </article>
+                </section>
               </div>
             </div>
 
@@ -619,7 +495,7 @@ import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import { toast } from "vue3-toastify";
 import api from "../../plugins/axios";
-import { getModulesByGroup, findModule } from "../../constants/erpModules";
+import { getModulesByGroup, findModule, getModulePermissions, PERMISSION_DETAILS } from "../../constants/erpModules";
 
 // State
 const showAddModal = ref(false);
@@ -631,17 +507,8 @@ const filterStatus = ref("all");
 const filterGroup = ref("all");
 const isLoading = ref(false);
 const isLoadingMessage = ref("Loading...");
-const activeTooltipKey = ref(null);
-
-function toggleTooltip(key) {
-  activeTooltipKey.value = activeTooltipKey.value === key ? null : key;
-}
-
-function handleGlobalClick(e) {
-  if (!e.target.closest(".info-tooltip-wrapper")) {
-    activeTooltipKey.value = null;
-  }
-}
+const expandedModules = ref([]);
+const permissionDetails = PERMISSION_DETAILS;
 
 // Data
 const employees = ref([]);
@@ -665,21 +532,12 @@ const modulesByGroup = computed(() => {
 });
 
 function sanitizeModulePermissions(modulePermissions = []) {
-  const mergedPermissions = new Map();
-
+  const uniquePermissions = new Map();
   for (const permission of modulePermissions) {
-    const normalizedKey = normalizeModuleKey(permission.module);
-    const existing = mergedPermissions.get(normalizedKey);
-
-    if (!existing || permission.access === "edit") {
-      mergedPermissions.set(normalizedKey, {
-        ...permission,
-        module: normalizedKey,
-      });
-    }
+    const normalized = { ...permission, module: normalizeModuleKey(permission.module) };
+    uniquePermissions.set(`${normalized.module}:${normalized.permission}`, normalized);
   }
-
-  return Array.from(mergedPermissions.values());
+  return Array.from(uniquePermissions.values());
 }
 
 function getModuleLabel(key) {
@@ -695,7 +553,6 @@ const formData = ref({
   email: "",
   username: "",
   password: "",
-  department: "",
   role: "",
   permissions: [],
   joiningDate: "",
@@ -705,48 +562,26 @@ const formData = ref({
 });
 
 // Permissions helpers
-function isModuleEnabled(moduleKey) {
-  return formData.value.permissions.some((p) => p.module === moduleKey);
+function hasPermission(moduleKey, permission) {
+  return formData.value.permissions.some((item) => item.module === moduleKey && item.permission === permission);
 }
-function getModuleAccess(moduleKey) {
-  return (
-    formData.value.permissions.find((p) => p.module === moduleKey)?.access ??
-    "view"
-  );
+function togglePermission(moduleKey, permission) {
+  const index = formData.value.permissions.findIndex((item) => item.module === moduleKey && item.permission === permission);
+  if (index >= 0) formData.value.permissions.splice(index, 1);
+  else formData.value.permissions.push({ module: moduleKey, permission });
 }
-function toggleModule(moduleKey) {
-  const idx = formData.value.permissions.findIndex(
-    (p) => p.module === moduleKey,
-  );
-  if (idx > -1) {
-    formData.value.permissions.splice(idx, 1);
-  } else {
-    formData.value.permissions.push({ module: moduleKey, access: "view" });
-  }
+function isModuleExpanded(moduleKey) {
+  return expandedModules.value.includes(moduleKey);
 }
-function setModuleAccess(moduleKey, access) {
-  const perm = formData.value.permissions.find((p) => p.module === moduleKey);
-  if (perm) perm.access = access;
+function toggleModuleAccordion(moduleKey) {
+  expandedModules.value = isModuleExpanded(moduleKey)
+    ? expandedModules.value.filter((key) => key !== moduleKey)
+    : [...expandedModules.value, moduleKey];
 }
 
 // View click: toggle on/off (disabled when edit is active)
-function handleViewClick(moduleKey) {
-  const isEdit =
-    isModuleEnabled(moduleKey) && getModuleAccess(moduleKey) === "edit";
-  if (isEdit) return;
-  toggleModule(moduleKey);
-}
 
 // Edit click: if off → enable with edit; if view → upgrade to edit; if edit → downgrade to view
-function handleEditClick(moduleKey) {
-  if (!isModuleEnabled(moduleKey)) {
-    formData.value.permissions.push({ module: moduleKey, access: "edit" });
-  } else if (getModuleAccess(moduleKey) === "edit") {
-    setModuleAccess(moduleKey, "view");
-  } else {
-    setModuleAccess(moduleKey, "edit");
-  }
-}
 
 // Filters
 const filteredEmployees = computed(() => {
@@ -819,14 +654,8 @@ const editEmployee = (employee) => {
     email: employee.email,
     username: employee.username,
     password: "",
-    department: employee.department || "",
     role: employee.role || "",
-    permissions: sanitizeModulePermissions(employee.module_permissions).map(
-      (p) => ({
-        module: p.module,
-        access: p.access,
-      }),
-    ),
+    permissions: sanitizeModulePermissions(employee.module_permissions),
     joiningDate: employee.joining_date,
     status: employee.status,
     phone: employee.phone || "",
@@ -848,7 +677,6 @@ const resetForm = () => {
     email: "",
     username: "",
     password: "",
-    department: "",
     role: "",
     permissions: [],
     joiningDate: "",
@@ -881,7 +709,6 @@ const saveEmployee = async () => {
     name: formData.value.name,
     email: formData.value.email,
     username: formData.value.username,
-    department: formData.value.department || null,
     role: formData.value.role || null,
     joining_date: formatDateForAPI(formData.value.joiningDate),
     status: formData.value.status,
@@ -980,7 +807,6 @@ const clearFilters = () => {
 const getStatusClass = (status) => status.toLowerCase().replace(" ", "-");
 
 onMounted(async () => {
-  window.addEventListener("click", handleGlobalClick);
   isLoading.value = true;
   isLoadingMessage.value = "Loading page data...";
   try {
@@ -993,11 +819,24 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  window.removeEventListener("click", handleGlobalClick);
 });
 </script>
 
 <style scoped>
+.permission-groups { display: grid; gap: 18px; }
+.permission-group h4 { margin: 0 0 8px; color: var(--primary-color, #5a4a9f); font-size: 0.8rem; letter-spacing: .08em; text-transform: uppercase; }
+.permission-accordion { border: 1px solid #e7e2f3; border-radius: 10px; background: #fff; overflow: hidden; margin-bottom: 8px; }
+.permission-accordion__header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 13px 15px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+.accordion-chevron { transition: transform .2s ease; color: #8276b5; font-size: 1.25rem; }
+.is-open .accordion-chevron { transform: rotate(180deg); }
+.permission-accordion__body { padding: 0 15px 12px; border-top: 1px solid #f0ecf8; }
+.permission-module-description { margin: 10px 0; color: #74707f; font-size: .82rem; }
+.permission-row { display: grid; grid-template-columns: 1fr auto auto; gap: 9px; align-items: center; padding: 8px 0; }
+.permission-row__help { color: #8276b5; cursor: help; }
+.permission-circle { border: 0; background: transparent; color: #b7afce; font-size: 1.35rem; line-height: 1; cursor: pointer; padding: 0; }
+.permission-circle.is-allowed { color: #6f5bc2; }
+.accordion-enter-active, .accordion-leave-active { transition: all .2s ease; }
+.accordion-enter-from, .accordion-leave-to { opacity: 0; transform: translateY(-5px); }
 * {
   margin: 0;
   padding: 0;

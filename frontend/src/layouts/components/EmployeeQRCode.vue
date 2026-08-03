@@ -24,7 +24,7 @@
 
     <!-- Action Buttons -->
     <div class="qr-actions">
-      <button @click="downloadQR" class="btn-download">
+      <button @click="downloadQR" class="btn-download" :disabled="!canExport" :title="canExport ? '' : permissionMessages.export">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="18"
@@ -41,7 +41,7 @@
         Download PNG
       </button>
 
-      <button @click="printQR" class="btn-print">
+      <button @click="printQR" class="btn-print" :disabled="!canPrint" :title="canPrint ? '' : permissionMessages.print">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="18"
@@ -74,8 +74,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted, watch, computed } from "vue";
 import QRCode from "qrcode";
+import { useAssignment } from "../../composables/useAssignment";
 
 const props = defineProps({
   employee_id: {
@@ -93,6 +94,13 @@ const props = defineProps({
 });
 
 const qrCodeDataUrl = ref("");
+const { can } = useAssignment();
+const canExport = computed(() => can("employees", "export"));
+const canPrint = computed(() => can("employees", "print"));
+const permissionMessages = {
+  export: "You don't have permission to export this data.",
+  print: "You don't have permission to print this information.",
+};
 
 // Generate QR code data
 const generateQRData = () => {
@@ -130,7 +138,7 @@ const renderQRCode = async () => {
 
 // Download QR as PNG
 const downloadQR = () => {
-  if (!qrCodeDataUrl.value) return;
+  if (!canExport.value || !qrCodeDataUrl.value) return;
 
   const link = document.createElement("a");
   link.download = `QR-${props.employee_id}-${props.employee_name.replace(/\s+/g, "-")}.png`;
@@ -140,7 +148,7 @@ const downloadQR = () => {
 
 // Print QR code
 const printQR = () => {
-  if (!qrCodeDataUrl.value) return;
+  if (!canPrint.value || !qrCodeDataUrl.value) return;
 
   const printWindow = window.open("", "_blank");
 
