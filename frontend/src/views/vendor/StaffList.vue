@@ -10,7 +10,7 @@
         <p class="subtitle">Manage your team members and their roles</p>
       </div>
     </div>
-
+    x``
     <!-- Recent Activity Cards -->
     <div class="activity-section">
       <h2>Recent Activity</h2>
@@ -496,7 +496,9 @@
                               </button>
                               <div
                                 class="info-tooltip"
-                                :class="{ 'is-active': activeTooltipKey === mod.key }"
+                                :class="{
+                                  'is-active': activeTooltipKey === mod.key,
+                                }"
                               >
                                 {{ mod.description }}
                               </div>
@@ -618,10 +620,7 @@ import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import { toast } from "vue3-toastify";
 import api from "../../plugins/axios";
-import {
-  getModulesByGroup,
-  findModule,
-} from "../../constants/erpModules";
+import { getModulesByGroup, findModule } from "../../constants/erpModules";
 
 // State
 const showAddModal = ref(false);
@@ -823,10 +822,12 @@ const editEmployee = (employee) => {
     password: "",
     department: employee.department || "",
     role: employee.role || "",
-    permissions: sanitizeModulePermissions(employee.module_permissions).map((p) => ({
-      module: p.module,
-      access: p.access,
-    })),
+    permissions: sanitizeModulePermissions(employee.module_permissions).map(
+      (p) => ({
+        module: p.module,
+        access: p.access,
+      }),
+    ),
     joiningDate: employee.joining_date,
     status: employee.status,
     phone: employee.phone || "",
@@ -1716,7 +1717,9 @@ onUnmounted(() => {
   color: #94a3b8;
   cursor: pointer;
   border-radius: 50%;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
   line-height: 1;
 }
 
@@ -1749,7 +1752,10 @@ onUnmounted(() => {
   letter-spacing: normal;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease,
+    transform 0.2s ease;
 }
 
 .info-tooltip::after {
