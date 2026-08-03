@@ -465,7 +465,44 @@
                         :key="mod.key"
                         class="perm-mod-row"
                       >
-                        <td class="mod-name-cell">{{ mod.label }}</td>
+                        <td class="mod-name-cell">
+                          <div class="mod-name-wrapper">
+                            <span>{{ mod.label }}</span>
+                            <div
+                              v-if="mod.description"
+                              class="info-tooltip-wrapper"
+                              @click.stop="toggleTooltip(mod.key)"
+                            >
+                              <button
+                                type="button"
+                                class="info-icon-btn"
+                                :aria-label="'Info about ' + mod.label"
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                >
+                                  <circle cx="12" cy="12" r="10"></circle>
+                                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                              </button>
+                              <div
+                                class="info-tooltip"
+                                :class="{ 'is-active': activeTooltipKey === mod.key }"
+                              >
+                                {{ mod.description }}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
                         <td class="perm-toggle-cell">
                           <button
                             type="button"
@@ -575,7 +612,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import vendorHeader from "../../layouts/vendorHeader.vue";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
@@ -596,6 +633,17 @@ const filterStatus = ref("all");
 const filterGroup = ref("all");
 const isLoading = ref(false);
 const isLoadingMessage = ref("Loading...");
+const activeTooltipKey = ref(null);
+
+function toggleTooltip(key) {
+  activeTooltipKey.value = activeTooltipKey.value === key ? null : key;
+}
+
+function handleGlobalClick(e) {
+  if (!e.target.closest(".info-tooltip-wrapper")) {
+    activeTooltipKey.value = null;
+  }
+}
 
 // Data
 const employees = ref([]);
@@ -932,6 +980,7 @@ const clearFilters = () => {
 const getStatusClass = (status) => status.toLowerCase().replace(" ", "-");
 
 onMounted(async () => {
+  window.addEventListener("click", handleGlobalClick);
   isLoading.value = true;
   isLoadingMessage.value = "Loading page data...";
   try {
@@ -941,6 +990,10 @@ onMounted(async () => {
   } finally {
     isLoading.value = false;
   }
+});
+
+onUnmounted(() => {
+  window.removeEventListener("click", handleGlobalClick);
 });
 </script>
 
@@ -1580,7 +1633,7 @@ onMounted(async () => {
 .perm-table-wrapper {
   border: 1px solid #e8ecf0;
   border-radius: 10px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .perm-table {
@@ -1636,12 +1689,84 @@ onMounted(async () => {
   font-size: 13px;
   color: #334155;
   font-weight: 400;
+  position: relative;
 }
 
-.perm-toggle-cell {
-  text-align: center;
-  vertical-align: middle;
-  padding: 12px 0;
+.mod-name-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.info-tooltip-wrapper {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  cursor: pointer;
+}
+
+.info-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 2px;
+  color: #94a3b8;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  line-height: 1;
+}
+
+.info-tooltip-wrapper:hover .info-icon-btn,
+.info-icon-btn:focus-visible {
+  color: #3b82f6;
+  background-color: #eff6ff;
+  outline: none;
+}
+
+.info-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: -8px;
+  transform: translateY(4px);
+  background: #1e293b;
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 400;
+  width: 240px;
+  max-width: 75vw;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.25);
+  pointer-events: none;
+  z-index: 1050;
+  white-space: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+}
+
+.info-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 14px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #1e293b transparent transparent transparent;
+}
+
+.info-tooltip-wrapper:hover .info-tooltip,
+.info-tooltip.is-active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 /* The toggle button */

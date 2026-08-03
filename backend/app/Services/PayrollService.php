@@ -115,6 +115,8 @@ class PayrollService
             if (!$employee) return ['success' => false, 'message' => 'Employee not found'];
             if (!$employee->basic_salary || !$employee->salary_type) return ['success' => false, 'message' => "Employee '{$employee->full_name}' does not have salary configuration set."];
             if (!$employee->standard_work_hours_per_day) return ['success' => false, 'message' => "Employee '{$employee->full_name}' is missing standard work hours per day."];
+            if ($employee->salary_type === 'weekly' && !$employee->working_days_per_week) return ['success' => false, 'message' => "Employee '{$employee->full_name}' is missing working days per week."];
+            if ($employee->salary_type === 'monthly' && !$employee->working_days_per_month) return ['success' => false, 'message' => "Employee '{$employee->full_name}' is missing working days per month."];
 
             $c             = $this->calculate($ownerId, $employee, $periodStart, $periodEnd);
             $contributions = $this->resolveContributions($employee, $includeContributions);
@@ -133,6 +135,8 @@ class PayrollService
                     'basic_salary'              => number_format($employee->basic_salary, 2),
                     'hourly_rate'               => number_format($c['hourlyRate'], 2),
                     'daily_rate'                => number_format($c['dailyRate'], 2),
+                    'weekly_rate'               => number_format($c['weeklyRate'], 2),
+                    'monthly_rate'              => number_format($c['monthlyRate'], 2),
                     'expected_work_days'        => $c['expectedWorkingDays'],
                     'actual_work_days'          => $c['actualWorkDays'],
                     'attendance_records_count'  => $c['actualWorkDays'],
@@ -407,14 +411,21 @@ class PayrollService
         $totalHoursWorked     = $actualWorkHours + $paidLeaveHours;
 
         $hourlyRate = $this->calculateHourlyRate(
-            $employee->basic_salary,
+            (float) $employee->basic_salary,
             $employee->salary_type,
-            $employee->standard_work_hours_per_day,
+            (float) $employee->standard_work_hours_per_day,
             $employee->working_days_per_week,
             $employee->working_days_per_month,
         );
 
-        $dailyRate            = $hourlyRate * $employee->standard_work_hours_per_day;
+        $hoursPerDay          = (float) ($employee->standard_work_hours_per_day ?: 8);
+        $daysWeek             = (int) ($employee->working_days_per_week ?: 5);
+        $daysMonth            = (int) ($employee->working_days_per_month ?: 22);
+
+        $dailyRate            = $hourlyRate * $hoursPerDay;
+        $weeklyRate           = $dailyRate * $daysWeek;
+        $monthlyRate          = $dailyRate * $daysMonth;
+
         $payableDays          = $actualWorkDays + $paidLeaveDaysCount;
         $actualWorkAmount     = $actualWorkDays * $dailyRate;
         $paidLeaveAmount      = $paidLeaveDaysCount * $dailyRate;
@@ -434,9 +445,9 @@ class PayrollService
             'expectedWorkingDays', 'actualWorkDays', 'paidLeaveDaysCount',
             'unpaidLeaveDaysCount', 'absentDays', 'actualWorkHours',
             'paidLeaveHours', 'totalHoursWorked', 'hourlyRate', 'dailyRate',
-            'payableDays', 'actualWorkAmount', 'paidLeaveAmount',
-            'grossSalary', 'absentDeduction', 'unpaidLeaveDeduction',
-            'totalDeductions', 'netSalary',
+            'weeklyRate', 'monthlyRate', 'payableDays', 'actualWorkAmount',
+            'paidLeaveAmount', 'grossSalary', 'absentDeduction',
+            'unpaidLeaveDeduction', 'totalDeductions', 'netSalary',
         );
     }
 
@@ -483,10 +494,14 @@ class PayrollService
 
     private function calculateHourlyRate(float $basicSalary, string $salaryType, float $standardHoursPerDay, ?int $workingDaysPerWeek, ?int $workingDaysPerMonth): float
     {
+        $stdHours  = $standardHoursPerDay > 0 ? $standardHoursPerDay : 8;
+        $daysWeek  = ($workingDaysPerWeek && $workingDaysPerWeek > 0) ? $workingDaysPerWeek : 5;
+        $daysMonth = ($workingDaysPerMonth && $workingDaysPerMonth > 0) ? $workingDaysPerMonth : 22;
+
         return match ($salaryType) {
-            'daily'   => $basicSalary / $standardHoursPerDay,
-            'weekly'  => $basicSalary / ($standardHoursPerDay * $workingDaysPerWeek),
-            'monthly' => $basicSalary / ($standardHoursPerDay * $workingDaysPerMonth),
+            'daily'   => $basicSalary / $stdHours,
+            'weekly'  => $basicSalary / ($stdHours * $daysWeek),
+            'monthly' => $basicSalary / ($stdHours * $daysMonth),
             default   => throw new \Exception('Invalid salary type'),
         };
     }

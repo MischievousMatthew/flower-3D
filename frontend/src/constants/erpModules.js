@@ -9,6 +9,8 @@ export const ERP_MODULES = [
     icon: "dashboard",
     group: "HR",
     path: "/erp/hr",
+    description:
+      "Gives an overview of employee activities, attendance, leave, and other important HR information.",
   },
   {
     key: "employees",
@@ -20,6 +22,8 @@ export const ERP_MODULES = [
       { label: "Directory", path: "/erp/hr/employees/directory" },
       { label: "Profiles", path: "/erp/hr/employees/profiles" },
     ],
+    description:
+      "Allows you to add, update, and manage employee information, roles, and employment status.",
   },
   {
     key: "attendance",
@@ -31,6 +35,8 @@ export const ERP_MODULES = [
       { label: "Logs", path: "/erp/hr/attendance/logs" },
       { label: "QR Scanner", path: "/erp/hr/attendance/qrscanner" },
     ],
+    description:
+      "Allows you to view and manage employee attendance, working hours, and attendance records.",
   },
   {
     key: "payroll",
@@ -42,6 +48,8 @@ export const ERP_MODULES = [
       { label: "Payroll list", path: "/erp/hr/payroll/list" },
       { label: "Create payroll", path: "/erp/hr/payroll/create" },
     ],
+    description:
+      "Allows you to manage employee salaries, deductions, and payroll-related records.",
   },
   {
     key: "leave_management",
@@ -49,6 +57,8 @@ export const ERP_MODULES = [
     icon: "leave",
     group: "HR",
     path: "/erp/hr/leave/management-requests",
+    description:
+      "Allows you to review employee leave requests and manage approved or pending leaves.",
   },
 
   {
@@ -57,6 +67,8 @@ export const ERP_MODULES = [
     icon: "dashboard",
     group: "Finance",
     path: "/erp/finance/dashboard",
+    description:
+      "Provides an overview of the company's financial activities, transactions, and important financial information.",
   },
   {
     key: "funding_requests",
@@ -64,6 +76,8 @@ export const ERP_MODULES = [
     icon: "funding",
     group: "Finance",
     path: "/erp/finance/funding-requests",
+    description:
+      "Allows you to manage bills, supplier payments, funding requests, and other amounts the company needs to pay.",
   },
   {
     key: "payroll_requests",
@@ -71,6 +85,8 @@ export const ERP_MODULES = [
     icon: "payroll",
     group: "Finance",
     path: "/erp/finance/payroll-requests",
+    description:
+      "Allows you to review, approve, and manage payroll funding and salary disbursement requests.",
   },
   {
     key: "crm",
@@ -78,6 +94,8 @@ export const ERP_MODULES = [
     icon: "crm",
     group: "CRM",
     path: "/erp/crm/chat",
+    description:
+      "Allows you to manage customer interaction, support messaging, and communication.",
   },
 
   {
@@ -90,6 +108,8 @@ export const ERP_MODULES = [
       { label: "Products", path: "/erp/procurement/inventory/products" },
       { label: "Add Product", path: "/erp/procurement/inventory/add-product" },
     ],
+    description:
+      "Allows you to manage product quantities, stock levels, product listings, and inventory records.",
   },
   {
     key: "inventory_funding",
@@ -97,6 +117,8 @@ export const ERP_MODULES = [
     icon: "funding",
     group: "Procurement",
     path: "/erp/procurement/inventory/funding-request",
+    description:
+      "Allows employees to create and manage requests for products, materials, or services needed by the company.",
   },
 
   {
@@ -105,6 +127,8 @@ export const ERP_MODULES = [
     icon: "dashboard",
     group: "Supply Chain",
     path: "/erp/procurement/supply-chain/dashboard",
+    description:
+      "Provides an overview of inventory, warehouse activities, deliveries, and other supply chain operations.",
   },
   {
     key: "suppliers",
@@ -112,6 +136,8 @@ export const ERP_MODULES = [
     icon: "suppliers",
     group: "Supply Chain",
     path: "/erp/procurement/supply-chain/suppliers",
+    description:
+      "Allows you to manage supplier information, contacts, and supplier records.",
   },
   {
     key: "warehouse",
@@ -138,6 +164,8 @@ export const ERP_MODULES = [
         path: "/erp/procurement/supply-chain/warehouse/locations",
       },
     ],
+    description:
+      "Allows you to manage storage locations, warehouse items, and product movement.",
   },
   {
     key: "sc_orders",
@@ -145,6 +173,8 @@ export const ERP_MODULES = [
     icon: "orders",
     group: "Supply Chain",
     path: "/erp/procurement/supply-chain/orders",
+    description:
+      "Allows you to view and manage customer orders throughout the fulfillment process.",
   },
   {
     key: "deliveries",
@@ -152,6 +182,8 @@ export const ERP_MODULES = [
     icon: "deliveries",
     group: "Supply Chain",
     path: "/erp/procurement/supply-chain/deliveries",
+    description:
+      "Allows you to manage deliveries and track orders as they move toward customers.",
   },
   {
     key: "order_scan",
@@ -164,6 +196,8 @@ export const ERP_MODULES = [
       { label: "To ship", path: "/erp/procurement/supply-chain/scan/ship" },
       { label: "To receive", path: "/erp/procurement/supply-chain/scan/receive" },
     ],
+    description:
+      "Allows you to scan order items, monitor available stock, and process shipments.",
   },
 ];
 

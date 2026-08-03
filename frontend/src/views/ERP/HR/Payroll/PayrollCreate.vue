@@ -466,46 +466,36 @@
             </div>
           </div>
 
-          <div class="breakdown-item">
+          <!-- Rate Breakdown Card -->
+          <div class="breakdown-item rate-card">
             <div class="item-label">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="12" y1="1" x2="12" y2="23"></line>
-                <path
-                  d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
-                ></path>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
               </svg>
-              Daily Rate
+              Salary Rate Breakdown
+              <span class="rate-basis-badge">
+                {{ previewData.salary_type === 'daily' ? 'Daily basis' : previewData.salary_type === 'weekly' ? 'Weekly basis' : 'Monthly basis' }}
+              </span>
             </div>
-            <div class="item-value">₱{{ previewData.daily_rate }}</div>
-          </div>
-
-          <div class="breakdown-item">
-            <div class="item-label">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <line x1="12" y1="1" x2="12" y2="23"></line>
-                <path
-                  d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
-                ></path>
-              </svg>
-              Hourly Rate
+            <div class="rate-grid">
+              <div class="rate-item" :class="{ 'rate-item--primary': previewData.salary_type === 'daily' }">
+                <span class="rate-label">Hourly</span>
+                <span class="rate-value">₱{{ previewData.hourly_rate }}<span class="rate-unit">/hr</span></span>
+              </div>
+              <div class="rate-item" :class="{ 'rate-item--primary': previewData.salary_type === 'daily' }">
+                <span class="rate-label">Daily</span>
+                <span class="rate-value">₱{{ previewData.daily_rate }}<span class="rate-unit">/day</span></span>
+              </div>
+              <div v-if="previewData.salary_type === 'weekly'" class="rate-item rate-item--primary">
+                <span class="rate-label">Weekly</span>
+                <span class="rate-value">₱{{ previewData.weekly_rate }}<span class="rate-unit">/wk</span></span>
+              </div>
+              <div v-if="previewData.salary_type === 'monthly'" class="rate-item rate-item--primary">
+                <span class="rate-label">Monthly</span>
+                <span class="rate-value">₱{{ previewData.monthly_rate }}<span class="rate-unit">/mo</span></span>
+              </div>
             </div>
-            <div class="item-value">₱{{ previewData.hourly_rate }}</div>
           </div>
 
           <div class="breakdown-item success">
@@ -666,41 +656,53 @@
         <div class="salary-explanation">
           <h4>How Salary is Calculated:</h4>
           <div class="explanation-steps">
+            <!-- Step 0: Rate derivation -->
+            <div class="step">
+              <span class="step-number">0</span>
+              <span class="step-text">
+                <template v-if="previewData.salary_type === 'daily'">
+                  Daily salary ₱{{ previewData.basic_salary }} ÷ {{ previewData.salary_type === 'daily' ? Number(previewData.daily_rate) > 0 ? (parseFloat(previewData.basic_salary) / parseFloat(previewData.daily_rate)).toFixed(0) : '?' : '?' }} hrs/day
+                  → <strong>Hourly rate ₱{{ previewData.hourly_rate }}/hr &amp; Daily rate ₱{{ previewData.daily_rate }}/day</strong>
+                </template>
+                <template v-else-if="previewData.salary_type === 'weekly'">
+                  Weekly salary ₱{{ previewData.basic_salary }} ÷ working days/wk
+                  → <strong>Daily rate ₱{{ previewData.daily_rate }}/day (Weekly basis ₱{{ previewData.weekly_rate }}/wk)</strong>
+                </template>
+                <template v-else>
+                  Monthly salary ₱{{ previewData.basic_salary }} ÷ working days/mo
+                  → <strong>Daily rate ₱{{ previewData.daily_rate }}/day (Monthly basis ₱{{ previewData.monthly_rate }}/mo)</strong>
+                </template>
+              </span>
+            </div>
             <div class="step">
               <span class="step-number">1</span>
               <span class="step-text"
                 >Actual work pay: {{ previewData.actual_work_days }} day(s) ×
-                ₱{{ previewData.daily_rate }} = ₱{{
-                  previewData.actual_work_amount
-                }}</span
+                ₱{{ previewData.daily_rate }}/day = ₱{{ previewData.actual_work_amount }}</span
               >
             </div>
             <div v-if="previewData.paid_leave_days > 0" class="step success">
               <span class="step-number">2</span>
               <span class="step-text"
                 >Paid leave pay added: {{ previewData.paid_leave_days }} day(s)
-                × ₱{{ previewData.daily_rate }} = ₱{{
-                  previewData.paid_leave_amount
-                }}</span
+                × ₱{{ previewData.daily_rate }}/day = ₱{{ previewData.paid_leave_amount }}</span
               >
             </div>
             <div class="step">
               <span class="step-number">{{
-                previewData.paid_leave_days > 0 ? "3" : "2"
+                previewData.paid_leave_days > 0 ? '3' : '2'
               }}</span>
               <span class="step-text"
-                >Payable work covered: {{ previewData.payable_days }} day(s) or
+                >Payable days covered: {{ previewData.payable_days }} day(s) /
                 {{ previewData.total_hours_worked }} paid hour(s)</span
               >
             </div>
             <div class="step success">
               <span class="step-number">{{
-                previewData.paid_leave_days > 0 ? "4" : "3"
+                previewData.paid_leave_days > 0 ? '4' : '3'
               }}</span>
               <span class="step-text"
-                >Gross salary before deductions = ₱{{
-                  previewData.gross_salary
-                }}</span
+                >Gross salary before deductions = ₱{{ previewData.gross_salary }}</span
               >
             </div>
             <div
@@ -708,14 +710,12 @@
               class="step error"
             >
               <span class="step-number">{{
-                previewData.paid_leave_days > 0 ? "5" : "4"
+                previewData.paid_leave_days > 0 ? '5' : '4'
               }}</span>
               <span class="step-text"
-                >Deductions for {{ previewData.unpaid_leave_days }} unpaid
-                leave day(s), {{ previewData.absent_days }} absent day(s), and
-                selected contributions = -₱{{
-                  previewData.deduction_amount
-                }}</span
+                >Deductions: {{ previewData.unpaid_leave_days }} unpaid leave day(s) +
+                {{ previewData.absent_days }} absent day(s) +
+                contributions = -₱{{ previewData.deduction_amount }}</span
               >
             </div>
             <div class="step final">
@@ -1409,6 +1409,86 @@ onMounted(() => {
   font-size: 28px;
   color: white;
 }
+
+/* ── Rate Card ─────────────────────────────────────────────────── */
+.breakdown-item.rate-card {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  background: #f0fff4;
+  border: 1px solid #9ae6b4;
+}
+
+.rate-basis-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: #48bb78;
+  color: white;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.rate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.rate-item {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  text-align: center;
+}
+
+.rate-item--primary {
+  background: #c6f6d5;
+  border: 2px solid #48bb78;
+}
+
+.rate-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.rate-item--primary .rate-label {
+  color: #276749;
+}
+
+.rate-value {
+  display: block;
+  font-size: 17px;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.rate-item--primary .rate-value {
+  color: #22543d;
+}
+
+.rate-unit {
+  font-size: 11px;
+  font-weight: 500;
+  color: #718096;
+  margin-left: 1px;
+}
+
+.rate-item--primary .rate-unit {
+  color: #276749;
+}
+
 
 /* Salary Explanation */
 .salary-explanation {
