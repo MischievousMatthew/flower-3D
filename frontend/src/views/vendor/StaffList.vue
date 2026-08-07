@@ -420,28 +420,82 @@
               <div class="permissions-header">
                 <div>
                   <h3>Module Permissions *</h3>
-                  <p class="permissions-hint">Choose only the actions this employee may perform.</p>
+                  <p class="permissions-hint">
+                    Choose only the actions this employee may perform.
+                  </p>
                 </div>
               </div>
               <div class="permission-groups">
-                <section v-for="(group, groupName) in modulesByGroup" :key="groupName" class="permission-group">
+                <section
+                  v-for="(group, groupName) in modulesByGroup"
+                  :key="groupName"
+                  class="permission-group"
+                >
                   <h4>{{ groupName }}</h4>
-                  <article v-for="mod in group" :key="mod.key" class="permission-accordion" :class="{ 'is-open': isModuleExpanded(mod.key) }">
-                    <button type="button" class="permission-accordion__header" @click="toggleModuleAccordion(mod.key)" :aria-expanded="isModuleExpanded(mod.key)">
+                  <article
+                    v-for="mod in group"
+                    :key="mod.key"
+                    class="permission-accordion"
+                    :class="{ 'is-open': isModuleExpanded(mod.key) }"
+                  >
+                    <button
+                      type="button"
+                      class="permission-accordion__header"
+                      @click="toggleModuleAccordion(mod.key)"
+                      :aria-expanded="isModuleExpanded(mod.key)"
+                    >
                       <span>{{ mod.label }}</span>
-                      <svg class="accordion-chevron" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" aria-hidden="true">
+                      <svg
+                        class="accordion-chevron"
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="1em"
+                        height="1em"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
                         <path d="M0 0h24v24H0z" fill="none" />
-                        <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 9.343L12 15L6.343 9.343" />
+                        <path
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M17.657 9.343L12 15L6.343 9.343"
+                        />
                       </svg>
                     </button>
                     <transition name="accordion">
-                      <div v-if="isModuleExpanded(mod.key)" class="permission-accordion__body">
-                        <p class="permission-module-description">{{ mod.description }}</p>
-                        <div v-for="permission in getModulePermissions(mod.key)" :key="permission" class="permission-row">
+                      <div
+                        v-if="isModuleExpanded(mod.key)"
+                        class="permission-accordion__body"
+                      >
+                        <p class="permission-module-description">
+                          {{ mod.description }}
+                        </p>
+                        <div
+                          v-for="permission in getModulePermissions(mod.key)"
+                          :key="permission"
+                          class="permission-row"
+                        >
                           <span>{{ permissionDetails[permission].label }}</span>
-                          <span class="permission-row__help" :title="permissionDetails[permission].description">ⓘ</span>
-                          <button type="button" class="permission-toggle" :class="{ 'is-allowed': hasPermission(mod.key, permission) }" @click="togglePermission(mod.key, permission)" :aria-label="`${hasPermission(mod.key, permission) ? 'Remove' : 'Allow'} ${permissionDetails[permission].label} permission for ${mod.label}`">
-                            <span class="permission-toggle__knob" aria-hidden="true"></span>
+                          <span
+                            class="permission-row__help"
+                            :title="permissionDetails[permission].description"
+                            >ⓘ</span
+                          >
+                          <button
+                            type="button"
+                            class="permission-toggle"
+                            :class="{
+                              'is-allowed': hasPermission(mod.key, permission),
+                            }"
+                            @click="togglePermission(mod.key, permission)"
+                            :aria-label="`${hasPermission(mod.key, permission) ? 'Remove' : 'Allow'} ${permissionDetails[permission].label} permission for ${mod.label}`"
+                          >
+                            <span
+                              class="permission-toggle__knob"
+                              aria-hidden="true"
+                            ></span>
                           </button>
                         </div>
                       </div>
@@ -499,7 +553,12 @@ import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import { toast } from "vue3-toastify";
 import api from "../../plugins/axios";
-import { getModulesByGroup, findModule, getModulePermissions, PERMISSION_DETAILS } from "../../constants/erpModules";
+import {
+  getModulesByGroup,
+  findModule,
+  getModulePermissions,
+  PERMISSION_DETAILS,
+} from "../../constants/erpModules";
 
 // State
 const showAddModal = ref(false);
@@ -538,8 +597,14 @@ const modulesByGroup = computed(() => {
 function sanitizeModulePermissions(modulePermissions = []) {
   const uniquePermissions = new Map();
   for (const permission of modulePermissions) {
-    const normalized = { ...permission, module: normalizeModuleKey(permission.module) };
-    uniquePermissions.set(`${normalized.module}:${normalized.permission}`, normalized);
+    const normalized = {
+      ...permission,
+      module: normalizeModuleKey(permission.module),
+    };
+    uniquePermissions.set(
+      `${normalized.module}:${normalized.permission}`,
+      normalized,
+    );
   }
   return Array.from(uniquePermissions.values());
 }
@@ -567,10 +632,14 @@ const formData = ref({
 
 // Permissions helpers
 function hasPermission(moduleKey, permission) {
-  return formData.value.permissions.some((item) => item.module === moduleKey && item.permission === permission);
+  return formData.value.permissions.some(
+    (item) => item.module === moduleKey && item.permission === permission,
+  );
 }
 function togglePermission(moduleKey, permission) {
-  const index = formData.value.permissions.findIndex((item) => item.module === moduleKey && item.permission === permission);
+  const index = formData.value.permissions.findIndex(
+    (item) => item.module === moduleKey && item.permission === permission,
+  );
   if (index >= 0) formData.value.permissions.splice(index, 1);
   else formData.value.permissions.push({ module: moduleKey, permission });
 }
@@ -822,28 +891,111 @@ onMounted(async () => {
   }
 });
 
-onUnmounted(() => {
-});
+onUnmounted(() => {});
 </script>
 
 <style scoped>
-.permission-groups { display: grid; gap: 18px; }
-.permission-group h4 { margin: 0 0 8px; color: var(--primary-color, #5a4a9f); font-size: 0.8rem; letter-spacing: .08em; text-transform: uppercase; }
-.permission-accordion { border: 1px solid #e7e2f3; border-radius: 10px; background: #fff; overflow: hidden; margin-bottom: 8px; }
-.permission-accordion__header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 13px 15px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
-.accordion-chevron { width: 1.25rem; height: 1.25rem; transition: transform .2s ease; color: #8276b5; }
-.is-open .accordion-chevron { transform: rotate(180deg); }
-.permission-accordion__body { padding: 0 15px 12px; border-top: 1px solid #f0ecf8; }
-.permission-module-description { margin: 10px 0; color: #74707f; font-size: .82rem; }
-.permission-row { display: grid; grid-template-columns: 1fr auto auto; gap: 9px; align-items: center; padding: 8px 0; }
-.permission-row__help { color: #8276b5; cursor: help; }
-.permission-toggle { width: 58px; height: 30px; display: inline-flex; align-items: center; padding: 3px; border: 0; border-radius: 999px; background: #c7c4d7; cursor: pointer; transition: background .2s ease; }
-.permission-toggle__knob { width: 24px; height: 24px; display: block; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(31, 26, 68, .22); transition: transform .2s ease; }
-.permission-toggle.is-allowed { background: #6565e9; }
-.permission-toggle.is-allowed .permission-toggle__knob { transform: translateX(28px); }
-.permission-toggle:focus-visible { outline: 2px solid #4e49bd; outline-offset: 2px; }
-.accordion-enter-active, .accordion-leave-active { transition: all .2s ease; }
-.accordion-enter-from, .accordion-leave-to { opacity: 0; transform: translateY(-5px); }
+.permission-groups {
+  display: grid;
+  gap: 18px;
+}
+.permission-group h4 {
+  margin: 0 0 8px;
+  color: var(--primary-color, #5a4a9f);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.permission-accordion {
+  border: 1px solid #e7e2f3;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.permission-accordion__header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 13px 15px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.accordion-chevron {
+  width: 1.25rem;
+  height: 1.25rem;
+  transition: transform 0.2s ease;
+  color: #8276b5;
+}
+.is-open .accordion-chevron {
+  transform: rotate(180deg);
+}
+.permission-accordion__body {
+  padding: 0 15px 12px;
+  border-top: 1px solid #f0ecf8;
+}
+.permission-module-description {
+  margin: 10px 0;
+  color: #74707f;
+  font-size: 0.82rem;
+}
+.permission-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 9px;
+  align-items: center;
+  padding: 8px 0;
+}
+.permission-row__help {
+  color: #8276b5;
+  cursor: help;
+}
+.permission-toggle {
+  width: 58px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border: 0;
+  border-radius: 999px;
+  background: #c7c4d7;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.permission-toggle__knob {
+  width: 24px;
+  height: 24px;
+  display: block;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(31, 26, 68, 0.22);
+  transition: transform 0.2s ease;
+}
+.permission-toggle.is-allowed {
+  background: #6565e9;
+}
+.permission-toggle.is-allowed .permission-toggle__knob {
+  transform: translateX(28px);
+}
+.permission-toggle:focus-visible {
+  outline: 2px solid #4e49bd;
+  outline-offset: 2px;
+}
+.accordion-enter-active,
+.accordion-leave-active {
+  transition: all 0.2s ease;
+}
+.accordion-enter-from,
+.accordion-leave-to {
+  opacity: 0;
+  transform: translateY(-5px);
+}
 * {
   margin: 0;
   padding: 0;

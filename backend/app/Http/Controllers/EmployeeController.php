@@ -185,6 +185,7 @@ class EmployeeController extends Controller
                 $seenPermissions[] = $key;
 
                 EmployeeModulePermission::create([
+                    'owner_id'    => $ownerId,
                     'employee_id' => $employee->id,
                     'module'      => $perm['module'],
                     'permission'  => $perm['permission'],
@@ -329,6 +330,7 @@ class EmployeeController extends Controller
                     $seenPermissions[] = $key;
 
                     EmployeeModulePermission::create([
+                        'owner_id'    => $ownerId,
                         'employee_id' => $employee->id,
                         'module'      => $perm['module'],
                         'permission'  => $perm['permission'],
