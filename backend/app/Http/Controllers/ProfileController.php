@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Helpers\CloudinaryHelper;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -48,7 +49,11 @@ class ProfileController extends Controller
                 'address'        => 'nullable|string|max:500',
                 'city'           => 'nullable|string|max:100',
                 'postal_code'    => 'nullable|string|max:20',
-                'contact_number' => 'nullable|digits:11',
+                'contact_number' => [
+                    'nullable',
+                    'digits:11',
+                    Rule::unique('users', 'contact_number')->ignore($user->id),
+                ],
                 'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             ]);
 

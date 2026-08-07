@@ -889,7 +889,7 @@ const saveProfile = async () => {
       address: editData.address || null,
       city: editData.city || null,
       postal_code: editData.postal_code || null,
-      contact_number: editData.contact_number || null, // ✅ include phone in payload
+      contact_number: editData.contact_number || null,
     };
 
     const response = await api.put("/profile/user-details", updateData, {
