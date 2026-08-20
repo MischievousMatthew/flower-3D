@@ -178,9 +178,16 @@
               class="form-input"
               :class="{ 'input-error': errors.password }"
             />
-            <p class="hint-text">
-              Must include uppercase, lowercase, and number
-            </p>
+            <div class="password-requirements" aria-live="polite">
+              <div class="password-strength-track" aria-hidden="true"><span :class="passwordStrength.level" :style="{ width: `${passwordStrength.percent}%` }"></span></div>
+              <div class="password-strength-label"><span>Password strength</span><strong :class="passwordStrength.level">{{ passwordStrength.label }}</strong></div>
+              <ul>
+                <li :class="{ met: passwordChecks.length }"><span>{{ passwordChecks.length ? '✓' : '○' }}</span> At least 8 characters</li>
+                <li :class="{ met: passwordChecks.uppercase }"><span>{{ passwordChecks.uppercase ? '✓' : '○' }}</span> 1 uppercase letter</li>
+                <li :class="{ met: passwordChecks.lowercase }"><span>{{ passwordChecks.lowercase ? '✓' : '○' }}</span> 1 lowercase letter</li>
+                <li :class="{ met: passwordChecks.number }"><span>{{ passwordChecks.number ? '✓' : '○' }}</span> 1 number</li>
+              </ul>
+            </div>
             <span v-if="errors.password" class="error-msg">{{
               errors.password
             }}</span>
@@ -260,6 +267,19 @@ function startCooldown(seconds = 60) {
 }
 
 const canResend = computed(() => cooldown.value === 0);
+const passwordChecks = computed(() => ({
+  length: form.password.length >= 8,
+  uppercase: /[A-Z]/.test(form.password),
+  lowercase: /[a-z]/.test(form.password),
+  number: /\d/.test(form.password),
+}));
+const passwordStrength = computed(() => {
+  const passed = Object.values(passwordChecks.value).filter(Boolean).length;
+  if (!form.password) return { percent: 0, label: 'Enter a password', level: 'empty' };
+  if (passed <= 2) return { percent: 45, label: 'Weak', level: 'weak' };
+  if (passed === 3) return { percent: 72, label: 'Fair', level: 'fair' };
+  return { percent: 100, label: 'Strong', level: 'strong' };
+});
 
 // ── reset email (let user correct it) ───────────────────────
 function resetEmail() {
@@ -336,8 +356,8 @@ function validateStep() {
       errors.value.password = "Password is required.";
       return false;
     }
-    if (form.password.length < 8) {
-      errors.value.password = "Password must be at least 8 characters.";
+    if (!Object.values(passwordChecks.value).every(Boolean)) {
+      errors.value.password = "Password must contain at least 8 characters, an uppercase letter, a lowercase letter, and a number.";
       return false;
     }
     if (form.password !== form.password_confirmation) {
@@ -631,6 +651,13 @@ async function handleRegister() {
   color: #a0aec0;
   margin-top: 6px;
 }
+
+.password-requirements { margin-top: 10px; font-size: 12px; color: #718096; }
+.password-strength-track { height: 6px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
+.password-strength-track span { display: block; height: 100%; border-radius: inherit; transition: width .2s ease, background .2s ease; }
+.password-strength-track .empty { background: #cbd5e0; }.password-strength-track .weak { background: #ef4444; }.password-strength-track .fair { background: #f59e0b; }.password-strength-track .strong { background: #16a34a; }
+.password-strength-label { display: flex; justify-content: space-between; margin-top: 7px; }.password-strength-label strong.empty { color: #718096; }.password-strength-label strong.weak { color: #dc2626; }.password-strength-label strong.fair { color: #d97706; }.password-strength-label strong.strong { color: #15803d; }
+.password-requirements ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 12px; margin: 10px 0 0; padding: 0; list-style: none; }.password-requirements li { color: #718096; }.password-requirements li span { display: inline-block; width: 14px; }.password-requirements li.met { color: #15803d; font-weight: 600; }
 
 .otp-btn {
   width: 100%;

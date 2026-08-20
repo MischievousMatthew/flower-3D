@@ -326,8 +326,9 @@
             <div
               class="file-drop-zone"
               @click="$refs.government_idInput.click()"
-              @dragover.prevent="handleDragOver"
-              @dragleave.prevent="handleDragLeave"
+              @dragenter.prevent="handleDragEnter($event, 'government_id')"
+              @dragover.prevent="handleDragOver($event, 'government_id')"
+              @dragleave.prevent="handleDragLeave($event, 'government_id')"
               @drop.prevent="handleDrop($event, 'government_id')"
               :class="{
                 'drag-over': dragOver.government_id,
@@ -347,6 +348,7 @@
               </div>
               <div v-else class="file-preview">
                 <div class="preview-icon">
+                  <img v-if="isImage(fileInfo.government_id.type) && fileInfo.government_id.url" :src="fileInfo.government_id.url" :alt="fileInfo.government_id.name" class="file-thumbnail" />
                   <span v-if="isImage(fileInfo.government_id.type)">🖼️</span>
                   <span v-else>📄</span>
                 </div>
@@ -394,8 +396,9 @@
             <div
               class="file-drop-zone"
               @click="$refs.selfie_with_idInput.click()"
-              @dragover.prevent="handleDragOver"
-              @dragleave.prevent="handleDragLeave"
+              @dragenter.prevent="handleDragEnter($event, 'selfie_with_id')"
+              @dragover.prevent="handleDragOver($event, 'selfie_with_id')"
+              @dragleave.prevent="handleDragLeave($event, 'selfie_with_id')"
               @drop.prevent="handleDrop($event, 'selfie_with_id')"
               :class="{
                 'drag-over': dragOver.selfie_with_id,
@@ -413,6 +416,7 @@
               </div>
               <div v-else class="file-preview">
                 <div class="preview-icon">
+                  <img v-if="fileInfo.selfie_with_id.url" :src="fileInfo.selfie_with_id.url" :alt="fileInfo.selfie_with_id.name" class="file-thumbnail" />
                   <span>📸</span>
                 </div>
                 <div class="file-details">
@@ -458,8 +462,9 @@
             <div
               class="file-drop-zone"
               @click="$refs.proof_of_addressInput.click()"
-              @dragover.prevent="handleDragOver"
-              @dragleave.prevent="handleDragLeave"
+              @dragenter.prevent="handleDragEnter($event, 'proof_of_address')"
+              @dragover.prevent="handleDragOver($event, 'proof_of_address')"
+              @dragleave.prevent="handleDragLeave($event, 'proof_of_address')"
               @drop.prevent="handleDrop($event, 'proof_of_address')"
               :class="{
                 'drag-over': dragOver.proof_of_address,
@@ -479,6 +484,7 @@
               </div>
               <div v-else class="file-preview">
                 <div class="preview-icon">
+                  <img v-if="isImage(fileInfo.proof_of_address.type) && fileInfo.proof_of_address.url" :src="fileInfo.proof_of_address.url" :alt="fileInfo.proof_of_address.name" class="file-thumbnail" />
                   <span v-if="isImage(fileInfo.proof_of_address.type)">🏠</span>
                   <span v-else>📄</span>
                 </div>
@@ -574,8 +580,9 @@
             <div
               class="file-drop-zone"
               @click="$refs.barangay_clearanceInput.click()"
-              @dragover.prevent="handleDragOver"
-              @dragleave.prevent="handleDragLeave"
+              @dragenter.prevent="handleDragEnter($event, 'barangay_clearance')"
+              @dragover.prevent="handleDragOver($event, 'barangay_clearance')"
+              @dragleave.prevent="handleDragLeave($event, 'barangay_clearance')"
               @drop.prevent="handleDrop($event, 'barangay_clearance')"
               :class="{
                 'drag-over': dragOver.barangay_clearance,
@@ -598,6 +605,7 @@
               </div>
               <div v-else class="file-preview">
                 <div class="preview-icon">
+                  <img v-if="isImage(fileInfo.barangay_clearance.type) && fileInfo.barangay_clearance.url" :src="fileInfo.barangay_clearance.url" :alt="fileInfo.barangay_clearance.name" class="file-thumbnail" />
                   <span v-if="isImage(fileInfo.barangay_clearance.type)"
                     >🏛️</span
                   >
@@ -656,8 +664,9 @@
             <div
               class="file-drop-zone"
               @click="$refs.mayor_permitInput.click()"
-              @dragover.prevent="handleDragOver"
-              @dragleave.prevent="handleDragLeave"
+              @dragenter.prevent="handleDragEnter($event, 'mayor_permit')"
+              @dragover.prevent="handleDragOver($event, 'mayor_permit')"
+              @dragleave.prevent="handleDragLeave($event, 'mayor_permit')"
               @drop.prevent="handleDrop($event, 'mayor_permit')"
               :class="{
                 'drag-over': dragOver.mayor_permit,
@@ -677,6 +686,7 @@
               </div>
               <div v-else class="file-preview">
                 <div class="preview-icon">
+                  <img v-if="isImage(fileInfo.mayor_permit.type) && fileInfo.mayor_permit.url" :src="fileInfo.mayor_permit.url" :alt="fileInfo.mayor_permit.name" class="file-thumbnail" />
                   <span v-if="isImage(fileInfo.mayor_permit.type)">🏢</span>
                   <span v-else>📄</span>
                 </div>
@@ -813,8 +823,9 @@
             <div
               class="file-drop-zone"
               @click="$refs.store_logoInput.click()"
-              @dragover.prevent="handleDragOver"
-              @dragleave.prevent="handleDragLeave"
+              @dragenter.prevent="handleDragEnter($event, 'store_logo')"
+              @dragover.prevent="handleDragOver($event, 'store_logo')"
+              @dragleave.prevent="handleDragLeave($event, 'store_logo')"
               @drop.prevent="handleDrop($event, 'store_logo')"
               :class="{
                 'drag-over': dragOver.store_logo,
@@ -832,6 +843,7 @@
               </div>
               <div v-else class="file-preview">
                 <div class="preview-icon">
+                  <img v-if="fileInfo.store_logo.url" :src="fileInfo.store_logo.url" :alt="fileInfo.store_logo.name" class="file-thumbnail" />
                   <span>🏪</span>
                 </div>
                 <div class="file-details">
@@ -871,8 +883,9 @@
             <div
               class="file-drop-zone"
               @click="$refs.portfolio_photosInput.click()"
-              @dragover.prevent="handleDragOver"
-              @dragleave.prevent="handleDragLeave"
+              @dragenter.prevent="handleDragEnter($event, 'portfolio_photos')"
+              @dragover.prevent="handleDragOver($event, 'portfolio_photos')"
+              @dragleave.prevent="handleDragLeave($event, 'portfolio_photos')"
               @drop.prevent="handleDrop($event, 'portfolio_photos')"
               :class="{
                 'drag-over': dragOver.portfolio_photos,
@@ -925,6 +938,7 @@
                       :key="index"
                       class="file-item"
                     >
+                      <img v-if="file.url" :src="file.url" :alt="file.name" class="file-list-thumbnail" />
                       <span class="file-item-name">{{ file.name }}</span>
                       <span class="file-item-size">{{
                         formatFileSize(file.size)
@@ -1732,22 +1746,30 @@ const closeActiveModal = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // File handling methods (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
-const handleDragOver = (event) => {
-  event.preventDefault();
-  const target = event.currentTarget;
-  if (target) target.classList.add("drag-over");
+const hasDraggedFiles = (event) =>
+  Array.from(event.dataTransfer?.types || []).includes("Files");
+
+const clearDragOver = () => {
+  Object.keys(dragOver).forEach((fieldName) => {
+    dragOver[fieldName] = false;
+  });
 };
 
-const handleDragLeave = (event) => {
-  event.preventDefault();
-  const target = event.currentTarget;
-  if (target) target.classList.remove("drag-over");
+const handleDragEnter = (event, fieldName) => {
+  if (hasDraggedFiles(event)) dragOver[fieldName] = true;
+};
+
+const handleDragOver = (event, fieldName) => {
+  if (hasDraggedFiles(event)) dragOver[fieldName] = true;
+};
+
+const handleDragLeave = (event, fieldName) => {
+  if (!event.currentTarget?.contains(event.relatedTarget)) dragOver[fieldName] = false;
 };
 
 const handleDrop = (event, fieldName) => {
   event.preventDefault();
-  const target = event.currentTarget;
-  if (target) target.classList.remove("drag-over");
+  dragOver[fieldName] = false;
   const files = event.dataTransfer.files;
   if (files && files.length > 0) {
     handleFileUpload({ target: { files } }, fieldName);
@@ -1769,6 +1791,7 @@ const handleFileUpload = async (event, fieldName) => {
         event.target.value = "";
         return;
       }
+      if (fileInfo[fieldName]?.url) URL.revokeObjectURL(fileInfo[fieldName].url);
       fileObjects[fieldName] = file;
       fileInfo[fieldName] = {
         name: file.name,
@@ -2455,10 +2478,12 @@ onMounted(() => {
       clearProgress();
     }
   }
+  window.addEventListener("dragend", clearDragOver);
 });
 
 onUnmounted(() => {
   if (saveInterval.value) clearInterval(saveInterval.value);
+  window.removeEventListener("dragend", clearDragOver);
 
   Object.keys(fileInfo).forEach((key) => {
     if (fileInfo[key]) {
@@ -2731,10 +2756,6 @@ textarea.form-input {
   overflow: hidden;
 }
 
-.file-drop-zone:hover {
-  border-color: #cbd5e0;
-  background: #edf2f7;
-}
 .file-drop-zone.drag-over {
   border-color: #20734d;
   background: rgba(32, 115, 77, 0.05);
@@ -2749,9 +2770,6 @@ textarea.form-input {
   height: 48px;
   fill: #cbd5e0;
   margin-bottom: 12px;
-}
-.file-drop-zone:hover .upload-icon {
-  fill: #a0aec0;
 }
 
 .upload-text {
@@ -2800,6 +2818,8 @@ textarea.form-input {
   margin-right: 12px;
   flex-shrink: 0;
 }
+.file-thumbnail { width: 56px; height: 56px; display: block; border-radius: 6px; object-fit: cover; }
+.preview-icon:has(.file-thumbnail) { font-size: 0; }
 .file-preview.multiple .preview-icon {
   margin-right: 0;
   margin-bottom: 12px;
@@ -2882,6 +2902,7 @@ textarea.form-input {
   font-size: 12px;
   border-bottom: 1px solid #f1f5f9;
 }
+.file-list-thumbnail { width: 32px; height: 32px; margin-right: 8px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
 
 .file-item:last-child {
   border-bottom: none;
