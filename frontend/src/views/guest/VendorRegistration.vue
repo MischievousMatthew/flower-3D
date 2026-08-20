@@ -163,19 +163,21 @@
             class="operating-hours-container"
             :class="{ 'container-error': errors.operatingHours }"
           >
-            <!-- Day Selection -->
+            <div v-for="(schedule, scheduleIndex) in operatingSchedules" :key="schedule.id" class="schedule-card">
+            <div class="schedule-heading"><strong>Schedule {{ scheduleIndex + 1 }}</strong><button v-if="operatingSchedules.length > 1" type="button" class="schedule-remove" @click="removeSchedule(scheduleIndex)">Remove</button></div>
             <p class="oh-section-label">Select operating days:</p>
             <div class="days-grid">
               <label
                 v-for="day in daysOfWeek"
                 :key="day"
                 class="day-checkbox-label"
-                :class="{ selected: operatingHoursConfig.days.includes(day) }"
+                :class="{ selected: schedule.days.includes(day), disabled: isDayAssignedElsewhere(day, scheduleIndex) }"
               >
                 <input
                   type="checkbox"
                   :value="day"
-                  v-model="operatingHoursConfig.days"
+                  v-model="schedule.days"
+                  :disabled="isDayAssignedElsewhere(day, scheduleIndex)"
                   class="day-checkbox-hidden"
                 />
                 <span>{{ day.substring(0, 3) }}</span>
@@ -187,24 +189,24 @@
               <button
                 type="button"
                 class="shortcut-btn"
-                @click="selectWeekdays"
+                @click="selectWeekdays(scheduleIndex)"
               >
                 Mon–Fri
               </button>
               <button
                 type="button"
                 class="shortcut-btn"
-                @click="selectWeekends"
+                @click="selectWeekends(scheduleIndex)"
               >
                 Sat–Sun
               </button>
-              <button type="button" class="shortcut-btn" @click="selectAllDays">
+              <button type="button" class="shortcut-btn" @click="selectAllDays(scheduleIndex)">
                 Everyday
               </button>
               <button
                 type="button"
                 class="shortcut-btn shortcut-clear"
-                @click="clearDays"
+                @click="clearDays(scheduleIndex)"
               >
                 Clear
               </button>
@@ -219,7 +221,7 @@
                 <label class="time-label">Opening Time</label>
                 <input
                   type="time"
-                  v-model="operatingHoursConfig.startTime"
+                  v-model="schedule.opening_time"
                   class="form-input time-input"
                 />
               </div>
@@ -228,20 +230,21 @@
                 <label class="time-label">Closing Time</label>
                 <input
                   type="time"
-                  v-model="operatingHoursConfig.endTime"
+                  v-model="schedule.closing_time"
                   class="form-input time-input"
                 />
               </div>
             </div>
 
-            <!-- Live Preview -->
-            <div v-if="formData.operatingHours" class="hours-preview">
+            <div v-if="schedule.days.length && schedule.opening_time && schedule.closing_time" class="hours-preview">
               <span class="preview-icon">🕐</span>
-              <span>{{ formData.operatingHours }}</span>
+              <span>{{ formatDays(schedule.days) }}: {{ formatTime(schedule.opening_time) }} – {{ formatTime(schedule.closing_time) }}</span>
             </div>
+            </div>
+            <button v-if="operatingSchedules.length < 7" type="button" class="shortcut-btn add-schedule-btn" @click="addSchedule">+ Add Schedule</button>
           </div>
-          <div v-if="errors.operatingHours" class="error-message">
-            {{ errors.operatingHours }}
+          <div v-if="errors.operatingHours || errors.operating_schedules" class="error-message">
+            {{ errors.operatingHours || errors.operating_schedules }}
           </div>
         </div>
       </div>
@@ -1342,31 +1345,33 @@ const daysOfWeek = [
   "Sunday",
 ];
 
-const operatingHoursConfig = reactive({
-  days: [], // Array of selected day strings
-  startTime: "", // "HH:MM" 24-hour format
-  endTime: "", // "HH:MM" 24-hour format
-});
+const operatingSchedules = ref([{ id: 1, days: [], opening_time: "", closing_time: "" }]);
 
 // ── Quick-select helpers ───────────────────────────────────────────────────────
-const selectWeekdays = () => {
-  operatingHoursConfig.days = [
+const assignAvailableDays = (index, days) => {
+  operatingSchedules.value[index].days = days.filter((day) => !isDayAssignedElsewhere(day, index));
+};
+const selectWeekdays = (index) => {
+  assignAvailableDays(index, [
     "Monday",
     "Tuesday",
     "Wednesday",
     "Thursday",
     "Friday",
-  ];
+  ]);
 };
-const selectWeekends = () => {
-  operatingHoursConfig.days = ["Saturday", "Sunday"];
+const selectWeekends = (index) => {
+  assignAvailableDays(index, ["Saturday", "Sunday"]);
 };
-const selectAllDays = () => {
-  operatingHoursConfig.days = [...daysOfWeek];
+const selectAllDays = (index) => {
+  assignAvailableDays(index, daysOfWeek);
 };
-const clearDays = () => {
-  operatingHoursConfig.days = [];
+const clearDays = (index) => {
+  operatingSchedules.value[index].days = [];
 };
+const isDayAssignedElsewhere = (day, index) => operatingSchedules.value.some((schedule, scheduleIndex) => scheduleIndex !== index && schedule.days.includes(day));
+const addSchedule = () => { if (operatingSchedules.value.length < 7) operatingSchedules.value.push({ id: Date.now(), days: [], opening_time: "", closing_time: "" }); };
+const removeSchedule = (index) => { if (operatingSchedules.value.length > 1) operatingSchedules.value.splice(index, 1); };
 
 // ── Time formatter: "HH:MM" → "H:MM AM/PM" ───────────────────────────────────
 const formatTime = (time) => {
@@ -1412,12 +1417,10 @@ watchEffect(() => {
 
 // ── Keep formData.operatingHours in sync with day/time config ─────────────────
 watchEffect(() => {
-  const { days, startTime, endTime } = operatingHoursConfig;
-  if (days.length > 0 && startTime && endTime) {
-    formData.operatingHours = `${formatDays(days)}: ${formatTime(startTime)} – ${formatTime(endTime)}`;
-  } else {
-    formData.operatingHours = "";
-  }
+  formData.operatingHours = operatingSchedules.value
+    .filter((schedule) => schedule.days.length && schedule.opening_time && schedule.closing_time)
+    .map((schedule) => `${formatDays(schedule.days)}: ${formatTime(schedule.opening_time)} – ${formatTime(schedule.closing_time)}`)
+    .join("; ");
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2013,21 +2016,34 @@ const validateStep = (step) => {
         errors.serviceAreas = "Please select at least one service area";
         isValid = false;
       }
-      // NEW: operating hours (days + times)
-      if (operatingHoursConfig.days.length === 0) {
-        errors.operatingHours = "Please select at least one operating day";
+      const assignedOperatingDays = new Set();
+      if (!operatingSchedules.value.length) {
+        errors.operatingHours = "Please add at least one operating schedule";
         isValid = false;
-      } else if (!operatingHoursConfig.startTime) {
-        errors.operatingHours = "Please set an opening time";
-        isValid = false;
-      } else if (!operatingHoursConfig.endTime) {
-        errors.operatingHours = "Please set a closing time";
-        isValid = false;
-      } else if (
-        operatingHoursConfig.startTime >= operatingHoursConfig.endTime
-      ) {
-        errors.operatingHours = "Closing time must be after opening time";
-        isValid = false;
+      } else {
+        for (const schedule of operatingSchedules.value) {
+          if (!schedule.days.length) {
+            errors.operatingHours = "Each schedule needs at least one operating day";
+            isValid = false;
+            break;
+          }
+          if (!schedule.opening_time || !schedule.closing_time) {
+            errors.operatingHours = "Each schedule needs opening and closing times";
+            isValid = false;
+            break;
+          }
+          if (schedule.opening_time >= schedule.closing_time) {
+            errors.operatingHours = "Closing time must be after opening time";
+            isValid = false;
+            break;
+          }
+          if (schedule.days.some((day) => assignedOperatingDays.has(day))) {
+            errors.operatingHours = "A day can belong to only one schedule";
+            isValid = false;
+            break;
+          }
+          schedule.days.forEach((day) => assignedOperatingDays.add(day));
+        }
       }
       break;
 
@@ -2175,9 +2191,9 @@ const saveProgress = () => {
     currentStep: currentStep.value,
     formData: JSON.parse(JSON.stringify(formData)),
     fileInfo: {},
-    // NEW: persist the raw config so UI state is restored on reload
+    // Persist the structured weekly schedules so UI state is restored on reload.
     selectedServiceAreas: [...selectedServiceAreas.value],
-    operatingHoursConfig: JSON.parse(JSON.stringify(operatingHoursConfig)),
+    operatingSchedules: JSON.parse(JSON.stringify(operatingSchedules.value)),
     timestamp: new Date().getTime(),
   };
 
@@ -2226,8 +2242,20 @@ const loadProgress = () => {
         if (Array.isArray(parsed.selectedServiceAreas)) {
           selectedServiceAreas.value = parsed.selectedServiceAreas;
         }
-        if (parsed.operatingHoursConfig) {
-          Object.assign(operatingHoursConfig, parsed.operatingHoursConfig);
+        if (Array.isArray(parsed.operatingSchedules) && parsed.operatingSchedules.length) {
+          operatingSchedules.value = parsed.operatingSchedules.map((schedule, index) => ({
+            id: schedule.id || index + 1,
+            days: Array.isArray(schedule.days) ? schedule.days : [],
+            opening_time: schedule.opening_time || "",
+            closing_time: schedule.closing_time || "",
+          }));
+        } else if (parsed.operatingHoursConfig) {
+          operatingSchedules.value = [{
+            id: 1,
+            days: parsed.operatingHoursConfig.days || [],
+            opening_time: parsed.operatingHoursConfig.startTime || "",
+            closing_time: parsed.operatingHoursConfig.endTime || "",
+          }];
         }
 
         if (currentStep.value > 1) {
@@ -2272,9 +2300,7 @@ const clearProgress = () => {
 
   // NEW: reset extra UI state
   selectedServiceAreas.value = [];
-  operatingHoursConfig.days = [];
-  operatingHoursConfig.startTime = "";
-  operatingHoursConfig.endTime = "";
+  operatingSchedules.value = [{ id: 1, days: [], opening_time: "", closing_time: "" }];
 
   Object.keys(fileObjects).forEach((key) => {
     fileObjects[key] = Array.isArray(fileObjects[key]) ? [] : null;
@@ -2357,6 +2383,17 @@ const handleSubmit = async () => {
         }
       }
     }
+
+    submitData.append(
+      "operating_schedules",
+      JSON.stringify(
+        operatingSchedules.value.map(({ days, opening_time, closing_time }) => ({
+          days,
+          opening_time,
+          closing_time,
+        })),
+      ),
+    );
 
     if (
       fileObjects.government_id &&
@@ -3285,6 +3322,18 @@ textarea.form-input {
   color: #ffffff;
 }
 
+.day-checkbox-label.disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  background: #edf2f7;
+}
+
+.day-checkbox-label.disabled:hover {
+  border-color: #e2e8f0;
+  color: #718096;
+  background: #edf2f7;
+}
+
 .day-checkbox-hidden {
   position: absolute;
   opacity: 0;
@@ -3328,6 +3377,33 @@ textarea.form-input {
   border-color: #e53e3e;
   background: #fff5f5;
   color: #c53030;
+}
+
+.schedule-card + .schedule-card {
+  border-top: 1px solid #e2e8f0;
+  margin-top: 18px;
+  padding-top: 18px;
+}
+
+.schedule-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #2d3748;
+  margin-bottom: 12px;
+}
+
+.schedule-remove {
+  border: 0;
+  background: transparent;
+  color: #c53030;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.add-schedule-btn {
+  margin-top: 16px;
 }
 
 /* Time range */

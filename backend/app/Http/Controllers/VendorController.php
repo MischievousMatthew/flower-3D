@@ -26,6 +26,7 @@ class VendorController extends Controller
             'store_address'             => 'required|string',
             'service_areas'             => 'required|string',
             'operating_hours'           => 'required|string',
+            'operating_schedules'       => 'required|string',
             'owner_name'                => 'required|string|max:255',
             'position'                  => 'required|string|max:255',
             'contact_number'            => 'required|string|max:20',
@@ -85,6 +86,12 @@ class VendorController extends Controller
             ], 422);
         }
 
+        $operatingSchedules = json_decode($request->operating_schedules, true);
+        $scheduleError = $this->validateOperatingSchedules($operatingSchedules);
+        if ($scheduleError) {
+            return response()->json(['success' => false, 'message' => 'Validation failed. Please check your input.', 'errors' => ['operating_schedules' => [$scheduleError]]], 422);
+        }
+
         try {
             DB::beginTransaction();
 
@@ -99,6 +106,7 @@ class VendorController extends Controller
             $app->store_address   = $request->store_address;
             $app->service_areas   = $request->service_areas;
             $app->operating_hours = $request->operating_hours;
+            $app->operating_schedules = $operatingSchedules;
             $app->owner_name      = $request->owner_name;
             $app->position        = $request->position;
             $app->contact_number  = $request->contact_number;
@@ -247,6 +255,34 @@ class VendorController extends Controller
                 'error'   => config('app.debug') ? $e->getMessage() : 'Please try again later or contact support.',
             ], 500);
         }
+    }
+
+    private function validateOperatingSchedules($schedules): ?string
+    {
+        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        if (!is_array($schedules) || count($schedules) < 1 || count($schedules) > 7) return 'Provide between 1 and 7 operating schedules.';
+        $assigned = [];
+        foreach ($schedules as $schedule) {
+            $scheduleDays = $schedule['days'] ?? [];
+            $opening = $schedule['opening_time'] ?? null;
+            $closing = $schedule['closing_time'] ?? null;
+            if (!is_array($scheduleDays) || !$scheduleDays || !$this->isValidScheduleTime($opening) || !$this->isValidScheduleTime($closing) || $opening >= $closing) return 'Every schedule needs at least one day and a closing time after its opening time.';
+            foreach ($scheduleDays as $day) {
+                if (!in_array($day, $days, true) || in_array($day, $assigned, true)) return 'Each day can belong to only one schedule.';
+                $assigned[] = $day;
+            }
+        }
+        return null;
+    }
+
+    private function isValidScheduleTime($time): bool
+    {
+        if (!is_string($time) || !preg_match('/^\d{2}:\d{2}$/', $time)) {
+            return false;
+        }
+
+        [$hours, $minutes] = array_map('intval', explode(':', $time));
+        return $hours >= 0 && $hours <= 23 && $minutes >= 0 && $minutes <= 59;
     }
 
     public function checkStatus(Request $request)

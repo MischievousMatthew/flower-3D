@@ -680,6 +680,7 @@ const vendorReservationSettings = ref({
   timezone: PH_TIMEZONE,
   sameDayDelivery: false,
   sameDayAvailableToday: false,
+  operatingSchedules: [],
   cutoffTimeToday: null,
   maxOrdersPerDay: 10,
 });
@@ -999,6 +1000,9 @@ async function loadCalendarData() {
         timezone: vendor.timezone || PH_TIMEZONE,
         sameDayDelivery: Boolean(vendor.same_day_delivery),
         sameDayAvailableToday: Boolean(vendor.same_day_available_today),
+        operatingSchedules: Array.isArray(vendor.operating_schedules)
+          ? vendor.operating_schedules
+          : [],
         cutoffTimeToday: vendor.cutoff_time_today || null,
         maxOrdersPerDay: Number(vendor.max_orders_per_day ?? 10),
       };

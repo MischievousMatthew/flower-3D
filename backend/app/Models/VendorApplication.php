@@ -22,7 +22,7 @@ class VendorApplication extends Model
 
     protected $fillable = [
         'application_id', 'status_token', 'store_name', 'store_description',
-        'business_type', 'store_address', 'service_areas', 'operating_hours',
+        'business_type', 'store_address', 'service_areas', 'operating_hours', 'operating_schedules',
         'owner_name', 'position', 'contact_number', 'email',
         'government_id_number', 'government_id_path', 'selfie_with_id_path',
         'proof_of_address_path', 'dti_number', 'sec_number',
@@ -43,6 +43,7 @@ class VendorApplication extends Model
     protected $casts = [
         'product_types'               => 'array',
         'cutoff_times'                => 'array',
+        'operating_schedules'         => 'array',
         'portfolio_photos_paths'      => 'array',
         'same_day_delivery'           => 'boolean',
         'max_orders_per_day'          => 'integer',
@@ -470,6 +471,7 @@ class VendorApplication extends Model
             'cutoff_time_today'         => $cutoffTimeToday,
             'same_day_cutoff_reached'   => $sameDayCutoffReached,
             'same_day_available_today'  => $sameDayDelivery && !$sameDayCutoffReached,
+            'operating_schedules'       => $application?->operating_schedules ?? [],
         ];
     }
 
@@ -502,7 +504,27 @@ class VendorApplication extends Model
             return null;
         }
 
-        return self::SAME_DAY_CUTOFF_TIME;
+        $schedule = $this->operatingScheduleForDate($date);
+        if ($schedule) {
+            return $schedule['closing_time'];
+        }
+
+        // Existing vendors retain their historical same-day cutoff until they
+        // provide structured weekly schedules.
+        return empty($this->operating_schedules) ? self::SAME_DAY_CUTOFF_TIME : null;
+    }
+
+    public function operatingScheduleForDate(CarbonInterface $date): ?array
+    {
+        $day = $date->copy()->setTimezone(self::RESERVATION_TIMEZONE)->format('l');
+
+        foreach ($this->operating_schedules ?? [] as $schedule) {
+            if (in_array($day, $schedule['days'] ?? [], true)) {
+                return $schedule;
+            }
+        }
+
+        return null;
     }
 
     public function isSameDayCutoffReached(?CarbonInterface $referenceNow = null): bool
@@ -517,7 +539,7 @@ class VendorApplication extends Model
 
         $cutoffTime = $this->cutoffTimeForDate($now);
         if (!$cutoffTime) {
-            return false;
+            return true;
         }
 
         $cutoffDateTime = Carbon::createFromFormat(

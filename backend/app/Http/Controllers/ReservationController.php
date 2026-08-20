@@ -125,6 +125,7 @@ class ReservationController extends Controller
                         'same_day_delivery' => $settings['same_day_delivery'],
                         'same_day_available_today' => $settings['same_day_available_today'],
                         'cutoff_time_today' => $settings['cutoff_time_today'],
+                        'operating_schedules' => $settings['operating_schedules'],
                         'timezone' => $settings['timezone'],
                     ],
                     'date_range' => [
