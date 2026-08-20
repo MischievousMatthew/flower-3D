@@ -160,6 +160,12 @@
                 <span>{{ selectedFlower.locked ? "Drag and arrow controls are disabled." : "Drag the flower or nudge it with the arrows below." }}</span>
               </div>
               <label class="fc-transform-row">
+                <span>Flower Size</span>
+                <strong>{{ Number(selectedFlower.scale ?? 1).toFixed(2) }}&times;</strong>
+              </label>
+              <input class="fc-range" type="range" min="0.25" max="2" step="0.01" :value="selectedFlower.scale ?? 1" @input="updateSelectedScale(Number($event.target.value))" />
+              <div class="fc-range-caption"><span>Small</span><span>Large</span></div>
+              <label class="fc-transform-row">
                 <span>Rotate X</span>
                 <strong>{{ Math.round(selectedFlower.rotation.xDeg) }}&deg;</strong>
               </label>
@@ -666,6 +672,7 @@ async function placeFlowerOnBouquet(flower, placement) {
       model_3d_url: flower.model,
       position: { x: placement.point.x, y: placement.point.y, z: placement.point.z },
       rotation: initialRotation,
+      scale: 1,
       locked: false,
     });
     selectedSceneId.value = sceneId;
@@ -763,6 +770,16 @@ function updateSelectedRotation(axis, degrees) {
   updateFlowerState(sceneId, { rotation: nextRotation });
 }
 
+function updateSelectedScale(scale) {
+  const flower = selectedFlower.value;
+  const object = flower ? placedObjects.get(flower.sceneId) : null;
+  if (!flower || !object) return;
+
+  const nextScale = THREE.MathUtils.clamp(scale, 0.25, 2);
+  object.scale.setScalar(nextScale);
+  updateFlowerState(flower.sceneId, { scale: nextScale });
+}
+
 function nudgeSelectedRotation(axis, delta) {
   const flower = selectedFlower.value;
   if (!flower) return;
@@ -779,7 +796,8 @@ function resetSelectedTransform() {
     THREE.MathUtils.degToRad(resetRotation.yDeg),
     THREE.MathUtils.degToRad(resetRotation.zDeg),
   );
-  updateFlowerState(flower.sceneId, { rotation: resetRotation });
+  object.scale.setScalar(1);
+  updateFlowerState(flower.sceneId, { rotation: resetRotation, scale: 1 });
 }
 
 function toggleSelectedLock() {
@@ -895,9 +913,7 @@ function buildBouquetCustomization() {
         placement_order: index,
         position: { ...flower.position },
         rotation: { ...flower.rotation },
-        scale: object
-          ? { x: object.scale.x, y: object.scale.y, z: object.scale.z }
-          : { x: 1, y: 1, z: 1 },
+        scale: Number(flower.scale ?? object?.scale.x ?? 1),
         locked: flower.locked,
       };
     }),
@@ -1100,6 +1116,7 @@ function showToast(message, type = "success") {
 .fc-transform { display: grid; gap: 12px; }
 .fc-transform-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #6c5a4c; }
 .fc-range { width: 100%; accent-color: #8b5e3c; }
+.fc-range-caption { display: flex; justify-content: space-between; margin-top: -8px; color: #9a8470; font-size: 11px; font-weight: 700; }
 .fc-transform-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .fc-transform-actions.single { grid-template-columns: 1fr; }
 .fc-btn-lock { border: 1px solid rgba(139, 94, 60, 0.22); background: linear-gradient(180deg, #fffaf6 0%, #f7ece1 100%); color: #6d4528; font-weight: 800; box-shadow: 0 10px 24px rgba(83,55,32,.08); }

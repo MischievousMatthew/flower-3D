@@ -423,11 +423,10 @@ const loadBouquetArrangement = async (arrangement) => {
       THREE.MathUtils.degToRad(Number(flower.rotation?.yDeg || 0)),
       THREE.MathUtils.degToRad(Number(flower.rotation?.zDeg || 0)),
     );
-    placement.scale.set(
-      Number(flower.scale?.x ?? 1),
-      Number(flower.scale?.y ?? 1),
-      Number(flower.scale?.z ?? 1),
-    );
+    const savedScale = typeof flower.scale === "number"
+      ? flower.scale
+      : Number(flower.scale?.x ?? 1);
+    placement.scale.setScalar(savedScale);
     model.add(placement);
   }
 
