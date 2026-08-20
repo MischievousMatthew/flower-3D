@@ -251,7 +251,7 @@ import { toast } from "vue3-toastify";
 
 const props = defineProps({
   vendorId: { type: Number, required: true },
-  modelValue: { type: Object, default: null },
+  modelValue: { type: String, default: "" },
   closedDates: {
     type: Array,
     default: () => [],
@@ -272,7 +272,7 @@ const emit = defineEmits(["update:modelValue", "dateSelected", "viewOrders"]);
 // State
 const isLoading = ref(false);
 const currentDate = ref(new Date());
-const selectedDate = ref(props.modelValue);
+const selectedDate = ref(props.modelValue || "");
 const calendarData = ref({});
 const vendorInfo = ref({});
 const leadTimeDays = ref(3); // Default to 3 days
@@ -629,6 +629,8 @@ watch(
   (val) => {
     if (val && val !== selectedDate.value) {
       selectedDate.value = val;
+    } else if (!val) {
+      selectedDate.value = "";
     }
   },
 );

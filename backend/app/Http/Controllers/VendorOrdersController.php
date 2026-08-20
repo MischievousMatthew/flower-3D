@@ -162,6 +162,7 @@ class VendorOrdersController extends Controller
                             'unit_price' => (float) $item->unit_price,
                             'price' => (float) $item->unit_price, // Alternative field name
                             'subtotal' => (float) $item->subtotal,
+                            'customizations' => $item->customizations ?? [],
                             'product' => $item->product ? [
                                 'product_name' => $item->product->product_name,
                                 'images' => $item->product->images ?? [],
@@ -435,6 +436,7 @@ class VendorOrdersController extends Controller
                             'quantity' => (int) $item->quantity,
                             'price' => (float) $item->unit_price,
                             'unit_price' => (float) $item->unit_price,
+                            'customizations' => $item->customizations ?? [],
                             'product' => $item->product ? [
                                 'product_name' => $item->product->product_name,
                                 'images' => $item->product->images ?? [],
@@ -575,7 +577,9 @@ class VendorOrdersController extends Controller
                         'subtotal' => (float) $item->subtotal,
                         'color' => $item->color,
                         'size' => $item->size,
-                        'customizations' => $item->customizations ? json_decode($item->customizations, true) : [],
+                        'customizations' => is_array($item->customizations)
+                            ? $item->customizations
+                            : (json_decode($item->customizations ?: '[]', true) ?: []),
                         'notes' => $item->notes,
                         'model_3d_url' => $modelUrl,
                         'model_type' => $model3d?->model_type ?? 'glb',

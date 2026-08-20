@@ -150,7 +150,7 @@
               :key="product.id"
               class="table-row"
             >
-              <div class="td td-name">
+              <div class="td td-name" @click="openViewDetailsModal(product)">
                 <div class="product-info">
                   <div class="product-img-wrap">
                     <img

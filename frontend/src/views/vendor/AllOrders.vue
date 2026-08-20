@@ -289,7 +289,7 @@
                       />
                       <button
                         v-if="
-                          item.model_3d_url || item.product?.models?.length > 0
+                          has3DPreview(item)
                         "
                         @click="show3DModel(item)"
                         class="btn-3d-viewer"
@@ -622,9 +622,7 @@
                       />
                       <button
                         v-if="
-                          item.model_3d_url ||
-                          item.product?.models?.length > 0 ||
-                          item.has_3d_model
+                          has3DPreview(item)
                         "
                         @click="show3DModel(item)"
                         class="btn-3d-viewer"
@@ -975,7 +973,7 @@
                     />
                     <button
                       v-if="
-                        item.model_3d_url || item.product?.models?.length > 0
+                        has3DPreview(item)
                       "
                       @click="show3DModel(item)"
                       class="btn-3d-mini"
@@ -1174,6 +1172,7 @@
             v-if="current3DModel"
             :modelUrl="current3DModel.url"
             :modelType="current3DModel.type"
+            :arrangement="current3DModel.arrangement"
             :backgroundColor="'#1a1a2e'"
           />
         </div>
@@ -1196,35 +1195,6 @@
       </div>
     </div>
 
-    <!-- 3D Model Viewer Modal -->
-    <div v-if="show3DModal" class="modal-overlay" @click="close3DModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>3D Model Preview</h3>
-          <button @click="close3DModal" class="btn-close">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-            >
-              <path
-                fill="currentColor"
-                d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-              />
-            </svg>
-          </button>
-        </div>
-        <div class="modal-body">
-          <ThreeDModelViewer
-            v-if="current3DModel"
-            :modelUrl="current3DModel.url"
-            :modelType="current3DModel.type"
-            :backgroundColor="'#f5f7fa'"
-          />
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -1641,6 +1611,18 @@ function show3DModel(item) {
   let modelUrl = null;
   let modelType = "glb";
   let productName = item.product_name || item.product?.product_name || "Flower";
+  const arrangement = getBouquetArrangement(item);
+
+  if (arrangement) {
+    current3DModel.value = {
+      url: arrangement.bouquet_model_url || "/bouquet.glb",
+      type: "glb",
+      productName: "Custom Bouquet",
+      arrangement,
+    };
+    show3DModal.value = true;
+    return;
+  }
 
   // Priority 1: Check item's direct model_3d_url
   if (item.model_3d_url) {
@@ -1670,6 +1652,7 @@ function show3DModel(item) {
         url: url.href,
         type: modelType,
         productName: productName,
+        arrangement: null,
       };
       show3DModal.value = true;
 
@@ -1700,6 +1683,29 @@ async function viewOrderDetails(orderId) {
   } finally {
     loadingOrderDetails.value = false;
   }
+}
+
+function parseCustomizations(customizations) {
+  if (Array.isArray(customizations) || (customizations && typeof customizations === "object")) {
+    return customizations;
+  }
+
+  try {
+    return typeof customizations === "string" ? JSON.parse(customizations) : {};
+  } catch {
+    return {};
+  }
+}
+
+function getBouquetArrangement(item) {
+  const customizations = parseCustomizations(item?.customizations);
+  return customizations?.type === "custom_flower_bouquet" && Array.isArray(customizations.flowers)
+    ? customizations
+    : null;
+}
+
+function has3DPreview(item) {
+  return !!getBouquetArrangement(item) || !!item?.model_3d_url || !!item?.product?.models?.length || !!item?.has_3d_model;
 }
 
 async function fetchOrderDetails(orderId) {

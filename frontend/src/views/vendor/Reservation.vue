@@ -401,11 +401,11 @@ const viewing3DModel = ref(null);
 const current3DModelName = ref("");
 const calendarRefreshKey = ref(0);
 
-const today = computed(() => new Date().toISOString().split("T")[0]);
+const today = computed(() => formatLocalDateString(new Date()));
 const maxCloseDate = computed(() => {
   const max = new Date();
   max.setMonth(max.getMonth() + 3);
-  return max.toISOString().split("T")[0];
+  return formatLocalDateString(max);
 });
 const closedDateStrings = computed(() =>
   closedDates.value
@@ -481,10 +481,10 @@ async function submitCloseDate() {
     }
 
     isLoading.value = true;
-    const response = await api.post(
-      "/vendor/reservations/close-date",
-      closeDateForm.value,
-    );
+    const response = await api.post("/vendor/reservations/close-date", {
+      ...closeDateForm.value,
+      date: normalizeDateString(closeDateForm.value.date),
+    });
 
     if (response.data.success) {
       toast.success("Date marked as closed successfully");
@@ -551,8 +551,15 @@ function normalizeDateString(value) {
   return `${year}-${month}-${day}`;
 }
 
+function formatLocalDateString(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function formatDate(dateStr) {
-  const date = new Date(dateStr);
+  const dateOnly = normalizeDateString(dateStr);
+  if (!dateOnly) return "—";
+
+  const date = new Date(`${dateOnly}T00:00:00`);
   return date.toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",

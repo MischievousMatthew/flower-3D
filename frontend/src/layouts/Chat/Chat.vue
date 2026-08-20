@@ -260,7 +260,7 @@
                     </div>
 
                     <div class="message-meta">
-                      <span class="message-time">{{ message.time }}</span>
+                      <span class="message-time">{{ formatMessageTimestamp(message) }}</span>
                       <span v-if="message.is_own" class="message-status">
                         {{ message.read ? "✓✓" : "✓" }}
                       </span>
@@ -516,6 +516,7 @@ import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import { toast } from "vue3-toastify";
 import api from "../../plugins/axios";
+import { formatPhilippineDateTime } from "../../utils/philippineDateTime";
 
 const props = defineProps({
   chatRole: {
@@ -883,6 +884,11 @@ const openFileUpload = () => {
   fileInput.value?.click();
 };
 
+const formatMessageTimestamp = (message) =>
+  message?.created_at
+    ? formatPhilippineDateTime(message.created_at)
+    : message?.time ?? "—";
+
 const handleFileUpload = (event) => {
   if (!props.canSendMessages) return;
   const files = Array.from(event.target.files);
@@ -927,7 +933,7 @@ const formatFileSize = (bytes) => {
 
 const viewVendorShop = () => {
   if (selectedConversation.value?.vendor?.id) {
-    router.push(`/shop/vendor/${selectedConversation.value.vendor.id}`);
+    router.push(`/store/${selectedConversation.value.vendor.id}`);
   }
 };
 
@@ -1040,10 +1046,6 @@ const pollNewMessages = async () => {
       );
 
       if (relevantMessages.length > 0) {
-        relevantMessages.forEach((msg) => {
-          msg.is_own = false;
-        });
-
         selectedConversation.value.messages.push(...relevantMessages);
         lastMessageId.value = data.last_message_id;
 

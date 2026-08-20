@@ -1781,16 +1781,43 @@ async function doAdvance(targetStatus) {
       advanceModal.value.delivery.id,
       targetStatus,
     );
+    const body = res?.data ?? res;
+    if (body?.success === false || !body?.delivery) {
+      throw new Error(body?.message ?? "Update failed.");
+    }
+
+    const updatedDelivery = body.delivery;
+    const previousStatus = advanceModal.value.delivery.status;
     const idx = orders.value.findIndex(
       (o) => o.id === advanceModal.value.delivery.id,
     );
-    if (idx !== -1 && res.delivery) orders.value[idx] = res.delivery;
+    if (idx !== -1) {
+      if (
+        activeTab.value === "all" ||
+        activeTab.value === updatedDelivery.status
+      ) {
+        orders.value.splice(idx, 1, updatedDelivery);
+      } else {
+        orders.value.splice(idx, 1);
+      }
+    }
+
+    if (previousStatus !== updatedDelivery.status) {
+      counts.value = {
+        ...counts.value,
+        [previousStatus]: Math.max(0, (counts.value[previousStatus] ?? 0) - 1),
+        [updatedDelivery.status]: (counts.value[updatedDelivery.status] ?? 0) + 1,
+      };
+    }
+
+    if (detailModal.value.delivery?.id === updatedDelivery.id) {
+      detailModal.value.delivery = updatedDelivery;
+    }
     advanceModal.value.open = false;
     toast.success("Status updated.", {
       position: toast.POSITION.TOP_RIGHT,
       autoClose: 3000,
     });
-    fetchOrders(meta.value.current_page, true);
   } catch (e) {
     toast.error(e?.response?.data?.message ?? "Update failed.", {
       position: toast.POSITION.TOP_RIGHT,

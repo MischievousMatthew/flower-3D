@@ -119,11 +119,18 @@ class CartController extends Controller
 
             $price = $product->discount_price ?: $product->selling_price;
 
-            $existingCartItem = Cart::where('user_id', $user->id)
-                ->where('product_id', $request->product_id)
-                ->where('color', $request->color)
-                ->where('size', $request->size)
-                ->first();
+            // A custom bouquet is a complete design tied to this cart line. Do not
+            // merge it into an earlier line for the same product, or its transforms
+            // would be replaced by the newly submitted design.
+            $existingCartItem = null;
+            if (!$request->filled('customizations')) {
+                $existingCartItem = Cart::where('user_id', $user->id)
+                    ->where('product_id', $request->product_id)
+                    ->where('color', $request->color)
+                    ->where('size', $request->size)
+                    ->whereNull('customizations')
+                    ->first();
+            }
 
             if ($existingCartItem) {
                 $newQuantity = $existingCartItem->quantity + $request->quantity;

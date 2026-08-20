@@ -200,7 +200,7 @@
             <div class="fc-summary"><span>Flowers</span><strong>{{ selectedFlowers.length }}/{{ MAX_FLOWERS }}</strong></div>
             <div class="fc-summary total"><span>Total</span><strong>PHP {{ totalPrice.toFixed(2) }}</strong></div>
             <button class="fc-btn fc-btn-primary" @click="checkout" :disabled="!selectedFlowers.length || isCheckingOut">{{ isCheckingOut ? "Processing..." : "Proceed to Checkout" }}</button>
-            <button class="fc-btn fc-btn-light full" @click="addCart" :disabled="!selectedFlowers.length">Add to Cart</button>
+            <button class="fc-btn fc-btn-light full" @click="addCart" :disabled="!selectedFlowers.length || isCheckingOut">Add to Cart</button>
           </section>
         </aside>
       </div>
@@ -842,6 +842,7 @@ async function checkout() {
   if (!selectedFlowers.value.length) return;
   isCheckingOut.value = true;
   try {
+    const customization = buildBouquetCustomization();
     sessionStorage.setItem(
       "directCheckout",
       JSON.stringify({
@@ -857,20 +858,7 @@ async function checkout() {
           vendor_id: flower.owner_id,
           product_name: flower.product_name,
           price: flower.price,
-          customizations: {
-            type: "custom_flower_bouquet",
-            store_id: storeId.value,
-            vendor_id: vendorOwnerId.value,
-            paper_color: paperColor.value,
-            ribbon_color: ribbonColor.value,
-            placement: {
-              scene_id: flower.sceneId,
-              position: flower.position,
-              rotation: flower.rotation,
-              locked: flower.locked,
-              model_3d_url: flower.model_3d_url,
-            },
-          },
+          customizations: customization,
         })),
         total: totalPrice.value,
         isDirectCheckout: true,
@@ -887,12 +875,66 @@ async function checkout() {
   }
 }
 
-function addCart() {
+function buildBouquetCustomization() {
+  return {
+    type: "custom_flower_bouquet",
+    bouquet_model_url: "/bouquet.glb",
+    store_id: storeId.value,
+    vendor_id: vendorOwnerId.value,
+    paper_color: paperColor.value,
+    ribbon_color: ribbonColor.value,
+    flowers: selectedFlowers.value.map((flower, index) => {
+      const object = placedObjects.get(flower.sceneId);
+
+      return {
+        scene_id: flower.sceneId,
+        product_id: flower.id,
+        product_name: flower.product_name,
+        model_3d_url: flower.model_3d_url,
+        quantity: 1,
+        placement_order: index,
+        position: { ...flower.position },
+        rotation: { ...flower.rotation },
+        scale: object
+          ? { x: object.scale.x, y: object.scale.y, z: object.scale.z }
+          : { x: 1, y: 1, z: 1 },
+        locked: flower.locked,
+      };
+    }),
+  };
+}
+
+async function addCart() {
   if (!isAuthenticated.value) {
     router.push({ path: "/guest/login", query: { redirect: route.fullPath } });
     return;
   }
-  showToast("Custom bouquet added to cart.", "success");
+  if (!selectedFlowers.value.length) return;
+
+  isCheckingOut.value = true;
+  const createdCartItemIds = [];
+  try {
+    const customization = buildBouquetCustomization();
+
+    for (const flower of selectedFlowers.value) {
+      const response = await cartStore.addToCart({
+        product_id: flower.id,
+        quantity: 1,
+        customizations: customization,
+      });
+      if (response?.data?.id) createdCartItemIds.push(response.data.id);
+    }
+
+    showToast("Custom bouquet added to cart.", "success");
+  } catch (error) {
+    console.error("Failed to add custom bouquet to cart:", error);
+    await Promise.all(
+      createdCartItemIds.map((cartItemId) => cartStore.removeFromCart(cartItemId).catch(() => null)),
+    );
+    showToast(error?.response?.data?.message || error?.message || "Failed to add custom bouquet to cart.", "error");
+  } finally {
+    isCheckingOut.value = false;
+  }
 }
 
 function takeScreenshot() {

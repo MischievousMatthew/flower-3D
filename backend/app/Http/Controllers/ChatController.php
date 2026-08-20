@@ -132,13 +132,11 @@ class ChatController extends Controller
                 return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
             }
 
-            $participantId = $actor['participant_id'];
-
             $messages = Message::where('conversation_id', $conversationId)
                 ->with('sender:id,name,surname,profile_picture')
                 ->orderBy('created_at', 'asc')
                 ->get()
-                ->map(function ($message) use ($participantId) {
+                ->map(function ($message) use ($actor, $conversation) {
                     $attachments = [];
 
                     if (!empty($message->attachments)) {
@@ -155,16 +153,19 @@ class ChatController extends Controller
                         'sender_name' => $message->sender->full_name ?? 'Unknown',
                         'sender_avatar' => $message->sender->avatar_url ?? null,
                         'text' => $message->message,
+                        'created_at' => $message->created_at?->copy()->setTimezone('Asia/Manila')->toIso8601String(),
                         'time' => $message->created_at->diffForHumans(),
                         'read' => (bool) $message->is_read,
                         'type' => $message->message_type ?? 'text',
                         'attachments' => $attachments,
-                        'is_own' => $message->sender_id === $participantId,
+                        // Vendor-side messages belong to the shared shop identity,
+                        // so every authorized CRM user sees them as their shop's messages.
+                        'is_own' => $this->isMessageFromActorSide($message, $conversation, $actor),
                     ];
                 });
 
             Message::where('conversation_id', $conversationId)
-                ->where('sender_id', '!=', $participantId)
+                ->where('sender_id', $this->otherParticipantId($conversation, $actor))
                 ->update(['is_read' => true, 'read_at' => now()]);
 
             if ($actor['is_vendor_context']) {
@@ -299,6 +300,7 @@ class ChatController extends Controller
                     'id' => $message->id,
                     'sender_id' => $actor['participant_id'],
                     'text' => $message->message,
+                    'created_at' => $message->created_at?->copy()->setTimezone('Asia/Manila')->toIso8601String(),
                     'time' => $message->created_at->diffForHumans(),
                     'read' => false,
                     'type' => $messageType,
@@ -322,7 +324,6 @@ class ChatController extends Controller
 
         try {
             $actor = $this->resolveActor($request);
-            $participantId = $actor['participant_id'];
             $lastMessageId = $request->integer('last_message_id', 0);
             $conversationId = $request->integer('conversation_id', 0);
 
@@ -344,21 +345,26 @@ class ChatController extends Controller
             }
 
             $newMessages = $query->where('id', '>', $lastMessageId)
-                ->where('sender_id', '!=', $participantId)
-                ->with('sender:id,name,surname,role')
+                ->with([
+                    'sender:id,name,surname,role',
+                    'conversation:id,vendor_id,customer_id',
+                ])
                 ->orderBy('created_at')
                 ->get()
                 ->map(fn ($message) => [
                     'id' => $message->id,
                     'conversation_id' => $message->conversation_id,
                     'sender_id' => $message->sender_id,
-                    'sender_name' => $message->sender->full_name,
+                    'sender_name' => $message->sender?->full_name ?? 'Unknown',
                     'text' => $message->message,
+                    'created_at' => $message->created_at?->copy()->setTimezone('Asia/Manila')->toIso8601String(),
                     'time' => $message->created_at->diffForHumans(),
                     'read' => $message->is_read,
                     'type' => $message->message_type,
                     'attachments' => $message->attachments ?? [],
-                    'is_own' => false,
+                    'is_own' => $message->conversation
+                        ? $this->isMessageFromActorSide($message, $message->conversation, $actor)
+                        : false,
                 ]);
 
             return response()->json([
@@ -626,6 +632,22 @@ class ChatController extends Controller
         }
 
         return $conversation->customer_id === $participantId;
+    }
+
+    private function isMessageFromActorSide(Message $message, Conversation $conversation, array $actor): bool
+    {
+        $actorSideId = $actor['is_vendor_context']
+            ? $conversation->vendor_id
+            : $conversation->customer_id;
+
+        return $message->sender_id === $actorSideId;
+    }
+
+    private function otherParticipantId(Conversation $conversation, array $actor): int
+    {
+        return $actor['is_vendor_context']
+            ? $conversation->customer_id
+            : $conversation->vendor_id;
     }
 
     private function getSenderDisplayName(array $actor): string

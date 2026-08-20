@@ -58,6 +58,7 @@ class CustomerChatController extends Controller
                             'contact_number' => $conv->vendor->contact_number,
                             'username' => $conv->vendor->username,
                             'store_name' => $this->resolveVendorStoreName($conv->vendor),
+                            'display_name' => $this->resolveVendorStoreName($conv->vendor),
                         ],
                         'last_message' => $conv->last_message
                             ? Str::limit($conv->last_message, 50)
@@ -183,6 +184,7 @@ class CustomerChatController extends Controller
                     'id' => $message->id,
                     'conversation_id' => $message->conversation_id,
                     'text' => $message->message,
+                    'created_at' => $message->created_at?->copy()->setTimezone('Asia/Manila')->toIso8601String(),
                     'time' => $message->created_at->format('H:i'),
                     'sender_id' => $message->sender_id,
                     'is_own' => true, // ✅ customer is sending

@@ -110,7 +110,7 @@
         <path d="M24 28v4M24 24v1" />
       </svg>
       <p>No batches found</p>
-      <router-link to="/erp/warehouse/batches/receive" class="btn-primary"
+      <router-link :to="{ name: 'BatchesToReceive' }" class="btn-primary"
         >Receive First Batch</router-link
       >
     </div>

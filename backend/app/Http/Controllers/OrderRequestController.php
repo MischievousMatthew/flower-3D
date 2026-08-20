@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Auth;
 use App\Traits\ScopesOwner;
 use App\Helpers\CloudinaryHelper;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 
 class OrderRequestController extends Controller
@@ -92,41 +94,56 @@ class OrderRequestController extends Controller
      */
     public function approve(Request $request, int $id): JsonResponse
     {
-        $orderRequest = $this->findOwnedRequest($id);
-        if (! $orderRequest) {
-            return response()->json(['success' => false, 'message' => 'Request not found'], 404);
-        }
-
-        if ($orderRequest->status !== 'pending') {
-            if ($orderRequest->status === 'approved') {
-                return response()->json([
-                    'success' => true,
-                    'message' => ucfirst($orderRequest->type) . ' request is already approved.',
-                    'data' => $this->formatRequest($orderRequest->fresh(['order.delivery', 'user'])),
-                ]);
-            }
-
-            return response()->json([
-                'success' => false,
-                'message' => ucfirst($orderRequest->type) . ' request was already rejected and can no longer be approved.',
-            ], 422);
-        }
-
         $request->validate([
             'admin_notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $orderRequest->update([
-            'status'      => 'approved',
-            'admin_notes' => $request->admin_notes,
-        ]);
+        return DB::transaction(function () use ($request, $id) {
+            // Serialize approvals for this request before changing any statuses.
+            $orderRequest = $this->findOwnedRequest($id, true);
+            if (! $orderRequest) {
+                return response()->json(['success' => false, 'message' => 'Request not found'], 404);
+            }
 
-        // Sync order + delivery statuses
-        $order    = $orderRequest->order;
-        $delivery = $order?->delivery;
+            if ($orderRequest->status !== 'pending') {
+                if ($orderRequest->status === 'approved') {
+                    return response()->json([
+                        'success' => true,
+                        'message' => ucfirst($orderRequest->type) . ' request is already approved.',
+                        'data' => $this->formatRequest($orderRequest->fresh(['order.delivery', 'user'])),
+                    ]);
+                }
 
-        if ($order && $delivery) {
-            if ($orderRequest->type === 'return') {
+                return response()->json([
+                    'success' => false,
+                    'message' => ucfirst($orderRequest->type) . ' request was already rejected and can no longer be approved.',
+                ], 422);
+            }
+
+            $orderRequest->update([
+                'status'      => 'approved',
+                'admin_notes' => $request->admin_notes,
+            ]);
+
+            // Sync order + delivery statuses
+            $order    = $orderRequest->order;
+            $delivery = $order?->delivery;
+
+            if ($orderRequest->type === 'refund' && $order) {
+                if ($delivery) {
+                    $delivery->update(['status' => 'refunded', 'last_scanned_at' => now()]);
+                    $delivery->logs()->create([
+                        'owner_id'   => $delivery->owner_id ?? $order->vendor_id,
+                        'status'     => 'refunded',
+                        'scanned_at' => now(),
+                        'notes'      => 'Refund approved by SC coordinator.',
+                    ]);
+                }
+
+                // This is the finance source of truth: it marks the order refunded,
+                // debits VendorBalance, and writes one idempotent refund ledger row.
+                $order->markAsRefunded();
+            } elseif ($order && $delivery && $orderRequest->type === 'return') {
                 $delivery->update(['status' => 'returned', 'last_scanned_at' => now()]);
                 $delivery->logs()->create([
                     'owner_id'   => $delivery->owner_id ?? $order->vendor_id,
@@ -135,29 +152,20 @@ class OrderRequestController extends Controller
                     'notes'      => 'Return approved by SC coordinator.',
                 ]);
                 $order->update(['status' => 'returned']);
-            } elseif ($orderRequest->type === 'refund') {
-                $delivery->update(['status' => 'refunded', 'last_scanned_at' => now()]);
-                $delivery->logs()->create([
-                    'owner_id'   => $delivery->owner_id ?? $order->vendor_id,
-                    'status'     => 'refunded',
-                    'scanned_at' => now(),
-                    'notes'      => 'Refund approved by SC coordinator.',
-                ]);
-                $order->update(['status' => 'refunded', 'payment_status' => 'refunded']);
             }
-        }
 
-        Log::info('[OrderRequest] approved', [
-            'id'      => $id,
-            'type'    => $orderRequest->type,
-            'by'      => Auth::id(),
-        ]);
+            Log::info('[OrderRequest] approved', [
+                'id'      => $id,
+                'type'    => $orderRequest->type,
+                'by'      => Auth::id(),
+            ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => ucfirst($orderRequest->type) . ' request approved.',
-            'data'    => $this->formatRequest($orderRequest->fresh(['order.delivery', 'user'])),
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => ucfirst($orderRequest->type) . ' request approved.',
+                'data'    => $this->formatRequest($orderRequest->fresh(['order.delivery', 'user'])),
+            ]);
+        });
     }
 
     /**
@@ -211,17 +219,22 @@ class OrderRequestController extends Controller
 
 
 
-    private function findOwnedRequest(int $id): ?OrderRequest
+    private function findOwnedRequest(int $id, bool $forUpdate = false): ?OrderRequest
     {
         $ownerId = $this->getOwnerId();
 
-        return OrderRequest::with(['order', 'user'])
+        $query = OrderRequest::with(['order', 'user'])
             ->when($ownerId, fn ($q) =>
                 $q->whereHas('order', fn ($oq) =>
                     $oq->where('vendor_id', $ownerId)
                 )
-            )
-            ->find($id);
+            );
+
+        if ($forUpdate) {
+            $query->lockForUpdate();
+        }
+
+        return $query->find($id);
     }
 
     private function requestCounts(?int $ownerId): array

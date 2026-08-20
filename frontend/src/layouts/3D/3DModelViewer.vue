@@ -51,7 +51,7 @@ import * as THREE from "three";
 const props = defineProps({
   modelUrl: {
     type: String,
-    required: true,
+    default: "",
   },
   modelType: {
     type: String,
@@ -60,6 +60,10 @@ const props = defineProps({
   backgroundColor: {
     type: String,
     default: "#f8f9fa",
+  },
+  arrangement: {
+    type: Object,
+    default: null,
   },
 });
 
@@ -91,6 +95,14 @@ watch(
   () => {
     reloadModel();
   },
+);
+
+watch(
+  () => props.arrangement,
+  () => {
+    reloadModel();
+  },
+  { deep: true },
 );
 
 watch(
@@ -210,6 +222,15 @@ const loadModel = async () => {
     isLoading.value = true;
     error.value = null;
 
+    if (props.arrangement?.type === "custom_flower_bouquet") {
+      await loadBouquetArrangement(props.arrangement);
+      return;
+    }
+
+    if (!props.modelUrl) {
+      throw new Error("No 3D model is available for this item.");
+    }
+
     let loader;
 
     if (props.modelType === "glb" || props.modelType === "gltf") {
@@ -292,6 +313,125 @@ const loadModel = async () => {
     isLoading.value = false;
     createFallbackFlower();
   }
+};
+
+const loadGltf = async (url) => {
+  const { GLTFLoader } = await import(
+    "three/examples/jsm/loaders/GLTFLoader.js"
+  );
+  const loader = new GLTFLoader();
+
+  return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
+};
+
+const prepareModel = (object) => {
+  object.traverse((child) => {
+    if (!child.isMesh) return;
+    child.castShadow = true;
+    child.receiveShadow = true;
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    materials.forEach((material) => {
+      if (material) material.side = THREE.DoubleSide;
+    });
+  });
+};
+
+const fitFlowerModel = (flowerModel) => {
+  const sourceBox = new THREE.Box3().setFromObject(flowerModel);
+  const size = sourceBox.getSize(new THREE.Vector3());
+  const scale = 0.9 / Math.max(size.x, size.y, size.z, 1);
+  flowerModel.scale.setScalar(scale);
+  flowerModel.updateMatrixWorld(true);
+  const center = new THREE.Box3().setFromObject(flowerModel).getCenter(
+    new THREE.Vector3(),
+  );
+  flowerModel.position.sub(center);
+  flowerModel.updateMatrixWorld(true);
+};
+
+const loadBouquetArrangement = async (arrangement) => {
+  const bouquetUrl = arrangement.bouquet_model_url || "/bouquet.glb";
+  const bouquetResult = await loadGltf(bouquetUrl);
+  const bouquet = bouquetResult.scene || bouquetResult.scenes?.[0];
+  if (!bouquet) throw new Error("The saved bouquet base model is unavailable.");
+
+  prepareModel(bouquet);
+  const wrapperMaterials = new Set();
+  const ribbonMaterials = new Set();
+  const bouquetMeshes = [];
+
+  bouquet.traverse((child) => {
+    if (!child.isMesh) return;
+    bouquetMeshes.push(child);
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    const name = String(child.name || "").toLowerCase();
+    if (name.includes("ribbon") || name.includes("bow") || name.includes("lace")) {
+      materials.forEach((material) => ribbonMaterials.add(material));
+    } else if (name.includes("wrapper") || name.includes("wrap") || name.includes("paper")) {
+      materials.forEach((material) => wrapperMaterials.add(material));
+    }
+  });
+
+  if (!wrapperMaterials.size) {
+    bouquetMeshes.forEach((mesh) => {
+      const name = String(mesh.name || "").toLowerCase();
+      if (name.includes("ribbon") || name.includes("bow")) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      materials.forEach((material) => wrapperMaterials.add(material));
+    });
+  }
+
+  wrapperMaterials.forEach((material) => material?.color?.set(arrangement.paper_color));
+  ribbonMaterials.forEach((material) => material?.color?.set(arrangement.ribbon_color));
+
+  const bouquetBox = new THREE.Box3().setFromObject(bouquet);
+  const bouquetSize = bouquetBox.getSize(new THREE.Vector3());
+  const bouquetCenter = bouquetBox.getCenter(new THREE.Vector3());
+  const bouquetScale = 3.5 / Math.max(bouquetSize.x, bouquetSize.y, bouquetSize.z, 1);
+  bouquet.scale.setScalar(bouquetScale);
+  bouquet.position.sub(bouquetCenter.multiplyScalar(bouquetScale));
+  const scaledBox = new THREE.Box3().setFromObject(bouquet);
+  bouquet.position.y -= scaledBox.min.y;
+
+  model = new THREE.Group();
+  model.add(bouquet);
+
+  const flowers = [...arrangement.flowers].sort(
+    (first, second) => Number(first.placement_order || 0) - Number(second.placement_order || 0),
+  );
+
+  for (const flower of flowers) {
+    if (!flower.model_3d_url) continue;
+    const flowerResult = await loadGltf(flower.model_3d_url);
+    const flowerModel = flowerResult.scene || flowerResult.scenes?.[0];
+    if (!flowerModel) continue;
+
+    prepareModel(flowerModel);
+    fitFlowerModel(flowerModel);
+    const placement = new THREE.Group();
+    placement.add(flowerModel);
+    placement.position.set(
+      Number(flower.position?.x || 0),
+      Number(flower.position?.y || 0),
+      Number(flower.position?.z || 0),
+    );
+    placement.rotation.set(
+      THREE.MathUtils.degToRad(Number(flower.rotation?.xDeg || 0)),
+      THREE.MathUtils.degToRad(Number(flower.rotation?.yDeg || 0)),
+      THREE.MathUtils.degToRad(Number(flower.rotation?.zDeg || 0)),
+    );
+    placement.scale.set(
+      Number(flower.scale?.x ?? 1),
+      Number(flower.scale?.y ?? 1),
+      Number(flower.scale?.z ?? 1),
+    );
+    model.add(placement);
+  }
+
+  originalModelRotation = { x: 0, y: 0, z: 0 };
+  scene.add(model);
+  isLoading.value = false;
+  animateEntrance();
 };
 
 const animateEntrance = () => {

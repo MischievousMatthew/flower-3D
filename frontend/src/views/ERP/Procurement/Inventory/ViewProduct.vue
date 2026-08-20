@@ -350,7 +350,10 @@
               :key="product.id"
               class="t-row"
             >
-              <div class="td td-product">
+              <div
+                class="td td-product"
+                @click="canViewInventoryProducts && openViewDetailsModal(product)"
+              >
                 <div class="p-thumb-wrap">
                   <div
                     class="p-thumb"

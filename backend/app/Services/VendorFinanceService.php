@@ -121,20 +121,41 @@ class VendorFinanceService
      */
     public function handleOrderRefund(Order $order): void
     {
-        $alreadyRefunded = VendorTransaction::where('order_id', $order->id)
-            ->where('category', 'refund')
-            ->exists();
+        $processed = DB::transaction(function () use ($order): bool {
+            $lockedOrder = Order::query()
+                ->whereKey($order->id)
+                ->lockForUpdate()
+                ->first();
 
-        if ($alreadyRefunded) {
-            Log::info('VendorFinanceService: refund already processed', ['order_id' => $order->id]);
-            return;
-        }
+            if (! $lockedOrder) {
+                throw new \RuntimeException("Order [{$order->id}] not found for refund processing.");
+            }
 
-        DB::transaction(function () use ($order) {
-            $vendorBalance = VendorBalance::forVendor($order->vendor_id);
+            $alreadyRefunded = VendorTransaction::where('order_id', $lockedOrder->id)
+                ->where('category', 'refund')
+                ->exists();
+
+            if ($alreadyRefunded) {
+                Log::info('VendorFinanceService: refund already processed', ['order_id' => $lockedOrder->id]);
+                return false;
+            }
+
+            VendorBalance::query()->insertOrIgnore([
+                'vendor_id' => $lockedOrder->vendor_id,
+                'balance' => 0,
+                'total_earned' => 0,
+                'total_withdrawn' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $vendorBalance = VendorBalance::query()
+                ->where('vendor_id', $lockedOrder->vendor_id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
             $balanceBefore = (float) $vendorBalance->balance;
-            $amount        = (float) $order->total_amount;
+            $amount        = (float) $lockedOrder->total_amount;
             $balanceAfter  = max(0, $balanceBefore - $amount); // don't go negative
 
             // Debit vendor
@@ -145,21 +166,27 @@ class VendorFinanceService
 
             // Record refund transaction
             VendorTransaction::create([
-                'vendor_id'      => $order->vendor_id,
-                'order_id'       => $order->id,
+                'vendor_id'      => $lockedOrder->vendor_id,
+                'order_id'       => $lockedOrder->id,
                 'type'           => 'debit',
                 'category'       => 'refund',
                 'amount'         => $amount,
                 'balance_before' => $balanceBefore,
                 'balance_after'  => $balanceAfter,
-                'description'    => "Refund for Order #{$order->order_number}",
+                'description'    => "Refund for Order #{$lockedOrder->order_number}",
                 'status'         => 'completed',
                 'metadata'       => [
-                    'order_number' => $order->order_number,
+                    'order_number' => $lockedOrder->order_number,
                     'refunded_at'  => now()->toIso8601String(),
                 ],
             ]);
+
+            return true;
         });
+
+        if (! $processed) {
+            return;
+        }
 
         Log::info('VendorFinanceService: refund processed', [
             'order_id'  => $order->id,
