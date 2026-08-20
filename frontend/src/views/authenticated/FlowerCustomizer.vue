@@ -878,7 +878,7 @@ async function checkout() {
 function buildBouquetCustomization() {
   return {
     type: "custom_flower_bouquet",
-    bouquet_model_url: "/bouquet.glb",
+    bouquet_model_url: "/Boquet.glb",
     store_id: storeId.value,
     vendor_id: vendorOwnerId.value,
     paper_color: paperColor.value,

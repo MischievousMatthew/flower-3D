@@ -350,7 +350,10 @@ const fitFlowerModel = (flowerModel) => {
 };
 
 const loadBouquetArrangement = async (arrangement) => {
-  const bouquetUrl = arrangement.bouquet_model_url || "/bouquet.glb";
+  // The base model is a public application asset. Older orders saved the
+  // lower-case path, which fails on case-sensitive hosting, so use the
+  // canonical asset path for every saved bouquet.
+  const bouquetUrl = "/Boquet.glb";
   const bouquetResult = await loadGltf(bouquetUrl);
   const bouquet = bouquetResult.scene || bouquetResult.scenes?.[0];
   if (!bouquet) throw new Error("The saved bouquet base model is unavailable.");

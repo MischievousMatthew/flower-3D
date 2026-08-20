@@ -1615,7 +1615,7 @@ function show3DModel(item) {
 
   if (arrangement) {
     current3DModel.value = {
-      url: arrangement.bouquet_model_url || "/bouquet.glb",
+      url: "/Boquet.glb",
       type: "glb",
       productName: "Custom Bouquet",
       arrangement,
