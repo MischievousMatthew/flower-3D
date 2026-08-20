@@ -291,7 +291,7 @@
                         v-if="
                           has3DPreview(item)
                         "
-                        @click="show3DModel(item)"
+                        @click="show3DModel(item, order.items)"
                         class="btn-3d-viewer"
                         title="View 3D Model"
                       >
@@ -624,7 +624,7 @@
                         v-if="
                           has3DPreview(item)
                         "
-                        @click="show3DModel(item)"
+                        @click="show3DModel(item, order.items)"
                         class="btn-3d-viewer"
                         title="View 3D Model"
                       >
@@ -975,7 +975,7 @@
                       v-if="
                         has3DPreview(item)
                       "
-                      @click="show3DModel(item)"
+                      @click="show3DModel(item, selectedOrderDetails.items)"
                       class="btn-3d-mini"
                       title="View 3D Model"
                     >
@@ -1604,14 +1604,14 @@ function goToToday() {
   loadCalendarOrders();
 }
 
-function show3DModel(item) {
+function show3DModel(item, orderItems = []) {
   console.log("=== 3D MODEL DEBUG ===");
   console.log("Full item:", item);
 
   let modelUrl = null;
   let modelType = "glb";
   let productName = item.product_name || item.product?.product_name || "Flower";
-  const arrangement = getBouquetArrangement(item);
+  const arrangement = getBouquetArrangement(item) || getLegacyBouquetArrangement(item, orderItems);
 
   if (arrangement) {
     current3DModel.value = {
@@ -1702,6 +1702,30 @@ function getBouquetArrangement(item) {
   return customizations?.type === "custom_flower_bouquet" && Array.isArray(customizations.flowers)
     ? customizations
     : null;
+}
+
+function getLegacyBouquetArrangement(item, orderItems = []) {
+  const bouquetItems = (orderItems.length ? orderItems : [item])
+    .map((orderItem) => ({ orderItem, customizations: parseCustomizations(orderItem?.customizations) }))
+    .filter(({ customizations }) => customizations?.type === "custom_flower_bouquet" && customizations?.placement);
+
+  if (!bouquetItems.length) return null;
+
+  const first = bouquetItems[0].customizations;
+  return {
+    type: "custom_flower_bouquet",
+    bouquet_model_url: "/Boquet.glb",
+    paper_color: first.paper_color,
+    ribbon_color: first.ribbon_color,
+    flowers: bouquetItems.map(({ orderItem, customizations }, index) => ({
+      ...customizations.placement,
+      product_id: orderItem.product_id,
+      product_name: orderItem.product_name,
+      quantity: orderItem.quantity,
+      placement_order: index,
+      scale: customizations.placement.scale || { x: 1, y: 1, z: 1 },
+    })),
+  };
 }
 
 function has3DPreview(item) {

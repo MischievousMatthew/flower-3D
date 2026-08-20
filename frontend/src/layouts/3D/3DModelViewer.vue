@@ -432,9 +432,18 @@ const loadBouquetArrangement = async (arrangement) => {
   }
 
   originalModelRotation = { x: 0, y: 0, z: 0 };
+  isRotating.value = false;
+  setBouquetCamera();
   scene.add(model);
   isLoading.value = false;
   animateEntrance();
+};
+
+const setBouquetCamera = () => {
+  camera.fov = 42;
+  camera.position.set(0, 2.1, 6.4);
+  camera.lookAt(0, 1.5, 0);
+  camera.updateProjectionMatrix();
 };
 
 const animateEntrance = () => {
@@ -699,7 +708,7 @@ const animate = () => {
     model.rotation.y += 0.003;
   }
 
-  if (model && isRotating.value) {
+  if (model && isRotating.value && props.arrangement?.type !== "custom_flower_bouquet") {
     model.position.y = -0.5 + Math.sin(Date.now() * 0.001) * 0.05;
   }
 
@@ -718,15 +727,20 @@ const handleResize = () => {
 };
 
 const resetCamera = () => {
-  camera.position.set(0, 1, 5);
-  camera.lookAt(0, 0, 0);
+  if (props.arrangement?.type === "custom_flower_bouquet") {
+    setBouquetCamera();
+  } else {
+    camera.position.set(0, 1, 5);
+    camera.lookAt(0, 0, 0);
+  }
 
   if (model) {
-    rotationX = originalModelRotation.x;
-    rotationY = originalModelRotation.y;
-
-    model.rotation.set(rotationX, rotationY, originalModelRotation.z);
-    model.position.y = -0.5;
+    model.rotation.set(
+      originalModelRotation.x,
+      originalModelRotation.y,
+      originalModelRotation.z,
+    );
+    model.position.y = props.arrangement?.type === "custom_flower_bouquet" ? 0 : -0.5;
   }
 };
 
