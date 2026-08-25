@@ -478,11 +478,10 @@
                         View Details
                       </button>
                       <button
-                        v-if="activeTab !== 'approved'"
                         class="menu-item"
                         :disabled="!canEditInventoryProducts"
                         :title="canEditInventoryProducts ? '' : permissionMessages.edit"
-                        @click="goEdit(product.id)"
+                        @click="openEditModal(product)"
                       >
                         <svg
                           width="13"
@@ -499,7 +498,7 @@
                             d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
                           />
                         </svg>
-                        Edit
+                        Edit Product Details
                       </button>
                       <button
                         v-if="activeTab === 'draft'"
@@ -844,18 +843,20 @@
               Close
             </button>
             <button
-              v-if="activeTab === 'approved'"
               class="btn-primary"
+              :disabled="!canEditInventoryProducts"
+              :title="canEditInventoryProducts ? '' : permissionMessages.edit"
+              @click="switchToEdit"
+            >
+              ✏️ Edit Product Details
+            </button>
+            <button
+              v-if="activeTab === 'approved'"
+              class="btn-ghost-sm"
               :disabled="!canEditInventoryProducts"
               :title="canEditInventoryProducts ? '' : permissionMessages.edit"
               @click="openUpdateStockModal(selectedProduct)"
             >
-              Update Stock
-            </button>
-          </div>
-        </div>
-      </div>
-    </transition>
 
     <!-- ══ UPDATE STOCK MODAL ══ -->
     <transition name="mfade">
@@ -961,6 +962,53 @@
       </div>
     </transition>
 
+              Update Stock
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ══ SUBMIT MODAL ══ -->
+    <transition name="mfade">
+      <div
+        v-if="showSubmitModal"
+        class="modal-overlay"
+        @click="closeSubmitModal"
+      >
+        <div class="modal-box modal-sm" @click.stop>
+          <div class="modal-hd">
+            <div class="mhd-left">
+              <span class="mhd-ico">📤</span>
+              <div>
+                <h2 class="mhd-title">Submit for Approval</h2>
+                <p class="mhd-sub">Send to admin for review</p>
+              </div>
+            </div>
+            <button class="btn-close" @click="closeSubmitModal">✕</button>
+          </div>
+          <div class="modal-bd" style="padding: 24px" v-if="selectedProduct">
+            <div class="confirm-ico">📤</div>
+            <p class="modal-desc">
+              Submit <strong>{{ selectedProduct.product_name }}</strong> for
+              admin approval?
+            </p>
+            <p class="modal-note">
+              Once submitted, you won't be able to edit until it's reviewed.
+            </p>
+          </div>
+          <div class="modal-ft">
+            <button class="btn-ghost-sm" @click="closeSubmitModal">
+              Cancel
+            </button>
+            <button class="btn-primary" @click="confirmSubmitForApproval">
+              Submit for Approval
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <!-- ══ DELETE MODAL ══ -->
     <transition name="mfade">
       <div
@@ -1005,7 +1053,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch, reactive } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../../plugins/axios";
 import { useAuth } from "../../../../composables/useAuth";
@@ -1030,6 +1078,42 @@ const showViewDetailsModal = ref(false);
 const showUpdateStockModal = ref(false);
 const showSubmitModal = ref(false);
 const showDeleteModal = ref(false);
+const showEditModal = ref(false);
+const isSubmitting = ref(false);
+const editFileInput = ref(null);
+const existingImages = ref([]);
+const newProductImages = ref([]);
+const removedImageIds = ref([]);
+
+const editFormData = reactive({
+  product_name: "",
+  description: "",
+  sku: "",
+  category: "",
+  flower_type: "",
+  color: "",
+  color_other: "",
+  purchase_price: 0,
+  selling_price: 0,
+  has_discount: false,
+  discount_price: null,
+  quantity_in_stock: 0,
+  min_stock_level: 0,
+  max_stock_level: null,
+  selling_type: "per_piece",
+  season: "all-year",
+  supplier_name: "",
+  supplier_contact: "",
+  supplier_sku: "",
+  care_instructions: "",
+  occasion_tags: [],
+  notes: "",
+  is_fragile: false,
+  requires_refrigeration: false,
+  status: "active",
+});
+const editErrors = reactive({});
+
 const canViewInventoryProducts = computed(() => can("inventory_products", "view"));
 const canCreateInventoryProducts = computed(() => can("inventory_products", "create"));
 const canEditInventoryProducts = computed(() => can("inventory_products", "edit"));
@@ -1257,6 +1341,255 @@ const closeSubmitModal = () => {
   showSubmitModal.value = false;
   selectedProduct.value = null;
 };
+const occasionTags = knownTags;
+
+const editProfitAmount = computed(() => {
+  const s = parseFloat(editFormData.selling_price) || 0;
+  const p = parseFloat(editFormData.purchase_price) || 0;
+  return s - p;
+});
+const editProfitPct = computed(() => {
+  const p = parseFloat(editFormData.purchase_price) || 0;
+  if (p === 0) return 0;
+  return (editProfitAmount.value / p) * 100;
+});
+const editDiscountPct = computed(() => {
+  if (!editFormData.has_discount || !editFormData.discount_price) return 0;
+  const s = parseFloat(editFormData.selling_price) || 0;
+  const d = parseFloat(editFormData.discount_price) || 0;
+  if (s === 0) return 0;
+  return ((s - d) / s) * 100;
+});
+
+const openEditModal = (p) => {
+  if (!canEditInventoryProducts.value) {
+    toast.error("You do not have permission to edit inventory products.");
+    activeMenu.value = null;
+    return;
+  }
+  selectedProduct.value = p;
+  populateEditForm(p);
+  showViewDetailsModal.value = false;
+  showEditModal.value = true;
+  activeMenu.value = null;
+};
+const closeEditModal = () => {
+  showEditModal.value = false;
+  Object.keys(editErrors).forEach((k) => delete editErrors[k]);
+  newProductImages.value = [];
+  removedImageIds.value = [];
+};
+const switchToEdit = () => {
+  if (selectedProduct.value) openEditModal(selectedProduct.value);
+};
+const populateEditForm = (p) => {
+  const tags = Array.isArray(p.occasion_tags)
+    ? p.occasion_tags.filter((t) => knownTags.includes(t))
+    : knownTags.filter((tag) => {
+        const joined = (p.occasion_tags || "").replace(/[\[\]\\"]/g, "");
+        return new RegExp(`\\b${tag}\\b`, "i").test(joined);
+      });
+
+  Object.assign(editFormData, {
+    product_name: p.product_name || "",
+    description: p.description || "",
+    sku: p.sku || "",
+    category: p.category || "",
+    flower_type: p.flower_type || "",
+    color: p.color || "",
+    color_other: "",
+    purchase_price: parseFloat(p.purchase_price || 0),
+    selling_price: parseFloat(p.selling_price || 0),
+    has_discount: isOnSale(p),
+    discount_price: p.discount_price ? parseFloat(p.discount_price) : null,
+    quantity_in_stock: parseInt(p.quantity_in_stock || 0),
+    min_stock_level: parseInt(p.min_stock_level || 0),
+    max_stock_level: p.max_stock_level ? parseInt(p.max_stock_level) : null,
+    selling_type: p.selling_type || "per_piece",
+    season: p.season || "all-year",
+    supplier_name: p.supplier_name || "",
+    supplier_contact: p.supplier_contact || "",
+    supplier_sku: p.supplier_sku || "",
+    care_instructions: p.care_instructions || "",
+    occasion_tags: tags,
+    notes: p.notes || "",
+    is_fragile: Boolean(p.is_fragile),
+    requires_refrigeration: Boolean(p.requires_refrigeration),
+    status: p.status || "active",
+  });
+
+  existingImages.value = (p.images || []).map((img) => ({ ...img }));
+  newProductImages.value = [];
+  removedImageIds.value = [];
+};
+const onEditDiscountToggle = () => {
+  if (!editFormData.has_discount) {
+    editFormData.discount_price = null;
+    delete editErrors.discount_price;
+  }
+};
+const isEditTagDisabled = (tag) =>
+  editFormData.occasion_tags.length >= 2 &&
+  !editFormData.occasion_tags.includes(tag);
+const onEditTagChange = () => {
+  if (editFormData.occasion_tags.length > 2)
+    editFormData.occasion_tags = editFormData.occasion_tags.slice(0, 2);
+};
+const triggerEditFileInput = () => editFileInput.value?.click();
+const handleEditFileSelect = (e) => addEditImages(Array.from(e.target.files));
+const handleEditDrop = (e) => {
+  e.preventDefault();
+  addEditImages(Array.from(e.dataTransfer.files));
+};
+const addEditImages = (files) => {
+  const remaining =
+    5 - existingImages.value.length - newProductImages.value.length;
+  const imageFiles = files
+    .filter((f) => f.type.startsWith("image/"))
+    .slice(0, remaining);
+  imageFiles.forEach((file) => {
+    const reader = new FileReader();
+    reader.onload = (e) =>
+      newProductImages.value.push({ file, url: e.target.result });
+    reader.readAsDataURL(file);
+  });
+  if (editFileInput.value) editFileInput.value.value = "";
+};
+const removeExistingImage = (i) => {
+  const removed = existingImages.value.splice(i, 1);
+  if (removed[0]?.id) removedImageIds.value.push(removed[0].id);
+};
+const removeNewImage = (i) => newProductImages.value.splice(i, 1);
+const clearEditError = (field) => {
+  if (editErrors[field]) delete editErrors[field];
+};
+const validateEditForm = () => {
+  Object.keys(editErrors).forEach((k) => delete editErrors[k]);
+  let isValid = true;
+
+  if (!editFormData.product_name?.trim()) {
+    editErrors.product_name = "Product Name is required";
+    isValid = false;
+  }
+  if (!editFormData.description?.trim()) {
+    editErrors.description = "Description is required";
+    isValid = false;
+  }
+  if (!editFormData.sku?.trim()) {
+    editErrors.sku = "SKU is required";
+    isValid = false;
+  }
+  if (!editFormData.category) {
+    editErrors.category = "Category is required";
+    isValid = false;
+  }
+
+  const sell = parseFloat(editFormData.selling_price) || 0;
+  const pur = parseFloat(editFormData.purchase_price) || 0;
+  if (pur < 0) {
+    editErrors.purchase_price = "Purchase price must be 0 or greater";
+    isValid = false;
+  }
+  if (sell <= pur) {
+    editErrors.selling_price =
+      "Selling price must be greater than purchase price";
+    isValid = false;
+  }
+  if (parseInt(editFormData.quantity_in_stock) < 0) {
+    editErrors.quantity_in_stock = "Stock must be 0 or greater";
+    isValid = false;
+  }
+
+  if (editFormData.has_discount) {
+    const disc = parseFloat(editFormData.discount_price) || 0;
+    if (!editFormData.discount_price || disc <= 0) {
+      editErrors.discount_price =
+        "Discount price is required when discount is enabled";
+      isValid = false;
+    } else if (disc >= sell) {
+      editErrors.discount_price =
+        "Discount price must be less than selling price";
+      isValid = false;
+    }
+  }
+
+  if (!isValid) {
+    const first = Object.keys(editErrors)[0];
+    toast.error(editErrors[first]);
+  }
+  return isValid;
+};
+const submitEditProduct = async () => {
+  if (isSubmitting.value) return;
+  if (!canEditInventoryProducts.value) {
+    toast.error("You do not have permission to edit inventory products.");
+    return;
+  }
+  if (!validateEditForm()) return;
+
+  isSubmitting.value = true;
+  try {
+    const fd = new FormData();
+    fd.append("_method", "PUT");
+
+    const booleans = ["is_fragile", "requires_refrigeration", "has_discount"];
+    booleans.forEach((key) => {
+      fd.append(key, editFormData[key] ? "1" : "0");
+    });
+
+    Object.entries(editFormData).forEach(([key, value]) => {
+      if ([...booleans, "occasion_tags"].includes(key)) return;
+      if (value === null || value === undefined) {
+        fd.append(key, "");
+      } else {
+        fd.append(key, value.toString());
+      }
+    });
+
+    if (Array.isArray(editFormData.occasion_tags)) {
+      editFormData.occasion_tags.forEach((tag) => {
+        fd.append("occasion_tags[]", tag);
+      });
+    }
+
+    newProductImages.value.forEach((img) => {
+      if (img.file) fd.append("images[]", img.file);
+    });
+
+    removedImageIds.value.forEach((id) => {
+      fd.append("removed_image_ids[]", id);
+    });
+
+    const res = await api.post(
+      `/procurement/inventory/products/${selectedProduct.value.id}`,
+      fd,
+    );
+
+    if (res.data.success) {
+      toast.success("Product updated successfully!");
+      closeEditModal();
+      fetchProducts();
+    } else {
+      toast.error(res.data.message || "Failed to update product");
+    }
+  } catch (error) {
+    if (error.response?.data?.errors) {
+      Object.keys(editErrors).forEach((k) => delete editErrors[k]);
+      Object.entries(error.response.data.errors).forEach(([k, v]) => {
+        editErrors[k] = Array.isArray(v) ? v[0] : v;
+      });
+      toast.error(
+        Object.values(error.response.data.errors)[0]?.[0] ||
+          "Validation failed",
+      );
+    } else {
+      toast.error(error.response?.data?.message || "Failed to update product");
+    }
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
 const openDeleteModal = (p) => {
   if (!canDeleteInventoryProducts.value) {
     toast.error(permissionMessages.delete);
@@ -2468,5 +2801,302 @@ watch(activeTab, () => {
   .stat-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* ── Edit Modal Form Controls ── */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.form-group.full-width,
+.form-group.span2 {
+  grid-column: 1 / -1;
+}
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+.form-input,
+.form-select,
+.form-textarea {
+  padding: 9px 13px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #111827;
+  transition: all 0.2s;
+  background: #fff;
+  font-family: inherit;
+  width: 100%;
+}
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+}
+.form-textarea {
+  resize: vertical;
+  min-height: 64px;
+}
+.form-input.is-invalid,
+.form-select.is-invalid,
+.form-textarea.is-invalid {
+  border-color: #dc2626;
+}
+.error-text {
+  color: #dc2626;
+  font-size: 11px;
+}
+.hint-text {
+  font-size: 11px;
+  color: #9ca3af;
+}
+.input-with-prefix {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.prefix {
+  position: absolute;
+  left: 12px;
+  color: #9ca3af;
+  font-weight: 500;
+  z-index: 1;
+  pointer-events: none;
+}
+.input-with-prefix .form-input {
+  padding-left: 28px;
+}
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.profit-display {
+  padding: 12px;
+  background: #dcfce7;
+  border-radius: 8px;
+  border: 1px solid #86efac;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.profit-amount {
+  font-size: 18px;
+  font-weight: 700;
+  color: #15803d;
+}
+.profit-percentage {
+  font-size: 11px;
+  color: #16a34a;
+}
+.discount-display {
+  padding: 12px;
+  background: #fef3c7;
+  border-radius: 8px;
+  border: 1px solid #fde68a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.discount-amount {
+  font-size: 18px;
+  font-weight: 700;
+  color: #b45309;
+}
+.discount-text {
+  font-size: 11px;
+  color: #d97706;
+}
+.discount-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: #d1d5db;
+  border-radius: 22px;
+  transition: 0.3s;
+}
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+.toggle-switch input:checked + .toggle-slider {
+  background: #16a34a;
+}
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(18px);
+}
+.toggle-label-group {
+  flex: 1;
+}
+.toggle-label-main {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+.toggle-label-sub {
+  display: block;
+  font-size: 11px;
+  color: #9ca3af;
+}
+.discount-active-pill {
+  padding: 4px 10px;
+  background: #dc2626;
+  color: #fff;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.tag-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.tag-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  background: #fff;
+}
+.tag-option:hover:not(.disabled) {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+.tag-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.tag-option input[type="checkbox"] {
+  accent-color: #16a34a;
+}
+.checkboxes-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #111827;
+}
+.checkbox-label input[type="checkbox"] {
+  accent-color: #16a34a;
+}
+.image-upload-section {
+  width: 100%;
+}
+.image-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.image-preview {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #e5e7eb;
+}
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.remove-image-btn {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(220, 38, 38, 0.9);
+  color: #fff;
+  cursor: pointer;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.image-upload-placeholder {
+  width: 72px;
+  height: 72px;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: #f9fafb;
+  gap: 2px;
+}
+.image-upload-placeholder:hover {
+  border-color: #16a34a;
+  background: #dcfce7;
+}
+.upload-icon {
+  font-size: 18px;
+}
+.upload-text {
+  font-size: 9px;
+  font-weight: 600;
+  color: #6b7280;
+}
+.new-badge {
+  position: absolute;
+  bottom: 3px;
+  left: 3px;
+  padding: 1px 5px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 700;
+  border-radius: 3px;
 }
 </style>
