@@ -73,7 +73,7 @@
                 v-for="notification in orderNotifications"
                 :key="notification.id"
                 class="notification-entry"
-                @click="goToOrders"
+                @click="goToOrders(notification)"
               >
                 <div
                   class="notification-status-dot"
@@ -234,6 +234,7 @@ const loadingNotifications = ref(false);
 const isLoadingMessage = ref("Loading...");
 const isLoading = ref(null);
 const orderNotifications = ref([]);
+const seenOrderNotificationIds = ref(new Set());
 let notificationInterval = null;
 
 const cartStore = useCart();
@@ -304,7 +305,38 @@ const userRoleDisplay = computed(() => {
   return roleMap[user.value.role] || user.value.role;
 });
 
-const notificationCount = computed(() => orderNotifications.value.length);
+const notificationCount = computed(
+  () =>
+    orderNotifications.value.filter(
+      (notification) => !seenOrderNotificationIds.value.has(notification.id),
+    ).length,
+);
+
+const orderNotificationStorageKey = () =>
+  `seen_order_notifications:${user.value?.id ?? "guest"}`;
+
+const loadSeenOrderNotifications = () => {
+  try {
+    const stored = JSON.parse(
+      localStorage.getItem(orderNotificationStorageKey()) || "[]",
+    );
+    seenOrderNotificationIds.value = new Set(
+      Array.isArray(stored) ? stored : [],
+    );
+  } catch {
+    seenOrderNotificationIds.value = new Set();
+  }
+};
+
+const markOrderNotificationsAsSeen = (notifications) => {
+  const nextSeenIds = new Set(seenOrderNotificationIds.value);
+  notifications.forEach((notification) => nextSeenIds.add(notification.id));
+  seenOrderNotificationIds.value = nextSeenIds;
+  localStorage.setItem(
+    orderNotificationStorageKey(),
+    JSON.stringify([...nextSeenIds]),
+  );
+};
 
 const scrollToSection = (sectionId) => {
   emit("scroll-to-section", sectionId);
@@ -324,6 +356,7 @@ const toggleNotificationDropdown = async () => {
 
   if (showNotificationDropdown.value) {
     await loadOrderNotifications();
+    markOrderNotificationsAsSeen(orderNotifications.value);
   }
 };
 
@@ -422,7 +455,8 @@ const handleLogout = async () => {
   }
 };
 
-const goToOrders = () => {
+const goToOrders = (notification) => {
+  if (notification) markOrderNotificationsAsSeen([notification]);
   showNotificationDropdown.value = false;
   router.push("/customer/orders");
 };
@@ -557,6 +591,7 @@ watch(
   isAuthenticated,
   (newVal) => {
     if (newVal && user.value) {
+      loadSeenOrderNotifications();
       if (user.value.role === "customer") {
         cartStore.initialize();
       }
@@ -568,6 +603,7 @@ watch(
       };
     } else {
       userProfile.value = null;
+      seenOrderNotificationIds.value = new Set();
       cartStore.resetCart();
     }
   },
