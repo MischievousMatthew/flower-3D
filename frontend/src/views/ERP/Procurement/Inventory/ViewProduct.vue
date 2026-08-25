@@ -76,7 +76,8 @@
             :aria-disabled="!canCreateInventoryProducts"
             :title="canCreateInventoryProducts ? '' : permissionMessages.create"
             @click.prevent="
-              !canCreateInventoryProducts && toast.error(permissionMessages.create)
+              !canCreateInventoryProducts &&
+              toast.error(permissionMessages.create)
             "
           >
             <svg
@@ -314,9 +315,12 @@
               class="btn-primary"
               :class="{ 'btn-disabled-link': !canCreateInventoryProducts }"
               :aria-disabled="!canCreateInventoryProducts"
-              :title="canCreateInventoryProducts ? '' : permissionMessages.create"
+              :title="
+                canCreateInventoryProducts ? '' : permissionMessages.create
+              "
               @click.prevent="
-                !canCreateInventoryProducts && toast.error(permissionMessages.create)
+                !canCreateInventoryProducts &&
+                toast.error(permissionMessages.create)
               "
             >
               <svg
@@ -349,11 +353,12 @@
               v-for="product in filteredProducts"
               :key="product.id"
               class="t-row"
-              :class="{ 'row-active': activeMenu === product.id }"
             >
               <div
                 class="td td-product"
-                @click="canViewInventoryProducts && openViewDetailsModal(product)"
+                @click="
+                  canViewInventoryProducts && openViewDetailsModal(product)
+                "
               >
                 <div class="p-thumb-wrap">
                   <div
@@ -444,7 +449,7 @@
                         ? 'Open product actions'
                         : permissionMessages.view
                     "
-                    @click.stop="toggleMenu(product.id)"
+                    @click.stop="toggleMenu(product.id, $event)"
                   >
                     <svg
                       width="15"
@@ -458,7 +463,16 @@
                     </svg>
                   </button>
                   <transition name="pop">
-                    <div v-if="activeMenu === product.id" class="menu-dropdown">
+                    <div
+                      v-if="activeMenu === product.id"
+                      ref="dropdownRef"
+                      class="menu-dropdown"
+                      :style="{
+                        top: menuStyle.top,
+                        left: menuStyle.left,
+                        visibility: menuStyle.visibility,
+                      }"
+                    >
                       <button
                         class="menu-item"
                         @click="openViewDetailsModal(product)"
@@ -481,7 +495,11 @@
                       <button
                         class="menu-item"
                         :disabled="!canEditInventoryProducts"
-                        :title="canEditInventoryProducts ? '' : permissionMessages.edit"
+                        :title="
+                          canEditInventoryProducts
+                            ? ''
+                            : permissionMessages.edit
+                        "
                         @click="openEditModal(product)"
                       >
                         <svg
@@ -505,7 +523,11 @@
                         v-if="activeTab === 'draft'"
                         class="menu-item"
                         :disabled="!canEditInventoryProducts"
-                        :title="canEditInventoryProducts ? '' : permissionMessages.edit"
+                        :title="
+                          canEditInventoryProducts
+                            ? ''
+                            : permissionMessages.edit
+                        "
                         @click="openSubmitModal(product)"
                       >
                         <svg
@@ -525,7 +547,11 @@
                         v-if="activeTab === 'approved'"
                         class="menu-item"
                         :disabled="!canEditInventoryProducts"
-                        :title="canEditInventoryProducts ? '' : permissionMessages.edit"
+                        :title="
+                          canEditInventoryProducts
+                            ? ''
+                            : permissionMessages.edit
+                        "
                         @click="openUpdateStockModal(product)"
                       >
                         <svg
@@ -545,7 +571,11 @@
                       <button
                         class="menu-item danger"
                         :disabled="!canDeleteInventoryProducts"
-                        :title="canDeleteInventoryProducts ? '' : permissionMessages.delete"
+                        :title="
+                          canDeleteInventoryProducts
+                            ? ''
+                            : permissionMessages.delete
+                        "
                         @click="openDeleteModal(product)"
                       >
                         <svg
@@ -844,478 +874,13 @@
               Close
             </button>
             <button
-              class="btn-primary"
-              :disabled="!canEditInventoryProducts"
-              :title="canEditInventoryProducts ? '' : permissionMessages.edit"
-              @click="switchToEdit"
-            >
-              ✏️ Edit Product Details
-            </button>
-            <button
               v-if="activeTab === 'approved'"
-              class="btn-ghost-sm"
+              class="btn-primary"
               :disabled="!canEditInventoryProducts"
               :title="canEditInventoryProducts ? '' : permissionMessages.edit"
               @click="openUpdateStockModal(selectedProduct)"
             >
               Update Stock
-            </button>
-          </div>
-        </div>
-      </div>
-    </transition>
-
-    <!-- ══ EDIT PRODUCT DETAILS MODAL ══ -->
-    <transition name="mfade">
-      <div v-if="showEditModal" class="modal-overlay" @click="closeEditModal">
-        <div class="modal-box modal-xl" @click.stop>
-          <div class="modal-hd">
-            <div class="mhd-left">
-              <span class="mhd-ico">✏️</span>
-              <div>
-                <h2 class="mhd-title">Edit Product Details</h2>
-                <p class="mhd-sub">{{ editFormData.product_name }}</p>
-              </div>
-            </div>
-            <button class="btn-close" @click="closeEditModal">✕</button>
-          </div>
-
-          <div class="modal-bd scroll">
-            <form @submit.prevent="submitEditProduct">
-              <div class="vd-grid">
-                <!-- ── Basic Information ── -->
-                <div class="vd-card span2">
-                  <h3 class="vdc-title">📋 Basic Information</h3>
-                  <div class="form-grid-2">
-                    <div class="form-group full-width">
-                      <label class="form-label">Product Name *</label>
-                      <input
-                        v-model="editFormData.product_name"
-                        type="text"
-                        class="form-input"
-                        :class="{ 'is-invalid': editErrors.product_name }"
-                        placeholder="e.g., Red Rose Bouquet"
-                      />
-                      <span v-if="editErrors.product_name" class="error-text">{{ editErrors.product_name }}</span>
-                    </div>
-                    <div class="form-group full-width">
-                      <label class="form-label">Description *</label>
-                      <textarea
-                        v-model="editFormData.description"
-                        rows="3"
-                        class="form-textarea"
-                        :class="{ 'is-invalid': editErrors.description }"
-                        placeholder="Describe your product..."
-                      ></textarea>
-                      <span v-if="editErrors.description" class="error-text">{{ editErrors.description }}</span>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">SKU *</label>
-                      <input
-                        v-model="editFormData.sku"
-                        type="text"
-                        class="form-input"
-                        :class="{ 'is-invalid': editErrors.sku }"
-                        placeholder="e.g., ROSE-RED-001"
-                      />
-                      <span v-if="editErrors.sku" class="error-text">{{ editErrors.sku }}</span>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Category *</label>
-                      <select
-                        v-model="editFormData.category"
-                        class="form-select"
-                        :class="{ 'is-invalid': editErrors.category }"
-                      >
-                        <option value="">Select category</option>
-                        <option value="roses">Roses</option>
-                        <option value="tulips">Tulips</option>
-                        <option value="lilies">Lilies</option>
-                        <option value="orchids">Orchids</option>
-                        <option value="sunflowers">Sunflowers</option>
-                        <option value="mixed-bouquets">Mixed Bouquets</option>
-                        <option value="arrangements">Arrangements</option>
-                        <option value="plants">Plants</option>
-                        <option value="gifts">Gifts & Add-ons</option>
-                        <option value="seasonal">Seasonal Flowers</option>
-                      </select>
-                      <span v-if="editErrors.category" class="error-text">{{ editErrors.category }}</span>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Flower Type *</label>
-                      <select v-model="editFormData.flower_type" class="form-select">
-                        <option value="">Select flower type</option>
-                        <option value="focal">Focal Flowers</option>
-                        <option value="secondary">Secondary Flowers</option>
-                        <option value="filler">Filler Flowers</option>
-                        <option value="line">Line Flowers</option>
-                        <option value="greenery">Greenery</option>
-                      </select>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Color *</label>
-                      <select v-model="editFormData.color" class="form-select">
-                        <option value="">Select color</option>
-                        <option value="white">White</option>
-                        <option value="yellow">Yellow</option>
-                        <option value="red">Red</option>
-                        <option value="pink">Pink</option>
-                        <option value="purple">Purple</option>
-                        <option value="orange">Orange</option>
-                        <option value="blue">Blue</option>
-                        <option value="green">Green</option>
-                        <option value="cream">Cream</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-                    <div v-if="editFormData.color === 'other'" class="form-group">
-                      <label class="form-label">Specify Color *</label>
-                      <input
-                        v-model="editFormData.color_other"
-                        type="text"
-                        class="form-input"
-                        placeholder="e.g., Burgundy"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- ── Pricing ── -->
-                <div class="vd-card">
-                  <h3 class="vdc-title">💰 Pricing</h3>
-                  <div class="form-grid-2">
-                    <div class="form-group">
-                      <label class="form-label">Purchase Price *</label>
-                      <div class="input-with-prefix">
-                        <span class="prefix">₱</span>
-                        <input
-                          v-model.number="editFormData.purchase_price"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          class="form-input"
-                          :class="{ 'is-invalid': editErrors.purchase_price }"
-                          @input="clearEditError('purchase_price')"
-                        />
-                      </div>
-                      <span v-if="editErrors.purchase_price" class="error-text">{{ editErrors.purchase_price }}</span>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Selling Price *</label>
-                      <div class="input-with-prefix">
-                        <span class="prefix">₱</span>
-                        <input
-                          v-model.number="editFormData.selling_price"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          class="form-input"
-                          :class="{ 'is-invalid': editErrors.selling_price }"
-                          @input="clearEditError('selling_price')"
-                        />
-                      </div>
-                      <span v-if="editErrors.selling_price" class="error-text">{{ editErrors.selling_price }}</span>
-                    </div>
-
-                    <!-- Profit display -->
-                    <div class="form-group span2">
-                      <label class="form-label">Profit Margin</label>
-                      <div class="profit-display">
-                        <div class="profit-amount">₱{{ editProfitAmount.toFixed(2) }}</div>
-                        <div class="profit-percentage">{{ editProfitPct.toFixed(1) }}% margin</div>
-                      </div>
-                    </div>
-
-                    <!-- Discount Toggle -->
-                    <div class="form-group span2">
-                      <div class="discount-toggle-row">
-                        <label class="toggle-switch">
-                          <input
-                            type="checkbox"
-                            v-model="editFormData.has_discount"
-                            @change="onEditDiscountToggle"
-                          />
-                          <span class="toggle-slider"></span>
-                        </label>
-                        <div class="toggle-label-group">
-                          <span class="toggle-label-main">Enable Discount Price</span>
-                          <span class="toggle-label-sub">Show regular & sale price</span>
-                        </div>
-                        <span v-if="editFormData.has_discount" class="discount-active-pill">🏷️ Sale Active</span>
-                      </div>
-                    </div>
-
-                    <!-- Discount inputs -->
-                    <div v-if="editFormData.has_discount" class="form-group span2">
-                      <div class="form-grid-2">
-                        <div class="form-group">
-                          <label class="form-label">Discount Price *</label>
-                          <div class="input-with-prefix">
-                            <span class="prefix">₱</span>
-                            <input
-                              v-model.number="editFormData.discount_price"
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              class="form-input"
-                              :class="{ 'is-invalid': editErrors.discount_price }"
-                              @input="clearEditError('discount_price')"
-                              placeholder="0.00"
-                            />
-                          </div>
-                          <span v-if="editErrors.discount_price" class="error-text">{{ editErrors.discount_price }}</span>
-                        </div>
-                        <div class="form-group">
-                          <label class="form-label">Discount Amount</label>
-                          <div class="discount-display">
-                            <div class="discount-amount">{{ editDiscountPct.toFixed(1) }}%</div>
-                            <div class="discount-text">off selling price</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- ── Stock ── -->
-                <div class="vd-card">
-                  <h3 class="vdc-title">📦 Stock Management</h3>
-                  <div class="form-grid-2">
-                    <div class="form-group">
-                      <label class="form-label">Quantity in Stock *</label>
-                      <input
-                        v-model.number="editFormData.quantity_in_stock"
-                        type="number"
-                        min="0"
-                        class="form-input"
-                        :class="{ 'is-invalid': editErrors.quantity_in_stock }"
-                        @input="clearEditError('quantity_in_stock')"
-                      />
-                      <span v-if="editErrors.quantity_in_stock" class="error-text">{{ editErrors.quantity_in_stock }}</span>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Min Stock Level *</label>
-                      <input
-                        v-model.number="editFormData.min_stock_level"
-                        type="number"
-                        min="0"
-                        class="form-input"
-                        @input="clearEditError('min_stock_level')"
-                      />
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Max Stock Level</label>
-                      <input
-                        v-model.number="editFormData.max_stock_level"
-                        type="number"
-                        min="0"
-                        class="form-input"
-                        placeholder="Optional"
-                      />
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Season</label>
-                      <select v-model="editFormData.season" class="form-select">
-                        <option value="all-year">All Year Round</option>
-                        <option value="spring">Spring</option>
-                        <option value="summer">Summer</option>
-                        <option value="autumn">Autumn</option>
-                        <option value="winter">Winter</option>
-                      </select>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Selling Type</label>
-                      <select v-model="editFormData.selling_type" class="form-select">
-                        <option value="per_piece">Per Piece</option>
-                        <option value="per_piece_customizable">Per Piece (Customizable)</option>
-                        <option value="bouquet">Bouquet</option>
-                      </select>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Shop Status</label>
-                      <select v-model="editFormData.status" class="form-select">
-                        <option value="active">Active (Visible in Shop)</option>
-                        <option value="inactive">Inactive (Hidden)</option>
-                        <option value="discontinued">Discontinued</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- ── Supplier Information ── -->
-                <div class="vd-card span2">
-                  <h3 class="vdc-title">🏢 Supplier Information</h3>
-                  <div class="form-grid-2">
-                    <div class="form-group">
-                      <label class="form-label">Supplier Name</label>
-                      <input
-                        v-model="editFormData.supplier_name"
-                        type="text"
-                        class="form-input"
-                        placeholder="e.g., Garden Wholesale Inc."
-                      />
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Supplier Contact</label>
-                      <input
-                        v-model="editFormData.supplier_contact"
-                        type="text"
-                        class="form-input"
-                        placeholder="Phone or email"
-                      />
-                    </div>
-                    <div class="form-group full-width">
-                      <label class="form-label">Supplier SKU</label>
-                      <input
-                        v-model="editFormData.supplier_sku"
-                        type="text"
-                        class="form-input"
-                        placeholder="Supplier's product code"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- ── Additional Information ── -->
-                <div class="vd-card span2">
-                  <h3 class="vdc-title">ℹ️ Additional Information</h3>
-                  <div class="form-grid-2">
-                    <div class="form-group full-width">
-                      <label class="form-label">Care Instructions</label>
-                      <textarea
-                        v-model="editFormData.care_instructions"
-                        rows="2"
-                        class="form-textarea"
-                        placeholder="How to care for these flowers..."
-                      ></textarea>
-                    </div>
-                    <div class="form-group full-width">
-                      <label class="form-label">Occasion Tags (Select up to 2)</label>
-                      <div class="tag-selector">
-                        <label
-                          v-for="tag in occasionTags"
-                          :key="tag"
-                          class="tag-option"
-                          :class="{ disabled: isEditTagDisabled(tag) }"
-                        >
-                          <input
-                            type="checkbox"
-                            :value="tag"
-                            v-model="editFormData.occasion_tags"
-                            :disabled="isEditTagDisabled(tag)"
-                            @change="onEditTagChange"
-                          />
-                          <span>{{ tag }}</span>
-                        </label>
-                      </div>
-                    </div>
-                    <div class="form-group full-width">
-                      <label class="form-label">Additional Notes</label>
-                      <textarea
-                        v-model="editFormData.notes"
-                        rows="2"
-                        class="form-textarea"
-                        placeholder="Extra information..."
-                      ></textarea>
-                    </div>
-                    <div class="form-group full-width checkboxes-row">
-                      <label class="checkbox-label">
-                        <input
-                          type="checkbox"
-                          v-model="editFormData.is_fragile"
-                        />
-                        <span>⚠️ Fragile — Handle with Care</span>
-                      </label>
-                      <label class="checkbox-label">
-                        <input
-                          type="checkbox"
-                          v-model="editFormData.requires_refrigeration"
-                        />
-                        <span>❄️ Requires Refrigeration</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- ── Product Images ── -->
-                <div class="vd-card span2">
-                  <h3 class="vdc-title">📷 Product Images</h3>
-                  <div class="image-upload-section">
-                    <div class="image-grid">
-                      <!-- Existing images -->
-                      <div
-                        v-for="(img, i) in existingImages"
-                        :key="'ex-' + img.id"
-                        class="image-preview"
-                      >
-                        <img :src="img.image_url" alt="Product" />
-                        <button
-                          type="button"
-                          @click="removeExistingImage(i)"
-                          class="remove-image-btn"
-                        >
-                          ✕
-                        </button>
-                        <div v-if="img.is_primary" class="pri-badge">Primary</div>
-                      </div>
-                      <!-- New images -->
-                      <div
-                        v-for="(img, i) in newProductImages"
-                        :key="'new-' + i"
-                        class="image-preview"
-                      >
-                        <img :src="img.url" alt="Product" />
-                        <button
-                          type="button"
-                          @click="removeNewImage(i)"
-                          class="remove-image-btn"
-                        >
-                          ✕
-                        </button>
-                        <div class="new-badge">New</div>
-                      </div>
-                      <!-- Upload slot -->
-                      <div
-                        v-if="existingImages.length + newProductImages.length < 5"
-                        class="image-upload-placeholder"
-                        @click="triggerEditFileInput"
-                        @dragover.prevent
-                        @drop.prevent="handleEditDrop"
-                      >
-                        <span class="upload-icon">📷</span>
-                        <span class="upload-text">Add Photo</span>
-                      </div>
-                    </div>
-                    <input
-                      ref="editFileInput"
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      @change="handleEditFileSelect"
-                      style="display: none"
-                    />
-                    <p class="hint-text">Up to 5 photos total. Removing existing images is permanent.</p>
-                  </div>
-                </div>
-              </div>
-            </form>
-          </div>
-
-          <div class="modal-ft">
-            <button
-              class="btn-ghost-sm"
-              @click="closeEditModal"
-              :disabled="isSubmitting"
-            >
-              Cancel
-            </button>
-            <button
-              class="btn-primary"
-              @click="submitEditProduct"
-              :disabled="isSubmitting"
-            >
-              <span v-if="isSubmitting">Saving...</span>
-              <span v-else>💾 Save Changes</span>
             </button>
           </div>
         </div>
@@ -1459,7 +1024,14 @@
             <button class="btn-ghost-sm" @click="closeDeleteModal">
               Cancel
             </button>
-            <button class="btn-danger" @click="confirmDeleteProduct" :disabled="!canDeleteInventoryProducts" :title="canDeleteInventoryProducts ? '' : permissionMessages.delete">
+            <button
+              class="btn-danger"
+              @click="confirmDeleteProduct"
+              :disabled="!canDeleteInventoryProducts"
+              :title="
+                canDeleteInventoryProducts ? '' : permissionMessages.delete
+              "
+            >
               Delete Product
             </button>
           </div>
@@ -1470,11 +1042,22 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, reactive } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  onUnmounted,
+  nextTick,
+  watch,
+  reactive,
+} from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../../plugins/axios";
 import { useAuth } from "../../../../composables/useAuth";
-import { PERMISSION_TOOLTIPS, useAssignment } from "../../../../composables/useAssignment";
+import {
+  PERMISSION_TOOLTIPS,
+  useAssignment,
+} from "../../../../composables/useAssignment";
 import { toast } from "vue3-toastify";
 import { clearStoredAuth } from "../../../../utils/authSession";
 
@@ -1490,6 +1073,14 @@ const isLoadingMessage = ref("");
 const activeMenu = ref(null);
 const selectedProduct = ref(null);
 const newStockQuantity = ref(null);
+
+const dropdownRef = ref(null);
+const activeTriggerEl = ref(null);
+const menuStyle = reactive({
+  top: "0px",
+  left: "0px",
+  visibility: "hidden",
+});
 
 const showViewDetailsModal = ref(false);
 const showUpdateStockModal = ref(false);
@@ -1531,13 +1122,21 @@ const editFormData = reactive({
 });
 const editErrors = reactive({});
 
-const canViewInventoryProducts = computed(() => can("inventory_products", "view"));
-const canCreateInventoryProducts = computed(() => can("inventory_products", "create"));
-const canEditInventoryProducts = computed(() => can("inventory_products", "edit"));
-const canDeleteInventoryProducts = computed(() => can("inventory_products", "delete"));
+const canViewInventoryProducts = computed(() =>
+  can("inventory_products", "view"),
+);
+const canCreateInventoryProducts = computed(() =>
+  can("inventory_products", "create"),
+);
+const canEditInventoryProducts = computed(() =>
+  can("inventory_products", "edit"),
+);
+const canDeleteInventoryProducts = computed(() =>
+  can("inventory_products", "delete"),
+);
 const canCreateFunding = computed(() => can("inventory_funding", "create"));
-const isReadOnlyInventoryProducts = computed(() =>
-  canViewInventoryProducts.value && !canEditInventoryProducts.value,
+const isReadOnlyInventoryProducts = computed(
+  () => canViewInventoryProducts.value && !canEditInventoryProducts.value,
 );
 const permissionMessages = PERMISSION_TOOLTIPS;
 
@@ -1708,12 +1307,63 @@ const cleanedOccasionTags = computed(() => {
   return knownTags.filter((t) => new RegExp(`\\b${t}\\b`, "i").test(j));
 });
 
-const toggleMenu = (id) => {
+const toggleMenu = (id, event) => {
   if (!canEditInventoryProducts.value) {
     return;
   }
 
-  activeMenu.value = activeMenu.value === id ? null : id;
+  if (activeMenu.value === id) {
+    activeMenu.value = null;
+    return;
+  }
+
+  activeTriggerEl.value = event.currentTarget;
+  menuStyle.visibility = "hidden";
+  activeMenu.value = id;
+
+  nextTick(() => {
+    positionMenu();
+  });
+};
+
+const positionMenu = () => {
+  const btn = activeTriggerEl.value;
+  const menu = dropdownRef.value;
+  if (!btn || !menu) return;
+
+  const margin = 8;
+  const gap = 6;
+  const btnRect = btn.getBoundingClientRect();
+  const menuRect = menu.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  let left = btnRect.right - menuRect.width;
+  if (left < margin) {
+    left = btnRect.left;
+  }
+  if (left + menuRect.width > vw - margin) {
+    left = vw - menuRect.width - margin;
+  }
+  if (left < margin) left = margin;
+
+  let top = btnRect.bottom + gap;
+  const spaceBelow = vh - btnRect.bottom;
+  const spaceAbove = btnRect.top;
+  if (spaceBelow < menuRect.height + margin && spaceAbove > spaceBelow) {
+    top = btnRect.top - menuRect.height - gap;
+  }
+  if (top < margin) top = margin;
+
+  menuStyle.top = `${top}px`;
+  menuStyle.left = `${left}px`;
+  menuStyle.visibility = "visible";
+};
+
+const closeMenuOnScrollOrResize = () => {
+  if (activeMenu.value !== null) {
+    activeMenu.value = null;
+  }
 };
 
 const openViewDetailsModal = (p) => {
@@ -2091,7 +1741,15 @@ onMounted(() => {
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".menu-wrap")) activeMenu.value = null;
   });
+  window.addEventListener("scroll", closeMenuOnScrollOrResize, true);
+  window.addEventListener("resize", closeMenuOnScrollOrResize);
 });
+
+onUnmounted(() => {
+  window.removeEventListener("scroll", closeMenuOnScrollOrResize, true);
+  window.removeEventListener("resize", closeMenuOnScrollOrResize);
+});
+
 watch(activeTab, () => {
   selectedProduct.value = null;
 });
@@ -2327,6 +1985,22 @@ watch(activeTab, () => {
 }
 .stat-lbl {
   font-size: 11px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+/* ── Table Card ── */
+.table-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+  overflow: hidden;
+}
+
+/* ── Tabs ── */
+.tab-bar {
+  display: flex;
   gap: 4px;
   padding: 12px 16px 0;
   border-bottom: 1px solid #e5e7eb;
@@ -2657,201 +2331,6 @@ watch(activeTab, () => {
   position: relative;
 }
 .menu-btn {
-  background: #fafafa;
-  border-bottom: 1px solid #e5e7eb;
-}
-.t-head > div {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #9ca3af;
-}
-.t-row {
-  display: grid;
-  grid-template-columns: 2.4fr 1fr 1fr 1.2fr 1.3fr 1.1fr 52px;
-  gap: 10px;
-  padding: 13px 18px;
-  border-bottom: 1px solid #f3f4f6;
-  align-items: center;
-  transition: background 0.15s;
-}
-.t-row:last-child {
-  border-bottom: none;
-}
-.t-row:hover {
-  background: #fafafa;
-}
-.td {
-  font-size: 13px;
-  color: #111827;
-}
-
-/* Product cell */
-.td-product {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.p-thumb-wrap {
-  position: relative;
-  flex-shrink: 0;
-}
-.p-thumb {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.p-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.sale-dot {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  background: #dc2626;
-  color: #fff;
-  font-size: 7px;
-  font-weight: 700;
-  padding: 1px 3px;
-  border-radius: 3px;
-  line-height: 1.2;
-}
-.p-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-.p-name {
-  font-weight: 600;
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.p-season {
-  font-size: 11px;
-  color: #9ca3af;
-}
-.chip {
-  display: inline-block;
-  padding: 3px 9px;
-  background: #f3f4f6;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 500;
-  color: #6b7280;
-}
-.mono {
-  font-family: monospace;
-  font-size: 11px;
-  color: #6b7280;
-}
-
-/* Price cell */
-.td-price {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.price-sale {
-  font-weight: 700;
-  color: #dc2626;
-  font-size: 13px;
-}
-.price-struck {
-  font-size: 11px;
-  color: #9ca3af;
-  text-decoration: line-through;
-}
-.price-main {
-  font-weight: 600;
-  font-size: 13px;
-  color: #111827;
-}
-.price-cost {
-  font-size: 11px;
-  color: #9ca3af;
-}
-
-/* Stock cell */
-.td-stock {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.stock-num {
-  font-weight: 600;
-  font-size: 14px;
-  color: #111827;
-}
-.stock-track {
-  height: 3px;
-  background: #f3f4f6;
-  border-radius: 2px;
-  overflow: hidden;
-}
-.stock-fill {
-  height: 100%;
-  border-radius: 2px;
-  transition: width 0.3s;
-}
-.sf-in {
-  background: #16a34a;
-}
-.sf-low {
-  background: #d97706;
-}
-.sf-out {
-  background: #dc2626;
-  width: 0 !important;
-}
-
-/* Status badge */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 600;
-}
-.sb-in {
-  background: #dcfce7;
-  color: #16a34a;
-}
-.sb-low {
-  background: #fef3c7;
-  color: #d97706;
-}
-.sb-out {
-  background: #fee2e2;
-  color: #dc2626;
-}
-.badge-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-/* Action menu */
-.td-action {
-  display: flex;
-  justify-content: flex-end;
-}
-.menu-wrap {
-  position: relative;
-}
-.menu-btn {
   width: 30px;
   height: 30px;
   border-radius: 6px;
@@ -2876,8 +2355,7 @@ watch(activeTab, () => {
   border-color: #e5e7eb;
 }
 .menu-dropdown {
-  right: 0;
-  top: calc(100% + 4px);
+  position: fixed;
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
@@ -3396,302 +2874,5 @@ watch(activeTab, () => {
   .stat-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-}
-
-/* ── Edit Modal Form Controls ── */
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.form-group.full-width,
-.form-group.span2 {
-  grid-column: 1 / -1;
-}
-.form-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #374151;
-}
-.form-input,
-.form-select,
-.form-textarea {
-  padding: 9px 13px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #111827;
-  transition: all 0.2s;
-  background: #fff;
-  font-family: inherit;
-  width: 100%;
-}
-.form-input:focus,
-.form-select:focus,
-.form-textarea:focus {
-  outline: none;
-  border-color: #16a34a;
-  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
-}
-.form-textarea {
-  resize: vertical;
-  min-height: 64px;
-}
-.form-input.is-invalid,
-.form-select.is-invalid,
-.form-textarea.is-invalid {
-  border-color: #dc2626;
-}
-.error-text {
-  color: #dc2626;
-  font-size: 11px;
-}
-.hint-text {
-  font-size: 11px;
-  color: #9ca3af;
-}
-.input-with-prefix {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.prefix {
-  position: absolute;
-  left: 12px;
-  color: #9ca3af;
-  font-weight: 500;
-  z-index: 1;
-  pointer-events: none;
-}
-.input-with-prefix .form-input {
-  padding-left: 28px;
-}
-.form-grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-.profit-display {
-  padding: 12px;
-  background: #dcfce7;
-  border-radius: 8px;
-  border: 1px solid #86efac;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-.profit-amount {
-  font-size: 18px;
-  font-weight: 700;
-  color: #15803d;
-}
-.profit-percentage {
-  font-size: 11px;
-  color: #16a34a;
-}
-.discount-display {
-  padding: 12px;
-  background: #fef3c7;
-  border-radius: 8px;
-  border: 1px solid #fde68a;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-.discount-amount {
-  font-size: 18px;
-  font-weight: 700;
-  color: #b45309;
-}
-.discount-text {
-  font-size: 11px;
-  color: #d97706;
-}
-.discount-toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-}
-.toggle-switch {
-  position: relative;
-  display: inline-block;
-  width: 40px;
-  height: 22px;
-  flex-shrink: 0;
-}
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-.toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  inset: 0;
-  background: #d1d5db;
-  border-radius: 22px;
-  transition: 0.3s;
-}
-.toggle-slider::before {
-  content: "";
-  position: absolute;
-  height: 16px;
-  width: 16px;
-  left: 3px;
-  bottom: 3px;
-  background: #fff;
-  border-radius: 50%;
-  transition: 0.3s;
-}
-.toggle-switch input:checked + .toggle-slider {
-  background: #16a34a;
-}
-.toggle-switch input:checked + .toggle-slider::before {
-  transform: translateX(18px);
-}
-.toggle-label-group {
-  flex: 1;
-}
-.toggle-label-main {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: #111827;
-}
-.toggle-label-sub {
-  display: block;
-  font-size: 11px;
-  color: #9ca3af;
-}
-.discount-active-pill {
-  padding: 4px 10px;
-  background: #dc2626;
-  color: #fff;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 700;
-}
-.tag-selector {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.tag-option {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  background: #fff;
-}
-.tag-option:hover:not(.disabled) {
-  border-color: #16a34a;
-  background: #f0fdf4;
-}
-.tag-option.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.tag-option input[type="checkbox"] {
-  accent-color: #16a34a;
-}
-.checkboxes-row {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  color: #111827;
-}
-.checkbox-label input[type="checkbox"] {
-  accent-color: #16a34a;
-}
-.image-upload-section {
-  width: 100%;
-}
-.image-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-.image-preview {
-  position: relative;
-  width: 72px;
-  height: 72px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 2px solid #e5e7eb;
-}
-.image-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.remove-image-btn {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(220, 38, 38, 0.9);
-  color: #fff;
-  cursor: pointer;
-  font-size: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.image-upload-placeholder {
-  width: 72px;
-  height: 72px;
-  border: 2px dashed #d1d5db;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  background: #f9fafb;
-  gap: 2px;
-}
-.image-upload-placeholder:hover {
-  border-color: #16a34a;
-  background: #dcfce7;
-}
-.upload-icon {
-  font-size: 18px;
-}
-.upload-text {
-  font-size: 9px;
-  font-weight: 600;
-  color: #6b7280;
-}
-.new-badge {
-  position: absolute;
-  bottom: 3px;
-  left: 3px;
-  padding: 1px 5px;
-  background: #2563eb;
-  color: #fff;
-  font-size: 8px;
-  font-weight: 700;
-  border-radius: 3px;
 }
 </style>
