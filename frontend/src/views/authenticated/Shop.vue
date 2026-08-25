@@ -1089,7 +1089,11 @@ const clearVendorFilter = () => {
   pagination.value.current_page = 1;
   fetchProducts();
 };
-const goToStorefront = (id) => router.push(`/store/${id}`);
+const goToStorefront = (storeId) =>
+  router.push({
+    name: "VendorStorefront",
+    state: { storeId: String(storeId) },
+  });
 const handleVendorLogoError = (e) => {
   e.target.style.display = "none";
 };

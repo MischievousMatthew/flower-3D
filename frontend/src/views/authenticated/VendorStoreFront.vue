@@ -701,7 +701,9 @@ const { flyToCart } = useFlyToCart();
 const navHeaderRef = ref(null);
 
 // ── IDs ────────────────────────────────────────────────────────────────────
-const vendorId = computed(() => route.params.id);
+// Store IDs stay out of the URL. They are carried in the existing browser
+// history entry by Shop.vue and Chat.vue, preserving back navigation.
+const vendorId = computed(() => window.history.state?.storeId || null);
 
 // ── State ──────────────────────────────────────────────────────────────────
 const loading = ref(true);
@@ -857,6 +859,11 @@ const isStorefrontVisibleProduct = (product) =>
 const fetchVendor = async () => {
   loading.value = true;
   error.value = null;
+  if (!vendorId.value) {
+    error.value = "This store could not be identified.";
+    loading.value = false;
+    return;
+  }
   try {
     const { data } = await api.get(`vendors/${vendorId.value}`);
     if (data.success) {

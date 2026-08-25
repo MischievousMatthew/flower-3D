@@ -966,8 +966,13 @@ const formatFileSize = (bytes) => {
 };
 
 const viewVendorShop = () => {
-  if (selectedConversation.value?.vendor?.id) {
-    router.push(`/store/${selectedConversation.value.vendor.id}`);
+  const storeId = selectedConversation.value?.vendor?.store_id;
+
+  if (storeId) {
+    router.push({
+      name: "VendorStorefront",
+      state: { storeId: String(storeId) },
+    });
   }
 };
 

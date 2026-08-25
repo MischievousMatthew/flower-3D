@@ -82,6 +82,7 @@ class ChatController extends Controller
                     if (!$isVendorContext && $otherUser->isVendor()) {
                         $vendorApplication = $this->resolveVendorApplication($otherUser);
                         if ($vendorApplication) {
+                            $userData['store_id'] = $vendorApplication->id;
                             $userData['store_name'] = $vendorApplication->store_name;
                             $userData['display_name'] = $vendorApplication->store_name;
                             $userData['avatar'] = $vendorApplication->store_logo_url;

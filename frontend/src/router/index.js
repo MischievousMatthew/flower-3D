@@ -38,7 +38,7 @@ const routes = [
         meta: { public: true, onlyCustomerOrGuest: true },
       },
       {
-        path: "store/:id",
+        path: "store",
         name: "VendorStorefront",
         component: () => import("../views/authenticated/VendorStoreFront.vue"),
         meta: { public: true },
