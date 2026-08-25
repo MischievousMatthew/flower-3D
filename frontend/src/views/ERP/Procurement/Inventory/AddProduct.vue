@@ -33,636 +33,652 @@
       <!-- Form -->
       <div class="form-container">
         <p v-if="isReadOnlyInventoryProducts" class="permission-banner">
-          Read-only mode. You can review product details, but only employees with edit access can create or update inventory products.
+          Read-only mode. You can review product details, but only employees
+          with edit access can create or update inventory products.
         </p>
         <form @submit.prevent="publishProduct">
-          <fieldset :disabled="isReadOnlyInventoryProducts" class="permission-fieldset">
-          <!-- Basic Information -->
-          <div class="form-section">
-            <h2 class="section-title">Basic Information</h2>
-            <div class="form-grid">
-              <div class="form-group full-width">
-                <label class="form-label">Product Name *</label>
-                <input
-                  v-model="formData.product_name"
-                  type="text"
-                  placeholder="e.g., Red Rose Bouquet"
-                  class="form-input"
-                  :class="{ 'is-invalid': errors.product_name }"
-                  @input="clearError('product_name')"
-                  required
-                />
-                <span v-if="errors.product_name" class="error-text">{{
-                  errors.product_name
-                }}</span>
-              </div>
-              <div class="form-group full-width">
-                <label class="form-label">Product Description *</label>
-                <textarea
-                  v-model="formData.description"
-                  placeholder="Describe your product in detail..."
-                  rows="4"
-                  class="form-textarea"
-                  :class="{ 'is-invalid': errors.description }"
-                  @input="clearError('description')"
-                  required
-                ></textarea>
-                <span v-if="errors.description" class="error-text">{{
-                  errors.description
-                }}</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">SKU (Stock Keeping Unit) *</label>
-                <input
-                  v-model="formData.sku"
-                  type="text"
-                  placeholder="e.g., ROSE-RED-001"
-                  class="form-input"
-                  :class="{ 'is-invalid': errors.sku }"
-                  @input="clearError('sku')"
-                  required
-                />
-                <span v-if="errors.sku" class="error-text">{{
-                  errors.sku
-                }}</span>
-                <span class="hint-text"
-                  >Unique identifier for this product</span
-                >
-              </div>
-              <div class="form-group">
-                <label class="form-label">Category / Type *</label>
-                <select
-                  v-model="formData.category"
-                  class="form-select"
-                  :class="{ 'is-invalid': errors.category }"
-                  @change="clearError('category')"
-                  required
-                >
-                  <option value="">Select category</option>
-                  <option value="roses">Roses</option>
-                  <option value="tulips">Tulips</option>
-                  <option value="lilies">Lilies</option>
-                  <option value="orchids">Orchids</option>
-                  <option value="sunflowers">Sunflowers</option>
-                  <option value="mixed-bouquets">Mixed Bouquets</option>
-                  <option value="arrangements">Arrangements</option>
-                  <option value="plants">Plants</option>
-                  <option value="gifts">Gifts & Add-ons</option>
-                  <option value="seasonal">Seasonal Flowers</option>
-                </select>
-                <span v-if="errors.category" class="error-text">{{
-                  errors.category
-                }}</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Flower Type *</label>
-                <select
-                  v-model="formData.flower_type"
-                  class="form-select"
-                  :class="{ 'is-invalid': errors.flower_type }"
-                  @change="clearError('flower_type')"
-                  required
-                >
-                  <option value="">Select flower type</option>
-                  <option value="focal">Focal Flowers (Main attraction)</option>
-                  <option value="secondary">
-                    Secondary Flowers (Support & volume)
-                  </option>
-                  <option value="filler">Filler Flowers (Small texture)</option>
-                  <option value="line">
-                    Line Flowers (Height & direction)
-                  </option>
-                  <option value="greenery">Greenery (Foliage)</option>
-                </select>
-                <span v-if="errors.flower_type" class="error-text">{{
-                  errors.flower_type
-                }}</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Color *</label>
-                <select
-                  v-model="formData.color"
-                  class="form-select"
-                  :class="{ 'is-invalid': errors.color }"
-                  @change="handleColorChange"
-                  required
-                >
-                  <option value="">Select color</option>
-                  <option value="white">White</option>
-                  <option value="yellow">Yellow</option>
-                  <option value="red">Red</option>
-                  <option value="pink">Pink</option>
-                  <option value="purple">Purple</option>
-                  <option value="orange">Orange</option>
-                  <option value="blue">Blue</option>
-                  <option value="green">Green</option>
-                  <option value="cream">Cream</option>
-                  <option value="other">Other</option>
-                </select>
-                <span v-if="errors.color" class="error-text">{{
-                  errors.color
-                }}</span>
-              </div>
-              <div class="form-group" v-if="formData.color === 'other'">
-                <label class="form-label">Specify Color *</label>
-                <input
-                  v-model="formData.color_other"
-                  type="text"
-                  placeholder="e.g., Burgundy, Lavender"
-                  class="form-input"
-                  :class="{ 'is-invalid': errors.color_other }"
-                  @input="clearError('color_other')"
-                  required
-                />
-                <span v-if="errors.color_other" class="error-text">{{
-                  errors.color_other
-                }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Pricing Information -->
-          <div class="form-section">
-            <h2 class="section-title">Pricing Information</h2>
-            <div class="form-grid">
-              <div class="form-group">
-                <label class="form-label">Purchase Price / Cost *</label>
-                <div class="input-with-prefix">
-                  <span class="prefix">₱</span>
+          <fieldset
+            :disabled="isReadOnlyInventoryProducts"
+            class="permission-fieldset"
+          >
+            <!-- Basic Information -->
+            <div class="form-section">
+              <h2 class="section-title">Basic Information</h2>
+              <div class="form-grid">
+                <div class="form-group full-width">
+                  <label class="form-label">Product Name *</label>
                   <input
-                    v-model.number="formData.purchase_price"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
+                    v-model="formData.product_name"
+                    type="text"
+                    placeholder="e.g., Red Rose Bouquet"
                     class="form-input"
-                    :class="{ 'is-invalid': errors.purchase_price }"
-                    @input="
-                      clearError('purchase_price');
-                      calculateProfit();
-                    "
+                    :class="{ 'is-invalid': errors.product_name }"
+                    @input="clearError('product_name')"
                     required
                   />
+                  <span v-if="errors.product_name" class="error-text">{{
+                    errors.product_name
+                  }}</span>
                 </div>
-                <span v-if="errors.purchase_price" class="error-text">{{
-                  errors.purchase_price
-                }}</span>
-                <span class="hint-text">Your cost to acquire this product</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Selling Price / Retail Price *</label>
-                <div class="input-with-prefix">
-                  <span class="prefix">₱</span>
+                <div class="form-group full-width">
+                  <label class="form-label">Product Description *</label>
+                  <textarea
+                    v-model="formData.description"
+                    placeholder="Describe your product in detail..."
+                    rows="4"
+                    class="form-textarea"
+                    :class="{ 'is-invalid': errors.description }"
+                    @input="clearError('description')"
+                    required
+                  ></textarea>
+                  <span v-if="errors.description" class="error-text">{{
+                    errors.description
+                  }}</span>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">SKU (Stock Keeping Unit) *</label>
                   <input
-                    v-model.number="formData.selling_price"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
+                    v-model="formData.sku"
+                    type="text"
+                    placeholder="e.g., ROSE-RED-001"
                     class="form-input"
-                    :class="{ 'is-invalid': errors.selling_price }"
-                    @input="
-                      clearError('selling_price');
-                      calculateProfit();
-                    "
+                    :class="{ 'is-invalid': errors.sku }"
+                    @input="clearError('sku')"
                     required
                   />
-                </div>
-                <span v-if="errors.selling_price" class="error-text">{{
-                  errors.selling_price
-                }}</span>
-                <span class="hint-text">Price customers will pay</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Profit Margin</label>
-                <div class="profit-display">
-                  <div class="profit-amount">
-                    ₱{{ profitAmount.toFixed(2) }}
-                  </div>
-                  <div class="profit-percentage">
-                    {{ profitPercentage.toFixed(1) }}% margin
-                  </div>
-                </div>
-              </div>
-
-              <!-- ── Discount Toggle (matches Edit modal style) ── -->
-              <div class="form-group full-width">
-                <div
-                  class="discount-toggle-row"
-                  :class="{ active: formData.has_discount }"
-                >
-                  <label class="toggle-switch">
-                    <input
-                      type="checkbox"
-                      v-model="formData.has_discount"
-                      @change="handleDiscountToggle"
-                    />
-                    <span class="toggle-slider"></span>
-                  </label>
-                  <div class="toggle-label-group">
-                    <span class="toggle-label-main">Enable Discount Price</span>
-                    <span class="toggle-label-sub"
-                      >Show a crossed-out original price and a lower sale
-                      price</span
-                    >
-                  </div>
-                  <span
-                    v-if="formData.has_discount"
-                    class="discount-active-pill"
-                    >🏷️ Sale Active</span
+                  <span v-if="errors.sku" class="error-text">{{
+                    errors.sku
+                  }}</span>
+                  <span class="hint-text"
+                    >Unique identifier for this product</span
                   >
                 </div>
+                <div class="form-group">
+                  <label class="form-label">Category / Type *</label>
+                  <select
+                    v-model="formData.category"
+                    class="form-select"
+                    :class="{ 'is-invalid': errors.category }"
+                    @change="clearError('category')"
+                    required
+                  >
+                    <option value="">Select category</option>
+                    <option value="roses">Roses</option>
+                    <option value="tulips">Tulips</option>
+                    <option value="lilies">Lilies</option>
+                    <option value="orchids">Orchids</option>
+                    <option value="sunflowers">Sunflowers</option>
+                    <option value="mixed-bouquets">Mixed Bouquets</option>
+                    <option value="arrangements">Arrangements</option>
+                    <option value="plants">Plants</option>
+                    <option value="gifts">Gifts & Add-ons</option>
+                    <option value="seasonal">Seasonal Flowers</option>
+                  </select>
+                  <span v-if="errors.category" class="error-text">{{
+                    errors.category
+                  }}</span>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Flower Type *</label>
+                  <select
+                    v-model="formData.flower_type"
+                    class="form-select"
+                    :class="{ 'is-invalid': errors.flower_type }"
+                    @change="clearError('flower_type')"
+                    required
+                  >
+                    <option value="">Select flower type</option>
+                    <option value="focal">
+                      Focal Flowers (Main attraction)
+                    </option>
+                    <option value="secondary">
+                      Secondary Flowers (Support & volume)
+                    </option>
+                    <option value="filler">
+                      Filler Flowers (Small texture)
+                    </option>
+                    <option value="line">
+                      Line Flowers (Height & direction)
+                    </option>
+                    <option value="greenery">Greenery (Foliage)</option>
+                  </select>
+                  <span v-if="errors.flower_type" class="error-text">{{
+                    errors.flower_type
+                  }}</span>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Color *</label>
+                  <select
+                    v-model="formData.color"
+                    class="form-select"
+                    :class="{ 'is-invalid': errors.color }"
+                    @change="handleColorChange"
+                    required
+                  >
+                    <option value="">Select color</option>
+                    <option value="white">White</option>
+                    <option value="yellow">Yellow</option>
+                    <option value="red">Red</option>
+                    <option value="pink">Pink</option>
+                    <option value="purple">Purple</option>
+                    <option value="orange">Orange</option>
+                    <option value="blue">Blue</option>
+                    <option value="green">Green</option>
+                    <option value="cream">Cream</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <span v-if="errors.color" class="error-text">{{
+                    errors.color
+                  }}</span>
+                </div>
+                <div class="form-group" v-if="formData.color === 'other'">
+                  <label class="form-label">Specify Color *</label>
+                  <input
+                    v-model="formData.color_other"
+                    type="text"
+                    placeholder="e.g., Burgundy, Lavender"
+                    class="form-input"
+                    :class="{ 'is-invalid': errors.color_other }"
+                    @input="clearError('color_other')"
+                    required
+                  />
+                  <span v-if="errors.color_other" class="error-text">{{
+                    errors.color_other
+                  }}</span>
+                </div>
               </div>
+            </div>
 
-              <transition name="slide-down">
-                <div v-if="formData.has_discount">
-                  <div class="form-group">
-                    <label class="form-label">Discount Price *</label>
-                    <div class="input-with-prefix">
-                      <span class="prefix">₱</span>
-                      <input
-                        v-model.number="formData.discount_price"
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        class="form-input"
-                        :class="{ 'is-invalid': errors.discount_price }"
-                        @input="clearError('discount_price')"
-                        :required="formData.has_discount"
-                      />
-                    </div>
-                    <span v-if="errors.discount_price" class="error-text">{{
-                      errors.discount_price
-                    }}</span>
-                    <span class="hint-text"
-                      >Must be less than selling price</span
-                    >
+            <!-- Pricing Information -->
+            <div class="form-section">
+              <h2 class="section-title">Pricing Information</h2>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">Purchase Price / Cost *</label>
+                  <div class="input-with-prefix">
+                    <span class="prefix">₱</span>
+                    <input
+                      v-model.number="formData.purchase_price"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      class="form-input"
+                      :class="{ 'is-invalid': errors.purchase_price }"
+                      @input="
+                        clearError('purchase_price');
+                        calculateProfit();
+                      "
+                      required
+                    />
                   </div>
-                  <div class="form-group">
-                    <label class="form-label">Discount Percentage</label>
-                    <div class="discount-display">
-                      <div class="discount-amount">
-                        {{ discountPercentage.toFixed(1) }}%
-                      </div>
-                      <div class="discount-text">off selling price</div>
+                  <span v-if="errors.purchase_price" class="error-text">{{
+                    errors.purchase_price
+                  }}</span>
+                  <span class="hint-text"
+                    >Your cost to acquire this product</span
+                  >
+                </div>
+                <div class="form-group">
+                  <label class="form-label"
+                    >Selling Price / Retail Price *</label
+                  >
+                  <div class="input-with-prefix">
+                    <span class="prefix">₱</span>
+                    <input
+                      v-model.number="formData.selling_price"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      class="form-input"
+                      :class="{ 'is-invalid': errors.selling_price }"
+                      @input="
+                        clearError('selling_price');
+                        calculateProfit();
+                      "
+                      required
+                    />
+                  </div>
+                  <span v-if="errors.selling_price" class="error-text">{{
+                    errors.selling_price
+                  }}</span>
+                  <span class="hint-text">Price customers will pay</span>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Profit Margin</label>
+                  <div class="profit-display">
+                    <div class="profit-amount">
+                      ₱{{ profitAmount.toFixed(2) }}
+                    </div>
+                    <div class="profit-percentage">
+                      {{ profitPercentage.toFixed(1) }}% margin
                     </div>
                   </div>
                 </div>
-              </transition>
-            </div>
-          </div>
 
-          <!-- Stock Management -->
-          <div class="form-section">
-            <h2 class="section-title">Stock Management</h2>
-            <div class="form-grid">
-              <div class="form-group">
-                <label class="form-label">Quantity in Stock *</label>
-                <input
-                  v-model.number="formData.quantity_in_stock"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  class="form-input"
-                  :class="{ 'is-invalid': errors.quantity_in_stock }"
-                  @input="clearError('quantity_in_stock')"
-                  required
-                />
-                <span v-if="errors.quantity_in_stock" class="error-text">{{
-                  errors.quantity_in_stock
-                }}</span>
-                <span class="hint-text">Current available units</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Minimum Stock Level *</label>
-                <input
-                  v-model.number="formData.min_stock_level"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  class="form-input"
-                  :class="{ 'is-invalid': errors.min_stock_level }"
-                  @input="clearError('min_stock_level')"
-                  required
-                />
-                <span v-if="errors.min_stock_level" class="error-text">{{
-                  errors.min_stock_level
-                }}</span>
-                <span class="hint-text"
-                  >Alert when stock reaches this level</span
-                >
-              </div>
-              <div class="form-group">
-                <label class="form-label">Maximum Stock Level</label>
-                <input
-                  v-model.number="formData.max_stock_level"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  class="form-input"
-                />
-                <span class="hint-text">Avoid overstocking</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Season Availability</label>
-                <select v-model="formData.season" class="form-select">
-                  <option value="all-year">All Year Round</option>
-                  <option value="spring">Spring</option>
-                  <option value="summer">Summer</option>
-                  <option value="autumn">Autumn</option>
-                  <option value="winter">Winter</option>
-                </select>
+                <!-- ── Discount Toggle (matches Edit modal style) ── -->
+                <div class="form-group full-width">
+                  <div
+                    class="discount-toggle-row"
+                    :class="{ active: formData.has_discount }"
+                  >
+                    <label class="toggle-switch">
+                      <input
+                        type="checkbox"
+                        v-model="formData.has_discount"
+                        @change="handleDiscountToggle"
+                      />
+                      <span class="toggle-slider"></span>
+                    </label>
+                    <div class="toggle-label-group">
+                      <span class="toggle-label-main"
+                        >Enable Discount Price</span
+                      >
+                      <span class="toggle-label-sub"
+                        >Show a crossed-out original price and a lower sale
+                        price</span
+                      >
+                    </div>
+                    <span
+                      v-if="formData.has_discount"
+                      class="discount-active-pill"
+                      >🏷️ Sale Active</span
+                    >
+                  </div>
+                </div>
+
+                <transition name="slide-down">
+                  <div v-if="formData.has_discount">
+                    <div class="form-group">
+                      <label class="form-label">Discount Price *</label>
+                      <div class="input-with-prefix">
+                        <span class="prefix">₱</span>
+                        <input
+                          v-model.number="formData.discount_price"
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          class="form-input"
+                          :class="{ 'is-invalid': errors.discount_price }"
+                          @input="clearError('discount_price')"
+                          :required="formData.has_discount"
+                        />
+                      </div>
+                      <span v-if="errors.discount_price" class="error-text">{{
+                        errors.discount_price
+                      }}</span>
+                      <span class="hint-text"
+                        >Must be less than selling price</span
+                      >
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Discount Percentage</label>
+                      <div class="discount-display">
+                        <div class="discount-amount">
+                          {{ discountPercentage.toFixed(1) }}%
+                        </div>
+                        <div class="discount-text">off selling price</div>
+                      </div>
+                    </div>
+                  </div>
+                </transition>
               </div>
             </div>
-            <div class="info-banner">
-              <span class="info-icon">🏭</span>
-              <div>
-                <strong>Storage & Freshness managed by Warehouse</strong>
-                <p>
-                  Storage location, harvest dates, expiration dates, and batch
-                  tracking are handled in the Warehouse module when flowers
-                  physically arrive.
+
+            <!-- Stock Management -->
+            <div class="form-section">
+              <h2 class="section-title">Stock Management</h2>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">Quantity in Stock *</label>
+                  <input
+                    v-model.number="formData.quantity_in_stock"
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    class="form-input"
+                    :class="{ 'is-invalid': errors.quantity_in_stock }"
+                    @input="clearError('quantity_in_stock')"
+                    required
+                  />
+                  <span v-if="errors.quantity_in_stock" class="error-text">{{
+                    errors.quantity_in_stock
+                  }}</span>
+                  <span class="hint-text">Current available units</span>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Minimum Stock Level *</label>
+                  <input
+                    v-model.number="formData.min_stock_level"
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    class="form-input"
+                    :class="{ 'is-invalid': errors.min_stock_level }"
+                    @input="clearError('min_stock_level')"
+                    required
+                  />
+                  <span v-if="errors.min_stock_level" class="error-text">{{
+                    errors.min_stock_level
+                  }}</span>
+                  <span class="hint-text"
+                    >Alert when stock reaches this level</span
+                  >
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Maximum Stock Level</label>
+                  <input
+                    v-model.number="formData.max_stock_level"
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    class="form-input"
+                  />
+                  <span class="hint-text">Avoid overstocking</span>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Season Availability</label>
+                  <select v-model="formData.season" class="form-select">
+                    <option value="all-year">All Year Round</option>
+                    <option value="spring">Spring</option>
+                    <option value="summer">Summer</option>
+                    <option value="autumn">Autumn</option>
+                    <option value="winter">Winter</option>
+                  </select>
+                </div>
+              </div>
+              <div class="info-banner">
+                <span class="info-icon">🏭</span>
+                <div>
+                  <strong>Storage & Freshness managed by Warehouse</strong>
+                  <p>
+                    Storage location, harvest dates, expiration dates, and batch
+                    tracking are handled in the Warehouse module when flowers
+                    physically arrive.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Selling Type -->
+            <div class="form-section">
+              <h2 class="section-title">Selling Type</h2>
+              <div class="form-grid">
+                <div class="form-group full-width">
+                  <label class="form-label">How is this product sold? *</label>
+                  <select
+                    v-model="formData.selling_type"
+                    class="form-select"
+                    :class="{ 'is-invalid': errors.selling_type }"
+                    @change="clearError('selling_type')"
+                    required
+                  >
+                    <option value="per_piece">Per Piece</option>
+                    <option value="per_piece_customizable">
+                      Per Piece (Customizable)
+                    </option>
+                    <option value="bouquet">Bouquet</option>
+                  </select>
+                  <span v-if="errors.selling_type" class="error-text">{{
+                    errors.selling_type
+                  }}</span>
+                  <span class="hint-text">
+                    <template v-if="formData.selling_type === 'per_piece'"
+                      >Single stem or piece sold as-is</template
+                    >
+                    <template
+                      v-else-if="
+                        formData.selling_type === 'per_piece_customizable'
+                      "
+                      >Customer can customize quantity, color, or
+                      arrangement</template
+                    >
+                    <template v-else-if="formData.selling_type === 'bouquet'"
+                      >Pre-arranged bouquet ready for sale</template
+                    >
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Supplier Information -->
+            <div class="form-section">
+              <h2 class="section-title">Supplier Information</h2>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">Supplier Name</label>
+                  <input
+                    v-model="formData.supplier_name"
+                    type="text"
+                    placeholder="e.g., Garden Wholesale Inc."
+                    class="form-input"
+                  />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Supplier Contact</label>
+                  <input
+                    v-model="formData.supplier_contact"
+                    type="text"
+                    placeholder="Phone or email"
+                    class="form-input"
+                  />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Supplier SKU / Code</label>
+                  <input
+                    v-model="formData.supplier_sku"
+                    type="text"
+                    placeholder="Supplier's product code"
+                    class="form-input"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- 3D Model -->
+            <div class="form-section">
+              <h2 class="section-title">
+                3D Model <span class="optional-label">(Optional)</span>
+              </h2>
+              <div class="model-upload-section">
+                <div v-if="product3DModel" class="model-preview-container">
+                  <div class="model-preview">
+                    <div class="model-info">
+                      <span class="model-icon">🎨</span>
+                      <div class="model-details">
+                        <p class="model-name">{{ product3DModel.file.name }}</p>
+                        <p class="model-size">
+                          {{ formatFileSize(product3DModel.file.size) }}
+                        </p>
+                        <p class="model-type">
+                          {{
+                            product3DModel.file.name
+                              .split(".")
+                              .pop()
+                              .toUpperCase()
+                          }}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      @click="remove3DModel"
+                      class="remove-model-btn"
+                    >
+                      ✕ Remove
+                    </button>
+                  </div>
+                </div>
+                <div
+                  v-else
+                  class="model-upload-placeholder"
+                  @click="trigger3DFileInput"
+                  @dragover.prevent
+                  @drop.prevent="handle3DFileDrop"
+                >
+                  <span class="upload-icon">🎨</span>
+                  <span class="upload-text">Upload 3D Model</span>
+                  <span class="upload-hint">GLB, GLTF, OBJ, or FBX format</span>
+                  <span class="upload-size-hint">Max 50MB</span>
+                </div>
+                <input
+                  ref="modelFileInput"
+                  type="file"
+                  accept=".glb,.gltf,.obj,.fbx"
+                  @change="handle3DFileSelect"
+                  style="display: none"
+                />
+                <p class="hint-text">
+                  Upload a 3D model to give customers an interactive view.
+                  Supported: GLB (recommended), GLTF, OBJ, FBX
                 </p>
               </div>
             </div>
-          </div>
 
-          <!-- Selling Type -->
-          <div class="form-section">
-            <h2 class="section-title">Selling Type</h2>
-            <div class="form-grid">
-              <div class="form-group full-width">
-                <label class="form-label">How is this product sold? *</label>
-                <select
-                  v-model="formData.selling_type"
-                  class="form-select"
-                  :class="{ 'is-invalid': errors.selling_type }"
-                  @change="clearError('selling_type')"
-                  required
-                >
-                  <option value="per_piece">Per Piece</option>
-                  <option value="per_piece_customizable">
-                    Per Piece (Customizable)
-                  </option>
-                  <option value="bouquet">Bouquet</option>
-                </select>
-                <span v-if="errors.selling_type" class="error-text">{{
-                  errors.selling_type
-                }}</span>
-                <span class="hint-text">
-                  <template v-if="formData.selling_type === 'per_piece'"
-                    >Single stem or piece sold as-is</template
+            <!-- Product Images -->
+            <div class="form-section">
+              <h2 class="section-title">Product Images</h2>
+              <div class="image-upload-section">
+                <div class="image-grid">
+                  <div
+                    v-for="(image, index) in productImages"
+                    :key="index"
+                    class="image-preview"
                   >
-                  <template
-                    v-else-if="
-                      formData.selling_type === 'per_piece_customizable'
-                    "
-                    >Customer can customize quantity, color, or
-                    arrangement</template
-                  >
-                  <template v-else-if="formData.selling_type === 'bouquet'"
-                    >Pre-arranged bouquet ready for sale</template
-                  >
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Supplier Information -->
-          <div class="form-section">
-            <h2 class="section-title">Supplier Information</h2>
-            <div class="form-grid">
-              <div class="form-group">
-                <label class="form-label">Supplier Name</label>
-                <input
-                  v-model="formData.supplier_name"
-                  type="text"
-                  placeholder="e.g., Garden Wholesale Inc."
-                  class="form-input"
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Supplier Contact</label>
-                <input
-                  v-model="formData.supplier_contact"
-                  type="text"
-                  placeholder="Phone or email"
-                  class="form-input"
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Supplier SKU / Code</label>
-                <input
-                  v-model="formData.supplier_sku"
-                  type="text"
-                  placeholder="Supplier's product code"
-                  class="form-input"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- 3D Model -->
-          <div class="form-section">
-            <h2 class="section-title">
-              3D Model <span class="optional-label">(Optional)</span>
-            </h2>
-            <div class="model-upload-section">
-              <div v-if="product3DModel" class="model-preview-container">
-                <div class="model-preview">
-                  <div class="model-info">
-                    <span class="model-icon">🎨</span>
-                    <div class="model-details">
-                      <p class="model-name">{{ product3DModel.file.name }}</p>
-                      <p class="model-size">
-                        {{ formatFileSize(product3DModel.file.size) }}
-                      </p>
-                      <p class="model-type">
-                        {{
-                          product3DModel.file.name
-                            .split(".")
-                            .pop()
-                            .toUpperCase()
-                        }}
-                      </p>
-                    </div>
+                    <img :src="image.url" alt="Product" />
+                    <button
+                      type="button"
+                      @click="removeImage(index)"
+                      class="remove-image-btn"
+                    >
+                      ✕
+                    </button>
+                    <div v-if="index === 0" class="primary-badge">Primary</div>
                   </div>
-                  <button
-                    type="button"
-                    @click="remove3DModel"
-                    class="remove-model-btn"
+                  <div
+                    v-if="productImages.length < 5"
+                    class="image-upload-placeholder"
+                    @click="triggerFileInput"
+                    @dragover.prevent
+                    @drop.prevent="handleDrop"
                   >
-                    ✕ Remove
-                  </button>
+                    <span class="upload-icon">📷</span>
+                    <span class="upload-text">Add Photo</span>
+                    <span class="upload-hint">Click or drag image here</span>
+                  </div>
                 </div>
+                <input
+                  ref="fileInput"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  @change="handleFileSelect"
+                  style="display: none"
+                />
+                <p class="hint-text">
+                  Upload up to 5 photos. First image will be the primary product
+                  image.
+                </p>
               </div>
-              <div
-                v-else
-                class="model-upload-placeholder"
-                @click="trigger3DFileInput"
-                @dragover.prevent
-                @drop.prevent="handle3DFileDrop"
-              >
-                <span class="upload-icon">🎨</span>
-                <span class="upload-text">Upload 3D Model</span>
-                <span class="upload-hint">GLB, GLTF, OBJ, or FBX format</span>
-                <span class="upload-size-hint">Max 50MB</span>
-              </div>
-              <input
-                ref="modelFileInput"
-                type="file"
-                accept=".glb,.gltf,.obj,.fbx"
-                @change="handle3DFileSelect"
-                style="display: none"
-              />
-              <p class="hint-text">
-                Upload a 3D model to give customers an interactive view.
-                Supported: GLB (recommended), GLTF, OBJ, FBX
-              </p>
             </div>
-          </div>
 
-          <!-- Product Images -->
-          <div class="form-section">
-            <h2 class="section-title">Product Images</h2>
-            <div class="image-upload-section">
-              <div class="image-grid">
-                <div
-                  v-for="(image, index) in productImages"
-                  :key="index"
-                  class="image-preview"
-                >
-                  <img :src="image.url" alt="Product" />
-                  <button
-                    type="button"
-                    @click="removeImage(index)"
-                    class="remove-image-btn"
-                  >
-                    ✕
-                  </button>
-                  <div v-if="index === 0" class="primary-badge">Primary</div>
+            <!-- Additional Information -->
+            <div class="form-section">
+              <h2 class="section-title">Additional Information</h2>
+              <div class="form-grid">
+                <div class="form-group full-width">
+                  <label class="form-label">Care Instructions</label>
+                  <textarea
+                    v-model="formData.care_instructions"
+                    placeholder="How to care for these flowers..."
+                    rows="3"
+                    class="form-textarea"
+                  ></textarea>
                 </div>
-                <div
-                  v-if="productImages.length < 5"
-                  class="image-upload-placeholder"
-                  @click="triggerFileInput"
-                  @dragover.prevent
-                  @drop.prevent="handleDrop"
-                >
-                  <span class="upload-icon">📷</span>
-                  <span class="upload-text">Add Photo</span>
-                  <span class="upload-hint">Click or drag image here</span>
-                </div>
-              </div>
-              <input
-                ref="fileInput"
-                type="file"
-                accept="image/*"
-                multiple
-                @change="handleFileSelect"
-                style="display: none"
-              />
-              <p class="hint-text">
-                Upload up to 5 photos. First image will be the primary product
-                image.
-              </p>
-            </div>
-          </div>
-
-          <!-- Additional Information -->
-          <div class="form-section">
-            <h2 class="section-title">Additional Information</h2>
-            <div class="form-grid">
-              <div class="form-group full-width">
-                <label class="form-label">Care Instructions</label>
-                <textarea
-                  v-model="formData.care_instructions"
-                  placeholder="How to care for these flowers..."
-                  rows="3"
-                  class="form-textarea"
-                ></textarea>
-              </div>
-              <div class="form-group full-width">
-                <label class="form-label"
-                  >Occasion Tags
-                  <span class="optional-label">(Select up to 2)</span></label
-                >
-                <div class="tag-selector">
-                  <label
-                    v-for="tag in occasionTags"
-                    :key="tag"
-                    class="tag-option"
-                    :class="{ disabled: isTagDisabled(tag) }"
+                <div class="form-group full-width">
+                  <label class="form-label"
+                    >Occasion Tags
+                    <span class="optional-label">(Select up to 2)</span></label
                   >
-                    <input
-                      type="checkbox"
-                      :value="tag"
-                      v-model="formData.occasion_tags"
-                      :disabled="isTagDisabled(tag)"
-                      @change="handleTagChange"
-                    />
-                    <span>{{ tag }}</span>
+                  <div class="tag-selector">
+                    <label
+                      v-for="tag in occasionTags"
+                      :key="tag"
+                      class="tag-option"
+                      :class="{ disabled: isTagDisabled(tag) }"
+                    >
+                      <input
+                        type="checkbox"
+                        :value="tag"
+                        v-model="formData.occasion_tags"
+                        :disabled="isTagDisabled(tag)"
+                        @change="handleTagChange"
+                      />
+                      <span>{{ tag }}</span>
+                    </label>
+                  </div>
+                  <span v-if="errors.occasion_tags" class="error-text">{{
+                    errors.occasion_tags
+                  }}</span>
+                  <span
+                    class="hint-text"
+                    v-if="formData.occasion_tags.length > 0"
+                    >Selected: {{ formData.occasion_tags.join(", ") }}</span
+                  >
+                </div>
+                <div class="form-group full-width">
+                  <label class="form-label">Additional Notes</label>
+                  <textarea
+                    v-model="formData.notes"
+                    placeholder="Any extra information (e.g., fragile, limited edition, special handling)..."
+                    rows="3"
+                    class="form-textarea"
+                  ></textarea>
+                </div>
+                <div class="form-group full-width">
+                  <label class="checkbox-label">
+                    <input type="checkbox" v-model="formData.is_fragile" />
+                    <span>⚠️ Fragile — Handle with Care</span>
                   </label>
                 </div>
-                <span v-if="errors.occasion_tags" class="error-text">{{
-                  errors.occasion_tags
-                }}</span>
-                <span class="hint-text" v-if="formData.occasion_tags.length > 0"
-                  >Selected: {{ formData.occasion_tags.join(", ") }}</span
-                >
-              </div>
-              <div class="form-group full-width">
-                <label class="form-label">Additional Notes</label>
-                <textarea
-                  v-model="formData.notes"
-                  placeholder="Any extra information (e.g., fragile, limited edition, special handling)..."
-                  rows="3"
-                  class="form-textarea"
-                ></textarea>
-              </div>
-              <div class="form-group full-width">
-                <label class="checkbox-label">
-                  <input type="checkbox" v-model="formData.is_fragile" />
-                  <span>⚠️ Fragile — Handle with Care</span>
-                </label>
-              </div>
-              <div class="form-group full-width">
-                <label class="checkbox-label">
-                  <input
-                    type="checkbox"
-                    v-model="formData.requires_refrigeration"
-                  />
-                  <span>❄️ Requires Refrigeration</span>
-                </label>
+                <div class="form-group full-width">
+                  <label class="checkbox-label">
+                    <input
+                      type="checkbox"
+                      v-model="formData.requires_refrigeration"
+                    />
+                    <span>❄️ Requires Refrigeration</span>
+                  </label>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Form Actions -->
-          <div class="form-actions">
-            <button type="button" @click="goBack" class="btn-cancel">
-              Cancel
-            </button>
-            <div class="action-group">
-              <button
-                type="button"
-                @click="saveDraft"
-                class="btn-secondary"
-                :disabled="isReadOnlyInventoryProducts || isSubmitting"
-                :title="isReadOnlyInventoryProducts ? permissionTooltip : ''"
-              >
-                <span v-if="isSubmitting && isDraft">Saving...</span>
-                <span v-else>📝 Save as Draft</span>
+            <!-- Form Actions -->
+            <div class="form-actions">
+              <button type="button" @click="goBack" class="btn-cancel">
+                Cancel
               </button>
-              <button
-                type="submit"
-                class="btn-primary"
-                :disabled="isReadOnlyInventoryProducts || isSubmitting"
-                :title="isReadOnlyInventoryProducts ? permissionTooltip : ''"
-              >
-                <span v-if="isSubmitting && !isDraft">Publishing...</span>
-                <span v-else>✅ Publish Product</span>
-              </button>
+              <div class="action-group">
+                <button
+                  type="button"
+                  @click="saveDraft"
+                  class="btn-secondary"
+                  :disabled="isReadOnlyInventoryProducts || isSubmitting"
+                  :title="isReadOnlyInventoryProducts ? permissionTooltip : ''"
+                >
+                  <span v-if="isSubmitting && isDraft">Saving...</span>
+                  <span v-else>📝 Save as Draft</span>
+                </button>
+                <button
+                  type="submit"
+                  class="btn-primary"
+                  :disabled="isReadOnlyInventoryProducts || isSubmitting"
+                  :title="isReadOnlyInventoryProducts ? permissionTooltip : ''"
+                >
+                  <span v-if="isSubmitting && !isDraft">Publishing...</span>
+                  <span v-else>✅ Publish Product</span>
+                </button>
+              </div>
             </div>
-          </div>
           </fieldset>
         </form>
       </div>
@@ -674,7 +690,10 @@
 import { ref, computed, onMounted, reactive } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../../../composables/useAuth";
-import { PERMISSION_TOOLTIPS, useAssignment } from "../../../../composables/useAssignment";
+import {
+  PERMISSION_TOOLTIPS,
+  useAssignment,
+} from "../../../../composables/useAssignment";
 
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
@@ -689,9 +708,11 @@ const isSubmitting = ref(false);
 const isDraft = ref(false);
 const product3DModel = ref(null);
 const errors = reactive({});
-const canCreateInventoryProducts = computed(() => can("inventory_products", "create"));
-const isReadOnlyInventoryProducts = computed(() =>
-  !canCreateInventoryProducts.value,
+const canCreateInventoryProducts = computed(() =>
+  can("inventory_products", "create"),
+);
+const isReadOnlyInventoryProducts = computed(
+  () => !canCreateInventoryProducts.value,
 );
 const permissionTooltip = PERMISSION_TOOLTIPS.create;
 
@@ -1205,7 +1226,6 @@ onMounted(() => {
 }
 
 .main-content {
-  margin-left: 260px;
   flex: 1;
   padding: 24px;
 }
