@@ -139,8 +139,8 @@ const addToCart = async (payload) => {
   return response;
 };
 
-const updateCartItem = async (itemId, quantity) => {
-  const response = await cartService.updateCartItem(itemId, quantity);
+const updateCartItem = async (itemId, updates) => {
+  const response = await cartService.updateCartItem(itemId, updates);
   if (response?.success) {
     syncItems(response.data?.items || response.data?.cart?.items || items.value);
     if (!response.data?.items && !response.data?.cart?.items) {

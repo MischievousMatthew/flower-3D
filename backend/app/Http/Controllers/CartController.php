@@ -109,7 +109,54 @@ class CartController extends Controller
                 ], 404);
             }
 
-            if ($product->quantity_in_stock < $request->quantity) {
+            $isCustomBouquet = data_get($request->customizations, 'type') === 'custom_flower_bouquet';
+            $bouquetPrice = null;
+
+            if ($isCustomBouquet) {
+                $bouquetFlowers = data_get($request->customizations, 'flowers', []);
+                if (!is_array($bouquetFlowers) || count($bouquetFlowers) === 0 || $request->quantity != 1) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'A custom bouquet must contain flowers and have a quantity of one.'
+                    ], 422);
+                }
+
+                $flowerQuantities = [];
+                foreach ($bouquetFlowers as $flower) {
+                    $flowerId = (int) ($flower['product_id'] ?? 0);
+                    $quantity = (int) ($flower['quantity'] ?? 1);
+                    if ($flowerId < 1 || $quantity < 1) {
+                        return response()->json(['success' => false, 'message' => 'The custom bouquet contains an invalid flower.'], 422);
+                    }
+                    $flowerQuantities[$flowerId] = ($flowerQuantities[$flowerId] ?? 0) + $quantity;
+                }
+
+                if (!array_key_exists((int) $request->product_id, $flowerQuantities)) {
+                    return response()->json(['success' => false, 'message' => 'The bouquet cart product must be one of its flowers.'], 422);
+                }
+
+                $bouquetProducts = Product::whereIn('id', array_keys($flowerQuantities))
+                    ->where('status', 'active')
+                    ->get()
+                    ->keyBy('id');
+                if ($bouquetProducts->count() !== count($flowerQuantities)) {
+                    return response()->json(['success' => false, 'message' => 'One or more bouquet flowers are unavailable.'], 400);
+                }
+
+                $bouquetPrice = 0;
+                foreach ($flowerQuantities as $flowerId => $quantity) {
+                    $bouquetProduct = $bouquetProducts->get($flowerId);
+                    if ($bouquetProduct->quantity_in_stock < $quantity) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Insufficient stock for ' . $bouquetProduct->product_name . '.'
+                        ], 400);
+                    }
+                    $bouquetPrice += (float) ($bouquetProduct->discount_price ?: $bouquetProduct->selling_price) * $quantity;
+                }
+            }
+
+            if (!$isCustomBouquet && $product->quantity_in_stock < $request->quantity) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Insufficient stock. Only ' . $product->quantity_in_stock . ' items available.',
@@ -117,7 +164,7 @@ class CartController extends Controller
                 ], 400);
             }
 
-            $price = $product->discount_price ?: $product->selling_price;
+            $price = $bouquetPrice ?? ($product->discount_price ?: $product->selling_price);
 
             // A custom bouquet is a complete design tied to this cart line. Do not
             // merge it into an earlier line for the same product, or its transforms
@@ -218,7 +265,37 @@ class CartController extends Controller
                 return response()->json(['success'=>false,'message'=>'Product no longer available'],400);
             }
 
-            if ($product->quantity_in_stock < $request->quantity) {
+            $isCustomBouquet = data_get($request->customizations ?? $cartItem->customizations, 'type') === 'custom_flower_bouquet';
+            $bouquetPrice = null;
+            if ($isCustomBouquet) {
+                $bouquetFlowers = data_get($request->customizations ?? $cartItem->customizations, 'flowers', []);
+                if (!is_array($bouquetFlowers) || count($bouquetFlowers) === 0 || $request->quantity != 1) {
+                    return response()->json(['success' => false, 'message' => 'A custom bouquet must contain flowers and have a quantity of one.'], 422);
+                }
+                $flowerQuantities = [];
+                foreach ($bouquetFlowers as $flower) {
+                    $flowerId = (int) ($flower['product_id'] ?? 0);
+                    $quantity = (int) ($flower['quantity'] ?? 1);
+                    if ($flowerId < 1 || $quantity < 1) {
+                        return response()->json(['success' => false, 'message' => 'The custom bouquet contains an invalid flower.'], 422);
+                    }
+                    $flowerQuantities[$flowerId] = ($flowerQuantities[$flowerId] ?? 0) + $quantity;
+                }
+                $bouquetProducts = Product::whereIn('id', array_keys($flowerQuantities))->where('status', 'active')->get()->keyBy('id');
+                if ($bouquetProducts->count() !== count($flowerQuantities)) {
+                    return response()->json(['success' => false, 'message' => 'One or more bouquet flowers are unavailable.'], 400);
+                }
+                $bouquetPrice = 0;
+                foreach ($flowerQuantities as $flowerId => $quantity) {
+                    $bouquetProduct = $bouquetProducts->get($flowerId);
+                    if ($bouquetProduct->quantity_in_stock < $quantity) {
+                        return response()->json(['success' => false, 'message' => 'Insufficient stock for ' . $bouquetProduct->product_name . '.'], 400);
+                    }
+                    $bouquetPrice += (float) ($bouquetProduct->discount_price ?: $bouquetProduct->selling_price) * $quantity;
+                }
+            }
+
+            if (!$isCustomBouquet && $product->quantity_in_stock < $request->quantity) {
                 return response()->json([
                     'success'=>false,
                     'message'=>'Insufficient stock. Only '.$product->quantity_in_stock.' items available.',
@@ -226,7 +303,7 @@ class CartController extends Controller
                 ],400);
             }
 
-            $price = $product->discount_price ?: $product->selling_price;
+            $price = $bouquetPrice ?? ($product->discount_price ?: $product->selling_price);
 
             $cartItem->update([
                 'quantity'=>$request->quantity,

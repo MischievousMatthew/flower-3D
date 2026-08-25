@@ -395,6 +395,7 @@ const loadBouquetArrangement = async (arrangement) => {
   bouquet.position.sub(bouquetCenter.multiplyScalar(bouquetScale));
   const scaledBox = new THREE.Box3().setFromObject(bouquet);
   bouquet.position.y -= scaledBox.min.y;
+  bouquet.scale.multiplyScalar(Number(arrangement.wrapper_scale ?? 1));
 
   model = new THREE.Group();
   model.add(bouquet);

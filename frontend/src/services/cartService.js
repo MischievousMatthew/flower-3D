@@ -28,9 +28,10 @@ const cartService = {
   },
 
   // Update cart item quantity
-  async updateCartItem(itemId, quantity) {
+  async updateCartItem(itemId, updates) {
     try {
-      const response = await api.put(`/cart/update/${itemId}`, { quantity });
+      const payload = typeof updates === "number" ? { quantity: updates } : updates;
+      const response = await api.put(`/cart/update/${itemId}`, payload);
       return response.data;
     } catch (error) {
       console.error("Error updating cart item:", error);

@@ -156,7 +156,7 @@
                       getProductImage(item.product) ||
                       'https://via.placeholder.com/150'
                     "
-                    :alt="getProductName(item.product)"
+                    :alt="getProductName(item.product, item)"
                     @error="handleImageError"
                   />
                 </div>
@@ -165,10 +165,10 @@
                   <div class="item-header">
                     <div>
                       <h3 class="item-name">
-                        {{ getProductName(item.product) }}
+                        {{ getProductName(item.product, item) }}
                       </h3>
                       <p class="item-category">
-                        {{ getProductCategory(item.product) }}
+                        {{ getProductCategory(item.product, item) }}
                       </p>
                     </div>
                     <button
@@ -225,7 +225,7 @@
                           class="qty-btn"
                           @click="decreaseQuantity(item.id)"
                           :disabled="
-                            getStockStatus(item.product) === 'Out of stock'
+                            isCustomBouquet(item) || getStockStatus(item.product) === 'Out of stock'
                           "
                         >
                           <svg
@@ -243,14 +243,14 @@
                           @input="handleQuantityInput(item.id, $event)"
                           class="qty-input"
                           :disabled="
-                            getStockStatus(item.product) === 'Out of stock'
+                            isCustomBouquet(item) || getStockStatus(item.product) === 'Out of stock'
                           "
                         />
                         <button
                           class="qty-btn"
                           @click="increaseQuantity(item.id)"
                           :disabled="
-                            getStockStatus(item.product) === 'Out of stock'
+                            isCustomBouquet(item) || getStockStatus(item.product) === 'Out of stock'
                           "
                         >
                           <svg
@@ -277,6 +277,22 @@
 
                     <div class="item-actions">
                       <button
+                        v-if="isCustomBouquet(item)"
+                        class="btn-customize"
+                        @click="viewBouquet(item)"
+                      >
+                        <span>View 3D</span>
+                      </button>
+                      <button
+                        v-if="isCustomBouquet(item)"
+                        class="btn-customize"
+                        @click="editBouquet(item)"
+                        :disabled="getStockStatus(item.product) === 'Out of stock'"
+                      >
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        v-else
                         class="btn-customize"
                         @click="customizeItem(item)"
                         :disabled="
@@ -427,6 +443,22 @@
         </div>
       </div>
     </div>
+
+    <div v-if="show3DModal" class="bouquet-modal" @click.self="close3DModal">
+      <div class="bouquet-modal-content">
+        <div class="bouquet-modal-header">
+          <h3>Custom Bouquet</h3>
+          <button class="btn-remove" @click="close3DModal" title="Close">×</button>
+        </div>
+        <ThreeDModelViewer
+          v-if="viewingArrangement"
+          model-url="/Boquet.glb"
+          model-type="glb"
+          :arrangement="viewingArrangement"
+          background-color="#1a1a2e"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -441,6 +473,7 @@ import api from "../../plugins/axios"; // ✅ needed to fetch profile
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
+import ThreeDModelViewer from "../../layouts/3D/3DModelViewer.vue";
 
 const router = useRouter();
 const { isAuthenticated } = useAuth();
@@ -463,6 +496,8 @@ const isLoading = ref(true);
 const isLoadingMessage = ref("");
 const pendingUpdates = ref({});
 const updateTimeouts = ref({});
+const show3DModal = ref(false);
+const viewingArrangement = ref(null);
 
 const showProfileModal = ref(false);
 const userProfile = ref({ address: null, contact_number: null, city: null });
@@ -517,6 +552,7 @@ const hydrateCartItems = (sourceItems = []) => {
     price: parseFloat(item.price || 0),
     color: item.color,
     size: item.size,
+    customizations: item.customizations || null,
     product: item.product
       ? {
           ...item.product,
@@ -758,6 +794,30 @@ const customizeItem = (item) => {
   router.push(`/customize/${item.product.id}`);
 };
 
+const isCustomBouquet = (item) => item?.customizations?.type === "custom_flower_bouquet";
+
+const viewBouquet = (item) => {
+  viewingArrangement.value = item.customizations;
+  show3DModal.value = true;
+};
+
+const close3DModal = () => {
+  show3DModal.value = false;
+  viewingArrangement.value = null;
+};
+
+const editBouquet = (item) => {
+  const customization = item.customizations;
+  router.push({
+    path: "/customize/flower",
+    query: {
+      cart_item_id: item.id,
+      store_id: customization.store_id,
+      owner_id: customization.vendor_id,
+    },
+  });
+};
+
 const removeFromCart = async (itemId) => {
   const idx = cartItems.value.findIndex((i) => i.id === itemId);
   if (idx === -1) return;
@@ -790,8 +850,8 @@ const getStockStatus = (product) => {
   return "In stock";
 };
 
-const getProductName = (p) => p?.product_name || "Unknown Product";
-const getProductCategory = (p) => p?.category || "Uncategorized";
+const getProductName = (p, item = null) => isCustomBouquet(item) ? "Custom Bouquet" : (p?.product_name || "Unknown Product");
+const getProductCategory = (p, item = null) => isCustomBouquet(item) ? "Custom flower arrangement" : (p?.category || "Uncategorized");
 
 const getProductImage = (product) => {
   if (!product) return null;
@@ -1304,6 +1364,33 @@ const handleImageError = (e) => {
   cursor: not-allowed;
   transform: none;
 }
+
+.bouquet-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.bouquet-modal-content {
+  width: min(760px, 100%);
+  height: min(680px, 88vh);
+  padding: 18px;
+  border-radius: 16px;
+  background: white;
+}
+
+.bouquet-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.bouquet-modal-header h3 { margin: 0; }
 
 .item-pricing {
   text-align: right;

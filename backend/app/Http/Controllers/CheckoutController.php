@@ -136,9 +136,12 @@ class CheckoutController extends Controller
                     ], 400);
                 }
 
-                $effectivePrice = $cartItem->product->discount_price 
-                    ? (float) $cartItem->product->discount_price 
-                    : (float) $cartItem->product->selling_price;
+                $isCustomBouquet = data_get($cartItem->customizations, 'type') === 'custom_flower_bouquet';
+                $effectivePrice = $isCustomBouquet
+                    ? (float) $cartItem->price
+                    : ($cartItem->product->discount_price
+                        ? (float) $cartItem->product->discount_price
+                        : (float) $cartItem->product->selling_price);
 
                 $itemSubtotal = $effectivePrice * $cartItem->quantity;
                 $subtotal += $itemSubtotal;
@@ -146,20 +149,16 @@ class CheckoutController extends Controller
                 // Get 3D model if exists
                 $model3d = $cartItem->product->models->first();
 
-                $effectivePrice = $cartItem->product->discount_price
-    ? (float) $cartItem->product->discount_price
-    : (float) $cartItem->product->selling_price;
-
                 $items[] = [
                     'cart_item_id'   => $cartItem->id,
                     'product_id'     => $cartItem->product_id,
-                    'product_name'   => $cartItem->product->product_name,
+                    'product_name'   => $isCustomBouquet ? 'Custom Bouquet' : $cartItem->product->product_name,
                     'product_image'  => $cartItem->product->primary_image->image_url
                                         ?? ($cartItem->product->images[0]->image_url ?? null),
                     'quantity'       => $cartItem->quantity,
                     'unit_price'     => $effectivePrice,           // ← correct
-                    'original_price' => (float) $cartItem->product->selling_price,
-                    'discount_price' => $cartItem->product->discount_price
+                    'original_price' => $isCustomBouquet ? $effectivePrice : (float) $cartItem->product->selling_price,
+                    'discount_price' => !$isCustomBouquet && $cartItem->product->discount_price
                                         ? (float) $cartItem->product->discount_price
                                         : null,
                     'subtotal'       => $effectivePrice * $cartItem->quantity,
@@ -414,9 +413,12 @@ class CheckoutController extends Controller
                 $itemsData = [];
                 
                 foreach ($cartItems as $item) {
-                    $price = $item->product->discount_price
-                        ? (float) $item->product->discount_price
-                        : (float) ($item->product->selling_price ?: $item->price);
+                    $isCustomBouquet = data_get($item->customizations, 'type') === 'custom_flower_bouquet';
+                    $price = $isCustomBouquet
+                        ? (float) $item->price
+                        : ($item->product->discount_price
+                            ? (float) $item->product->discount_price
+                            : (float) ($item->product->selling_price ?: $item->price));
 
                     if (!$price) {
                         throw new \Exception("Price not found for product: " . $item->product->product_name);
@@ -430,7 +432,7 @@ class CheckoutController extends Controller
                     
                     $itemsData[] = [
                         'product_id'          => $item->product_id,
-                        'product_name'        => $item->product->product_name ?? 'Unknown Product',
+                        'product_name'        => $isCustomBouquet ? 'Custom Bouquet' : ($item->product->product_name ?? 'Unknown Product'),
                         'product_description' => $item->product->product_description ?? '',
                         'product_image'       => $item->product->primary_image->image_url ??
                                                 ($item->product->images[0]->image_url ?? ''),

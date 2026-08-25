@@ -206,7 +206,7 @@
             <div class="fc-summary"><span>Flowers</span><strong>{{ selectedFlowers.length }}/{{ MAX_FLOWERS }}</strong></div>
             <div class="fc-summary total"><span>Total</span><strong>PHP {{ totalPrice.toFixed(2) }}</strong></div>
             <button class="fc-btn fc-btn-primary" @click="checkout" :disabled="!selectedFlowers.length || isCheckingOut">{{ isCheckingOut ? "Processing..." : "Proceed to Checkout" }}</button>
-            <button class="fc-btn fc-btn-light full" @click="addCart" :disabled="!selectedFlowers.length || isCheckingOut">Add to Cart</button>
+            <button class="fc-btn fc-btn-light full" @click="addCart" :disabled="!selectedFlowers.length || isCheckingOut">{{ editingCartItemId ? "Update Custom Bouquet" : "Add to Cart" }}</button>
           </section>
         </aside>
       </div>
@@ -254,14 +254,17 @@ const isFullscreen = ref(false);
 const dragFeedback = ref("");
 const paperColor = ref("#d3b18f");
 const ribbonColor = ref("#caa6d9");
+const wrapperScale = ref(1);
 const isLoading3D = ref(true);
 const sceneReady = ref(false);
 const bouquetLoadError = ref("");
 const isCheckingOut = ref(false);
 const toast = reactive({ show: false, message: "", type: "success" });
 
-const storeId = computed(() => String(route.query.store_id || route.params.id || ""));
-const vendorOwnerId = computed(() => Number(route.query.owner_id || 0) || null);
+const editingCartItemId = computed(() => String(route.query.cart_item_id || ""));
+const editingCustomization = ref(null);
+const storeId = computed(() => String(editingCustomization.value?.store_id || route.query.store_id || route.params.id || ""));
+const vendorOwnerId = computed(() => Number(editingCustomization.value?.vendor_id || route.query.owner_id || 0) || null);
 const storeName = computed(() => String(route.query.store_name || ""));
 const cartCount = computed(() => cartStore.count?.value ?? 0);
 const filteredFlowers = computed(() => {
@@ -287,7 +290,9 @@ const canUseFlower = (flower) => !!flower?.model && selectedFlowers.value.length
 onMounted(async () => {
   if (isAuthenticated.value) await cartStore.initialize?.();
   initScene();
+  await loadEditingCustomization();
   await Promise.all([loadBouquetModel(), fetchFlowers()]);
+  if (editingCustomization.value) await restoreBouquet(editingCustomization.value);
   window.addEventListener("resize", handleResize);
   document.addEventListener("fullscreenchange", syncFullscreenState);
 });
@@ -375,6 +380,7 @@ async function loadBouquetModel() {
     bouquetRoot.position.sub(center.multiplyScalar(scale));
     const scaledBox = new THREE.Box3().setFromObject(bouquetRoot);
     bouquetRoot.position.y -= scaledBox.min.y;
+    bouquetRoot.scale.multiplyScalar(wrapperScale.value);
     scene.add(bouquetRoot);
     applyPaperColor(paperColor.value);
     applyRibbonColor(ribbonColor.value);
@@ -901,6 +907,7 @@ function buildBouquetCustomization() {
     vendor_id: vendorOwnerId.value,
     paper_color: paperColor.value,
     ribbon_color: ribbonColor.value,
+    wrapper_scale: wrapperScale.value,
     flowers: selectedFlowers.value.map((flower, index) => {
       const object = placedObjects.get(flower.sceneId);
 
@@ -909,6 +916,7 @@ function buildBouquetCustomization() {
         product_id: flower.id,
         product_name: flower.product_name,
         model_3d_url: flower.model_3d_url,
+        price: Number(flower.price || 0),
         quantity: 1,
         placement_order: index,
         position: { ...flower.position },
@@ -928,29 +936,90 @@ async function addCart() {
   if (!selectedFlowers.value.length) return;
 
   isCheckingOut.value = true;
-  const createdCartItemIds = [];
   try {
     const customization = buildBouquetCustomization();
+    const payload = {
+      product_id: selectedFlowers.value[0].id,
+      quantity: 1,
+      customizations: customization,
+    };
 
-    for (const flower of selectedFlowers.value) {
-      const response = await cartStore.addToCart({
-        product_id: flower.id,
-        quantity: 1,
-        customizations: customization,
-      });
-      if (response?.data?.id) createdCartItemIds.push(response.data.id);
+    if (editingCartItemId.value) {
+      await cartStore.updateCartItem(editingCartItemId.value, payload);
+      showToast("Custom bouquet updated in cart.", "success");
+    } else {
+      await cartStore.addToCart(payload);
+      showToast("Custom bouquet added to cart.", "success");
     }
-
-    showToast("Custom bouquet added to cart.", "success");
   } catch (error) {
     console.error("Failed to add custom bouquet to cart:", error);
-    await Promise.all(
-      createdCartItemIds.map((cartItemId) => cartStore.removeFromCart(cartItemId).catch(() => null)),
-    );
     showToast(error?.response?.data?.message || error?.message || "Failed to add custom bouquet to cart.", "error");
   } finally {
     isCheckingOut.value = false;
   }
+}
+
+async function loadEditingCustomization() {
+  if (!editingCartItemId.value || !isAuthenticated.value) return;
+  await cartStore.refreshCart();
+  const cartItem = cartStore.items.value.find((item) => String(item.id) === editingCartItemId.value);
+  const customization = cartItem?.customizations;
+  if (customization?.type !== "custom_flower_bouquet" || !Array.isArray(customization.flowers)) {
+    showToast("The saved custom bouquet could not be found.", "error");
+    return;
+  }
+  editingCustomization.value = customization;
+  wrapperScale.value = Number(customization.wrapper_scale ?? 1);
+}
+
+async function restoreBouquet(customization) {
+  resetDesign();
+  const savedFlowers = [...customization.flowers].sort(
+    (first, second) => Number(first.placement_order || 0) - Number(second.placement_order || 0),
+  );
+  applyPaperColor(customization.paper_color || paperColor.value);
+  applyRibbonColor(customization.ribbon_color || ribbonColor.value);
+
+  for (const [index, savedFlower] of savedFlowers.entries()) {
+    if (!savedFlower.model_3d_url) continue;
+    try {
+      const template = await loadFlowerTemplate(savedFlower.model_3d_url);
+      const instance = SkeletonUtils.clone(template);
+      fitFlowerModel(instance);
+      const wrapper = new THREE.Group();
+      const sceneId = savedFlower.scene_id || `restored-${savedFlower.product_id}-${index}`;
+      const position = savedFlower.position || { x: 0, y: 0, z: 0 };
+      const rotation = savedFlower.rotation || { xDeg: 0, yDeg: 0, zDeg: 0 };
+      const scale = Number(savedFlower.scale ?? 1);
+      wrapper.add(instance);
+      wrapper.position.set(Number(position.x || 0), Number(position.y || 0), Number(position.z || 0));
+      wrapper.rotation.set(
+        THREE.MathUtils.degToRad(Number(rotation.xDeg || 0)),
+        THREE.MathUtils.degToRad(Number(rotation.yDeg || 0)),
+        THREE.MathUtils.degToRad(Number(rotation.zDeg || 0)),
+      );
+      wrapper.scale.setScalar(scale);
+      wrapper.userData.sceneId = sceneId;
+      flowerLayer.add(wrapper);
+      placedObjects.set(sceneId, wrapper);
+      const catalogFlower = flowers.value.find((flower) => Number(flower.id) === Number(savedFlower.product_id));
+      selectedFlowers.value.push({
+        sceneId,
+        id: Number(savedFlower.product_id),
+        owner_id: Number(savedFlower.owner_id || catalogFlower?.owner_id || vendorOwnerId.value || 0) || null,
+        product_name: savedFlower.product_name || catalogFlower?.product_name || "Flower",
+        price: Number(savedFlower.price ?? catalogFlower?.price ?? 0),
+        model_3d_url: savedFlower.model_3d_url,
+        position: { x: Number(position.x || 0), y: Number(position.y || 0), z: Number(position.z || 0) },
+        rotation: { xDeg: Number(rotation.xDeg || 0), yDeg: Number(rotation.yDeg || 0), zDeg: Number(rotation.zDeg || 0) },
+        scale,
+        locked: Boolean(savedFlower.locked),
+      });
+    } catch (error) {
+      console.error("Failed to restore saved flower:", error);
+    }
+  }
+  selectedSceneId.value = selectedFlowers.value[0]?.sceneId || null;
 }
 
 function takeScreenshot() {
