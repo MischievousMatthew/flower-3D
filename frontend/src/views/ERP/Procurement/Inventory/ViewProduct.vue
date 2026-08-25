@@ -465,7 +465,7 @@
                   <transition name="pop">
                     <div
                       v-if="activeMenu === product.id"
-                      ref="dropdownRef"
+                      :ref="setDropdownRef"
                       class="menu-dropdown"
                       :style="{
                         top: menuStyle.top,
@@ -1075,6 +1075,9 @@ const selectedProduct = ref(null);
 const newStockQuantity = ref(null);
 
 const dropdownRef = ref(null);
+const setDropdownRef = (el) => {
+  if (el) dropdownRef.value = el;
+};
 const activeTriggerEl = ref(null);
 const menuStyle = reactive({
   top: "0px",
