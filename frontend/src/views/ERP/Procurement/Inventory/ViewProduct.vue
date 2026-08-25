@@ -874,13 +874,541 @@
               Close
             </button>
             <button
-              v-if="activeTab === 'approved'"
               class="btn-primary"
+              :disabled="!canEditInventoryProducts"
+              :title="canEditInventoryProducts ? '' : permissionMessages.edit"
+              @click="switchToEdit"
+            >
+              ✏️ Edit Product Details
+            </button>
+            <button
+              v-if="activeTab === 'approved'"
+              class="btn-ghost-sm"
               :disabled="!canEditInventoryProducts"
               :title="canEditInventoryProducts ? '' : permissionMessages.edit"
               @click="openUpdateStockModal(selectedProduct)"
             >
               Update Stock
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ══ EDIT PRODUCT DETAILS MODAL ══ -->
+    <transition name="mfade">
+      <div v-if="showEditModal" class="modal-overlay" @click="closeEditModal">
+        <div class="modal-box modal-xl" @click.stop>
+          <div class="modal-hd">
+            <div class="mhd-left">
+              <span class="mhd-ico">✏️</span>
+              <div>
+                <h2 class="mhd-title">Edit Product Details</h2>
+                <p class="mhd-sub">{{ editFormData.product_name }}</p>
+              </div>
+            </div>
+            <button class="btn-close" @click="closeEditModal">✕</button>
+          </div>
+
+          <div class="modal-bd scroll">
+            <form @submit.prevent="submitEditProduct">
+              <div class="vd-grid">
+                <!-- ── Basic Information ── -->
+                <div class="vd-card span2">
+                  <h3 class="vdc-title">📋 Basic Information</h3>
+                  <div class="form-grid-2">
+                    <div class="form-group full-width">
+                      <label class="form-label">Product Name *</label>
+                      <input
+                        v-model="editFormData.product_name"
+                        type="text"
+                        class="form-input"
+                        :class="{ 'is-invalid': editErrors.product_name }"
+                        placeholder="e.g., Red Rose Bouquet"
+                      />
+                      <span v-if="editErrors.product_name" class="error-text">{{
+                        editErrors.product_name
+                      }}</span>
+                    </div>
+                    <div class="form-group full-width">
+                      <label class="form-label">Description *</label>
+                      <textarea
+                        v-model="editFormData.description"
+                        rows="3"
+                        class="form-textarea"
+                        :class="{ 'is-invalid': editErrors.description }"
+                        placeholder="Describe your product..."
+                      ></textarea>
+                      <span v-if="editErrors.description" class="error-text">{{
+                        editErrors.description
+                      }}</span>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">SKU *</label>
+                      <input
+                        v-model="editFormData.sku"
+                        type="text"
+                        class="form-input"
+                        :class="{ 'is-invalid': editErrors.sku }"
+                        placeholder="e.g., ROSE-RED-001"
+                      />
+                      <span v-if="editErrors.sku" class="error-text">{{
+                        editErrors.sku
+                      }}</span>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Category *</label>
+                      <select
+                        v-model="editFormData.category"
+                        class="form-select"
+                        :class="{ 'is-invalid': editErrors.category }"
+                      >
+                        <option value="">Select category</option>
+                        <option value="roses">Roses</option>
+                        <option value="tulips">Tulips</option>
+                        <option value="lilies">Lilies</option>
+                        <option value="orchids">Orchids</option>
+                        <option value="sunflowers">Sunflowers</option>
+                        <option value="mixed-bouquets">Mixed Bouquets</option>
+                        <option value="arrangements">Arrangements</option>
+                        <option value="plants">Plants</option>
+                        <option value="gifts">Gifts & Add-ons</option>
+                        <option value="seasonal">Seasonal Flowers</option>
+                      </select>
+                      <span v-if="editErrors.category" class="error-text">{{
+                        editErrors.category
+                      }}</span>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Flower Type *</label>
+                      <select
+                        v-model="editFormData.flower_type"
+                        class="form-select"
+                      >
+                        <option value="">Select flower type</option>
+                        <option value="focal">Focal Flowers</option>
+                        <option value="secondary">Secondary Flowers</option>
+                        <option value="filler">Filler Flowers</option>
+                        <option value="line">Line Flowers</option>
+                        <option value="greenery">Greenery</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Color *</label>
+                      <select v-model="editFormData.color" class="form-select">
+                        <option value="">Select color</option>
+                        <option value="white">White</option>
+                        <option value="yellow">Yellow</option>
+                        <option value="red">Red</option>
+                        <option value="pink">Pink</option>
+                        <option value="purple">Purple</option>
+                        <option value="orange">Orange</option>
+                        <option value="blue">Blue</option>
+                        <option value="green">Green</option>
+                        <option value="cream">Cream</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div
+                      v-if="editFormData.color === 'other'"
+                      class="form-group"
+                    >
+                      <label class="form-label">Specify Color *</label>
+                      <input
+                        v-model="editFormData.color_other"
+                        type="text"
+                        class="form-input"
+                        placeholder="e.g., Burgundy"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── Pricing ── -->
+                <div class="vd-card">
+                  <h3 class="vdc-title">💰 Pricing</h3>
+                  <div class="form-grid-2">
+                    <div class="form-group">
+                      <label class="form-label">Purchase Price *</label>
+                      <div class="input-with-prefix">
+                        <span class="prefix">₱</span>
+                        <input
+                          v-model.number="editFormData.purchase_price"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          class="form-input"
+                          :class="{ 'is-invalid': editErrors.purchase_price }"
+                          @input="clearEditError('purchase_price')"
+                        />
+                      </div>
+                      <span
+                        v-if="editErrors.purchase_price"
+                        class="error-text"
+                        >{{ editErrors.purchase_price }}</span
+                      >
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Selling Price *</label>
+                      <div class="input-with-prefix">
+                        <span class="prefix">₱</span>
+                        <input
+                          v-model.number="editFormData.selling_price"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          class="form-input"
+                          :class="{ 'is-invalid': editErrors.selling_price }"
+                          @input="clearEditError('selling_price')"
+                        />
+                      </div>
+                      <span
+                        v-if="editErrors.selling_price"
+                        class="error-text"
+                        >{{ editErrors.selling_price }}</span
+                      >
+                    </div>
+
+                    <!-- Profit display -->
+                    <div class="form-group span2">
+                      <label class="form-label">Profit Margin</label>
+                      <div class="profit-display">
+                        <div class="profit-amount">
+                          ₱{{ editProfitAmount.toFixed(2) }}
+                        </div>
+                        <div class="profit-percentage">
+                          {{ editProfitPct.toFixed(1) }}% margin
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Discount Toggle -->
+                    <div class="form-group span2">
+                      <div class="discount-toggle-row">
+                        <label class="toggle-switch">
+                          <input
+                            type="checkbox"
+                            v-model="editFormData.has_discount"
+                            @change="onEditDiscountToggle"
+                          />
+                          <span class="toggle-slider"></span>
+                        </label>
+                        <div class="toggle-label-group">
+                          <span class="toggle-label-main"
+                            >Enable Discount Price</span
+                          >
+                          <span class="toggle-label-sub"
+                            >Show regular & sale price</span
+                          >
+                        </div>
+                        <span
+                          v-if="editFormData.has_discount"
+                          class="discount-active-pill"
+                          >🏷️ Sale Active</span
+                        >
+                      </div>
+                    </div>
+
+                    <!-- Discount inputs -->
+                    <div
+                      v-if="editFormData.has_discount"
+                      class="form-group span2"
+                    >
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label class="form-label">Discount Price *</label>
+                          <div class="input-with-prefix">
+                            <span class="prefix">₱</span>
+                            <input
+                              v-model.number="editFormData.discount_price"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              class="form-input"
+                              :class="{
+                                'is-invalid': editErrors.discount_price,
+                              }"
+                              @input="clearEditError('discount_price')"
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <span
+                            v-if="editErrors.discount_price"
+                            class="error-text"
+                            >{{ editErrors.discount_price }}</span
+                          >
+                        </div>
+                        <div class="form-group">
+                          <label class="form-label">Discount Amount</label>
+                          <div class="discount-display">
+                            <div class="discount-amount">
+                              {{ editDiscountPct.toFixed(1) }}%
+                            </div>
+                            <div class="discount-text">off selling price</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── Stock ── -->
+                <div class="vd-card">
+                  <h3 class="vdc-title">📦 Stock Management</h3>
+                  <div class="form-grid-2">
+                    <div class="form-group">
+                      <label class="form-label">Quantity in Stock *</label>
+                      <input
+                        v-model.number="editFormData.quantity_in_stock"
+                        type="number"
+                        min="0"
+                        class="form-input"
+                        :class="{ 'is-invalid': editErrors.quantity_in_stock }"
+                        @input="clearEditError('quantity_in_stock')"
+                      />
+                      <span
+                        v-if="editErrors.quantity_in_stock"
+                        class="error-text"
+                        >{{ editErrors.quantity_in_stock }}</span
+                      >
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Min Stock Level *</label>
+                      <input
+                        v-model.number="editFormData.min_stock_level"
+                        type="number"
+                        min="0"
+                        class="form-input"
+                        @input="clearEditError('min_stock_level')"
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Max Stock Level</label>
+                      <input
+                        v-model.number="editFormData.max_stock_level"
+                        type="number"
+                        min="0"
+                        class="form-input"
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Season</label>
+                      <select v-model="editFormData.season" class="form-select">
+                        <option value="all-year">All Year Round</option>
+                        <option value="spring">Spring</option>
+                        <option value="summer">Summer</option>
+                        <option value="autumn">Autumn</option>
+                        <option value="winter">Winter</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Selling Type</label>
+                      <select
+                        v-model="editFormData.selling_type"
+                        class="form-select"
+                      >
+                        <option value="per_piece">Per Piece</option>
+                        <option value="per_piece_customizable">
+                          Per Piece (Customizable)
+                        </option>
+                        <option value="bouquet">Bouquet</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Shop Status</label>
+                      <select v-model="editFormData.status" class="form-select">
+                        <option value="active">Active (Visible in Shop)</option>
+                        <option value="inactive">Inactive (Hidden)</option>
+                        <option value="discontinued">Discontinued</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── Supplier Information ── -->
+                <div class="vd-card span2">
+                  <h3 class="vdc-title">🏢 Supplier Information</h3>
+                  <div class="form-grid-2">
+                    <div class="form-group">
+                      <label class="form-label">Supplier Name</label>
+                      <input
+                        v-model="editFormData.supplier_name"
+                        type="text"
+                        class="form-input"
+                        placeholder="e.g., Garden Wholesale Inc."
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Supplier Contact</label>
+                      <input
+                        v-model="editFormData.supplier_contact"
+                        type="text"
+                        class="form-input"
+                        placeholder="Phone or email"
+                      />
+                    </div>
+                    <div class="form-group full-width">
+                      <label class="form-label">Supplier SKU</label>
+                      <input
+                        v-model="editFormData.supplier_sku"
+                        type="text"
+                        class="form-input"
+                        placeholder="Supplier's product code"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── Additional Information ── -->
+                <div class="vd-card span2">
+                  <h3 class="vdc-title">ℹ️ Additional Information</h3>
+                  <div class="form-grid-2">
+                    <div class="form-group full-width">
+                      <label class="form-label">Care Instructions</label>
+                      <textarea
+                        v-model="editFormData.care_instructions"
+                        rows="2"
+                        class="form-textarea"
+                        placeholder="How to care for these flowers..."
+                      ></textarea>
+                    </div>
+                    <div class="form-group full-width">
+                      <label class="form-label"
+                        >Occasion Tags (Select up to 2)</label
+                      >
+                      <div class="tag-selector">
+                        <label
+                          v-for="tag in occasionTags"
+                          :key="tag"
+                          class="tag-option"
+                          :class="{ disabled: isEditTagDisabled(tag) }"
+                        >
+                          <input
+                            type="checkbox"
+                            :value="tag"
+                            v-model="editFormData.occasion_tags"
+                            :disabled="isEditTagDisabled(tag)"
+                            @change="onEditTagChange"
+                          />
+                          <span>{{ tag }}</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="form-group full-width">
+                      <label class="form-label">Additional Notes</label>
+                      <textarea
+                        v-model="editFormData.notes"
+                        rows="2"
+                        class="form-textarea"
+                        placeholder="Extra information..."
+                      ></textarea>
+                    </div>
+                    <div class="form-group full-width checkboxes-row">
+                      <label class="checkbox-label">
+                        <input
+                          type="checkbox"
+                          v-model="editFormData.is_fragile"
+                        />
+                        <span>⚠️ Fragile — Handle with Care</span>
+                      </label>
+                      <label class="checkbox-label">
+                        <input
+                          type="checkbox"
+                          v-model="editFormData.requires_refrigeration"
+                        />
+                        <span>❄️ Requires Refrigeration</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── Product Images ── -->
+                <div class="vd-card span2">
+                  <h3 class="vdc-title">📷 Product Images</h3>
+                  <div class="image-upload-section">
+                    <div class="image-grid">
+                      <!-- Existing images -->
+                      <div
+                        v-for="(img, i) in existingImages"
+                        :key="'ex-' + img.id"
+                        class="image-preview"
+                      >
+                        <img :src="img.image_url" alt="Product" />
+                        <button
+                          type="button"
+                          @click="removeExistingImage(i)"
+                          class="remove-image-btn"
+                        >
+                          ✕
+                        </button>
+                        <div v-if="img.is_primary" class="pri-badge">
+                          Primary
+                        </div>
+                      </div>
+                      <!-- New images -->
+                      <div
+                        v-for="(img, i) in newProductImages"
+                        :key="'new-' + i"
+                        class="image-preview"
+                      >
+                        <img :src="img.url" alt="Product" />
+                        <button
+                          type="button"
+                          @click="removeNewImage(i)"
+                          class="remove-image-btn"
+                        >
+                          ✕
+                        </button>
+                        <div class="new-badge">New</div>
+                      </div>
+                      <!-- Upload slot -->
+                      <div
+                        v-if="
+                          existingImages.length + newProductImages.length < 5
+                        "
+                        class="image-upload-placeholder"
+                        @click="triggerEditFileInput"
+                        @dragover.prevent
+                        @drop.prevent="handleEditDrop"
+                      >
+                        <span class="upload-icon">📷</span>
+                        <span class="upload-text">Add Photo</span>
+                      </div>
+                    </div>
+                    <input
+                      ref="editFileInput"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      @change="handleEditFileSelect"
+                      style="display: none"
+                    />
+                    <p class="hint-text">
+                      Up to 5 photos total. Removing existing images is
+                      permanent.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div class="modal-ft">
+            <button
+              class="btn-ghost-sm"
+              @click="closeEditModal"
+              :disabled="isSubmitting"
+            >
+              Cancel
+            </button>
+            <button
+              class="btn-primary"
+              @click="submitEditProduct"
+              :disabled="isSubmitting"
+            >
+              <span v-if="isSubmitting">Saving...</span>
+              <span v-else>💾 Save Changes</span>
             </button>
           </div>
         </div>
