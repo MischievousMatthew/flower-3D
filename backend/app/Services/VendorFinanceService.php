@@ -40,30 +40,28 @@ class VendorFinanceService
      */
     public function handleOrderPayment(Order $order): void
     {
-        if ($order->payment_status !== 'paid') {
-            Log::warning('VendorFinanceService::handleOrderPayment: order not paid', [
-                'order_id' => $order->id,
-            ]);
-            return;
-        }
-
-        // Prevent double-crediting
-        $alreadyProcessed = VendorTransaction::where('order_id', $order->id)
-            ->where('category', 'order_revenue')
-            ->exists();
-
-        if ($alreadyProcessed) {
-            Log::info('VendorFinanceService::handleOrderPayment: already processed', [
-                'order_id' => $order->id,
-            ]);
-            return;
-        }
-
         DB::transaction(function () use ($order) {
-            $vendorBalance = VendorBalance::forVendor($order->vendor_id);
+            $lockedOrder = Order::query()
+                ->whereKey($order->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $lockedOrder || $lockedOrder->payment_status !== 'paid') {
+                return;
+            }
+
+            // This check must happen after locking the order so concurrent
+            // receipt/review requests cannot credit the vendor twice.
+            if (VendorTransaction::where('order_id', $lockedOrder->id)
+                ->where('category', 'order_revenue')
+                ->exists()) {
+                return;
+            }
+
+            $vendorBalance = VendorBalance::forVendor($lockedOrder->vendor_id);
 
             $balanceBefore = (float) $vendorBalance->balance;
-            $amount        = (float) $order->total_amount;
+            $amount        = (float) $lockedOrder->total_amount;
             $balanceAfter  = $balanceBefore + $amount;
 
             $vendorBalance->update([
@@ -71,25 +69,25 @@ class VendorFinanceService
                 'total_earned' => $vendorBalance->total_earned + $amount,
             ]);
 
-            $items = $order->items()->get();
+            $items = $lockedOrder->items()->get();
 
             VendorTransaction::create([
-                'vendor_id'      => $order->vendor_id,
-                'order_id'       => $order->id,
+                'vendor_id'      => $lockedOrder->vendor_id,
+                'order_id'       => $lockedOrder->id,
                 'type'           => 'credit',
                 'category'       => 'order_revenue',
                 'amount'         => $amount,
                 'balance_before' => $balanceBefore,
                 'balance_after'  => $balanceAfter,
-                'description'    => "Payment received for Order #{$order->order_number}",
+                'description'    => "Payment received for Order #{$lockedOrder->order_number}",
                 'status'         => 'completed',
                 'metadata'       => [
-                    'order_number'  => $order->order_number,
-                    'subtotal'      => (float) $order->subtotal,
-                    'delivery_fee'  => (float) $order->delivery_fee,
+                    'order_number'  => $lockedOrder->order_number,
+                    'subtotal'      => (float) $lockedOrder->subtotal,
+                    'delivery_fee'  => (float) $lockedOrder->delivery_fee,
                     'items_count'   => $items->count(),
                     'paid_at'       => now()->toIso8601String(),
-                    'payment_method'=> $order->payment_method,
+                    'payment_method'=> $lockedOrder->payment_method,
                 ],
             ]);
         });
@@ -113,6 +111,40 @@ class VendorFinanceService
             'order_id'  => $order->id,
             'vendor_id' => $order->vendor_id,
         ]);
+    }
+
+    /**
+     * Settle COD only after the order has been completed by the customer.
+     * Online methods remain exclusively controlled by their PayMongo callbacks.
+     */
+    public function settleCashOnDeliveryOrder(Order $order): bool
+    {
+        $settled = DB::transaction(function () use ($order): bool {
+            $lockedOrder = Order::query()
+                ->whereKey($order->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $lockedOrder
+                || $lockedOrder->status !== 'completed'
+                || $lockedOrder->payment_method !== 'cod'
+                || $lockedOrder->payment_status !== 'unpaid') {
+                return false;
+            }
+
+            $lockedOrder->update([
+                'payment_status' => 'paid',
+                'paid_at' => now(),
+            ]);
+
+            return true;
+        });
+
+        if ($settled) {
+            $this->handleOrderPayment($order->fresh());
+        }
+
+        return $settled;
     }
 
     /**

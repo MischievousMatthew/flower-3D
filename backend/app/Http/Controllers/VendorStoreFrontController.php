@@ -216,7 +216,7 @@ class VendorStorefrontController extends Controller
 
             $flowers = $this->storefrontProductsQuery($ownerId)
                 ->where('status', 'active')
-                ->whereIn('selling_type', ['per_piece', 'per_piece_customizable'])
+                ->where('selling_type', 'per_piece_customizable')
                 ->whereHas('models', function ($query) {
                     $query->where(function ($q) {
                         $q->whereNotNull('model_path')->where('model_path', '!=', '');
@@ -470,7 +470,7 @@ class VendorStorefrontController extends Controller
             'quantity_in_stock' => (int) $product->quantity_in_stock,
             'owner_id' => (int) $product->owner_id,
             'selling_type' => $product->selling_type,
-            'is_customizable' => in_array($product->selling_type, ['per_piece', 'per_piece_customizable'], true),
+            'is_customizable' => $product->selling_type === 'per_piece_customizable',
             'model_3d_url' => $modelUrl,
             'model_3d_path' => $primaryModel?->model_path,
             'model_type' => $primaryModel?->model_type,

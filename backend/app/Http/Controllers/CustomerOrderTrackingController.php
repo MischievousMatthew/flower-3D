@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
+use App\Services\VendorFinanceService;
 
 class CustomerOrderTrackingController extends Controller
 {
@@ -117,6 +118,7 @@ class CustomerOrderTrackingController extends Controller
         ]);
 
         $order->markAsCompleted();
+        app(VendorFinanceService::class)->settleCashOnDeliveryOrder($order->fresh());
 
         return response()->json(['success' => true, 'message' => 'Order marked as received. Thank you!']);
     }

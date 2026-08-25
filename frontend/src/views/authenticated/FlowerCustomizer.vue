@@ -227,6 +227,8 @@ import api from "../../plugins/axios.js";
 import NavHeader from "../../layouts/NavHeader.vue";
 import { useAuth } from "../../composables/useAuth";
 import { useCart } from "../../composables/useCart";
+import { toast as toastify } from "vue3-toastify";
+import "vue3-toastify/dist/index.css";
 
 const MAX_FLOWERS = 3;
 const paperPresets = ["#d3b18f", "#f3e9dc", "#d7d2c8", "#e2c7cf", "#c8b6a6"];
@@ -401,10 +403,9 @@ async function fetchFlowers() {
       params: vendorOwnerId.value ? { owner_id: vendorOwnerId.value } : {},
     });
     const rawItems = Array.isArray(response.data?.data) ? response.data.data : [];
-    flowers.value = rawItems.map(normalizeFlower).filter((flower) => {
-      if (!flower.model) return false;
-      return true;
-    });
+    flowers.value = rawItems
+      .map(normalizeFlower)
+      .filter((flower) => flower.selling_type === "per_piece_customizable" && !!flower.model);
   } catch (error) {
     console.error("Failed to fetch customizable flowers:", error);
     flowers.value = [];
@@ -418,14 +419,7 @@ function normalizeFlower(flower) {
   const model = resolveModelUrl(flower);
   const sellingType = flower.selling_type || "per_piece";
 
-  // Force true for per_piece_customizable
-  // For others, check truthiness of is_customizable (supporting 1, "1", true, "true")
-  const isCustomizable =
-    sellingType === "per_piece_customizable" ||
-    flower.is_customizable === true ||
-    flower.is_customizable === 1 ||
-    flower.is_customizable === "1" ||
-    flower.is_customizable === "true";
+  const isCustomizable = sellingType === "per_piece_customizable";
 
   return {
     id: Number(flower.id),
@@ -946,10 +940,10 @@ async function addCart() {
 
     if (editingCartItemId.value) {
       await cartStore.updateCartItem(editingCartItemId.value, payload);
-      showToast("Custom bouquet updated in cart.", "success");
+      toastify.success("Custom bouquet updated in cart.");
     } else {
       await cartStore.addToCart(payload);
-      showToast("Custom bouquet added to cart.", "success");
+      toastify.success("Custom bouquet added to cart.");
     }
   } catch (error) {
     console.error("Failed to add custom bouquet to cart:", error);

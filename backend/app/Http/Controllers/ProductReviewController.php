@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Helpers\CloudinaryHelper;
+use App\Services\VendorFinanceService;
 
 class ProductReviewController extends Controller
 {
@@ -189,6 +190,10 @@ class ProductReviewController extends Controller
         ]);
 
         $review->load('user:id,name');
+
+        // A completed COD order is settled once the customer confirms receipt
+        // through a review as well. Online payments remain webhook-controlled.
+        app(VendorFinanceService::class)->settleCashOnDeliveryOrder($order->fresh());
 
         return response()->json([
             'success' => true,
