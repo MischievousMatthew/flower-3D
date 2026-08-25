@@ -401,12 +401,10 @@ const viewing3DModel = ref(null);
 const current3DModelName = ref("");
 const calendarRefreshKey = ref(0);
 
-const today = computed(() => formatLocalDateString(new Date()));
-const maxCloseDate = computed(() => {
-  const max = new Date();
-  max.setMonth(max.getMonth() + 3);
-  return formatLocalDateString(max);
-});
+const today = computed(() => getPhilippineDateString());
+const maxCloseDate = computed(() =>
+  addMonthsNoOverflow(getPhilippineDateString(), 3),
+);
 const closedDateStrings = computed(() =>
   closedDates.value
     .map((item) => normalizeDateString(item.closed_date || item.date))
@@ -538,29 +536,53 @@ function normalizeDateString(value) {
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-    const isoMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
-    if (isoMatch) return isoMatch[1];
+
+    // Laravel serializes a DATE at Manila midnight as the previous UTC day
+    // (e.g. 2026-08-31 → 2026-08-30T16:00:00.000000Z). Convert timestamp
+    // responses back to the application's calendar timezone before using them.
+    if (/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(trimmed)) {
+      return getPhilippineDateString(new Date(trimmed));
+    }
+
+    const datePrefix = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (datePrefix) return datePrefix[1];
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
 
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return getPhilippineDateString(date);
 }
 
-function formatLocalDateString(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+function getPhilippineDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const part = (type) => parts.find((item) => item.type === type)?.value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+function addMonthsNoOverflow(dateString, months) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  const monthIndex = month - 1 + months;
+  const targetYear = year + Math.floor(monthIndex / 12);
+  const targetMonth = ((monthIndex % 12) + 12) % 12;
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  return `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-${String(
+    Math.min(day, lastDay),
+  ).padStart(2, "0")}`;
 }
 
 function formatDate(dateStr) {
   const dateOnly = normalizeDateString(dateStr);
   if (!dateOnly) return "—";
 
-  const date = new Date(`${dateOnly}T00:00:00`);
+  const date = new Date(`${dateOnly}T00:00:00+08:00`);
   return date.toLocaleDateString("en-US", {
+    timeZone: "Asia/Manila",
     weekday: "long",
     year: "numeric",
     month: "long",
