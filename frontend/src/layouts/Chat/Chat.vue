@@ -54,10 +54,10 @@
                   v-if="getOtherUser(conversation).avatar"
                   :src="getOtherUser(conversation).avatar"
                   class="vendor-avatar"
-                  :alt="getOtherUser(conversation).name"
+                  :alt="getOtherUserDisplayName(conversation)"
                 />
                 <div v-else class="vendor-avatar-placeholder">
-                  {{ getInitials(getOtherUser(conversation).name) }}
+                  {{ getInitials(getOtherUserDisplayName(conversation)) }}
                 </div>
                 <span
                   v-if="getOtherUser(conversation).online"
@@ -68,7 +68,7 @@
               <div class="conversation-info">
                 <div class="conversation-header">
                   <h4 class="vendor-name">
-                    {{ getOtherUser(conversation).display_name }}
+                    {{ getOtherUserDisplayName(conversation) }}
                   </h4>
                   <span class="conversation-time">{{
                     conversation.last_message_time
@@ -140,10 +140,10 @@
                     v-if="getOtherUser(selectedConversation).avatar"
                     :src="getOtherUser(selectedConversation).avatar"
                     class="vendor-avatar"
-                    :alt="getOtherUser(selectedConversation).name"
+                    :alt="getOtherUserDisplayName(selectedConversation)"
                   />
                   <div v-else class="vendor-avatar-placeholder">
-                    {{ getInitials(getOtherUser(selectedConversation).name) }}
+                    {{ getInitials(getOtherUserDisplayName(selectedConversation)) }}
                   </div>
                   <span
                     v-if="getOtherUser(selectedConversation).online"
@@ -152,7 +152,7 @@
                 </div>
                 <div class="vendor-details">
                   <div class="vendor-name">
-                    {{ getOtherUser(selectedConversation).display_name }}
+                    {{ getOtherUserDisplayName(selectedConversation) }}
                   </div>
                   <div class="vendor-status">
                     {{
@@ -203,10 +203,10 @@
                       v-if="getOtherUser(selectedConversation).avatar"
                       :src="getOtherUser(selectedConversation).avatar"
                       class="message-avatar"
-                      :alt="getOtherUser(selectedConversation).name"
+                      :alt="getOtherUserDisplayName(selectedConversation)"
                     />
                     <div v-else class="message-avatar-placeholder">
-                      {{ getInitials(getOtherUser(selectedConversation).name) }}
+                      {{ getInitials(getOtherUserDisplayName(selectedConversation)) }}
                     </div>
                   </div>
 
@@ -276,10 +276,10 @@
                     v-if="getOtherUser(selectedConversation).avatar"
                     :src="getOtherUser(selectedConversation).avatar"
                     class="message-avatar"
-                    :alt="getOtherUser(selectedConversation).name"
+                    :alt="getOtherUserDisplayName(selectedConversation)"
                   />
                   <div v-else class="message-avatar-placeholder">
-                    {{ getInitials(getOtherUser(selectedConversation).name) }}
+                    {{ getInitials(getOtherUserDisplayName(selectedConversation)) }}
                   </div>
                 </div>
                 <div class="typing-indicator">
@@ -371,13 +371,13 @@
                 v-if="getOtherUser(selectedConversation).avatar"
                 :src="getOtherUser(selectedConversation).avatar"
                 class="profile-avatar"
-                :alt="getOtherUser(selectedConversation).name"
+                :alt="getOtherUserDisplayName(selectedConversation)"
               />
               <div v-else class="profile-avatar-placeholder">
-                {{ getInitials(getOtherUser(selectedConversation).name) }}
+                {{ getInitials(getOtherUserDisplayName(selectedConversation)) }}
               </div>
             </div>
-            <h4>{{ getOtherUser(selectedConversation).display_name }}</h4>
+            <h4>{{ getOtherUserDisplayName(selectedConversation) }}</h4>
             <p class="vendor-email">
               {{ getOtherUser(selectedConversation).email }}
             </p>
@@ -475,14 +475,14 @@
                 v-if="user.avatar"
                 :src="user.avatar"
                 class="vendor-avatar-small"
-                :alt="user.name"
+                :alt="getSearchResultDisplayName(user)"
               />
               <div v-else class="vendor-avatar-placeholder-small">
-                {{ getInitials(user.name) }}
+                {{ getInitials(getSearchResultDisplayName(user)) }}
               </div>
               <div class="vendor-item-info">
                 <div class="vendor-item-name">
-                  {{ user.display_name }}
+                  {{ getSearchResultDisplayName(user) }}
                 </div>
                 <div class="vendor-item-email">{{ user.email }}</div>
               </div>
@@ -716,6 +716,28 @@ const getOtherUser = (conversation) => {
   }
 };
 
+// Use the same vendor display-name fallback as Cart.vue. Conversation and
+// search responses already include this data, so no additional API call is
+// needed to identify each vendor's store.
+const getVendorDisplayName = (vendor) =>
+  vendor?.display_name ||
+  vendor?.store_name ||
+  vendor?.name ||
+  "Local Vendor";
+
+const getOtherUserDisplayName = (conversation) => {
+  const otherUser = getOtherUser(conversation);
+
+  return isVendor.value
+    ? otherUser.display_name || otherUser.name || "Customer"
+    : getVendorDisplayName(otherUser);
+};
+
+const getSearchResultDisplayName = (otherUser) =>
+  isVendor.value
+    ? otherUser?.display_name || otherUser?.name || "Customer"
+    : getVendorDisplayName(otherUser);
+
 const isAttachmentPlaceholder = (text) => {
   return text === "📷 Image" || text === "📎 File" || text === " ";
 };
@@ -794,8 +816,7 @@ const formatLastMessagePreview = (conversation, message, currentUserId) => {
 
   const senderName = isOwnMessage
     ? "You"
-    : getOtherUser(conversation).display_name ||
-      getOtherUser(conversation).name;
+    : getOtherUserDisplayName(conversation);
 
   if (message.attachments && message.attachments.length > 0) {
     const allImages = message.attachments.every(
