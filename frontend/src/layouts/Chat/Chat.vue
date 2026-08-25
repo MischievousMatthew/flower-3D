@@ -57,7 +57,7 @@
                   :alt="getOtherUserDisplayName(conversation)"
                 />
                 <div v-else class="vendor-avatar-placeholder">
-                  {{ getInitials(getOtherUserDisplayName(conversation)) }}
+                  {{ getOtherUserAvatarInitial(conversation) }}
                 </div>
                 <span
                   v-if="getOtherUser(conversation).online"
@@ -143,7 +143,7 @@
                     :alt="getOtherUserDisplayName(selectedConversation)"
                   />
                   <div v-else class="vendor-avatar-placeholder">
-                    {{ getInitials(getOtherUserDisplayName(selectedConversation)) }}
+                    {{ getOtherUserAvatarInitial(selectedConversation) }}
                   </div>
                   <span
                     v-if="getOtherUser(selectedConversation).online"
@@ -206,7 +206,7 @@
                       :alt="getOtherUserDisplayName(selectedConversation)"
                     />
                     <div v-else class="message-avatar-placeholder">
-                      {{ getInitials(getOtherUserDisplayName(selectedConversation)) }}
+                      {{ getOtherUserAvatarInitial(selectedConversation) }}
                     </div>
                   </div>
 
@@ -279,7 +279,7 @@
                     :alt="getOtherUserDisplayName(selectedConversation)"
                   />
                   <div v-else class="message-avatar-placeholder">
-                    {{ getInitials(getOtherUserDisplayName(selectedConversation)) }}
+                    {{ getOtherUserAvatarInitial(selectedConversation) }}
                   </div>
                 </div>
                 <div class="typing-indicator">
@@ -374,7 +374,7 @@
                 :alt="getOtherUserDisplayName(selectedConversation)"
               />
               <div v-else class="profile-avatar-placeholder">
-                {{ getInitials(getOtherUserDisplayName(selectedConversation)) }}
+                {{ getOtherUserAvatarInitial(selectedConversation) }}
               </div>
             </div>
             <h4>{{ getOtherUserDisplayName(selectedConversation) }}</h4>
@@ -478,7 +478,7 @@
                 :alt="getSearchResultDisplayName(user)"
               />
               <div v-else class="vendor-avatar-placeholder-small">
-                {{ getInitials(getSearchResultDisplayName(user)) }}
+                {{ getSearchResultAvatarInitial(user) }}
               </div>
               <div class="vendor-item-info">
                 <div class="vendor-item-name">
@@ -699,6 +699,9 @@ const getInitials = (name) => {
     .slice(0, 2);
 };
 
+const getStoreInitial = (storeName) =>
+  storeName?.trim()?.charAt(0)?.toUpperCase() || "?";
+
 const getOtherUser = (conversation) => {
   if (!conversation)
     return {
@@ -733,10 +736,20 @@ const getOtherUserDisplayName = (conversation) => {
     : getVendorDisplayName(otherUser);
 };
 
+const getOtherUserAvatarInitial = (conversation) =>
+  isVendor.value
+    ? getInitials(getOtherUserDisplayName(conversation))
+    : getStoreInitial(getOtherUserDisplayName(conversation));
+
 const getSearchResultDisplayName = (otherUser) =>
   isVendor.value
     ? otherUser?.display_name || otherUser?.name || "Customer"
     : getVendorDisplayName(otherUser);
+
+const getSearchResultAvatarInitial = (otherUser) =>
+  isVendor.value
+    ? getInitials(getSearchResultDisplayName(otherUser))
+    : getStoreInitial(getSearchResultDisplayName(otherUser));
 
 const isAttachmentPlaceholder = (text) => {
   return text === "📷 Image" || text === "📎 File" || text === " ";

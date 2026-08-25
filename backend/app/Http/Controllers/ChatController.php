@@ -38,7 +38,7 @@ class ChatController extends Controller
             if ($isVendorContext) {
                 $query->with(['customer:id,name,surname,email,profile_picture,contact_number,username']);
             } else {
-                $query->with(['vendor:id,name,surname,email,profile_picture,contact_number,username,vendor_data']);
+                $query->with(['vendor:id,name,surname,email,profile_picture,contact_number,username,role,vendor_data']);
             }
 
             $query->withCount(['messages as unread_count' => function ($q) use ($participantId) {
@@ -72,7 +72,7 @@ class ChatController extends Controller
                         'id' => $otherUser->id,
                         'name' => $otherUser->full_name,
                         'email' => $otherUser->email,
-                        'avatar' => $otherUser->avatar_url,
+                        'avatar' => $isVendorContext ? $otherUser->avatar_url : null,
                         'online' => $otherUser->is_online,
                         'contact_number' => $otherUser->contact_number,
                         'username' => $otherUser->username,
@@ -80,10 +80,11 @@ class ChatController extends Controller
                     ];
 
                     if (!$isVendorContext && $otherUser->isVendor()) {
-                        $storeName = $this->resolveVendorStoreName($otherUser);
-                        if ($storeName) {
-                            $userData['store_name'] = $storeName;
-                            $userData['display_name'] = $storeName;
+                        $vendorApplication = $this->resolveVendorApplication($otherUser);
+                        if ($vendorApplication) {
+                            $userData['store_name'] = $vendorApplication->store_name;
+                            $userData['display_name'] = $vendorApplication->store_name;
+                            $userData['avatar'] = $vendorApplication->store_logo_url;
                         }
                     }
 
@@ -417,16 +418,17 @@ class ChatController extends Controller
                 'name' => $otherUser->full_name,
                 'email' => $otherUser->email,
                 'contact_number' => $otherUser->contact_number,
-                'avatar' => $otherUser->avatar_url,
+                'avatar' => $otherUser->isVendor() ? null : $otherUser->avatar_url,
                 'online' => $otherUser->is_online,
                 'address' => $otherUser->address . ', ' . $otherUser->city,
                 'shared_files' => $sharedFiles,
             ];
 
             if ($otherUser->isVendor()) {
-                $storeName = $this->resolveVendorStoreName($otherUser);
-                if ($storeName) {
-                    $userData['store_name'] = $storeName;
+                $vendorApplication = $this->resolveVendorApplication($otherUser);
+                if ($vendorApplication) {
+                    $userData['store_name'] = $vendorApplication->store_name;
+                    $userData['avatar'] = $vendorApplication->store_logo_url;
                 }
             }
 
@@ -550,16 +552,17 @@ class ChatController extends Controller
                         'name' => $user->full_name,
                         'email' => $user->email,
                         'contact_number' => $user->contact_number,
-                        'avatar' => $user->avatar_url,
+                        'avatar' => $user->isVendor() ? null : $user->avatar_url,
                         'username' => $user->username,
                         'display_name' => $user->full_name,
                     ];
 
                     if ($user->isVendor()) {
-                        $storeName = $this->resolveVendorStoreName($user);
-                        if ($storeName) {
-                            $data['store_name'] = $storeName;
-                            $data['display_name'] = $storeName;
+                        $vendorApplication = $this->resolveVendorApplication($user);
+                        if ($vendorApplication) {
+                            $data['store_name'] = $vendorApplication->store_name;
+                            $data['display_name'] = $vendorApplication->store_name;
+                            $data['avatar'] = $vendorApplication->store_logo_url;
                         }
                     }
 
@@ -679,20 +682,16 @@ class ChatController extends Controller
         return 'User';
     }
 
-    private function resolveVendorStoreName(User $user): ?string
+    /**
+     * Use the same approved vendor-application record as CartController when
+     * exposing a vendor's public store identity to customers.
+     */
+    private function resolveVendorApplication(User $user): ?VendorApplication
     {
-        $storeName = data_get($user->vendor_data, 'store_name');
-        if (is_string($storeName) && trim($storeName) !== '') {
-            return trim($storeName);
-        }
-
-        $applicationStoreName = VendorApplication::query()
+        return VendorApplication::query()
             ->where('email', $user->email)
-            ->value('store_name');
-
-        return is_string($applicationStoreName) && trim($applicationStoreName) !== ''
-            ? trim($applicationStoreName)
-            : null;
+            ->where('status', 'approved')
+            ->first();
     }
 
     private function getFileIcon(string $fileType): string
