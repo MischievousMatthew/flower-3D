@@ -33,41 +33,54 @@
       </router-link>
       <div class="nav-links">
         <router-link to="/shop">Shop</router-link>
-        <a href="#features" @click.prevent="scrollToSection('features')">Features</a>
-        <a href="#how-it-works" @click.prevent="scrollToSection('how-it-works')">How It Works</a>
-        <a href="#vendors" @click.prevent="scrollAndHighlight('register-vendor')">For Vendors</a>
+        <a href="#features" @click.prevent="scrollToSection('features')"
+          >Features</a
+        >
+        <a href="#how-it-works" @click.prevent="scrollToSection('how-it-works')"
+          >How It Works</a
+        >
+        <a
+          href="#vendors"
+          @click.prevent="scrollAndHighlight('register-vendor')"
+          >For Vendors</a
+        >
         <a href="#blog" @click.prevent="scrollToSection('blog')">Blog</a>
       </div>
       <div class="nav-buttons">
         <template v-if="!isAuthenticated">
           <router-link to="/guest/login" class="btn-login">Login</router-link>
-          <router-link to="/guest/register" class="btn-register">Register</router-link>
+          <router-link to="/guest/register" class="btn-register"
+            >Register</router-link
+          >
         </template>
       </div>
     </nav>
 
     <!-- Scroll Panels Story -->
     <div class="scroll-story-container">
-      
       <!-- Panel 1: Hero Section -->
       <section class="panel-section hero-panel" ref="heroSection">
         <div class="panel-container hero-collapse-container">
           <div class="panel-content text-left-side hero-collapse-content">
-            <span class="eyebrow reveal-fade-up">Bespoke florals, built by you</span>
+            <span class="hero-kicker reveal-fade-up"
+              >Bespoke florals, built by you</span
+            >
             <h1 class="hero-title reveal-fade-up">
               Create your perfect
               <span class="highlight">bouquet</span>
             </h1>
             <p class="hero-desc reveal-fade-up">
-              Where vendors meet creativity. Design custom flower arrangements in 3D
-              or let our AI suggest the perfect bloom for every occasion.
+              Where vendors meet creativity. Design custom flower arrangements
+              in 3D or let our AI suggest the perfect bloom for every occasion.
             </p>
             <div class="hero-cta-wrap reveal-fade-up">
               <router-link to="/guest/register" class="btn-register btn-hero">
                 Get Started
               </router-link>
             </div>
-            <span class="scroll-cue reveal-fade-up hero-scroll-cue">Scroll to explore</span>
+            <span class="scroll-cue reveal-fade-up hero-scroll-cue"
+              >Scroll to explore</span
+            >
           </div>
           <div class="panel-visual spacer-right" aria-hidden="true"></div>
         </div>
@@ -80,7 +93,7 @@
           <div class="panel-content text-right-side">
             <h2 class="reveal-fade-up">Trusted by Flower Lovers</h2>
             <p class="reveal-fade-up">
-              Join {{ stats.vendors }}+ vendors and thousands of happy customers
+              The florists and boutique growers behind every arrangement.
             </p>
             <div class="clients-grid">
               <div v-for="n in 5" :key="n" class="client-logo reveal-card">
@@ -95,16 +108,21 @@
       <section class="panel-section content-panel" ref="contentSection1">
         <div class="panel-container">
           <div class="panel-content text-left-side">
-            <span class="eyebrow reveal-fade-up">3D Design Studio</span>
             <h2 class="reveal-fade-up">Design in 3D, deliver with love</h2>
             <p class="reveal-fade-up">
-              Our revolutionary 3D customization tool lets you become the designer.
-              Choose flowers, arrange them in real-time, adjust colors and sizes,
-              and visualize your perfect bouquet before placing your order.
+              Our revolutionary 3D customization tool lets you become the
+              designer. Choose flowers, arrange them in real-time, adjust colors
+              and sizes, and visualize your perfect bouquet before placing your
+              order.
             </p>
-            <p class="reveal-fade-up">Every arrangement is unique, just like your story.</p>
+            <p class="reveal-fade-up">
+              Every arrangement is unique, just like your story.
+            </p>
             <div class="reveal-fade-up">
-              <button class="btn-learn-more" @click="handleLearnMore('3d-designer')">
+              <button
+                class="btn-learn-more"
+                @click="handleLearnMore('3d-designer')"
+              >
                 Explore 3D Designer
               </button>
             </div>
@@ -114,14 +132,18 @@
       </section>
 
       <!-- Panel 4: Features Section -->
-      <section class="panel-section features-panel" id="features" ref="featuresSection">
+      <section
+        class="panel-section features-panel"
+        id="features"
+        ref="featuresSection"
+      >
         <div class="panel-container">
           <div class="panel-visual spacer-left" aria-hidden="true"></div>
           <div class="panel-content text-right-side">
-            <span class="eyebrow reveal-fade-up">Why BloomCraft</span>
             <h2 class="reveal-fade-up">Everything you need to bloom</h2>
             <p class="reveal-fade-up features-header-desc">
-              Powerful features for vendors and delightful experiences for customers
+              Powerful features for vendors and delightful experiences for
+              customers
             </p>
             <div class="features-stacked-grid">
               <div
@@ -141,22 +163,28 @@
       </section>
 
       <!-- Panel 5: Content Section 2 (AI Concierge) -->
-      <section class="panel-section content-panel" id="how-it-works" ref="contentSection2">
+      <section
+        class="panel-section content-panel"
+        id="how-it-works"
+        ref="contentSection2"
+      >
         <div class="panel-container">
           <div class="panel-content text-left-side">
-            <span class="eyebrow reveal-fade-up">AI Concierge</span>
-            <h2 class="reveal-fade-up">AI-powered recommendations</h2>
+            <h2 class="reveal-fade-up">Meet your AI concierge</h2>
             <p class="reveal-fade-up">
-              Don't know where to start? Our intelligent AI analyzes the occasion,
-              season, recipient preferences, and current trends to suggest the
-              perfect arrangement.
+              Don't know where to start? Our intelligent AI analyzes the
+              occasion, season, recipient preferences, and current trends to
+              suggest the perfect arrangement.
             </p>
             <p class="reveal-fade-up">
               Get inspired by thousands of beautiful combinations, or let our AI
               create something uniquely yours.
             </p>
             <div class="reveal-fade-up">
-              <button class="btn-learn-more" @click="handleLearnMore('ai-designer')">
+              <button
+                class="btn-learn-more"
+                @click="handleLearnMore('ai-designer')"
+              >
                 Try AI Designer
               </button>
             </div>
@@ -166,10 +194,18 @@
       </section>
 
       <!-- Panel 6: Stats Section -->
-      <section class="panel-section stats-panel" id="vendors" ref="statsSection">
+      <section
+        class="panel-section stats-panel"
+        id="vendors"
+        ref="statsSection"
+      >
         <div class="panel-container">
           <div class="panel-visual spacer-left" aria-hidden="true"></div>
           <div class="panel-content text-right-side">
+            <h2 class="reveal-fade-up">The marketplace, right now</h2>
+            <p class="reveal-fade-up stats-header-desc">
+              A snapshot of what's moving through BloomCraft today.
+            </p>
             <div class="stats-stacked-grid">
               <div
                 v-for="stat in statsData"
@@ -177,7 +213,14 @@
                 class="stat-card-item reveal-card"
               >
                 <div class="stat-icon">{{ stat.icon }}</div>
-                <div class="stat-number">{{ stat.number }}</div>
+                <div class="stat-number">
+                  {{ stat.number }}
+                  <span
+                    v-if="stat.live"
+                    class="live-dot"
+                    aria-hidden="true"
+                  ></span>
+                </div>
                 <div class="stat-label">{{ stat.label }}</div>
               </div>
             </div>
@@ -189,17 +232,26 @@
       <section class="panel-section blog-panel" id="blog" ref="blogSection">
         <div class="panel-container">
           <div class="panel-content text-left-side">
-            <span class="eyebrow reveal-fade-up">The Journal</span>
-            <h2 class="reveal-fade-up">Fresh insights from our garden</h2>
+            <h2 class="reveal-fade-up">The BloomCraft Journal</h2>
             <p class="reveal-fade-up blog-header-desc">
               Tips, trends, and stories from the world of flowers
             </p>
             <div class="blog-stacked-grid">
-              <div v-for="post in blogPosts" :key="post.id" class="blog-card-item reveal-card">
-                <div class="blog-image">Blog Image {{ post.id }}<br />400x250px</div>
+              <div
+                v-for="post in blogPosts"
+                :key="post.id"
+                class="blog-card-item reveal-card"
+              >
+                <div class="blog-image">
+                  Blog Image {{ post.id }}<br />400x250px
+                </div>
                 <div class="blog-content">
                   <h3>{{ post.title }}</h3>
-                  <a href="#" @click.prevent="readBlog(post.id)" class="blog-link">
+                  <a
+                    href="#"
+                    @click.prevent="readBlog(post.id)"
+                    class="blog-link"
+                  >
                     Read more →
                   </a>
                 </div>
@@ -223,7 +275,6 @@
           </div>
         </div>
       </section>
-
     </div>
 
     <!-- Footer -->
@@ -283,10 +334,14 @@
             <li><router-link to="/guest/register">Sign Up</router-link></li>
             <li><router-link to="/guest/login">Login</router-link></li>
             <li id="register-vendor">
-              <router-link to="/guest/vendor_register">Become a Vendor</router-link>
+              <router-link to="/guest/vendor_register"
+                >Become a Vendor</router-link
+              >
             </li>
             <li>
-              <a href="#" @click.prevent="handleFooterLink('#pricing')">Pricing</a>
+              <a href="#" @click.prevent="handleFooterLink('#pricing')"
+                >Pricing</a
+              >
             </li>
           </ul>
         </div>
@@ -328,13 +383,6 @@ const flowerCanvas = ref(null);
 const navScrolled = ref(false);
 
 // Reactive Data
-const stats = ref({
-  vendors: 500,
-  customers: 5000,
-  designs: 10000,
-  rating: 4.9,
-});
-
 const features = ref([
   {
     id: 1,
@@ -360,10 +408,11 @@ const features = ref([
 ]);
 
 const statsData = ref([
-  { icon: "🌹", number: "10,000+", label: "Custom Designs" },
-  { icon: "👥", number: "5,000+", label: "Happy Customers" },
-  { icon: "🏪", number: "500+", label: "Vendor Partners" },
-  { icon: "⭐", number: "4.9/5", label: "Average Rating" },
+  { icon: "🌸", number: "340", label: "Arrangements sent this week" },
+  // In production, wire this to a real vendor-presence feed rather than a static count.
+  { icon: "🧑‍🌾", number: "62", label: "Vendor studios online now", live: true },
+  { icon: "🚚", number: "48hr", label: "Average delivery window" },
+  { icon: "⭐", number: "4.9/5", label: "Rating across 5,000+ orders" },
 ]);
 
 const blogPosts = ref([
@@ -483,7 +532,7 @@ function buildFlower() {
       petal.scale.set(0.42, length, 0.1);
       petal.position.set(0, length * 0.42, 0);
       petal.rotation.x = ringTilt;
-      
+
       petal.castShadow = true;
       petal.receiveShadow = true;
 
@@ -497,7 +546,11 @@ function buildFlower() {
 
   const center = new THREE.Mesh(
     new THREE.SphereGeometry(0.3, 24, 24),
-    new THREE.MeshStandardMaterial({ color: 0xf2c879, roughness: 0.5, metalness: 0.1 }),
+    new THREE.MeshStandardMaterial({
+      color: 0xf2c879,
+      roughness: 0.5,
+      metalness: 0.1,
+    }),
   );
   center.castShadow = true;
   center.receiveShadow = true;
@@ -517,7 +570,7 @@ function buildFlower() {
     leaf.scale.set(0.3, 0.9, 0.06);
     leaf.position.set(0, -0.85, 0);
     leaf.rotation.x = -1.3;
-    
+
     leaf.castShadow = true;
     leaf.receiveShadow = true;
 
@@ -726,7 +779,7 @@ function setupFlowerJourney() {
       scrollIdleTimeout = setTimeout(() => {
         isScrolling = false;
       }, 150);
-    }
+    },
   });
   journeyTriggers.push(scrollUpdateTrigger);
 
@@ -747,17 +800,21 @@ function setupFlowerJourney() {
         start: "top 90%",
         end: "top 20%",
         scrub: 1.0,
-      }
+      },
     });
 
     tl.to(rig.position, { x: toX, ease: "power2.inOut" }, 0);
     tl.to(rig.rotation, { y: toRotY, ease: "power2.inOut" }, 0);
-    tl.to(rig.scale, { 
-      x: scaleBase * toScaleMul, 
-      y: scaleBase * toScaleMul, 
-      z: scaleBase * toScaleMul, 
-      ease: "power2.inOut" 
-    }, 0);
+    tl.to(
+      rig.scale,
+      {
+        x: scaleBase * toScaleMul,
+        y: scaleBase * toScaleMul,
+        z: scaleBase * toScaleMul,
+        ease: "power2.inOut",
+      },
+      0,
+    );
 
     journeyTriggers.push(tl.scrollTrigger);
   };
@@ -765,7 +822,7 @@ function setupFlowerJourney() {
   // Journey Steps mapping: alternates left/right side columns
   // Panel 2: Clients (Left)
   addScrollJourney(clientsSection.value, -spread, Math.PI * 0.6, 0.9);
-  
+
   // Panel 3: Content Section 1 (Right)
   addScrollJourney(contentSection1.value, spread, Math.PI * 1.1, 1.05);
 
@@ -789,16 +846,24 @@ function setupFlowerJourney() {
         start: "top 90%",
         end: "top 25%",
         scrub: 1.0,
-      }
+      },
     });
-    tl.to(rig.position, { x: 0, y: isMobile ? 0.35 : 0.45, ease: "power2.inOut" }, 0);
+    tl.to(
+      rig.position,
+      { x: 0, y: isMobile ? 0.35 : 0.45, ease: "power2.inOut" },
+      0,
+    );
     tl.to(rig.rotation, { y: Math.PI * 3.75, ease: "power2.inOut" }, 0);
-    tl.to(rig.scale, { 
-      x: scaleBase * 1.35, 
-      y: scaleBase * 1.35, 
-      z: scaleBase * 1.35, 
-      ease: "power2.inOut" 
-    }, 0);
+    tl.to(
+      rig.scale,
+      {
+        x: scaleBase * 1.35,
+        y: scaleBase * 1.35,
+        z: scaleBase * 1.35,
+        ease: "power2.inOut",
+      },
+      0,
+    );
     journeyTriggers.push(tl.scrollTrigger);
   }
 
@@ -810,70 +875,72 @@ function setupFlowerJourney() {
         start: "top 95%",
         end: "top 45%",
         scrub: 1.0,
-      }
+      },
     });
     if (flowerCanvas.value) {
       tl.to(flowerCanvas.value, { opacity: 0, ease: "none" }, 0);
     }
     tl.to(".landing-page", { backgroundColor: "#1b1612", ease: "none" }, 0);
     tl.to(".cta-panel h2", { color: "#faf8f5", ease: "none" }, 0);
-    tl.to(".btn-cta", { backgroundColor: "#faf8f5", color: "#1b1612", ease: "none" }, 0);
+    tl.to(
+      ".btn-cta",
+      { backgroundColor: "#faf8f5", color: "#1b1612", ease: "none" },
+      0,
+    );
     // Navbar Transitions
-    tl.to(".navbar", { backgroundColor: "#1b1612", borderColor: "rgba(250, 248, 245, 0.15)", ease: "none" }, 0);
-    tl.to(".navbar .logo, .navbar .nav-links a", { color: "#faf8f5", ease: "none" }, 0);
-    tl.to(".navbar .btn-login", { color: "#faf8f5", borderColor: "rgba(250, 248, 245, 0.35)", ease: "none" }, 0);
-    tl.to(".navbar .btn-register", { backgroundColor: "#faf8f5", color: "#1b1612", ease: "none" }, 0);
+    tl.to(
+      ".navbar",
+      {
+        backgroundColor: "#1b1612",
+        borderColor: "rgba(250, 248, 245, 0.15)",
+        ease: "none",
+      },
+      0,
+    );
+    tl.to(
+      ".navbar .logo, .navbar .nav-links a",
+      { color: "#faf8f5", ease: "none" },
+      0,
+    );
+    tl.to(
+      ".navbar .btn-login",
+      {
+        color: "#faf8f5",
+        borderColor: "rgba(250, 248, 245, 0.35)",
+        ease: "none",
+      },
+      0,
+    );
+    tl.to(
+      ".navbar .btn-register",
+      { backgroundColor: "#faf8f5", color: "#1b1612", ease: "none" },
+      0,
+    );
     journeyTriggers.push(tl.scrollTrigger);
   }
 }
 
 function setupSectionReveals() {
-  const panels = gsap.utils.toArray('.panel-section');
-  
-  panels.forEach((panel) => {
-    // Fade in + slide up header details
-    const revealElements = panel.querySelectorAll('.reveal-fade-up');
-    if (revealElements.length) {
-      gsap.fromTo(
-        revealElements,
-        { autoAlpha: 0, y: 35 },
-        {
-          autoAlpha: 1,
-          y: 0,
-          duration: 0.95,
-          ease: "power3.out",
-          stagger: 0.12,
-          scrollTrigger: {
-            trigger: panel,
-            start: "top 78%",
-            toggleActions: "play none none reverse",
-          }
-        }
-      );
-    }
+  // The flower's scroll journey is the page's one orchestrated motion moment.
+  // Every other section renders in place — only the hero gets an entrance,
+  // played once on load rather than re-triggered as the visitor scrolls.
+  if (!heroSection.value) return;
 
-    // Stagger child cards/items
-    const cards = panel.querySelectorAll('.reveal-card');
-    if (cards.length) {
-      gsap.fromTo(
-        cards,
-        { autoAlpha: 0, y: 45, scale: 0.96 },
-        {
-          autoAlpha: 1,
-          y: 0,
-          scale: 1,
-          duration: 0.85,
-          ease: "power2.out",
-          stagger: 0.08,
-          scrollTrigger: {
-            trigger: panel,
-            start: "top 72%",
-            toggleActions: "play none none reverse",
-          }
-        }
-      );
-    }
-  });
+  const heroEls = heroSection.value.querySelectorAll(".reveal-fade-up");
+  if (heroEls.length) {
+    gsap.fromTo(
+      heroEls,
+      { autoAlpha: 0, y: 18 },
+      {
+        autoAlpha: 1,
+        y: 0,
+        duration: 0.75,
+        ease: "power2.out",
+        stagger: 0.08,
+        delay: 0.15,
+      },
+    );
+  }
 }
 
 function setupBackgroundParallax() {
@@ -953,10 +1020,10 @@ function setupHeroCollapse() {
     heroCollapseTrigger = null;
   }
 
-  const panel     = heroSection.value;
-  const container = panel.querySelector('.hero-collapse-container');
-  const content   = panel.querySelector('.hero-collapse-content');
-  const cue       = panel.querySelector('.hero-scroll-cue');
+  const panel = heroSection.value;
+  const container = panel.querySelector(".hero-collapse-container");
+  const content = panel.querySelector(".hero-collapse-content");
+  const cue = panel.querySelector(".hero-scroll-cue");
 
   if (!container || !content) return;
 
@@ -966,9 +1033,9 @@ function setupHeroCollapse() {
   const tl = gsap.timeline({
     scrollTrigger: {
       trigger: panel,
-      start: 'top top',
+      start: "top top",
       // End when the hero has scrolled 65vh — feels natural for a banner collapse
-      end: isMobile ? '+=55vh' : '+=65vh',
+      end: isMobile ? "+=55vh" : "+=65vh",
       scrub: 1.2,
       // Do NOT pin — let the page scroll naturally while the hero compresses
     },
@@ -977,27 +1044,30 @@ function setupHeroCollapse() {
   // Shrink hero panel top-padding (pushes content up toward navbar)
   tl.fromTo(
     panel,
-    { paddingTop: isMobile ? '140px' : '180px', paddingBottom: '120px' },
-    { paddingTop: isMobile ? '90px' : '96px',  paddingBottom: isMobile ? '40px' : '48px', ease: 'none' },
-    0
+    { paddingTop: isMobile ? "140px" : "180px", paddingBottom: "120px" },
+    {
+      paddingTop: isMobile ? "90px" : "96px",
+      paddingBottom: isMobile ? "40px" : "48px",
+      ease: "none",
+    },
+    0,
   );
 
   // Scale down and fade-shift the content block
   tl.fromTo(
     content,
-    { scale: 1, transformOrigin: 'left center' },
-    { scale: isMobile ? 0.78 : 0.72, transformOrigin: 'left center', ease: 'none' },
-    0
+    { scale: 1, transformOrigin: "left center" },
+    {
+      scale: isMobile ? 0.78 : 0.72,
+      transformOrigin: "left center",
+      ease: "none",
+    },
+    0,
   );
 
   // Fade out the scroll cue
   if (cue) {
-    tl.fromTo(
-      cue,
-      { autoAlpha: 0.65 },
-      { autoAlpha: 0, ease: 'none' },
-      0
-    );
+    tl.fromTo(cue, { autoAlpha: 0.65 }, { autoAlpha: 0, ease: "none" }, 0);
   }
 
   heroCollapseTrigger = tl.scrollTrigger;
@@ -1060,7 +1130,10 @@ onBeforeUnmount(() => {
   position: relative;
   background: var(--ivory);
   color: var(--ink);
-  font-family: "Poppins", -apple-system, sans-serif;
+  font-family:
+    "Poppins",
+    -apple-system,
+    sans-serif;
   font-weight: 300;
   line-height: 1.7;
   overflow-x: hidden;
@@ -1075,15 +1148,14 @@ onBeforeUnmount(() => {
   letter-spacing: -0.02em;
 }
 
-.eyebrow {
+.hero-kicker {
   display: inline-block;
   font-family: "Poppins", sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-size: 16px;
+  font-weight: 500;
+  font-style: italic;
   color: var(--rosewood);
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 /* Ambient dynamic background */
@@ -1154,7 +1226,7 @@ onBeforeUnmount(() => {
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 9999px;          /* effectively unrestricted at top */
+  max-width: 9999px; /* effectively unrestricted at top */
   background: #ffffff;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -1163,18 +1235,18 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   z-index: 1000;
-  border-radius: 0;           /* flat at top */
+  border-radius: 0; /* flat at top */
   border: 1px solid transparent;
   box-shadow: none;
   transition:
-    top           0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    width         0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    max-width     0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    padding       0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    top 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    width 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    max-width 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    padding 0.5s cubic-bezier(0.16, 1, 0.3, 1),
     border-radius 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color  0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    background    0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow    0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    border-color 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Scrolled state — floating pill */
@@ -1188,7 +1260,7 @@ onBeforeUnmount(() => {
   border-color: rgba(30, 27, 24, 0.12);
   box-shadow:
     0 8px 40px rgba(30, 27, 24, 0.1),
-    0 2px 8px  rgba(30, 27, 24, 0.06);
+    0 2px 8px rgba(30, 27, 24, 0.06);
 }
 
 .logo {
@@ -1406,7 +1478,8 @@ onBeforeUnmount(() => {
 }
 
 @keyframes pulseCue {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
     opacity: 0.45;
   }
@@ -1503,38 +1576,50 @@ onBeforeUnmount(() => {
 .features-stacked-grid {
   display: flex;
   flex-direction: column;
-  gap: 24px;
   width: 100%;
 }
 
 .feature-card-item {
-  display: flex;
-  gap: 24px;
-  padding: 28px;
-  border-radius: 20px;
-  border: 1px solid var(--line);
-  background: rgba(250, 248, 245, 0.5);
-  backdrop-filter: blur(8px);
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  display: grid;
+  grid-template-columns: 68px 1fr;
+  gap: 28px;
+  align-items: flex-start;
+  padding: 34px 4px;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  backdrop-filter: none;
+  transition: padding-left 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.feature-card-item:last-child {
+  border-bottom: 1px solid var(--line);
 }
 
 .feature-card-item:hover {
-  border-color: rgba(184, 101, 88, 0.25);
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.04);
-  background: rgba(250, 248, 245, 0.8);
+  padding-left: 16px;
+  transform: none;
+  box-shadow: none;
+  border-top-color: var(--line);
 }
 
 .feature-icon {
   width: 58px;
   height: 58px;
-  background: var(--ivory-deep);
-  border-radius: 14px;
+  background: linear-gradient(145deg, var(--rosewood), var(--gold));
+  color: var(--ivory);
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  font-size: 24px;
   flex-shrink: 0;
+  box-shadow: 0 10px 24px rgba(184, 101, 88, 0.28);
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.feature-card-item:hover .feature-icon {
+  transform: rotate(-8deg) scale(1.06);
 }
 
 .feature-info {
@@ -1542,7 +1627,7 @@ onBeforeUnmount(() => {
 }
 
 .feature-info h3 {
-  font-size: 18.5px;
+  font-size: 19.5px;
   margin-bottom: 8px;
 }
 
@@ -1550,48 +1635,116 @@ onBeforeUnmount(() => {
   color: var(--ink-soft);
   font-size: 14.5px;
   line-height: 1.7;
+  max-width: 420px;
 }
 
 /* Stats Panel */
+.stats-header-desc {
+  color: var(--ink-soft);
+  font-size: 16.5px;
+  margin-bottom: 44px;
+  max-width: 460px;
+}
+
 .stats-stacked-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 28px;
+  gap: 0;
 }
 
 .stat-card-item {
-  background: rgba(250, 248, 245, 0.5);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  padding: 34px 28px;
-  text-align: center;
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  background: none;
+  backdrop-filter: none;
+  border: none;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  padding: 12px 0 20px 32px;
+  text-align: left;
+  transition: none;
+}
+
+.stat-card-item:nth-child(odd) {
+  border-left: none;
+  padding-left: 0;
 }
 
 .stat-card-item:hover {
-  transform: translateY(-4px);
-  border-color: rgba(184, 101, 88, 0.25);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.04);
-  background: rgba(250, 248, 245, 0.8);
+  transform: none;
+  box-shadow: none;
+  background: none;
 }
 
 .stat-icon {
-  font-size: 32px;
-  margin-bottom: 12px;
+  font-size: 20px;
+  margin-bottom: 14px;
+  opacity: 0.55;
 }
 
 .stat-number {
-  font-size: 36px;
-  color: var(--ink);
+  font-size: 44px;
   margin-bottom: 6px;
+  background: linear-gradient(120deg, var(--ink) 45%, var(--rosewood) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6f9c5f;
+  -webkit-text-fill-color: #6f9c5f;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 0 rgba(111, 156, 95, 0.55);
+  animation: liveDotPulse 2.2s ease-out infinite;
+}
+
+@keyframes liveDotPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(111, 156, 95, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 9px rgba(111, 156, 95, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(111, 156, 95, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot {
+    animation: none;
+  }
 }
 
 .stat-label {
   color: var(--ink-soft);
   font-size: 14px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   font-weight: 500;
+  position: relative;
+  padding-bottom: 14px;
+}
+
+.stat-label::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  background: var(--rosewood);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stat-card-item:hover .stat-label::after {
+  transform: scaleX(1);
 }
 
 .highlight-vendor {
@@ -1628,25 +1781,33 @@ onBeforeUnmount(() => {
 }
 
 .blog-card-item {
-  background: rgba(250, 248, 245, 0.5);
-  backdrop-filter: blur(8px);
-  border-radius: 20px;
+  background: none;
+  backdrop-filter: none;
+  border-radius: 4px;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: none;
+  border-bottom: 1px solid var(--line);
   display: flex;
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  padding-bottom: 28px;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.blog-card-item:last-child {
+  border-bottom: none;
 }
 
 .blog-card-item:hover {
-  transform: translateY(-4px);
-  border-color: rgba(184, 101, 88, 0.25);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.04);
-  background: rgba(250, 248, 245, 0.8);
+  transform: translateX(6px);
+  border-color: var(--line);
+  box-shadow: none;
+  background: none;
 }
 
 .blog-image {
   width: 180px;
-  background: var(--ivory-deep);
+  height: 130px;
+  background: linear-gradient(150deg, var(--ivory-deep), #e9ddcd);
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1655,7 +1816,12 @@ onBeforeUnmount(() => {
   text-align: center;
   padding: 20px;
   flex-shrink: 0;
-  border-right: 1px solid var(--line);
+  border-right: none;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.blog-card-item:hover .blog-image {
+  opacity: 0.82;
 }
 
 .blog-content {
@@ -1963,18 +2129,17 @@ onBeforeUnmount(() => {
     justify-content: center;
   }
 
-  .features-stacked-grid,
   .blog-stacked-grid {
     gap: 20px;
   }
 
-  .feature-card-item,
-  .blog-card-item {
-    background: rgba(250, 248, 245, 0.4);
-    padding: 20px;
+  .feature-card-item {
+    padding: 26px 4px;
   }
 
   .blog-card-item {
+    background: rgba(250, 248, 245, 0.4);
+    padding: 20px;
     flex-direction: column;
   }
 
@@ -1990,11 +2155,15 @@ onBeforeUnmount(() => {
   }
 
   .stats-stacked-grid {
-    gap: 20px;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .stat-card-item {
-    padding: 24px 18px;
+    padding: 12px 0 16px 24px;
+  }
+
+  .stat-number {
+    font-size: 34px;
   }
 
   .footer-content {
