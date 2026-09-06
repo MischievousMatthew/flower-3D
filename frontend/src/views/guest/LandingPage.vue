@@ -700,8 +700,17 @@ function initThreeScene() {
   flowerGroup = built.group;
   flowerRings = built.rings;
 
+  // The petals are built to open along local +Y (upward), but the camera
+  // sits level with the flower on the Z axis. This wrapper reorients the
+  // whole bloom to face +Z (toward the camera) without touching
+  // flowerGroup's own rotation, which animateFrame() drives every frame
+  // for the idle spin and pointer-tilt effect.
+  const flowerOrient = new THREE.Group();
+  flowerOrient.rotation.x = Math.PI / 2;
+  flowerOrient.add(flowerGroup);
+
   rig = new THREE.Group();
-  rig.add(flowerGroup);
+  rig.add(flowerOrient);
   scene.add(rig);
 
   particles = buildParticles();
