@@ -37,12 +37,14 @@ class User extends Authenticatable
         'plan',
         'email_verified_at',
         'api_token',
+        'two_factor_passkey_hash',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
         'api_token',
+        'two_factor_passkey_hash',
     ];
 
     protected $casts = [

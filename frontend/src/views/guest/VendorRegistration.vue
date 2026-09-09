@@ -1226,6 +1226,9 @@ import api from "../../plugins/axios";
 import { toast } from "vue3-toastify";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
 const router = useRouter();
 const currentStep = ref(1);
@@ -1325,6 +1328,15 @@ let mapInstance = null;
 let storeMarker = null;
 let caviteBoundary = null;
 let caviteBoundaryLayer = null;
+const storeMarkerIcon = L.icon({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
 
 const pointInRing = ([longitude, latitude], ring) => {
   let isInside = false;
@@ -1391,7 +1403,7 @@ const setStorePin = async (latLng) => {
     formData.storeAddress = address;
 
     if (!storeMarker) {
-      storeMarker = L.marker(latLng, { draggable: true }).addTo(mapInstance);
+      storeMarker = L.marker(latLng, { draggable: true, icon: storeMarkerIcon }).addTo(mapInstance);
       storeMarker.on("dragend", () => setStorePin(storeMarker.getLatLng()));
     } else {
       storeMarker.setLatLng(latLng);
@@ -1411,7 +1423,7 @@ const initialiseStoreLocationMap = async () => {
     if (!response.ok) throw new Error("Could not load the Cavite boundary.");
     caviteBoundary = await response.json();
 
-    mapInstance = L.map(storeLocationMap.value, { zoomControl: true });
+    mapInstance = L.map(storeLocationMap.value, { zoomControl: true, maxBoundsViscosity: 1 });
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18,
       attribution: "© OpenStreetMap contributors",
@@ -1421,13 +1433,14 @@ const initialiseStoreLocationMap = async () => {
     }).addTo(mapInstance);
     const bounds = caviteBoundaryLayer.getBounds();
     mapInstance.fitBounds(bounds, { padding: [12, 12] });
+    mapInstance.setMinZoom(mapInstance.getZoom());
     mapInstance.setMaxBounds(bounds.pad(0.05));
     mapInstance.on("click", ({ latlng }) => setStorePin(latlng));
 
     if (formData.storeLatitude !== null && formData.storeLongitude !== null) {
       const savedPin = L.latLng(formData.storeLatitude, formData.storeLongitude);
       if (isInsideCavite(savedPin)) {
-        storeMarker = L.marker(savedPin, { draggable: true }).addTo(mapInstance);
+        storeMarker = L.marker(savedPin, { draggable: true, icon: storeMarkerIcon }).addTo(mapInstance);
         storeMarker.on("dragend", () => setStorePin(storeMarker.getLatLng()));
       } else {
         formData.storeLatitude = null;

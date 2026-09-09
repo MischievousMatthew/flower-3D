@@ -146,6 +146,12 @@ Route::middleware('token.auth')->group(function () {
         Route::get('/user-profile', [ProfileController::class, 'getProfile']);
         Route::put('/user-details', [ProfileController::class, 'updateProfile']);
         Route::post('/picture',     [ProfileController::class, 'updateProfilePicture']);
+        Route::post('/two-factor/manage/start', [ProfileController::class, 'startTwoFactorManagement']);
+        Route::post('/two-factor/manage/verify-email-otp', [ProfileController::class, 'verifyTwoFactorManagementEmailOtp']);
+        Route::post('/two-factor/manage/send-alternative-otp', [ProfileController::class, 'sendTwoFactorManagementAlternativeOtp']);
+        Route::post('/two-factor/manage/verify-passkey', [ProfileController::class, 'verifyTwoFactorManagementPasskey']);
+        Route::post('/two-factor/manage/verify-alternative-otp', [ProfileController::class, 'verifyTwoFactorManagementAlternativeOtp']);
+        Route::post('/two-factor/manage/passkey', [ProfileController::class, 'setTwoFactorPasskey']);
     });
 
     // ----------------------------------------------------------

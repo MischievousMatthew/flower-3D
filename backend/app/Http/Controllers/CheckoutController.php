@@ -236,7 +236,7 @@ class CheckoutController extends Controller
             $user = Auth::user();
 
             $validator = Validator::make($request->all(), [
-                'payment_method' => 'required|in:bank_transfer,gcash,maya,paymaya,cod,card',
+                'payment_method' => 'required|in:bank_transfer,gcash,maya,cod,card',
                 'delivery_address' => 'required|string',
                 'contact_number' => 'required|string',
                 'delivery_notes' => 'nullable|string',
@@ -640,6 +640,7 @@ class CheckoutController extends Controller
             $methods[] = [
                 'type' => 'gcash',
                 'name' => 'GCash',
+                'category' => 'E-Wallet (GCash / Maya)',
                 'description' => 'Pay via GCash',
                 'icon' => '💙',
                 'enabled' => true,
@@ -650,6 +651,7 @@ class CheckoutController extends Controller
             $methods[] = [
                 'type' => 'maya',
                 'name' => 'Maya',
+                'category' => 'E-Wallet (GCash / Maya)',
                 'description' => 'Pay via Maya',
                 'icon' => '💚',
                 'enabled' => true,

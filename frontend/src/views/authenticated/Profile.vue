@@ -536,7 +536,135 @@
             authentication.
           </p>
         </div>
-        <button class="btn-manage">Manage</button>
+        <button
+          class="btn-manage"
+          :disabled="twoFactorLoading"
+          @click="startTwoFactorManagement"
+        >
+          {{ twoFactorLoading ? "Sending..." : "Manage" }}
+        </button>
+      </div>
+
+      <div
+        v-if="showTwoFactorModal"
+        class="two-factor-modal-backdrop"
+        @click.self="closeTwoFactorModal"
+      >
+        <section class="two-factor-modal" role="dialog" aria-modal="true">
+          <button
+            class="two-factor-modal-close"
+            aria-label="Close two-factor verification"
+            @click="closeTwoFactorModal"
+          >
+            ×
+          </button>
+
+          <template v-if="twoFactorStep === 'email'">
+            <h2>Verify your email</h2>
+            <p>
+              Enter the six-digit verification code sent to your registered
+              email address.
+            </p>
+            <form @submit.prevent="verifyInitialEmailOtp">
+              <input
+                v-model="twoFactorOtp"
+                class="two-factor-code-input"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                maxlength="6"
+                placeholder="000000"
+                @input="sanitizeTwoFactorCode('otp')"
+              />
+              <button class="btn-two-factor-primary" :disabled="twoFactorLoading">
+                {{ twoFactorLoading ? "Verifying..." : "Verify code" }}
+              </button>
+            </form>
+          </template>
+
+          <template v-else-if="twoFactorStep === 'passkey'">
+            <h2>Second security step</h2>
+            <p v-if="twoFactorPasskeyConfigured">
+              Enter your six-digit security passkey to continue.
+            </p>
+            <p v-else>
+              No security passkey is set yet. Use another email code to
+              continue, then you can create one securely.
+            </p>
+            <form v-if="twoFactorPasskeyConfigured" @submit.prevent="verifyPasskey">
+              <input
+                v-model="twoFactorPasskey"
+                class="two-factor-code-input"
+                type="password"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                maxlength="6"
+                placeholder="••••••"
+                @input="sanitizeTwoFactorCode('passkey')"
+              />
+              <button class="btn-two-factor-primary" :disabled="twoFactorLoading">
+                {{ twoFactorLoading ? "Verifying..." : "Verify passkey" }}
+              </button>
+            </form>
+            <button
+              class="btn-two-factor-secondary"
+              :disabled="twoFactorLoading"
+              @click="sendAlternativeEmailOtp"
+            >
+              Try another way
+            </button>
+          </template>
+
+          <template v-else-if="twoFactorStep === 'alternative-email'">
+            <h2>Verify your email again</h2>
+            <p>
+              Enter the new six-digit verification code sent to your registered
+              email address.
+            </p>
+            <form @submit.prevent="verifyAlternativeEmailOtp">
+              <input
+                v-model="twoFactorOtp"
+                class="two-factor-code-input"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                maxlength="6"
+                placeholder="000000"
+                @input="sanitizeTwoFactorCode('otp')"
+              />
+              <button class="btn-two-factor-primary" :disabled="twoFactorLoading">
+                {{ twoFactorLoading ? "Verifying..." : "Verify code" }}
+              </button>
+            </form>
+          </template>
+
+          <template v-else>
+            <h2>2FA management unlocked</h2>
+            <p>
+              Your security verification is complete. You can now manage your
+              2FA security settings.
+            </p>
+            <form @submit.prevent="saveTwoFactorPasskey">
+              <label for="two-factor-new-passkey">
+                {{ twoFactorPasskeyConfigured ? "Change" : "Create" }} six-digit security passkey
+              </label>
+              <input
+                id="two-factor-new-passkey"
+                v-model="twoFactorNewPasskey"
+                class="two-factor-code-input"
+                type="password"
+                inputmode="numeric"
+                autocomplete="new-password"
+                maxlength="6"
+                placeholder="••••••"
+                @input="sanitizeTwoFactorCode('newPasskey')"
+              />
+              <button class="btn-two-factor-primary" :disabled="twoFactorLoading">
+                {{ twoFactorLoading ? "Saving..." : "Save passkey" }}
+              </button>
+            </form>
+          </template>
+        </section>
       </div>
 
       <!-- Access History -->
@@ -760,6 +888,7 @@ const user = reactive({
   postal_code: "",
   profile_picture: "",
   plan: "",
+  two_factor_passkey_configured: false,
 });
 
 const isEditing = ref(false);
@@ -768,6 +897,13 @@ const isLoadingMessage = ref("");
 const isSaving = ref(false);
 const newLoginAlerts = ref(true);
 const navHeaderRef = ref(null);
+const showTwoFactorModal = ref(false);
+const twoFactorStep = ref("email");
+const twoFactorOtp = ref("");
+const twoFactorPasskey = ref("");
+const twoFactorNewPasskey = ref("");
+const twoFactorPasskeyConfigured = ref(false);
+const twoFactorLoading = ref(false);
 
 const editData = reactive({
   name: "",
@@ -805,6 +941,9 @@ const fetchUserProfile = async () => {
 
     if (response.data.success) {
       Object.assign(user, response.data.user);
+      twoFactorPasskeyConfigured.value = Boolean(
+        response.data.user.two_factor_passkey_configured,
+      );
       console.log("Profile loaded successfully:", user.name);
     } else {
       toast.error("Failed to load profile");
@@ -1004,6 +1143,145 @@ const getInitials = (name, surname) => {
 
 const scrollToSection = (sectionId) => {
   console.log("Scroll to section:", sectionId);
+};
+
+const twoFactorErrorMessage = (error, fallback) => {
+  const errors = error.response?.data?.errors;
+  if (errors) {
+    return Object.values(errors).flat()[0] || fallback;
+  }
+
+  return error.response?.data?.message || fallback;
+};
+
+const sanitizeTwoFactorCode = (field) => {
+  const fieldMap = {
+    otp: twoFactorOtp,
+    passkey: twoFactorPasskey,
+    newPasskey: twoFactorNewPasskey,
+  };
+  const target = fieldMap[field];
+  target.value = target.value.replace(/\D/g, "").slice(0, 6);
+};
+
+const closeTwoFactorModal = () => {
+  showTwoFactorModal.value = false;
+  twoFactorStep.value = "email";
+  twoFactorOtp.value = "";
+  twoFactorPasskey.value = "";
+  twoFactorNewPasskey.value = "";
+};
+
+const startTwoFactorManagement = async () => {
+  try {
+    twoFactorLoading.value = true;
+    await api.post("/profile/two-factor/manage/start");
+    twoFactorStep.value = "email";
+    twoFactorOtp.value = "";
+    showTwoFactorModal.value = true;
+    toast.success("A verification code was sent to your registered email.");
+  } catch (error) {
+    toast.error(twoFactorErrorMessage(error, "Unable to send a verification code."));
+  } finally {
+    twoFactorLoading.value = false;
+  }
+};
+
+const verifyInitialEmailOtp = async () => {
+  if (!/^\d{6}$/.test(twoFactorOtp.value)) {
+    toast.error("Enter the six-digit verification code.");
+    return;
+  }
+
+  try {
+    twoFactorLoading.value = true;
+    const response = await api.post("/profile/two-factor/manage/verify-email-otp", {
+      otp: twoFactorOtp.value,
+    });
+    twoFactorPasskeyConfigured.value = Boolean(response.data.passkey_configured);
+    twoFactorOtp.value = "";
+    twoFactorStep.value = "passkey";
+  } catch (error) {
+    toast.error(twoFactorErrorMessage(error, "The verification code could not be verified."));
+  } finally {
+    twoFactorLoading.value = false;
+  }
+};
+
+const verifyPasskey = async () => {
+  if (!/^\d{6}$/.test(twoFactorPasskey.value)) {
+    toast.error("Passkey must be exactly six digits.");
+    return;
+  }
+
+  try {
+    twoFactorLoading.value = true;
+    await api.post("/profile/two-factor/manage/verify-passkey", {
+      passkey: twoFactorPasskey.value,
+    });
+    twoFactorPasskey.value = "";
+    twoFactorStep.value = "management";
+  } catch (error) {
+    toast.error(twoFactorErrorMessage(error, "The passkey could not be verified."));
+  } finally {
+    twoFactorLoading.value = false;
+  }
+};
+
+const sendAlternativeEmailOtp = async () => {
+  try {
+    twoFactorLoading.value = true;
+    await api.post("/profile/two-factor/manage/send-alternative-otp");
+    twoFactorOtp.value = "";
+    twoFactorStep.value = "alternative-email";
+    toast.success("A new verification code was sent to your registered email.");
+  } catch (error) {
+    toast.error(twoFactorErrorMessage(error, "Unable to send a new verification code."));
+  } finally {
+    twoFactorLoading.value = false;
+  }
+};
+
+const verifyAlternativeEmailOtp = async () => {
+  if (!/^\d{6}$/.test(twoFactorOtp.value)) {
+    toast.error("Enter the six-digit verification code.");
+    return;
+  }
+
+  try {
+    twoFactorLoading.value = true;
+    await api.post("/profile/two-factor/manage/verify-alternative-otp", {
+      otp: twoFactorOtp.value,
+    });
+    twoFactorOtp.value = "";
+    twoFactorStep.value = "management";
+  } catch (error) {
+    toast.error(twoFactorErrorMessage(error, "The verification code could not be verified."));
+  } finally {
+    twoFactorLoading.value = false;
+  }
+};
+
+const saveTwoFactorPasskey = async () => {
+  if (!/^\d{6}$/.test(twoFactorNewPasskey.value)) {
+    toast.error("Passkey must be exactly six digits.");
+    return;
+  }
+
+  try {
+    twoFactorLoading.value = true;
+    await api.post("/profile/two-factor/manage/passkey", {
+      passkey: twoFactorNewPasskey.value,
+    });
+    twoFactorNewPasskey.value = "";
+    twoFactorPasskeyConfigured.value = true;
+    user.two_factor_passkey_configured = true;
+    toast.success("Security passkey saved.");
+  } catch (error) {
+    toast.error(twoFactorErrorMessage(error, "Unable to save the security passkey."));
+  } finally {
+    twoFactorLoading.value = false;
+  }
 };
 
 onMounted(() => {
@@ -1428,6 +1706,101 @@ onMounted(() => {
 
 .btn-manage:hover {
   background: #38a169;
+}
+
+.btn-manage:disabled,
+.btn-two-factor-primary:disabled,
+.btn-two-factor-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.two-factor-modal-backdrop {
+  align-items: center;
+  background: rgba(45, 55, 72, 0.55);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1rem;
+  position: fixed;
+  z-index: 1000;
+}
+
+.two-factor-modal {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+  max-width: 440px;
+  padding: 2rem;
+  position: relative;
+  width: 100%;
+}
+
+.two-factor-modal h2 {
+  color: #2d3748;
+  font-size: 1.35rem;
+  margin: 0 0 0.75rem;
+}
+
+.two-factor-modal p,
+.two-factor-modal label {
+  color: #718096;
+  display: block;
+  font-size: 0.938rem;
+  line-height: 1.5;
+  margin: 0 0 1.25rem;
+}
+
+.two-factor-modal-close {
+  background: transparent;
+  border: 0;
+  color: #718096;
+  cursor: pointer;
+  font-size: 1.75rem;
+  line-height: 1;
+  position: absolute;
+  right: 1rem;
+  top: 1rem;
+}
+
+.two-factor-code-input {
+  border: 1px solid #cbd5e0;
+  border-radius: 8px;
+  box-sizing: border-box;
+  font-size: 1.25rem;
+  letter-spacing: 0.35em;
+  margin-bottom: 1rem;
+  padding: 0.8rem 1rem;
+  text-align: center;
+  width: 100%;
+}
+
+.two-factor-code-input:focus {
+  border-color: #48bb78;
+  outline: none;
+}
+
+.btn-two-factor-primary,
+.btn-two-factor-secondary {
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.938rem;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  width: 100%;
+}
+
+.btn-two-factor-primary {
+  background: #48bb78;
+  border: 1px solid #48bb78;
+  color: #fff;
+}
+
+.btn-two-factor-secondary {
+  background: #fff;
+  border: 1px solid #cbd5e0;
+  color: #4a5568;
+  margin-top: 0.75rem;
 }
 
 /* Access History */

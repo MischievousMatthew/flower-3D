@@ -324,6 +324,13 @@
                 Choose your preferred payment method
               </p>
 
+              <p
+                v-if="hasEWalletPaymentMethod"
+                class="payment-category"
+              >
+                E-Wallet (GCash / Maya)
+              </p>
+
               <!-- Available Payment Methods from Vendor -->
               <div class="payment-methods-grid">
                 <!-- Online Payment Methods (based on vendor's payout method) -->
@@ -716,6 +723,7 @@ const checkoutTotalSavings = computed(() => {
 const customerNotes = ref("");
 const selectedPaymentMethod = ref(null);
 const availablePaymentMethods = ref([]);
+const allowedEWalletPaymentMethods = new Set(["gcash", "maya"]);
 
 // Day headers
 const dayHeaders = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -737,12 +745,34 @@ const todayLegendText = computed(() =>
     : "Today",
 );
 
+const selectedDateRemainingCapacity = computed(() => {
+  const availability = selectedDate.value
+    ? calendarData.value[selectedDate.value]
+    : null;
+  const maxOrders = Number(
+    availability?.max_orders ?? vendorReservationSettings.value.maxOrdersPerDay,
+  );
+  const ordersCount = Number(availability?.orders_count ?? 0);
+
+  return Math.max(
+    0,
+    (Number.isFinite(maxOrders) ? maxOrders : 0) -
+      (Number.isFinite(ordersCount) ? ordersCount : 0),
+  );
+});
+
+const hasEWalletPaymentMethod = computed(() =>
+  availablePaymentMethods.value.some((method) =>
+    allowedEWalletPaymentMethods.has(method.type),
+  ),
+);
+
 const vendorReservationNotice = computed(() => {
   const parts = [];
   const leadDays = leadTimeDays.value;
 
   parts.push(
-    `Vendor capacity: ${vendorReservationSettings.value.maxOrdersPerDay} orders per day.`,
+    `Vendor capacity: ${selectedDateRemainingCapacity.value} orders remaining.`,
   );
   if (leadDays === 0) {
     parts.push("No lead time required for future dates.");
@@ -1098,10 +1128,23 @@ async function loadCheckoutData() {
 
     // Set available payment methods from backend
     if (checkoutData.value.payment_methods?.available_methods) {
-      availablePaymentMethods.value =
-        checkoutData.value.payment_methods.available_methods;
+      availablePaymentMethods.value = checkoutData.value.payment_methods.available_methods.filter(
+        (method) => {
+          const paymentMethod = String(method?.type || "").toLowerCase();
+          const isEWallet = ["gcash", "maya", "paymaya"].includes(
+            paymentMethod,
+          );
+
+          return !isEWallet || allowedEWalletPaymentMethods.has(paymentMethod);
+        },
+      );
       // Set default payment method
-      if (checkoutData.value.payment_methods.default_method) {
+      if (
+        availablePaymentMethods.value.some(
+          (method) =>
+            method.type === checkoutData.value.payment_methods.default_method,
+        )
+      ) {
         selectedPaymentMethod.value =
           checkoutData.value.payment_methods.default_method;
       } else if (availablePaymentMethods.value.length > 0) {
@@ -1753,6 +1796,13 @@ onMounted(async () => {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
+}
+
+.payment-category {
+  color: #4a5568;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px;
 }
 
 .payment-method-card {

@@ -167,7 +167,7 @@
                 class="status-badge"
                 :class="application.status.toLowerCase()"
               >
-                {{ formatStatus(application.resubmission_status || application.status) }}
+                {{ formatStatus(application.status === 'pending' ? (application.resubmission_status || application.status) : application.status) }}
               </span>
             </div>
             <div class="td" style="width: 100px">
@@ -335,9 +335,9 @@
                     role="button"
                     tabindex="0"
                     class="document-preview"
-                    @click="viewDocument(selectedApplication.government_id_url)"
-                    @keydown.enter="viewDocument(selectedApplication.government_id_url)"
-                    @keydown.space.prevent="viewDocument(selectedApplication.government_id_url)"
+                    @click="viewDocument(selectedApplication.government_id_url, 'Valid ID')"
+                    @keydown.enter="viewDocument(selectedApplication.government_id_url, 'Valid ID')"
+                    @keydown.space.prevent="viewDocument(selectedApplication.government_id_url, 'Valid ID')"
                     aria-label="View uploaded document in full screen">
                     <iframe v-if="isEmbeddedDocument(selectedApplication.government_id_url)" :src="selectedApplication.government_id_url" title="Government-issued ID preview"></iframe>
                     <img v-else :src="selectedApplication.government_id_url" alt="Government-issued ID preview" />
@@ -352,10 +352,10 @@
                     tabindex="0"
                     class="document-preview"
                     @click="
-                      viewDocument(selectedApplication.selfie_with_id_url)
+                      viewDocument(selectedApplication.selfie_with_id_url, 'Selfie with Valid ID')
                     "
-                    @keydown.enter="viewDocument(selectedApplication.selfie_with_id_url)"
-                    @keydown.space.prevent="viewDocument(selectedApplication.selfie_with_id_url)"
+                    @keydown.enter="viewDocument(selectedApplication.selfie_with_id_url, 'Selfie with Valid ID')"
+                    @keydown.space.prevent="viewDocument(selectedApplication.selfie_with_id_url, 'Selfie with Valid ID')"
                     aria-label="View uploaded document in full screen">
                     <iframe v-if="isEmbeddedDocument(selectedApplication.selfie_with_id_url)" :src="selectedApplication.selfie_with_id_url" title="Selfie with government ID preview"></iframe>
                     <img v-else :src="selectedApplication.selfie_with_id_url" alt="Selfie with government ID preview" />
@@ -370,10 +370,10 @@
                     tabindex="0"
                     class="document-preview"
                     @click="
-                      viewDocument(selectedApplication.proof_of_address_url)
+                      viewDocument(selectedApplication.proof_of_address_url, 'Proof of Address')
                     "
-                    @keydown.enter="viewDocument(selectedApplication.proof_of_address_url)"
-                    @keydown.space.prevent="viewDocument(selectedApplication.proof_of_address_url)"
+                    @keydown.enter="viewDocument(selectedApplication.proof_of_address_url, 'Proof of Address')"
+                    @keydown.space.prevent="viewDocument(selectedApplication.proof_of_address_url, 'Proof of Address')"
                     aria-label="View uploaded document in full screen">
                     <iframe v-if="isEmbeddedDocument(selectedApplication.proof_of_address_url)" :src="selectedApplication.proof_of_address_url" title="Proof of address preview"></iframe>
                     <img v-else :src="selectedApplication.proof_of_address_url" alt="Proof of address preview" />
@@ -408,10 +408,10 @@
                     tabindex="0"
                     class="document-preview"
                     @click="
-                      viewDocument(selectedApplication.barangay_clearance_url)
+                      viewDocument(selectedApplication.barangay_clearance_url, 'Barangay Permit')
                     "
-                    @keydown.enter="viewDocument(selectedApplication.barangay_clearance_url)"
-                    @keydown.space.prevent="viewDocument(selectedApplication.barangay_clearance_url)"
+                    @keydown.enter="viewDocument(selectedApplication.barangay_clearance_url, 'Barangay Permit')"
+                    @keydown.space.prevent="viewDocument(selectedApplication.barangay_clearance_url, 'Barangay Permit')"
                     aria-label="View uploaded document in full screen">
                     <iframe v-if="isEmbeddedDocument(selectedApplication.barangay_clearance_url)" :src="selectedApplication.barangay_clearance_url" title="Barangay clearance preview"></iframe>
                     <img v-else :src="selectedApplication.barangay_clearance_url" alt="Barangay clearance preview" />
@@ -429,9 +429,9 @@
                     role="button"
                     tabindex="0"
                     class="document-preview"
-                    @click="viewDocument(selectedApplication.mayor_permit_url)"
-                    @keydown.enter="viewDocument(selectedApplication.mayor_permit_url)"
-                    @keydown.space.prevent="viewDocument(selectedApplication.mayor_permit_url)"
+                    @click="viewDocument(selectedApplication.mayor_permit_url, 'Business Permit')"
+                    @keydown.enter="viewDocument(selectedApplication.mayor_permit_url, 'Business Permit')"
+                    @keydown.space.prevent="viewDocument(selectedApplication.mayor_permit_url, 'Business Permit')"
                     aria-label="View uploaded document in full screen">
                     <iframe v-if="isEmbeddedDocument(selectedApplication.mayor_permit_url)" :src="selectedApplication.mayor_permit_url" title="Mayor's permit preview"></iframe>
                     <img v-else :src="selectedApplication.mayor_permit_url" alt="Mayor's permit preview" />
@@ -657,9 +657,9 @@
                     role="button"
                     tabindex="0"
                     class="document-preview"
-                    @click="viewDocument(selectedApplication.store_logo_url)"
-                    @keydown.enter="viewDocument(selectedApplication.store_logo_url)"
-                    @keydown.space.prevent="viewDocument(selectedApplication.store_logo_url)"
+                    @click="viewDocument(selectedApplication.store_logo_url, 'Store Logo')"
+                    @keydown.enter="viewDocument(selectedApplication.store_logo_url, 'Store Logo')"
+                    @keydown.space.prevent="viewDocument(selectedApplication.store_logo_url, 'Store Logo')"
                     aria-label="View uploaded document in full screen">
                     <iframe v-if="isEmbeddedDocument(selectedApplication.store_logo_url)" :src="selectedApplication.store_logo_url" title="Store logo preview"></iframe>
                     <img v-else :src="selectedApplication.store_logo_url" alt="Store logo preview" />
@@ -679,7 +679,7 @@
                       :key="index"
                       type="button"
                       class="portfolio-item"
-                      @click="viewDocument(photo)"
+                      @click="viewDocument(photo, `Portfolio Photo ${index + 1}`)"
                     >
                       <img :src="photo" :alt="`Portfolio photo ${index + 1}`" />
                     </button>
@@ -885,7 +885,7 @@
     >
       <div class="modal-content document-viewer" @click.stop>
         <div class="modal-header">
-          <h2>Document Viewer</h2>
+          <h2>{{ currentDocumentTitle }}</h2>
           <div style="display: flex; gap: 12px; align-items: center;">
             <a 
               v-if="currentDocument" 
@@ -946,6 +946,7 @@ const isLoading = ref(false);
 const isLoadingMessage = ref("");
 const selectedApplication = ref(null);
 const currentDocument = ref(null);
+const currentDocumentTitle = ref("Document");
 const pendingAction = ref(null);
 const rejectionReason = ref("");
 const rejectionReasonError = ref("");
@@ -1259,9 +1260,10 @@ const requestResubmissionAgain = async (item) => {
   }
 };
 
-const viewDocument = (url) => {
+const viewDocument = (url, title = "") => {
   if (url) {
     currentDocument.value = url;
+    currentDocumentTitle.value = title || decodeURIComponent(url.split("/").pop()?.split("?")[0] || "Document");
     showDocumentViewer.value = true;
   } else {
     toast.error("Document URL is not available");
@@ -1277,6 +1279,7 @@ const isEmbeddedDocument = (url) => {
 const closeDocumentViewer = () => {
   showDocumentViewer.value = false;
   currentDocument.value = null;
+  currentDocumentTitle.value = "Document";
 };
 
 // Approve confirmation
@@ -1302,14 +1305,20 @@ const confirmApprove = async () => {
     );
 
     const data = response.data;
+    const approvedApplication = { ...pendingAction.value, ...(data.application || {}), status: "approved" };
+    const applicationIndex = vendorApplications.value.findIndex(
+      (application) => application.id === approvedApplication.id,
+    );
+    if (applicationIndex !== -1) vendorApplications.value[applicationIndex] = approvedApplication;
+    if (selectedApplication.value?.id === approvedApplication.id) selectedApplication.value = approvedApplication;
     toast.success(data.message || "Vendor application approved successfully!");
 
     closeApproveModal();
     if (showDetailModal.value) {
       closeModal();
     }
-    fetchApplications();
-    fetchStatistics();
+    activeTab.value = "approved";
+    await Promise.all([fetchApplications(), fetchStatistics()]);
   } catch (error) {
     console.error("Error approving application:", error);
     toast.error(getApiErrorMessage(error, "Failed to approve application"));

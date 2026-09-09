@@ -22,10 +22,19 @@ class EmailOtpService
 
     public static function send(string $email, string $ip): void
     {
-        $otp = rand(100000, 999999);
+        $email = strtolower(trim($email));
+        $rateLimitKey = 'email_otp:cooldown:' . hash('sha256', $email);
+        $hourlyKey = 'email_otp:hourly:' . hash('sha256', $email);
 
-        // Save OTP in DB or cache (your logic here)
-        
+        if (Cache::has($rateLimitKey)) {
+            throw new Exception('Please wait before requesting another OTP.');
+        }
+
+        if (Cache::get($hourlyKey, 0) >= self::MAX_PER_HOUR) {
+            throw new Exception('Too many OTP requests. Please try again later.');
+        }
+
+        $otp = (string) random_int(100000, 999999);
         $apiKey = config('services.brevo.key');
 
         if (!$apiKey) {
@@ -55,10 +64,25 @@ class EmailOtpService
 
             throw new \Exception('Failed to send email: ' . $response->body());
         }
+
+        EmailOtp::updateOrCreate(
+            ['email' => $email],
+            [
+                'otp_hash' => Hash::make($otp),
+                'expires_at' => now()->addMinutes(self::OTP_EXPIRY_MINUTES),
+                'attempts' => 0,
+                'is_locked' => false,
+                'ip_address' => $ip,
+            ],
+        );
+
+        Cache::put($rateLimitKey, true, now()->addSeconds(self::COOLDOWN_SECONDS));
+        Cache::put($hourlyKey, Cache::get($hourlyKey, 0) + 1, now()->addHour());
     }
 
     public static function verify(string $email, string $plain): bool
     {
+        $email = strtolower(trim($email));
         $record = EmailOtp::where('email', $email)->first();
 
         if (!$record) {
