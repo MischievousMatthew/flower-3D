@@ -99,30 +99,23 @@
         <!-- CHANGED: Physical Store Address — Dropdown Only -->
         <div class="input-group">
           <label class="input-label">Physical Store Address *</label>
-          <select
+          <input
             v-model="formData.storeAddress"
+            list="cavite-addresses"
+            type="text"
+            placeholder="Pin your store on the map, then edit the address if needed"
             class="form-input"
             :class="{ error: errors.storeAddress }"
-          >
-            <option value="">Select your city / municipality</option>
-            <optgroup label="── Cities ──">
-              <option v-for="city in caviteCities" :key="city" :value="city">
-                {{ city }}
-              </option>
-            </optgroup>
-            <optgroup label="── Municipalities ──">
-              <option
-                v-for="muni in caviteMunicipalities"
-                :key="muni"
-                :value="muni"
-              >
-                {{ muni }}
-              </option>
-            </optgroup>
-          </select>
+          />
+          <datalist id="cavite-addresses">
+            <option v-for="location in caviteLocations" :key="location" :value="location" />
+          </datalist>
+          <div class="store-location-map" :class="{ 'map-loading': mapLoading }">
+            <div ref="storeLocationMap" class="store-location-map-canvas"></div>
+            <p v-if="mapLoading" class="map-status">Loading the Cavite boundary…</p>
+          </div>
           <p class="hint-text">
-            Only cities and municipalities within Cavite are currently
-            supported.
+            Place or drag the pin within Cavite. You may edit the address text without changing the pin.
           </p>
           <div v-if="errors.storeAddress" class="error-message">
             {{ errors.storeAddress }}
@@ -1224,12 +1217,15 @@ import {
   reactive,
   onMounted,
   onUnmounted,
+  nextTick,
   computed,
   watchEffect,
 } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../plugins/axios";
 import { toast } from "vue3-toastify";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 const router = useRouter();
 const currentStep = ref(1);
@@ -1249,7 +1245,9 @@ const formData = reactive({
   storeName: "",
   storeDescription: "",
   businessType: "",
-  storeAddress: "", // Populated by dropdown
+  storeAddress: "",
+  storeLatitude: null,
+  storeLongitude: null,
   serviceAreas: "", // Auto-populated via watchEffect ← selectedServiceAreas
   operatingHours: "", // Auto-populated via watchEffect ← operatingHoursConfig
 
@@ -1317,17 +1315,140 @@ const caviteMunicipalities = [
   "Magallanes, Cavite",
   "General Emilio Aguinaldo, Cavite",
 ];
+const caviteLocations = [...caviteCities, ...caviteMunicipalities];
+
+const CAVITE_BOUNDARY_URL =
+  "https://raw.githubusercontent.com/faeldon/philippines-json-maps/master/2023/geojson/provdists/lowres/municities-provdist-402100000.0.001.json";
+const storeLocationMap = ref(null);
+const mapLoading = ref(true);
+let mapInstance = null;
+let storeMarker = null;
+let caviteBoundary = null;
+let caviteBoundaryLayer = null;
+
+const pointInRing = ([longitude, latitude], ring) => {
+  let isInside = false;
+  for (let current = 0, previous = ring.length - 1; current < ring.length; previous = current++) {
+    const [currentLongitude, currentLatitude] = ring[current];
+    const [previousLongitude, previousLatitude] = ring[previous];
+    const crossesLatitude = (currentLatitude > latitude) !== (previousLatitude > latitude);
+    const intersectionLongitude =
+      ((previousLongitude - currentLongitude) * (latitude - currentLatitude)) /
+        (previousLatitude - currentLatitude) +
+      currentLongitude;
+
+    if (crossesLatitude && longitude < intersectionLongitude) isInside = !isInside;
+  }
+  return isInside;
+};
+
+const pointInPolygon = (point, coordinates) =>
+  pointInRing(point, coordinates[0]) && !coordinates.slice(1).some((hole) => pointInRing(point, hole));
+
+const isInsideCavite = ({ lat, lng }) =>
+  caviteBoundary?.features.some(({ geometry }) => {
+    const point = [lng, lat];
+    if (geometry.type === "Polygon") return pointInPolygon(point, geometry.coordinates);
+    return geometry.coordinates.some((polygon) => pointInPolygon(point, polygon));
+  }) ?? false;
+
+const isCaviteReverseGeocode = (address) => {
+  const parts = Object.values(address || {}).join(" ").toLowerCase();
+  return parts.includes("cavite");
+};
+
+const reverseGeocodeStoreLocation = async ({ lat, lng }) => {
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1`,
+    { headers: { "Accept-Language": "en" } },
+  );
+  if (!response.ok) throw new Error("Unable to look up this location.");
+
+  const result = await response.json();
+  if (!isCaviteReverseGeocode(result.address)) {
+    throw new Error("This location is not in Cavite.");
+  }
+  return result.display_name;
+};
+
+const restoreMarker = () => {
+  if (storeMarker && formData.storeLatitude !== null && formData.storeLongitude !== null) {
+    storeMarker.setLatLng([formData.storeLatitude, formData.storeLongitude]);
+  }
+};
+
+const setStorePin = async (latLng) => {
+  if (!isInsideCavite(latLng)) {
+    restoreMarker();
+    toast.error("Please select a physical store location inside Cavite only.");
+    return;
+  }
+
+  try {
+    const address = await reverseGeocodeStoreLocation(latLng);
+    formData.storeLatitude = Number(latLng.lat.toFixed(7));
+    formData.storeLongitude = Number(latLng.lng.toFixed(7));
+    formData.storeAddress = address;
+
+    if (!storeMarker) {
+      storeMarker = L.marker(latLng, { draggable: true }).addTo(mapInstance);
+      storeMarker.on("dragend", () => setStorePin(storeMarker.getLatLng()));
+    } else {
+      storeMarker.setLatLng(latLng);
+    }
+  } catch (error) {
+    restoreMarker();
+    toast.error(error.message || "Unable to use that location.");
+  }
+};
+
+const initialiseStoreLocationMap = async () => {
+  await nextTick();
+  if (mapInstance || !storeLocationMap.value) return;
+
+  try {
+    const response = await fetch(CAVITE_BOUNDARY_URL);
+    if (!response.ok) throw new Error("Could not load the Cavite boundary.");
+    caviteBoundary = await response.json();
+
+    mapInstance = L.map(storeLocationMap.value, { zoomControl: true });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18,
+      attribution: "© OpenStreetMap contributors",
+    }).addTo(mapInstance);
+    caviteBoundaryLayer = L.geoJSON(caviteBoundary, {
+      style: { color: "#20734d", weight: 2, fillColor: "#48bb78", fillOpacity: 0.12 },
+    }).addTo(mapInstance);
+    const bounds = caviteBoundaryLayer.getBounds();
+    mapInstance.fitBounds(bounds, { padding: [12, 12] });
+    mapInstance.setMaxBounds(bounds.pad(0.05));
+    mapInstance.on("click", ({ latlng }) => setStorePin(latlng));
+
+    if (formData.storeLatitude !== null && formData.storeLongitude !== null) {
+      const savedPin = L.latLng(formData.storeLatitude, formData.storeLongitude);
+      if (isInsideCavite(savedPin)) {
+        storeMarker = L.marker(savedPin, { draggable: true }).addTo(mapInstance);
+        storeMarker.on("dragend", () => setStorePin(storeMarker.getLatLng()));
+      } else {
+        formData.storeLatitude = null;
+        formData.storeLongitude = null;
+      }
+    }
+  } catch (error) {
+    toast.error(error.message || "Unable to load the Cavite map.");
+  } finally {
+    mapLoading.value = false;
+  }
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NEW: Service area options (restricted list only)
 // ─────────────────────────────────────────────────────────────────────────────
 const serviceAreaOptions = [
-  { value: "Region IV-A (CALABARZON)", label: "Region IV-A (CALABARZON)" },
-  {
-    value: "NCR (National Capital Region)",
-    label: "NCR (National Capital Region)",
-  },
+  { value: "Cavite", label: "Cavite" },
+  { value: "Metro Manila", label: "Metro Manila" },
 ];
+const serviceAreaValues = serviceAreaOptions.map((area) => area.value);
 
 // Reactive array that drives the checkboxes; synced → formData.serviceAreas
 const selectedServiceAreas = ref([]);
@@ -2008,7 +2129,14 @@ const validateStep = (step) => {
       }
       // NEW: dropdown address
       if (!formData.storeAddress) {
-        errors.storeAddress = "Please select your city / municipality";
+        errors.storeAddress = "Please enter your physical store address";
+        isValid = false;
+      }
+      if (formData.storeLatitude === null || formData.storeLongitude === null) {
+        errors.storeAddress = "Please pin your physical store location inside Cavite";
+        isValid = false;
+      } else if (!isInsideCavite({ lat: formData.storeLatitude, lng: formData.storeLongitude })) {
+        errors.storeAddress = "Your pinned store location must be inside Cavite";
         isValid = false;
       }
       // NEW: service area checkboxes
@@ -2179,6 +2307,7 @@ const prevStep = () => {
   if (currentStep.value > 1) {
     currentStep.value--;
     window.scrollTo({ top: 0, behavior: "smooth" });
+    if (currentStep.value === 1) initialiseStoreLocationMap();
     saveProgress();
   }
 };
@@ -2240,7 +2369,9 @@ const loadProgress = () => {
 
         // NEW: restore checkbox/time state
         if (Array.isArray(parsed.selectedServiceAreas)) {
-          selectedServiceAreas.value = parsed.selectedServiceAreas;
+          selectedServiceAreas.value = parsed.selectedServiceAreas.filter((area) =>
+            serviceAreaValues.includes(area),
+          );
         }
         if (Array.isArray(parsed.operatingSchedules) && parsed.operatingSchedules.length) {
           operatingSchedules.value = parsed.operatingSchedules.map((schedule, index) => ({
@@ -2383,6 +2514,7 @@ const handleSubmit = async () => {
         }
       }
     }
+    submitData.append("physical_store_address", formData.storeAddress);
 
     submitData.append(
       "operating_schedules",
@@ -2503,8 +2635,9 @@ const closeModal = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Lifecycle hooks (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
-onMounted(() => {
+onMounted(async () => {
   loadProgress();
+  await initialiseStoreLocationMap();
   saveInterval.value = setInterval(saveProgress, 30000);
 
   const saved = localStorage.getItem("vendorRegistrationProgress");
@@ -2521,6 +2654,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (saveInterval.value) clearInterval(saveInterval.value);
   window.removeEventListener("dragend", clearDragOver);
+  mapInstance?.remove();
 
   Object.keys(fileInfo).forEach((key) => {
     if (fileInfo[key]) {
@@ -3541,12 +3675,40 @@ textarea.form-input {
   .steps-indicator {
     margin-bottom: 32px;
   }
-  .form-input,
-  .file-drop-zone {
+.form-input,
+.file-drop-zone {
     padding: 10px 14px;
   }
   .action-btn {
     padding: 12px 24px;
   }
+}
+
+.store-location-map {
+  position: relative;
+  height: 300px;
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f7fafc;
+}
+
+.store-location-map-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.map-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  color: #4a5568;
+  font-size: 13px;
+  background: rgba(247, 250, 252, 0.88);
+  pointer-events: none;
 }
 </style>

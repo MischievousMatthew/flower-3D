@@ -332,10 +332,15 @@
                   <label>Government-Issued ID</label>
                   <div
                     v-if="selectedApplication.government_id_url"
+                    role="button"
+                    tabindex="0"
                     class="document-preview"
                     @click="viewDocument(selectedApplication.government_id_url)"
-                  >
-                    <div class="doc-placeholder">📄 View Document</div>
+                    @keydown.enter="viewDocument(selectedApplication.government_id_url)"
+                    @keydown.space.prevent="viewDocument(selectedApplication.government_id_url)"
+                    aria-label="View uploaded document in full screen">
+                    <iframe v-if="isEmbeddedDocument(selectedApplication.government_id_url)" :src="selectedApplication.government_id_url" title="Government-issued ID preview"></iframe>
+                    <img v-else :src="selectedApplication.government_id_url" alt="Government-issued ID preview" />
                   </div>
                   <p v-else>Not uploaded</p>
                 </div>
@@ -343,12 +348,17 @@
                   <label>Selfie with Government ID</label>
                   <div
                     v-if="selectedApplication.selfie_with_id_url"
+                    role="button"
+                    tabindex="0"
                     class="document-preview"
                     @click="
                       viewDocument(selectedApplication.selfie_with_id_url)
                     "
-                  >
-                    <div class="doc-placeholder">📷 View Photo</div>
+                    @keydown.enter="viewDocument(selectedApplication.selfie_with_id_url)"
+                    @keydown.space.prevent="viewDocument(selectedApplication.selfie_with_id_url)"
+                    aria-label="View uploaded document in full screen">
+                    <iframe v-if="isEmbeddedDocument(selectedApplication.selfie_with_id_url)" :src="selectedApplication.selfie_with_id_url" title="Selfie with government ID preview"></iframe>
+                    <img v-else :src="selectedApplication.selfie_with_id_url" alt="Selfie with government ID preview" />
                   </div>
                   <p v-else>Not uploaded</p>
                 </div>
@@ -356,12 +366,17 @@
                   <label>Proof of Address</label>
                   <div
                     v-if="selectedApplication.proof_of_address_url"
+                    role="button"
+                    tabindex="0"
                     class="document-preview"
                     @click="
                       viewDocument(selectedApplication.proof_of_address_url)
                     "
-                  >
-                    <div class="doc-placeholder">📄 View Document</div>
+                    @keydown.enter="viewDocument(selectedApplication.proof_of_address_url)"
+                    @keydown.space.prevent="viewDocument(selectedApplication.proof_of_address_url)"
+                    aria-label="View uploaded document in full screen">
+                    <iframe v-if="isEmbeddedDocument(selectedApplication.proof_of_address_url)" :src="selectedApplication.proof_of_address_url" title="Proof of address preview"></iframe>
+                    <img v-else :src="selectedApplication.proof_of_address_url" alt="Proof of address preview" />
                   </div>
                   <p v-else>Not uploaded</p>
                 </div>
@@ -389,12 +404,17 @@
                   <label>Barangay Clearance</label>
                   <div
                     v-if="selectedApplication.barangay_clearance_url"
+                    role="button"
+                    tabindex="0"
                     class="document-preview"
                     @click="
                       viewDocument(selectedApplication.barangay_clearance_url)
                     "
-                  >
-                    <div class="doc-placeholder">📄 View Document</div>
+                    @keydown.enter="viewDocument(selectedApplication.barangay_clearance_url)"
+                    @keydown.space.prevent="viewDocument(selectedApplication.barangay_clearance_url)"
+                    aria-label="View uploaded document in full screen">
+                    <iframe v-if="isEmbeddedDocument(selectedApplication.barangay_clearance_url)" :src="selectedApplication.barangay_clearance_url" title="Barangay clearance preview"></iframe>
+                    <img v-else :src="selectedApplication.barangay_clearance_url" alt="Barangay clearance preview" />
                   </div>
                   <p v-else>Not uploaded</p>
                 </div>
@@ -406,10 +426,15 @@
                   <label>Mayor's Permit</label>
                   <div
                     v-if="selectedApplication.mayor_permit_url"
+                    role="button"
+                    tabindex="0"
                     class="document-preview"
                     @click="viewDocument(selectedApplication.mayor_permit_url)"
-                  >
-                    <div class="doc-placeholder">📄 View Document</div>
+                    @keydown.enter="viewDocument(selectedApplication.mayor_permit_url)"
+                    @keydown.space.prevent="viewDocument(selectedApplication.mayor_permit_url)"
+                    aria-label="View uploaded document in full screen">
+                    <iframe v-if="isEmbeddedDocument(selectedApplication.mayor_permit_url)" :src="selectedApplication.mayor_permit_url" title="Mayor's permit preview"></iframe>
+                    <img v-else :src="selectedApplication.mayor_permit_url" alt="Mayor's permit preview" />
                   </div>
                   <p v-else>Not uploaded</p>
                 </div>
@@ -629,10 +654,15 @@
                   <label>Store Logo</label>
                   <div
                     v-if="selectedApplication.store_logo_url"
+                    role="button"
+                    tabindex="0"
                     class="document-preview"
                     @click="viewDocument(selectedApplication.store_logo_url)"
-                  >
-                    <div class="doc-placeholder">🖼️ View Logo</div>
+                    @keydown.enter="viewDocument(selectedApplication.store_logo_url)"
+                    @keydown.space.prevent="viewDocument(selectedApplication.store_logo_url)"
+                    aria-label="View uploaded document in full screen">
+                    <iframe v-if="isEmbeddedDocument(selectedApplication.store_logo_url)" :src="selectedApplication.store_logo_url" title="Store logo preview"></iframe>
+                    <img v-else :src="selectedApplication.store_logo_url" alt="Store logo preview" />
                   </div>
                   <p v-else>Not uploaded</p>
                 </div>
@@ -642,16 +672,17 @@
                     v-if="selectedApplication.portfolio_photos_urls?.length"
                     class="portfolio-grid"
                   >
-                    <div
+                    <button
                       v-for="(
                         photo, index
                       ) in selectedApplication.portfolio_photos_urls"
                       :key="index"
+                      type="button"
                       class="portfolio-item"
                       @click="viewDocument(photo)"
                     >
-                      Photo {{ index + 1 }}
-                    </div>
+                      <img :src="photo" :alt="`Portfolio photo ${index + 1}`" />
+                    </button>
                   </div>
                   <p v-else>Not uploaded</p>
                 </div>
@@ -1235,6 +1266,12 @@ const viewDocument = (url) => {
   } else {
     toast.error("Document URL is not available");
   }
+};
+
+const isEmbeddedDocument = (url) => {
+  const normalizedUrl = String(url || "").toLowerCase();
+
+  return normalizedUrl.includes(".pdf") || normalizedUrl.includes("/raw/");
 };
 
 const closeDocumentViewer = () => {
@@ -2101,23 +2138,38 @@ function debounce(func, wait) {
 
 .document-preview {
   margin-top: 4px;
-}
-
-.doc-placeholder {
-  padding: 32px;
+  display: block;
+  width: 100%;
+  height: 180px;
+  padding: 0;
+  overflow: hidden;
   background: #f7fafc;
-  border: 2px dashed #e2e8f0;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  text-align: center;
-  color: #718096;
-  font-size: 14px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.doc-placeholder:hover {
+.document-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.document-preview iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  pointer-events: none;
+}
+
+.document-preview:hover,
+.document-preview:focus-visible {
   border-color: #48bb78;
-  color: #48bb78;
+  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.2);
+  outline: none;
 }
 
 .portfolio-grid {
@@ -2128,7 +2180,10 @@ function debounce(func, wait) {
 }
 
 .portfolio-item {
-  padding: 8px;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  overflow: hidden;
   background: #f7fafc;
   border: 1px dashed #e2e8f0;
   border-radius: 6px;
@@ -2137,6 +2192,13 @@ function debounce(func, wait) {
   color: #718096;
   cursor: pointer;
   transition: all 0.3s;
+}
+
+.portfolio-item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .portfolio-item:hover {
@@ -2391,12 +2453,21 @@ function debounce(func, wait) {
 }
 /* Document Viewer */
 .document-viewer {
-  max-width: 800px;
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
+  max-height: none;
+  border-radius: 0;
+}
+.document-viewer .modal-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .document-image {
   width: 100%;
   height: auto;
-  max-height: 60vh;
+  max-height: calc(100vh - 100px);
   object-fit: contain;
   border-radius: 8px;
 }

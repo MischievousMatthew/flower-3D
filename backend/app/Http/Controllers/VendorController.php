@@ -24,6 +24,9 @@ class VendorController extends Controller
             'store_description'         => 'required|string',
             'business_type'             => 'required|in:individual,partnership,corporation',
             'store_address'             => 'required|string',
+            'physical_store_address'    => 'required|string',
+            'store_latitude'            => 'required|numeric|between:14,15',
+            'store_longitude'           => 'required|numeric|between:120,122',
             'service_areas'             => 'required|string',
             'operating_hours'           => 'required|string',
             'operating_schedules'       => 'required|string',
@@ -104,6 +107,8 @@ class VendorController extends Controller
             $app->store_description = $request->store_description;
             $app->business_type   = $request->business_type;
             $app->store_address   = $request->store_address;
+            $app->store_latitude  = $request->store_latitude;
+            $app->store_longitude = $request->store_longitude;
             $app->service_areas   = $request->service_areas;
             $app->operating_hours = $request->operating_hours;
             $app->operating_schedules = $operatingSchedules;

@@ -17,6 +17,8 @@ class VendorApplicationResource extends JsonResource
             'business_type' => $this->business_type,
             'formatted_business_type' => $this->formatted_business_type,
             'store_address' => $this->store_address,
+            'store_latitude' => $this->store_latitude,
+            'store_longitude' => $this->store_longitude,
             'service_areas' => $this->service_areas,
             'operating_hours' => $this->operating_hours,
             'owner_name' => $this->owner_name,

@@ -22,7 +22,7 @@ class VendorApplication extends Model
 
     protected $fillable = [
         'application_id', 'status_token', 'store_name', 'store_description',
-        'business_type', 'store_address', 'service_areas', 'operating_hours', 'operating_schedules',
+        'business_type', 'store_address', 'store_latitude', 'store_longitude', 'service_areas', 'operating_hours', 'operating_schedules',
         'owner_name', 'position', 'contact_number', 'email',
         'government_id_number', 'government_id_path', 'selfie_with_id_path',
         'proof_of_address_path', 'dti_number', 'sec_number',
@@ -47,6 +47,8 @@ class VendorApplication extends Model
         'portfolio_photos_paths'      => 'array',
         'same_day_delivery'           => 'boolean',
         'max_orders_per_day'          => 'integer',
+        'store_latitude'              => 'float',
+        'store_longitude'             => 'float',
         'price_min'                   => 'decimal:2',
         'price_max'                   => 'decimal:2',
         'submitted_at'                => 'datetime',
