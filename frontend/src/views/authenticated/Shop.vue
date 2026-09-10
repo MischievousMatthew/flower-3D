@@ -40,17 +40,18 @@
 
     <section class="hero">
       <div class="hero-content">
-        <p class="hero-eyebrow">Fresh flowers, thoughtfully delivered</p>
+        <p class="hero-eyebrow">Fresh Flowers</p>
         <h1>
-          Make every moment<br /><span class="highlight">bloom brighter.</span>
+          The Ultimate <span class="highlight">Flower</span><br />Shopping
+          Destination
         </h1>
         <p>
-          Discover beautifully arranged flowers from trusted local florists,
-          ready for every kind of occasion.
+          Discover beautiful, fresh flowers from local vendors. Perfect for
+          every occasion.
         </p>
         <div class="hero-buttons">
           <button class="btn-primary" @click="scrollToSection('products')">
-            Browse Flowers &#x2192;
+            Shop Now &#x2192;
           </button>
           <button
             v-if="!isAuthenticated"
@@ -61,9 +62,9 @@
           </button>
         </div>
         <div class="hero-benefits">
-          <span>&#x1F69A; Local delivery</span>
-          <span>&#x1F6E1;&#xFE0F; Secure checkout</span>
-          <span>&#x2605; Loved by {{ totalCustomers }}+ customers</span>
+          <span>&#x1F69A; Fast Delivery</span>
+          <span>&#x1F6E1;&#xFE0F; Secure Payment</span>
+          <span>&#x1F33F; Fresh &amp; Quality</span>
         </div>
       </div>
       <div class="hero-image">
@@ -80,8 +81,10 @@
       <div class="vendors-container">
         <div class="vendors-header">
           <div>
-            <p class="section-subtitle">Our Sellers</p>
-            <h2>Browse by Store</h2>
+            <h2>Our Stores</h2>
+            <p class="vendors-description">
+              Shop from trusted local florists and vendors
+            </p>
           </div>
           <div class="vendor-search-bar">
             <span class="vendor-search-icon">&#x1F50D;</span>
@@ -3446,48 +3449,51 @@ onUnmounted(() => {
 .hero {
   position: relative;
   max-width: 1360px;
-  min-height: 360px;
-  margin: 88px auto 34px;
-  padding: 48px 5%;
-  grid-template-columns: minmax(0, .95fr) minmax(360px, 1.05fr);
-  gap: 36px;
+  min-height: 212px;
+  margin: 74px auto 18px;
+  padding: 25px 4.2%;
+  grid-template-columns: minmax(0, .9fr) minmax(500px, 1.1fr);
+  gap: 16px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,.8);
-  border-radius: 24px;
-  background: linear-gradient(105deg, #eaf6ed 0%, #f4eee9 54%, #eee5f5 100%);
+  border-radius: 12px;
+  background: linear-gradient(100deg, #e4f8f0 0%, #f8fbf5 48%, #f6eaf3 100%);
   box-shadow: 0 14px 40px rgba(32, 74, 57, .09);
 }
-.hero::after { content: ""; position: absolute; width: 20rem; height: 20rem; border-radius: 50%; right: -9rem; top: -11rem; background: rgba(177, 151, 203, .18); }
+.hero::after { content: ""; position: absolute; width: 17rem; height: 17rem; border-radius: 50%; right: -7rem; top: -9rem; background: rgba(177, 151, 203, .18); }
 .hero-content { position: relative; z-index: 1; max-width: 560px; }
 .hero-eyebrow, .section-subtitle { margin: 0 0 7px; color: #2b9a69; font-size: 11px; line-height: 1.2; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-.hero-content h1 { margin: 0 0 15px; color: #1c4a38; font-size: clamp(34px, 4vw, 56px); font-weight: 650; letter-spacing: -.055em; line-height: .98; }
+.hero-content h1 { margin: 0 0 10px; color: #245171; font-size: clamp(28px, 2.55vw, 40px); font-weight: 600; letter-spacing: -.045em; line-height: .95; }
 .hero-content .highlight { color: #2f9a69; }
-.hero-content > p:not(.hero-eyebrow) { max-width: 460px; color: #587064; font-size: 15px; line-height: 1.55; }
-.hero-buttons { margin: 24px 0 20px; }
+.hero-content > p:not(.hero-eyebrow) { max-width: 410px; color: #436276; font-size: 12px; line-height: 1.35; }
+.hero-buttons { margin: 12px 0 12px; }
 .btn-primary, .btn-promo, .btn-shop-now { border-radius: 999px; background: #19734f; box-shadow: 0 8px 16px rgba(25,115,79,.2); }
 .btn-primary:hover, .btn-promo:hover, .btn-shop-now:hover { background: #125c3f; }
 .btn-secondary { border-radius: 999px; background: rgba(255,255,255,.65); border-color: #cfdccc; color: #24503e; }
-.hero-benefits { display: flex; flex-wrap: wrap; gap: 8px 14px; color: #49675a; font-size: 11px; font-weight: 650; }
+.hero-benefits { display: flex; flex-wrap: wrap; gap: 8px 28px; color: #365e67; font-size: 10px; font-weight: 650; }
 .hero-benefits span { display: inline-flex; align-items: center; gap: 4px; }
-.hero-image { height: 300px; max-width: none; margin: -20px -5% -20px 0; border-radius: 20px 0 0 20px; box-shadow: none; }
+.hero-image { height: 230px; max-width: none; margin: -34px -4.2% -34px 0; border-radius: 0; box-shadow: none; }
 .hero-image::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(234,246,237,.72), transparent 32%); }
 .hero-image img { object-position: center; }
 .badge { z-index: 1; border-radius: 999px; box-shadow: 0 7px 16px rgba(35,68,52,.12); }
 
-.vendors-section { padding: 0 5% 30px; background: transparent; }
+.vendors-section { padding: 0 5% 22px; background: transparent; }
 .vendors-container, .products-container { max-width: 1360px; margin: auto; }
-.vendors-header { margin-bottom: 15px; }
+.vendors-header { margin-bottom: 10px; }
 .vendors-header h2, .section-header h2 { color: #204a39; font-weight: 700; letter-spacing: -.035em; }
+.vendors-description { margin: 3px 0 0; color: #668074; font-size: 11px; }
 .vendor-search-bar { background: #fffefd; border: 1px solid #e2e7df; border-radius: 999px; box-shadow: 0 4px 13px rgba(35,68,52,.05); }
-.vendors-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-.vendor-card { min-height: 116px; padding: 15px; border: 1px solid #e5e9e2; border-radius: 16px; background: rgba(255,254,253,.88); box-shadow: 0 7px 18px rgba(32,74,57,.05); }
+.vendors-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.vendor-card { min-height: 108px; padding: 12px; border: 1px solid #e5e9e2; border-radius: 10px; background: rgba(255,254,253,.88); box-shadow: 0 7px 18px rgba(32,74,57,.05); }
 .vendor-card:hover, .vendor-card-active { border-color: #a6d5ba; box-shadow: 0 12px 25px rgba(32,74,57,.11); }
-.vendor-card-logo { width: 48px; height: 48px; }
-.btn-view-store { align-self: flex-end; margin: 10px 0 0; padding: 7px 10px; border-radius: 999px; font-size: 11px; }
+.vendor-card-logo { width: 42px; height: 42px; }
+.vendor-card-name { font-size: 11px; }
+.vendor-card-desc { font-size: 10px; }
+.btn-view-store { width: 100%; align-self: flex-end; margin: 8px 0 0; padding: 6px 8px; border-radius: 6px; font-size: 10px; }
 
-.products-section { padding: 8px 5% 44px; background: transparent; }
-.products-container { grid-template-columns: 220px minmax(0, 1fr); gap: 24px; align-items: start; }
-.filter-sidebar { top: 86px; border: 1px solid #e2e7df; border-radius: 18px; padding: 17px; background: rgba(255,254,253,.9); box-shadow: 0 10px 26px rgba(32,74,57,.06); }
+.products-section { padding: 0 5% 44px; background: transparent; }
+.products-container { grid-template-columns: 275px minmax(0, 1fr); gap: 26px; align-items: start; }
+.filter-sidebar { top: 74px; border: 1px solid #e2e7df; border-radius: 12px; padding: 15px; background: rgba(255,254,253,.9); box-shadow: 0 10px 26px rgba(32,74,57,.06); }
 .filter-header h2 { color: #244a3b; font-size: 18px; }
 .filter-subtitle { display: none; }
 .filter-group { border-color: #edf0eb; }
@@ -3505,7 +3511,7 @@ onUnmounted(() => {
 .popular-products-head h3 { color: #2c4e40; }
 .popular-products-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
 .popular-product-card { border-radius: 12px; }
-.products-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.products-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .pagination { margin-top: 28px; }
 .pagination-btn { border-radius: 999px; }
 
@@ -3528,6 +3534,7 @@ onUnmounted(() => {
   .hero { margin-left: 3%; margin-right: 3%; }
   .vendors-section, .products-section { padding-left: 3%; padding-right: 3%; }
   .products-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .vendors-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .popular-products-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
 }
 @media (max-width: 768px) {

@@ -672,18 +672,20 @@ const handleImageError = (e) => {
 .badge-discount { top: 12px; left: 12px; right: auto; background: #d95d78; border-radius: 999px; padding: 5px 10px; letter-spacing: .02em; }
 .image-actions {
   position: absolute;
-  inset: auto 12px 12px;
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 7px;
   opacity: 0;
-  transform: translateY(12px);
+  transform: translateX(10px);
   pointer-events: none;
   transition: opacity .25s ease, transform .25s ease;
 }
-.product-card:hover .image-actions, .product-card:focus-within .image-actions { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.product-card:hover .image-actions, .product-card:focus-within .image-actions { opacity: 1; transform: translateX(0); pointer-events: auto; }
 .image-action {
-  min-width: 0;
+  width: 38px;
   height: 38px;
   border: 0;
   border-radius: 10px;
@@ -691,18 +693,19 @@ const handleImageError = (e) => {
   background: rgba(20, 68, 51, .94);
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0;
-  padding: 0 8px;
+  padding: 0 11px;
   cursor: pointer;
   overflow: hidden;
   font: 600 11px/1 inherit;
   white-space: nowrap;
   box-shadow: 0 4px 14px rgba(17, 49, 38, .2);
-  transition: background .2s ease, gap .25s ease;
+  transition: width .28s ease, background .2s ease, gap .25s ease;
 }
 .image-action svg { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .image-action span { max-width: 0; opacity: 0; overflow: hidden; transition: max-width .28s ease, opacity .18s ease; }
+.product-card:hover .image-action, .product-card:focus-within .image-action { width: 126px; }
 .product-card:hover .image-action span, .product-card:focus-within .image-action span { max-width: 76px; opacity: 1; }
 .product-card:hover .image-action { gap: 5px; }
 .image-action-buy { background: #8d6bb1; }
@@ -726,7 +729,8 @@ const handleImageError = (e) => {
 @media (max-width: 700px) {
   .product-image { height: 205px; }
   .image-actions { opacity: 1; transform: none; pointer-events: auto; }
-  .image-action { height: 34px; padding: 0 5px; }
+  .image-action { width: 34px; height: 34px; padding: 0 9px; }
+  .product-card .image-action { width: 116px; }
   .image-action span { max-width: 70px; opacity: 1; font-size: 10px; }
   .product-card:hover .image-action { gap: 3px; }
 }
