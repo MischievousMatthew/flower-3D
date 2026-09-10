@@ -24,7 +24,9 @@ export function useAuth() {
   const isUnauthorizedError = (err) => err?.response?.status === 401;
 
   // ==================== Helpers ====================
-  const setAuthHeader = (type = getPreferredUserType(window.location.pathname)) => {
+  const setAuthHeader = (
+    type = getPreferredUserType(window.location.pathname),
+  ) => {
     const token =
       type === "employee" ? getStoredEmployeeToken() : getStoredUserToken();
 
@@ -85,14 +87,11 @@ export function useAuth() {
         "employee",
       );
 
-      // Bootstrap assignments
       const { loadAssignments, getDefaultRoute } = useAssignment();
       await loadAssignments(data.employee);
 
-      // Redirect to the default route for their active assignment
       const redirectUrl = getDefaultRoute() || "/dashboard";
       await router.push(redirectUrl);
-      toast.success(`Welcome ${data.employee.name}!`);
 
       return { success: true, data };
     } catch (err) {
@@ -291,13 +290,18 @@ export function useAuth() {
         loadAssignments(data.employee);
       }
 
-      localStorage.setItem("user_type", userType === "employee" ? "employee" : "user");
+      localStorage.setItem(
+        "user_type",
+        userType === "employee" ? "employee" : "user",
+      );
       localStorage.setItem("user", JSON.stringify(user.value));
       setAuthHeader(userType);
     } catch (err) {
       console.warn("Fetch user error (ignored if transient):", err?.message);
       if (err?.response?.status === 401) {
-        console.warn("Unauthorized during fetchUser - clearing local auth state");
+        console.warn(
+          "Unauthorized during fetchUser - clearing local auth state",
+        );
         clearAuthData();
       }
       throw err;
@@ -315,7 +319,7 @@ export function useAuth() {
     // Set the auth header in axios so the fetch call below works
     setAuthHeader(userType);
 
-    // CRITICAL: Hydrate in-memory state before any async calls to prevent 
+    // CRITICAL: Hydrate in-memory state before any async calls to prevent
     // router guards from seeing a null user during navigation.
     if (storedUser && !user.value) {
       try {
@@ -331,7 +335,10 @@ export function useAuth() {
       // If we already have a user in memory from localStorage, don't crash
       // the navigation just because the background fetch failed (unless it was a 401).
       if (user.value && err?.response?.status !== 401) {
-        console.warn("Fetch user failed, but continuing with stored data.", err?.message);
+        console.warn(
+          "Fetch user failed, but continuing with stored data.",
+          err?.message,
+        );
         return;
       }
       throw err;
