@@ -1231,10 +1231,23 @@ class CheckoutController extends Controller
         }
 
         if ($success) {
-            // A browser redirect is not proof of payment. The signed PayMongo
-            // webhook is the only path that may mark this order as paid.
+            // A browser redirect is not proof of payment. Confirm the session
+            // directly with PayMongo; the signed webhook remains the primary
+            // asynchronous confirmation path.
+            if ($order->payment_status !== 'paid' && $this->confirmPaidCheckoutSession($order)) {
+                $this->markOrderPaidFromWebhook($order, [
+                    'checkout_session_id' => $order->paymongo_payment_intent_id,
+                    'reference_number' => $reference ?: $this->buildPayMongoReference($order),
+                    'resource' => 'payment.callback.paymongo_lookup',
+                ]);
+            }
+
+            $paymentState = $order->fresh()->payment_status === 'paid'
+                ? 'success'
+                : 'pending';
+
             return redirect(
-                $frontendUrl . '/customer/orders?payment=pending&reference='
+                $frontendUrl . '/customer/orders?payment=' . $paymentState . '&reference='
                 . urlencode($reference ?: $this->buildPayMongoReference($order))
             );
         }
@@ -1248,6 +1261,71 @@ class CheckoutController extends Controller
     private function buildPayMongoReference(Order $order): string
     {
         return $order->order_number;
+    }
+
+    /**
+     * Confirms a completed Checkout Session with PayMongo's authenticated API.
+     * This is intentionally used only after the return URL and never treats a
+     * redirect itself as payment confirmation.
+     */
+    private function confirmPaidCheckoutSession(Order $order): bool
+    {
+        $sessionId = $order->paymongo_payment_intent_id;
+        $secretKey = $this->getPayMongoSecretKey();
+
+        if (!$sessionId || !$secretKey) {
+            return false;
+        }
+
+        try {
+            $response = Http::withBasicAuth($secretKey, '')
+                ->acceptJson()
+                ->timeout(15)
+                ->get('https://api.paymongo.com/v1/checkout_sessions/' . urlencode($sessionId));
+
+            if (!$response->successful()) {
+                Log::warning('Unable to confirm PayMongo checkout session', [
+                    'order_id' => $order->id,
+                    'checkout_session_id' => $sessionId,
+                    'status' => $response->status(),
+                ]);
+                return false;
+            }
+
+            $attributes = data_get($response->json(), 'data.attributes', []);
+            $statuses = collect([
+                data_get($attributes, 'status'),
+                data_get($attributes, 'payment.status'),
+                data_get($attributes, 'payment.attributes.status'),
+                data_get($attributes, 'payment_intent.status'),
+                data_get($attributes, 'payment_intent.attributes.status'),
+            ])
+                ->merge(collect(data_get($attributes, 'payments', []))->map(
+                    fn ($payment) => data_get($payment, 'attributes.status', data_get($payment, 'status'))
+                ))
+                ->filter()
+                ->map(fn ($status) => strtolower((string) $status));
+
+            $isPaid = $statuses->contains(
+                fn ($status) => in_array($status, ['paid', 'succeeded'], true)
+            );
+            Log::info('PayMongo checkout session confirmation result', [
+                'order_id' => $order->id,
+                'checkout_session_id' => $sessionId,
+                'statuses' => $statuses->values()->all(),
+                'is_paid' => $isPaid,
+            ]);
+
+            return $isPaid;
+        } catch (\Throwable $e) {
+            Log::warning('PayMongo checkout session confirmation failed', [
+                'order_id' => $order->id,
+                'checkout_session_id' => $sessionId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     private function getPayMongoSecretKey(): ?string
