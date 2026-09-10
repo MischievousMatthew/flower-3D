@@ -1,5 +1,13 @@
 <template>
-  <div ref="cardRef" class="product-card">
+  <article
+    ref="cardRef"
+    class="product-card"
+    role="button"
+    tabindex="0"
+    @click="$emit('open-modal', product)"
+    @keydown.enter="$emit('open-modal', product)"
+    @keydown.space.prevent="$emit('open-modal', product)"
+  >
     <!-- ── Image ─────────────────────────────────────── -->
     <div class="product-image">
       <img
@@ -11,6 +19,28 @@
       <span v-if="product.discount_price" class="badge-discount">
         {{ discountPct }}% off
       </span>
+      <div class="image-actions" @click.stop>
+        <button
+          class="image-action image-action-cart"
+          :disabled="product.quantity_in_stock === 0 || addingToCart"
+          @click.stop="handleAddToCart"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h2l2.4 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 1.9-1.4L21 7H6"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+          <span>{{ addingToCart ? "Adding" : "Add to Cart" }}</span>
+        </button>
+        <button
+          class="image-action image-action-buy"
+          :disabled="product.quantity_in_stock === 0"
+          @click.stop="$emit('buy-now', product)"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10Z"/></svg>
+          <span>Buy Now</span>
+        </button>
+        <button class="image-action image-action-view" @click.stop="$emit('open-modal', product)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+          <span>View Details</span>
+        </button>
+      </div>
     </div>
 
     <!-- ── Info ──────────────────────────────────────── -->
@@ -94,21 +124,6 @@
         <span :class="['stock-badge', stockClass]">{{ stockText }}</span>
       </div>
 
-      <div class="product-actions-bottom">
-        <button class="btn-view-details" @click="$emit('open-modal', product)">
-          View Details
-        </button>
-        <button
-          class="btn-add-to-cart"
-          :disabled="product.quantity_in_stock === 0 || addingToCart"
-          @click="handleAddToCart"
-        >
-          <span v-if="addingToCart" class="loading-spinner-small"></span>
-          <span v-else>
-            {{ product.quantity_in_stock > 0 ? "Add to Cart" : "Out of Stock" }}
-          </span>
-        </button>
-      </div>
     </div>
 
     <!-- ── Report modal ──────────────────────────────── -->
@@ -180,7 +195,7 @@
         </div>
       </transition>
     </teleport>
-  </div>
+  </article>
 </template>
 
 <script setup>
@@ -195,7 +210,7 @@ const props = defineProps({
   selectedVendor: { type: Object, default: null },
   addingToCart: { type: Boolean, default: false },
 });
-const emit = defineEmits(["open-modal", "add-to-cart", "select-vendor"]);
+const emit = defineEmits(["open-modal", "add-to-cart", "buy-now", "select-vendor"]);
 
 const { isAuthenticated } = useAuth();
 const cardRef = ref(null);
@@ -632,6 +647,88 @@ const handleImageError = (e) => {
 .btn-add-to-cart:disabled {
   background: #cbd5e0;
   cursor: not-allowed;
+}
+
+/* ── Marketplace card treatment ───────────────────────── */
+.product-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  cursor: pointer;
+  border: 1px solid #e7e5de;
+  border-radius: 18px;
+  background: #fffefd;
+  box-shadow: 0 8px 24px rgba(42, 67, 57, 0.07);
+}
+.product-card:focus-visible {
+  outline: 3px solid rgba(41, 143, 100, 0.34);
+  outline-offset: 3px;
+}
+.product-card:hover { transform: translateY(-5px); box-shadow: 0 16px 34px rgba(30, 64, 48, 0.14); }
+.product-image { height: clamp(190px, 18vw, 255px); background: #edf1ed; }
+.product-image img { transition: transform .55s cubic-bezier(.2,.75,.25,1); }
+.product-card:hover .product-image img { transform: scale(1.06); }
+.badge-discount { top: 12px; left: 12px; right: auto; background: #d95d78; border-radius: 999px; padding: 5px 10px; letter-spacing: .02em; }
+.image-actions {
+  position: absolute;
+  inset: auto 12px 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 7px;
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition: opacity .25s ease, transform .25s ease;
+}
+.product-card:hover .image-actions, .product-card:focus-within .image-actions { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.image-action {
+  min-width: 0;
+  height: 38px;
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  background: rgba(20, 68, 51, .94);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0 8px;
+  cursor: pointer;
+  overflow: hidden;
+  font: 600 11px/1 inherit;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(17, 49, 38, .2);
+  transition: background .2s ease, gap .25s ease;
+}
+.image-action svg { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.image-action span { max-width: 0; opacity: 0; overflow: hidden; transition: max-width .28s ease, opacity .18s ease; }
+.product-card:hover .image-action span, .product-card:focus-within .image-action span { max-width: 76px; opacity: 1; }
+.product-card:hover .image-action { gap: 5px; }
+.image-action-buy { background: #8d6bb1; }
+.image-action-view { background: rgba(255,255,255,.95); color: #225641; }
+.image-action:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.image-action:disabled { cursor: not-allowed; opacity: .58; }
+.product-info { padding: 14px 15px 16px; }
+.product-rating-row { margin-bottom: 5px; }
+.product-rating { font-size: 12px; color: #547064; }
+.sold-count { background: transparent; border: 0; padding: 0; color: #75867f; }
+.product-category { color: #8b6ba9; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 5px; }
+.product-vendor-tag { color: #4e7d68; font-size: 11px; margin-bottom: 4px; }
+.product-name { min-height: 38px; color: #1f4536; font-size: 15px; line-height: 1.25; margin: 0 0 7px; font-weight: 650; }
+.product-description { display: none; }
+.product-footer { margin: 0; }
+.price-current { color: #173e30; font-size: 18px; }
+.price-original { font-size: 12px; }
+.stock-badge { border-radius: 999px; padding: 4px 8px; font-size: 10px; }
+.dot-btn { position: relative; z-index: 2; }
+.product-actions-bottom { display: none; }
+@media (max-width: 700px) {
+  .product-image { height: 205px; }
+  .image-actions { opacity: 1; transform: none; pointer-events: auto; }
+  .image-action { height: 34px; padding: 0 5px; }
+  .image-action span { max-width: 70px; opacity: 1; font-size: 10px; }
+  .product-card:hover .image-action { gap: 3px; }
 }
 
 /* ── Report Modal ─────────────────────────────────────── */

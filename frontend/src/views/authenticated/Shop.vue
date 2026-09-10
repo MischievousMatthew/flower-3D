@@ -6,7 +6,6 @@
       :isAuthenticated="isAuthenticated"
       @scroll-to-section="scrollToSection"
     />
-    <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
 
     <div
       v-if="showAuthModal"
@@ -41,13 +40,13 @@
 
     <section class="hero">
       <div class="hero-content">
+        <p class="hero-eyebrow">Fresh flowers, thoughtfully delivered</p>
         <h1>
-          The Ultimate <span class="highlight">Flower</span><br />Shopping
-          Destination
+          Make every moment<br /><span class="highlight">bloom brighter.</span>
         </h1>
         <p>
-          Discover beautiful, fresh flowers from local vendors. Perfect for
-          every occasion.
+          Discover beautifully arranged flowers from trusted local florists,
+          ready for every kind of occasion.
         </p>
         <div class="hero-buttons">
           <button class="btn-primary" @click="scrollToSection('products')">
@@ -61,21 +60,10 @@
             Create Free Account
           </button>
         </div>
-        <div class="ratings">
-          <div class="customer-avatars">
-            <img
-              v-for="n in 4"
-              :key="n"
-              :src="`https://i.pravatar.cc/40?img=${n}`"
-              alt="Customer"
-              class="avatar"
-            />
-            <div class="avatar-more">+</div>
-          </div>
-          <div class="rating-text">
-            <div class="stars">&#x2B50; 4.9+ Ratings</div>
-            <p>Trusted by {{ totalCustomers }}+ Customers</p>
-          </div>
+        <div class="hero-benefits">
+          <span>&#x1F69A; Local delivery</span>
+          <span>&#x1F6E1;&#xFE0F; Secure checkout</span>
+          <span>&#x2605; Loved by {{ totalCustomers }}+ customers</span>
         </div>
       </div>
       <div class="hero-image">
@@ -521,7 +509,18 @@
               </button>
             </div>
           </div>
-          <div v-if="products.length === 0 && !isLoading" class="no-results">
+          <div v-if="isLoading" class="products-grid products-grid-skeleton" aria-label="Loading products">
+            <div v-for="n in 8" :key="n" class="product-card-skeleton">
+              <div class="skeleton skeleton-product-image"></div>
+              <div class="skeleton-card-copy">
+                <div class="skeleton skeleton-line skeleton-line-short"></div>
+                <div class="skeleton skeleton-line"></div>
+                <div class="skeleton skeleton-line skeleton-line-medium"></div>
+                <div class="skeleton skeleton-price"></div>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="products.length === 0" class="no-results">
             <div class="no-results-icon">&#x1F50D;</div>
             <h3>No products found</h3>
             <p>Try adjusting your filters to find what you're looking for.</p>
@@ -538,6 +537,7 @@
               :adding-to-cart="addingToCartProductId === product.id"
               @open-modal="openProductModal"
               @add-to-cart="addToCartDirect"
+              @buy-now="buyNowDirect"
               @select-vendor="selectVendorById"
             />
           </div>
@@ -852,7 +852,6 @@ import { useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import api from "../../plugins/axios.js";
 import NavHeader from "../../layouts/NavHeader.vue";
-import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import ModelViewer3D from "../../layouts/3D/3DModelViewer.vue";
 import productService from "../../services/productService.js";
 import { useCart } from "../../composables/useCart";
@@ -881,7 +880,6 @@ const showAuthModal = ref(false);
 const pendingAction = ref(null);
 const sortBy = ref("created_at_desc");
 const isLoading = ref(false);
-const isLoadingMessage = ref("");
 const products = ref([]);
 const popularProducts = ref([]);
 
@@ -1158,7 +1156,6 @@ const buildQueryParams = () => {
 const fetchProducts = async () => {
   try {
     isLoading.value = true;
-    isLoadingMessage.value = "Preparing our products...";
     const params = buildQueryParams();
     let endpoint = "customer/products";
     if (selectedVendor.value) {
@@ -1520,6 +1517,11 @@ const buyNow = async () => {
   if (!selectedProduct.value) return;
   if (!requireAuth("buyNow", selectedProduct.value, quantity.value)) return;
   await buyNowAction(selectedProduct.value, quantity.value);
+};
+const buyNowDirect = async (product) => {
+  if (!product || product.quantity_in_stock === 0) return;
+  if (!requireAuth("buyNow", product, 1)) return;
+  await buyNowAction(product, 1);
 };
 
 // ── Countdown ─────────────────────────────────────────────────────────────
@@ -3430,5 +3432,120 @@ onUnmounted(() => {
   .btn-buy-now {
     width: 100%;
   }
+}
+
+/* ── Premium marketplace refresh ───────────────────────────────────────── */
+.shop-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 5% 28%, rgba(218, 203, 235, .32), transparent 22rem),
+    radial-gradient(circle at 95% 38%, rgba(193, 229, 208, .36), transparent 24rem),
+    #fbfaf7;
+  color: #214a39;
+}
+.hero {
+  position: relative;
+  max-width: 1360px;
+  min-height: 360px;
+  margin: 88px auto 34px;
+  padding: 48px 5%;
+  grid-template-columns: minmax(0, .95fr) minmax(360px, 1.05fr);
+  gap: 36px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.8);
+  border-radius: 24px;
+  background: linear-gradient(105deg, #eaf6ed 0%, #f4eee9 54%, #eee5f5 100%);
+  box-shadow: 0 14px 40px rgba(32, 74, 57, .09);
+}
+.hero::after { content: ""; position: absolute; width: 20rem; height: 20rem; border-radius: 50%; right: -9rem; top: -11rem; background: rgba(177, 151, 203, .18); }
+.hero-content { position: relative; z-index: 1; max-width: 560px; }
+.hero-eyebrow, .section-subtitle { margin: 0 0 7px; color: #2b9a69; font-size: 11px; line-height: 1.2; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.hero-content h1 { margin: 0 0 15px; color: #1c4a38; font-size: clamp(34px, 4vw, 56px); font-weight: 650; letter-spacing: -.055em; line-height: .98; }
+.hero-content .highlight { color: #2f9a69; }
+.hero-content > p:not(.hero-eyebrow) { max-width: 460px; color: #587064; font-size: 15px; line-height: 1.55; }
+.hero-buttons { margin: 24px 0 20px; }
+.btn-primary, .btn-promo, .btn-shop-now { border-radius: 999px; background: #19734f; box-shadow: 0 8px 16px rgba(25,115,79,.2); }
+.btn-primary:hover, .btn-promo:hover, .btn-shop-now:hover { background: #125c3f; }
+.btn-secondary { border-radius: 999px; background: rgba(255,255,255,.65); border-color: #cfdccc; color: #24503e; }
+.hero-benefits { display: flex; flex-wrap: wrap; gap: 8px 14px; color: #49675a; font-size: 11px; font-weight: 650; }
+.hero-benefits span { display: inline-flex; align-items: center; gap: 4px; }
+.hero-image { height: 300px; max-width: none; margin: -20px -5% -20px 0; border-radius: 20px 0 0 20px; box-shadow: none; }
+.hero-image::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(234,246,237,.72), transparent 32%); }
+.hero-image img { object-position: center; }
+.badge { z-index: 1; border-radius: 999px; box-shadow: 0 7px 16px rgba(35,68,52,.12); }
+
+.vendors-section { padding: 0 5% 30px; background: transparent; }
+.vendors-container, .products-container { max-width: 1360px; margin: auto; }
+.vendors-header { margin-bottom: 15px; }
+.vendors-header h2, .section-header h2 { color: #204a39; font-weight: 700; letter-spacing: -.035em; }
+.vendor-search-bar { background: #fffefd; border: 1px solid #e2e7df; border-radius: 999px; box-shadow: 0 4px 13px rgba(35,68,52,.05); }
+.vendors-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.vendor-card { min-height: 116px; padding: 15px; border: 1px solid #e5e9e2; border-radius: 16px; background: rgba(255,254,253,.88); box-shadow: 0 7px 18px rgba(32,74,57,.05); }
+.vendor-card:hover, .vendor-card-active { border-color: #a6d5ba; box-shadow: 0 12px 25px rgba(32,74,57,.11); }
+.vendor-card-logo { width: 48px; height: 48px; }
+.btn-view-store { align-self: flex-end; margin: 10px 0 0; padding: 7px 10px; border-radius: 999px; font-size: 11px; }
+
+.products-section { padding: 8px 5% 44px; background: transparent; }
+.products-container { grid-template-columns: 220px minmax(0, 1fr); gap: 24px; align-items: start; }
+.filter-sidebar { top: 86px; border: 1px solid #e2e7df; border-radius: 18px; padding: 17px; background: rgba(255,254,253,.9); box-shadow: 0 10px 26px rgba(32,74,57,.06); }
+.filter-header h2 { color: #244a3b; font-size: 18px; }
+.filter-subtitle { display: none; }
+.filter-group { border-color: #edf0eb; }
+.filter-toggle { min-height: 43px; padding: 9px 0; color: #305546; font-size: 13px; }
+.filter-icon { font-size: 15px; }
+.filter-value { max-width: 90px; color: #718178; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.filter-options { padding: 4px 0 11px 29px; }
+.checkbox-label { color: #607267; font-size: 12px; }
+.price-input { width: 78px; font-size: 11px; }
+.active-vendor-filter { border-radius: 12px; }
+.section-header { align-items: flex-end; margin-bottom: 16px; }
+.results-count { color: #6f8479; font-size: 11px; }
+.sort-select { border: 1px solid #dce5dc; border-radius: 10px; background: #fffefd; color: #365949; font-size: 12px; }
+.popular-products-panel { border: 1px solid #e6e2ed; border-radius: 18px; background: linear-gradient(125deg, #f8f4fb, #fdfcf9); box-shadow: none; }
+.popular-products-head h3 { color: #2c4e40; }
+.popular-products-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
+.popular-product-card { border-radius: 12px; }
+.products-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.pagination { margin-top: 28px; }
+.pagination-btn { border-radius: 999px; }
+
+.products-grid-skeleton { pointer-events: none; }
+.product-card-skeleton { overflow: hidden; border: 1px solid #e8eae4; border-radius: 18px; background: #fffefd; box-shadow: 0 8px 24px rgba(42,67,57,.05); }
+.skeleton { position: relative; overflow: hidden; background: #e8ece7; }
+.skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent); animation: shop-shimmer 1.45s infinite; }
+@keyframes shop-shimmer { 100% { transform: translateX(100%); } }
+.skeleton-product-image { height: clamp(190px, 18vw, 255px); }
+.skeleton-card-copy { padding: 15px; }
+.skeleton-line { height: 12px; margin-bottom: 11px; border-radius: 999px; }
+.skeleton-line-short { width: 38%; }
+.skeleton-line-medium { width: 62%; }
+.skeleton-price { width: 40%; height: 19px; margin-top: 17px; border-radius: 999px; }
+.promo-section { max-width: 1360px; margin: 0 auto 36px; padding: 0 5%; gap: 18px; }
+.promo-card { min-height: 230px; border-radius: 20px; overflow: hidden; }
+.holiday-sales { max-width: 1360px; margin: 0 auto 44px; border-radius: 22px; }
+
+@media (max-width: 1100px) {
+  .hero { margin-left: 3%; margin-right: 3%; }
+  .vendors-section, .products-section { padding-left: 3%; padding-right: 3%; }
+  .products-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .popular-products-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+}
+@media (max-width: 768px) {
+  .hero { min-height: 0; margin: 75px 16px 24px; padding: 34px 26px 0; grid-template-columns: 1fr; }
+  .hero-image { height: 210px; margin: 10px -26px 0; border-radius: 18px 18px 0 0; }
+  .hero-image::after { background: linear-gradient(0deg, rgba(234,246,237,.45), transparent 55%); }
+  .vendors-section, .products-section { padding-left: 16px; padding-right: 16px; }
+  .vendors-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .products-container { gap: 16px; }
+  .filter-sidebar { position: static; }
+  .products-grid, .popular-products-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .section-header { gap: 12px; align-items: flex-start; }
+}
+@media (max-width: 430px) {
+  .hero-content h1 { font-size: 35px; }
+  .hero-benefits { font-size: 10px; }
+  .vendors-grid { grid-template-columns: 1fr; }
+  .products-grid, .popular-products-grid { grid-template-columns: 1fr; }
+  .products-container { grid-template-columns: 1fr; }
 }
 </style>
