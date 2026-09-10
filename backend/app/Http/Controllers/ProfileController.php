@@ -160,12 +160,29 @@ class ProfileController extends Controller
     public function startTwoFactorManagement(Request $request)
     {
         $user = Auth::user();
+        if ($user->role !== \App\Models\User::ROLE_CUSTOMER) {
+            throw ValidationException::withMessages([
+                'two_factor' => ['Two-factor authentication is currently available for customer accounts only.'],
+            ]);
+        }
+        $request->validate(['action' => ['required', 'in:enable,disable']]);
+        $action = $request->action;
+
+        if ($action === 'enable' && $user->two_factor_enabled) {
+            throw ValidationException::withMessages(['two_factor' => ['Two-factor authentication is already enabled.']]);
+        }
+
+        if ($action === 'disable' && !$user->two_factor_enabled) {
+            throw ValidationException::withMessages(['two_factor' => ['Two-factor authentication is already disabled.']]);
+        }
+
         $challenge = TwoFactorManagementChallenge::updateOrCreate(
             [
                 'user_id' => $user->id,
                 'session_token_hash' => $this->sessionTokenHash($request),
             ],
             [
+                'action' => $action,
                 'email_otp_verified_at' => null,
                 'authorized_at' => null,
                 'passkey_attempts' => 0,
@@ -208,97 +225,40 @@ class ProfileController extends Controller
             'expires_at' => now()->addMinutes(self::TWO_FACTOR_CHALLENGE_MINUTES),
         ])->save();
 
-        return response()->json([
-            'success' => true,
-            'passkey_configured' => !empty($user->two_factor_passkey_hash),
-        ]);
-    }
+        if ($challenge->action === 'disable') {
+            $user->forceFill([
+                'two_factor_enabled' => false,
+                'two_factor_passkey_hash' => null,
+            ])->save();
+            $challenge->delete();
 
-    public function sendTwoFactorManagementAlternativeOtp(Request $request)
-    {
-        $challenge = $this->activeChallenge($request, true);
-        $user = Auth::user();
-
-        try {
-            EmailOtpService::send($user->email, $request->ip());
-        } catch (\Throwable $e) {
-            throw ValidationException::withMessages(['otp' => [$e->getMessage()]]);
+            return response()->json([
+                'success' => true,
+                'two_factor_enabled' => false,
+            ]);
         }
-
-        $challenge->forceFill([
-            'expires_at' => now()->addMinutes(self::TWO_FACTOR_CHALLENGE_MINUTES),
-        ])->save();
 
         return response()->json([
             'success' => true,
-            'message' => 'A new verification code was sent to your registered email address.',
+            'two_factor_enabled' => false,
         ]);
-    }
-
-    public function verifyTwoFactorManagementPasskey(Request $request)
-    {
-        $request->validate(['passkey' => ['required', 'digits:6']]);
-        $challenge = $this->activeChallenge($request, true);
-        $user = Auth::user();
-
-        if (!$user->two_factor_passkey_hash) {
-            throw ValidationException::withMessages([
-                'passkey' => ['No security passkey is configured. Try another way instead.'],
-            ]);
-        }
-
-        if ($challenge->is_locked) {
-            throw ValidationException::withMessages([
-                'passkey' => ['Too many failed passkey attempts. Start again.'],
-            ]);
-        }
-
-        $challenge->increment('passkey_attempts');
-        if (!Hash::check($request->passkey, $user->two_factor_passkey_hash)) {
-            $challenge->refresh();
-            if ($challenge->passkey_attempts >= self::MAX_PASSKEY_ATTEMPTS) {
-                $challenge->update(['is_locked' => true]);
-            }
-
-            $remaining = max(0, self::MAX_PASSKEY_ATTEMPTS - $challenge->passkey_attempts);
-            throw ValidationException::withMessages([
-                'passkey' => ["Invalid passkey. {$remaining} attempt(s) remaining."],
-            ]);
-        }
-
-        $this->authorizeChallenge($challenge);
-
-        return response()->json(['success' => true]);
-    }
-
-    public function verifyTwoFactorManagementAlternativeOtp(Request $request)
-    {
-        $request->validate(['otp' => ['required', 'digits:6']]);
-        $challenge = $this->activeChallenge($request, true);
-        $user = Auth::user();
-
-        try {
-            if (!EmailOtpService::verify($user->email, $request->otp)) {
-                throw new \Exception('Invalid OTP. Please request a new one.');
-            }
-        } catch (\Throwable $e) {
-            throw ValidationException::withMessages(['otp' => [$e->getMessage()]]);
-        }
-
-        $this->authorizeChallenge($challenge);
-
-        return response()->json(['success' => true]);
     }
 
     public function setTwoFactorPasskey(Request $request)
     {
         $request->validate(['passkey' => ['required', 'digits:6']]);
-        $this->activeChallenge($request, true, true);
+        $challenge = $this->activeChallenge($request, true);
+
+        if ($challenge->action !== 'enable') {
+            throw ValidationException::withMessages(['two_factor' => ['This verification cannot enable two-factor authentication.']]);
+        }
 
         $user = Auth::user();
         $user->forceFill([
             'two_factor_passkey_hash' => Hash::make($request->passkey),
+            'two_factor_enabled' => true,
         ])->save();
+        $challenge->delete();
 
         return response()->json([
             'success' => true,
@@ -306,7 +266,7 @@ class ProfileController extends Controller
         ]);
     }
 
-    private function activeChallenge(Request $request, bool $requireEmailVerification = false, bool $requireAuthorization = false): TwoFactorManagementChallenge
+    private function activeChallenge(Request $request, bool $requireEmailVerification = false): TwoFactorManagementChallenge
     {
         $challenge = TwoFactorManagementChallenge::query()
             ->where('user_id', Auth::id())
@@ -332,21 +292,7 @@ class ProfileController extends Controller
             ]);
         }
 
-        if ($requireAuthorization && !$challenge->authorized_at) {
-            throw ValidationException::withMessages([
-                'two_factor' => ['Complete the second security verification first.'],
-            ]);
-        }
-
         return $challenge;
-    }
-
-    private function authorizeChallenge(TwoFactorManagementChallenge $challenge): void
-    {
-        $challenge->forceFill([
-            'authorized_at' => now(),
-            'expires_at' => now()->addMinutes(self::TWO_FACTOR_CHALLENGE_MINUTES),
-        ])->save();
     }
 
     private function sessionTokenHash(Request $request): string
@@ -398,6 +344,7 @@ class ProfileController extends Controller
             'profile_picture'   => $profilePicture,
             'plan'              => $user->plan,
             'two_factor_passkey_configured' => !empty($user->two_factor_passkey_hash),
+            'two_factor_enabled' => (bool) $user->two_factor_enabled,
         ];
     }
 }

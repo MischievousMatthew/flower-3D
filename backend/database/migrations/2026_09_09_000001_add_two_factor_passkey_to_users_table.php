@@ -10,13 +10,14 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             $table->string('two_factor_passkey_hash')->nullable()->after('api_token');
+            $table->boolean('two_factor_enabled')->default(false)->after('two_factor_passkey_hash');
         });
     }
 
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('two_factor_passkey_hash');
+            $table->dropColumn(['two_factor_passkey_hash', 'two_factor_enabled']);
         });
     }
 };

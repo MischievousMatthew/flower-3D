@@ -38,6 +38,7 @@ class User extends Authenticatable
         'email_verified_at',
         'api_token',
         'two_factor_passkey_hash',
+        'two_factor_enabled',
     ];
 
     protected $hidden = [
@@ -53,6 +54,7 @@ class User extends Authenticatable
         'is_verified' => 'boolean',
         'vendor_data' => 'array',
         'date_of_birth' => 'date',
+        'two_factor_enabled' => 'boolean',
     ];
 
     // Add these accessors

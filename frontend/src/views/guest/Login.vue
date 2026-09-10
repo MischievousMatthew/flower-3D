@@ -20,12 +20,10 @@
 
     <!-- Form Content -->
     <div class="form-content">
-      <form @submit.prevent="handleLogin" class="login-form">
-        <!-- Error Alert -->
-        <div v-if="errorMessage" class="alert-error">
-          {{ errorMessage }}
-        </div>
-
+      <div v-if="errorMessage" class="alert-error">
+        {{ errorMessage }}
+      </div>
+      <form v-if="!twoFactorRequired" @submit.prevent="handleLogin" class="login-form">
         <!-- Username Input -->
         <div class="input-group">
           <label class="input-label">Username</label>
@@ -76,14 +74,43 @@
           <span v-else>Log in</span>
         </button>
       </form>
+
+      <section v-else class="two-factor-login">
+        <h2>{{ twoFactorMethod === "passkey" ? "Verify your passkey" : "Verify your email" }}</h2>
+        <p v-if="twoFactorMethod === 'passkey'">Enter your six-digit security passkey to continue.</p>
+        <p v-else>Code was sent to {{ maskedEmail }}</p>
+        <div class="code-boxes" @paste.prevent="pasteCode">
+          <input
+            v-for="(_, index) in twoFactorCode"
+            :key="index"
+            :ref="(element) => setCodeInput(element, index)"
+            v-model="twoFactorCode[index]"
+            class="code-box"
+            :type="twoFactorMethod === 'passkey' ? 'password' : 'text'"
+            inputmode="numeric"
+            maxlength="1"
+            :autocomplete="twoFactorMethod === 'otp' ? 'one-time-code' : 'off'"
+            @input="advanceCode(index)"
+            @keydown.backspace="retreatCode($event, index)"
+          />
+        </div>
+        <button class="login-btn" :disabled="loading || !isCompleteTwoFactorCode" @click="completeTwoFactorLogin">
+          {{ loading ? "Verifying..." : "Continue" }}
+        </button>
+        <button v-if="twoFactorMethod === 'passkey'" class="try-another-way" :disabled="loading" @click="requestLoginOtp">
+          Try another way
+        </button>
+        <button class="try-another-way" :disabled="loading" @click="cancelTwoFactorLogin">Cancel</button>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
+import api from "../../plugins/axios";
 import {
   hasStoredAuthSession,
   getPreferredAuthToken,
@@ -91,7 +118,7 @@ import {
 } from "../../utils/authSession";
 
 const router = useRouter();
-const { combinedLogin, loading } = useAuth();
+const { combinedLogin, completeTwoFactorLogin: finishTwoFactorLogin, loading } = useAuth();
 
 const form = reactive({
   username: "",
@@ -101,6 +128,13 @@ const form = reactive({
 const errors = ref({});
 const errorMessage = ref("");
 const showPassword = ref(false);
+const twoFactorRequired = ref(false);
+const twoFactorMethod = ref("passkey");
+const twoFactorChallengeToken = ref("");
+const twoFactorCode = ref(Array(6).fill(""));
+const maskedEmail = ref("");
+const codeInputs = [];
+const isCompleteTwoFactorCode = computed(() => /^\d{6}$/.test(twoFactorCode.value.join("")));
 
 const handleLogin = async () => {
   errors.value = {};
@@ -108,6 +142,14 @@ const handleLogin = async () => {
 
   try {
     const result = await combinedLogin(form);
+
+    if (result.requiresTwoFactor) {
+      twoFactorChallengeToken.value = result.challengeToken;
+      twoFactorRequired.value = true;
+      twoFactorMethod.value = "passkey";
+      twoFactorCode.value = Array(6).fill("");
+      return;
+    }
 
     if (!result.success) {
       if (result.errors) {
@@ -120,6 +162,60 @@ const handleLogin = async () => {
     console.error("Login error:", error);
     errorMessage.value = "An error occurred. Please try again.";
   }
+};
+
+const setCodeInput = (element, index) => {
+  if (element) codeInputs[index] = element;
+};
+
+const advanceCode = (index) => {
+  twoFactorCode.value[index] = twoFactorCode.value[index].replace(/\D/g, "").slice(-1);
+  if (twoFactorCode.value[index] && index < 5) codeInputs[index + 1]?.focus();
+};
+
+const retreatCode = (event, index) => {
+  if (!twoFactorCode.value[index] && index > 0) {
+    event.preventDefault();
+    codeInputs[index - 1]?.focus();
+  }
+};
+
+const pasteCode = (event) => {
+  const digits = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+  if (!digits) return;
+  digits.split("").forEach((digit, index) => { twoFactorCode.value[index] = digit; });
+  codeInputs[Math.min(digits.length, 6) - 1]?.focus();
+};
+
+const requestLoginOtp = async () => {
+  errorMessage.value = "";
+  try {
+    const { data } = await api.post("/auth/two-factor/send-otp", {
+      challenge_token: twoFactorChallengeToken.value,
+    });
+    maskedEmail.value = data.masked_email;
+    twoFactorMethod.value = "otp";
+    twoFactorCode.value = Array(6).fill("");
+  } catch (error) {
+    errorMessage.value = error.response?.data?.errors?.otp?.[0] || "Unable to send a verification code.";
+  }
+};
+
+const completeTwoFactorLogin = async () => {
+  if (!isCompleteTwoFactorCode.value) return;
+  const result = await finishTwoFactorLogin(
+    twoFactorChallengeToken.value,
+    twoFactorCode.value.join(""),
+    twoFactorMethod.value,
+  );
+  if (!result.success) errorMessage.value = result.error;
+};
+
+const cancelTwoFactorLogin = () => {
+  twoFactorRequired.value = false;
+  twoFactorChallengeToken.value = "";
+  twoFactorCode.value = Array(6).fill("");
+  twoFactorMethod.value = "passkey";
 };
 
 onMounted(() => {
@@ -219,6 +315,61 @@ onMounted(() => {
 
 .login-form {
   width: 100%;
+}
+
+.two-factor-login {
+  text-align: center;
+}
+
+.two-factor-login h2 {
+  color: #2d3748;
+  font-size: 22px;
+  font-weight: 500;
+  margin: 0 0 10px;
+}
+
+.two-factor-login p {
+  color: #718096;
+  font-size: 14px;
+  margin: 0 0 24px;
+}
+
+.code-boxes {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.code-box {
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  box-sizing: border-box;
+  font-size: 20px;
+  height: 48px;
+  text-align: center;
+  width: 44px;
+}
+
+.code-box:focus {
+  border-color: #2d3748;
+  outline: none;
+}
+
+.try-another-way {
+  background: transparent;
+  border: 0;
+  color: #4a5568;
+  cursor: pointer;
+  display: block;
+  font-size: 14px;
+  margin: 16px auto 0;
+  text-decoration: underline;
+}
+
+.try-another-way:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .alert-error {

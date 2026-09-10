@@ -10,6 +10,7 @@ class TwoFactorManagementChallenge extends Model
     protected $fillable = [
         'user_id',
         'session_token_hash',
+        'action',
         'email_otp_verified_at',
         'authorized_at',
         'passkey_attempts',

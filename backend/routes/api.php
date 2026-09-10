@@ -58,6 +58,9 @@ Route::prefix('auth')->group(function () {
     Route::post('/send-otp',     [AuthController::class, 'sendOtp']);
     Route::post('/register',     [AuthController::class, 'register']);
     Route::post('/login',        [AuthController::class, 'login']);
+    Route::post('/two-factor/verify-passkey', [AuthController::class, 'verifyTwoFactorPasskey']);
+    Route::post('/two-factor/send-otp', [AuthController::class, 'sendTwoFactorLoginOtp']);
+    Route::post('/two-factor/verify-otp', [AuthController::class, 'verifyTwoFactorLoginOtp']);
     Route::post('/vendor/login', [AuthController::class, 'vendorLogin']);
 });
 
@@ -148,9 +151,6 @@ Route::middleware('token.auth')->group(function () {
         Route::post('/picture',     [ProfileController::class, 'updateProfilePicture']);
         Route::post('/two-factor/manage/start', [ProfileController::class, 'startTwoFactorManagement']);
         Route::post('/two-factor/manage/verify-email-otp', [ProfileController::class, 'verifyTwoFactorManagementEmailOtp']);
-        Route::post('/two-factor/manage/send-alternative-otp', [ProfileController::class, 'sendTwoFactorManagementAlternativeOtp']);
-        Route::post('/two-factor/manage/verify-passkey', [ProfileController::class, 'verifyTwoFactorManagementPasskey']);
-        Route::post('/two-factor/manage/verify-alternative-otp', [ProfileController::class, 'verifyTwoFactorManagementAlternativeOtp']);
         Route::post('/two-factor/manage/passkey', [ProfileController::class, 'setTwoFactorPasskey']);
     });
 

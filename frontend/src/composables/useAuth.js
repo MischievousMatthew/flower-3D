@@ -139,6 +139,14 @@ export function useAuth() {
         login_context: loginContext,
       });
 
+      if (data?.requires_two_factor) {
+        return {
+          success: false,
+          requiresTwoFactor: true,
+          challengeToken: data.challenge_token,
+        };
+      }
+
       const token = data?.token;
       const userData = data?.user || data;
 
@@ -195,11 +203,44 @@ export function useAuth() {
       loginContext,
     });
     if (userResult.success) return userResult;
+    if (userResult.requiresTwoFactor) return userResult;
 
     return {
       success: false,
       error: "Invalid username or password. Please check your credentials.",
     };
+  };
+
+  const completeTwoFactorLogin = async (challengeToken, code, method) => {
+    try {
+      loading.value = true;
+      error.value = null;
+      const endpoint = method === "otp"
+        ? "/auth/two-factor/verify-otp"
+        : "/auth/two-factor/verify-passkey";
+      const payload = {
+        challenge_token: challengeToken,
+        [method === "otp" ? "otp" : "passkey"]: code,
+        login_context: await buildLoginContext(),
+      };
+      const { data } = await api.post(endpoint, payload);
+      if (!data?.token) throw new Error("Login verification failed");
+
+      const userData = data.user;
+      setAuthData(data.token, { ...userData, type: userData?.role || "customer" }, "user");
+      await router.push(data.redirect_url || "/shop");
+      toast.success(`Welcome back, ${userData?.name || "User"}!`);
+      return { success: true };
+    } catch (err) {
+      const errors = err?.response?.data?.errors;
+      const firstError = errors ? Object.values(errors)[0] : null;
+      return {
+        success: false,
+        error: Array.isArray(firstError) ? firstError[0] : (err?.response?.data?.message || err.message || "Verification failed"),
+      };
+    } finally {
+      loading.value = false;
+    }
   };
 
   // ================= REGISTER =================
@@ -392,6 +433,7 @@ export function useAuth() {
     login,
     employeeLogin,
     combinedLogin,
+    completeTwoFactorLogin,
     logout,
     fetchUser,
     loadUser,

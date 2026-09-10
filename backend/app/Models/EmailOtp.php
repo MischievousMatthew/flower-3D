@@ -31,6 +31,7 @@ class EmailOtp extends Model
     public function incrementAttempts(int $maxAttempts = 5): void
     {
         $this->increment('attempts');
+        $this->refresh();
         if ($this->attempts >= $maxAttempts) {
             $this->update(['is_locked' => true]);
         }
