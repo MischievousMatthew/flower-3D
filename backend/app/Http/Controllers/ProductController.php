@@ -313,6 +313,9 @@ class ProductController extends Controller
                 'status'                 => 'nullable|in:draft,active,inactive,discontinued',
                 'removed_image_ids'      => 'nullable|array',
                 'removed_image_ids.*'    => 'integer',
+                'images'                 => 'nullable|array|max:5',
+                'images.*'               => 'file|image|max:10240',
+                'model_file'             => 'nullable|file|mimes:glb,gltf,obj,fbx|max:51200',
             ]);
 
             if ($validator->fails()) {
@@ -362,6 +365,7 @@ class ProductController extends Controller
 
             // ── Upload new images ─────────────────────────────────────────
             $this->handleImageUploads($request, $product);
+            $this->ensurePrimaryImage($product);
 
             // ── Replace 3D model ──────────────────────────────────────────
             if ($request->hasFile('model_file')) {
@@ -639,6 +643,9 @@ class ProductController extends Controller
         $files = array_values(array_filter($files));
 
         $existingCount = $product->images()->count();
+        // If the previous primary was removed in this edit, make the first
+        // replacement upload primary even when secondary images still exist.
+        $hasPrimaryImage = $product->images()->where('is_primary', true)->exists();
 
         foreach ($files as $index => $imageFile) {
             if (!($imageFile instanceof \Illuminate\Http\UploadedFile)) {
@@ -663,7 +670,7 @@ class ProductController extends Controller
                     'product_id'    => $product->id,
                     'image_url'     => $result['secure_url'],
                     'image_path'    => $result['public_id'],
-                    'is_primary'    => ($existingCount === 0 && $index === 0),
+                    'is_primary'    => (!$hasPrimaryImage && $index === 0),
                     'display_order' => $existingCount + $index,
                 ]);
 
@@ -682,6 +689,19 @@ class ProductController extends Controller
                 ]);
             }
         }
+    }
+
+    /** Keep product list/detail responses renderable after an image replacement. */
+    private function ensurePrimaryImage(Product $product): void
+    {
+        $images = $product->images()->orderBy('display_order')->orderBy('id')->get();
+
+        if ($images->isEmpty() || $images->contains('is_primary', true)) {
+            return;
+        }
+
+        ProductImage::where('product_id', $product->id)->update(['is_primary' => false]);
+        $images->first()->update(['is_primary' => true]);
     }
 
     private function normalizeProductPayload(Request $request): array

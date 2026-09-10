@@ -1385,9 +1385,22 @@
                       style="display: none"
                     />
                     <p class="hint-text">
-                      Up to 5 photos total. Removing existing images is
-                      permanent.
+                      Remove the current primary photo, then add a new photo to
+                      replace it. The first remaining/new photo becomes primary.
                     </p>
+                  </div>
+                </div>
+
+                <div class="vd-card span2">
+                  <h3 class="vdc-title">🧊 3D Product Model</h3>
+                  <div class="model-upload-row">
+                    <div class="model-file-summary">
+                      <strong>{{ newModelFile?.name || currentModel?.metadata?.original_filename || "No 3D model selected" }}</strong>
+                      <span>{{ newModelFile ? "New model will replace the current model when saved." : currentModel ? "Upload a file to replace the current model." : "GLB, GLTF, OBJ, or FBX (max 50 MB)" }}</span>
+                    </div>
+                    <button type="button" class="btn-model-upload" @click="triggerModelFileInput">{{ newModelFile || currentModel ? "Replace 3D Model" : "Add 3D Model" }}</button>
+                    <input ref="editModelInput" type="file" accept=".glb,.gltf,.obj,.fbx" @change="handleModelFileSelect" style="display: none" />
+                    <button v-if="newModelFile" type="button" class="btn-model-clear" @click="clearModelFile">Clear</button>
                   </div>
                 </div>
               </div>
@@ -1620,9 +1633,12 @@ const showDeleteModal = ref(false);
 const showEditModal = ref(false);
 const isSubmitting = ref(false);
 const editFileInput = ref(null);
+const editModelInput = ref(null);
 const existingImages = ref([]);
 const newProductImages = ref([]);
 const removedImageIds = ref([]);
+const newModelFile = ref(null);
+const currentModel = ref(null);
 
 const editFormData = reactive({
   product_name: "",
@@ -1976,6 +1992,8 @@ const closeEditModal = () => {
   Object.keys(editErrors).forEach((k) => delete editErrors[k]);
   newProductImages.value = [];
   removedImageIds.value = [];
+  newModelFile.value = null;
+  currentModel.value = null;
 };
 const switchToEdit = () => {
   if (selectedProduct.value) openEditModal(selectedProduct.value);
@@ -2019,6 +2037,8 @@ const populateEditForm = (p) => {
   existingImages.value = (p.images || []).map((img) => ({ ...img }));
   newProductImages.value = [];
   removedImageIds.value = [];
+  newModelFile.value = null;
+  currentModel.value = p.models?.[0] || p.model || null;
 };
 const onEditDiscountToggle = () => {
   if (!editFormData.has_discount) {
@@ -2058,6 +2078,19 @@ const removeExistingImage = (i) => {
   if (removed[0]?.id) removedImageIds.value.push(removed[0].id);
 };
 const removeNewImage = (i) => newProductImages.value.splice(i, 1);
+const triggerModelFileInput = () => editModelInput.value?.click();
+const handleModelFileSelect = (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  if (!["glb", "gltf", "obj", "fbx"].includes(extension) || file.size > 50 * 1024 * 1024) {
+    toast.error("Choose a GLB, GLTF, OBJ, or FBX file no larger than 50 MB.");
+  } else {
+    newModelFile.value = file;
+  }
+  event.target.value = "";
+};
+const clearModelFile = () => { newModelFile.value = null; };
 const clearEditError = (field) => {
   if (editErrors[field]) delete editErrors[field];
 };
@@ -2153,6 +2186,7 @@ const submitEditProduct = async () => {
     newProductImages.value.forEach((img) => {
       if (img.file) fd.append("images[]", img.file);
     });
+    if (newModelFile.value) fd.append("model_file", newModelFile.value);
 
     removedImageIds.value.forEach((id) => {
       fd.append("removed_image_ids[]", id);
@@ -3652,6 +3686,23 @@ watch(activeTab, () => {
   font-weight: 600;
   color: #6b7280;
 }
+
+.model-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px dashed #a7d7bd;
+  border-radius: 10px;
+  background: #f5fbf7;
+}
+.model-file-summary { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.model-file-summary strong { color: #22563d; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-file-summary span { color: #647a6d; font-size: 11px; }
+.btn-model-upload, .btn-model-clear { border: 0; border-radius: 7px; padding: 9px 12px; font: 600 12px inherit; cursor: pointer; white-space: nowrap; }
+.btn-model-upload { background: #19734f; color: #fff; }
+.btn-model-clear { background: #e8f0eb; color: #3e6450; }
+@media (max-width: 600px) { .model-upload-row { align-items: stretch; flex-direction: column; } }
 .new-badge {
   position: absolute;
   bottom: 3px;
