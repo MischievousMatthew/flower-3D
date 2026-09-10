@@ -95,12 +95,12 @@ export function useAuth() {
 
       return { success: true, data };
     } catch (err) {
-      console.error("❌ Employee login error:", {
-        message: err?.message,
-        response: err?.response?.data,
-        status: err?.response?.status,
-        url: err?.response?.config?.url,
-      });
+      // console.error("❌ Employee login error:", {
+      //   message: err?.message,
+      //   response: err?.response?.data,
+      //   status: err?.response?.status,
+      //   url: err?.response?.config?.url,
+      // });
 
       let errorMessage = "Employee login failed";
       if (err?.response?.status === 404) {
@@ -215,9 +215,10 @@ export function useAuth() {
     try {
       loading.value = true;
       error.value = null;
-      const endpoint = method === "otp"
-        ? "/auth/two-factor/verify-otp"
-        : "/auth/two-factor/verify-passkey";
+      const endpoint =
+        method === "otp"
+          ? "/auth/two-factor/verify-otp"
+          : "/auth/two-factor/verify-passkey";
       const payload = {
         challenge_token: challengeToken,
         [method === "otp" ? "otp" : "passkey"]: code,
@@ -227,7 +228,11 @@ export function useAuth() {
       if (!data?.token) throw new Error("Login verification failed");
 
       const userData = data.user;
-      setAuthData(data.token, { ...userData, type: userData?.role || "customer" }, "user");
+      setAuthData(
+        data.token,
+        { ...userData, type: userData?.role || "customer" },
+        "user",
+      );
       await router.push(data.redirect_url || "/shop");
       toast.success(`Welcome back, ${userData?.name || "User"}!`);
       return { success: true };
@@ -236,7 +241,11 @@ export function useAuth() {
       const firstError = errors ? Object.values(errors)[0] : null;
       return {
         success: false,
-        error: Array.isArray(firstError) ? firstError[0] : (err?.response?.data?.message || err.message || "Verification failed"),
+        error: Array.isArray(firstError)
+          ? firstError[0]
+          : err?.response?.data?.message ||
+            err.message ||
+            "Verification failed",
       };
     } finally {
       loading.value = false;
