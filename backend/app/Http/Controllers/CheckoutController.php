@@ -236,7 +236,7 @@ class CheckoutController extends Controller
             $user = Auth::user();
 
             $validator = Validator::make($request->all(), [
-                'payment_method' => 'required|in:gcash,maya,cod',
+                'payment_method' => 'required|in:ewallet,cod',
                 'delivery_address' => 'required|string',
                 'contact_number' => 'required|string',
                 'delivery_notes' => 'nullable|string',
@@ -516,7 +516,7 @@ class CheckoutController extends Controller
                 DB::commit();
 
                 // Handle payment
-                if (in_array($paymentMethod, ['gcash', 'maya'], true)) {
+                if ($paymentMethod === 'ewallet') {
                     $paymentResponse = $this->createPayMongoPayment($order, $paymentMethod);
                     
                     if ($paymentResponse['success']) {
@@ -603,10 +603,10 @@ class CheckoutController extends Controller
     private function retryOnlinePayment(Request $request, $user)
     {
         $paymentMethod = $this->normalizePaymentMethod($request->payment_method);
-        if (!in_array($paymentMethod, ['gcash', 'maya'], true)) {
+        if ($paymentMethod !== 'ewallet') {
             return response()->json([
                 'success' => false,
-                'message' => 'Only GCash or Maya can be used to retry this payment.',
+                'message' => 'Only E-Wallet can be used to retry this payment.',
             ], 422);
         }
 
@@ -672,27 +672,13 @@ class CheckoutController extends Controller
 
         $methods = [];
 
-        if ($vendorApplication->payout_method === 'gcash') {
-            $methods[] = [
-                'type' => 'gcash',
-                'name' => 'GCash',
-                'category' => 'E-Wallet (GCash / Maya)',
-                'description' => 'Pay via GCash',
-                'icon' => '💙',
-                'enabled' => true,
-            ];
-        }
-
-        if ($vendorApplication->payout_method === 'maya') {
-            $methods[] = [
-                'type' => 'maya',
-                'name' => 'Maya',
-                'category' => 'E-Wallet (GCash / Maya)',
-                'description' => 'Pay via Maya',
-                'icon' => '💚',
-                'enabled' => true,
-            ];
-        }
+        $methods[] = [
+            'type' => 'ewallet',
+            'name' => 'E-Wallet',
+            'description' => 'Choose GCash or Maya securely in PayMongo',
+            'icon' => '📱',
+            'enabled' => true,
+        ];
 
         $methods[] = [
             'type' => 'cod',
@@ -721,13 +707,7 @@ class CheckoutController extends Controller
             return ['success' => false, 'message' => 'Payment gateway not configured'];
         }
 
-        $checkoutMethod = match ($paymentMethod) {
-            'gcash' => 'gcash',
-            'maya' => 'paymaya',
-            default => null,
-        };
-
-        if (!$checkoutMethod) {
+        if ($paymentMethod !== 'ewallet') {
             return ['success' => false, 'message' => 'Unsupported online payment method.'];
         }
 
@@ -760,7 +740,7 @@ class CheckoutController extends Controller
                                 'name' => 'Order #' . $order->order_number,
                             ]
                         ],
-                        'payment_method_types' => [$checkoutMethod],
+                        'payment_method_types' => ['gcash', 'paymaya'],
                         'success_url' => $callbackUrl
                             . '?success=true&order_id=' . urlencode((string) $order->id)
                             . '&reference=' . urlencode($referenceNumber),
@@ -782,7 +762,7 @@ class CheckoutController extends Controller
             Log::info('Creating PayMongo checkout session', [
                 'order_id' => $order->id,
                 'payment_method' => $paymentMethod,
-                'checkout_method' => $checkoutMethod,
+                'checkout_methods' => ['gcash', 'paymaya'],
                 'amount_centavos' => $checkoutData['data']['attributes']['line_items'][0]['amount'],
                 'success_url' => $checkoutData['data']['attributes']['success_url'],
                 'cancel_url' => $checkoutData['data']['attributes']['cancel_url'],
@@ -1293,7 +1273,7 @@ class CheckoutController extends Controller
     private function normalizePaymentMethod(?string $paymentMethod): ?string
     {
         return match ($paymentMethod) {
-            'paymaya' => 'maya',
+            'paymaya', 'gcash', 'maya' => 'ewallet',
             default => $paymentMethod,
         };
     }
@@ -1361,7 +1341,7 @@ class CheckoutController extends Controller
                 );
             }
 
-            if (in_array($order->payment_method, ['gcash', 'maya'], true)) {
+            if ($order->payment_method === 'ewallet') {
                 $productIds = $order->items()->pluck('product_id')->filter();
                 if ($productIds->isNotEmpty()) {
                     Cart::where('user_id', $order->user_id)

@@ -324,13 +324,6 @@
                 Choose your preferred payment method
               </p>
 
-              <p
-                v-if="hasEWalletPaymentMethod"
-                class="payment-category"
-              >
-                E-Wallet (GCash / Maya)
-              </p>
-
               <!-- Available Payment Methods from Vendor -->
               <div class="payment-methods-grid">
                 <!-- Online Payment Methods (based on vendor's payout method) -->
@@ -354,9 +347,9 @@
                 </label>
               </div>
 
-              <!-- PayMongo redirect details for GCash or Maya -->
+              <!-- PayMongo redirect details for E-Wallet -->
               <div
-                v-if="['gcash', 'maya'].includes(selectedPaymentMethod)"
+                v-if="selectedPaymentMethod === 'ewallet'"
                 class="card-details-section"
               >
                 <h3>Payment Details</h3>
@@ -670,7 +663,6 @@ const checkoutTotalSavings = computed(() => {
 const customerNotes = ref("");
 const selectedPaymentMethod = ref(null);
 const availablePaymentMethods = ref([]);
-const allowedEWalletPaymentMethods = new Set(["gcash", "maya"]);
 
 // Day headers
 const dayHeaders = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -707,12 +699,6 @@ const selectedDateRemainingCapacity = computed(() => {
       (Number.isFinite(ordersCount) ? ordersCount : 0),
   );
 });
-
-const hasEWalletPaymentMethod = computed(() =>
-  availablePaymentMethods.value.some((method) =>
-    allowedEWalletPaymentMethods.has(method.type),
-  ),
-);
 
 const vendorReservationNotice = computed(() => {
   const parts = [];
@@ -1080,11 +1066,7 @@ async function loadCheckoutData() {
       availablePaymentMethods.value = checkoutData.value.payment_methods.available_methods.filter(
         (method) => {
           const paymentMethod = String(method?.type || "").toLowerCase();
-          const isEWallet = ["gcash", "maya", "paymaya"].includes(paymentMethod);
-
-          return paymentMethod === "cod" || (
-            isEWallet && allowedEWalletPaymentMethods.has(paymentMethod)
-          );
+          return ["ewallet", "cod"].includes(paymentMethod);
         },
       );
       // Set default payment method
@@ -1188,6 +1170,11 @@ async function placeOrder() {
   } catch (error) {
     console.log("Validation errors:", error.response?.data?.errors);
     console.error("Checkout error:", error.response?.data || error);
+    const retryOrderId = error.response?.data?.data?.order?.id;
+    if (retryOrderId) {
+      pendingOnlineOrderId.value = retryOrderId;
+      sessionStorage.setItem("pending_online_order_id", String(retryOrderId));
+    }
     toast.error(error.response?.data?.message || "Failed to place order");
   } finally {
     isProcessing.value = false;
@@ -1243,7 +1230,7 @@ onMounted(async () => {
   if (route.query.payment === "cancelled" || pendingOnlineOrderId.value) {
     currentStep.value = 3;
     if (route.query.payment === "cancelled") {
-      toast.info("Payment was not completed. Choose GCash or Maya to try again.");
+      toast.info("Payment was not completed. Choose E-Wallet to try again.");
     }
   }
 });
@@ -1761,12 +1748,6 @@ onMounted(async () => {
   margin-bottom: 24px;
 }
 
-.payment-category {
-  color: #4a5568;
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0 0 12px;
-}
 
 .payment-method-card {
   padding: 20px;

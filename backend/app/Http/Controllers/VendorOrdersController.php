@@ -647,6 +647,13 @@ class VendorOrdersController extends Controller
                 ], 404);
             }
 
+            if ($order->payment_method === 'ewallet' && $order->payment_status !== 'paid') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This order cannot be processed until PayMongo confirms payment.',
+                ], 422);
+            }
+
             $oldStatus = $this->resolveDisplayStatus($order);
             $newStatus = $request->status;
 

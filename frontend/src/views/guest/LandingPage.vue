@@ -774,7 +774,7 @@ function setupFlowerJourney() {
 
   const spread = getSpreadX();
   const isMobile = window.innerWidth < 968;
-  const scaleBase = isMobile ? 0.7 : 1.15;
+  const scaleBase = isMobile ? 0.58 : 0.95;
 
   // Setup scroll behavior to record scrolling state
   const scrollUpdateTrigger = ScrollTrigger.create({
