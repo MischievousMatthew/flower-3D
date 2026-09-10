@@ -49,6 +49,14 @@ const shouldForceLogout = (error) => {
 // ================= REQUEST INTERCEPTOR =================
 api.interceptors.request.use(
   (config) => {
+    // Let the browser generate the multipart boundary for every FormData
+    // request. Keeping the client's JSON default here causes Laravel to read
+    // uploaded images/models as ordinary values instead of UploadedFile items.
+    if (config.data instanceof FormData) {
+      delete config.headers["Content-Type"];
+      delete config.headers["content-type"];
+    }
+
     const token = getPreferredAuthToken(window.location.pathname);
 
     if (token) {
