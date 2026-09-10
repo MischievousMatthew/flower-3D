@@ -315,8 +315,29 @@ class ProductController extends Controller
                 'removed_image_ids.*'    => 'integer',
                 'images'                 => 'nullable|array|max:5',
                 'images.*'               => 'file|image|max:10240',
-                'model_file'             => 'nullable|file|mimes:glb,gltf,obj,fbx|max:51200',
+                // GLB is commonly detected as application/octet-stream, so
+                // Laravel's MIME-based mimes rule rejects valid .glb files.
+                'model_file'             => 'nullable|file|max:51200',
             ]);
+
+            $validator->after(function ($validator) use ($request) {
+                if (!$request->hasFile('model_file')) {
+                    return;
+                }
+
+                $modelFile = $request->file('model_file');
+                if (is_array($modelFile)) {
+                    $modelFile = $modelFile[0] ?? null;
+                }
+
+                $extension = $modelFile instanceof \Illuminate\Http\UploadedFile
+                    ? strtolower($modelFile->getClientOriginalExtension())
+                    : '';
+
+                if (!in_array($extension, ['glb', 'gltf', 'obj', 'fbx'], true)) {
+                    $validator->errors()->add('model_file', 'The 3D model must be a GLB, GLTF, OBJ, or FBX file.');
+                }
+            });
 
             if ($validator->fails()) {
                 return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
