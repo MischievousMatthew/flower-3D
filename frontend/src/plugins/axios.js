@@ -28,15 +28,15 @@ const shouldForceLogout = (error) => {
 
   // Only identity endpoints should trigger a full local data wipe.
   const isIdentityEndpoint = ["/auth/me", "/auth/employee-me"].some(
-    (ep) => normalizedUrl === ep || normalizedUrl === `/api${ep}`
+    (ep) => normalizedUrl === ep || normalizedUrl === `/api${ep}`,
   );
 
   if (!isIdentityEndpoint) {
     return false;
   }
 
-  // If we are currently navigating and don't even have a user in memory yet, 
-  // we should be more cautious about wiping localStorage, as it might be 
+  // If we are currently navigating and don't even have a user in memory yet,
+  // we should be more cautious about wiping localStorage, as it might be
   // a transient context mismatch during page load.
   const hasToken = !!error.config?.headers?.Authorization;
   if (!hasToken) {
@@ -76,7 +76,7 @@ api.interceptors.request.use(
 // ================= RESPONSE INTERCEPTOR =================
 api.interceptors.response.use(
   (response) => {
-    console.log(`[API Response] ${response.status} ${response.config.url}`);
+    // console.log(`[API Response] ${response.status} ${response.config.url}`);
     return response;
   },
   (error) => {
