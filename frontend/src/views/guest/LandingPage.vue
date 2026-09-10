@@ -727,20 +727,19 @@ function animateFrame() {
     // Gentle floating
     flowerGroup.position.y = Math.sin(Date.now() * 0.0006) * 0.08;
 
-    if (!isScrolling) {
-      flowerGroup.userData.idleY = (flowerGroup.userData.idleY || 0) + 0.0009;
+    // Gentle bounded sway around the face-forward orientation — this
+    // oscillates rather than accumulating, so the bloom always stays
+    // within a front-facing range no matter how long the user scrolls
+    // or lingers. (The rig's own yaw, driven by scroll position below,
+    // is what actually steers the flower left/right toward the text.)
+    flowerGroup.rotation.y = Math.sin(Date.now() * 0.00035) * 0.12;
 
-      if (!isTouchDevice) {
-        tilt.x += (pointer.y * 0.22 - tilt.x) * 0.04;
-        tilt.z += (pointer.x * -0.18 - tilt.z) * 0.04;
-      }
-      flowerGroup.rotation.x = tilt.x;
-      flowerGroup.rotation.z = tilt.z;
-      flowerGroup.rotation.y = flowerGroup.userData.idleY;
-    } else {
-      // Gentle spin response during scroll
-      flowerGroup.rotation.y += 0.005;
+    if (!isScrolling && !isTouchDevice) {
+      tilt.x += (pointer.y * 0.22 - tilt.x) * 0.04;
+      tilt.z += (pointer.x * -0.18 - tilt.z) * 0.04;
     }
+    flowerGroup.rotation.x = tilt.x;
+    flowerGroup.rotation.z = tilt.z;
   }
 
   if (flowerRings.length) {
@@ -792,17 +791,28 @@ function setupFlowerJourney() {
   });
   journeyTriggers.push(scrollUpdateTrigger);
 
-  // Set initial Hero Section position
+  // Maximum yaw the flower ever turns — enough to read as "looking toward"
+  // the text on whichever side it's paired with, never far enough to swing
+  // past a front-facing view into the profile.
+  const maxYaw = 0.42;
+
+  // Set initial Hero Section position — flower starts on the right,
+  // so it starts yawed to look back toward the headline on the left.
   gsap.set(rig.position, { x: spread, y: isMobile ? -0.2 : 0, z: 0 });
   gsap.set(rig.scale, { x: scaleBase, y: scaleBase, z: scaleBase });
-  gsap.set(rig.rotation, { x: 0, y: Math.PI * 0.15, z: 0 });
+  gsap.set(rig.rotation, { x: 0, y: -maxYaw, z: 0 });
   if (flowerCanvas.value) {
     gsap.set(flowerCanvas.value, { opacity: 1 });
   }
 
-  // Helper for adding timeline scrolls
-  const addScrollJourney = (trigger, toX, toRotY, toScaleMul = 1.0) => {
+  // Helper for adding timeline scrolls. Yaw is derived from the target
+  // x position rather than passed in: whichever side the flower sits on,
+  // it turns toward the opposite side (where the text column is) by at
+  // most maxYaw — so it's always "looking toward" the content, and always
+  // facing front enough to read as the bloom rather than its profile.
+  const addScrollJourney = (trigger, toX, toScaleMul = 1.0) => {
     if (!trigger) return;
+    const toYaw = spread ? -(toX / spread) * maxYaw : 0;
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger,
@@ -813,7 +823,7 @@ function setupFlowerJourney() {
     });
 
     tl.to(rig.position, { x: toX, ease: "power2.inOut" }, 0);
-    tl.to(rig.rotation, { y: toRotY, ease: "power2.inOut" }, 0);
+    tl.to(rig.rotation, { y: toYaw, ease: "power2.inOut" }, 0);
     tl.to(
       rig.scale,
       {
@@ -830,24 +840,25 @@ function setupFlowerJourney() {
 
   // Journey Steps mapping: alternates left/right side columns
   // Panel 2: Clients (Left)
-  addScrollJourney(clientsSection.value, -spread, Math.PI * 0.6, 0.9);
+  addScrollJourney(clientsSection.value, -spread, 0.9);
 
   // Panel 3: Content Section 1 (Right)
-  addScrollJourney(contentSection1.value, spread, Math.PI * 1.1, 1.05);
+  addScrollJourney(contentSection1.value, spread, 1.05);
 
   // Panel 4: Features Section (Left)
-  addScrollJourney(featuresSection.value, -spread, Math.PI * 1.6, 0.95);
+  addScrollJourney(featuresSection.value, -spread, 0.95);
 
   // Panel 5: Content Section 2 (Right)
-  addScrollJourney(contentSection2.value, spread, Math.PI * 2.1, 1.05);
+  addScrollJourney(contentSection2.value, spread, 1.05);
 
   // Panel 6: Stats Section (Left)
-  addScrollJourney(statsSection.value, -spread, Math.PI * 2.6, 0.9);
+  addScrollJourney(statsSection.value, -spread, 0.9);
 
   // Panel 7: Blog Section (Right)
-  addScrollJourney(blogSection.value, spread, Math.PI * 3.1, 1.05);
+  addScrollJourney(blogSection.value, spread, 1.05);
 
-  // Panel 8: CTA Section (Center / Showcased)
+  // Panel 8: CTA Section (Center / Showcased) — centered, so it faces
+  // dead-on rather than turning toward either side.
   if (ctaSection.value) {
     const tl = gsap.timeline({
       scrollTrigger: {
@@ -862,7 +873,7 @@ function setupFlowerJourney() {
       { x: 0, y: isMobile ? 0.35 : 0.45, ease: "power2.inOut" },
       0,
     );
-    tl.to(rig.rotation, { y: Math.PI * 3.75, ease: "power2.inOut" }, 0);
+    tl.to(rig.rotation, { y: 0, ease: "power2.inOut" }, 0);
     tl.to(
       rig.scale,
       {
@@ -876,7 +887,11 @@ function setupFlowerJourney() {
     journeyTriggers.push(tl.scrollTrigger);
   }
 
-  // Footer Section: Fades out flower canvas and transitions background & navbar to dark theme
+  // Footer Section: tilts the flower's face up slightly as it approaches,
+  // then fades out the canvas and transitions background & navbar to dark theme.
+  // NOTE: the sign on rotation.x below is a best guess at which way reads as
+  // "tilting up" — since this can't be rendered here, flip it to +0.25 if it
+  // ends up tilting down instead.
   if (footerSection.value) {
     const tl = gsap.timeline({
       scrollTrigger: {
@@ -886,6 +901,7 @@ function setupFlowerJourney() {
         scrub: 1.0,
       },
     });
+    tl.to(rig.rotation, { x: -0.25, ease: "none" }, 0);
     if (flowerCanvas.value) {
       tl.to(flowerCanvas.value, { opacity: 0, ease: "none" }, 0);
     }
