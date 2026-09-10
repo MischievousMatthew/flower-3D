@@ -63,7 +63,7 @@ api.interceptors.request.use(
       config.headers["X-Active-Assignment"] = assignmentId;
     }
 
-    console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
+    // console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
 
     return config;
   },
