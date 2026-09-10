@@ -471,47 +471,6 @@
               </select>
             </div>
           </div>
-          <div
-            v-if="!selectedVendor && popularProducts.length > 0"
-            class="popular-products-panel"
-          >
-            <div class="popular-products-head">
-              <div>
-                <p class="section-subtitle">Most Popular</p>
-                <h3>Best-selling flowers right now</h3>
-              </div>
-              <button
-                class="btn-show-popular"
-                @click="applyPopularSort"
-              >
-                Show Full Ranking
-              </button>
-            </div>
-            <div class="popular-products-grid">
-              <button
-                v-for="(product, index) in popularProducts"
-                :key="`popular-${product.id}`"
-                class="popular-product-card"
-                @click="openProductModal(product)"
-              >
-                <span class="popular-rank">#{{ index + 1 }}</span>
-                <img
-                  :src="getProductImage(product)"
-                  :alt="product.product_name"
-                  class="popular-image"
-                  @error="handleImageError"
-                />
-                <div class="popular-copy">
-                  <h4>{{ product.product_name }}</h4>
-                  <p>{{ product.vendor_name }}</p>
-                </div>
-                <div class="popular-stats">
-                  <span>{{ product.sold_count || 0 }} sold</span>
-                  <strong>&#x20B1;{{ formatPrice(product.selling_price) }}</strong>
-                </div>
-              </button>
-            </div>
-          </div>
           <div v-if="isLoading" class="products-grid products-grid-skeleton" aria-label="Loading products">
             <div v-for="n in 8" :key="n" class="product-card-skeleton">
               <div class="skeleton skeleton-product-image"></div>
@@ -884,7 +843,6 @@ const pendingAction = ref(null);
 const sortBy = ref("created_at_desc");
 const isLoading = ref(false);
 const products = ref([]);
-const popularProducts = ref([]);
 
 // Live stats for the open product modal
 const productStats = ref({
@@ -1206,24 +1164,6 @@ const fetchProducts = async () => {
     pagination.value.total = products.value.length;
   } finally {
     isLoading.value = false;
-  }
-};
-
-const fetchPopularProducts = async () => {
-  try {
-    const response = await productService.getAllProducts({
-      sort_by: "popular_desc",
-      per_page: 4,
-      page: 1,
-      in_stock_only: 1,
-    });
-
-    if (response.success) {
-      popularProducts.value = response.data.data || [];
-    }
-  } catch (error) {
-    console.error("fetchPopularProducts:", error);
-    popularProducts.value = [];
   }
 };
 
@@ -1551,7 +1491,6 @@ onMounted(async () => {
     fetchFilterOptions(),
     fetchProducts(),
     fetchVendors(),
-    fetchPopularProducts(),
   ]);
   if (isAuthenticated.value) {
     await loadCart();

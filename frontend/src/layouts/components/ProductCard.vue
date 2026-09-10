@@ -16,8 +16,8 @@
         :alt="product.product_name"
         @error="handleImageError"
       />
-      <span v-if="product.discount_price" class="badge-discount">
-        {{ discountPct }}% off
+      <span v-if="productBadge" :class="['badge-discount', productBadge.className]">
+        {{ productBadge.label }}
       </span>
       <div class="image-actions" @click.stop>
         <button
@@ -297,6 +297,18 @@ const discountPct = computed(() => {
   const sale = parseFloat(props.product.discount_price);
   if (!orig || !sale || sale >= orig) return 0;
   return Math.round(((orig - sale) / orig) * 100);
+});
+
+const productBadge = computed(() => {
+  if (props.product.discount_price) {
+    return { label: "Sale", className: "badge-sale" };
+  }
+
+  if ((props.product.sold_count ?? 0) >= 10) {
+    return { label: "Best Seller", className: "badge-best-seller" };
+  }
+
+  return { label: "New", className: "badge-new" };
 });
 
 const soldLabel = computed(() => {
@@ -669,7 +681,12 @@ const handleImageError = (e) => {
 .product-image { height: clamp(190px, 18vw, 255px); background: #edf1ed; }
 .product-image img { transition: transform .55s cubic-bezier(.2,.75,.25,1); }
 .product-card:hover .product-image img { transform: scale(1.06); }
-.badge-discount { top: 12px; left: 12px; right: auto; background: #d95d78; border-radius: 999px; padding: 5px 10px; letter-spacing: .02em; }
+.badge-discount { top: 12px; left: 12px; right: auto; background: #d95d78; border-radius: 7px; padding: 5px 10px; letter-spacing: .02em; transition: opacity .18s ease, transform .18s ease; }
+.badge-new { background: #22ab70; }
+.badge-sale { background: #f0527d; }
+.badge-best-seller { background: #9e73ca; }
+.product-card:hover .badge-discount,
+.product-card:focus-within .badge-discount { opacity: 0; transform: translateY(-5px); pointer-events: none; }
 .image-actions {
   position: absolute;
   top: 12px;
