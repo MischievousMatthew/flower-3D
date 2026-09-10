@@ -236,16 +236,17 @@ class CheckoutController extends Controller
             $user = Auth::user();
 
             $validator = Validator::make($request->all(), [
-                'payment_method' => 'required|in:bank_transfer,gcash,maya,cod,card',
+                'payment_method' => 'required|in:gcash,maya,cod',
                 'delivery_address' => 'required|string',
                 'contact_number' => 'required|string',
                 'delivery_notes' => 'nullable|string',
                 'customer_notes' => 'nullable|string',
-                'reservation_date' => 'required|date_format:Y-m-d',
-                'cart_item_ids' => 'required_without_all:product_id,custom_items|array|min:1',
-                'product_id' => 'required_without_all:cart_item_ids,custom_items|integer|exists:products,id',
+                'reservation_date' => 'required_without:retry_order_id|nullable|date_format:Y-m-d',
+                'retry_order_id' => 'nullable|integer',
+                'cart_item_ids' => 'required_without_all:product_id,custom_items,retry_order_id|array|min:1',
+                'product_id' => 'required_without_all:cart_item_ids,custom_items,retry_order_id|integer|exists:products,id',
                 'quantity' => 'required_with:product_id|integer|min:1',
-                'custom_items' => 'required_without_all:cart_item_ids,product_id|array|min:1|max:3',
+                'custom_items' => 'required_without_all:cart_item_ids,product_id,retry_order_id|array|min:1|max:3',
                 'custom_items.*.product_id' => 'required|integer|exists:products,id',
                 'custom_items.*.quantity' => 'nullable|integer|min:1',
                 'custom_items.*.customizations' => 'nullable|array',
@@ -257,6 +258,10 @@ class CheckoutController extends Controller
                     'message' => 'Validation failed',
                     'errors' => $validator->errors()
                 ], 422);
+            }
+
+            if ($request->filled('retry_order_id')) {
+                return $this->retryOnlinePayment($request, $user);
             }
 
             $reservationDate = Carbon::parse(
@@ -508,38 +513,10 @@ class CheckoutController extends Controller
                 // Update reservation cache
                 ReservationAvailabilityCache::updateForDate($vendorId, $reservationDate->toDateString());
 
-                if ($request->filled('cart_item_ids')) {
-                    Cart::where('user_id', $user->id)
-                        ->whereIn('id', $request->cart_item_ids)
-                        ->delete();
-                }
-
                 DB::commit();
 
                 // Handle payment
-                if (in_array($paymentMethod, ['gcash', 'maya', 'card', 'bank_transfer'], true)) {
-                    if ($paymentMethod === 'bank_transfer' && ! $this->hasPayMongoConfiguration()) {
-                        Log::warning('Falling back to manual bank transfer because PayMongo is not configured', [
-                            'order_id' => $order->id,
-                            'vendor_id' => $vendorId,
-                        ]);
-
-                        return response()->json([
-                            'success' => true,
-                            'message' => 'Order created. Awaiting bank transfer.',
-                            'data' => [
-                                'order' => [
-                                    'id' => $order->id,
-                                    'order_number' => $order->order_number,
-                                    'total_amount' => $order->total_amount,
-                                    'payment_method' => $order->payment_method,
-                                    'status' => $order->status,
-                                    'reservation_date' => $order->reservation_date,
-                                ],
-                            ],
-                        ]);
-                    }
-
+                if (in_array($paymentMethod, ['gcash', 'maya'], true)) {
                     $paymentResponse = $this->createPayMongoPayment($order, $paymentMethod);
                     
                     if ($paymentResponse['success']) {
@@ -555,6 +532,8 @@ class CheckoutController extends Controller
                         ]);
                         
                         return response()->json([
+                            'success' => true,
+                            'order_id' => $order->id,
                             'checkout_url' => $paymentResponse['checkout_url'],
                         ]);
                     }
@@ -580,7 +559,13 @@ class CheckoutController extends Controller
                     ], 502);
                 }
 
-                // For COD or bank transfer
+                if ($request->filled('cart_item_ids')) {
+                    Cart::where('user_id', $user->id)
+                        ->whereIn('id', $request->cart_item_ids)
+                        ->delete();
+                }
+
+                // COD remains available without an online payment confirmation.
                 return response()->json([
                     'success' => true,
                     'message' => 'Order created successfully',
@@ -615,6 +600,67 @@ class CheckoutController extends Controller
         }
     }
 
+    private function retryOnlinePayment(Request $request, $user)
+    {
+        $paymentMethod = $this->normalizePaymentMethod($request->payment_method);
+        if (!in_array($paymentMethod, ['gcash', 'maya'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only GCash or Maya can be used to retry this payment.',
+            ], 422);
+        }
+
+        $order = Order::where('id', $request->retry_order_id)
+            ->where('user_id', $user->id)
+            ->whereIn('payment_status', ['unpaid', 'failed'])
+            ->whereIn('status', ['pending', 'failed', 'payment_failed'])
+            ->first();
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This payment can no longer be retried.',
+            ], 422);
+        }
+
+        $paymentResponse = $this->createPayMongoPayment($order, $paymentMethod);
+        if (!$paymentResponse['success']) {
+            $order->update([
+                'payment_status' => 'failed',
+                'status' => 'payment_failed',
+                'paymongo_response' => [
+                    'error' => $paymentResponse['message'] ?? 'Failed to initialize online payment.',
+                    'payment_method' => $paymentMethod,
+                ],
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $paymentResponse['message'] ?? 'Failed to initialize online payment.',
+            ], 502);
+        }
+
+        $order->update([
+            'payment_method' => $paymentMethod,
+            'payment_status' => 'unpaid',
+            'status' => 'pending',
+            'paymongo_payment_intent_id' => $paymentResponse['checkout_session_id'] ?? null,
+            'paymongo_source_id' => $paymentResponse['source_id'] ?? null,
+            'paymongo_checkout_url' => $paymentResponse['checkout_url'] ?? null,
+            'paymongo_response' => [
+                'checkout_session_id' => $paymentResponse['checkout_session_id'] ?? null,
+                'reference_number' => $paymentResponse['reference_number'] ?? null,
+                'payment_method' => $paymentMethod,
+            ],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'order_id' => $order->id,
+            'checkout_url' => $paymentResponse['checkout_url'],
+        ]);
+    }
+
     /**
      * Get available payment methods
      */
@@ -625,16 +671,6 @@ class CheckoutController extends Controller
         }
 
         $methods = [];
-
-        if ($vendorApplication->payout_method === 'bank') {
-            $methods[] = [
-                'type' => 'bank_transfer',
-                'name' => 'Bank Transfer',
-                'description' => 'Direct bank transfer',
-                'icon' => '🏦',
-                'enabled' => true,
-            ];
-        }
 
         if ($vendorApplication->payout_method === 'gcash') {
             $methods[] = [
@@ -688,8 +724,6 @@ class CheckoutController extends Controller
         $checkoutMethod = match ($paymentMethod) {
             'gcash' => 'gcash',
             'maya' => 'paymaya',
-            'card' => 'card',
-            'bank_transfer' => 'dob',
             default => null,
         };
 
@@ -1217,28 +1251,18 @@ class CheckoutController extends Controller
         }
 
         if ($success) {
-            if ($order->payment_status !== 'paid') {
-                try {
-                    $this->markOrderPaidFromWebhook($order, [
-                        'reference_number' => $reference ?: $this->buildPayMongoReference($order),
-                        'resource' => 'payment.callback',
-                    ]);
-                } catch (\Throwable $e) {
-                    Log::error('Payment callback failed to mark order as paid', [
-                        'order_id' => $order->id,
-                        'reference' => $reference,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
-
+            // A browser redirect is not proof of payment. The signed PayMongo
+            // webhook is the only path that may mark this order as paid.
             return redirect(
-                $frontendUrl . '/customer/orders?payment=success&reference='
+                $frontendUrl . '/customer/orders?payment=pending&reference='
                 . urlencode($reference ?: $this->buildPayMongoReference($order))
             );
         }
 
-        return redirect($frontendUrl . '/customer/checkout?payment=cancelled');
+        return redirect(
+            $frontendUrl . '/customer/checkout?payment=cancelled&order_id='
+            . urlencode((string) $order->id)
+        );
     }
 
     private function buildPayMongoReference(Order $order): string
@@ -1335,6 +1359,15 @@ class CheckoutController extends Controller
                     $order->vendor_id,
                     $order->reservation_date
                 );
+            }
+
+            if (in_array($order->payment_method, ['gcash', 'maya'], true)) {
+                $productIds = $order->items()->pluck('product_id')->filter();
+                if ($productIds->isNotEmpty()) {
+                    Cart::where('user_id', $order->user_id)
+                        ->whereIn('product_id', $productIds)
+                        ->delete();
+                }
             }
         });
 

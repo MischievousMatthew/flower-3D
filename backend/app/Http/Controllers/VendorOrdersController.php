@@ -64,6 +64,12 @@ class VendorOrdersController extends Controller
 
             // Build query with proper relationships for 3D models
             $query = Order::where('vendor_id', $user->id)
+                // Wallet orders are released to the vendor only by the
+                // PayMongo paid webhook. COD remains visible immediately.
+                ->where(function ($paymentQuery) {
+                    $paymentQuery->where('payment_method', 'cod')
+                        ->orWhere('payment_status', 'paid');
+                })
                 ->with([
                     'user:id,name,email,contact_number,address',
                     'delivery',

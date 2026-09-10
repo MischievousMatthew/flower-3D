@@ -354,9 +354,9 @@
                 </label>
               </div>
 
-              <!-- Online Payment Card Details (only for gcash/maya/card) -->
+              <!-- PayMongo redirect details for GCash or Maya -->
               <div
-                v-if="['gcash', 'maya', 'card'].includes(selectedPaymentMethod)"
+                v-if="['gcash', 'maya'].includes(selectedPaymentMethod)"
                 class="card-details-section"
               >
                 <h3>Payment Details</h3>
@@ -427,60 +427,6 @@
                       />
                     </svg>
                     <span>Ensure contact number is correct</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Bank Transfer Instructions -->
-              <div
-                v-if="selectedPaymentMethod === 'bank_transfer'"
-                class="bank-instructions"
-              >
-                <h3>Bank Transfer Instructions</h3>
-                <div class="instructions-list">
-                  <div class="instruction-item">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        fill="#48bb78"
-                        d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
-                      />
-                    </svg>
-                    <span>Complete payment within 24 hours</span>
-                  </div>
-                  <div class="instruction-item">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        fill="#48bb78"
-                        d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
-                      />
-                    </svg>
-                    <span>Send proof of payment to vendor</span>
-                  </div>
-                  <div class="instruction-item">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        fill="#48bb78"
-                        d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
-                      />
-                    </svg>
-                    <span
-                      >Order will be processed after payment confirmation</span
-                    >
                   </div>
                 </div>
               </div>
@@ -676,6 +622,7 @@ const loadingMessage = ref("");
 const isProcessing = ref(false);
 const isDirectCheckout = ref(false);
 const directCheckoutData = ref(null);
+const pendingOnlineOrderId = ref(null);
 
 // Reservation state
 const selectedDate = ref(null);
@@ -1074,7 +1021,9 @@ async function loadCheckoutData() {
 
     const savedData = localStorage.getItem("checkout_data");
     const directData = sessionStorage.getItem("directCheckout");
-    const isDirect = route.query.direct === "true";
+    const isDirect = route.query.direct === "true" || (
+      Boolean(pendingOnlineOrderId.value) && Boolean(directData)
+    );
 
     if (isDirect && directData) {
       isDirectCheckout.value = true;
@@ -1131,11 +1080,11 @@ async function loadCheckoutData() {
       availablePaymentMethods.value = checkoutData.value.payment_methods.available_methods.filter(
         (method) => {
           const paymentMethod = String(method?.type || "").toLowerCase();
-          const isEWallet = ["gcash", "maya", "paymaya"].includes(
-            paymentMethod,
-          );
+          const isEWallet = ["gcash", "maya", "paymaya"].includes(paymentMethod);
 
-          return !isEWallet || allowedEWalletPaymentMethods.has(paymentMethod);
+          return paymentMethod === "cod" || (
+            isEWallet && allowedEWalletPaymentMethods.has(paymentMethod)
+          );
         },
       );
       // Set default payment method
@@ -1177,6 +1126,9 @@ async function placeOrder() {
       delivery_address: checkoutData.value.user?.address || "",
       contact_number: checkoutData.value.user?.contact_number || "",
       customer_notes: customerNotes.value,
+      ...(pendingOnlineOrderId.value
+        ? { retry_order_id: pendingOnlineOrderId.value }
+        : {}),
 
       ...(isDirectCheckout.value
         ? directCheckoutData.value.custom_items
@@ -1201,11 +1153,11 @@ async function placeOrder() {
     const checkoutUrl = response.data.checkout_url;
 
     if (checkoutUrl) {
-      if (isDirectCheckout.value) {
-        sessionStorage.removeItem("directCheckout");
-      } else {
-        localStorage.removeItem("checkout_data");
-      }
+      pendingOnlineOrderId.value = response.data.order_id;
+      sessionStorage.setItem(
+        "pending_online_order_id",
+        String(response.data.order_id),
+      );
 
       window.location.href = checkoutUrl;
       return;
@@ -1226,6 +1178,7 @@ async function placeOrder() {
         } else {
           localStorage.removeItem("checkout_data");
         }
+        sessionStorage.removeItem("pending_online_order_id");
 
         router.push("/customer/orders");
       }
@@ -1281,8 +1234,18 @@ function formatCutoffTime(value) {
 }
 
 onMounted(async () => {
+  pendingOnlineOrderId.value = Number(
+    route.query.order_id || sessionStorage.getItem("pending_online_order_id"),
+  ) || null;
   await loadCheckoutData();
   await loadCalendarData();
+
+  if (route.query.payment === "cancelled" || pendingOnlineOrderId.value) {
+    currentStep.value = 3;
+    if (route.query.payment === "cancelled") {
+      toast.info("Payment was not completed. Choose GCash or Maya to try again.");
+    }
+  }
 });
 </script>
 
