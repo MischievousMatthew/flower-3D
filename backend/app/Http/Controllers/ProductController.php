@@ -390,11 +390,23 @@ class ProductController extends Controller
 
             // ── Replace 3D model ──────────────────────────────────────────
             if ($request->hasFile('model_file')) {
-                if ($product->model) {
-                    CloudinaryHelper::destroy($product->model->model_path, ['resource_type' => 'raw']);
-                    $product->model->delete();
+                // Product has a models() collection, not a model() relation.
+                // Upload first, then remove old records only after the new
+                // model has been persisted so a failed upload keeps the
+                // current model available.
+                $previousModels = $product->models()->get();
+                $newModel = $this->handleModelUpload($request, $product);
+
+                if (!$newModel) {
+                    throw new \RuntimeException('The 3D model could not be uploaded.');
                 }
-                $this->handleModelUpload($request, $product);
+
+                $previousModels->each(function (ProductModel $model) {
+                    if ($model->model_path) {
+                        CloudinaryHelper::destroy($model->model_path, ['resource_type' => 'raw']);
+                    }
+                    $model->delete();
+                });
             }
 
             $product = Product::with(['primaryImage', 'images', 'models'])->find($product->id);
@@ -776,11 +788,11 @@ class ProductController extends Controller
     /**
      * Handle 3D model upload from request to Cloudinary.
      */
-    private function handleModelUpload(Request $request, Product $product): void
+    private function handleModelUpload(Request $request, Product $product): ?ProductModel
     {
         if (!$request->hasFile('model_file')) {
             Log::info('No model_file in request for product ' . $product->id);
-            return;
+            return null;
         }
 
         $modelFile = $request->file('model_file');
@@ -792,7 +804,7 @@ class ProductController extends Controller
 
         if (!($modelFile instanceof \Illuminate\Http\UploadedFile)) {
             Log::warning('model_file is not a valid UploadedFile for product ' . $product->id);
-            return;
+            return null;
         }
 
         $extension = strtolower($modelFile->getClientOriginalExtension());
@@ -800,12 +812,12 @@ class ProductController extends Controller
 
         if (!in_array($extension, $allowed)) {
             Log::warning('Invalid 3D model extension: ' . $extension);
-            return;
+            return null;
         }
 
         if ($modelFile->getSize() > 50 * 1024 * 1024) {
             Log::warning('3D model too large: ' . $modelFile->getSize() . ' bytes');
-            return;
+            return null;
         }
 
         Log::info('Uploading 3D model to Cloudinary', [
@@ -821,7 +833,7 @@ class ProductController extends Controller
                 'resource_type' => 'raw',
             ]);
 
-            ProductModel::create([
+            $model = ProductModel::create([
                 'product_id' => $product->id,
                 'model_url'  => $result['secure_url'],
                 'model_path' => $result['public_id'],
@@ -839,11 +851,14 @@ class ProductController extends Controller
                 'url'        => $result['secure_url'],
             ]);
 
+            return $model;
+
         } catch (\Throwable $e) {
             Log::error('3D model upload failed for product ' . $product->id, [
                 'error' => $e->getMessage(),
                 'file'  => $modelFile->getClientOriginalName(),
             ]);
+            throw $e;
         }
     }
 
