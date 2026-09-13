@@ -146,6 +146,12 @@
               </p>
               <div class="vendor-card-meta">
                 <span
+                  v-if="isVendorCloseToCustomer(vendor)"
+                  class="vendor-meta-tag tag-nearby"
+                  title="Approximate distance from your selected city"
+                  >Close to you</span
+                >
+                <span
                   v-if="vendor.same_day_delivery"
                   class="vendor-meta-tag tag-sameday"
                   >&#x26A1; Same-Day</span
@@ -828,7 +834,7 @@ import ProductReviews from "../../layouts/components/ProductReviews.vue";
 import ProductCard from "../../layouts/components/ProductCard.vue";
 
 const router = useRouter();
-const { isAuthenticated } = useAuth();
+const { isAuthenticated, user } = useAuth();
 const cartStore = useCart();
 const { flyToCart } = useFlyToCart();
 
@@ -866,6 +872,50 @@ const vendorPagination = ref({
   per_page: 8,
   total: 0,
 });
+
+// Customer locations are intentionally city reference points, not customer pins.
+// Vendor coordinates always come from the vendor's saved registration map pin.
+const customerCityCoordinates = {
+  Manila: [14.5995, 120.9842],
+  "Quezon City": [14.676, 121.0437],
+  Caloocan: [14.7566, 121.0456],
+  "Las Piñas": [14.4445, 120.9939],
+  Makati: [14.5547, 121.0244],
+  Malabon: [14.6681, 120.9658],
+  Mandaluyong: [14.5794, 121.0359],
+  Marikina: [14.6507, 121.1029],
+  Muntinlupa: [14.4081, 121.0415],
+  Navotas: [14.6667, 120.9417],
+  Parañaque: [14.4793, 121.0198],
+  Pasay: [14.5378, 121.0014],
+  Pasig: [14.5764, 121.0851],
+  "San Juan": [14.6019, 121.0355],
+  Taguig: [14.5176, 121.0509],
+  Valenzuela: [14.7006, 120.983],
+  "Bacoor, Cavite": [14.459, 120.9486],
+  "Imus, Cavite": [14.4297, 120.9367],
+  "Dasmariñas, Cavite": [14.3294, 120.9367],
+  "General Trias, Cavite": [14.296, 120.9045],
+  "Trece Martires, Cavite": [14.2814, 120.8689],
+  "Tagaytay, Cavite": [14.1153, 120.9621],
+  "Carmona, Cavite": [14.3132, 121.0576],
+  "Cavite City, Cavite": [14.4791, 120.8969],
+  "Silang, Cavite": [14.2157, 120.9714],
+  "General Mariano Alvarez, Cavite": [14.305, 121.0005],
+  "Kawit, Cavite": [14.4443, 120.901],
+  "Noveleta, Cavite": [14.4292, 120.8799],
+  "Rosario, Cavite": [14.4148, 120.8532],
+  "Tanza, Cavite": [14.3944, 120.8554],
+  "Naic, Cavite": [14.3181, 120.7669],
+  "Maragondon, Cavite": [14.2733, 120.7372],
+  "Ternate, Cavite": [14.2897, 120.715],
+  "Indang, Cavite": [14.1953, 120.8769],
+  "Amadeo, Cavite": [14.1706, 120.9234],
+  "Mendez, Cavite": [14.1287, 120.9051],
+  "Alfonso, Cavite": [14.1406, 120.8532],
+  "Magallanes, Cavite": [14.1874, 120.7587],
+  "General Emilio Aguinaldo, Cavite": [14.1842, 120.7947],
+};
 
 const filterOptions = ref({
   categories: [],
@@ -918,6 +968,42 @@ const priceRangeText = computed(() =>
 const availabilityText = computed(() =>
   selectedFilters.value.inStockOnly ? "In Stock Only" : "All",
 );
+
+function getCustomerCityCoordinates(city) {
+  return customerCityCoordinates[city?.trim()] ?? null;
+}
+
+function calculateDistanceInKm([latitudeA, longitudeA], [latitudeB, longitudeB]) {
+  const degreesToRadians = (degrees) => (degrees * Math.PI) / 180;
+  const earthRadiusInKm = 6371;
+  const latitudeDifference = degreesToRadians(latitudeB - latitudeA);
+  const longitudeDifference = degreesToRadians(longitudeB - longitudeA);
+  const haversine =
+    Math.sin(latitudeDifference / 2) ** 2 +
+    Math.cos(degreesToRadians(latitudeA)) *
+      Math.cos(degreesToRadians(latitudeB)) *
+      Math.sin(longitudeDifference / 2) ** 2;
+
+  return earthRadiusInKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
+function isVendorCloseToCustomer(vendor) {
+  const customerCoordinates = getCustomerCityCoordinates(user.value?.city);
+  const vendorLatitude = Number(vendor.store_latitude);
+  const vendorLongitude = Number(vendor.store_longitude);
+
+  if (
+    !customerCoordinates ||
+    !Number.isFinite(vendorLatitude) ||
+    !Number.isFinite(vendorLongitude) ||
+    vendorLatitude < -90 || vendorLatitude > 90 ||
+    vendorLongitude < -180 || vendorLongitude > 180
+  ) {
+    return false;
+  }
+
+  return calculateDistanceInKm(customerCoordinates, [vendorLatitude, vendorLongitude]) <= 3;
+}
 
 // ── Star helper ───────────────────────────────────────────────────────────
 function getStarClass(n, rating) {
@@ -1998,6 +2084,11 @@ onUnmounted(() => {
 .tag-sameday {
   background: #ebf8ff;
   color: #2b6cb0;
+}
+.tag-nearby {
+  background: #e6fffa;
+  color: #276749;
+  font-weight: 700;
 }
 .tag-price {
   background: #f0fff4;

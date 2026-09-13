@@ -377,6 +377,8 @@ class VendorStorefrontController extends Controller
             'store_logo_path'     => $this->storageUrl($v->store_logo_path),
             'business_type'       => $v->business_type ?? '',
             'store_address'       => $v->store_address ?? '',
+            'store_latitude'      => $v->store_latitude,
+            'store_longitude'     => $v->store_longitude,
             'verification_level'  => $v->verification_level ?? '',
             'status'              => $v->status ?? '',
             'same_day_delivery'   => (bool) ($v->same_day_delivery ?? false),
