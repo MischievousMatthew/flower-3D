@@ -254,6 +254,18 @@
               <div v-if="expandedId === order.id" class="ot-detail">
                 <!-- ── Action buttons ───────────────────────────────────────── -->
                 <div class="ot-actions" v-if="showActions(order)">
+                  <!-- Cancel is intentionally available only while Ordered. -->
+                  <button
+                    v-if="canCancel(order)"
+                    class="ot-btn ot-btn--cancel"
+                    :disabled="actionLoading === order.id + '_cancel'"
+                    @click.stop="doCancel(order)"
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" class="ot-btn__ico">
+                      <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                    {{ actionLoading === order.id + "_cancel" ? "Cancelling…" : "Cancel Order" }}
+                  </button>
                   <!-- Mark as Received -->
                   <button
                     v-if="canComplete(order)"
@@ -1051,8 +1063,11 @@ const canComplete = (o) => o.delivery?.status === "to_received";
 const canReturn = (o) => o.delivery?.status === "completed";
 const canRefund = (o) =>
   o.delivery?.status === "completed" && o.payment_status === "paid";
+const canCancel = (o) =>
+  ["pending", "processing"].includes(o.status) &&
+  (!o.delivery || o.delivery.status === "pending");
 const showActions = (o) =>
-  canComplete(o) || canReturn(o) || canRefund(o) || canReview(o);
+  canCancel(o) || canComplete(o) || canReturn(o) || canRefund(o) || canReview(o);
 
 // ① canReview computed helper — true if order is completed
 const canReview = (order) =>
@@ -1079,6 +1094,37 @@ function doComplete(order) {
       await fetchOrders(meta.current_page);
     } catch (e) {
       alert(e.response?.data?.message ?? "Action failed.");
+    } finally {
+      confirmModal.loading = false;
+      actionLoading.value = null;
+    }
+  };
+}
+
+function doCancel(order) {
+  confirmModal.show = true;
+  confirmModal.loading = false;
+  confirmModal.body = `Cancel order ${order.order_number}? Its reserved stock will be returned to the store.`;
+  confirmModal.onConfirm = async () => {
+    confirmModal.loading = true;
+    actionLoading.value = order.id + "_cancel";
+    try {
+      const response = await api.post(
+        `${API_BASE}/${order.id}/cancel`,
+        {},
+        { headers: authHeaders() },
+      );
+      confirmModal.show = false;
+      toast.success(response.data?.message || "Order cancelled and stock restored.", {
+        autoClose: 3500,
+        position: toast.POSITION.TOP_RIGHT,
+      });
+      await fetchOrders(meta.current_page);
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Unable to cancel this order.", {
+        autoClose: 3500,
+        position: toast.POSITION.TOP_RIGHT,
+      });
     } finally {
       confirmModal.loading = false;
       actionLoading.value = null;
@@ -1254,6 +1300,7 @@ const isStepActive = (o, i) => i === stepIdx(o);
 
 // labels & chips
 function dlvLabel(order) {
+  if (order.status === "cancelled") return "Cancelled";
   const m = {
     pending: "Pending",
     to_processed: "Packed",
@@ -1266,6 +1313,7 @@ function dlvLabel(order) {
   return m[order.delivery?.status] ?? "Pending";
 }
 function dlvChipClass(order) {
+  if (order.status === "cancelled") return "chip--red";
   const ds = order.delivery?.status ?? "pending";
   if (["to_ship", "to_received"].includes(ds)) return "chip--blue";
   if (ds === "completed") return "chip--green";
@@ -2143,6 +2191,14 @@ onMounted(async () => {
 }
 .ot-btn--orange:hover:not(:disabled) {
   background: #dd6b20;
+}
+.ot-btn--cancel {
+  color: #b42318;
+  background: #fff1f0;
+  border: 1px solid #f5c6c2;
+}
+.ot-btn--cancel:hover:not(:disabled) {
+  background: #ffe2df;
 }
 .ot-btn--outline {
   background: var(--surface);

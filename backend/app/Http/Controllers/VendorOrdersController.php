@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\VendorClosedDate;
 use App\Models\ReservationAvailabilityCache;
 use App\Services\DeliveryService;
+use App\Services\VendorFinanceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
@@ -680,7 +681,13 @@ class VendorOrdersController extends Controller
             }
 
             if ($newStatus === 'cancelled') {
-                $order->cancel();
+                $cancelledOrder = app(VendorFinanceService::class)->cancelPendingOrder($order);
+                if ($cancelledOrder->reservation_date) {
+                    ReservationAvailabilityCache::updateForDate(
+                        $cancelledOrder->vendor_id,
+                        $cancelledOrder->reservation_date->toDateString()
+                    );
+                }
             } else {
                 $delivery = $order->delivery;
 

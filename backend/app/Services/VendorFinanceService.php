@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\Delivery;
 use App\Models\VendorBalance;
 use App\Models\VendorTransaction;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +38,8 @@ class VendorFinanceService
     }
 
     /**
-     * Cancel an Ordered order and restore its previously deducted quantities.
+     * Cancel an Ordered (not yet Packed) order and restore its previously
+     * deducted quantities.
      * Row locks and stock timestamps make retries/double-clicks safe.
      */
     public function cancelPendingOrder(Order $order): Order
@@ -49,7 +51,13 @@ class VendorFinanceService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($lockedOrder->status !== 'pending') {
+            $delivery = Delivery::query()
+                ->where('order_id', $lockedOrder->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! in_array($lockedOrder->status, ['pending', 'processing'], true)
+                || ($delivery && $delivery->status !== 'pending')) {
                 throw new \RuntimeException('Only orders that are still Ordered can be cancelled.');
             }
 

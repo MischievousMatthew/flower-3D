@@ -1433,10 +1433,14 @@ class CheckoutController extends Controller
                         ->delete();
                 }
             }
+
+            // The payment confirmation and inventory commitment belong to the
+            // same database transaction. The service lock/timestamp makes
+            // repeated webhook deliveries harmless.
+            app(VendorFinanceService::class)->deductOrderStock($order);
         });
 
         $freshOrder = $order->fresh();
-        app(VendorFinanceService::class)->deductOrderStock($freshOrder);
         app(VendorFinanceService::class)->handleOrderPayment($freshOrder);
     }
 }

@@ -187,6 +187,7 @@ Route::middleware('token.auth')->group(function () {
 
         Route::post('/orders/{id}/complete',         [CustomerOrderTrackingController::class, 'complete'])->whereNumber('id');
         Route::post('/orders/{id}/confirm-received', [CustomerOrderTrackingController::class, 'confirmReceived'])->whereNumber('id');
+        Route::post('/orders/{id}/cancel',           [CustomerOrderTrackingController::class, 'cancel'])->whereNumber('id');
         Route::post('/orders/{id}/request-return',   [CustomerOrderTrackingController::class, 'requestReturn'])->whereNumber('id');
         Route::post('/orders/{id}/request-refund',   [CustomerOrderTrackingController::class, 'requestRefund'])->whereNumber('id');
         Route::get('/{orderId}/delivery',            [DeliveryController::class, 'customerOrder']);

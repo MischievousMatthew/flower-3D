@@ -175,6 +175,6 @@ class Order extends Model
 
     public function cancel(): void
     {
-        $this->update(['status' => 'cancelled', 'cancelled_at' => now()]);
+        app(VendorFinanceService::class)->cancelPendingOrder($this);
     }
 }

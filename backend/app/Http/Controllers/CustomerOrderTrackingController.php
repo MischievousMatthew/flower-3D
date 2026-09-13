@@ -128,6 +128,34 @@ class CustomerOrderTrackingController extends Controller
         return $this->complete($id);
     }
 
+    /** POST /api/customer/orders/{id}/cancel — only while still Ordered. */
+    public function cancel(int $id): JsonResponse
+    {
+        $order = $this->ownedOrder($id);
+        if (! $order) {
+            return response()->json(['success' => false, 'message' => 'Order not found'], 404);
+        }
+
+        try {
+            $cancelledOrder = app(VendorFinanceService::class)->cancelPendingOrder($order);
+
+            if ($cancelledOrder->reservation_date) {
+                \App\Models\ReservationAvailabilityCache::updateForDate(
+                    $cancelledOrder->vendor_id,
+                    $cancelledOrder->reservation_date->toDateString()
+                );
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Order cancelled and stock restored.',
+                'data' => $this->formatOrder($cancelledOrder->load(['delivery.logs', 'vendor:id,name,email', 'orderRequests'])),
+            ]);
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
     /**
      * POST /api/customer/orders/{id}/request-return
      */
