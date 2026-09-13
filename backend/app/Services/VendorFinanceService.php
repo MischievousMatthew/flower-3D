@@ -28,6 +28,57 @@ class VendorFinanceService
         ]);
     }
 
+    /** Deduct stock at the point an order is committed, once only. */
+    public function deductOrderStock(Order $order): void
+    {
+        DB::transaction(function () use ($order) {
+            $this->ensureOrderStockDeducted($order);
+        });
+    }
+
+    /**
+     * Cancel an Ordered order and restore its previously deducted quantities.
+     * Row locks and stock timestamps make retries/double-clicks safe.
+     */
+    public function cancelPendingOrder(Order $order): Order
+    {
+        return DB::transaction(function () use ($order) {
+            $lockedOrder = Order::query()
+                ->with('items')
+                ->whereKey($order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedOrder->status !== 'pending') {
+                throw new \RuntimeException('Only orders that are still Ordered can be cancelled.');
+            }
+
+            if ($lockedOrder->stock_deducted_at && ! $lockedOrder->stock_restored_at) {
+                $quantities = $lockedOrder->items
+                    ->filter(fn ($item) => $item->product_id)
+                    ->groupBy('product_id')
+                    ->map(fn ($items) => (int) $items->sum('quantity'));
+
+                foreach ($quantities as $productId => $quantity) {
+                    $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
+                    if ($product) {
+                        $product->increment('quantity_in_stock', $quantity);
+                    }
+                }
+            }
+
+            $lockedOrder->update([
+                'status'            => 'cancelled',
+                'cancelled_at'      => now(),
+                'stock_restored_at' => $lockedOrder->stock_deducted_at
+                    ? now()
+                    : $lockedOrder->stock_restored_at,
+            ]);
+
+            return $lockedOrder->fresh(['items']);
+        });
+    }
+
     /**
      * Called when an order is marked as completed.
      *
@@ -238,19 +289,23 @@ class VendorFinanceService
         // Load items if not already loaded
         $items = $order->relationLoaded('items') ? $order->items : $order->items()->get();
 
-        foreach ($items as $item) {
-            if (! $item->product_id) {
-                continue;
+        $quantities = $items
+            ->filter(fn ($item) => $item->product_id)
+            ->groupBy('product_id')
+            ->map(fn ($items) => (int) $items->sum('quantity'));
+
+        foreach ($quantities as $productId => $quantity) {
+            $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
+
+            if (! $product || $product->quantity_in_stock < $quantity) {
+                throw new \RuntimeException("Insufficient stock for product [{$productId}].");
             }
 
-            // Decrement but never go below 0
-            Product::where('id', $item->product_id)
-                ->where('quantity_in_stock', '>', 0)
-                ->decrement('quantity_in_stock', $item->quantity);
+            $product->decrement('quantity_in_stock', $quantity);
 
             Log::info('Stock deducted', [
-                'product_id' => $item->product_id,
-                'qty'        => $item->quantity,
+                'product_id' => $productId,
+                'qty'        => $quantity,
                 'order_id'   => $order->id,
             ]);
         }

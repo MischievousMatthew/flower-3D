@@ -510,6 +510,12 @@ class CheckoutController extends Controller
 
                 DB::table('order_items')->insert($orderItems);
 
+                // COD is a committed order at this point. E-wallet stock is
+                // committed only after PayMongo confirms payment below.
+                if ($paymentMethod === 'cod') {
+                    app(VendorFinanceService::class)->deductOrderStock($order);
+                }
+
                 // Update reservation cache
                 ReservationAvailabilityCache::updateForDate($vendorId, $reservationDate->toDateString());
 
@@ -1429,6 +1435,8 @@ class CheckoutController extends Controller
             }
         });
 
-        app(VendorFinanceService::class)->handleOrderPayment($order->fresh());
+        $freshOrder = $order->fresh();
+        app(VendorFinanceService::class)->deductOrderStock($freshOrder);
+        app(VendorFinanceService::class)->handleOrderPayment($freshOrder);
     }
 }
