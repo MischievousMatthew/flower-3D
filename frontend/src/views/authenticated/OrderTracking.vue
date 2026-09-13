@@ -902,8 +902,8 @@
         @click.self="confirmModal.show = false"
       >
         <div class="ot-modal ot-modal--sm">
-          <div class="ot-modal__ico-lg">✅</div>
-          <h3 class="ot-modal__title">Confirm Delivery</h3>
+          <div class="ot-modal__ico-lg">{{ confirmModal.icon }}</div>
+          <h3 class="ot-modal__title">{{ confirmModal.title }}</h3>
           <p class="ot-modal__confirm-body">{{ confirmModal.body }}</p>
           <div class="ot-modal__footer">
             <button
@@ -913,11 +913,12 @@
               Cancel
             </button>
             <button
-              class="ot-btn ot-btn--green"
+              class="ot-btn"
+              :class="confirmModal.variant === 'danger' ? 'ot-btn--cancel' : 'ot-btn--green'"
               :disabled="confirmModal.loading"
               @click="confirmModal.onConfirm"
             >
-              {{ confirmModal.loading ? "Confirming…" : "Yes, I received it" }}
+              {{ confirmModal.loading ? confirmModal.loadingLabel : confirmModal.confirmLabel }}
             </button>
           </div>
         </div>
@@ -986,7 +987,12 @@ const reqModal = reactive({
 // Simple confirm modal
 const confirmModal = reactive({
   show: false,
+  title: "Confirm Delivery",
+  icon: "✅",
   body: "",
+  confirmLabel: "Yes, I received it",
+  loadingLabel: "Confirming…",
+  variant: "success",
   loading: false,
   onConfirm: null,
 });
@@ -1063,9 +1069,14 @@ const canComplete = (o) => o.delivery?.status === "to_received";
 const canReturn = (o) => o.delivery?.status === "completed";
 const canRefund = (o) =>
   o.delivery?.status === "completed" && o.payment_status === "paid";
+const isPaidEWallet = (o) =>
+  ["ewallet", "gcash", "maya", "paymaya"].includes(
+    String(o.payment_method || "").toLowerCase(),
+  ) && o.payment_status === "paid";
 const canCancel = (o) =>
   ["pending", "processing"].includes(o.status) &&
-  (!o.delivery || o.delivery.status === "pending");
+  (!o.delivery || o.delivery.status === "pending") &&
+  !isPaidEWallet(o);
 const showActions = (o) =>
   canCancel(o) || canComplete(o) || canReturn(o) || canRefund(o) || canReview(o);
 
@@ -1080,7 +1091,12 @@ const hasReviewed = (order) => reviewedOrderIds.value.has(order.id);
 function doComplete(order) {
   confirmModal.show = true;
   confirmModal.loading = false;
+  confirmModal.title = "Confirm Delivery";
+  confirmModal.icon = "✅";
   confirmModal.body = `Have you received order ${order.order_number}? This will mark it as delivered.`;
+  confirmModal.confirmLabel = "Yes, I received it";
+  confirmModal.loadingLabel = "Confirming…";
+  confirmModal.variant = "success";
   confirmModal.onConfirm = async () => {
     confirmModal.loading = true;
     actionLoading.value = order.id + "_c";
@@ -1104,7 +1120,12 @@ function doComplete(order) {
 function doCancel(order) {
   confirmModal.show = true;
   confirmModal.loading = false;
-  confirmModal.body = `Cancel order ${order.order_number}? Its reserved stock will be returned to the store.`;
+  confirmModal.title = "Cancel Delivery";
+  confirmModal.icon = "?";
+  confirmModal.body = `Are you sure you want to cancel order ${order.order_number}?`;
+  confirmModal.confirmLabel = "Yes, cancel my order";
+  confirmModal.loadingLabel = "Cancelling…";
+  confirmModal.variant = "danger";
   confirmModal.onConfirm = async () => {
     confirmModal.loading = true;
     actionLoading.value = order.id + "_cancel";
@@ -1115,7 +1136,7 @@ function doCancel(order) {
         { headers: authHeaders() },
       );
       confirmModal.show = false;
-      toast.success(response.data?.message || "Order cancelled and stock restored.", {
+      toast.success(response.data?.message || "The order was cancelled.", {
         autoClose: 3500,
         position: toast.POSITION.TOP_RIGHT,
       });

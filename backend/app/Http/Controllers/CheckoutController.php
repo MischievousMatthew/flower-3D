@@ -334,16 +334,21 @@ class CheckoutController extends Controller
 
             $vendorId = $vendorUserIds->first();
             $vendorUser = \App\Models\User::find($vendorId);
+            $paymentMethod = $this->normalizePaymentMethod($request->payment_method);
 
             $vendor = VendorApplication::where('email', $vendorUser->email)
                 ->where('status', 'approved')
-                ->where('payment_details_completed', true)
                 ->first();
 
-            if (!$vendor) {
+            // Cash on Delivery does not use the vendor's online-payment setup.
+            // Requiring it here made a COD option appear usable in Checkout but
+            // reject the order when it was submitted.
+            if (!$vendor || ($paymentMethod === 'ewallet' && !$vendor->payment_details_completed)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Vendor is not ready to accept orders'
+                    'message' => $paymentMethod === 'ewallet'
+                        ? 'Vendor is not ready to accept online payments'
+                        : 'Vendor is not ready to accept orders'
                 ], 400);
             }
 
@@ -454,8 +459,6 @@ class CheckoutController extends Controller
                 }
 
                 $total = $subtotal;
-                $paymentMethod = $this->normalizePaymentMethod($request->payment_method);
-
                 // Create order with CORRECT reservation date (Y-m-d format)
                 $order = Order::create([
                     'user_id' => $user->id,

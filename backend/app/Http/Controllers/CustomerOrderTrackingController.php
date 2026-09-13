@@ -148,7 +148,7 @@ class CustomerOrderTrackingController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Order cancelled and stock restored.',
+                'message' => 'The order was cancelled.',
                 'data' => $this->formatOrder($cancelledOrder->load(['delivery.logs', 'vendor:id,name,email', 'orderRequests'])),
             ]);
         } catch (\RuntimeException $e) {

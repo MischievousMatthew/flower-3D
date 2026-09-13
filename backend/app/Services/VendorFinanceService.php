@@ -56,6 +56,13 @@ class VendorFinanceService
                 ->lockForUpdate()
                 ->first();
 
+            // A confirmed online payment is not cancellable from the customer
+            // order screen. It must follow the existing support/refund process.
+            if (in_array($lockedOrder->payment_method, ['ewallet', 'gcash', 'maya', 'paymaya'], true)
+                && $lockedOrder->payment_status === 'paid') {
+                throw new \RuntimeException('Paid online orders cannot be cancelled. Please contact support if you need help.');
+            }
+
             if (! in_array($lockedOrder->status, ['pending', 'processing'], true)
                 || ($delivery && $delivery->status !== 'pending')) {
                 throw new \RuntimeException('Only orders that are still Ordered can be cancelled.');
