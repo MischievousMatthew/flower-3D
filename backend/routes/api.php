@@ -162,6 +162,8 @@ Route::middleware('token.auth')->group(function () {
         Route::post('/initialize',      [CheckoutController::class, 'initializeCheckout']);
         Route::post('/create-order',    [CheckoutController::class, 'createOrder']);
         Route::get('/orders/{orderId}', [CheckoutController::class, 'getOrder']);
+        Route::post('/orders/{orderId}/abandon-payment', [CheckoutController::class, 'abandonPayment'])
+            ->whereNumber('orderId');
         Route::get('/payment-callback', [CheckoutController::class, 'paymentCallback']);
     });
 

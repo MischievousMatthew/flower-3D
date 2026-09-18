@@ -896,6 +896,53 @@ class CheckoutController extends Controller
     }
 
     /**
+     * Browser Back does not call PayMongo's cancel URL. Explicitly retire the
+     * active checkout session when the customer returns to this checkout page.
+     * A paid order is deliberately left untouched.
+     */
+    public function abandonPayment(Request $request, $orderId)
+    {
+        $order = Order::query()
+            ->whereKey($orderId)
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        if (! $order) {
+            return response()->json(['success' => false, 'message' => 'Order not found'], 404);
+        }
+
+        if ($order->payment_method !== 'ewallet'
+            || $order->payment_status === 'paid'
+            || ! in_array($order->status, ['pending', 'payment_failed', 'failed'], true)) {
+            return response()->json([
+                'success' => true,
+                'data' => ['order' => $order],
+            ]);
+        }
+
+        $previous = is_array($order->paymongo_response) ? $order->paymongo_response : [];
+        $activeSessionId = $order->paymongo_payment_intent_id;
+        $order->update([
+            'payment_status' => 'failed',
+            'status' => 'failed',
+            'paymongo_payment_intent_id' => null,
+            'paymongo_source_id' => null,
+            'paymongo_checkout_url' => null,
+            'paymongo_response' => array_merge($previous, [
+                'cancelled_at' => now()->toIso8601String(),
+                'cancelled_checkout_session_id' => $activeSessionId,
+            ]),
+        ]);
+
+        Log::info('PayMongo checkout abandoned by customer return', ['order_id' => $order->id]);
+
+        return response()->json([
+            'success' => true,
+            'data' => ['order' => $order->fresh()],
+        ]);
+    }
+
+    /**
      * Handle PayMongo webhooks
      */
     public function handleWebhook(Request $request)
@@ -1297,9 +1344,18 @@ class CheckoutController extends Controller
                 ? 'success'
                 : 'pending';
 
+            if ($paymentState === 'success') {
+                return redirect(
+                    $frontendUrl . '/customer/orders?payment=success&reference='
+                    . urlencode($reference ?: $this->buildPayMongoReference($order))
+                );
+            }
+
+            // Do not present an unconfirmed payment as an order. Return to
+            // payment instead; Checkout will retire this unfinished attempt.
             return redirect(
-                $frontendUrl . '/customer/orders?payment=' . $paymentState . '&reference='
-                . urlencode($reference ?: $this->buildPayMongoReference($order))
+                $frontendUrl . '/customer/checkout?payment=pending&order_id='
+                . urlencode((string) $order->id)
             );
         }
 

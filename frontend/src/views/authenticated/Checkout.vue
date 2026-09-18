@@ -1048,6 +1048,18 @@ async function restorePendingOnlineOrderState() {
   }
 }
 
+async function abandonPendingOnlinePayment() {
+  if (!pendingOnlineOrderId.value) return;
+
+  try {
+    await api.post(
+      `/checkout/orders/${pendingOnlineOrderId.value}/abandon-payment`,
+    );
+  } catch (error) {
+    console.warn("Unable to retire unfinished PayMongo checkout", error);
+  }
+}
+
 async function loadCheckoutData() {
   try {
     isLoading.value = true;
@@ -1287,6 +1299,11 @@ onMounted(async () => {
     route.query.order_id || sessionStorage.getItem("pending_online_order_id"),
   ) || null;
   await loadCheckoutData();
+  // This covers both PayMongo's Cancel action and the browser Back action.
+  // Neither path may leave an online order active while payment is unfinished.
+  if (pendingOnlineOrderId.value) {
+    await abandonPendingOnlinePayment();
+  }
   await restorePendingOnlineOrderState();
   await loadCalendarData();
 
