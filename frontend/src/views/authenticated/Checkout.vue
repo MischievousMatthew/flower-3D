@@ -1021,6 +1021,33 @@ function restoreCheckoutDraft() {
   }
 }
 
+async function restorePendingOnlineOrderState() {
+  if (!pendingOnlineOrderId.value) return;
+
+  try {
+    const response = await api.get(
+      `/checkout/orders/${pendingOnlineOrderId.value}`,
+    );
+    const order = response.data?.data;
+    const reservationDate = String(order?.reservation_date || "").slice(0, 10);
+
+    // Session storage is a convenience, not the source of truth. Returning
+    // from PayMongo must still restore the original reservation if storage was
+    // cleared, the browser was restarted, or the redirect used another tab.
+    if (!selectedDate.value && reservationDate) {
+      selectedDate.value = reservationDate;
+      const [year, month] = reservationDate.split("-").map(Number);
+      calendarDate.value = new Date(year, month - 1, 1);
+    }
+    if (!customerNotes.value && order?.customer_notes) {
+      customerNotes.value = order.customer_notes;
+    }
+  } catch (error) {
+    // The draft is still usable if the pending order no longer exists.
+    console.warn("Unable to restore cancelled checkout order", error);
+  }
+}
+
 async function loadCheckoutData() {
   try {
     isLoading.value = true;
@@ -1260,6 +1287,7 @@ onMounted(async () => {
     route.query.order_id || sessionStorage.getItem("pending_online_order_id"),
   ) || null;
   await loadCheckoutData();
+  await restorePendingOnlineOrderState();
   await loadCalendarData();
 
   if (route.query.payment === "cancelled" || pendingOnlineOrderId.value) {

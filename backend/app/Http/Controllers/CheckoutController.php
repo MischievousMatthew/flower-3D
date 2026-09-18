@@ -235,6 +235,26 @@ class CheckoutController extends Controller
         try {
             $user = Auth::user();
 
+            // Browsers can retain the retry id while the customer changes the
+            // radio button to COD. Treat that as a new checkout at the API
+            // boundary too, rather than returning the E-Wallet-only retry
+            // error. Recover the original reservation date when necessary.
+            if ($this->normalizePaymentMethod($request->input('payment_method')) === 'cod'
+                && $request->filled('retry_order_id')) {
+                $abandonedOrder = Order::query()
+                    ->whereKey($request->input('retry_order_id'))
+                    ->where('user_id', $user->id)
+                    ->first();
+
+                if (! $request->filled('reservation_date') && $abandonedOrder?->reservation_date) {
+                    $request->merge([
+                        'reservation_date' => $abandonedOrder->reservation_date->toDateString(),
+                    ]);
+                }
+
+                $request->request->remove('retry_order_id');
+            }
+
             $validator = Validator::make($request->all(), [
                 'payment_method' => 'required|in:ewallet,cod',
                 'delivery_address' => 'required|string',
