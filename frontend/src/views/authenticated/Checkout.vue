@@ -1226,8 +1226,6 @@ async function placeOrder() {
         );
         return;
       } else {
-        toast.success("Order created successfully!");
-
         if (isDirectCheckout.value) {
           sessionStorage.removeItem("directCheckout");
         } else {
@@ -1236,7 +1234,15 @@ async function placeOrder() {
         sessionStorage.removeItem("pending_online_order_id");
         sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
 
-        router.push("/customer/orders");
+        // Show confirmation after the destination has rendered, instead of
+        // briefly flashing a Checkout toast during navigation.
+        router.push({
+          path: "/customer/orders",
+          query: {
+            ordered: "success",
+            order_id: response.data.data?.order?.id,
+          },
+        });
       }
     } else {
       toast.error(response.data.message || "Failed to place order");

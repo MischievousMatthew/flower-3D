@@ -1399,6 +1399,16 @@ onMounted(async () => {
     delete nextQuery.reference;
 
     router.replace({ query: nextQuery });
+  } else if (route.query.ordered === "success") {
+    toast.success("Order placed successfully! You can track it here.", {
+      position: toast.POSITION.TOP_RIGHT,
+    });
+
+    const nextQuery = { ...route.query };
+    delete nextQuery.ordered;
+    delete nextQuery.order_id;
+
+    router.replace({ query: nextQuery });
   }
 });
 </script>
