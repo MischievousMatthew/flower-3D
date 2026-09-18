@@ -616,6 +616,7 @@ const isProcessing = ref(false);
 const isDirectCheckout = ref(false);
 const directCheckoutData = ref(null);
 const pendingOnlineOrderId = ref(null);
+const CHECKOUT_DRAFT_KEY = "checkout_payment_draft";
 
 // Reservation state
 const selectedDate = ref(null);
@@ -1000,6 +1001,26 @@ function goToStep(step) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function saveCheckoutDraft() {
+  sessionStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify({
+    selectedDate: selectedDate.value,
+    customerNotes: customerNotes.value,
+    selectedPaymentMethod: selectedPaymentMethod.value,
+  }));
+}
+
+function restoreCheckoutDraft() {
+  try {
+    const draft = JSON.parse(sessionStorage.getItem(CHECKOUT_DRAFT_KEY) || "null");
+    if (!draft) return;
+    selectedDate.value = draft.selectedDate || null;
+    customerNotes.value = draft.customerNotes || "";
+    selectedPaymentMethod.value = draft.selectedPaymentMethod || selectedPaymentMethod.value;
+  } catch (error) {
+    console.warn("Unable to restore checkout draft", error);
+  }
+}
+
 async function loadCheckoutData() {
   try {
     isLoading.value = true;
@@ -1082,6 +1103,9 @@ async function loadCheckoutData() {
         selectedPaymentMethod.value = availablePaymentMethods.value[0].type;
       }
     }
+    // PayMongo replaces this page. Restore the draft only after payment
+    // options are loaded, so its selected method can be retained safely.
+    restoreCheckoutDraft();
   } catch (error) {
     console.error("Error loading checkout:", error);
     toast.error("Failed to initialize checkout");
@@ -1102,13 +1126,22 @@ async function placeOrder() {
     loadingMessage.value = "Processing your order...";
     isLoading.value = true;
 
+    // A cancelled online order can be retried only through E-Wallet. Selecting
+    // COD deliberately starts a fresh order instead of submitting the old one.
+    const isOnlineRetry = Boolean(pendingOnlineOrderId.value)
+      && selectedPaymentMethod.value === "ewallet";
+    if (!isOnlineRetry) {
+      pendingOnlineOrderId.value = null;
+      sessionStorage.removeItem("pending_online_order_id");
+    }
+
     const orderData = {
       reservation_date: selectedDate.value,
       payment_method: selectedPaymentMethod.value,
       delivery_address: checkoutData.value.user?.address || "",
       contact_number: checkoutData.value.user?.contact_number || "",
       customer_notes: customerNotes.value,
-      ...(pendingOnlineOrderId.value
+      ...(isOnlineRetry
         ? { retry_order_id: pendingOnlineOrderId.value }
         : {}),
 
@@ -1135,6 +1168,7 @@ async function placeOrder() {
     const checkoutUrl = response.data.checkout_url;
 
     if (checkoutUrl) {
+      saveCheckoutDraft();
       pendingOnlineOrderId.value = response.data.order_id;
       sessionStorage.setItem(
         "pending_online_order_id",
@@ -1161,6 +1195,7 @@ async function placeOrder() {
           localStorage.removeItem("checkout_data");
         }
         sessionStorage.removeItem("pending_online_order_id");
+        sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
 
         router.push("/customer/orders");
       }

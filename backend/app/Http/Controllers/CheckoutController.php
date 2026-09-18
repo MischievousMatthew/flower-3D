@@ -536,6 +536,7 @@ class CheckoutController extends Controller
                             'paymongo_response' => [
                                 'checkout_session_id' => $paymentResponse['checkout_session_id'] ?? null,
                                 'reference_number' => $paymentResponse['reference_number'] ?? null,
+                                'payment_attempt' => $paymentResponse['payment_attempt'] ?? null,
                                 'payment_method' => $paymentMethod,
                             ],
                         ]);
@@ -636,7 +637,7 @@ class CheckoutController extends Controller
         if (!$paymentResponse['success']) {
             $order->update([
                 'payment_status' => 'failed',
-                'status' => 'payment_failed',
+                'status' => 'failed',
                 'paymongo_response' => [
                     'error' => $paymentResponse['message'] ?? 'Failed to initialize online payment.',
                     'payment_method' => $paymentMethod,
@@ -659,6 +660,7 @@ class CheckoutController extends Controller
             'paymongo_response' => [
                 'checkout_session_id' => $paymentResponse['checkout_session_id'] ?? null,
                 'reference_number' => $paymentResponse['reference_number'] ?? null,
+                'payment_attempt' => $paymentResponse['payment_attempt'] ?? null,
                 'payment_method' => $paymentMethod,
             ],
         ]);
@@ -722,7 +724,10 @@ class CheckoutController extends Controller
 
         $frontendUrl = $this->frontendUrl();
         $callbackUrl = url('/api/payment/callback');
-        $referenceNumber = $this->buildPayMongoReference($order);
+        // A unique attempt makes late webhooks from a cancelled/replaced
+        // checkout session distinguishable from the active payment session.
+        $paymentAttempt = bin2hex(random_bytes(12));
+        $referenceNumber = $this->buildPayMongoReference($order, $paymentAttempt);
 
         $order->loadMissing('user');
 
@@ -761,6 +766,7 @@ class CheckoutController extends Controller
                             'order_id' => (string) $order->id,
                             'order_number' => $order->order_number,
                             'reference_number' => $referenceNumber,
+                            'payment_attempt' => $paymentAttempt,
                             'reservation_date' => $order->reservation_date,
                             'payment_method' => $paymentMethod,
                         ],
@@ -811,6 +817,7 @@ class CheckoutController extends Controller
                 'success' => true,
                 'checkout_session_id' => $responseData['data']['id'],
                 'reference_number' => $referenceNumber,
+                'payment_attempt' => $paymentAttempt,
                 'checkout_url' => $responseData['data']['attributes']['checkout_url'],
             ];
         } catch (\Throwable $e) {
@@ -975,6 +982,7 @@ class CheckoutController extends Controller
             $this->markOrderPaidFromWebhook($order, [
                 'checkout_session_id' => $sessionData['id'] ?? null,
                 'reference_number' => $sessionAttributes['reference_number'] ?? ($metadata['reference_number'] ?? null),
+                'payment_attempt' => $metadata['payment_attempt'] ?? null,
                 'resource' => 'checkout_session.payment.paid',
             ]);
 
@@ -1007,10 +1015,13 @@ class CheckoutController extends Controller
         }
 
         $this->markOrderPaidFromWebhook($order, [
+            'checkout_session_id' => $attributes['checkout_session_id']
+                ?? data_get($attributes, 'checkout_session.id'),
             'payment_id' => $paymentData['id'] ?? null,
             'reference_number' => $attributes['reference_number']
                 ?? $attributes['external_reference_number']
                 ?? ($metadata['reference_number'] ?? $metadata['pm_reference_number'] ?? null),
+            'payment_attempt' => $metadata['payment_attempt'] ?? null,
             'resource' => 'payment.paid',
         ]);
 
@@ -1069,10 +1080,10 @@ class CheckoutController extends Controller
         $metadata = $attributes['metadata'] ?? [];
         $order = $this->resolveWebhookOrder($attributes, $metadata);
 
-        if ($order) {
+        if ($order && $this->isActivePayMongoAttempt($order, $paymentData, $attributes, $metadata)) {
             $order->update([
                 'payment_status' => 'failed',
-                'status' => 'payment_failed',
+                'status' => 'failed',
             ]);
             $webhookEvent?->update(['order_id' => $order->id]);
             Log::info('Order marked as failed via webhook', ['order_id' => $order->id]);
@@ -1161,6 +1172,16 @@ class CheckoutController extends Controller
             return response()->json(['success' => false, 'message' => 'Missing order or source'], 400);
         }
         
+        if (! $this->isActivePayMongoAttempt($order, $sourceData, $attributes, $metadata)) {
+            Log::warning('Ignoring stale PayMongo source event', [
+                'order_id' => $order->id,
+                'source_id' => $sourceId,
+            ]);
+            $webhookEvent?->update(['order_id' => $order->id]);
+            $webhookEvent?->markAsProcessed();
+            return response()->json(['success' => true, 'status' => 'ignored']);
+        }
+
         $order->update([
             'paymongo_source_id' => $sourceId,
         ]);
@@ -1247,6 +1268,7 @@ class CheckoutController extends Controller
                 $this->markOrderPaidFromWebhook($order, [
                     'checkout_session_id' => $order->paymongo_payment_intent_id,
                     'reference_number' => $reference ?: $this->buildPayMongoReference($order),
+                    'payment_attempt' => data_get($order->paymongo_response, 'payment_attempt'),
                     'resource' => 'payment.callback.paymongo_lookup',
                 ]);
             }
@@ -1261,15 +1283,39 @@ class CheckoutController extends Controller
             );
         }
 
+        // A cancelled browser checkout is never a payment confirmation. Clear
+        // its active session so a delayed event from that session cannot later
+        // be attached to this order; the same order remains retryable.
+        $activeReference = data_get($order->paymongo_response, 'reference_number');
+        if ($order->payment_method === 'ewallet'
+            && $order->payment_status !== 'paid'
+            && in_array($order->status, ['pending', 'payment_failed', 'failed'], true)
+            // An old browser tab may return its cancel URL after a retry has
+            // begun. It must not cancel the retry's active session.
+            && (!$reference || !$activeReference || hash_equals($activeReference, $reference))) {
+            $previous = is_array($order->paymongo_response) ? $order->paymongo_response : [];
+            $order->update([
+                'payment_status' => 'failed',
+                'status' => 'failed',
+                'paymongo_payment_intent_id' => null,
+                'paymongo_source_id' => null,
+                'paymongo_checkout_url' => null,
+                'paymongo_response' => array_merge($previous, [
+                    'cancelled_at' => now()->toIso8601String(),
+                    'cancelled_checkout_session_id' => $order->paymongo_payment_intent_id,
+                ]),
+            ]);
+        }
+
         return redirect(
             $frontendUrl . '/customer/checkout?payment=cancelled&order_id='
             . urlencode((string) $order->id)
         );
     }
 
-    private function buildPayMongoReference(Order $order): string
+    private function buildPayMongoReference(Order $order, ?string $paymentAttempt = null): string
     {
-        return $order->order_number;
+        return $paymentAttempt ? $order->order_number . '-' . $paymentAttempt : $order->order_number;
     }
 
     /**
@@ -1392,28 +1438,89 @@ class CheckoutController extends Controller
         return $orderId ? Order::find($orderId) : null;
     }
 
-    private function markOrderPaidFromWebhook(Order $order, array $paymentContext = []): void
-    {
-        if ($order->payment_status === 'paid') {
-            return;
+    /**
+     * Match non-paid events to the active checkout attempt as well. Without
+     * this, a delayed failure from an abandoned session could fail a newer
+     * retry, or a delayed source event could overwrite its payment details.
+     */
+    private function isActivePayMongoAttempt(
+        Order $order,
+        array $resource,
+        array $attributes,
+        array $metadata = []
+    ): bool {
+        if ($order->payment_method !== 'ewallet'
+            || $order->payment_status !== 'unpaid'
+            || $order->status !== 'pending'
+            || ! $order->paymongo_payment_intent_id) {
+            return false;
         }
 
-        DB::transaction(function () use ($order, $paymentContext) {
-            $updates = [
-                'payment_status' => 'paid',
-                'paid_at' => $order->paid_at ?? now(),
-            ];
+        $expectedAttempt = data_get($order->paymongo_response, 'payment_attempt');
+        $receivedAttempt = $metadata['payment_attempt'] ?? null;
+        $receivedSession = $resource['id']
+            ?? $attributes['checkout_session_id']
+            ?? data_get($attributes, 'checkout_session.id');
 
-            if (in_array($order->status, ['pending', 'failed', 'payment_failed'], true)) {
-                $updates['status'] = 'processing';
+        if ($receivedSession && $receivedSession === $order->paymongo_payment_intent_id) {
+            return ! $expectedAttempt || $receivedAttempt === $expectedAttempt;
+        }
+
+        return (bool) ($expectedAttempt && $receivedAttempt === $expectedAttempt);
+    }
+
+    private function markOrderPaidFromWebhook(Order $order, array $paymentContext = []): bool
+    {
+        $markedPaid = DB::transaction(function () use ($order, $paymentContext): bool {
+            $lockedOrder = Order::query()->whereKey($order->id)->lockForUpdate()->first();
+            if (! $lockedOrder) {
+                return false;
             }
 
-            $paymongoResponse = is_array($order->paymongo_response) ? $order->paymongo_response : [];
+            if ($lockedOrder->payment_status === 'paid') {
+                return true;
+            }
 
-            $order->update(array_merge($updates, [
+            // Payment events must belong to the currently active checkout
+            // attempt. This rejects events delivered after a cancellation and
+            // events from an older retry attempt.
+            $response = is_array($lockedOrder->paymongo_response)
+                ? $lockedOrder->paymongo_response
+                : [];
+            $expectedSession = $lockedOrder->paymongo_payment_intent_id;
+            $expectedAttempt = $response['payment_attempt'] ?? null;
+            $receivedSession = $paymentContext['checkout_session_id'] ?? null;
+            $receivedAttempt = $paymentContext['payment_attempt'] ?? null;
+
+            if ($lockedOrder->payment_method !== 'ewallet'
+                || $lockedOrder->payment_status !== 'unpaid'
+                || $lockedOrder->status !== 'pending'
+                || ! $expectedSession
+                || (($receivedSession && $receivedSession !== $expectedSession)
+                    || ($expectedAttempt && $receivedAttempt !== $expectedAttempt)
+                    || (! $receivedSession && ! $receivedAttempt))) {
+                Log::warning('Ignoring stale or inactive PayMongo paid event', [
+                    'order_id' => $lockedOrder->id,
+                    'expected_session' => $expectedSession,
+                    'received_session' => $receivedSession,
+                    'expected_attempt' => $expectedAttempt,
+                    'received_attempt' => $receivedAttempt,
+                ]);
+                return false;
+            }
+
+            $updates = [
+                'payment_status' => 'paid',
+                'paid_at' => $lockedOrder->paid_at ?? now(),
+            ];
+
+            $updates['status'] = 'processing';
+            $paymongoResponse = $response;
+
+            $lockedOrder->update(array_merge($updates, [
                 'paymongo_payment_intent_id' => $paymentContext['checkout_session_id']
                     ?? $paymentContext['payment_id']
-                    ?? $order->paymongo_payment_intent_id,
+                    ?? $lockedOrder->paymongo_payment_intent_id,
                 'paymongo_response' => array_filter(array_merge($paymongoResponse, [
                     'reference_number' => $paymentContext['reference_number'] ?? null,
                     'webhook_resource' => $paymentContext['resource'] ?? null,
@@ -1421,17 +1528,17 @@ class CheckoutController extends Controller
                 ]), fn ($value) => $value !== null),
             ]));
 
-            if ($order->reservation_date) {
+            if ($lockedOrder->reservation_date) {
                 ReservationAvailabilityCache::updateForDate(
-                    $order->vendor_id,
-                    $order->reservation_date
+                    $lockedOrder->vendor_id,
+                    $lockedOrder->reservation_date
                 );
             }
 
-            if ($order->payment_method === 'ewallet') {
-                $productIds = $order->items()->pluck('product_id')->filter();
+            if ($lockedOrder->payment_method === 'ewallet') {
+                $productIds = $lockedOrder->items()->pluck('product_id')->filter();
                 if ($productIds->isNotEmpty()) {
-                    Cart::where('user_id', $order->user_id)
+                    Cart::where('user_id', $lockedOrder->user_id)
                         ->whereIn('product_id', $productIds)
                         ->delete();
                 }
@@ -1440,10 +1547,14 @@ class CheckoutController extends Controller
             // The payment confirmation and inventory commitment belong to the
             // same database transaction. The service lock/timestamp makes
             // repeated webhook deliveries harmless.
-            app(VendorFinanceService::class)->deductOrderStock($order);
+            app(VendorFinanceService::class)->deductOrderStock($lockedOrder);
+            return true;
         });
 
-        $freshOrder = $order->fresh();
-        app(VendorFinanceService::class)->handleOrderPayment($freshOrder);
+        if ($markedPaid) {
+            app(VendorFinanceService::class)->handleOrderPayment($order->fresh());
+        }
+
+        return $markedPaid;
     }
 }
