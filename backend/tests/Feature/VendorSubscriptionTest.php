@@ -8,6 +8,7 @@ use App\Models\VendorSubscription;
 use App\Http\Middleware\EnsureSubscriptionModuleAccess;
 use App\Http\Middleware\EnsureResourceLimit;
 use App\Http\Middleware\EnsureEmployeeModuleAccess;
+use App\Http\Middleware\EnsureEmployeeLeaveReviewAccess;
 use App\Services\ResourceLimitService;
 use App\Services\VendorSubscriptionService;
 use App\Subscriptions\SubscriptionPlans;
@@ -176,7 +177,7 @@ class VendorSubscriptionTest extends TestCase
         $middleware = app(EnsureSubscriptionModuleAccess::class);
 
         $allowed = $middleware->handle($request, fn () => response()->json(['ok' => true]), 'products');
-        $blocked = $middleware->handle($request, fn () => response()->json(['ok' => true]), 'warehouse');
+        $blocked = $middleware->handle($request, fn () => response()->json(['ok' => true]), 'procurement');
 
         $this->assertSame(200, $allowed->getStatusCode());
         $this->assertSame(403, $blocked->getStatusCode());
@@ -281,5 +282,72 @@ class VendorSubscriptionTest extends TestCase
         $blocked = $middleware->handle($request, fn () => response()->json(['ok' => true]), 'warehouse', 'view');
         $this->assertSame(403, $blocked->getStatusCode());
         $this->assertSame('subscription_module_unavailable', $blocked->getData(true)['code']);
+    }
+
+    public function test_business_vendor_is_denied_payroll_and_employee_without_warehouse_permission_is_denied(): void
+    {
+        $vendor = $this->vendor();
+        VendorSubscription::create([
+            'vendor_id' => $vendor->id,
+            'plan_key' => SubscriptionPlans::BUSINESS,
+            'status' => SubscriptionStatus::Active,
+            'subscription_started_at' => now(),
+        ]);
+        $request = Request::create('/api/payroll', 'GET');
+        $request->setUserResolver(fn () => $vendor);
+
+        $payrollResponse = app(EnsureEmployeeModuleAccess::class)->handle(
+            $request,
+            fn () => response()->json(['ok' => true]),
+            'payroll',
+            'view',
+        );
+        $this->assertSame(403, $payrollResponse->getStatusCode());
+        $this->assertSame('subscription_module_unavailable', $payrollResponse->getData(true)['code']);
+
+        $employeeId = \DB::table('employees')->insertGetId([
+            'owner_id' => $vendor->id, 'name' => 'No Warehouse', 'email' => 'no-warehouse@example.test', 'password' => 'x',
+        ]);
+        $employee = \App\Models\Employee::findOrFail($employeeId);
+        $warehouseRequest = Request::create('/api/procurement/supply-chain/warehouses', 'GET');
+        $warehouseRequest->setUserResolver(fn () => $employee);
+
+        $warehouseResponse = app(EnsureEmployeeModuleAccess::class)->handle(
+            $warehouseRequest,
+            fn () => response()->json(['ok' => true]),
+            'warehouse',
+            'view',
+        );
+        $this->assertSame(403, $warehouseResponse->getStatusCode());
+        $this->assertSame('Forbidden', $warehouseResponse->getData(true)['message']);
+    }
+
+    public function test_leave_review_requires_the_permission_for_the_requested_outcome(): void
+    {
+        $vendor = $this->vendor();
+        VendorSubscription::create([
+            'vendor_id' => $vendor->id,
+            'plan_key' => SubscriptionPlans::PROFESSIONAL,
+            'status' => SubscriptionStatus::Active,
+            'subscription_started_at' => now(),
+        ]);
+        $employeeId = \DB::table('employees')->insertGetId([
+            'owner_id' => $vendor->id, 'name' => 'Leave Reviewer', 'email' => 'leave@example.test', 'password' => 'x',
+        ]);
+        \DB::table('employee_module_permissions')->insert([
+            'owner_id' => $vendor->id, 'employee_id' => $employeeId,
+            'module' => 'leave_management', 'permission' => 'approve', 'access' => 'granular',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $employee = \App\Models\Employee::findOrFail($employeeId);
+        $middleware = app(EnsureEmployeeLeaveReviewAccess::class);
+
+        $approve = Request::create('/api/leaves/1/status', 'PUT', ['status' => 'approved']);
+        $approve->setUserResolver(fn () => $employee);
+        $this->assertSame(200, $middleware->handle($approve, fn () => response()->json(['ok' => true]))->getStatusCode());
+
+        $reject = Request::create('/api/leaves/1/status', 'PUT', ['status' => 'rejected']);
+        $reject->setUserResolver(fn () => $employee);
+        $this->assertSame(403, $middleware->handle($reject, fn () => response()->json(['ok' => true]))->getStatusCode());
     }
 }

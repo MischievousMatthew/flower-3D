@@ -30,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'finance.manager'   => \App\Http\Middleware\CheckFinanceManager::class,
             'assignment'        => \App\Http\Middleware\CheckActiveAssignment::class,
             'employee.module'   => \App\Http\Middleware\EnsureEmployeeModuleAccess::class,
+            'employee.leave-review' => \App\Http\Middleware\EnsureEmployeeLeaveReviewAccess::class,
             'subscription.module' => \App\Http\Middleware\EnsureSubscriptionModuleAccess::class,
             'resource.limit'    => \App\Http\Middleware\EnsureResourceLimit::class,
             'token.auth'        => \App\Http\Middleware\TokenAuth::class,

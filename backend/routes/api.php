@@ -248,7 +248,11 @@ Route::middleware('token.auth')->group(function () {
     // 6e. Vendor portal
     // ----------------------------------------------------------
 
-    Route::prefix('vendor')->group(function () {
+    // These are owner-facing administration and vendor-portal endpoints.  An
+    // employee must use the ERP endpoints below, where employee.module
+    // enforces both the company subscription and their delegated permission.
+    // Profile/password endpoints deliberately have no subscription middleware.
+    Route::prefix('vendor')->middleware('vendor')->group(function () {
 
         Route::get('/dashboard', fn () => response()->json(['message' => 'Vendor dashboard']));
 
@@ -433,9 +437,8 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/statistics',  [EmployeeLeaveController::class, 'getStatistics']);
         });
 
-        // Approval versus rejection is selected from the request status and is
-        // authorized independently inside EmployeeLeaveController.
-        Route::put('/{id}/status', [EmployeeLeaveController::class, 'updateStatus']);
+        Route::put('/{id}/status', [EmployeeLeaveController::class, 'updateStatus'])
+            ->middleware('employee.leave-review');
         Route::delete('/{id}', [EmployeeLeaveController::class, 'destroy'])->middleware('employee.module:leave_management,delete');
     });
 
@@ -443,7 +446,9 @@ Route::middleware('token.auth')->group(function () {
     // 6i. Procurement — Inventory Manager
     // ----------------------------------------------------------
 
-    Route::prefix('procurement/inventory')->group(function () {
+    // Inventory procurement is distinct from the vendor product catalog. The
+    // nested employee checks still enforce each employee's RBAC permission.
+    Route::prefix('procurement/inventory')->middleware('subscription.module:procurement')->group(function () {
         Route::middleware('employee.module:inventory_products,view')->group(function () {
             Route::get('/products',          [ProductController::class, 'myProducts']);
             Route::get('/my-products',       [ProductController::class, 'myProducts']);
