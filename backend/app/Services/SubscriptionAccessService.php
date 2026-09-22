@@ -20,7 +20,9 @@ class SubscriptionAccessService
             return true;
         }
 
-        $subscription = $vendor->subscription;
+        // Query rather than use a potentially stale loaded relationship so a
+        // downgrade takes effect on the next request immediately.
+        $subscription = $vendor->subscription()->first();
 
         return $subscription !== null
             && $subscription->isActive()
@@ -30,7 +32,7 @@ class SubscriptionAccessService
     public function accessSummary(?Authenticatable $actor): array
     {
         $vendor = $this->vendorFor($actor);
-        $subscription = $vendor?->subscription;
+        $subscription = $vendor?->subscription()->first();
         $active = $subscription?->isActive() ?? false;
 
         return [

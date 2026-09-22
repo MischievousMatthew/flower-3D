@@ -723,6 +723,32 @@ router.resolve = (location, currentLocation) => rawResolve(resolveOpaqueTarget(l
 router.push = (location) => rawPush(resolveOpaqueTarget(location));
 router.replace = (location) => rawReplace(resolveOpaqueTarget(location));
 
+// Existing RBAC keys for direct employee page navigation. Subscription access
+// is checked separately from this map by the Stage 3 guard above.
+const employeeModuleForPath = (path) => {
+  const mappings = [
+    ["/erp/procurement/supply-chain/warehouse", "warehouse"],
+    ["/erp/procurement/supply-chain/suppliers", "suppliers"],
+    ["/erp/procurement/supply-chain/orders", "sc_orders"],
+    ["/erp/procurement/supply-chain/logistics", "deliveries"],
+    ["/erp/procurement/supply-chain/deliveries", "deliveries"],
+    ["/erp/procurement/supply-chain/scan", "order_scan"],
+    ["/erp/procurement/supply-chain/dashboard", "sc_dashboard"],
+    ["/erp/procurement/inventory/funding-request", "inventory_funding"],
+    ["/erp/procurement/inventory", "inventory_products"],
+    ["/erp/finance/funding", "funding_requests"],
+    ["/erp/finance/payroll", "payroll_requests"],
+    ["/erp/finance", "finance_dashboard"],
+    ["/erp/crm", "crm"],
+    ["/erp/hr/employees", "employees"],
+    ["/erp/hr/attendance", "attendance"],
+    ["/erp/hr/payroll", "payroll"],
+    ["/erp/hr/leave", "leave_management"],
+    ["/erp/hr", "hr_dashboard"],
+  ];
+  return mappings.find(([prefix]) => path.startsWith(prefix))?.[1] ?? null;
+};
+
 /**
  * Global Route Guard
  */
@@ -851,6 +877,11 @@ router.beforeEach(async (to, from, next) => {
       return next(assignment.getDefaultRoute());
     }
     if (canonicalPath.startsWith("/erp/crm") && !assignment.canView("crm")) {
+      return next(assignment.getDefaultRoute());
+    }
+
+    const requiredEmployeeModule = employeeModuleForPath(canonicalPath);
+    if (requiredEmployeeModule && !assignment.canView(requiredEmployeeModule)) {
       return next(assignment.getDefaultRoute());
     }
 

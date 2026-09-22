@@ -436,15 +436,17 @@
                     v-for="mod in group"
                     :key="mod.key"
                     class="permission-accordion"
-                    :class="{ 'is-open': isModuleExpanded(mod.key) }"
+                    :class="{ 'is-open': isModuleExpanded(mod.key), locked: isSubscriptionLocked(mod) }"
                   >
                     <button
                       type="button"
                       class="permission-accordion__header"
-                      @click="toggleModuleAccordion(mod.key)"
+                      @click="!isSubscriptionLocked(mod) && toggleModuleAccordion(mod.key)"
                       :aria-expanded="isModuleExpanded(mod.key)"
+                      :title="isSubscriptionLocked(mod) ? subscriptionUpgradeMessage(subscriptionAccess, mod.subscriptionModule) : undefined"
                     >
                       <span>{{ mod.label }}</span>
+                      <span v-if="isSubscriptionLocked(mod)" class="permission-lock">🔒 Requires {{ subscriptionUpgradeMessage(subscriptionAccess, mod.subscriptionModule).replace('You need the ', '').replace(' to access this.', '') }}</span>
                       <svg
                         class="accordion-chevron"
                         xmlns="http://www.w3.org/2000/svg"
@@ -466,14 +468,14 @@
                     </button>
                     <transition name="accordion">
                       <div
-                        v-if="isModuleExpanded(mod.key)"
+                        v-if="isModuleExpanded(mod.key) && !isSubscriptionLocked(mod)"
                         class="permission-accordion__body"
                       >
                         <p class="permission-module-description">
-                          {{ mod.description }}
+                          Choose the actions this employee may perform.
                         </p>
                         <div
-                          v-for="permission in getModulePermissions(mod.key)"
+                          v-for="permission in getModulePermissions(permissionModuleKey(mod))"
                           :key="permission"
                           class="permission-row"
                         >
@@ -487,10 +489,10 @@
                             type="button"
                             class="permission-toggle"
                             :class="{
-                              'is-allowed': hasPermission(mod.key, permission),
+                              'is-allowed': hasPermission(permissionModuleKey(mod), permission),
                             }"
-                            @click="togglePermission(mod.key, permission)"
-                            :aria-label="`${hasPermission(mod.key, permission) ? 'Remove' : 'Allow'} ${permissionDetails[permission].label} permission for ${mod.label}`"
+                            @click="togglePermission(permissionModuleKey(mod), permission)"
+                            :aria-label="`${hasPermission(permissionModuleKey(mod), permission) ? 'Remove' : 'Allow'} ${permissionDetails[permission].label} permission for ${mod.label}`"
                           >
                             <span
                               class="permission-toggle__knob"
@@ -553,12 +555,9 @@ import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import { toast } from "vue3-toastify";
 import api from "../../plugins/axios";
-import {
-  getModulesByGroup,
-  findModule,
-  getModulePermissions,
-  PERMISSION_DETAILS,
-} from "../../constants/erpModules";
+import { findModule, getModulePermissions, PERMISSION_DETAILS } from "../../constants/erpModules";
+import { staffPermissionGroups } from "../../constants/staffPermissionModules";
+import { useSubscriptionAccess } from "../../composables/useSubscriptionAccess";
 
 // State
 const showAddModal = ref(false);
@@ -572,6 +571,7 @@ const isLoading = ref(false);
 const isLoadingMessage = ref("Loading...");
 const expandedModules = ref([]);
 const permissionDetails = PERMISSION_DETAILS;
+const { subscriptionAccess, loadSubscriptionAccess, subscriptionAllowsModule, subscriptionUpgradeMessage } = useSubscriptionAccess();
 
 // Data
 const employees = ref([]);
@@ -591,8 +591,11 @@ function normalizeModuleKey(moduleKey) {
 
 // Module helpers
 const modulesByGroup = computed(() => {
-  return getModulesByGroup();
+  return staffPermissionGroups();
 });
+
+const isSubscriptionLocked = (module) => subscriptionAccess.value !== null && !subscriptionAllowsModule(subscriptionAccess.value, module.subscriptionModule);
+const permissionModuleKey = (module) => module.permissionModule;
 
 function sanitizeModulePermissions(modulePermissions = []) {
   const uniquePermissions = new Map();
@@ -883,7 +886,7 @@ onMounted(async () => {
   isLoading.value = true;
   isLoadingMessage.value = "Loading page data...";
   try {
-    await Promise.allSettled([fetchEmployees(), fetchStatistics()]);
+    await Promise.allSettled([fetchEmployees(), fetchStatistics(), loadSubscriptionAccess()]);
   } catch (error) {
     console.error("Critical error during page load:", error);
   } finally {
@@ -898,6 +901,18 @@ onUnmounted(() => {});
 .permission-groups {
   display: grid;
   gap: 18px;
+}
+.permission-accordion.locked {
+  opacity: .58;
+}
+.permission-accordion.locked .permission-accordion__header {
+  cursor: not-allowed;
+}
+.permission-lock {
+  margin-left: auto;
+  color: #92400e;
+  font-size: .74rem;
+  font-weight: 600;
 }
 .permission-group h4 {
   margin: 0 0 8px;

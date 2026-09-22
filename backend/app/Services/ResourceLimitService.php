@@ -73,7 +73,7 @@ class ResourceLimitService
 
     private function activePlan(User $vendor): string
     {
-        $subscription = $vendor->subscription;
+        $subscription = $vendor->subscription()->first();
         if (! $subscription || ! $subscription->isActive()) {
             // Subscription-module middleware remains responsible for access;
             // this safe default prevents capacity creation without a plan.
@@ -90,6 +90,6 @@ class ResourceLimitService
             return 0;
         }
 
-        return $model::query()->withoutGlobalScopes()->where('owner_id', $vendor->id)->count();
+        return $model::query()->withoutGlobalScope('owner')->where('owner_id', $vendor->id)->count();
     }
 }

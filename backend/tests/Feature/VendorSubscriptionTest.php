@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\VendorSubscription;
 use App\Http\Middleware\EnsureSubscriptionModuleAccess;
 use App\Http\Middleware\EnsureResourceLimit;
+use App\Http\Middleware\EnsureEmployeeModuleAccess;
 use App\Services\ResourceLimitService;
 use App\Services\VendorSubscriptionService;
 use App\Subscriptions\SubscriptionPlans;
@@ -83,6 +84,15 @@ class VendorSubscriptionTest extends TestCase
             $table->string('password')->nullable();
             $table->softDeletes();
         });
+        Schema::create('employee_module_permissions', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('owner_id');
+            $table->unsignedBigInteger('employee_id');
+            $table->string('module');
+            $table->string('permission');
+            $table->string('access')->nullable();
+            $table->timestamps();
+        });
     }
 
     protected function tearDown(): void
@@ -91,6 +101,7 @@ class VendorSubscriptionTest extends TestCase
         Schema::dropIfExists('vendor_subscriptions');
         Schema::dropIfExists('warehouses');
         Schema::dropIfExists('employees');
+        Schema::dropIfExists('employee_module_permissions');
         Schema::dropIfExists('users');
 
         parent::tearDown();
@@ -239,5 +250,36 @@ class VendorSubscriptionTest extends TestCase
         $this->assertSame('Warehouse limit reached.', $response->getData(true)['message']);
         $this->assertStringContainsString('Professional plan includes 1 warehouse.', $response->getData(true)['detail']);
         $this->assertStringContainsString('Upgrade to Enterprise', $response->getData(true)['detail']);
+    }
+
+    public function test_employee_direct_module_access_requires_both_company_plan_and_employee_permission(): void
+    {
+        $vendor = $this->vendor();
+        $subscription = VendorSubscription::create([
+            'vendor_id' => $vendor->id,
+            'plan_key' => SubscriptionPlans::PROFESSIONAL,
+            'status' => SubscriptionStatus::Active,
+            'subscription_started_at' => now(),
+        ]);
+        $employeeId = \DB::table('employees')->insertGetId([
+            'owner_id' => $vendor->id, 'name' => 'John', 'email' => 'john@example.test', 'password' => 'x',
+        ]);
+        \DB::table('employee_module_permissions')->insert([
+            'owner_id' => $vendor->id, 'employee_id' => $employeeId,
+            'module' => 'warehouse', 'permission' => 'view', 'access' => 'granular',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $employee = \App\Models\Employee::findOrFail($employeeId);
+        $request = Request::create('/api/procurement/supply-chain/warehouses', 'GET');
+        $request->setUserResolver(fn () => $employee);
+        $middleware = app(EnsureEmployeeModuleAccess::class);
+
+        $allowed = $middleware->handle($request, fn () => response()->json(['ok' => true]), 'warehouse', 'view');
+        $this->assertSame(200, $allowed->getStatusCode());
+
+        $subscription->update(['plan_key' => SubscriptionPlans::STARTER]);
+        $blocked = $middleware->handle($request, fn () => response()->json(['ok' => true]), 'warehouse', 'view');
+        $this->assertSame(403, $blocked->getStatusCode());
+        $this->assertSame('subscription_module_unavailable', $blocked->getData(true)['code']);
     }
 }

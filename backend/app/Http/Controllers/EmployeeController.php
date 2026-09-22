@@ -8,6 +8,9 @@ use App\Models\Role;
 use App\Models\EmployeeAssignment;
 use App\Models\EmployeeModulePermission;
 use App\Constants\ErpModule;
+use App\Models\User;
+use App\Services\SubscriptionAccessService;
+use App\Subscriptions\SubscriptionPlans;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
@@ -154,6 +157,7 @@ class EmployeeController extends Controller
                     }
                 }
             });
+            $this->validateSubscriptionPermissions($validator, $ownerId, $request->input('permissions', []));
 
             if ($validator->fails()) {
                 return response()->json([
@@ -296,6 +300,11 @@ class EmployeeController extends Controller
                     }
                 }
             });
+            $existingPermissionPairs = $employee->modulePermissions()
+                ->get(['module', 'permission'])
+                ->map(fn ($permission) => $permission->module . ':' . $permission->permission)
+                ->all();
+            $this->validateSubscriptionPermissions($validator, $ownerId, $request->input('permissions', []), $existingPermissionPairs);
 
             if ($validator->fails()) {
                 return response()->json([
@@ -352,6 +361,29 @@ class EmployeeController extends Controller
                 'message' => 'Failed to update employee',
                 'error' => config('app.debug') ? $e->getMessage() : null
             ], 500);
+        }
+    }
+
+    /** A vendor may only grant modules included in the company's plan. */
+    private function validateSubscriptionPermissions($validator, int $ownerId, array $permissions, array $existingPermissionPairs = []): void
+    {
+        $vendor = User::find($ownerId);
+        if (! $vendor) return;
+
+        $access = app(SubscriptionAccessService::class);
+        foreach ($permissions as $index => $permission) {
+            $module = $permission['module'] ?? null;
+            if (! $module) continue;
+
+            $pair = $module . ':' . ($permission['permission'] ?? '');
+
+            if (! $access->canAccess($vendor, SubscriptionPlans::canonicalModule($module))
+                && ! in_array($pair, $existingPermissionPairs, true)) {
+                $validator->errors()->add(
+                    "permissions.$index.module",
+                    'This module is not included in the company subscription and cannot be assigned.'
+                );
+            }
         }
     }
 
