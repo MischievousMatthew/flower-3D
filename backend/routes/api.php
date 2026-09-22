@@ -128,6 +128,11 @@ Route::prefix('public/leave')->group(function () {
 
 Route::middleware('token.auth')->group(function () {
 
+    // Read-only company subscription data for the shared route guard. It is
+    // intentionally outside module protection so expired vendors can be
+    // informed safely without granting access to a business module.
+    Route::get('/subscription/access', [VendorSubscriptionController::class, 'access']);
+
     // Subscription billing is not implemented here. This sole Stage 2 endpoint
     // records the one-time Business trial for the authenticated vendor owner.
     Route::post('/vendor/subscription/business-trial', [VendorSubscriptionController::class, 'startBusinessTrial'])
@@ -276,35 +281,41 @@ Route::middleware('token.auth')->group(function () {
             Route::put('/change-password',  [VendorProfileController::class, 'changePassword']);
         });
 
-        Route::get('/products',            [ProductController::class, 'myProducts']);
-        Route::get('/my-products',         [ProductController::class, 'myProducts']);
-        Route::get('/products/draft',      [ProductController::class, 'draftProducts']);
-        Route::get('/draft-products',      [ProductController::class, 'draftProducts']);
-        Route::get('/products/inactive',   [ProductController::class, 'inactiveProducts']);
-        Route::get('/inactive-products',   [ProductController::class, 'inactiveProducts']);
-        Route::post('/products',           [ProductController::class, 'store']);
-        Route::get('/products/{id}',       [ProductController::class, 'show']);
-        Route::put('/products/{id}',       [ProductController::class, 'update']);
-        Route::patch('/products/{id}',     [ProductController::class, 'update']);
-        Route::delete('/products/{id}',    [ProductController::class, 'destroy']);
-        Route::post('/products/{id}/toggle-status',             [ProductController::class, 'toggleStatus']);
-        Route::post('/products/{id}/status',                    [ProductController::class, 'updateStatus']);
-        Route::patch('/products/{id}/stock',                    [ProductController::class, 'updateStock']);
-        Route::post('/products/{id}/update-stock',              [ProductController::class, 'updateStock']);
-        Route::delete('/products/{productId}/images/{imageId}', [ProductController::class, 'deleteImage']);
-        Route::delete('/products/{productId}/model',            [ProductController::class, 'deleteModel']);
+        Route::middleware('subscription.module:products')->group(function () {
+            Route::get('/products',            [ProductController::class, 'myProducts']);
+            Route::get('/my-products',         [ProductController::class, 'myProducts']);
+            Route::get('/products/draft',      [ProductController::class, 'draftProducts']);
+            Route::get('/draft-products',      [ProductController::class, 'draftProducts']);
+            Route::get('/products/inactive',   [ProductController::class, 'inactiveProducts']);
+            Route::get('/inactive-products',   [ProductController::class, 'inactiveProducts']);
+            Route::post('/products',           [ProductController::class, 'store']);
+            Route::get('/products/{id}',       [ProductController::class, 'show']);
+            Route::put('/products/{id}',       [ProductController::class, 'update']);
+            Route::patch('/products/{id}',     [ProductController::class, 'update']);
+            Route::delete('/products/{id}',    [ProductController::class, 'destroy']);
+            Route::post('/products/{id}/toggle-status',             [ProductController::class, 'toggleStatus']);
+            Route::post('/products/{id}/status',                    [ProductController::class, 'updateStatus']);
+            Route::patch('/products/{id}/stock',                    [ProductController::class, 'updateStock']);
+            Route::post('/products/{id}/update-stock',              [ProductController::class, 'updateStock']);
+            Route::delete('/products/{productId}/images/{imageId}', [ProductController::class, 'deleteImage']);
+            Route::delete('/products/{productId}/model',            [ProductController::class, 'deleteModel']);
+            Route::get('/products/{productId}/reviews', [ProductReviewController::class, 'vendorProductReviews'])
+                ->whereNumber('productId');
+        });
 
-        Route::get('/products/{productId}/reviews', [ProductReviewController::class, 'vendorProductReviews'])
-            ->whereNumber('productId');
+        Route::middleware('subscription.module:orders')->group(function () {
+            Route::get('/orders',                  [VendorOrdersController::class, 'getAllOrders']);
+            Route::get('/orders/statistics',       [VendorOrdersController::class, 'getOrderStatistics']);
+            Route::get('/orders/{orderId}',        [VendorOrdersController::class, 'getOrderDetails']);
+            Route::put('/orders/{orderId}/status', [VendorOrdersController::class, 'updateOrderStatus']);
+        });
 
-        Route::get('/orders',                  [VendorOrdersController::class, 'getAllOrders']);
-        Route::get('/orders/statistics',       [VendorOrdersController::class, 'getOrderStatistics']);
-        Route::get('/orders/calendar-data',    [VendorOrdersController::class, 'getCalendarData']);
-        Route::get('/orders/for-date',         [VendorOrdersController::class, 'getOrdersForDate']);
-        Route::get('/orders/{orderId}',        [VendorOrdersController::class, 'getOrderDetails']);
-        Route::put('/orders/{orderId}/status', [VendorOrdersController::class, 'updateOrderStatus']);
+        Route::middleware('subscription.module:calendar')->group(function () {
+            Route::get('/orders/calendar-data', [VendorOrdersController::class, 'getCalendarData']);
+            Route::get('/orders/for-date', [VendorOrdersController::class, 'getOrdersForDate']);
+        });
 
-        Route::prefix('reservations')->group(function () {
+        Route::prefix('reservations')->middleware('subscription.module:calendar')->group(function () {
             Route::get('/calendar',             [VendorOrdersController::class, 'getCalendarData']);
             Route::get('/closed-dates',         [VendorOrdersController::class, 'getClosedDates']);
             Route::post('/close-date',          [VendorOrdersController::class, 'markDateAsClosed']);
@@ -313,10 +324,10 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/orders/calendar-data', [VendorOrdersController::class, 'getCalendarData']);
         });
 
-        Route::post('/orders/{orderId}/scan-delivery', [DeliveryController::class, 'scan']);
-        Route::get('/deliveries',                      [DeliveryController::class, 'vendorOrders']);
+        Route::post('/orders/{orderId}/scan-delivery', [DeliveryController::class, 'scan'])->middleware('subscription.module:scanning');
+        Route::get('/deliveries', [DeliveryController::class, 'vendorOrders'])->middleware('subscription.module:deliveries');
 
-        Route::prefix('finance')->group(function () {
+        Route::prefix('finance')->middleware('subscription.module:finance')->group(function () {
             Route::get('/overview',     [VendorFinanceDashboardController::class, 'overview']);
             Route::get('/transactions', [VendorFinanceDashboardController::class, 'transactions']);
             Route::get('/cashflow',     [VendorFinanceDashboardController::class, 'cashflow']);
@@ -416,7 +427,7 @@ Route::middleware('token.auth')->group(function () {
         Route::delete('/{id}', [PayrollController::class, 'destroy'])->whereNumber('id')->middleware('employee.module:payroll,delete');
     });
 
-    Route::prefix('leaves')->group(function () {
+    Route::prefix('leaves')->middleware('subscription.module:leave')->group(function () {
         Route::middleware('employee.module:leave_management,view')->group(function () {
             Route::get('/',            [EmployeeLeaveController::class, 'index']);
             Route::get('/statistics',  [EmployeeLeaveController::class, 'getStatistics']);
@@ -572,7 +583,7 @@ Route::middleware('token.auth')->group(function () {
             Route::delete('/{id}/items/{itemId}', [OrderController::class, 'removeItem'])->middleware('employee.module:sc_orders,delete');
         });
 
-        Route::prefix('shipments')->group(function () {
+        Route::prefix('shipments')->middleware('subscription.module:logistics')->group(function () {
             Route::middleware('employee.module:deliveries,view')->group(function () {
                 Route::get('/',                [ShipmentController::class, 'index']);
                 Route::get('/{id}',            [ShipmentController::class, 'show']);

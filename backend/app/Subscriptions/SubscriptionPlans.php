@@ -21,6 +21,20 @@ final class SubscriptionPlans
         'attendance', 'payroll', 'leave',
     ];
 
+    /** Existing employee-RBAC keys mapped to subscription module keys. */
+    private const MODULE_ALIASES = [
+        'hr_dashboard' => 'hr',
+        'leave_management' => 'leave',
+        'finance_dashboard' => 'finance',
+        'funding_requests' => 'finance',
+        'payroll_requests' => 'finance',
+        'inventory_products' => 'products',
+        'inventory_funding' => 'finance',
+        'sc_dashboard' => 'supply_chain',
+        'sc_orders' => 'orders',
+        'order_scan' => 'scanning',
+    ];
+
     /**
      * A null resource limit means it is custom/unlimited and must be resolved
      * by an Enterprise agreement before an enforcement stage uses it.
@@ -94,11 +108,44 @@ final class SubscriptionPlans
 
     public static function includesModule(string $plan, string $module): bool
     {
-        return in_array($module, self::get($plan)['included_modules'], true);
+        return in_array(self::canonicalModule($module), self::get($plan)['included_modules'], true);
     }
 
     public static function resourceLimit(string $plan, string $resource): ?int
     {
         return self::get($plan)['resource_limits'][$resource] ?? null;
+    }
+
+    public static function canonicalModule(string $module): string
+    {
+        return self::MODULE_ALIASES[$module] ?? $module;
+    }
+
+    public static function requiredPlanForModule(string $module): ?array
+    {
+        $module = self::canonicalModule($module);
+        $keys = array_keys(self::PLANS);
+
+        foreach ($keys as $index => $key) {
+            if (in_array($module, self::PLANS[$key]['included_modules'], true)) {
+                return [
+                    'key' => $key,
+                    'name' => self::PLANS[$key]['name'],
+                    'or_higher' => $index < count($keys) - 1,
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    public static function requiredPlansByModule(): array
+    {
+        $requirements = [];
+        foreach (self::MODULES as $module) {
+            $requirements[$module] = self::requiredPlanForModule($module);
+        }
+
+        return $requirements;
     }
 }

@@ -11,6 +11,7 @@ import {
   getStoredEmployeeToken,
   getStoredUserToken,
 } from "../utils/authSession";
+import { clearSubscriptionAccess } from "./useSubscriptionAccess";
 
 const user = ref(null);
 const loading = ref(false);
@@ -38,6 +39,7 @@ export function useAuth() {
   };
 
   const setAuthData = (token, userData, type = "user") => {
+    clearSubscriptionAccess();
     if (type === "employee") {
       localStorage.setItem("employee_token", token);
       localStorage.removeItem("auth_token");
@@ -57,6 +59,7 @@ export function useAuth() {
 
   const clearAuthData = () => {
     clearStoredAuth();
+    clearSubscriptionAccess();
 
     delete api.defaults.headers.common["Authorization"];
 

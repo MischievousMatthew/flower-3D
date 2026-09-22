@@ -4,11 +4,14 @@ namespace Tests\Feature;
 
 use App\Enums\SubscriptionStatus;
 use App\Models\User;
+use App\Models\VendorSubscription;
+use App\Http\Middleware\EnsureSubscriptionModuleAccess;
 use App\Services\VendorSubscriptionService;
 use App\Subscriptions\SubscriptionPlans;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Http\Request;
 use LogicException;
 use Tests\TestCase;
 
@@ -124,5 +127,26 @@ class VendorSubscriptionTest extends TestCase
 
         $this->expectException(LogicException::class);
         $service->startBusinessTrial($vendor, Carbon::parse('2026-03-01'));
+    }
+
+    public function test_subscription_middleware_denies_direct_module_access_not_in_the_plan(): void
+    {
+        $vendor = $this->vendor();
+        VendorSubscription::create([
+            'vendor_id' => $vendor->id,
+            'plan_key' => SubscriptionPlans::STARTER,
+            'status' => SubscriptionStatus::Active,
+            'subscription_started_at' => now(),
+        ]);
+        $request = Request::create('/api/procurement/supply-chain/warehouses', 'GET');
+        $request->setUserResolver(fn () => $vendor);
+        $middleware = app(EnsureSubscriptionModuleAccess::class);
+
+        $allowed = $middleware->handle($request, fn () => response()->json(['ok' => true]), 'products');
+        $blocked = $middleware->handle($request, fn () => response()->json(['ok' => true]), 'warehouse');
+
+        $this->assertSame(200, $allowed->getStatusCode());
+        $this->assertSame(403, $blocked->getStatusCode());
+        $this->assertSame('subscription_module_unavailable', $blocked->getData(true)['code']);
     }
 }

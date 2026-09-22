@@ -7,6 +7,8 @@ import {
   getPreferredUserType,
 } from "../utils/authSession";
 import { opaquePathFor, opaqueRouteTokens } from "./opaqueRoutes";
+import { loadSubscriptionAccess, subscriptionAllowsModule } from "../composables/useSubscriptionAccess";
+import { SUBSCRIPTION_MODULES as MODULE } from "../constants/subscriptionModules";
 
 const routes = [
   // ===== PUBLIC =====
@@ -123,31 +125,37 @@ const routes = [
       {
         path: "products",
         name: "VendorProducts",
+        meta: { subscriptionModule: MODULE.PRODUCTS },
         component: () => import("../views/vendor/ViewProduct.vue"),
       },
       {
         path: "reservation",
         name: "VendorReservation",
+        meta: { subscriptionModule: MODULE.ORDERS },
         component: () => import("../views/vendor/AllOrders.vue"),
       },
       {
         path: "calendar",
         name: "VendorCalendar",
+        meta: { subscriptionModule: MODULE.CALENDAR },
         component: () => import("../views/vendor/Reservation.vue"),
       },
       {
         path: "add-product",
         name: "VendorAddProduct",
+        meta: { subscriptionModule: MODULE.PRODUCTS },
         component: () => import("../views/vendor/AddProduct.vue"),
       },
       {
         path: "chat",
         name: "VendorChat",
+        meta: { subscriptionModule: MODULE.CRM },
         component: () => import("../views/vendor/VendorChat.vue"),
       },
       {
         path: "finance-dashboard",
         name: "VendorFinanceDashboard",
+        meta: { subscriptionModule: MODULE.FINANCE },
         component: () => import("../views/ERP/Finance/Dashboard.vue"),
       },
       {
@@ -176,7 +184,7 @@ const routes = [
       // ================= FINANCE =================
       {
         path: "finance",
-        meta: { requiresDepartment: ["Finance"] },
+        meta: { requiresDepartment: ["Finance"], subscriptionModule: MODULE.FINANCE },
         component: () => import("../views/ERP/Finance/FinanceLayout.vue"),
         children: [
           {
@@ -214,26 +222,26 @@ const routes = [
           // ───────── INVENTORY MANAGER ─────────
           {
             path: "inventory",
-            meta: { requiresInventoryManager: true },
+            meta: { requiresInventoryManager: true, subscriptionModule: MODULE.PRODUCTS },
             children: [
               {
                 path: "funding-request",
                 name: "FundingRequest",
-                meta: { requiresInventoryManager: true },
+                meta: { requiresInventoryManager: true, subscriptionModule: MODULE.FINANCE },
                 component: () =>
                   import("../views/ERP/Procurement/Inventory/FundingRequest.vue"),
               },
               {
                 path: "funding-request/create",
                 name: "CreateFundingRequest",
-                meta: { requiresInventoryManager: true },
+                meta: { requiresInventoryManager: true, subscriptionModule: MODULE.FINANCE },
                 component: () =>
                   import("../views/ERP/Procurement/Inventory/CreateFundingRequest.vue"),
               },
               {
                 path: "funding-request/edit/:id",
                 name: "EditFundingRequest",
-                meta: { requiresInventoryManager: true },
+                meta: { requiresInventoryManager: true, subscriptionModule: MODULE.FINANCE },
                 props: true,
                 component: () =>
                   import("../views/ERP/Procurement/Inventory/EditFundingRequest.vue"),
@@ -241,7 +249,7 @@ const routes = [
               {
                 path: "funding-request/details/:id",
                 name: "FundingRequestDetails",
-                meta: { requiresInventoryManager: true },
+                meta: { requiresInventoryManager: true, subscriptionModule: MODULE.FINANCE },
                 props: (route) => ({
                   id: route.params.id,
                   context: "inventory",
@@ -269,9 +277,9 @@ const routes = [
           },
 
           // ───────── SUPPLY CHAIN COORDINATOR ─────────
-          {
-            path: "supply-chain",
-            meta: { requiresDepartment: ["Procurement"] },
+              {
+                path: "supply-chain",
+            meta: { requiresDepartment: ["Procurement"], subscriptionModule: MODULE.SUPPLY_CHAIN },
             redirect: "/erp/procurement/supply-chain/dashboard",
             children: [
               {
@@ -284,6 +292,7 @@ const routes = [
               // Suppliers
               {
                 path: "suppliers",
+                meta: { subscriptionModule: MODULE.SUPPLIERS },
                 children: [
                   {
                     path: "",
@@ -310,6 +319,7 @@ const routes = [
               // Warehouse
               {
                 path: "warehouse",
+                meta: { subscriptionModule: MODULE.WAREHOUSE },
                 children: [
                   {
                     path: "",
@@ -359,6 +369,7 @@ const routes = [
               // Orders
               {
                 path: "orders",
+                meta: { subscriptionModule: MODULE.ORDERS },
                 children: [
                   {
                     path: "",
@@ -385,6 +396,7 @@ const routes = [
               // Logistics
               {
                 path: "logistics",
+                meta: { subscriptionModule: MODULE.LOGISTICS },
                 children: [
                   {
                     path: "",
@@ -405,6 +417,7 @@ const routes = [
               // Delivery
               {
                 path: "deliveries",
+                meta: { subscriptionModule: MODULE.DELIVERIES },
                 children: [
                   {
                     path: "",
@@ -424,6 +437,7 @@ const routes = [
               // Scanner
               {
                 path: "scan",
+                meta: { subscriptionModule: MODULE.SCANNING },
                 redirect: "/erp/procurement/supply-chain/scan/process",
                 children: [
                   {
@@ -459,6 +473,7 @@ const routes = [
 
       {
         path: "crm",
+        meta: { subscriptionModule: MODULE.CRM },
         children: [
           {
             path: "chat",
@@ -471,7 +486,7 @@ const routes = [
       // ================= HR =================
       {
         path: "hr",
-        meta: { requiresDepartment: ["HR", "Human Resources"] },
+        meta: { requiresDepartment: ["HR", "Human Resources"], subscriptionModule: MODULE.HR },
         name: "HR",
         component: () => import("../views/ERP/HR/HRLayout.vue"),
         children: [
@@ -483,6 +498,7 @@ const routes = [
           {
             path: "employees",
             name: "Employees",
+            meta: { subscriptionModule: MODULE.EMPLOYEES },
             children: [
               {
                 path: "directory",
@@ -501,6 +517,7 @@ const routes = [
           {
             path: "attendance",
             name: "Attendance",
+            meta: { subscriptionModule: MODULE.ATTENDANCE },
             children: [
               {
                 path: "logs",
@@ -518,6 +535,7 @@ const routes = [
           {
             path: "payroll",
             name: "Payroll",
+            meta: { subscriptionModule: MODULE.PAYROLL },
             children: [
               {
                 path: "list",
@@ -536,6 +554,7 @@ const routes = [
           {
             path: "leave",
             name: "LeaveManagement",
+            meta: { subscriptionModule: MODULE.LEAVE },
             children: [
               {
                 path: "employee-request",
@@ -778,6 +797,22 @@ router.beforeEach(async (to, from, next) => {
 
   const user = auth.user.value;
   const role = user?.role;
+  const subscriptionModule = to.meta.subscriptionModule;
+
+  // Subscription access belongs to the vendor company. It applies before the
+  // existing employee permission checks, so an employee cannot reach a module
+  // merely because their individual role allows it.
+  if (subscriptionModule && (role === "vendor" || userType === "employee")) {
+    try {
+      const access = await loadSubscriptionAccess();
+      if (!subscriptionAllowsModule(access, subscriptionModule)) {
+        return next(userType === "employee" ? "/guest/login" : "/vendor/profile");
+      }
+    } catch (err) {
+      // Subscription state cannot be safely inferred from stale browser data.
+      return next(userType === "employee" ? "/guest/login" : "/vendor/profile");
+    }
+  }
 
   // ── Employee routing: use module-based permissions ──────────────────────
   if (userType === "employee") {
@@ -826,7 +861,7 @@ router.beforeEach(async (to, from, next) => {
   // ── Non-employee routing (owner, admin, customer) ─────────────────────
   if (canonicalPath.startsWith("/erp")) {
     if (role === "admin") return next("/admin/vendor-requests");
-    if (role === "vendor") return next("/vendor/products");
+    if (role === "vendor") return next();
     if (role === "customer") return next("/shop");
     return next("/guest/login");
   }

@@ -46,9 +46,13 @@
           to="/vendor/reservation"
           class="nav-item"
           active-class="active"
+          :class="{ 'is-locked': isLocked('orders') }"
+          :title="lockTooltip('orders')"
+          @click="handleModuleNavigation($event, 'orders')"
         >
           <span class="nav-icon">🛍️</span>
           <span>Orders</span>
+          <span v-if="isLocked('orders')" class="lock-icon" aria-hidden="true">🔒</span>
           <span v-if="notificationCounts.orders > 0" class="nav-badge">
             {{
               notificationCounts.orders > 99 ? "99+" : notificationCounts.orders
@@ -59,9 +63,13 @@
           to="/vendor/calendar"
           class="nav-item"
           active-class="active"
+          :class="{ 'is-locked': isLocked('calendar') }"
+          :title="lockTooltip('calendar')"
+          @click="handleModuleNavigation($event, 'calendar')"
         >
           <span class="nav-icon">📅</span>
           <span>Calendar</span>
+          <span v-if="isLocked('calendar')" class="lock-icon" aria-hidden="true">🔒</span>
         </router-link>
         <!-- <router-link to="/customers" class="nav-item">
           <span class="nav-icon">👥</span>
@@ -87,9 +95,13 @@
           to="/vendor/finance-dashboard"
           class="nav-item"
           active-class="active"
+          :class="{ 'is-locked': isLocked('finance') }"
+          :title="lockTooltip('finance')"
+          @click="handleModuleNavigation($event, 'finance')"
         >
           <span class="nav-icon">📈</span>
           <span>Finance Overview</span>
+          <span v-if="isLocked('finance')" class="lock-icon" aria-hidden="true">🔒</span>
         </router-link>
       </div>
 
@@ -99,13 +111,25 @@
           to="/vendor/products"
           class="nav-item"
           active-class="active"
+          :class="{ 'is-locked': isLocked('products') }"
+          :title="lockTooltip('products')"
+          @click="handleModuleNavigation($event, 'products')"
         >
           <span class="nav-icon">📦</span>
           <span>Stocks</span>
+          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
         </router-link>
-        <router-link to="/vendor/chat" class="nav-item" active-class="active">
+        <router-link
+          to="/vendor/chat"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('crm') }"
+          :title="lockTooltip('crm')"
+          @click="handleModuleNavigation($event, 'crm')"
+        >
           <span class="nav-icon">💬</span>
           <span>Chat</span>
+          <span v-if="isLocked('crm')" class="lock-icon" aria-hidden="true">🔒</span>
         </router-link>
       </div>
 
@@ -118,6 +142,11 @@
         <span>Customer Support</span>
       </router-link> -->
     </nav>
+
+    <div v-if="lockedModule" class="upgrade-hint" role="status">
+      <span>{{ lockTooltip(lockedModule) }}</span>
+      <button type="button" @click="viewPlans">View Plans</button>
+    </div>
 
     <!-- <div class="sidebar-footer">
       <button @click="handleLogout" class="logout-btn" :disabled="isLoading">
