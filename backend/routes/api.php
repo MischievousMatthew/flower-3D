@@ -431,7 +431,7 @@ Route::middleware('token.auth')->group(function () {
         Route::delete('/{id}', [PayrollController::class, 'destroy'])->whereNumber('id')->middleware('employee.module:payroll,delete');
     });
 
-    Route::prefix('leaves')->middleware('subscription.module:leave')->group(function () {
+    Route::prefix('leaves')->group(function () {
         Route::middleware('employee.module:leave_management,view')->group(function () {
             Route::get('/',            [EmployeeLeaveController::class, 'index']);
             Route::get('/statistics',  [EmployeeLeaveController::class, 'getStatistics']);

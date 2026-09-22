@@ -133,6 +133,36 @@ class VendorSubscriptionTest extends TestCase
         $this->assertSame('Professional', SubscriptionPlans::requiredPlanForModule('payroll')['name']);
     }
 
+    public function test_plan_matrix_keeps_starter_business_and_professional_boundaries(): void
+    {
+        $this->assertTrue(SubscriptionPlans::includesModule(SubscriptionPlans::STARTER, 'products'));
+        $this->assertTrue(SubscriptionPlans::includesModule(SubscriptionPlans::STARTER, 'calendar'));
+        $this->assertFalse(SubscriptionPlans::includesModule(SubscriptionPlans::STARTER, 'procurement'));
+        $this->assertFalse(SubscriptionPlans::includesModule(SubscriptionPlans::STARTER, 'payroll'));
+
+        $this->assertTrue(SubscriptionPlans::includesModule(SubscriptionPlans::BUSINESS, 'procurement'));
+        $this->assertTrue(SubscriptionPlans::includesModule(SubscriptionPlans::BUSINESS, 'warehouse'));
+        $this->assertFalse(SubscriptionPlans::includesModule(SubscriptionPlans::BUSINESS, 'payroll'));
+
+        foreach (SubscriptionPlans::MODULES as $module) {
+            $this->assertTrue(SubscriptionPlans::includesModule(SubscriptionPlans::PROFESSIONAL, $module));
+            $this->assertTrue(SubscriptionPlans::includesModule(SubscriptionPlans::ENTERPRISE, $module));
+        }
+    }
+
+    public function test_force_change_password_route_has_no_subscription_middleware(): void
+    {
+        $route = app('router')->getRoutes()->match(
+            Request::create('/api/v1/vendor/profile/change-password', 'PUT'),
+        );
+
+        $middleware = $route->gatherMiddleware();
+        $this->assertContains('token.auth', $middleware);
+        $this->assertContains('vendor', $middleware);
+        $this->assertNotContains('subscription.module:products', $middleware);
+        $this->assertEmpty(array_filter($middleware, fn (string $name) => str_starts_with($name, 'subscription.module:')));
+    }
+
     public function test_business_trial_is_linked_to_vendor_and_runs_for_one_calendar_month(): void
     {
         $vendor = $this->vendor();

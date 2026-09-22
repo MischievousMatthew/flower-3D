@@ -591,6 +591,7 @@ import { useSubscriptionAccess } from "../../../../../composables/useSubscriptio
 
 const router = useRouter();
 const { subscriptionAccess, loadSubscriptionAccess } = useSubscriptionAccess();
+const viewPlans = () => router.push("/pricing");
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -1021,7 +1022,6 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-const viewPlans = () => router.push("/pricing");
 .wh-badges {
   display: flex;
   gap: 6px;
