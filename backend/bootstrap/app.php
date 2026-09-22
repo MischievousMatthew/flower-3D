@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'assignment'        => \App\Http\Middleware\CheckActiveAssignment::class,
             'employee.module'   => \App\Http\Middleware\EnsureEmployeeModuleAccess::class,
             'subscription.module' => \App\Http\Middleware\EnsureSubscriptionModuleAccess::class,
+            'resource.limit'    => \App\Http\Middleware\EnsureResourceLimit::class,
             'token.auth'        => \App\Http\Middleware\TokenAuth::class,
         ]);
     })

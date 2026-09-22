@@ -7,6 +7,9 @@
       <div>
         <h1 class="page-title">Warehouses</h1>
         <p class="page-sub">Manage storage facilities</p>
+        <p v-if="warehouseLimit" class="limit-summary">
+          {{ warehouseLimit.unlimited ? "Warehouses: custom/unlimited" : `Warehouses: ${warehouseLimit.usage} of ${warehouseLimit.limit}` }}
+        </p>
       </div>
       <div class="header-actions">
         <router-link
@@ -34,6 +37,14 @@
           New Warehouse
         </button>
       </div>
+    </div>
+
+    <div v-if="limitNotice" class="limit-notice" role="status">
+      <div>
+        <strong>Warehouse limit reached.</strong>
+        <span>{{ limitNotice }}</span>
+      </div>
+      <button type="button" @click="viewPlans">Upgrade Plan</button>
     </div>
 
     <!-- Warehouse grid -->
@@ -575,15 +586,19 @@ import {
   warehouseService,
 } from "../../../../../services/warehouseService";
 import { warehouseLocationService } from "../../../../../services/warehouseBatchService";
+import { useSubscriptionAccess } from "../../../../../composables/useSubscriptionAccess";
 
 
 const router = useRouter();
+const { subscriptionAccess, loadSubscriptionAccess } = useSubscriptionAccess();
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
 const warehouses = ref([]);
 const loading = ref(false);
 const toast = ref({ show: false, type: "success", message: "" });
+const limitNotice = ref("");
+const warehouseLimit = computed(() => subscriptionAccess.value?.resource_limits?.warehouses ?? null);
 
 // Create modal (2-step)
 const showCreate = ref(false);
@@ -668,6 +683,11 @@ async function fetchWarehouses() {
 // ── Create modal ──────────────────────────────────────────────────────────────
 
 function openCreate() {
+  if (warehouseLimit.value && !warehouseLimit.value.can_create) {
+    limitNotice.value = warehouseLimit.value.message;
+    return;
+  }
+  limitNotice.value = "";
   createStep.value = 1;
   newWh.value = { name: "", location: "", manager: "" };
   selectedLocIds.value = [];
@@ -740,7 +760,12 @@ async function saveWarehouse() {
     );
     closeCreate();
     fetchWarehouses();
+    loadSubscriptionAccess().catch(() => {});
   } catch (e) {
+    if (e?.response?.data?.code === "resource_limit_reached") {
+      limitNotice.value = e.response.data.detail;
+      closeCreate();
+    }
     showToast(
       e?.response?.data?.message ?? "Failed to create warehouse",
       "error",
@@ -806,6 +831,7 @@ let stopInventoryListener = () => {};
 
 onMounted(() => {
   fetchWarehouses();
+  loadSubscriptionAccess().catch(() => {});
   stopInventoryListener = onWarehouseInventoryChanged(() => {
     fetchWarehouses();
   });
@@ -964,6 +990,38 @@ onBeforeUnmount(() => {
   color: #9ca3af;
   margin-top: 3px;
 }
+.limit-summary {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+.limit-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 13px;
+}
+.limit-notice div { display: grid; gap: 3px; }
+.limit-notice button {
+  border: 0;
+  border-radius: 7px;
+  padding: 8px 11px;
+  background: #d97706;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+const viewPlans = () => router.push("/pricing");
 .wh-badges {
   display: flex;
   gap: 6px;

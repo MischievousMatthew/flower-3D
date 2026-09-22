@@ -14,6 +14,10 @@ final class SubscriptionPlans
     public const PROFESSIONAL = 'professional';
     public const ENTERPRISE = 'enterprise';
 
+    public const RESOURCE_BRANCHES = 'branches';
+    public const RESOURCE_WAREHOUSES = 'warehouses';
+    public const RESOURCE_STAFF_EMPLOYEES = 'staff_employees';
+
     public const MODULES = [
         'products', 'reservations', 'calendar', 'finance', 'staff',
         'procurement', 'suppliers', 'warehouse', 'supply_chain', 'orders',
@@ -114,6 +118,36 @@ final class SubscriptionPlans
     public static function resourceLimit(string $plan, string $resource): ?int
     {
         return self::get($plan)['resource_limits'][$resource] ?? null;
+    }
+
+    public static function nextPlan(string $plan): ?array
+    {
+        $keys = array_keys(self::PLANS);
+        $index = array_search($plan, $keys, true);
+
+        if ($index === false || !isset($keys[$index + 1])) {
+            return null;
+        }
+
+        return self::get($keys[$index + 1]);
+    }
+
+    public static function nextPlanWithMoreOf(string $plan, string $resource): ?array
+    {
+        $keys = array_keys(self::PLANS);
+        $index = array_search($plan, $keys, true);
+        if ($index === false) return null;
+
+        $current = self::resourceLimit($plan, $resource);
+        for ($position = $index + 1; isset($keys[$position]); $position++) {
+            $candidate = self::get($keys[$position]);
+            $limit = $candidate['resource_limits'][$resource] ?? null;
+            if ($limit === null || ($current !== null && $limit > $current)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     public static function canonicalModule(string $module): string

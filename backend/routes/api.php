@@ -256,7 +256,7 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/',              [EmployeeController::class, 'index']);
             Route::get('/statistics',    [EmployeeController::class, 'statistics']);
             Route::get('/search',        [EmployeeController::class, 'search']);
-            Route::post('/',             [EmployeeController::class, 'store']);
+            Route::post('/',             [EmployeeController::class, 'store'])->middleware('resource.limit:staff_employees');
             Route::get('/{id}',          [EmployeeController::class, 'show']);
             Route::put('/{id}',          [EmployeeController::class, 'update']);
             Route::patch('/{id}',        [EmployeeController::class, 'update']);
@@ -521,7 +521,8 @@ Route::middleware('token.auth')->group(function () {
                 Route::get('/{warehouseId}/barcodes',           [WarehouseController::class, 'barcodes']);
             });
 
-            Route::post('/', [WarehouseController::class, 'store'])->middleware('employee.module:warehouse,create');
+            Route::post('/', [WarehouseController::class, 'store'])
+                ->middleware(['employee.module:warehouse,create', 'resource.limit:warehouses']);
             Route::post('/{warehouseId}/items', [WarehouseController::class, 'addItem'])->middleware('employee.module:warehouse,create');
             Route::middleware('employee.module:warehouse,edit')->group(function () {
                 Route::put('/{id}',    [WarehouseController::class, 'update']);

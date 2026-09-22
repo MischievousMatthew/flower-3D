@@ -6,6 +6,8 @@ use App\Enums\SubscriptionStatus;
 use App\Models\User;
 use App\Models\VendorSubscription;
 use App\Http\Middleware\EnsureSubscriptionModuleAccess;
+use App\Http\Middleware\EnsureResourceLimit;
+use App\Services\ResourceLimitService;
 use App\Services\VendorSubscriptionService;
 use App\Subscriptions\SubscriptionPlans;
 use Carbon\Carbon;
@@ -65,12 +67,30 @@ class VendorSubscriptionTest extends TestCase
             $table->timestamps();
             $table->unique(['vendor_id', 'plan_key']);
         });
+        Schema::create('warehouses', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('owner_id');
+            $table->string('name');
+            $table->string('location');
+            $table->string('manager')->nullable();
+            $table->timestamp('created_at')->nullable();
+        });
+        Schema::create('employees', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('owner_id');
+            $table->string('name')->nullable();
+            $table->string('email')->nullable();
+            $table->string('password')->nullable();
+            $table->softDeletes();
+        });
     }
 
     protected function tearDown(): void
     {
         Schema::dropIfExists('vendor_subscription_trials');
         Schema::dropIfExists('vendor_subscriptions');
+        Schema::dropIfExists('warehouses');
+        Schema::dropIfExists('employees');
         Schema::dropIfExists('users');
 
         parent::tearDown();
@@ -150,5 +170,74 @@ class VendorSubscriptionTest extends TestCase
         $this->assertSame(200, $allowed->getStatusCode());
         $this->assertSame(403, $blocked->getStatusCode());
         $this->assertSame('subscription_module_unavailable', $blocked->getData(true)['code']);
+    }
+
+    public function test_resource_limits_allow_creation_until_the_limit_and_enterprise_is_unlimited(): void
+    {
+        $vendor = $this->vendor();
+        $subscription = VendorSubscription::create([
+            'vendor_id' => $vendor->id,
+            'plan_key' => SubscriptionPlans::PROFESSIONAL,
+            'status' => SubscriptionStatus::Active,
+            'subscription_started_at' => now(),
+        ]);
+        $limits = app(ResourceLimitService::class);
+
+        $this->assertSame(1, $limits->getResourceLimit($vendor, 'warehouses'));
+        $this->assertSame(30, $limits->getResourceLimit($vendor, 'staff_employees'));
+        $this->assertTrue($limits->canCreateResource($vendor, 'warehouses'));
+
+        \DB::table('warehouses')->insert([
+            'owner_id' => $vendor->id, 'name' => 'Main', 'location' => 'Manila', 'created_at' => now(),
+        ]);
+        $this->assertFalse($limits->canCreateResource($vendor, 'warehouses'));
+        $this->expectException(\LogicException::class);
+        $limits->assertCanCreateResource($vendor, 'warehouses');
+    }
+
+    public function test_enterprise_resource_limits_are_unlimited(): void
+    {
+        $vendor = $this->vendor();
+        VendorSubscription::create([
+            'vendor_id' => $vendor->id,
+            'plan_key' => SubscriptionPlans::ENTERPRISE,
+            'status' => SubscriptionStatus::Active,
+            'subscription_started_at' => now(),
+        ]);
+        \DB::table('warehouses')->insert([
+            'owner_id' => $vendor->id, 'name' => 'Main', 'location' => 'Manila', 'created_at' => now(),
+        ]);
+
+        $limits = app(ResourceLimitService::class);
+        $this->assertNull($limits->getResourceLimit($vendor, 'warehouses'));
+        $this->assertTrue($limits->canCreateResource($vendor, 'warehouses'));
+        $this->assertTrue($limits->canCreateResource($vendor, 'staff_employees'));
+    }
+
+    public function test_resource_limit_middleware_blocks_a_direct_warehouse_create_request(): void
+    {
+        $vendor = $this->vendor();
+        VendorSubscription::create([
+            'vendor_id' => $vendor->id,
+            'plan_key' => SubscriptionPlans::PROFESSIONAL,
+            'status' => SubscriptionStatus::Active,
+            'subscription_started_at' => now(),
+        ]);
+        \DB::table('warehouses')->insert([
+            'owner_id' => $vendor->id, 'name' => 'Main', 'location' => 'Manila', 'created_at' => now(),
+        ]);
+        $request = Request::create('/api/procurement/supply-chain/warehouses', 'POST');
+        $request->setUserResolver(fn () => $vendor);
+
+        $response = app(EnsureResourceLimit::class)->handle(
+            $request,
+            fn () => response()->json(['created' => true], 201),
+            'warehouses',
+        );
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertSame('Warehouse limit reached.', $response->getData(true)['message']);
+        $this->assertStringContainsString('Professional plan includes 1 warehouse.', $response->getData(true)['detail']);
+        $this->assertStringContainsString('Upgrade to Enterprise', $response->getData(true)['detail']);
     }
 }

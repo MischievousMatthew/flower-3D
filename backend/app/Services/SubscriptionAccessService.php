@@ -39,6 +39,7 @@ class SubscriptionAccessService
             'plan_key' => $subscription?->plan_key,
             'modules' => $active ? SubscriptionPlans::get($subscription->plan_key)['included_modules'] : [],
             'required_plans' => SubscriptionPlans::requiredPlansByModule(),
+            'resource_limits' => $vendor ? app(ResourceLimitService::class)->summary($vendor) : [],
         ];
     }
 
