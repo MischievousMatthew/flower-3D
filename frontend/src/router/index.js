@@ -20,6 +20,13 @@ const routes = [
         component: () => import("../views/guest/LandingPage.vue"),
       },
       {
+        path: "pricing",
+        component: () => import("../views/guest/PricingPage.vue"),
+        // Pricing is a public landing-page URL, so it remains readable and
+        // does not need an opaque token registry entry.
+        meta: { public: true, preservePublicPath: true },
+      },
+      {
         path: "shop",
         name: "Shop",
         component: () => import("../views/authenticated/Shop.vue"),
@@ -636,7 +643,9 @@ const buildOpaqueRoutes = (records, parentPath = "", parentIndex = 0) =>
       },
     };
 
-    if (!isCatchAll && record.name && opaqueRouteTokens[record.name]) {
+    if (record.meta?.preservePublicPath) {
+      clone.path = canonicalPath;
+    } else if (!isCatchAll && record.name && opaqueRouteTokens[record.name]) {
       clone.path = opaquePathFor(record.name, parameterSuffix(canonicalPath) ? `/${parameterSuffix(canonicalPath)}` : "");
       legacyAliases.set(canonicalPath, {
         path: canonicalPath,

@@ -33,6 +33,7 @@
       </router-link>
       <div class="nav-links">
         <router-link to="/shop">Shop</router-link>
+        <router-link to="/pricing">Pricing</router-link>
         <a href="#features" @click.prevent="scrollToSection('features')"
           >Features</a
         >
@@ -339,9 +340,7 @@
               >
             </li>
             <li>
-              <a href="#" @click.prevent="handleFooterLink('#pricing')"
-                >Pricing</a
-              >
+              <router-link to="/pricing">Pricing</router-link>
             </li>
           </ul>
         </div>
