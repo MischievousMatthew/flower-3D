@@ -129,6 +129,17 @@ class User extends Authenticatable
         return $this->hasMany(EmployeeInfo::class, 'owner_id');
     }
 
+    /** The one current subscription for this existing vendor owner/company. */
+    public function subscription(): HasOne
+    {
+        return $this->hasOne(VendorSubscription::class, 'vendor_id');
+    }
+
+    public function subscriptionTrials(): HasMany
+    {
+        return $this->hasMany(VendorSubscriptionTrial::class, 'vendor_id');
+    }
+
     public function isVendorOwner(): bool
     {
         return $this->role === 'vendor_owner'; // Adjust based on your role system

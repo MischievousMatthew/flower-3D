@@ -43,6 +43,7 @@ use App\Http\Controllers\OrderRequestController;
 use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\VendorFinanceDashboardController;
 use App\Http\Controllers\ProductReportController; // ← NEW
+use App\Http\Controllers\VendorSubscriptionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -126,6 +127,11 @@ Route::prefix('public/leave')->group(function () {
 });
 
 Route::middleware('token.auth')->group(function () {
+
+    // Subscription billing is not implemented here. This sole Stage 2 endpoint
+    // records the one-time Business trial for the authenticated vendor owner.
+    Route::post('/vendor/subscription/business-trial', [VendorSubscriptionController::class, 'startBusinessTrial'])
+        ->middleware('vendor');
 
     // ----------------------------------------------------------
     // 6a. Auth — session management
