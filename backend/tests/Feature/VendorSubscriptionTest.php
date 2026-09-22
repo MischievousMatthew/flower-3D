@@ -97,6 +97,8 @@ class VendorSubscriptionTest extends TestCase
         $this->assertSame(3, SubscriptionPlans::resourceLimit(SubscriptionPlans::PROFESSIONAL, 'branches'));
         $this->assertSame(30, SubscriptionPlans::resourceLimit(SubscriptionPlans::PROFESSIONAL, 'staff_employees'));
         $this->assertNull(SubscriptionPlans::resourceLimit(SubscriptionPlans::ENTERPRISE, 'warehouses'));
+        $this->assertSame('Business', SubscriptionPlans::requiredPlanForModule('warehouse')['name']);
+        $this->assertSame('Professional', SubscriptionPlans::requiredPlanForModule('payroll')['name']);
     }
 
     public function test_business_trial_is_linked_to_vendor_and_runs_for_one_calendar_month(): void

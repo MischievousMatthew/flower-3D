@@ -164,6 +164,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import { useSidebarState } from "../../composables/useSidebarState";
 import { useVendorProfile } from "../../composables/useVendorProfile";
+import { useSubscriptionAccess } from "../../composables/useSubscriptionAccess";
 import api from "../../plugins/axios";
 import LoadingOverlay from "../components/LoadingOverlay.vue";
 
@@ -171,6 +172,12 @@ const { logout } = useAuth();
 const router = useRouter();
 const route = useRoute();
 const { isMobileOpen, closeMobile } = useSidebarState();
+const {
+  subscriptionAccess,
+  loadSubscriptionAccess,
+  subscriptionAllowsModule,
+  subscriptionUpgradeMessage,
+} = useSubscriptionAccess();
 const { vendorProfile, fetchProfile } = useVendorProfile({
   autoFetch: false,
   showToast: false,
@@ -182,7 +189,9 @@ const logoLoadFailed = ref(false);
 const notificationCounts = ref({
   orders: 0,
 });
+const lockedModule = ref(null);
 let notificationInterval = null;
+let subscriptionInterval = null;
 
 const businessName = computed(() => {
   return (
@@ -222,6 +231,23 @@ isLoading.value = false;
 const handleLogoError = () => {
   logoLoadFailed.value = true;
 };
+
+const isLocked = (module) =>
+  subscriptionAccess.value !== null &&
+  !subscriptionAllowsModule(subscriptionAccess.value, module);
+
+const lockTooltip = (module) =>
+  isLocked(module)
+    ? subscriptionUpgradeMessage(subscriptionAccess.value, module)
+    : undefined;
+
+const handleModuleNavigation = (event, module) => {
+  if (!isLocked(module)) return;
+  event.preventDefault();
+  lockedModule.value = module;
+};
+
+const viewPlans = () => router.push("/pricing");
 
 const handleLogout = async () => {
   if (isLoading.value) return;
@@ -299,8 +325,10 @@ onMounted(() => {
   checkAuthState();
   handlePageLoad();
   fetchProfile().catch(() => {});
+  loadSubscriptionAccess().catch(() => {});
   loadSidebarNotifications();
   notificationInterval = window.setInterval(loadSidebarNotifications, 60000);
+  subscriptionInterval = window.setInterval(() => loadSubscriptionAccess().catch(() => {}), 60000);
 
   window.addEventListener("beforeunload", handleBeforeUnload);
 });
@@ -310,12 +338,16 @@ onUnmounted(() => {
   if (notificationInterval) {
     window.clearInterval(notificationInterval);
   }
+  if (subscriptionInterval) {
+    window.clearInterval(subscriptionInterval);
+  }
 });
 
 // Close sidebar on route change (mobile)
 watch(
   () => route.path,
   () => {
+    loadSubscriptionAccess().catch(() => {});
     if (isMobileOpen.value) closeMobile();
   },
 );
@@ -465,6 +497,47 @@ watch(
 .nav-item.active {
   background: #48bb78;
   color: white;
+}
+
+.nav-item.is-locked {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+.nav-item.is-locked:hover,
+.nav-item.is-locked.active {
+  background: transparent;
+  color: #718096;
+}
+
+.lock-icon {
+  margin-left: auto;
+  font-size: 13px;
+  filter: grayscale(1);
+}
+
+.upgrade-hint {
+  margin: 0 16px 14px;
+  padding: 10px;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.upgrade-hint button {
+  width: fit-content;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 9px;
+  background: #d97706;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .nav-icon {

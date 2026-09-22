@@ -117,13 +117,14 @@
               v-if="item.path"
               :to="item.path"
               class="nav-item"
-              :class="{ 'is-restricted': !canView(item.moduleKey) }"
+              :class="{ 'is-restricted': !canOpen(item.moduleKey) }"
               :exact-active-class="'active'"
-              :title="!canView(item.moduleKey) ? permissionTooltip : (isCollapsed ? `${section.group}: ${item.label}` : undefined)"
-              @click.prevent="!canView(item.moduleKey)"
+              :title="itemTooltip(item, section)"
+              @click="handleItemNavigation($event, item.moduleKey)"
             >
               <span class="nav-icon" v-html="getIcon(item.icon)"></span>
               <span class="nav-label" v-if="!isCollapsed">{{ item.label }}</span>
+              <span v-if="isSubscriptionLocked(item.moduleKey)" class="lock-icon" aria-hidden="true">🔒</span>
               <span
                 v-if="getItemBadgeCount(item) > 0 && !isCollapsed"
                 class="nav-badge"
@@ -141,14 +142,15 @@
             <div v-else class="nav-group">
               <button
                 class="nav-item expandable"
-                :class="{ 'is-parent-active': isGroupActive(item) }"
-                @click="!isCollapsed && toggleGroup(item.label)"
-                :title="isCollapsed ? `${section.group}: ${item.label}` : undefined"
+                :class="{ 'is-parent-active': isGroupActive(item), 'is-restricted': !canOpen(item.moduleKey) }"
+                @click="handleGroupNavigation($event, item)"
+                :title="itemTooltip(item, section)"
               >
                 <span class="nav-icon" v-html="getIcon(item.icon)"></span>
                 <span class="nav-label" v-if="!isCollapsed">{{
                   item.label
                 }}</span>
+                <span v-if="isSubscriptionLocked(item.moduleKey)" class="lock-icon" aria-hidden="true">🔒</span>
                 <svg
                   v-if="!isCollapsed"
                   class="chevron"
@@ -176,6 +178,9 @@
                     :to="child.path"
                     class="sub-item"
                     active-class="active"
+                    :class="{ 'is-restricted': !canOpen(item.moduleKey) }"
+                    :title="itemTooltip(item, section)"
+                    @click="handleItemNavigation($event, item.moduleKey)"
                     >{{ child.label }}</router-link
                   >
                 </div>
@@ -184,6 +189,11 @@
           </template>
         </template>
       </nav>
+
+      <div v-if="lockedModule && !isCollapsed" class="upgrade-hint" role="status">
+        <span>{{ subscriptionUpgradeMessage(subscriptionAccess, lockedModule) }}</span>
+        <button type="button" @click="viewPlans">View Plans</button>
+      </div>
 
       <!-- ── Footer ─────────────────────────────────── -->
       <div class="sidebar-footer">
@@ -217,27 +227,62 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from "vue";
-import { useRoute } from "vue-router";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import { useAssignment } from "../../composables/useAssignment";
 import { useChatNotifications } from "../../composables/useChatNotifications";
 import { useSupplyChainNotifications } from "../../composables/useSupplyChainNotifications";
 import { useSidebarState } from "../../composables/useSidebarState";
 import { ERP_MODULES } from "../../constants/erpModules";
+import { useSubscriptionAccess } from "../../composables/useSubscriptionAccess";
 import LoadingOverlay from "../components/LoadingOverlay.vue";
 
 const route = useRoute();
+const router = useRouter();
 const { logout, user } = useAuth();
 const { canView } = useAssignment();
 const permissionTooltip = "You don't have permission to view this information.";
 const { unreadChatCount, chatRoute } = useChatNotifications();
 const { scOrdersBadgeCount } = useSupplyChainNotifications();
 const { isCollapsed, isMobileOpen, closeMobile } = useSidebarState();
+const {
+  subscriptionAccess,
+  loadSubscriptionAccess,
+  subscriptionAllowsModule,
+  subscriptionUpgradeMessage,
+} = useSubscriptionAccess();
 
 const isLoading = ref(false);
 const expandedGroups = ref([]);
 const searchQuery = ref("");
+const lockedModule = ref(null);
+let subscriptionInterval = null;
+
+const isVendorOwner = computed(() => user.value?.role === "vendor");
+const isSubscriptionLocked = (module) =>
+  subscriptionAccess.value !== null &&
+  !subscriptionAllowsModule(subscriptionAccess.value, module);
+const canOpen = (module) => !isSubscriptionLocked(module) && (isVendorOwner.value || canView(module));
+const itemTooltip = (item, section) => {
+  if (isSubscriptionLocked(item.moduleKey)) return subscriptionUpgradeMessage(subscriptionAccess.value, item.moduleKey);
+  if (!canOpen(item.moduleKey)) return permissionTooltip;
+  return isCollapsed.value ? `${section.group}: ${item.label}` : undefined;
+};
+const handleItemNavigation = (event, module) => {
+  if (canOpen(module)) return;
+  event.preventDefault();
+  if (isSubscriptionLocked(module)) lockedModule.value = module;
+};
+const handleGroupNavigation = (event, item) => {
+  if (!canOpen(item.moduleKey)) {
+    event.preventDefault();
+    if (isSubscriptionLocked(item.moduleKey)) lockedModule.value = item.moduleKey;
+    return;
+  }
+  if (!isCollapsed.value) toggleGroup(item.label);
+};
+const viewPlans = () => router.push("/pricing");
 
 // ── Icons ────────────────────────────────────────────────────────────────
 const ICONS = {
@@ -330,6 +375,15 @@ const currentConfig = computed(() => {
 
 const themeGradient = "linear-gradient(135deg, #48bb78, #38a169)";
 
+onMounted(() => {
+  loadSubscriptionAccess().catch(() => {});
+  subscriptionInterval = window.setInterval(() => loadSubscriptionAccess().catch(() => {}), 60000);
+});
+
+onUnmounted(() => {
+  if (subscriptionInterval) window.clearInterval(subscriptionInterval);
+});
+
 watch(
   () => route.path,
   (path) => {
@@ -348,6 +402,7 @@ watch(
 
 // Close sidebar on route change (mobile)
 watch(() => route.path, () => {
+  loadSubscriptionAccess().catch(() => {});
   if (isMobileOpen.value) closeMobile();
 });
 
@@ -742,6 +797,12 @@ async function handleLogout() {
   color: inherit;
 }
 
+.lock-icon {
+  margin-left: auto;
+  font-size: 12px;
+  filter: grayscale(1);
+}
+
 .nav-badge {
   min-width: 20px;
   height: 20px;
@@ -823,6 +884,37 @@ async function handleLogout() {
   color: var(--primary-dk);
   font-weight: 600;
   background: rgba(72, 187, 120, 0.1);
+}
+.sub-item.is-restricted {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.sub-item.is-restricted:hover {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.upgrade-hint {
+  margin: 0 12px 12px;
+  padding: 9px;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 11.5px;
+  display: grid;
+  gap: 7px;
+}
+.upgrade-hint button {
+  width: fit-content;
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 8px;
+  background: #d97706;
+  color: white;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 /* ── Footer ───────────────────────────────────── */
