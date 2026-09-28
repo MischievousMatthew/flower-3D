@@ -116,6 +116,7 @@ Route::get('/products/{productId}/reviews', [ProductReviewController::class, 'in
 Route::post('/paymongo/webhook', [CheckoutController::class, 'handleWebhook'])
     ->middleware('paymongo.webhook');
 Route::get('/payment/callback',  [CheckoutController::class, 'paymentCallback']);
+Route::get('/subscription/payment/callback', [VendorSubscriptionController::class, 'paymentCallback']);
 
 // ============================================================
 // 5. PUBLIC — EMPLOYEE LEAVE (QR token, no auth)
@@ -136,6 +137,10 @@ Route::middleware('token.auth')->group(function () {
     // Subscription billing is not implemented here. This sole Stage 2 endpoint
     // records the one-time Business trial for the authenticated vendor owner.
     Route::post('/vendor/subscription/business-trial', [VendorSubscriptionController::class, 'startBusinessTrial'])
+        ->middleware('vendor');
+    Route::post('/vendor/subscription/checkout', [VendorSubscriptionController::class, 'createCheckout'])
+        ->middleware('vendor');
+    Route::post('/vendor/subscription/checkout/{checkout}/cancel', [VendorSubscriptionController::class, 'cancelCheckout'])
         ->middleware('vendor');
 
     // ----------------------------------------------------------

@@ -22,7 +22,8 @@
     </section>
 
     <section class="plans" aria-label="Subscription plans">
-      <PricingPlanCard v-for="plan in plans" :key="plan.name" :plan="plan" />
+      <PricingPlanCard v-for="plan in plans" :key="plan.key" :plan="plan" :action-label="actionLabel(plan)" :loading="processingPlan === plan.key" @select="selectPlan" />
+      <p v-if="subscriptionMessage" class="subscription-message" role="status">{{ subscriptionMessage }}</p>
     </section>
 
     <section class="feature-overview" aria-labelledby="included-features-heading">
@@ -69,16 +70,81 @@
 </template>
 
 <script setup>
+import { computed, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import PricingPlanCard from "../../components/pricing/PricingPlanCard.vue";
+import api from "../../plugins/axios";
+import { useAuth } from "../../composables/useAuth";
+import { getStoredUserToken } from "../../utils/authSession";
+import { useSubscriptionAccess } from "../../composables/useSubscriptionAccess";
 
 const year = new Date().getFullYear();
+const router = useRouter();
+const route = useRoute();
+const { user, loadUser } = useAuth();
+const { subscriptionAccess, loadSubscriptionAccess } = useSubscriptionAccess();
+const processingPlan = ref(null);
+const subscriptionMessage = ref("");
+const isVendor = computed(() => user.value?.role === "vendor" && !!getStoredUserToken());
+
+const actionLabel = (plan) => {
+  if (!isVendor.value) return plan.action;
+  if (plan.key === "business" && subscriptionAccess.value?.business_trial_eligible) return "Start 1-Month Free Trial";
+  if (plan.key === "enterprise") return "Contact BloomCraft";
+  return "Continue to Payment";
+};
 
 const plans = [
-  { name: "STARTER", price: "₱999", priceSuffix: "/month", description: "Essential ecommerce and day-to-day business tools for getting started.", highlights: ["Ecommerce functionality", "Products, reservations, calendar, and chat", "Basic business management"], action: "Get started" },
-  { name: "BUSINESS", price: "₱2,999", priceSuffix: "/month", description: "Everything in Starter with the foundational ERP tools for a connected business.", highlights: ["Everything in Starter", "Basic ERP functionality", "Finance, procurement, and supplier workflows"], action: "Choose Business" },
-  { name: "PROFESSIONAL", price: "₱6,999", priceSuffix: "/month", description: "The complete normal BloomCraft ERP for teams running end-to-end operations.", highlights: ["Everything in Business", "Full ERP functionality", "Warehouse, supply chain, CRM, and HR"], action: "Choose Professional", featured: true },
-  { name: "ENTERPRISE", price: "₱15,000+", priceSuffix: "/month", description: "Professional ERP capabilities with enterprise-scale flexibility and support.", highlights: ["Everything in Professional", "Multi-branch and multi-warehouse", "Custom integrations and dedicated support"], action: "Talk to us" },
+  { key: "starter", name: "STARTER", price: "₱999", priceSuffix: "/month", description: "Essential ecommerce and day-to-day business tools for getting started.", highlights: ["Ecommerce functionality", "Products, reservations, calendar, and chat", "Basic business management"], action: "Get started" },
+  { key: "business", name: "BUSINESS", price: "₱2,999", priceSuffix: "/month", description: "Everything in Starter with the foundational ERP tools for a connected business.", highlights: ["Everything in Starter", "Basic ERP functionality", "Finance, procurement, and supplier workflows"], action: "Choose Business" },
+  { key: "professional", name: "PROFESSIONAL", price: "₱6,999", priceSuffix: "/month", description: "The complete normal BloomCraft ERP for teams running end-to-end operations.", highlights: ["Everything in Business", "Full ERP functionality", "Warehouse, supply chain, CRM, and HR"], action: "Choose Professional", featured: true },
+  { key: "enterprise", name: "ENTERPRISE", price: "₱15,000+", priceSuffix: "/month", description: "Professional ERP capabilities with enterprise-scale flexibility and support.", highlights: ["Everything in Professional", "Multi-branch and multi-warehouse", "Custom integrations and dedicated support"], action: "Talk to us" },
 ];
+
+async function selectPlan(plan) {
+  subscriptionMessage.value = "";
+  if (!isVendor.value) return router.push("/guest/vendor_register");
+  if (plan.key === "enterprise") {
+    subscriptionMessage.value = "Enterprise pricing is custom. Please contact BloomCraft to arrange your plan.";
+    return;
+  }
+  processingPlan.value = plan.key;
+  try {
+    if (plan.key === "business" && subscriptionAccess.value?.business_trial_eligible && !subscriptionAccess.value?.subscription_active) {
+      await api.post("/vendor/subscription/business-trial");
+      await loadSubscriptionAccess();
+      subscriptionMessage.value = "Your Business 1-month free trial is now active.";
+      return;
+    }
+    const { data } = await api.post("/vendor/subscription/checkout", { plan_key: plan.key });
+    if (!data?.data?.checkout_url) throw new Error(data?.message || "Unable to start subscription checkout.");
+    window.location.assign(data.data.checkout_url);
+  } catch (error) {
+    subscriptionMessage.value = error?.response?.data?.message || error.message || "Unable to continue. Please try again.";
+  } finally {
+    processingPlan.value = null;
+  }
+}
+
+onMounted(async () => {
+  if (!getStoredUserToken()) return;
+  try {
+    await loadUser("/vendor/profile");
+    if (user.value?.role === "vendor") {
+      await loadSubscriptionAccess();
+      const paymentState = route.query.subscription_payment;
+      const checkoutId = route.query.checkout_id;
+      if (paymentState === "cancelled") {
+        if (checkoutId) await api.post(`/vendor/subscription/checkout/${checkoutId}/cancel`);
+        subscriptionMessage.value = "Payment was not completed. Your current subscription is unchanged; you can retry at any time.";
+      } else if (paymentState === "pending") {
+        subscriptionMessage.value = "Payment was submitted. Your plan will update after PayMongo confirms it.";
+      }
+    }
+  } catch (_) {
+    // A public pricing page remains available if the stored session is stale.
+  }
+});
 
 const featureGroups = [
   { name: "Ecommerce", availableFrom: "Starter", features: ["Products", "Reservations / Orders", "Calendar", "Add Product", "Chat"] },
@@ -122,6 +188,7 @@ h1, h2, h3, p { margin-top: 0; }
 .pricing-hero h1 span { color: var(--rosewood); }
 .pricing-hero > p:last-child, .section-heading > p:last-child { color: var(--ink-soft); font-size: 16px; line-height: 1.8; }
 .plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; max-width: 1200px; margin: 0 auto; padding: 0 6%; }
+.subscription-message { grid-column: 1 / -1; margin: 4px 0 0; padding: 12px 16px; color: #5b3a1e; background: #fff5df; border: 1px solid #eacb95; border-radius: 12px; font-size: 14px; text-align: center; }
 .feature-overview { max-width: 1200px; margin: 120px auto 0; padding: 86px 6%; border-top: 1px solid var(--line); }
 .section-heading { max-width: 720px; margin-bottom: 42px; }
 .section-heading h2, .enterprise-note h2, .pricing-cta h2 { margin-bottom: 16px; font-size: clamp(29px, 3.5vw, 44px); line-height: 1.16; letter-spacing: -.04em; }

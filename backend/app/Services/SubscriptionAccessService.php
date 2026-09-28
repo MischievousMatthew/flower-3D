@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Employee;
 use App\Models\User;
 use App\Models\VendorSubscription;
+use App\Models\VendorSubscriptionTrial;
 use App\Subscriptions\SubscriptionPlans;
 use Illuminate\Contracts\Auth\Authenticatable;
 
@@ -42,6 +43,9 @@ class SubscriptionAccessService
             'modules' => $active ? SubscriptionPlans::get($subscription->plan_key)['included_modules'] : [],
             'required_plans' => SubscriptionPlans::requiredPlansByModule(),
             'resource_limits' => $vendor ? app(ResourceLimitService::class)->summary($vendor) : [],
+            'business_trial_eligible' => $vendor
+                ? ! VendorSubscriptionTrial::query()->where('vendor_id', $vendor->id)->where('plan_key', SubscriptionPlans::BUSINESS)->exists()
+                : false,
         ];
     }
 

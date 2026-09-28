@@ -14,9 +14,9 @@
       </li>
     </ul>
 
-    <router-link to="/guest/vendor_register" class="plan-action" :class="{ 'plan-action--dark': plan.featured }">
-      {{ plan.action }}
-    </router-link>
+    <button type="button" class="plan-action" :class="{ 'plan-action--dark': plan.featured }" :disabled="loading" @click="$emit('select', plan)">
+      {{ actionLabel || plan.action }}
+    </button>
   </article>
 </template>
 
@@ -26,7 +26,11 @@ defineProps({
     type: Object,
     required: true,
   },
+  loading: Boolean,
+  actionLabel: String,
 });
+
+defineEmits(['select']);
 </script>
 
 <style scoped>
@@ -75,8 +79,9 @@ defineProps({
 .plan-highlights { display: grid; gap: 12px; margin: 0 0 28px; padding: 0; list-style: none; color: var(--ink, #1e1b18); font-size: 13.5px; line-height: 1.45; }
 .plan-highlights li { display: flex; gap: 9px; }
 .plan-highlights span { color: var(--rosewood, #b86558); font-weight: 700; }
-.plan-action { display: block; margin-top: auto; padding: 12px 18px; color: var(--ink, #1e1b18); border: 1px solid var(--line, rgba(30, 27, 24, 0.12)); border-radius: 999px; font-size: 13.5px; font-weight: 600; text-align: center; text-decoration: none; transition: all 0.25s ease; }
+.plan-action { display: block; width: 100%; margin-top: auto; padding: 12px 18px; color: var(--ink, #1e1b18); background: transparent; border: 1px solid var(--line, rgba(30, 27, 24, 0.12)); border-radius: 999px; font: inherit; font-size: 13.5px; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; transition: all 0.25s ease; }
 .plan-action:hover { border-color: var(--ink, #1e1b18); transform: translateY(-2px); }
+.plan-action:disabled { cursor: wait; opacity: .65; transform: none; }
 .plan-action--dark { color: var(--ivory, #faf8f5); background: var(--ink, #1e1b18); border-color: var(--ink, #1e1b18); }
 .plan-action--dark:hover { background: var(--rosewood, #b86558); border-color: var(--rosewood, #b86558); }
 </style>

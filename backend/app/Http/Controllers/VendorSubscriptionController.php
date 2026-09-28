@@ -3,13 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Services\VendorSubscriptionService;
+use App\Services\VendorSubscriptionCheckoutService;
+use App\Models\VendorSubscriptionCheckout;
 use App\Services\SubscriptionAccessService;
 use Illuminate\Http\Request;
 use LogicException;
 
 /**
- * Stage 2 exposes only trial initialization. Billing management, checkout,
- * webhooks, history, and UI are intentionally deferred.
+ * Vendor-only subscription actions. Customer order checkout remains in
+ * CheckoutController and uses a separate payment record/path.
  */
 class VendorSubscriptionController extends Controller
 {
@@ -37,5 +39,37 @@ class VendorSubscriptionController extends Controller
                 'message' => $exception->getMessage(),
             ], 422);
         }
+    }
+
+    public function createCheckout(Request $request, VendorSubscriptionCheckoutService $checkouts)
+    {
+        $data = $request->validate(['plan_key' => ['required', 'string']]);
+        try {
+            $checkout = $checkouts->create($request->user(), $data['plan_key']);
+            return response()->json(['success' => true, 'data' => [
+                'checkout_id' => $checkout->id, 'checkout_url' => $checkout->checkout_url,
+                'status' => $checkout->status, 'plan_key' => $checkout->plan_key,
+            ]], 201);
+        } catch (LogicException $exception) {
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], 422);
+        }
+    }
+
+    public function cancelCheckout(Request $request, VendorSubscriptionCheckout $checkout, VendorSubscriptionCheckoutService $checkouts)
+    {
+        try {
+            $checkouts->cancel($request->user(), $checkout);
+            return response()->json(['success' => true]);
+        } catch (LogicException $exception) {
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], 404);
+        }
+    }
+
+    /** PayMongo returns here after browser success/cancellation; webhooks activate subscriptions. */
+    public function paymentCallback(Request $request)
+    {
+        $frontend = rtrim(env('FRONTEND_URL', config('app.url')), '/');
+        $state = $request->boolean('success') ? 'pending' : 'cancelled';
+        return redirect($frontend . '/pricing?subscription_payment=' . $state . '&checkout_id=' . urlencode((string) $request->query('checkout_id')));
     }
 }

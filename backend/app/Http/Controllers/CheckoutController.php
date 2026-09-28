@@ -9,6 +9,7 @@ use App\Models\VendorApplication;
 use App\Models\VendorClosedDate;
 use App\Models\ReservationAvailabilityCache;
 use App\Services\VendorFinanceService;
+use App\Services\VendorSubscriptionCheckoutService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -952,6 +953,14 @@ class CheckoutController extends Controller
         try {
             $payload = $request->all();
             Log::info('PayMongo Webhook Received:', $payload);
+
+            // Vendor subscriptions use the same configured PayMongo webhook,
+            // but are kept separate from customer orders and their records.
+            $subscriptionCheckouts = app(VendorSubscriptionCheckoutService::class);
+            if ($subscriptionCheckouts->handlesWebhook($payload)) {
+                $subscriptionCheckouts->handleWebhook($payload);
+                return response()->json(['success' => true, 'status' => 'subscription processed']);
+            }
 
             if (app()->environment('local') && $request->has('test_mode')) {
                 Log::info('Local test webhook processing');

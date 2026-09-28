@@ -11,10 +11,12 @@ use App\Http\Middleware\EnsureEmployeeModuleAccess;
 use App\Http\Middleware\EnsureEmployeeLeaveReviewAccess;
 use App\Services\ResourceLimitService;
 use App\Services\VendorSubscriptionService;
+use App\Services\VendorSubscriptionCheckoutService;
 use App\Subscriptions\SubscriptionPlans;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Request;
 use LogicException;
 use Tests\TestCase;
@@ -69,6 +71,24 @@ class VendorSubscriptionTest extends TestCase
             $table->timestamps();
             $table->unique(['vendor_id', 'plan_key']);
         });
+        Schema::create('vendor_subscription_checkouts', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('vendor_id');
+            $table->string('plan_key');
+            $table->string('status');
+            $table->decimal('amount', 12, 2);
+            $table->string('currency', 3);
+            $table->string('billing_period');
+            $table->string('reference_number')->unique();
+            $table->string('payment_attempt')->unique();
+            $table->string('paymongo_checkout_session_id')->nullable();
+            $table->string('paymongo_payment_id')->nullable();
+            $table->text('checkout_url')->nullable();
+            $table->timestamp('paid_at')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
+            $table->json('metadata')->nullable();
+            $table->timestamps();
+        });
         Schema::create('warehouses', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('owner_id');
@@ -99,6 +119,7 @@ class VendorSubscriptionTest extends TestCase
     protected function tearDown(): void
     {
         Schema::dropIfExists('vendor_subscription_trials');
+        Schema::dropIfExists('vendor_subscription_checkouts');
         Schema::dropIfExists('vendor_subscriptions');
         Schema::dropIfExists('warehouses');
         Schema::dropIfExists('employees');
@@ -379,5 +400,38 @@ class VendorSubscriptionTest extends TestCase
         $reject = Request::create('/api/leaves/1/status', 'PUT', ['status' => 'rejected']);
         $reject->setUserResolver(fn () => $employee);
         $this->assertSame(403, $middleware->handle($reject, fn () => response()->json(['ok' => true]))->getStatusCode());
+    }
+
+    public function test_paid_plan_checkout_does_not_replace_the_current_subscription_until_paymongo_confirms_it(): void
+    {
+        config()->set('services.paymongo.secret_key', 'test-key');
+        $vendor = $this->vendor();
+        VendorSubscription::create([
+            'vendor_id' => $vendor->id, 'plan_key' => SubscriptionPlans::STARTER,
+            'status' => SubscriptionStatus::Active, 'subscription_started_at' => now(),
+        ]);
+        Http::fake([
+            'https://api.paymongo.com/v1/checkout_sessions' => Http::response([
+                'data' => ['id' => 'cs_subscription_1', 'attributes' => ['checkout_url' => 'https://paymongo.test/checkout']],
+            ], 200),
+        ]);
+
+        $service = app(VendorSubscriptionCheckoutService::class);
+        $checkout = $service->create($vendor, SubscriptionPlans::PROFESSIONAL);
+        $this->assertSame('pending', $checkout->status);
+        $this->assertSame(SubscriptionPlans::STARTER, $vendor->fresh()->subscription->plan_key);
+
+        $service->handleWebhook([
+            'data' => ['attributes' => [
+                'type' => 'checkout_session.payment.paid',
+                'data' => ['id' => 'cs_subscription_1', 'attributes' => ['metadata' => [
+                    'payment_context' => 'vendor_subscription', 'vendor_subscription_checkout_id' => (string) $checkout->id,
+                ]]],
+            ]],
+        ]);
+
+        $this->assertSame(SubscriptionPlans::PROFESSIONAL, $vendor->fresh()->subscription->plan_key);
+        $this->assertSame(SubscriptionStatus::Active, $vendor->fresh()->subscription->status);
+        $this->assertSame('paid', $checkout->fresh()->status);
     }
 }
