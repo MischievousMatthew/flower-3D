@@ -9,6 +9,7 @@ use App\Models\VendorSubscriptionCheckout;
 use App\Subscriptions\SubscriptionPlans;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use LogicException;
 
 class VendorSubscriptionCheckoutService
@@ -81,17 +82,37 @@ class VendorSubscriptionCheckoutService
      */
     public function confirmPaidCheckout(VendorSubscriptionCheckout $checkout): bool
     {
-        if ($checkout->status !== 'pending' || ! $checkout->paymongo_checkout_session_id) return $checkout->status === 'paid';
+        if ($checkout->status !== 'pending' || ! $checkout->paymongo_checkout_session_id) {
+            return $checkout->status === 'paid';
+        }
         $key = config('services.paymongo.secret_key');
-        if (! $key) return false;
+        if (! $key) {
+            Log::warning('Subscription checkout confirmation skipped: PayMongo is not configured.', [
+                'checkout_id' => $checkout->id,
+            ]);
+            return false;
+        }
 
         try {
             $response = Http::withBasicAuth($key, '')->acceptJson()->timeout(15)
                 ->get('https://api.paymongo.com/v1/checkout_sessions/' . urlencode($checkout->paymongo_checkout_session_id));
-            if (! $response->successful()) return false;
+            if (! $response->successful()) {
+                Log::warning('Subscription checkout confirmation failed at PayMongo.', [
+                    'checkout_id' => $checkout->id,
+                    'checkout_session_id' => $checkout->paymongo_checkout_session_id,
+                    'status' => $response->status(),
+                ]);
+                return false;
+            }
             $attributes = data_get($response->json(), 'data.attributes', []);
             $metadata = data_get($attributes, 'metadata', []);
-            if ((string) data_get($metadata, 'vendor_subscription_checkout_id') !== (string) $checkout->id) return false;
+            if ((string) data_get($metadata, 'vendor_subscription_checkout_id') !== (string) $checkout->id) {
+                Log::warning('Subscription checkout confirmation rejected: PayMongo metadata did not match.', [
+                    'checkout_id' => $checkout->id,
+                    'checkout_session_id' => $checkout->paymongo_checkout_session_id,
+                ]);
+                return false;
+            }
             $statuses = collect([
                 data_get($attributes, 'status'), data_get($attributes, 'payment.status'),
                 data_get($attributes, 'payment.attributes.status'), data_get($attributes, 'payment_intent.status'),
@@ -99,11 +120,23 @@ class VendorSubscriptionCheckoutService
             ])->merge(collect(data_get($attributes, 'payments', []))->map(
                 fn ($payment) => data_get($payment, 'attributes.status', data_get($payment, 'status'))
             ))->filter()->map(fn ($status) => strtolower((string) $status));
-            if (! $statuses->contains(fn ($status) => in_array($status, ['paid', 'succeeded'], true))) return false;
+            if (! $statuses->contains(fn ($status) => in_array($status, ['paid', 'succeeded'], true))) {
+                Log::info('Subscription checkout is not paid yet.', [
+                    'checkout_id' => $checkout->id,
+                    'checkout_session_id' => $checkout->paymongo_checkout_session_id,
+                    'statuses' => $statuses->values()->all(),
+                ]);
+                return false;
+            }
 
             $this->activatePaidCheckout($checkout, data_get($attributes, 'payment.id') ?? data_get($attributes, 'payment.attributes.id'));
             return true;
-        } catch (\Throwable) {
+        } catch (\Throwable $exception) {
+            Log::warning('Subscription checkout confirmation could not be completed.', [
+                'checkout_id' => $checkout->id,
+                'checkout_session_id' => $checkout->paymongo_checkout_session_id,
+                'error' => $exception->getMessage(),
+            ]);
             return false;
         }
     }

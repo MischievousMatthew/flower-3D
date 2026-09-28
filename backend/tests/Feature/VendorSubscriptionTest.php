@@ -445,9 +445,11 @@ class VendorSubscriptionTest extends TestCase
         $this->assertSame(SubscriptionPlans::STARTER, $otherVendor->fresh()->subscription->plan_key);
     }
 
-    public function test_paymongo_return_verification_activates_only_the_matching_paid_checkout(): void
+    public function test_paymongo_return_verification_activates_and_redirects_to_the_vendor_profile(): void
     {
         config()->set('services.paymongo.secret_key', 'test-key');
+        config()->set('app.frontend_url', 'https://bloomcraft-app.vercel.app');
+        config()->set('app.frontend_vendor_profile_path', '/MySju890iPNSbkf2RtOrclCnGLtzdKvUT0bk0tXnZoD');
         $vendor = $this->vendor();
         $checkout = \App\Models\VendorSubscriptionCheckout::create([
             'vendor_id' => $vendor->id,
@@ -469,7 +471,10 @@ class VendorSubscriptionTest extends TestCase
             ], 200),
         ]);
 
-        $this->assertTrue(app(VendorSubscriptionCheckoutService::class)->confirmPaidCheckout($checkout));
+        $response = $this->get('/api/subscription/payment/callback?checkout_id=' . $checkout->id . '&success=true');
+        $response->assertRedirect(
+            'https://bloomcraft-app.vercel.app/MySju890iPNSbkf2RtOrclCnGLtzdKvUT0bk0tXnZoD?subscription_success=professional'
+        );
         $subscription = $vendor->fresh()->subscription;
         $this->assertSame(SubscriptionPlans::PROFESSIONAL, $subscription->plan_key);
         $this->assertSame(SubscriptionStatus::Active, $subscription->status);

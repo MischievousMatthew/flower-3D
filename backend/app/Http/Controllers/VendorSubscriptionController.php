@@ -81,10 +81,16 @@ class VendorSubscriptionController extends Controller
     /** PayMongo return triggers an authenticated gateway lookup, never browser-trusted activation. */
     public function paymentCallback(Request $request, VendorSubscriptionCheckoutService $checkouts)
     {
-        $frontend = rtrim(env('FRONTEND_URL', config('app.url')), '/');
+        $frontend = rtrim((string) config('app.frontend_url', 'https://bloomcraft-app.vercel.app'), '/');
         $checkout = VendorSubscriptionCheckout::find($request->integer('checkout_id'));
         $paid = $request->boolean('success') && $checkout && $checkouts->confirmPaidCheckout($checkout);
         $state = $paid ? 'paid' : ($request->boolean('success') ? 'pending' : 'cancelled');
+
+        if ($paid) {
+            $profilePath = '/' . ltrim((string) config('app.frontend_vendor_profile_path'), '/');
+            return redirect($frontend . $profilePath . '?subscription_success=' . urlencode($checkout->fresh()->plan_key));
+        }
+
         return redirect($frontend . '/pricing?subscription_payment=' . $state . '&checkout_id=' . urlencode((string) $request->query('checkout_id')));
     }
 }

@@ -124,5 +124,9 @@ return [
     ],
 
     'frontend_url' => env('FRONTEND_URL', 'https://bloomcraft-app.vercel.app'),
+    'frontend_vendor_profile_path' => env(
+        'FRONTEND_VENDOR_PROFILE_PATH',
+        '/MySju890iPNSbkf2RtOrclCnGLtzdKvUT0bk0tXnZoD'
+    ),
 
 ];
