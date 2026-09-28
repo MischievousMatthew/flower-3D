@@ -140,6 +140,10 @@ onMounted(async () => {
       } else if (paymentState === "pending") {
         subscriptionMessage.value = "Confirming your payment with PayMongo…";
         await waitForConfirmedCheckout(checkoutId);
+      } else if (paymentState === "paid") {
+        await loadSubscriptionAccess();
+        const planKey = subscriptionAccess.value?.plan_key;
+        await router.replace({ path: "/vendor/profile", query: { subscription_success: planKey } });
       }
     }
   } catch (_) {

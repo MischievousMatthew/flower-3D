@@ -406,8 +406,13 @@ class VendorSubscriptionTest extends TestCase
     {
         config()->set('services.paymongo.secret_key', 'test-key');
         $vendor = $this->vendor();
+        $otherVendor = $this->vendor();
         VendorSubscription::create([
             'vendor_id' => $vendor->id, 'plan_key' => SubscriptionPlans::STARTER,
+            'status' => SubscriptionStatus::Active, 'subscription_started_at' => now(),
+        ]);
+        VendorSubscription::create([
+            'vendor_id' => $otherVendor->id, 'plan_key' => SubscriptionPlans::STARTER,
             'status' => SubscriptionStatus::Active, 'subscription_started_at' => now(),
         ]);
         Http::fake([
@@ -433,5 +438,72 @@ class VendorSubscriptionTest extends TestCase
         $this->assertSame(SubscriptionPlans::PROFESSIONAL, $vendor->fresh()->subscription->plan_key);
         $this->assertSame(SubscriptionStatus::Active, $vendor->fresh()->subscription->status);
         $this->assertSame('paid', $checkout->fresh()->status);
+        $this->assertTrue(app(\App\Services\SubscriptionAccessService::class)->canAccess($vendor->fresh(), 'payroll'));
+        $summary = app(\App\Services\SubscriptionAccessService::class)->accessSummary($vendor->fresh());
+        $this->assertSame('professional', $summary['plan_key']);
+        $this->assertSame('active', $summary['status']);
+        $this->assertSame(SubscriptionPlans::STARTER, $otherVendor->fresh()->subscription->plan_key);
+    }
+
+    public function test_paymongo_return_verification_activates_only_the_matching_paid_checkout(): void
+    {
+        config()->set('services.paymongo.secret_key', 'test-key');
+        $vendor = $this->vendor();
+        $checkout = \App\Models\VendorSubscriptionCheckout::create([
+            'vendor_id' => $vendor->id,
+            'plan_key' => SubscriptionPlans::PROFESSIONAL,
+            'status' => 'pending',
+            'amount' => 6999,
+            'currency' => 'PHP',
+            'billing_period' => 'monthly',
+            'reference_number' => 'BC-SUB-RETURN-1',
+            'payment_attempt' => 'return-payment-attempt',
+            'paymongo_checkout_session_id' => 'cs_paid_return',
+        ]);
+        Http::fake([
+            'https://api.paymongo.com/v1/checkout_sessions/cs_paid_return' => Http::response([
+                'data' => ['id' => 'cs_paid_return', 'attributes' => [
+                    'status' => 'paid',
+                    'metadata' => ['vendor_subscription_checkout_id' => (string) $checkout->id],
+                ]],
+            ], 200),
+        ]);
+
+        $this->assertTrue(app(VendorSubscriptionCheckoutService::class)->confirmPaidCheckout($checkout));
+        $subscription = $vendor->fresh()->subscription;
+        $this->assertSame(SubscriptionPlans::PROFESSIONAL, $subscription->plan_key);
+        $this->assertSame(SubscriptionStatus::Active, $subscription->status);
+        $this->assertSame('paid', $checkout->fresh()->status);
+        $this->assertTrue(app(\App\Services\SubscriptionAccessService::class)->canAccess($vendor->fresh(), 'payroll'));
+    }
+
+    public function test_failed_or_cancelled_subscription_checkout_never_replaces_an_active_plan(): void
+    {
+        config()->set('services.paymongo.secret_key', 'test-key');
+        $vendor = $this->vendor();
+        VendorSubscription::create([
+            'vendor_id' => $vendor->id, 'plan_key' => SubscriptionPlans::BUSINESS,
+            'status' => SubscriptionStatus::Active, 'subscription_started_at' => now(),
+        ]);
+        Http::fake([
+            'https://api.paymongo.com/v1/checkout_sessions' => Http::response([
+                'data' => ['id' => 'cs_subscription_failed', 'attributes' => ['checkout_url' => 'https://paymongo.test/checkout']],
+            ], 200),
+        ]);
+        $service = app(VendorSubscriptionCheckoutService::class);
+        $failed = $service->create($vendor, SubscriptionPlans::PROFESSIONAL);
+        $service->handleWebhook(['data' => ['attributes' => [
+            'type' => 'checkout_session.payment.failed',
+            'data' => ['id' => 'cs_subscription_failed', 'attributes' => ['metadata' => [
+                'payment_context' => 'vendor_subscription', 'vendor_subscription_checkout_id' => (string) $failed->id,
+            ]]],
+        ]]]);
+        $this->assertSame('failed', $failed->fresh()->status);
+        $this->assertSame(SubscriptionPlans::BUSINESS, $vendor->fresh()->subscription->plan_key);
+
+        $cancelled = $service->create($vendor, SubscriptionPlans::PROFESSIONAL);
+        $service->cancel($vendor, $cancelled);
+        $this->assertSame('cancelled', $cancelled->fresh()->status);
+        $this->assertSame(SubscriptionPlans::BUSINESS, $vendor->fresh()->subscription->plan_key);
     }
 }

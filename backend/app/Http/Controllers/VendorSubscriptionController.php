@@ -78,11 +78,13 @@ class VendorSubscriptionController extends Controller
         ]]);
     }
 
-    /** PayMongo returns here after browser success/cancellation; webhooks activate subscriptions. */
-    public function paymentCallback(Request $request)
+    /** PayMongo return triggers an authenticated gateway lookup, never browser-trusted activation. */
+    public function paymentCallback(Request $request, VendorSubscriptionCheckoutService $checkouts)
     {
         $frontend = rtrim(env('FRONTEND_URL', config('app.url')), '/');
-        $state = $request->boolean('success') ? 'pending' : 'cancelled';
+        $checkout = VendorSubscriptionCheckout::find($request->integer('checkout_id'));
+        $paid = $request->boolean('success') && $checkout && $checkouts->confirmPaidCheckout($checkout);
+        $state = $paid ? 'paid' : ($request->boolean('success') ? 'pending' : 'cancelled');
         return redirect($frontend . '/pricing?subscription_payment=' . $state . '&checkout_id=' . urlencode((string) $request->query('checkout_id')));
     }
 }

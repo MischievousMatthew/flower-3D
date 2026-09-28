@@ -75,6 +75,39 @@ class VendorSubscriptionCheckoutService
         return data_get($attributes, 'metadata.payment_context') === 'vendor_subscription';
     }
 
+    /**
+     * The return URL is never proof of payment. It may only trigger this
+     * authenticated PayMongo lookup, which independently verifies paid status.
+     */
+    public function confirmPaidCheckout(VendorSubscriptionCheckout $checkout): bool
+    {
+        if ($checkout->status !== 'pending' || ! $checkout->paymongo_checkout_session_id) return $checkout->status === 'paid';
+        $key = config('services.paymongo.secret_key');
+        if (! $key) return false;
+
+        try {
+            $response = Http::withBasicAuth($key, '')->acceptJson()->timeout(15)
+                ->get('https://api.paymongo.com/v1/checkout_sessions/' . urlencode($checkout->paymongo_checkout_session_id));
+            if (! $response->successful()) return false;
+            $attributes = data_get($response->json(), 'data.attributes', []);
+            $metadata = data_get($attributes, 'metadata', []);
+            if ((string) data_get($metadata, 'vendor_subscription_checkout_id') !== (string) $checkout->id) return false;
+            $statuses = collect([
+                data_get($attributes, 'status'), data_get($attributes, 'payment.status'),
+                data_get($attributes, 'payment.attributes.status'), data_get($attributes, 'payment_intent.status'),
+                data_get($attributes, 'payment_intent.attributes.status'),
+            ])->merge(collect(data_get($attributes, 'payments', []))->map(
+                fn ($payment) => data_get($payment, 'attributes.status', data_get($payment, 'status'))
+            ))->filter()->map(fn ($status) => strtolower((string) $status));
+            if (! $statuses->contains(fn ($status) => in_array($status, ['paid', 'succeeded'], true))) return false;
+
+            $this->activatePaidCheckout($checkout, data_get($attributes, 'payment.id') ?? data_get($attributes, 'payment.attributes.id'));
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function handleWebhook(array $payload): void
     {
         $event = data_get($payload, 'data.attributes.type');
@@ -83,14 +116,25 @@ class VendorSubscriptionCheckoutService
         $metadata = data_get($attributes, 'metadata', []);
         $checkoutId = $metadata['vendor_subscription_checkout_id'] ?? null;
         $sessionId = $resource['id'] ?? data_get($attributes, 'checkout_session_id') ?? data_get($attributes, 'checkout_session.id');
-        $checkout = VendorSubscriptionCheckout::query()->where('id', $checkoutId)->orWhere('paymongo_checkout_session_id', $sessionId)->first();
+        if (! $checkoutId && ! $sessionId && empty($metadata['reference_number'])) return;
+        $checkout = VendorSubscriptionCheckout::query()
+            ->where(function ($query) use ($checkoutId, $sessionId, $metadata) {
+                if ($checkoutId) $query->where('id', $checkoutId);
+                if ($sessionId) $query->orWhere('paymongo_checkout_session_id', $sessionId);
+                if ($metadata['reference_number'] ?? null) $query->orWhere('reference_number', $metadata['reference_number']);
+            })->first();
         if (! $checkout || $checkout->status !== 'pending') return;
         if (in_array($event, ['checkout_session.payment.failed', 'payment.failed'], true)) {
             $checkout->update(['status' => 'failed']); return;
         }
         if (! in_array($event, ['checkout_session.payment.paid', 'payment.paid'], true)) return;
 
-        DB::transaction(function () use ($checkout, $resource, $attributes) {
+        $this->activatePaidCheckout($checkout, data_get($attributes, 'payment.id') ?? data_get($attributes, 'payment.attributes.id'));
+    }
+
+    private function activatePaidCheckout(VendorSubscriptionCheckout $checkout, ?string $paymentId = null): void
+    {
+        DB::transaction(function () use ($checkout, $paymentId) {
             $checkout = VendorSubscriptionCheckout::query()->lockForUpdate()->findOrFail($checkout->id);
             if ($checkout->status !== 'pending') return;
             $periodStart = now();
@@ -103,10 +147,10 @@ class VendorSubscriptionCheckoutService
                 'current_period_started_at' => $periodStart, 'current_period_ends_at' => $periodEnd, 'next_billing_at' => $periodEnd,
                 'cancelled_at' => null, 'expired_at' => null,
                 'paymongo_checkout_session_id' => $checkout->paymongo_checkout_session_id,
-                'paymongo_payment_id' => $resource['id'] ?? null, 'payment_status' => 'paid',
+                'paymongo_payment_id' => $paymentId, 'payment_status' => 'paid',
                 'paid_amount' => $checkout->amount, 'paid_currency' => $checkout->currency, 'billing_period' => $checkout->billing_period, 'paid_at' => now(),
             ])->save();
-            $checkout->update(['status' => 'paid', 'paymongo_payment_id' => $resource['id'] ?? null, 'paid_at' => now()]);
+            $checkout->update(['status' => 'paid', 'paymongo_payment_id' => $paymentId, 'paid_at' => now()]);
         });
     }
 }
