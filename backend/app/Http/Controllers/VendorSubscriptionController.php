@@ -88,7 +88,7 @@ class VendorSubscriptionController extends Controller
 
         if ($paid) {
             $profilePath = '/' . ltrim((string) config('app.frontend_vendor_profile_path'), '/');
-            return redirect($frontend . $profilePath . '?subscription_success=' . urlencode($checkout->fresh()->plan_key));
+            return redirect($frontend . $profilePath);
         }
 
         return redirect($frontend . '/pricing?subscription_payment=' . $state . '&checkout_id=' . urlencode((string) $request->query('checkout_id')));

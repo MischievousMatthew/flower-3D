@@ -442,6 +442,8 @@ class VendorSubscriptionTest extends TestCase
         $summary = app(\App\Services\SubscriptionAccessService::class)->accessSummary($vendor->fresh());
         $this->assertSame('professional', $summary['plan_key']);
         $this->assertSame('active', $summary['status']);
+        $this->assertSame(6999.00, $summary['monthly_price']);
+        $this->assertSame('PHP', $summary['currency']);
         $this->assertSame(SubscriptionPlans::STARTER, $otherVendor->fresh()->subscription->plan_key);
     }
 
@@ -472,9 +474,7 @@ class VendorSubscriptionTest extends TestCase
         ]);
 
         $response = $this->get('/api/subscription/payment/callback?checkout_id=' . $checkout->id . '&success=true');
-        $response->assertRedirect(
-            'https://bloomcraft-app.vercel.app/MySju890iPNSbkf2RtOrclCnGLtzdKvUT0bk0tXnZoD?subscription_success=professional'
-        );
+        $response->assertRedirect('https://bloomcraft-app.vercel.app/MySju890iPNSbkf2RtOrclCnGLtzdKvUT0bk0tXnZoD');
         $subscription = $vendor->fresh()->subscription;
         $this->assertSame(SubscriptionPlans::PROFESSIONAL, $subscription->plan_key);
         $this->assertSame(SubscriptionStatus::Active, $subscription->status);

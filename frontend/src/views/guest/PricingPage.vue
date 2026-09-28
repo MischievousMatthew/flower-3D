@@ -118,6 +118,10 @@ async function selectPlan(plan) {
     }
     const { data } = await api.post("/vendor/subscription/checkout", { plan_key: plan.key });
     if (!data?.data?.checkout_url) throw new Error(data?.message || "Unable to start subscription checkout.");
+    sessionStorage.setItem("vendor_subscription_checkout", JSON.stringify({
+      checkoutId: data.data.checkout_id,
+      planKey: data.data.plan_key,
+    }));
     window.location.assign(data.data.checkout_url);
   } catch (error) {
     subscriptionMessage.value = error?.response?.data?.message || error.message || "Unable to continue. Please try again.";

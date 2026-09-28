@@ -88,7 +88,12 @@
           <p v-if="profileData.subscription.status === 'trialing'">
             Free Trial · Ends {{ formatSubscriptionDate(profileData.subscription.trial_ends_at) }}
           </p>
-          <p v-else>Status: {{ formatSubscriptionStatus(profileData.subscription.status) }}</p>
+          <p v-else>
+            <template v-if="profileData.subscription.monthly_price !== null">
+              {{ formatSubscriptionPrice(profileData.subscription.monthly_price, profileData.subscription.currency) }}/month ·
+            </template>
+            Status: {{ formatSubscriptionStatus(profileData.subscription.status) }}
+          </p>
         </div>
         <span class="subscription-card__status" :class="`status-${profileData.subscription.status}`">
           {{ profileData.subscription.status === 'trialing' ? 'Trial' : formatSubscriptionStatus(profileData.subscription.status) }}
@@ -1078,6 +1083,11 @@ const profileData = reactive({
 
 const formatSubscriptionStatus = (status) => (status || "pending").replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 const formatSubscriptionDate = (date) => date ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(date)) : "—";
+const formatSubscriptionPrice = (amount, currency = "PHP") => new Intl.NumberFormat("en-PH", {
+  style: "currency",
+  currency,
+  maximumFractionDigits: 0,
+}).format(Number(amount));
 
 // ── Form data ─────────────────────────────────────────────────────────────
 const formData = reactive({
@@ -1209,6 +1219,32 @@ const fetchProfile = async () => {
     toast.error("Failed to load profile data");
   } finally {
     isLoading.value = false;
+  }
+};
+
+// The backend redirect intentionally contains no payment state. The checkout
+// ID was recorded before leaving this Vercel origin and is verified again via
+// the authenticated API before displaying a one-time success message.
+const notifyVerifiedSubscriptionCheckout = async () => {
+  let pendingCheckout;
+  try {
+    pendingCheckout = JSON.parse(sessionStorage.getItem("vendor_subscription_checkout") || "null");
+  } catch (_) {
+    sessionStorage.removeItem("vendor_subscription_checkout");
+    return;
+  }
+  if (!pendingCheckout?.checkoutId) return;
+
+  try {
+    const { data } = await api.get(`/vendor/subscription/checkout/${pendingCheckout.checkoutId}`);
+    if (data?.data?.status === "paid" && profileData.subscription?.plan_key === data.data.plan_key) {
+      toast.success(`Successfully subscribed to the ${profileData.subscription.plan_name} Plan!`);
+      sessionStorage.removeItem("vendor_subscription_checkout");
+    } else if (["failed", "cancelled"].includes(data?.data?.status)) {
+      sessionStorage.removeItem("vendor_subscription_checkout");
+    }
+  } catch (_) {
+    // Keep it for a later profile load when the network is temporarily unavailable.
   }
 };
 
@@ -1419,7 +1455,8 @@ const handleClickOutside = (event) => {
 };
 
 onMounted(() => {
-  fetchProfile().then(() => {
+  fetchProfile().then(async () => {
+    await notifyVerifiedSubscriptionCheckout();
     const success = route.query.subscription_success;
     if (success === "business_trial") {
       toast.success("Successfully claimed your 1-month Business free trial!");

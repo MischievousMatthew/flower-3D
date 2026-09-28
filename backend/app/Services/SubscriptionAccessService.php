@@ -42,6 +42,8 @@ class SubscriptionAccessService
             'status' => $subscription?->isExpired() ? 'expired' : $subscription?->status?->value,
             'plan_key' => $subscription?->plan_key,
             'plan_name' => $plan['name'] ?? null,
+            'monthly_price' => $plan['monthly_price'] ?? null,
+            'currency' => $plan['currency'] ?? null,
             'trial_ends_at' => $subscription?->trial_ends_at?->toIso8601String(),
             'subscription_ends_at' => $subscription?->subscription_ends_at?->toIso8601String(),
             'modules' => $active ? SubscriptionPlans::get($subscription->plan_key)['included_modules'] : [],
