@@ -405,6 +405,7 @@ class VendorSubscriptionTest extends TestCase
     public function test_paid_plan_checkout_does_not_replace_the_current_subscription_until_paymongo_confirms_it(): void
     {
         config()->set('services.paymongo.secret_key', 'test-key');
+        config()->set('services.paymongo.subscription_callback_url', 'https://flower-3d.onrender.com');
         $vendor = $this->vendor();
         $otherVendor = $this->vendor();
         VendorSubscription::create([
@@ -425,6 +426,11 @@ class VendorSubscriptionTest extends TestCase
         $checkout = $service->create($vendor, SubscriptionPlans::PROFESSIONAL);
         $this->assertSame('pending', $checkout->status);
         $this->assertSame(SubscriptionPlans::STARTER, $vendor->fresh()->subscription->plan_key);
+        Http::assertSent(fn (\Illuminate\Http\Client\Request $request) =>
+            $request->url() === 'https://api.paymongo.com/v1/checkout_sessions'
+            && data_get($request->data(), 'data.attributes.success_url')
+                === 'https://flower-3d.onrender.com/api/subscription/payment/callback?checkout_id=' . $checkout->id . '&success=true'
+        );
 
         $service->handleWebhook([
             'data' => ['attributes' => [
@@ -450,7 +456,7 @@ class VendorSubscriptionTest extends TestCase
     public function test_paymongo_return_verification_activates_and_redirects_to_the_vendor_profile(): void
     {
         config()->set('services.paymongo.secret_key', 'test-key');
-        config()->set('app.frontend_url', 'https://bloomcraft-app.vercel.app');
+        config()->set('app.frontend_url', 'bloomcraft-app.vercel.app');
         config()->set('app.frontend_vendor_profile_path', '/MySju890iPNSbkf2RtOrclCnGLtzdKvUT0bk0tXnZoD');
         $vendor = $this->vendor();
         $checkout = \App\Models\VendorSubscriptionCheckout::create([

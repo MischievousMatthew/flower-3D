@@ -39,6 +39,9 @@ return [
         'secret_key' => env('PAYMONGO_SECRET_KEY'),
         'public_key' => env('PAYMONGO_PUBLIC_KEY'),
         'webhook_secret' => env('PAYMONGO_WEBHOOK_SECRET'),
+        // Subscription returns must use the live Laravel API host, not an
+        // accidentally overridden APP_URL or the Vercel frontend host.
+        'subscription_callback_url' => env('PAYMONGO_SUBSCRIPTION_CALLBACK_URL', env('APP_URL')),
     ],
 
     'brevo' => [

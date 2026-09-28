@@ -19,3 +19,5 @@ services:
         value: https://bloomcraft-app.vercel.app
       - key: APP_URL
         value: https://flower-3d.onrender.com
+      - key: PAYMONGO_SUBSCRIPTION_CALLBACK_URL
+        value: https://flower-3d.onrender.com

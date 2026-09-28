@@ -30,7 +30,8 @@ class VendorSubscriptionCheckoutService
             'amount' => $plan['monthly_price'], 'currency' => $plan['currency'], 'billing_period' => 'monthly',
             'payment_attempt' => $attempt, 'reference_number' => 'BC-SUB-' . $vendor->id . '-' . strtoupper(substr($attempt, 0, 12)),
         ]);
-        $callback = rtrim(config('app.url'), '/') . '/api/subscription/payment/callback?checkout_id=' . $checkout->id;
+        $callbackBase = rtrim((string) config('services.paymongo.subscription_callback_url', config('app.url')), '/');
+        $callback = $callbackBase . '/api/subscription/payment/callback?checkout_id=' . $checkout->id;
         $attributes = [
             'send_email_receipt' => true, 'show_description' => true, 'show_line_items' => true,
             'description' => "BloomCraft {$plan['name']} monthly subscription",
