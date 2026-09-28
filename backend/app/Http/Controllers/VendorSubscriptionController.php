@@ -65,6 +65,19 @@ class VendorSubscriptionController extends Controller
         }
     }
 
+    public function checkoutStatus(Request $request, VendorSubscriptionCheckout $checkout)
+    {
+        if ($checkout->vendor_id !== $request->user()->id) {
+            return response()->json(['success' => false, 'message' => 'Subscription checkout not found.'], 404);
+        }
+
+        return response()->json(['success' => true, 'data' => [
+            'status' => $checkout->status,
+            'plan_key' => $checkout->plan_key,
+            'paid_at' => $checkout->paid_at?->toIso8601String(),
+        ]]);
+    }
+
     /** PayMongo returns here after browser success/cancellation; webhooks activate subscriptions. */
     public function paymentCallback(Request $request)
     {

@@ -133,6 +133,7 @@
                   <span class="badge-plan" :class="planClass">{{
                     planLabel
                   }}</span>
+                  <span v-if="subscriptionStatus" class="badge-plan badge-status" :class="statusClass">{{ subscriptionStatus }}</span>
                 </div>
               </div>
             </div>
@@ -269,6 +270,7 @@ import { useChatNotifications } from "../composables/useChatNotifications";
 import { useSidebarState } from "../composables/useSidebarState";
 import api from "../plugins/axios";
 import { toast } from "vue3-toastify";
+import { useSubscriptionAccess } from "../composables/useSubscriptionAccess";
 import LoadingOverlay from "../layouts/components/LoadingOverlay.vue";
 
 const props = defineProps({
@@ -283,6 +285,7 @@ const router = useRouter();
 const { user, logout } = useAuth();
 const { unreadChatCount, chatRoute } = useChatNotifications();
 const { toggleMobile } = useSidebarState();
+const { subscriptionAccess, loadSubscriptionAccess } = useSubscriptionAccess();
 
 const showDropdown = ref(false);
 const dropdownRef = ref(null);
@@ -342,11 +345,20 @@ const resolvedAvatar = computed(() => {
 
 const planLabel = computed(
   () =>
+    subscriptionAccess.value?.plan_name ? `${subscriptionAccess.value.plan_name} Plan` :
     vendorProfile.value?.plan ||
     user.value?.plan ||
     user.value?.subscription_plan ||
     "Free Plan",
 );
+
+const subscriptionStatus = computed(() => {
+  const status = subscriptionAccess.value?.status;
+  if (!status) return "";
+  return status === "trialing" ? "Trial" : status.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+});
+
+const statusClass = computed(() => subscriptionAccess.value?.status === "trialing" ? "status-trial" : "status-active");
 
 const planClass = computed(() => {
   const p = planLabel.value.toLowerCase();
@@ -362,7 +374,10 @@ const isChatRoute = computed(() =>
 // ── Dropdown ──────────────────────────────────────────────────────────────
 const toggleDropdown = () => {
   showDropdown.value = !showDropdown.value;
-  if (showDropdown.value && !vendorProfile.value) loadVendorProfile();
+  if (showDropdown.value) {
+    loadVendorProfile();
+    loadSubscriptionAccess().catch(() => {});
+  }
 };
 
 const onOutsideClick = (e) => {
@@ -372,6 +387,7 @@ const onOutsideClick = (e) => {
 onMounted(() => {
   document.addEventListener("click", onOutsideClick);
   loadVendorProfile();
+  loadSubscriptionAccess().catch(() => {});
 });
 onUnmounted(() => document.removeEventListener("click", onOutsideClick));
 watch(
@@ -760,6 +776,9 @@ const handleLogout = async () => {
   color: #2563eb;
   border: 1.5px solid #bfdbfe;
 }
+.badge-status { border: 1.5px solid transparent; }
+.status-trial { color: #2563eb; background: #eff6ff; border-color: #bfdbfe; }
+.status-active { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
 
 /* Profile link */
 .drop-body {

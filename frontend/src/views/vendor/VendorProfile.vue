@@ -81,6 +81,20 @@
         </div>
       </div>
 
+      <section v-if="profileData.subscription?.plan_name" class="subscription-card" aria-label="Current subscription">
+        <div>
+          <p class="subscription-card__eyebrow">Current subscription</p>
+          <h2>{{ profileData.subscription.plan_name }} Plan</h2>
+          <p v-if="profileData.subscription.status === 'trialing'">
+            Free Trial · Ends {{ formatSubscriptionDate(profileData.subscription.trial_ends_at) }}
+          </p>
+          <p v-else>Status: {{ formatSubscriptionStatus(profileData.subscription.status) }}</p>
+        </div>
+        <span class="subscription-card__status" :class="`status-${profileData.subscription.status}`">
+          {{ profileData.subscription.status === 'trialing' ? 'Trial' : formatSubscriptionStatus(profileData.subscription.status) }}
+        </span>
+      </section>
+
       <!-- Tabs -->
       <div class="profile-tabs">
         <button
@@ -992,7 +1006,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from "vue";
 import vendorHeader from "../../layouts/vendorHeader.vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import api from "../../plugins/axios";
@@ -1001,6 +1015,7 @@ import { useFormSubmit } from "../../composables/useFormSubmit";
 import { useVendorProfile } from "../../composables/useVendorProfile";
 
 const router = useRouter();
+const route = useRoute();
 const { updateLocalProfile } = useVendorProfile({
   autoFetch: false,
   showToast: false,
@@ -1058,7 +1073,11 @@ const profileData = reactive({
   delivery_details_completed: false,
   profile_fully_completed: false,
   profile_completion_percentage: 0,
+  subscription: null,
 });
+
+const formatSubscriptionStatus = (status) => (status || "pending").replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const formatSubscriptionDate = (date) => date ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(date)) : "—";
 
 // ── Form data ─────────────────────────────────────────────────────────────
 const formData = reactive({
@@ -1400,7 +1419,14 @@ const handleClickOutside = (event) => {
 };
 
 onMounted(() => {
-  fetchProfile();
+  fetchProfile().then(() => {
+    const success = route.query.subscription_success;
+    if (success === "business_trial") {
+      toast.success("Successfully claimed your 1-month Business free trial!");
+    } else if (success && profileData.subscription?.plan_name) {
+      toast.success(`Successfully subscribed to the ${profileData.subscription.plan_name} Plan!`);
+    }
+  });
   document.addEventListener("click", handleClickOutside);
 });
 onUnmounted(() => document.removeEventListener("click", handleClickOutside));
@@ -1423,6 +1449,12 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
   padding: 28px;
   max-width: 1400px;
 }
+.subscription-card { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 0 0 22px; padding: 21px 24px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 3px 12px rgba(15, 23, 42, .05); }
+.subscription-card__eyebrow { margin: 0 0 5px; color: #64748b; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.subscription-card h2 { margin: 0 0 4px; color: #1e293b; font-size: 20px; }
+.subscription-card p:not(.subscription-card__eyebrow) { margin: 0; color: #64748b; font-size: 14px; }
+.subscription-card__status { padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.status-trialing { color: #1d4ed8; background: #dbeafe; }.status-active { color: #047857; background: #d1fae5; }.status-pending, .status-past_due { color: #92400e; background: #fef3c7; }
 
 /* Completion card */
 .completion-card {

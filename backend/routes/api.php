@@ -142,6 +142,8 @@ Route::middleware('token.auth')->group(function () {
         ->middleware('vendor');
     Route::post('/vendor/subscription/checkout/{checkout}/cancel', [VendorSubscriptionController::class, 'cancelCheckout'])
         ->middleware('vendor');
+    Route::get('/vendor/subscription/checkout/{checkout}', [VendorSubscriptionController::class, 'checkoutStatus'])
+        ->middleware('vendor');
 
     // ----------------------------------------------------------
     // 6a. Auth — session management

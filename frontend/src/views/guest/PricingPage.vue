@@ -113,7 +113,7 @@ async function selectPlan(plan) {
     if (plan.key === "business" && subscriptionAccess.value?.business_trial_eligible && !subscriptionAccess.value?.subscription_active) {
       await api.post("/vendor/subscription/business-trial");
       await loadSubscriptionAccess();
-      subscriptionMessage.value = "Your Business 1-month free trial is now active.";
+      await router.push({ path: "/vendor/profile", query: { subscription_success: "business_trial" } });
       return;
     }
     const { data } = await api.post("/vendor/subscription/checkout", { plan_key: plan.key });
@@ -138,13 +138,36 @@ onMounted(async () => {
         if (checkoutId) await api.post(`/vendor/subscription/checkout/${checkoutId}/cancel`);
         subscriptionMessage.value = "Payment was not completed. Your current subscription is unchanged; you can retry at any time.";
       } else if (paymentState === "pending") {
-        subscriptionMessage.value = "Payment was submitted. Your plan will update after PayMongo confirms it.";
+        subscriptionMessage.value = "Confirming your payment with PayMongo…";
+        await waitForConfirmedCheckout(checkoutId);
       }
     }
   } catch (_) {
     // A public pricing page remains available if the stored session is stale.
   }
 });
+
+async function waitForConfirmedCheckout(checkoutId) {
+  if (!checkoutId) return;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      const { data } = await api.get(`/vendor/subscription/checkout/${checkoutId}`);
+      if (data?.data?.status === "paid") {
+        await loadSubscriptionAccess();
+        await router.replace({ path: "/vendor/profile", query: { subscription_success: data.data.plan_key } });
+        return;
+      }
+      if (["failed", "cancelled"].includes(data?.data?.status)) {
+        subscriptionMessage.value = "Payment was not completed. Your current subscription is unchanged; you can retry at any time.";
+        return;
+      }
+    } catch (_) {
+      return;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 1500));
+  }
+  subscriptionMessage.value = "Payment is still being confirmed. Your subscription will update as soon as PayMongo confirms it.";
+}
 
 const featureGroups = [
   { name: "Ecommerce", availableFrom: "Starter", features: ["Products", "Reservations / Orders", "Calendar", "Add Product", "Chat"] },

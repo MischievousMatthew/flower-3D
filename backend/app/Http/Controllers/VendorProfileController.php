@@ -6,6 +6,7 @@ use App\Helpers\CloudinaryHelper;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\VendorApplication;
+use App\Services\SubscriptionAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -36,7 +37,9 @@ class VendorProfileController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data'    => $this->serializeVendorApplication($vendorApplication),
+                'data'    => array_merge($this->serializeVendorApplication($vendorApplication), [
+                    'subscription' => app(SubscriptionAccessService::class)->accessSummary($request->user()),
+                ]),
             ]);
 
         } catch (\Exception $e) {
