@@ -829,7 +829,9 @@ const getSearchResultAvatarInitial = (otherUser) =>
     ? getInitials(getSearchResultDisplayName(otherUser))
     : getStoreInitial(getSearchResultDisplayName(otherUser));
 
-const isAttachmentPlaceholder = (text) => text === "📷 Image" || text === "📎 File" || text === " ";
+// Photo/file-only messages used to be saved with placeholder text
+const isAttachmentPlaceholder = (text) =>
+  ["Image", "File", "📷 Image", "📎 File"].includes(text) || !String(text ?? "").trim();
 
 const toggleUserDetails = async () => {
   showUserDetails.value = !showUserDetails.value;
@@ -953,15 +955,22 @@ const closeThread = () => {
   showUserDetails.value = false;
 };
 
+// Matches the server's preview: "You sent a photo" / "You: hi" for your own
+// messages, "Shop sent a photo" / "hi" for the other person's.
 const formatLastMessagePreview = (conversation, message, currentUserId) => {
-  const isOwnMessage = message.sender_id === currentUserId || message.is_own === true;
-  const senderName = isOwnMessage ? "You" : getOtherUserDisplayName(conversation);
+  const isOwnMessage = message.is_own === true || (message.is_own === undefined && message.sender_id === currentUserId);
+  const attachments = message.attachments || [];
+  const text = isAttachmentPlaceholder(message.text) ? "" : message.text;
 
-  if (message.attachments && message.attachments.length > 0) {
-    const allImages = message.attachments.every((a) => a.type && a.type.startsWith("image/"));
-    return allImages ? `${senderName} sent a photo` : `${senderName} sent a file`;
+  if (!text && attachments.length > 0) {
+    const allImages = attachments.every((a) => a.type && a.type.startsWith("image/"));
+    const count = attachments.length;
+    const what = allImages
+      ? count > 1 ? `${count} photos` : "a photo"
+      : count > 1 ? `${count} files` : "a file";
+    return `${isOwnMessage ? "You" : getOtherUserDisplayName(conversation)} sent ${what}`;
   }
-  return `${senderName}: ${message.text || ""}`;
+  return isOwnMessage ? `You: ${text}` : text;
 };
 
 const resizeComposer = () => {

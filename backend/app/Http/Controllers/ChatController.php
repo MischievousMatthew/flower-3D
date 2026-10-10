@@ -48,6 +48,7 @@ class ChatController extends Controller
             } else {
                 $query->with(['vendor:id,name,surname,email,profile_picture,contact_number,username,role,vendor_data']);
             }
+            $query->with('latestMessage');
 
             $query->withCount(['messages as unread_count' => function ($q) use ($participantId, $clearedColumn) {
                 $q->where('sender_id', '!=', $participantId)
@@ -74,7 +75,7 @@ class ChatController extends Controller
 
             $conversations = $query->orderBy('last_message_time', 'desc')
                 ->get()
-                ->map(function ($conversation) use ($isVendorContext, $archivedColumn) {
+                ->map(function ($conversation) use ($isVendorContext, $archivedColumn, $actor) {
                     $otherUser = $isVendorContext ? $conversation->customer : $conversation->vendor;
 
                     if (!$otherUser) {
@@ -105,7 +106,7 @@ class ChatController extends Controller
                     return [
                         'id' => $conversation->id,
                         $isVendorContext ? 'customer' : 'vendor' => $userData,
-                        'last_message' => $conversation->last_message ? Str::limit($conversation->last_message, 50) : '',
+                        'last_message' => $this->previewFor($conversation, $actor, $userData['display_name']),
                         'last_message_time' => $conversation->last_message_time
                             ? $conversation->last_message_time->diffForHumans()
                             : 'No messages',
@@ -171,7 +172,7 @@ class ChatController extends Controller
                         'sender_id' => $message->sender_id,
                         'sender_name' => $message->sender->full_name ?? 'Unknown',
                         'sender_avatar' => $message->sender->avatar_url ?? null,
-                        'text' => $message->message,
+                        'text' => $this->messageText($message),
                         'created_at' => $message->created_at?->copy()->setTimezone('Asia/Manila')->toIso8601String(),
                         'time' => $message->created_at->diffForHumans(),
                         'read' => (bool) $message->is_read,
@@ -280,7 +281,7 @@ class ChatController extends Controller
                 'sender_id' => $actor['participant_id'],
                 'message' => $hasText
                     ? $messageText
-                    : ($hasAttachments ? ($messageType === 'image' ? 'Image' : 'File') : ' '),
+                    : null, // photo or file only: no placeholder text
                 'message_type' => $messageType,
                 'is_read' => false,
             ];
@@ -318,7 +319,7 @@ class ChatController extends Controller
                 'message' => [
                     'id' => $message->id,
                     'sender_id' => $actor['participant_id'],
-                    'text' => $message->message,
+                    'text' => $this->messageText($message),
                     'created_at' => $message->created_at?->copy()->setTimezone('Asia/Manila')->toIso8601String(),
                     'time' => $message->created_at->diffForHumans(),
                     'read' => false,
@@ -375,7 +376,7 @@ class ChatController extends Controller
                     'conversation_id' => $message->conversation_id,
                     'sender_id' => $message->sender_id,
                     'sender_name' => $message->sender?->full_name ?? 'Unknown',
-                    'text' => $message->message,
+                    'text' => $this->messageText($message),
                     'created_at' => $message->created_at?->copy()->setTimezone('Asia/Manila')->toIso8601String(),
                     'time' => $message->created_at->diffForHumans(),
                     'read' => $message->is_read,
@@ -721,6 +722,56 @@ class ChatController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * The message's own text, or null for a photo/file-only message. Older
+     * messages stored a placeholder ("Image", "File") instead of no text.
+     */
+    private function messageText(Message $message): ?string
+    {
+        $text = $message->message;
+        $hasAttachments = !empty($message->attachments);
+
+        if ($text === null || trim($text) === '') {
+            return null;
+        }
+
+        if ($hasAttachments && in_array($text, ['Image', 'File', '📷 Image', '📎 File'], true)) {
+            return null;
+        }
+
+        return $text;
+    }
+
+    /**
+     * Conversation preview from the viewer's side: "You sent a photo" /
+     * "You: hello" for their own messages, "Shop sent a photo" / "hello"
+     * for the other person's.
+     */
+    private function previewFor(Conversation $conversation, array $actor, string $otherName): string
+    {
+        $message = $conversation->latestMessage;
+
+        if (!$message) {
+            return $conversation->last_message ? Str::limit($conversation->last_message, 50) : '';
+        }
+
+        $isOwn = $this->isMessageFromActorSide($message, $conversation, $actor);
+        $text = $this->messageText($message);
+        $attachments = $message->attachments ?? [];
+
+        if ($text === null && !empty($attachments)) {
+            $allImages = collect($attachments)->every(fn ($a) => str_starts_with($a['type'] ?? '', 'image/'));
+            $count = count($attachments);
+            $what = $allImages
+                ? ($count > 1 ? "{$count} photos" : 'a photo')
+                : ($count > 1 ? "{$count} files" : 'a file');
+
+            return ($isOwn ? 'You' : $otherName) . " sent {$what}";
+        }
+
+        return Str::limit(($isOwn ? 'You: ' : '') . ($text ?? ''), 50);
     }
 
     private function clearedColumn(array $actor): string
