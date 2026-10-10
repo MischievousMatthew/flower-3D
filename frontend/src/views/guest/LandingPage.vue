@@ -1,5 +1,5 @@
 <template>
-  <div class="landing-page">
+  <div class="landing-page bc-theme">
     <LandingLoader
       v-if="showLoader"
       :progress="loaderProgress"
@@ -31,24 +31,26 @@
 
     <!-- Navigation: hides while scrolling down, returns on scroll up -->
     <nav
-      class="navbar"
+      class="navbar bc-navbar"
       :class="{
         'navbar--scrolled': navScrolled,
+        'bc-navbar--scrolled': navScrolled,
         'navbar--hidden': navHidden,
         'navbar--menu-open': mobileMenuOpen,
+        'bc-navbar--menu-open': mobileMenuOpen,
       }"
       aria-label="Main navigation"
     >
-      <router-link to="/" class="logo" @click="closeMobileMenu">
+      <router-link to="/" class="logo bc-logo" @click="closeMobileMenu">
         <img
           src="/bloomcraft-blankBg.png"
           alt="Bloomcraft Logo"
           width="44"
           height="44"
         />
-        <span class="logo-text">BloomCraft</span>
+        <span class="bc-logo-text">BloomCraft</span>
       </router-link>
-      <div id="primary-nav" class="nav-links">
+      <div id="primary-nav" class="nav-links bc-nav-links">
         <router-link to="/shop" @click="closeMobileMenu">Shop</router-link>
         <router-link to="/pricing" @click="closeMobileMenu"
           >Pricing</router-link
@@ -65,28 +67,28 @@
         <router-link
           v-if="!isAuthenticated"
           to="/guest/login"
-          class="nav-menu-login"
+          class="bc-nav-menu-only"
           @click="closeMobileMenu"
           >Login</router-link
         >
       </div>
       <div class="nav-buttons">
         <template v-if="!isAuthenticated">
-          <router-link to="/guest/login" class="btn-login">Login</router-link>
-          <router-link to="/guest/register" class="btn-register"
+          <router-link to="/guest/login" class="btn-login bc-nav-login">Login</router-link>
+          <router-link to="/guest/register" class="btn-register bc-nav-register"
             >Register</router-link
           >
         </template>
         <button
           type="button"
-          class="nav-toggle"
+          class="bc-nav-toggle"
           :aria-expanded="mobileMenuOpen"
           aria-controls="primary-nav"
           :aria-label="mobileMenuOpen ? 'Close menu' : 'Open menu'"
           @click="mobileMenuOpen = !mobileMenuOpen"
         >
-          <span class="nav-toggle-bar" aria-hidden="true"></span>
-          <span class="nav-toggle-bar" aria-hidden="true"></span>
+          <span class="bc-nav-toggle-bar" aria-hidden="true"></span>
+          <span class="bc-nav-toggle-bar" aria-hidden="true"></span>
         </button>
       </div>
     </nav>
@@ -98,9 +100,9 @@
           <span class="halo-ring halo-ring--outer"></span>
           <span class="halo-ring halo-ring--inner"></span>
         </div>
-        <div class="container">
+        <div class="bc-container">
           <div class="hero-content">
-            <p class="label hero-reveal">Bespoke florals, built by you</p>
+            <p class="bc-label hero-reveal">Bespoke florals, built by you</p>
             <h1 class="hero-title" aria-label="Create your perfect bouquet">
               <span class="line" aria-hidden="true"
                 ><span class="line-inner">Create your</span></span
@@ -114,20 +116,20 @@
               in 3D or let our AI suggest the perfect bloom for every occasion.
             </p>
             <div class="hero-actions hero-reveal">
-              <router-link to="/guest/register" class="btn btn--dark">
+              <router-link to="/guest/register" class="bc-btn bc-btn--dark">
                 Get Started
-                <span class="btn-arrow" aria-hidden="true">→</span>
+                <span class="bc-btn-arrow" aria-hidden="true">→</span>
               </router-link>
               <a
                 href="#how-it-works"
-                class="link-underline"
+                class="bc-link"
                 @click.prevent="navigateTo('how-it-works')"
                 >How it works</a
               >
             </div>
           </div>
         </div>
-        <div class="container hero-foot hero-scroll-cue hero-reveal" aria-hidden="true">
+        <div class="bc-container hero-foot hero-scroll-cue hero-reveal" aria-hidden="true">
           <span class="hero-foot-cue"><span class="cue-line"></span>Scroll to explore</span>
           <span class="hero-foot-note">Hand-tied by local florists · Designed by you</span>
         </div>
@@ -142,10 +144,10 @@
         aria-labelledby="story-heading"
       >
         <div class="story-pin">
-          <div class="container story-inner">
+          <div class="bc-container story-inner">
             <header class="story-head">
-              <p class="label">The 3D bouquet studio</p>
-              <h2 id="story-heading" class="sr-only">
+              <p class="bc-label">The 3D bouquet studio</p>
+              <h2 id="story-heading" class="bc-sr-only">
                 Build a bouquet in three steps
               </h2>
               <ol class="story-index" aria-hidden="true">
@@ -264,16 +266,16 @@
                   </li>
                 </ul>
                 <button
-                  class="btn btn--dark btn-learn-more"
+                  class="bc-btn bc-btn--dark btn-learn-more"
                   @click="handleLearnMore('3d-designer')"
                 >
                   Explore 3D Designer
-                  <span class="btn-arrow" aria-hidden="true">→</span>
+                  <span class="bc-btn-arrow" aria-hidden="true">→</span>
                 </button>
               </article>
             </div>
           </div>
-          <div class="container story-progress-wrap" aria-hidden="true">
+          <div class="bc-container story-progress-wrap" aria-hidden="true">
             <div class="story-progress">
               <span ref="storyProgressFill" class="story-progress-fill"></span>
             </div>
@@ -288,9 +290,9 @@
         class="process"
         aria-labelledby="process-heading"
       >
-        <div class="container">
-          <div class="section-head">
-            <p class="label">How it works</p>
+        <div class="bc-container">
+          <div class="bc-section-head">
+            <p class="bc-label">How it works</p>
             <h2 id="process-heading">
               From a local florist's bench <em>to your door</em>
             </h2>
@@ -321,13 +323,13 @@
       >
         <div class="plans-inner">
           <div class="plans-head">
-            <p class="label">For flower businesses</p>
+            <p class="bc-label">For flower businesses</p>
             <h2 id="plans-heading">Plans that grow <em>with your shop</em></h2>
             <p>
               Start with the essentials, then grow into a connected ERP
               workspace when your operations need more.
             </p>
-            <router-link to="/pricing" class="link-underline"
+            <router-link to="/pricing" class="bc-link"
               >Compare all features</router-link
             >
             <div class="plans-progress" aria-hidden="true">
@@ -364,13 +366,13 @@
         class="journal"
         aria-labelledby="journal-heading"
       >
-        <div class="container">
-          <div class="section-head section-head--split">
+        <div class="bc-container">
+          <div class="bc-section-head bc-section-head--split">
             <div>
-              <p class="label">The BloomCraft Journal</p>
+              <p class="bc-label">The BloomCraft Journal</p>
               <h2 id="journal-heading">Notes from the <em>flower world</em></h2>
             </div>
-            <p class="section-intro">
+            <p class="bc-section-intro">
               Tips, trends, and stories from the world of flowers
             </p>
           </div>
@@ -398,9 +400,9 @@
         class="about-section"
         aria-labelledby="about-heading"
       >
-        <div class="container about-inner">
-          <header class="section-head about-head">
-            <p class="label">About us</p>
+        <div class="bc-container about-inner">
+          <header class="bc-section-head about-head">
+            <p class="bc-label">About us</p>
             <h2 id="about-heading">The purpose behind <em>every bouquet</em></h2>
           </header>
           <div class="about-grid">
@@ -426,11 +428,11 @@
 
       <!-- Closing call to action -->
       <section class="cta-panel" ref="ctaSection">
-        <div class="container cta-content">
+        <div class="bc-container cta-content">
           <h2>Ready to create something <em>beautiful</em>?</h2>
-          <router-link to="/guest/register" class="btn btn--dark btn-cta">
+          <router-link to="/guest/register" class="bc-btn bc-btn--dark btn-cta">
             Start Designing Now
-            <span class="btn-arrow" aria-hidden="true">→</span>
+            <span class="bc-btn-arrow" aria-hidden="true">→</span>
           </router-link>
         </div>
       </section>
@@ -469,7 +471,7 @@
 
     <!-- Footer -->
     <footer class="footer" ref="footerSection">
-      <div class="container">
+      <div class="bc-container">
         <div class="footer-content">
           <div class="footer-brand">
             <div class="footer-logo">
@@ -556,6 +558,7 @@ import {
   PAPER_PRESETS,
   RIBBON_PRESETS,
 } from "../../composables/useLandingBouquet";
+import "../../styles/bloomcraft.css";
 import LandingLoader from "../../components/landing/LandingLoader.vue";
 import PlanAccountModal from "../../components/landing/PlanAccountModal.vue";
 import PricingPlanCard from "../../components/pricing/PricingPlanCard.vue";
@@ -1340,7 +1343,7 @@ function setupJourney() {
       if (stage) tl.to(stage, { autoAlpha: 0, ease: "power1.in", duration: 0.6, immediateRender: false }, 0);
       tl.to(rig.scale, { x: scale * 0.55, y: scale * 0.55, z: scale * 0.55, ease: "power1.in", duration: 0.6 }, 0);
       tl.to(".landing-page", { backgroundColor: "#1b1612", ease: "none", duration: 0.12 }, 0.6);
-      tl.to(".navbar .nav-toggle-bar", { backgroundColor: "#faf8f5", ease: "none" }, 0);
+      tl.to(".navbar .bc-nav-toggle-bar", { backgroundColor: "#faf8f5", ease: "none" }, 0);
       tl.fromTo(
         footer.querySelectorAll(".footer-brand, .footer-section, .footer-wordmark, .footer-bottom"),
         { autoAlpha: 0, y: 48 },
@@ -1532,45 +1535,26 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Poppins:wght@300;400;500;600&display=swap");
+/* Fonts, tokens, type, labels, buttons and the navbar base live in
+   src/styles/bloomcraft.css (shared with the customer pages). */
 
 /* ============================================================
    DESIGN TOKENS
 ============================================================= */
 .landing-page {
-  /* Dim-white base, warm like petals */
-  --ivory: #f4f1ec;
-  --ivory-deep: #ebe5dd;
-  --paper: #faf8f4;
-  --ink: #1e1b18;
-  --ink-soft: #6e6761;
-  --line: rgba(30, 27, 24, 0.12);
-  --line-soft: rgba(30, 27, 24, 0.07);
-  --rosewood: #b86558;
-  --rosewood-dark: #8e443a;
-  --gold: #d4b27a;
-  --espresso: #1b1612;
-
-  --font-display: "Cormorant Garamond", "Cormorant", Georgia, "Times New Roman", serif;
-  --font-sans: "Poppins", -apple-system, "Segoe UI", sans-serif;
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --gutter: clamp(20px, 5vw, 72px);
-  --section-space: clamp(110px, 13vw, 190px);
-
   position: relative;
   background: var(--ivory);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-weight: 300;
-  line-height: 1.7;
   overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* Reset in a cascade layer: it zeroes browser defaults but never overrides
+   real styles (incl. the shared bloomcraft.css rules), whatever the CSS order. */
+@layer bc-reset {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 }
 
 /* Same body reset the pricing page applies; removes the UA 8px margin. */
@@ -1578,159 +1562,13 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
-.container {
-  width: 100%;
-  max-width: calc(1240px + var(--gutter) * 2);
-  margin: 0 auto;
-  padding-inline: var(--gutter);
-}
-
 /* ============================================================
    TYPOGRAPHY
 ============================================================= */
-.landing-page h1,
-.landing-page h2,
-.landing-page h3 {
-  font-family: var(--font-display);
-  font-weight: 500;
-  letter-spacing: -0.015em;
-  line-height: 1.02;
-  color: var(--ink);
-}
-
-.landing-page h1 em,
-.landing-page h2 em,
-.landing-page h3 em {
-  font-style: italic;
-  font-weight: 400;
-  color: var(--rosewood-dark);
-}
-
 /* One quiet label style for every section */
-.label {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  font-family: var(--font-sans);
-  font-size: 11.5px;
-  font-weight: 500;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-
-.label::before {
-  content: "";
-  width: 28px;
-  height: 1px;
-  background: currentColor;
-  opacity: 0.5;
-}
-
-.section-head h2 {
-  margin-top: 22px;
-  font-size: clamp(44px, 5.6vw, 84px);
-  max-width: 900px;
-}
-
-.section-head--split {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 48px;
-  align-items: end;
-}
-
-.section-intro {
-  max-width: 360px;
-  justify-self: end;
-  color: var(--ink-soft);
-  font-size: 15.5px;
-  line-height: 1.8;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 /* ============================================================
    BUTTONS + LINKS
 ============================================================= */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  padding: 17px 30px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  text-decoration: none;
-  cursor: pointer;
-  transition:
-    background 0.45s var(--ease-out),
-    color 0.45s var(--ease-out),
-    border-color 0.45s var(--ease-out);
-}
-
-.btn--dark {
-  background: var(--ink);
-  color: var(--ivory);
-}
-
-.btn--dark:hover {
-  background: var(--rosewood-dark);
-}
-
-.btn-arrow {
-  display: inline-block;
-  transition: transform 0.45s var(--ease-out);
-}
-
-.btn:hover .btn-arrow {
-  transform: translateX(4px);
-}
-
-.btn:focus-visible,
-.link-underline:focus-visible {
-  outline: 2px solid var(--rosewood);
-  outline-offset: 4px;
-}
-
-.link-underline {
-  position: relative;
-  padding-bottom: 4px;
-  color: var(--ink);
-  font-size: 14px;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.link-underline::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: currentColor;
-  transform-origin: right;
-  transition: transform 0.5s var(--ease-out);
-}
-
-.link-underline:hover::after {
-  transform: scaleX(0.35);
-}
-
 /* Skip link: visible only when focused */
 .skip-link {
   position: fixed;
@@ -1930,35 +1768,6 @@ onBeforeUnmount(() => {
 /* ============================================================
    NAVIGATION — full width at top, floating pill when scrolled
 ============================================================= */
-.navbar {
-  position: fixed;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 9999px;
-  z-index: 1000;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem var(--gutter);
-  background: var(--ivory);
-  border: 1px solid transparent;
-  border-radius: 0;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  transition:
-    transform 0.5s var(--ease-out),
-    top 0.5s var(--ease-out),
-    width 0.5s var(--ease-out),
-    max-width 0.5s var(--ease-out),
-    padding 0.5s var(--ease-out),
-    border-radius 0.5s var(--ease-out),
-    border-color 0.5s var(--ease-out),
-    background 0.5s var(--ease-out),
-    box-shadow 0.5s var(--ease-out);
-}
-
 .navbar--hidden {
   transform: translate(-50%, calc(-100% - 32px));
 }
@@ -1967,151 +1776,10 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
 }
 
-.navbar--scrolled {
-  top: 18px;
-  width: calc(100% - 48px);
-  max-width: 1240px;
-  padding: 0.7rem 0.8rem 0.7rem 1.6rem;
-  border-radius: 999px;
-  background: rgba(250, 248, 244, 0.86);
-  border-color: var(--line-soft);
-  box-shadow: 0 12px 40px rgba(30, 27, 24, 0.08);
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.logo img {
-  width: 40px;
-  height: 40px;
-  object-fit: contain;
-}
-
-.logo-text {
-  font-family: var(--font-display);
-  font-size: 27px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.nav-links {
-  display: flex;
-  gap: 34px;
-  align-items: center;
-}
-
-.nav-links a {
-  position: relative;
-  padding-bottom: 3px;
-  color: var(--ink);
-  font-size: 13.5px;
-  font-weight: 400;
-  text-decoration: none;
-  transition: color 0.3s;
-}
-
-.nav-links a::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: currentColor;
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.45s var(--ease-out);
-}
-
-.nav-links a:hover::after {
-  transform: scaleX(1);
-}
-
 .nav-buttons {
   display: flex;
   align-items: center;
   gap: 20px;
-}
-
-.btn-login {
-  color: var(--ink);
-  font-size: 13.5px;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.btn-login:hover {
-  color: var(--rosewood-dark);
-}
-
-.btn-register {
-  display: inline-block;
-  padding: 11px 24px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--ivory);
-  font-size: 13.5px;
-  font-weight: 500;
-  text-decoration: none;
-  transition: background 0.4s var(--ease-out);
-}
-
-.btn-register:hover {
-  background: var(--rosewood-dark);
-}
-
-.nav-links a:focus-visible,
-.nav-buttons a:focus-visible,
-.logo:focus-visible,
-.nav-toggle:focus-visible {
-  outline: 2px solid var(--rosewood);
-  outline-offset: 4px;
-  border-radius: 6px;
-}
-
-.nav-toggle {
-  display: none;
-  position: relative;
-  width: 42px;
-  height: 42px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: transparent;
-  cursor: pointer;
-}
-
-.nav-toggle-bar {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  height: 1.5px;
-  background: var(--ink);
-  transition: transform 0.35s var(--ease-out);
-}
-
-.nav-toggle-bar:first-child {
-  transform: translateY(-4px);
-}
-
-.nav-toggle-bar:last-child {
-  transform: translateY(4px);
-}
-
-.navbar--menu-open .nav-toggle-bar:first-child {
-  transform: rotate(45deg);
-}
-
-.navbar--menu-open .nav-toggle-bar:last-child {
-  transform: rotate(-45deg);
-}
-
-.nav-menu-login {
-  display: none;
 }
 
 /* ============================================================
@@ -2135,8 +1803,8 @@ onBeforeUnmount(() => {
 .hero-title {
   margin: 28px 0 30px;
   font-size: clamp(64px, 8.4vw, 136px);
-  line-height: 0.92;
-  letter-spacing: -0.025em;
+  /* The heading defaults (line-height 1.02, -0.015em) are what the approved
+     design renders; they come from the shared .bc-theme heading rule. */
 }
 
 .hero-title .line {
@@ -2574,7 +2242,7 @@ onBeforeUnmount(() => {
   font-size: clamp(42px, 4.6vw, 72px);
 }
 
-.plans-head p:not(.label) {
+.plans-head p:not(.bc-label) {
   margin-bottom: 28px;
   color: var(--ink-soft);
   font-size: 15.5px;
@@ -2965,57 +2633,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 968px) {
-  .navbar--scrolled {
-    top: 14px;
-    width: calc(100% - 32px);
-  }
-
-  .nav-toggle {
-    display: inline-block;
-  }
-
-  .nav-links {
-    position: absolute;
-    top: calc(100% + 10px);
-    left: 0;
-    right: 0;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    padding: 10px 22px;
-    border: 1px solid var(--line-soft);
-    border-radius: 22px;
-    background: rgba(250, 248, 244, 0.97);
-    box-shadow: 0 18px 40px rgba(30, 27, 24, 0.12);
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-8px);
-    transition:
-      opacity 0.3s ease,
-      transform 0.3s ease,
-      visibility 0.3s;
-  }
-
-  .navbar--menu-open .nav-links {
-    opacity: 1;
-    visibility: visible;
-    transform: none;
-  }
-
-  .nav-links a {
-    padding: 14px 0;
-    font-size: 16px;
-    border-bottom: 1px solid var(--line-soft);
-  }
-
-  .nav-links a:last-child {
-    border-bottom: none;
-  }
-
-  .nav-links a::after {
-    display: none;
-  }
-
   /* Hero: copy on top, bouquet beneath */
   .hero {
     justify-content: flex-start;
@@ -3105,15 +2722,6 @@ onBeforeUnmount(() => {
 
   .story--static .story-step {
     position: static;
-  }
-
-  .section-head--split {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-
-  .section-intro {
-    justify-self: start;
   }
 
   .process-list {
@@ -3235,41 +2843,9 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
-  .navbar {
-    padding: 1rem var(--gutter);
-  }
-
-  .navbar--scrolled {
-    top: 10px;
-    width: calc(100% - 24px);
-    padding: 0.55rem 0.6rem 0.55rem 1.1rem;
-  }
-
-  .btn-register {
-    padding: 9px 18px;
-    font-size: 13px;
-  }
-
   /* Login moves into the menu; Register stays in the bar */
-  .nav-buttons .btn-login {
-    display: none;
-  }
-
   .nav-buttons {
     gap: 10px;
-  }
-
-  .nav-menu-login {
-    display: block;
-  }
-
-  .logo-text {
-    font-size: 23px;
-  }
-
-  .logo img {
-    width: 34px;
-    height: 34px;
   }
 
   .hero-actions {

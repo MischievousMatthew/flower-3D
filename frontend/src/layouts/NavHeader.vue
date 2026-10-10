@@ -1,32 +1,46 @@
 <template>
   <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
-  <nav class="navbar" :class="{ 'navbar--scrolled': navScrolled }">
-    <router-link to="/" class="logo">
-      <span
-        ><img
-          src="../../public/bloomcraft-blankBg.png"
-          alt="Bloomcraft Logo"
-          width="50"
-          height="50"
-      /></span>
-      <span>BloomCraft</span>
+  <!-- Same bar as the landing page (src/styles/bloomcraft.css) -->
+  <nav
+    class="navbar bc-theme bc-navbar"
+    :class="{
+      'bc-navbar--scrolled': navScrolled,
+      'bc-navbar--menu-open': mobileMenuOpen,
+    }"
+    aria-label="Main navigation"
+  >
+    <router-link to="/" class="bc-logo" @click="closeMobileMenu">
+      <img
+        src="/bloomcraft-blankBg.png"
+        alt="Bloomcraft Logo"
+        width="44"
+        height="44"
+      />
+      <span class="bc-logo-text">BloomCraft</span>
     </router-link>
 
-    <div class="nav-links">
+    <div id="customer-nav" class="bc-nav-links">
       <template v-if="!isAuthenticated">
-        <router-link to="/">Home</router-link>
+        <router-link to="/" @click="closeMobileMenu">Home</router-link>
       </template>
-      <router-link to="/shop">Shop</router-link>
-      <a href="#occasions" @click.prevent="scrollToSection('occasions')"
+      <router-link to="/shop" @click="closeMobileMenu">Shop</router-link>
+      <a href="#occasions" @click.prevent="navigateTo('occasions')"
         >Occasions</a
       >
-      <a href="#sale" @click.prevent="scrollToSection('sale')">Sales</a>
+      <a href="#sale" @click.prevent="navigateTo('sale')">Sales</a>
+      <router-link
+        v-if="!isAuthenticated"
+        to="/guest/login"
+        class="bc-nav-menu-only"
+        @click="closeMobileMenu"
+        >Login</router-link
+      >
     </div>
 
-    <div class="nav-buttons">
+    <div class="nav-actions">
       <template v-if="!isAuthenticated">
-        <router-link to="/guest/login" class="btn-login">Login</router-link>
-        <router-link to="/guest/register" class="btn-register"
+        <router-link to="/guest/login" class="bc-nav-login">Login</router-link>
+        <router-link to="/guest/register" class="bc-nav-register"
           >Register</router-link
         >
       </template>
@@ -35,30 +49,57 @@
           v-if="user?.role === 'customer'"
           to="/customer/cart"
           id="cart-icon"
-          class="btn-cart"
+          class="btn-cart nav-icon-btn"
           :class="{ 'cart-pulse': cartPulse }"
+          :aria-label="`Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}`"
         >
-          🛒 Cart ({{ cartCount }})
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 7h12l-1 13H7L6 7Z" />
+            <path d="M9 7a3 3 0 0 1 6 0" />
+          </svg>
+          <span class="nav-icon-label">Cart</span>
+          <span class="nav-count">{{ cartCount }}</span>
         </router-link>
 
         <div v-if="user?.role === 'customer'" class="notification-wrapper">
-          <button class="btn-notification" @click="toggleNotificationDropdown">
-            <span class="notification-bell">Notifications</span>
-            <span v-if="notificationCount > 0" class="notification-count-badge">
+          <button
+            type="button"
+            class="btn-notification nav-icon-btn"
+            :aria-expanded="showNotificationDropdown"
+            aria-label="Order notifications"
+            @click="toggleNotificationDropdown"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" />
+              <path d="M10 20a2 2 0 0 0 4 0" />
+            </svg>
+            <span v-if="notificationCount > 0" class="nav-badge">
               {{ notificationCount > 9 ? "9+" : notificationCount }}
             </span>
           </button>
 
-          <div v-if="showNotificationDropdown" class="notification-menu">
-            <div class="notification-menu-header">
-              <span>Order Notifications</span>
-              <button class="notification-refresh" @click="loadOrderNotifications">
+          <div v-if="showNotificationDropdown" class="nav-menu notification-menu">
+            <div class="nav-menu-head">
+              <span class="bc-label">Order updates</span>
+              <button
+                type="button"
+                class="nav-menu-action"
+                @click="loadOrderNotifications"
+              >
                 Refresh
               </button>
             </div>
 
-            <div v-if="loadingNotifications" class="notification-empty">
-              Loading notifications...
+            <div v-if="loadingNotifications" class="notification-skeletons">
+              <div v-for="n in 3" :key="n" class="notification-skeleton">
+                <span class="bc-skeleton notification-skeleton-dot"></span>
+                <span class="notification-skeleton-lines">
+                  <span class="bc-skeleton notification-skeleton-line"></span>
+                  <span
+                    class="bc-skeleton notification-skeleton-line notification-skeleton-line--short"
+                  ></span>
+                </span>
+              </div>
             </div>
 
             <div
@@ -72,32 +113,38 @@
               <button
                 v-for="notification in orderNotifications"
                 :key="notification.id"
+                type="button"
                 class="notification-entry"
                 @click="goToOrders(notification)"
               >
-                <div
+                <span
                   class="notification-status-dot"
                   :class="notification.variant"
-                ></div>
-                <div class="notification-entry-content">
-                  <div class="notification-entry-title">
+                ></span>
+                <span class="notification-entry-content">
+                  <span class="notification-entry-title">
                     {{ notification.title }}
-                  </div>
-                  <div class="notification-entry-message">
+                  </span>
+                  <span class="notification-entry-message">
                     {{ notification.message }}
-                  </div>
-                  <div class="notification-entry-time">
+                  </span>
+                  <span class="notification-entry-time">
                     {{ notification.time }}
-                  </div>
-                </div>
+                  </span>
+                </span>
               </button>
             </div>
           </div>
         </div>
 
         <div class="user-dropdown-wrapper">
-          <button class="btn-user" @click="toggleUserDropdown">
-            <div class="user-avatar" :class="{ loading: loadingProfile }">
+          <button
+            type="button"
+            class="btn-user"
+            :aria-expanded="showUserDropdown"
+            @click="toggleUserDropdown"
+          >
+            <span class="user-avatar" :class="{ loading: loadingProfile }">
               <img
                 v-if="hasProfilePicture"
                 :src="profilePictureUrl"
@@ -105,57 +152,46 @@
                 @error="handleAvatarError"
               />
               <span v-else>{{ avatarInitial }}</span>
-            </div>
-            <span class="user-name">{{ userName }}</span>
-            <span class="dropdown-icon" :class="{ open: showUserDropdown }">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 1024 1024"
-              >
-                <path
-                  fill="currentColor"
-                  d="M831.872 340.864L512 652.672L192.128 340.864a30.59 30.59 0 0 0-42.752 0a29.12 29.12 0 0 0 0 41.6L489.664 714.24a32 32 0 0 0 44.672 0l340.288-331.712a29.12 29.12 0 0 0 0-41.728a30.59 30.59 0 0 0-42.752 0z"
-                  stroke-width="25.5"
-                  stroke="currentColor"
-                />
-              </svg>
             </span>
+            <span class="user-name">{{ userName }}</span>
+            <svg
+              class="dropdown-icon"
+              :class="{ open: showUserDropdown }"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
           </button>
-          <div v-if="showUserDropdown" class="dropdown-menu">
+          <div v-if="showUserDropdown" class="nav-menu dropdown-menu">
             <div class="dropdown-header">
-              <div class="user-info">
-                <div
-                  class="user-avatar-large"
-                  :class="{ loading: loadingProfile }"
-                >
-                  <img
-                    v-if="hasProfilePicture"
-                    :src="profilePictureUrl"
-                    :alt="userName"
-                    @error="handleAvatarError"
-                  />
-                  <span v-else>{{ avatarInitial }}</span>
-                </div>
-                <div class="user-details">
-                  <span class="user-display-name">{{ userName }}</span>
-                  <span class="user-role">{{ userRoleDisplay }}</span>
-                  <span v-if="userProfile?.plan" class="user-plan">{{
-                    userProfile.plan
-                  }}</span>
-                </div>
-              </div>
+              <span class="user-avatar-large" :class="{ loading: loadingProfile }">
+                <img
+                  v-if="hasProfilePicture"
+                  :src="profilePictureUrl"
+                  :alt="userName"
+                  @error="handleAvatarError"
+                />
+                <span v-else>{{ avatarInitial }}</span>
+              </span>
+              <span class="user-details">
+                <span class="user-display-name">{{ userName }}</span>
+                <span class="user-role">{{ userRoleDisplay }}</span>
+                <span v-if="userProfile?.plan" class="user-plan">{{
+                  userProfile.plan
+                }}</span>
+              </span>
             </div>
-
-            <div class="dropdown-divider"></div>
 
             <router-link
               v-if="user?.role === 'customer'"
               to="/customer/profile"
               class="dropdown-item"
             >
-              <span class="icons"> 👤 </span>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="8" r="3.5" />
+                <path d="M5 20a7 7 0 0 1 14 0" />
+              </svg>
               <span>Profile</span>
             </router-link>
 
@@ -164,7 +200,10 @@
               to="/customer/orders"
               class="dropdown-item"
             >
-              <span class="icons"> 📦 </span>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 8l8-4 8 4v8l-8 4-8-4V8Z" />
+                <path d="M4 8l8 4 8-4M12 12v8" />
+              </svg>
               <span>Orders</span>
             </router-link>
 
@@ -173,40 +212,46 @@
               to="/customer/chat"
               class="dropdown-item"
             >
-              <span class="icons"> 💬 </span>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 5h14v10H9l-4 4V5Z" />
+              </svg>
               <span>Chat</span>
               <span v-if="unreadChatCount > 0" class="dropdown-badge">
                 {{ unreadChatCount > 9 ? "9+" : unreadChatCount }}
               </span>
             </router-link>
 
-            <div class="dropdown-divider"></div>
-
             <a
-              class="dropdown-item"
+              href="#"
+              class="dropdown-item dropdown-item--logout"
               @click.prevent="handleLogout"
               :class="{ 'logout-loading': isLoading }"
             >
-              <span>
-                <svg
-                  v-if="!isLoading"
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    fill="currentColor"
-                    d="M5.616 20q-.691 0-1.153-.462T4 18.384V5.616q0-.691.463-1.153T5.616 4h5.903q.214 0 .357.143t.143.357t-.143.357t-.357.143H5.616q-.231 0-.424.192T5 5.616v12.769q0 .23.192.423t.423.192h5.904q.214 0 .357.143t.143.357t-.143.357t-.357.143zm12.444-7.5H9.692q-.213 0-.356-.143T9.192 12t.143-.357t.357-.143h8.368l-1.971-1.971q-.141-.14-.15-.338q-.01-.199.15-.364q.159-.165.353-.168q.195-.003.36.162l2.614 2.613q.242.243.242.566t-.243.566l-2.613 2.613q-.146.146-.347.153t-.366-.159q-.16-.165-.157-.357t.162-.35z"
-                  />
-                </svg>
-                <span v-else class="logout-spinner"></span>
-              </span>
+              <svg
+                v-if="!isLoading"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9" />
+              </svg>
+              <span v-else class="logout-spinner"></span>
               <span>{{ isLoading ? "Logging out..." : "Logout" }}</span>
             </a>
           </div>
         </div>
       </template>
+
+      <button
+        type="button"
+        class="bc-nav-toggle"
+        :aria-expanded="mobileMenuOpen"
+        aria-controls="customer-nav"
+        :aria-label="mobileMenuOpen ? 'Close menu' : 'Open menu'"
+        @click="mobileMenuOpen = !mobileMenuOpen"
+      >
+        <span class="bc-nav-toggle-bar" aria-hidden="true"></span>
+        <span class="bc-nav-toggle-bar" aria-hidden="true"></span>
+      </button>
     </div>
   </nav>
 </template>
@@ -220,6 +265,7 @@ import { useChatNotifications } from "../composables/useChatNotifications";
 import api from "../plugins/axios";
 import { toast } from "vue3-toastify";
 import LoadingOverlay from "../layouts/components/LoadingOverlay.vue";
+import "../styles/bloomcraft.css";
 
 const router = useRouter();
 const { isAuthenticated, logout, isLoggingOut, user } = useAuth();
@@ -340,6 +386,16 @@ const markOrderNotificationsAsSeen = (notifications) => {
 
 const scrollToSection = (sectionId) => {
   emit("scroll-to-section", sectionId);
+};
+
+// Mobile menu (same pattern as the landing page navbar).
+const mobileMenuOpen = ref(false);
+const closeMobileMenu = () => {
+  mobileMenuOpen.value = false;
+};
+const navigateTo = (sectionId) => {
+  closeMobileMenu();
+  scrollToSection(sectionId);
 };
 
 const toggleUserDropdown = () => {
@@ -578,6 +634,9 @@ const handleClickOutside = (event) => {
   if (notificationDropdown && !notificationDropdown.contains(event.target)) {
     showNotificationDropdown.value = false;
   }
+  if (!event.target.closest?.(".bc-navbar")) {
+    mobileMenuOpen.value = false;
+  }
 };
 
 const triggerCartPulse = () => {
@@ -649,472 +708,321 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-* {
-  font-family: "Poppins", "sans-serif";
-}
+/* Bar, logo, links, login/register and the mobile menu come from
+   src/styles/bloomcraft.css (same as the landing page). Only the customer
+   controls (cart, notifications, account menu) are styled here. */
 
-/* Navbar — full-width at top, floating pill when scrolled */
-.navbar {
-  position: fixed;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 9999px;           /* unrestricted at top */
-  background: #ffffff;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  padding: 1.6rem 6%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  z-index: 1000;
-  border-radius: 0;            /* flat at top */
-  border: 1px solid transparent;
-  box-shadow: none;
-  transition:
-    top           0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    width         0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    max-width     0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    padding       0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    border-radius 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color  0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    background    0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow    0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* Scrolled state — floating pill */
-.navbar--scrolled {
-  top: 20px;
-  width: calc(100% - 48px);
-  max-width: 1240px;
-  padding: 0.72rem 2rem;
-  border-radius: 999px;
-  background: #ffffff;
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow:
-    0 8px 40px rgba(0, 0, 0, 0.1),
-    0 2px 8px  rgba(0, 0, 0, 0.06);
-}
-
-.logo {
+.nav-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-family: "Montserrat", sans-serif;
-  font-size: 23px;
-  font-weight: 700;
-  color: #2d3748;
-  text-decoration: none;
-  letter-spacing: -0.02em;
+  gap: 20px;
 }
 
-.nav-links {
-  display: flex;
-  gap: 44px;
-  align-items: center;
-}
-
-.nav-links a {
+/* ---- Cart + notifications ---- */
+.nav-icon-btn {
   position: relative;
-  color: #4a5568;
-  text-decoration: none;
-  font-size: 14.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
   font-weight: 500;
-  padding-bottom: 4px;
-  transition: color 0.3s;
+  text-decoration: none;
   cursor: pointer;
-  white-space: nowrap;
+  transition: color 0.3s;
 }
 
-.nav-links a::after {
-  content: "";
+.nav-icon-btn:hover {
+  color: var(--rosewood-dark);
+}
+
+.nav-icon-btn svg,
+.dropdown-item svg,
+.dropdown-icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nav-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--ivory);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.nav-badge {
   position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 0;
-  height: 1.5px;
-  background: #48bb78;
-  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.nav-links a:hover {
-  color: #48bb78;
-}
-
-.nav-links a.router-link-active {
-  color: #48bb78;
+  top: -6px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--rosewood);
+  color: #fff;
+  font-size: 10px;
   font-weight: 600;
 }
 
-.nav-links a:hover::after,
-.nav-links a.router-link-active::after {
-  width: 100%;
-}
-
-.nav-buttons {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-}
-
-.btn-login {
-  padding: 10px 28px;
-  background: transparent;
-  color: #2d3748;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
-  text-decoration: none;
-  display: inline-block;
-  white-space: nowrap;
-}
-
-.btn-login:hover {
-  background: #f7fafc;
-  border-color: #cbd5e0;
-}
-
-.btn-register,
-.btn-cart,
-.btn-chat {
-  padding: 10px 28px;
-  background: #2d3748;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
-  text-decoration: none;
-  display: inline-block;
-  white-space: nowrap;
-}
-
-.btn-register:hover,
-.btn-cart:hover,
-.btn-chat:hover {
-  background: #1a202c;
-  transform: translateY(-1px);
-}
-
-.btn-chat {
-  position: relative;
-}
-
-.btn-chat--active {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-}
-
-.chat-label {
-  display: inline-flex;
-  align-items: center;
-}
-
-.chat-count-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  background: #dc2626;
-  color: white;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 6px;
-}
-
-.btn-cart.cart-pulse {
-  animation: cartPulse 0.6s ease-in-out;
+.cart-pulse {
+  animation: cartPulse 0.6s var(--ease-out);
 }
 
 @keyframes cartPulse {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  25% {
-    transform: scale(1.15);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-  75% {
-    transform: scale(1.1);
+  40% {
+    transform: scale(1.12);
   }
 }
 
-.icons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
+.nav-icon-btn:focus-visible,
+.btn-user:focus-visible,
+.dropdown-item:focus-visible,
+.notification-entry:focus-visible,
+.nav-menu-action:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 4px;
+  border-radius: 6px;
 }
 
+/* ---- Dropdown panels ---- */
+.notification-wrapper,
 .user-dropdown-wrapper {
   position: relative;
 }
 
-.notification-wrapper {
-  position: relative;
-}
-
-.btn-notification {
-  position: relative;
-  padding: 8px 12px;
-  height: 42px;
-  border: 1px solid #e2e8f0;
-  background: white;
-  border-radius: 10px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.btn-notification:hover {
-  background: #f7fafc;
-  border-color: #cbd5e0;
-}
-
-.notification-bell {
-  font-size: 12px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.notification-count-badge {
+.nav-menu {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  min-width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  background: #dc2626;
-  color: white;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 6px;
+  top: calc(100% + 18px);
+  right: 0;
+  z-index: 1001;
+  width: 300px;
+  padding: 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  background: var(--paper);
+  box-shadow: 0 24px 60px rgba(30, 27, 24, 0.14);
+  animation: menuIn 0.3s var(--ease-out);
+}
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
 }
 
 .notification-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
   width: 340px;
-  max-height: 420px;
-  overflow: hidden;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-  z-index: 1001;
 }
 
-.notification-menu-header {
-  padding: 14px 16px;
-  border-bottom: 1px solid #e2e8f0;
+.nav-menu-head {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1f2937;
+  align-items: center;
+  padding: 10px 12px 12px;
+  border-bottom: 1px solid var(--line-soft);
 }
 
-.notification-refresh {
+.nav-menu-action {
   border: none;
-  background: transparent;
-  color: #059669;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
+}
+
+.notification-empty {
+  padding: 22px 12px;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  text-align: center;
 }
 
 .notification-list {
-  max-height: 360px;
+  max-height: 340px;
   overflow-y: auto;
 }
 
 .notification-entry {
-  width: 100%;
-  border: none;
-  background: white;
   display: flex;
-  align-items: flex-start;
   gap: 12px;
-  padding: 14px 16px;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  font-family: var(--font-sans);
   text-align: left;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.25s;
 }
 
 .notification-entry:hover {
-  background: #f8fafc;
-}
-
-.notification-entry + .notification-entry {
-  border-top: 1px solid #f1f5f9;
+  background: var(--ivory);
 }
 
 .notification-status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-top: 6px;
   flex-shrink: 0;
-}
-
-.notification-status-dot.warning {
-  background: #f59e0b;
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: var(--gold);
 }
 
 .notification-status-dot.info {
-  background: #3b82f6;
+  background: var(--rosewood);
 }
 
 .notification-status-dot.success {
-  background: #10b981;
+  background: #7d8f69;
 }
 
 .notification-status-dot.completed {
-  background: #6366f1;
+  background: var(--ink-soft);
 }
 
 .notification-entry-content {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 0;
+  gap: 2px;
 }
 
 .notification-entry-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #111827;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 500;
 }
 
 .notification-entry-message {
-  font-size: 12px;
-  line-height: 1.45;
-  color: #4b5563;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
 }
 
 .notification-entry-time {
-  font-size: 11px;
-  color: #9ca3af;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  opacity: 0.8;
 }
 
-.notification-empty {
-  padding: 20px 16px;
-  font-size: 13px;
-  color: #6b7280;
-  text-align: center;
+.notification-skeletons {
+  padding: 6px 4px;
 }
 
-.btn-user {
-  padding: 8px 16px;
-  background: transparent;
-  color: #2d3748;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
+.notification-skeleton {
   display: flex;
-  align-items: center;
+  gap: 12px;
+  padding: 10px 8px;
+}
+
+.notification-skeleton-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+}
+
+.notification-skeleton-lines {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   gap: 8px;
 }
 
-.btn-user:hover {
-  background: #f7fafc;
-  border-color: #cbd5e0;
+.notification-skeleton-line {
+  height: 10px;
+}
+
+.notification-skeleton-line--short {
+  width: 60%;
+}
+
+/* ---- Account ---- */
+.btn-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 4px 4px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.user-avatar,
+.user-avatar-large {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--ivory-deep);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 600;
 }
 
 .user-avatar {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #48bb78, #7c3aed);
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 14px;
-  overflow: hidden;
-  position: relative;
-}
-
-.user-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-
-.user-avatar span {
-  position: relative;
-  z-index: 1;
+  width: 34px;
+  height: 34px;
+  font-size: 17px;
 }
 
 .user-avatar-large {
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(135deg, #48bb78, #7c3aed);
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 20px;
-  overflow: hidden;
-  position: relative;
+  width: 46px;
+  height: 46px;
+  font-size: 22px;
 }
 
+.user-avatar img,
 .user-avatar-large img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  position: absolute;
-  top: 0;
-  left: 0;
 }
 
-.user-avatar-large span {
-  position: relative;
-  z-index: 1;
+.user-avatar.loading,
+.user-avatar-large.loading {
+  opacity: 0.6;
 }
 
 .user-name {
-  font-weight: 500;
-  max-width: 100px;
+  max-width: 140px;
   overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .dropdown-icon {
-  font-size: 10px;
-  transition: transform 0.3s;
-  display: flex;
-  align-items: center;
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s var(--ease-out);
 }
 
 .dropdown-icon.open {
@@ -1122,252 +1030,149 @@ onUnmounted(() => {
 }
 
 .dropdown-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-  min-width: 280px;
-  z-index: 1001;
-  animation: dropdownSlide 0.2s ease;
-  overflow: hidden;
-}
-
-@keyframes dropdownSlide {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  width: 260px;
 }
 
 .dropdown-header {
-  padding: 20px;
-  background: linear-gradient(135deg, #f7fafc, #f0fff4);
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.user-info {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 12px 12px 16px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .user-details {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .user-display-name {
-  font-weight: 600;
-  font-size: 16px;
-  color: #2d3748;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.user-role {
+.user-role,
+.user-plan {
+  color: var(--ink-soft);
   font-size: 12px;
-  color: #718096;
-  background: white;
-  padding: 2px 8px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  margin-top: 4px;
-  display: inline-block;
-  width: fit-content;
 }
 
 .user-plan {
-  font-size: 12px;
-  color: #48bb78;
-  background: #f0fff4;
-  padding: 2px 8px;
-  border-radius: 12px;
-  border: 1px solid #c6f6d5;
-  margin-top: 4px;
-  display: inline-block;
-  width: fit-content;
-  font-weight: 500;
-}
-
-.dropdown-divider {
-  height: 1px;
-  background: #e2e8f0;
-  margin: 0;
+  color: var(--rosewood-dark);
 }
 
 .dropdown-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 20px;
-  color: #2d3748;
-  text-decoration: none;
+  padding: 11px 12px;
+  border-radius: 12px;
+  color: var(--ink);
   font-size: 14px;
-  transition: all 0.2s;
+  font-weight: 400;
+  text-decoration: none;
   cursor: pointer;
-  position: relative;
+  transition: background 0.25s;
 }
 
 .dropdown-item:hover {
-  background: #f7fafc;
+  background: var(--ivory);
 }
 
-.dropdown-item.logout-loading {
-  background-color: #f8f9fa;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.dropdown-item.logout-loading:hover {
-  background-color: #f8f9fa;
-}
-
-.dropdown-item span:first-child {
-  display: flex;
-  align-items: center;
-  width: 24px;
-}
-
-.logout-spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid #2d3748;
-  border-radius: 50%;
-  border-top-color: transparent;
-  animation: spin 0.8s linear infinite;
+.dropdown-item--logout {
+  margin-top: 6px;
+  border-top: 1px solid var(--line-soft);
+  border-radius: 0 0 12px 12px;
 }
 
 .dropdown-badge {
-  position: absolute;
-  right: 20px;
-  background: #e53e3e;
-  color: white;
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--rosewood);
+  color: #fff;
   font-size: 11px;
   font-weight: 600;
-  width: 20px;
-  height: 20px;
+  text-align: center;
+}
+
+.logout-loading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.logout-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--line);
+  border-top-color: var(--ink);
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  animation: spin 0.8s linear infinite;
 }
 
-/* Loading state for avatar */
-.user-avatar.loading::after,
-.user-avatar-large.loading::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.4),
-    transparent
-  );
-  animation: loadingShimmer 1.5s infinite;
-  z-index: 2;
-}
-
-@keyframes loadingShimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
-/* Responsive Design */
+/* ---- Responsive ---- */
 @media (max-width: 968px) {
-  .nav-links {
+  .user-name {
     display: none;
   }
 
-  .user-name {
-    max-width: 80px;
+  .nav-actions {
+    gap: 16px;
   }
 
-  .dropdown-menu {
+  .nav-menu {
     position: fixed;
-    top: 70px;
-    right: 20px;
-    left: 20px;
+    top: 84px;
+    right: 16px;
+    left: 16px;
     width: auto;
-    max-width: 320px;
-  }
-
-  .notification-menu {
-    position: fixed;
-    top: 70px;
-    right: 20px;
-    left: 20px;
-    width: auto;
-    max-width: 340px;
-    margin-left: auto;
   }
 }
 
 @media (max-width: 640px) {
-  .nav-buttons {
-    gap: 8px;
+  .nav-actions {
+    gap: 12px;
   }
 
-  .btn-login,
-  .btn-register,
-  .btn-cart,
-  .btn-chat,
-  .btn-user {
-    padding: 8px 12px;
-    font-size: 13px;
-  }
-
-  .user-name {
+  .nav-icon-label,
+  .dropdown-icon {
     display: none;
   }
 
-  .user-avatar {
-    width: 28px;
-    height: 28px;
-    font-size: 12px;
+  .btn-user {
+    padding: 0;
   }
 
-  .user-avatar-large {
-    width: 40px;
-    height: 40px;
-    font-size: 16px;
-  }
-
-  .dropdown-menu {
-    right: 10px;
-    left: 10px;
-    min-width: auto;
-  }
-
-  .notification-menu {
-    right: 10px;
-    left: 10px;
-    max-width: none;
+  /* Cart count becomes a corner badge, like notifications */
+  .nav-count {
+    position: absolute;
+    top: -6px;
+    right: -9px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    font-size: 10px;
   }
 }
 
-@media (max-width: 480px) {
-  .btn-cart {
-    padding: 8px;
-    min-width: 40px;
-    justify-content: center;
-  }
-
-  .btn-cart::before {
-    content: "🛒";
+@media (prefers-reduced-motion: reduce) {
+  .nav-menu,
+  .cart-pulse {
+    animation: none;
   }
 }
 </style>

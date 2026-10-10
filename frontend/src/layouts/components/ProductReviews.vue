@@ -179,7 +179,7 @@
               alt="Review photo"
               class="pr-item__img"
             />
-            <div class="pr-item__img-overlay">🔍</div>
+            <div class="pr-item__img-overlay"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg></div>
           </div>
         </div>
       </div>
@@ -457,7 +457,7 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 20px;
-  font-family: "Poppins", sans-serif;
+  font-family: var(--font-sans, "Poppins", sans-serif);
 }
 
 /* ── Summary ─────────────────────────────────────────────────────────────── */
@@ -466,7 +466,7 @@ watch(
   gap: 24px;
   padding: 20px;
   background: #fff;
-  border: 1px solid #e8edf2;
+  border: 1px solid var(--ivory-deep, #ebe5dd);
   border-radius: 12px;
   flex-wrap: wrap;
 }
@@ -480,7 +480,7 @@ watch(
 .pr-big-num {
   font-size: 2.8rem;
   font-weight: 800;
-  color: #1a202c;
+  color: var(--ink, #1e1b18);
   line-height: 1;
 }
 .pr-summary__stars {
@@ -491,36 +491,36 @@ watch(
   font-size: 1rem;
 }
 .pr-star--full {
-  color: #f6ad55;
+  color: var(--gold, #d4b27a);
 }
 .pr-star--half {
-  color: #f6ad55;
+  color: var(--gold, #d4b27a);
   opacity: 0.5;
 }
 .pr-star--empty {
-  color: #e2e8f0;
+  color: var(--line, rgba(30, 27, 24, 0.12));
 }
 .pr-total-lbl {
   font-size: 0.75rem;
-  color: #718096;
+  color: var(--ink-soft, #6e6761);
 }
 .pr-sold-badge {
   display: flex;
   align-items: center;
   gap: 5px;
   padding: 4px 10px;
-  background: #f0fff4;
-  border: 1px solid #c6f6d5;
+  background: var(--ivory, #f4f1ec);
+  border: 1px solid var(--ivory-deep, #ebe5dd);
   border-radius: 20px;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #276749;
+  color: var(--rosewood-dark, #8e443a);
   margin-top: 4px;
 }
 .pr-sold-ico {
   width: 13px;
   height: 13px;
-  color: #276749;
+  color: var(--rosewood-dark, #8e443a);
 }
 
 .pr-breakdown {
@@ -538,7 +538,7 @@ watch(
 }
 .pr-bar-label {
   font-size: 0.75rem;
-  color: #718096;
+  color: var(--ink-soft, #6e6761);
   width: 22px;
   text-align: right;
   flex-shrink: 0;
@@ -546,19 +546,19 @@ watch(
 .pr-bar-track {
   flex: 1;
   height: 8px;
-  background: #f0f2f5;
+  background: var(--ivory, #f4f1ec);
   border-radius: 4px;
   overflow: hidden;
 }
 .pr-bar-fill {
   height: 100%;
-  background: #f6ad55;
+  background: var(--gold, #d4b27a);
   border-radius: 4px;
   transition: width 0.3s;
 }
 .pr-bar-count {
   font-size: 0.72rem;
-  color: #a0aec0;
+  color: var(--ink-soft, #6e6761);
   width: 22px;
   flex-shrink: 0;
 }
@@ -572,7 +572,7 @@ watch(
 .pr-skel {
   padding: 16px;
   background: #fff;
-  border: 1px solid #e8edf2;
+  border: 1px solid var(--ivory-deep, #ebe5dd);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -586,7 +586,7 @@ watch(
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #f0f2f5;
+  background: var(--ivory, #f4f1ec);
   flex-shrink: 0;
 }
 .pr-skel__lines {
@@ -598,7 +598,7 @@ watch(
 .pr-skel__line {
   height: 10px;
   border-radius: 5px;
-  background: linear-gradient(90deg, #f0f2f5 25%, #e2e8f0 50%, #f0f2f5 75%);
+  background: linear-gradient(90deg, var(--ivory, #f4f1ec) 25%, var(--line, rgba(30, 27, 24, 0.12)) 50%, var(--ivory, #f4f1ec) 75%);
   background-size: 200%;
   animation: shimmer 1.4s infinite;
 }
@@ -639,7 +639,7 @@ watch(
 }
 .pr-empty p {
   font-size: 0.875rem;
-  color: #718096;
+  color: var(--ink-soft, #6e6761);
   margin: 0;
 }
 
@@ -651,21 +651,21 @@ watch(
 }
 .pr-toolbar-count {
   font-size: 0.8rem;
-  color: #718096;
+  color: var(--ink-soft, #6e6761);
 }
 .pr-sort {
   padding: 6px 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line, rgba(30, 27, 24, 0.12));
   border-radius: 7px;
   font-family: inherit;
   font-size: 0.8rem;
-  color: #2d3748;
+  color: var(--ink, #1e1b18);
   background: #fff;
   outline: none;
   cursor: pointer;
 }
 .pr-sort:focus {
-  border-color: #48bb78;
+  border-color: var(--rosewood, #b86558);
 }
 
 /* ── Review list ─────────────────────────────────────────────────────────── */
@@ -677,7 +677,7 @@ watch(
 .pr-item {
   padding: 16px;
   background: #fff;
-  border: 1px solid #e8edf2;
+  border: 1px solid var(--ivory-deep, #ebe5dd);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -697,7 +697,7 @@ watch(
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #48bb78, #276749);
+  background: linear-gradient(135deg, var(--rosewood, #b86558), var(--rosewood-dark, #8e443a));
   color: #fff;
   display: flex;
   align-items: center;
@@ -721,27 +721,27 @@ watch(
 .pr-item__name {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--ink, #1e1b18);
 }
 .pr-item__date {
   font-size: 0.72rem;
-  color: #a0aec0;
+  color: var(--ink-soft, #6e6761);
 }
 .pr-anon-badge {
   font-size: 0.68rem;
   padding: 2px 7px;
-  background: #f7f8fa;
-  border: 1px solid #e2e8f0;
+  background: var(--ivory, #f4f1ec);
+  border: 1px solid var(--line, rgba(30, 27, 24, 0.12));
   border-radius: 20px;
-  color: #718096;
+  color: var(--ink-soft, #6e6761);
 }
 .pr-mine-badge {
   font-size: 0.68rem;
   padding: 2px 7px;
-  background: #f0fff4;
-  border: 1px solid #c6f6d5;
+  background: var(--ivory, #f4f1ec);
+  border: 1px solid var(--ivory-deep, #ebe5dd);
   border-radius: 20px;
-  color: #276749;
+  color: var(--rosewood-dark, #8e443a);
   font-weight: 600;
 }
 
@@ -754,24 +754,24 @@ watch(
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line, rgba(30, 27, 24, 0.12));
   background: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #718096;
+  color: var(--ink-soft, #6e6761);
   transition: all 0.15s;
 }
 .pr-action-btn:hover {
-  border-color: #48bb78;
-  color: #48bb78;
-  background: #f0fff4;
+  border-color: var(--rosewood, #b86558);
+  color: var(--rosewood, #b86558);
+  background: var(--ivory, #f4f1ec);
 }
 .pr-action-btn--del:hover {
-  border-color: #fc8181;
-  color: #e53e3e;
-  background: #fff5f5;
+  border-color: var(--rosewood, #b86558);
+  color: var(--rosewood-dark, #8e443a);
+  background: var(--ivory, #f4f1ec);
 }
 .pr-action-btn svg {
   width: 13px;
@@ -784,15 +784,15 @@ watch(
 }
 .pr-star-sm {
   font-size: 1rem;
-  color: #e2e8f0;
+  color: var(--line, rgba(30, 27, 24, 0.12));
 }
 .pr-star-sm.lit {
-  color: #f6ad55;
+  color: var(--gold, #d4b27a);
 }
 
 .pr-item__comment {
   font-size: 0.875rem;
-  color: #4a5568;
+  color: var(--ink, #1e1b18);
   line-height: 1.6;
   margin: 0;
 }
@@ -807,7 +807,7 @@ watch(
   max-height: 130px;
   object-fit: cover;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line, rgba(30, 27, 24, 0.12));
   display: block;
 }
 .pr-item__img-overlay {
@@ -835,23 +835,23 @@ watch(
 }
 .pr-pager-info {
   font-size: 0.875rem;
-  color: #718096;
+  color: var(--ink-soft, #6e6761);
 }
 .pr-pager-btn {
   padding: 8px 16px;
   background: #fff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line, rgba(30, 27, 24, 0.12));
   border-radius: 7px;
   font-family: inherit;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #4a5568;
+  color: var(--ink, #1e1b18);
   cursor: pointer;
   transition: all 0.15s;
 }
 .pr-pager-btn:hover:not(:disabled) {
-  border-color: #48bb78;
-  color: #48bb78;
+  border-color: var(--rosewood, #b86558);
+  color: var(--rosewood, #b86558);
 }
 .pr-pager-btn:disabled {
   opacity: 0.4;
@@ -894,19 +894,19 @@ watch(
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--ivory, #f4f1ec);
 }
 .pr-edit-modal__head h3 {
   font-size: 1rem;
   font-weight: 700;
   margin: 0;
-  color: #1a202c;
+  color: var(--ink, #1e1b18);
 }
 .pr-edit-close {
   background: none;
   border: none;
   cursor: pointer;
-  color: #a0aec0;
+  color: var(--ink-soft, #6e6761);
   padding: 4px;
 }
 .pr-edit-close svg {
@@ -927,7 +927,7 @@ watch(
 .pr-edit-lbl {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--ink, #1e1b18);
 }
 .pr-stars-edit {
   display: flex;
@@ -939,14 +939,14 @@ watch(
   background: none;
   border: none;
   cursor: pointer;
-  color: #e2e8f0;
+  color: var(--line, rgba(30, 27, 24, 0.12));
   transition:
     color 0.12s,
     transform 0.1s;
   padding: 0;
 }
 .rv-star.lit {
-  color: #f6ad55;
+  color: var(--gold, #d4b27a);
 }
 .rv-star:hover {
   transform: scale(1.12);
@@ -954,19 +954,19 @@ watch(
 .pr-edit-textarea {
   width: 100%;
   padding: 9px 12px;
-  background: #f7f8fa;
-  border: 1.5px solid #e2e8f0;
+  background: var(--ivory, #f4f1ec);
+  border: 1.5px solid var(--line, rgba(30, 27, 24, 0.12));
   border-radius: 8px;
   font-family: inherit;
   font-size: 0.875rem;
-  color: #2d3748;
+  color: var(--ink, #1e1b18);
   resize: vertical;
   outline: none;
   transition: border-color 0.2s;
   box-sizing: border-box;
 }
 .pr-edit-textarea:focus {
-  border-color: #48bb78;
+  border-color: var(--rosewood, #b86558);
   background: #fff;
 }
 .pr-edit-anon {
@@ -974,7 +974,7 @@ watch(
   align-items: center;
   gap: 8px;
   font-size: 0.8rem;
-  color: #4a5568;
+  color: var(--ink, #1e1b18);
   cursor: pointer;
 }
 .pr-edit-anon__lbl {
@@ -985,7 +985,7 @@ watch(
   gap: 10px;
   justify-content: flex-end;
   padding: 14px 20px;
-  border-top: 1px solid #f0f2f5;
+  border-top: 1px solid var(--ivory, #f4f1ec);
 }
 
 .pr-btn {
@@ -1002,19 +1002,19 @@ watch(
   transition: all 0.18s;
 }
 .pr-btn--green {
-  background: #48bb78;
+  background: var(--rosewood, #b86558);
   color: #fff;
 }
 .pr-btn--green:hover:not(:disabled) {
-  background: #38a169;
+  background: var(--rosewood-dark, #8e443a);
 }
 .pr-btn--ghost {
   background: transparent;
-  color: #718096;
-  border: 1.5px solid #e2e8f0;
+  color: var(--ink-soft, #6e6761);
+  border: 1.5px solid var(--line, rgba(30, 27, 24, 0.12));
 }
 .pr-btn--ghost:hover:not(:disabled) {
-  background: #f7f8fa;
+  background: var(--ivory, #f4f1ec);
 }
 .pr-btn:disabled {
   opacity: 0.5;
@@ -1031,5 +1031,11 @@ watch(
 .pr-modal-leave-to {
   opacity: 0;
   transform: scale(0.97);
+}
+
+/* BloomCraft: serif rating number */
+.pr-big-num {
+  font-family: var(--font-display, "Cormorant Garamond", Georgia, serif);
+  font-weight: 500;
 }
 </style>

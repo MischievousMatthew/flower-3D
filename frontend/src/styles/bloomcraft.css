@@ -1,0 +1,502 @@
+/*
+ * BloomCraft design system: shared by the landing page and the customer pages.
+ *
+ * These rules were moved verbatim from LandingPage.vue so every page uses
+ * one source of truth. Classes are prefixed `bc-` so they never collide with
+ * the ERP / vendor pages' own `.btn`, `.navbar` or `.label` classes.
+ * Wrap a page (or a component root) in `.bc-theme` to get the tokens.
+ */
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Poppins:wght@300;400;500;600&display=swap");
+
+/* Border-box sizing for everything inside a themed root. In a cascade layer,
+   so it never overrides a component's own explicit sizing. */
+@layer bc-reset {
+  .bc-theme,
+  .bc-theme *,
+  .bc-theme *::before,
+  .bc-theme *::after {
+    box-sizing: border-box;
+  }
+}
+
+/* ============================================================
+   DESIGN TOKENS
+============================================================= */
+.bc-theme {
+  /* Dim-white base, warm like petals */
+  --ivory: #f4f1ec;
+  --ivory-deep: #ebe5dd;
+  --paper: #faf8f4;
+  --ink: #1e1b18;
+  --ink-soft: #6e6761;
+  --line: rgba(30, 27, 24, 0.12);
+  --line-soft: rgba(30, 27, 24, 0.07);
+  --rosewood: #b86558;
+  --rosewood-dark: #8e443a;
+  --gold: #d4b27a;
+  --espresso: #1b1612;
+
+  --font-display: "Cormorant Garamond", "Cormorant", Georgia, "Times New Roman", serif;
+  --font-sans: "Poppins", -apple-system, "Segoe UI", sans-serif;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --gutter: clamp(20px, 5vw, 72px);
+  --section-space: clamp(110px, 13vw, 190px);
+
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-weight: 300;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+.bc-container {
+  width: 100%;
+  max-width: calc(1240px + var(--gutter) * 2);
+  margin: 0 auto;
+  padding-inline: var(--gutter);
+}
+
+/* ============================================================
+   TYPOGRAPHY
+============================================================= */
+.bc-theme :is(h1, h2, h3) {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.02;
+  color: var(--ink);
+}
+
+.bc-theme :is(h1, h2, h3) em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--rosewood-dark);
+}
+
+/* One quiet label style for every section */
+.bc-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.bc-label::before {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.bc-section-head h2 {
+  margin-top: 22px;
+  font-size: clamp(44px, 5.6vw, 84px);
+  max-width: 900px;
+}
+
+.bc-section-head--split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 48px;
+  align-items: end;
+}
+
+.bc-section-intro {
+  max-width: 360px;
+  justify-self: end;
+  color: var(--ink-soft);
+  font-size: 15.5px;
+  line-height: 1.8;
+}
+
+.bc-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ============================================================
+   BUTTONS + LINKS
+============================================================= */
+.bc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 17px 30px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.45s var(--ease-out),
+    color 0.45s var(--ease-out),
+    border-color 0.45s var(--ease-out);
+}
+
+.bc-btn--dark {
+  background: var(--ink);
+  color: var(--ivory);
+}
+
+.bc-btn--dark:hover {
+  background: var(--rosewood-dark);
+}
+
+.bc-btn-arrow {
+  display: inline-block;
+  transition: transform 0.45s var(--ease-out);
+}
+
+.bc-btn:hover .bc-btn-arrow {
+  transform: translateX(4px);
+}
+
+.bc-btn:focus-visible,
+.bc-link:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 4px;
+}
+
+.bc-link {
+  position: relative;
+  padding-bottom: 4px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.bc-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: currentColor;
+  transform-origin: right;
+  transition: transform 0.5s var(--ease-out);
+}
+
+.bc-link:hover::after {
+  transform: scaleX(0.35);
+}
+
+/* ============================================================
+   NAVIGATION — full width at top, floating pill when scrolled
+============================================================= */
+.bc-navbar {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 9999px;
+  z-index: 1000;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem var(--gutter);
+  background: var(--ivory);
+  border: 1px solid transparent;
+  border-radius: 0;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition:
+    transform 0.5s var(--ease-out),
+    top 0.5s var(--ease-out),
+    width 0.5s var(--ease-out),
+    max-width 0.5s var(--ease-out),
+    padding 0.5s var(--ease-out),
+    border-radius 0.5s var(--ease-out),
+    border-color 0.5s var(--ease-out),
+    background 0.5s var(--ease-out),
+    box-shadow 0.5s var(--ease-out);
+}
+
+.bc-navbar--scrolled {
+  top: 18px;
+  width: calc(100% - 48px);
+  max-width: 1240px;
+  padding: 0.7rem 0.8rem 0.7rem 1.6rem;
+  border-radius: 999px;
+  background: rgba(250, 248, 244, 0.86);
+  border-color: var(--line-soft);
+  box-shadow: 0 12px 40px rgba(30, 27, 24, 0.08);
+}
+
+.bc-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.bc-logo img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.bc-logo-text {
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.bc-nav-links {
+  display: flex;
+  gap: 34px;
+  align-items: center;
+}
+
+.bc-nav-links a {
+  position: relative;
+  padding-bottom: 3px;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 400;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.bc-nav-links a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.45s var(--ease-out);
+}
+
+.bc-nav-links a:hover::after {
+  transform: scaleX(1);
+}
+
+.bc-nav-login {
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.bc-nav-login:hover {
+  color: var(--rosewood-dark);
+}
+
+.bc-nav-register {
+  display: inline-block;
+  padding: 11px 24px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--ivory);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.4s var(--ease-out);
+}
+
+.bc-nav-register:hover {
+  background: var(--rosewood-dark);
+}
+
+.bc-nav-links a:focus-visible,
+.bc-nav-login:focus-visible,
+.bc-nav-register:focus-visible,
+.bc-logo:focus-visible,
+.bc-nav-toggle:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+/* Mobile menu toggle (shown below 968px) */
+.bc-nav-toggle {
+  display: none;
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.bc-nav-toggle-bar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: 1.5px;
+  background: var(--ink);
+  transition: transform 0.35s var(--ease-out);
+}
+
+.bc-nav-toggle-bar:first-child {
+  transform: translateY(-4px);
+}
+
+.bc-nav-toggle-bar:last-child {
+  transform: translateY(4px);
+}
+
+.bc-navbar--menu-open .bc-nav-toggle-bar:first-child {
+  transform: rotate(45deg);
+}
+
+.bc-navbar--menu-open .bc-nav-toggle-bar:last-child {
+  transform: rotate(-45deg);
+}
+
+/* Items that only appear inside the mobile menu */
+.bc-nav-menu-only {
+  display: none;
+}
+
+@media (max-width: 968px) {
+  .bc-section-head--split {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .bc-section-intro {
+    justify-self: start;
+  }
+
+  .bc-navbar--scrolled {
+    top: 14px;
+    width: calc(100% - 32px);
+  }
+
+  .bc-nav-toggle {
+    display: inline-block;
+  }
+
+  .bc-nav-links {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 10px 22px;
+    border: 1px solid var(--line-soft);
+    border-radius: 22px;
+    background: rgba(250, 248, 244, 0.97);
+    box-shadow: 0 18px 40px rgba(30, 27, 24, 0.12);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease,
+      visibility 0.3s;
+  }
+
+  .bc-navbar--menu-open .bc-nav-links {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+
+  .bc-nav-links a {
+    padding: 14px 0;
+    font-size: 16px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .bc-nav-links a:last-child {
+    border-bottom: none;
+  }
+
+  .bc-nav-links a::after {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .bc-navbar {
+    padding: 1rem var(--gutter);
+  }
+
+  .bc-navbar--scrolled {
+    top: 10px;
+    width: calc(100% - 24px);
+    padding: 0.55rem 0.6rem 0.55rem 1.1rem;
+  }
+
+  .bc-nav-register {
+    padding: 9px 18px;
+    font-size: 13px;
+  }
+
+  .bc-logo-text {
+    font-size: 23px;
+  }
+
+  .bc-logo img {
+    width: 34px;
+    height: 34px;
+  }
+
+  /* Login moves into the mobile menu */
+  .bc-nav-login {
+    display: none;
+  }
+
+  .bc-nav-menu-only {
+    display: block;
+  }
+}
+
+/* ============================================================
+   SKELETON LOADING
+============================================================= */
+.bc-skeleton {
+  border-radius: 10px;
+  background: linear-gradient(
+    100deg,
+    var(--ivory-deep, #ebe5dd) 30%,
+    var(--paper, #faf8f4) 50%,
+    var(--ivory-deep, #ebe5dd) 70%
+  );
+  background-size: 300% 100%;
+  animation: bcShimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes bcShimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bc-skeleton {
+    animation: none;
+  }
+}
