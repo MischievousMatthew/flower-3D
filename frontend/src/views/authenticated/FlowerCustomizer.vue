@@ -1,314 +1,610 @@
 <template>
-  <div class="fc-page">
+  <div class="fc-page bc-theme">
     <NavHeader :cartCount="cartCount" :isAuthenticated="isAuthenticated" />
+
     <div class="fc-shell">
-      <header class="fc-topbar">
-        <div>
-          <p class="fc-kicker">Flower Customizer</p>
-          <h1>{{ storeName || "Build Your Bouquet" }}</h1>
-          <p class="fc-subtitle">Drag a flower or pick one, then click the bouquet to place it.</p>
+      <header class="fc-head">
+        <div class="fc-head-copy">
+          <p class="fc-store">{{ storeName ? `Arranged by ${storeName}` : "Custom bouquet" }}</p>
+          <h1>Build your bouquet</h1>
+          <p class="fc-lede">Choose up to {{ MAX_FLOWERS }} stems, set them on the wrap, then finish with a wrapper and ribbon.</p>
         </div>
-        <div class="fc-head-actions">
-          <span class="fc-pill">{{ placedFlowers.length }}/{{ MAX_FLOWERS }} selected</span>
-          <button class="fc-btn fc-btn-light" @click="toggleLeftSidebar">
-            {{ isLeftSidebarCollapsed ? "Open Flowers" : "Hide Flowers" }}
-          </button>
-          <button class="fc-btn fc-btn-light" @click="toggleRightSidebar">
-            {{ isRightSidebarCollapsed ? "Open Tools" : "Hide Tools" }}
-          </button>
-          <button class="fc-btn fc-btn-light" @click="resetDesign" :disabled="!selectedFlowers.length">Reset</button>
-          <button class="fc-btn fc-btn-light" @click="toggleFullscreen" :disabled="!sceneReady">
-            {{ isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen" }}
-          </button>
-          <button class="fc-btn fc-btn-light" @click="takeScreenshot" :disabled="!sceneReady">Screenshot</button>
+
+        <div class="fc-head-meta">
+          <ol class="fc-stems" aria-label="Stems on the bouquet">
+            <li
+              v-for="(slot, index) in stemSlots"
+              :key="index"
+              class="fc-stem"
+              :class="{ filled: slot, active: slot && slot.sceneId === selectedSceneId }"
+            >
+              <button v-if="slot" type="button" :aria-label="`Select ${slot.product_name}`" @click="selectPlacedFlower(slot.sceneId)">
+                <img v-if="flowerImage(slot.id)" :src="flowerImage(slot.id)" alt="" />
+                <BcIcon v-else name="flower" />
+              </button>
+              <span v-else class="fc-stem-empty" aria-label="Empty stem slot"><BcIcon name="plus" /></span>
+            </li>
+          </ol>
+          <div class="fc-head-total">
+            <span>{{ placedFlowers.length }} of {{ MAX_FLOWERS }} stems</span>
+            <strong>{{ formatPeso(totalPrice) }}</strong>
+          </div>
         </div>
       </header>
 
-      <div ref="layoutContainer" class="fc-layout" :class="{ 'left-collapsed': isLeftSidebarCollapsed, 'right-collapsed': isRightSidebarCollapsed, fullscreen: isFullscreen }">
-        <aside v-if="!isLeftSidebarCollapsed" class="fc-panel">
+      <div
+        ref="layoutContainer"
+        class="fc-layout"
+        :class="{ 'left-collapsed': isLeftSidebarCollapsed, 'right-collapsed': isRightSidebarCollapsed, fullscreen: isFullscreen }"
+      >
+        <!-- Catalog -->
+        <aside v-if="!isLeftSidebarCollapsed" class="fc-panel fc-catalog" aria-label="Flowers and fillers">
           <div class="fc-panel-head">
-            <div>
-              <h2>Flowers</h2>
-              <p>3D vendor products only</p>
-            </div>
-            <span class="fc-pill">{{ placedFlowers.length }}/{{ MAX_FLOWERS }}</span>
+            <h2>Flowers</h2>
+            <span v-if="flowers.length">{{ filteredFlowers.length }} available</span>
           </div>
 
-          <input v-model="search" class="fc-input" type="search" placeholder="Search flowers" />
+          <label class="fc-search">
+            <span class="bc-sr-only">Search flowers</span>
+            <BcIcon name="search" />
+            <input v-model="search" type="search" placeholder="Search flowers" />
+          </label>
 
-          <div v-if="!storeId" class="fc-empty">Open this page from a vendor storefront so the customizer can load that vendor's flowers.</div>
-          <div v-else-if="loadingFlowers" class="fc-empty">Loading flowers...</div>
-          <div v-else-if="!filteredFlowers.length" class="fc-empty">No valid per-piece flowers were found for this vendor.</div>
+          <div class="fc-catalog-scroll">
+            <p v-if="!storeId" class="fc-note">Open the customizer from a flower shop's page to see the stems they offer.</p>
 
-          <div v-else class="fc-list">
-            <article
-              v-for="flower in filteredFlowers"
-              :key="flower.id"
-              class="fc-card"
-              :class="{ active: pendingFlower?.kind !== 'filler' && pendingFlower?.id === flower.id, disabled: !canUseFlower(flower), dragging: draggedFlower?.kind !== 'filler' && draggedFlower?.id === flower.id }"
-              :draggable="canUseFlower(flower)"
-              @dragstart="onDragStart($event, flower)"
-              @dragend="onDragEnd"
-              @click="selectFlower(flower)"
-            >
-              <div class="fc-card-media">
-                <img v-if="flower.image" :src="flower.image" :alt="flower.product_name" class="fc-card-image" />
-                <div v-else class="fc-card-placeholder">No Photo</div>
+            <div v-else-if="loadingFlowers" class="fc-grid" aria-busy="true" aria-label="Loading flowers">
+              <div v-for="n in 4" :key="n" class="fc-tile is-skeleton">
+                <div class="fc-tile-media bc-skeleton"></div>
+                <div class="bc-skeleton fc-skel-line"></div>
+                <div class="bc-skeleton fc-skel-line short"></div>
               </div>
-              <div class="fc-row">
-                <strong>{{ flower.product_name }}</strong>
-                <span>PHP {{ flower.price.toFixed(2) }}</span>
-              </div>
-              <div class="fc-tags">
-                <span class="fc-tag">{{ flower.quantity_in_stock }} in stock</span>
-                <span class="fc-tag ok">3D model ready</span>
-              </div>
-              <div class="fc-row fc-note">
-                <span>{{ countOfFlower(flower.id) ? `${countOfFlower(flower.id)} placed` : "Click then place on bouquet" }}</span>
-                <span v-if="!canUseFlower(flower)">{{ placedFlowers.length >= MAX_FLOWERS ? "Limit reached" : "Out of stock" }}</span>
-              </div>
-            </article>
-          </div>
-
-          <template v-if="fillers.length">
-            <div class="fc-panel-head fc-subhead">
-              <div>
-                <h2>Fillers</h2>
-                <p>Greenery and small blooms</p>
-              </div>
-              <span class="fc-pill">{{ placedFillers.length }}/{{ MAX_FILLERS }}</span>
             </div>
-            <div class="fc-list">
-              <article
-                v-for="filler in filteredFillers"
-                :key="`filler-${filler.id}`"
-                class="fc-card"
-                :class="{ active: pendingFlower?.kind === 'filler' && pendingFlower?.id === filler.id, disabled: !canUseFlower(filler), dragging: draggedFlower?.kind === 'filler' && draggedFlower?.id === filler.id }"
-                :draggable="canUseFlower(filler)"
-                @dragstart="onDragStart($event, filler)"
+
+            <p v-else-if="!filteredFlowers.length" class="fc-note">
+              {{ search ? `No flowers match “${search}”.` : "This shop hasn't added any stems for custom bouquets yet." }}
+            </p>
+
+            <div v-else class="fc-grid">
+              <div
+                v-for="flower in filteredFlowers"
+                :key="flower.id"
+                role="button"
+                tabindex="0"
+                class="fc-tile"
+                :class="{
+                  active: pendingFlower?.kind !== 'filler' && pendingFlower?.id === flower.id,
+                  disabled: !canUseFlower(flower),
+                  dragging: draggedFlower?.kind !== 'filler' && draggedFlower?.id === flower.id,
+                }"
+                :aria-disabled="!canUseFlower(flower)"
+                :draggable="canUseFlower(flower)"
+                @dragstart="onDragStart($event, flower)"
                 @dragend="onDragEnd"
-                @click="selectFlower(filler)"
+                @click="selectFlower(flower)"
+                @keydown.enter.prevent="selectFlower(flower)"
+                @keydown.space.prevent="selectFlower(flower)"
               >
-                <div class="fc-row">
-                  <strong>{{ filler.product_name }}</strong>
-                  <span>{{ filler.price ? `+ ${formatPeso(filler.price)}` : "Free" }}</span>
-                </div>
-                <p v-if="filler.description" class="fc-desc">{{ filler.description }}</p>
-                <div class="fc-row fc-note">
-                  <span>{{ countOfFlower(filler.id, "filler") ? `${countOfFlower(filler.id, "filler")} placed` : "Click then place on bouquet" }}</span>
-                  <span v-if="!canUseFlower(filler)">Limit reached</span>
-                </div>
-              </article>
+                <span class="fc-tile-media">
+                  <img v-if="flower.image" :src="flower.image" :alt="flower.product_name" />
+                  <BcIcon v-else name="flower" class="fc-tile-fallback" />
+                  <span v-if="countOfFlower(flower.id)" class="fc-tile-count">{{ countOfFlower(flower.id) }}</span>
+                </span>
+                <span class="fc-tile-name">{{ flower.product_name }}</span>
+                <span class="fc-tile-meta">
+                  <span>{{ formatPeso(flower.price) }}</span>
+                  <span v-if="!canUseFlower(flower)" class="fc-tile-flag">{{ placedFlowers.length >= MAX_FLOWERS ? "Full" : "Sold out" }}</span>
+                  <span v-else class="fc-tile-stock">{{ flower.quantity_in_stock }} left</span>
+                </span>
+              </div>
             </div>
-          </template>
+
+            <template v-if="fillers.length">
+              <div class="fc-panel-head fc-subhead">
+                <h2>Fillers</h2>
+                <span>{{ placedFillers.length }} of {{ MAX_FILLERS }} used</span>
+              </div>
+              <ul class="fc-fillers">
+                <li v-for="filler in filteredFillers" :key="`filler-${filler.id}`">
+                  <div
+                    role="button"
+                    tabindex="0"
+                    class="fc-filler"
+                    :class="{
+                      active: pendingFlower?.kind === 'filler' && pendingFlower?.id === filler.id,
+                      disabled: !canUseFlower(filler),
+                      dragging: draggedFlower?.kind === 'filler' && draggedFlower?.id === filler.id,
+                    }"
+                    :aria-disabled="!canUseFlower(filler)"
+                    :draggable="canUseFlower(filler)"
+                    @dragstart="onDragStart($event, filler)"
+                    @dragend="onDragEnd"
+                    @click="selectFlower(filler)"
+                    @keydown.enter.prevent="selectFlower(filler)"
+                    @keydown.space.prevent="selectFlower(filler)"
+                  >
+                    <span class="fc-filler-icon"><BcIcon name="leaf" /></span>
+                    <span class="fc-filler-copy">
+                      <strong>{{ filler.product_name }}</strong>
+                      <small v-if="filler.description">{{ filler.description }}</small>
+                    </span>
+                    <span class="fc-filler-price">
+                      {{ filler.price ? `+${formatPeso(filler.price)}` : "Free" }}
+                      <small v-if="countOfFlower(filler.id, 'filler')">{{ countOfFlower(filler.id, "filler") }} on bouquet</small>
+                    </span>
+                  </div>
+                </li>
+              </ul>
+            </template>
+          </div>
         </aside>
 
+        <!-- Stage -->
         <main
           class="fc-stage"
-          :class="{ over: isDragOver, dragging: isTransformDragging }"
+          :class="{ over: isDragOver, dragging: isTransformDragging, placing: pendingFlower || draggedFlower }"
           @dragover.prevent="onCanvasDragOver"
           @dragleave="onCanvasDragLeave"
           @drop.prevent="onCanvasDrop"
         >
-          <div class="fc-stage-actions">
-            <button class="fc-icon-btn" @click="toggleLeftSidebar">
-              {{ isLeftSidebarCollapsed ? "Open Flowers" : "Hide Flowers" }}
-            </button>
-            <button class="fc-icon-btn" @click="toggleFullscreen" :disabled="!sceneReady">
-              {{ isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen" }}
-            </button>
-            <button class="fc-icon-btn" @click="toggleRightSidebar">
-              {{ isRightSidebarCollapsed ? "Open Tools" : "Hide Tools" }}
+          <div ref="viewerContainer" class="fc-viewer"></div>
+
+          <div class="fc-toolbar fc-toolbar-left">
+            <button
+              type="button"
+              class="fc-tool"
+              :class="{ on: !isLeftSidebarCollapsed }"
+              :data-tip="isLeftSidebarCollapsed ? 'Show flowers' : 'Hide flowers'"
+              :aria-label="isLeftSidebarCollapsed ? 'Show flowers' : 'Hide flowers'"
+              :aria-pressed="!isLeftSidebarCollapsed"
+              @click="toggleLeftSidebar"
+            >
+              <BcIcon name="panelLeft" />
             </button>
           </div>
-          <div ref="viewerContainer" class="fc-viewer"></div>
-          <div class="fc-overlay fc-top">
-            <div class="fc-status">
-              <strong>{{ pendingFlower ? `Ready to place: ${pendingFlower.product_name}` : draggedFlower ? `Drop ${draggedFlower.product_name} on the bouquet` : selectedFlower ? `Selected: ${selectedFlower.product_name}` : "Rotate the bouquet and pick a flower" }}</strong>
-              <span>{{ placedFlowers.length >= MAX_FLOWERS ? "Maximum of 3 flowers only" : selectedFlower ? "Drag anywhere on the bouquet surface to move the selected flower, or rotate it from the panel." : "Click directly on the bouquet wrapper to place the model" }}</span>
+
+          <div class="fc-toolbar fc-toolbar-right">
+            <button type="button" class="fc-tool" data-tip="Start over" aria-label="Start over" :disabled="!selectedFlowers.length" @click="resetDesign">
+              <BcIcon name="reset" />
+            </button>
+            <button type="button" class="fc-tool" data-tip="Save as image" aria-label="Save as image" :disabled="!sceneReady" @click="takeScreenshot">
+              <BcIcon name="camera" />
+            </button>
+            <button
+              type="button"
+              class="fc-tool"
+              :data-tip="isFullscreen ? 'Exit full screen' : 'Full screen'"
+              :aria-label="isFullscreen ? 'Exit full screen' : 'Full screen'"
+              :disabled="!sceneReady"
+              @click="toggleFullscreen"
+            >
+              <BcIcon :name="isFullscreen ? 'minimize' : 'maximize'" />
+            </button>
+            <span class="fc-toolbar-rule" aria-hidden="true"></span>
+            <button
+              type="button"
+              class="fc-tool"
+              :class="{ on: !isRightSidebarCollapsed }"
+              :data-tip="isRightSidebarCollapsed ? 'Show details' : 'Hide details'"
+              :aria-label="isRightSidebarCollapsed ? 'Show details' : 'Hide details'"
+              :aria-pressed="!isRightSidebarCollapsed"
+              @click="toggleRightSidebar"
+            >
+              <BcIcon name="panelRight" />
+            </button>
+          </div>
+
+          <div v-if="bouquetLoadError" class="fc-stage-center">
+            <div class="fc-stage-message">
+              <BcIcon name="info" />
+              <h3>The bouquet couldn't load</h3>
+              <p>{{ bouquetLoadError }}</p>
             </div>
           </div>
-          <div v-if="bouquetLoadError" class="fc-overlay fc-center"><div class="fc-modal"><h3>Unable to load bouquet.glb</h3><p>{{ bouquetLoadError }}</p></div></div>
-          <div v-else-if="isLoading3D" class="fc-overlay fc-center"><div class="fc-modal">Loading 3D bouquet...</div></div>
-          <div v-if="dragFeedback" class="fc-overlay fc-bottom"><div class="fc-modal">{{ dragFeedback }}</div></div>
+          <div v-else-if="isLoading3D" class="fc-stage-center">
+            <div class="fc-stage-loading">
+              <span class="bc-skeleton fc-skel-arch"></span>
+              <p>Setting up the bouquet</p>
+            </div>
+          </div>
+
+          <div v-if="sceneReady" class="fc-hint" :class="{ live: dragFeedback || pendingFlower }" role="status" aria-live="polite">
+            <BcIcon :name="pendingFlower || draggedFlower ? 'target' : selectedFlower ? 'move' : 'rotate'" />
+            <span class="fc-hint-copy">
+              <strong>{{ dragFeedback || stageHint.title }}</strong>
+              <span v-if="!dragFeedback">{{ stageHint.detail }}</span>
+            </span>
+            <button v-if="pendingFlower" type="button" class="fc-hint-cancel" aria-label="Cancel placing" @click="pendingFlower = null">
+              <BcIcon name="x" />
+            </button>
+          </div>
         </main>
 
-        <aside v-if="!isRightSidebarCollapsed" class="fc-panel fc-side">
-          <section class="fc-section">
-            <div class="fc-panel-head"><h2>Placed Flowers</h2><span>{{ placedFlowers.length }}/{{ MAX_FLOWERS }}<template v-if="placedFillers.length"> · {{ placedFillers.length }} filler{{ placedFillers.length === 1 ? "" : "s" }}</template></span></div>
-            <div v-if="!selectedFlowers.length" class="fc-empty">No flowers placed yet.</div>
-            <div v-else class="fc-list">
-              <div
-                v-for="selection in selectedFlowers"
-                :key="selection.sceneId"
-                class="fc-selection"
-                :class="{ active: selectedSceneId === selection.sceneId }"
-                @click="selectPlacedFlower(selection.sceneId)"
-              >
-                <div class="fc-selection-copy">
-                  <div class="fc-selection-title">
-                    <strong>{{ selection.product_name }}</strong>
-                    <span class="fc-lock-chip" :class="{ locked: selection.locked }">
-                      <span v-if="selection.locked">&#128274;</span>
-                      <span v-else>&#128275;</span>
-                      {{ selection.locked ? "Locked" : "Unlocked" }}
+        <!-- Inspector -->
+        <aside v-if="!isRightSidebarCollapsed" class="fc-panel fc-inspector" aria-label="Bouquet details">
+          <div class="fc-inspector-scroll">
+            <section class="fc-section">
+              <div class="fc-panel-head">
+                <h2>On the bouquet</h2>
+                <span v-if="selectedFlowers.length">{{ selectedFlowers.length }} item{{ selectedFlowers.length === 1 ? "" : "s" }}</span>
+              </div>
+              <p v-if="!selectedFlowers.length" class="fc-note">Nothing placed yet. Pick a flower on the left, then click the wrap.</p>
+              <ul v-else class="fc-placed">
+                <li
+                  v-for="selection in selectedFlowers"
+                  :key="selection.sceneId"
+                  class="fc-placed-row"
+                  :class="{ active: selectedSceneId === selection.sceneId }"
+                >
+                  <button type="button" class="fc-placed-main" @click="selectPlacedFlower(selection.sceneId)">
+                    <span class="fc-placed-thumb">
+                      <img v-if="selection.kind !== 'filler' && flowerImage(selection.id)" :src="flowerImage(selection.id)" alt="" />
+                      <BcIcon v-else :name="selection.kind === 'filler' ? 'leaf' : 'flower'" />
                     </span>
+                    <span class="fc-placed-copy">
+                      <strong>{{ selection.product_name }}</strong>
+                      <small>{{ selection.kind === "filler" ? "Filler" : "Stem" }} · {{ formatPeso(selection.price) }}</small>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="fc-mini"
+                    :class="{ on: selection.locked }"
+                    :aria-label="selection.locked ? `Unlock ${selection.product_name}` : `Lock ${selection.product_name}`"
+                    :title="selection.locked ? 'Unlock position' : 'Lock position'"
+                    @click="toggleFlowerLock(selection.sceneId)"
+                  >
+                    <BcIcon :name="selection.locked ? 'lock' : 'unlock'" />
+                  </button>
+                  <button
+                    type="button"
+                    class="fc-mini danger"
+                    :aria-label="`Remove ${selection.product_name}`"
+                    title="Remove"
+                    @click="removeFlower(selection.sceneId)"
+                  >
+                    <BcIcon name="trash" />
+                  </button>
+                </li>
+              </ul>
+            </section>
+
+            <section class="fc-section">
+              <div class="fc-panel-head">
+                <h2>Adjust</h2>
+                <span v-if="selectedFlower" class="fc-truncate">{{ selectedFlower.product_name }}</span>
+              </div>
+              <p v-if="!selectedFlower" class="fc-note">Select something on the bouquet to resize, turn or move it.</p>
+
+              <div v-else class="fc-adjust">
+                <button
+                  type="button"
+                  class="fc-switch"
+                  role="switch"
+                  :aria-checked="selectedFlower.locked"
+                  @click="toggleSelectedLock"
+                >
+                  <span class="fc-switch-copy">
+                    <strong><BcIcon :name="selectedFlower.locked ? 'lock' : 'unlock'" /> Hold position</strong>
+                    <small>{{ selectedFlower.locked ? "Dragging and arrows are off." : "Drag it on the wrap or use the arrows." }}</small>
+                  </span>
+                  <span class="fc-switch-track"><span class="fc-switch-knob"></span></span>
+                </button>
+
+                <div class="fc-control">
+                  <div class="fc-control-head">
+                    <label for="fc-size">Size</label>
+                    <output>{{ Number(selectedFlower.scale ?? 1).toFixed(2) }}&times;</output>
                   </div>
-                  <p>PHP {{ selection.price.toFixed(2) }}<template v-if="selection.kind === 'filler'"> · Filler</template></p>
+                  <input
+                    id="fc-size"
+                    class="fc-range"
+                    type="range"
+                    min="0.25"
+                    max="2"
+                    step="0.01"
+                    :value="selectedFlower.scale ?? 1"
+                    :style="rangeFill(selectedFlower.scale ?? 1, 0.25, 2)"
+                    @input="updateSelectedScale(Number($event.target.value))"
+                  />
                 </div>
-                <div class="fc-selection-actions">
-                  <button class="fc-icon-action" :class="{ locked: selection.locked }" @click.stop="toggleFlowerLock(selection.sceneId)">
-                    <span v-if="selection.locked">&#128274;</span>
-                    <span v-else>&#128275;</span>
-                  </button>
-                  <button class="fc-icon-action danger" @click.stop="removeFlower(selection.sceneId)">
-                    <span>&#128465;</span>
-                  </button>
+
+                <div class="fc-control">
+                  <div class="fc-control-head">
+                    <label for="fc-tilt">Tilt</label>
+                    <output>{{ Math.round(selectedFlower.rotation.xDeg) }}&deg;</output>
+                  </div>
+                  <div class="fc-control-row">
+                    <button type="button" class="fc-step" aria-label="Tilt back 15 degrees" @click="nudgeSelectedRotation('x', -15)"><BcIcon name="minus" /></button>
+                    <input
+                      id="fc-tilt"
+                      class="fc-range"
+                      type="range"
+                      min="-180"
+                      max="180"
+                      :value="selectedFlower.rotation.xDeg"
+                      :style="rangeFill(selectedFlower.rotation.xDeg, -180, 180)"
+                      @input="updateSelectedRotation('x', Number($event.target.value))"
+                    />
+                    <button type="button" class="fc-step" aria-label="Tilt forward 15 degrees" @click="nudgeSelectedRotation('x', 15)"><BcIcon name="plus" /></button>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </section>
 
-          <section class="fc-section">
-            <div class="fc-panel-head"><h2>Wrapper</h2><span>{{ selectedWrapper ? selectedWrapper.name : paperColor.toUpperCase() }}</span></div>
-            <div v-if="wrapperOptions.length" class="fc-options">
-              <button
-                v-for="option in wrapperOptions"
-                :key="option.id"
-                type="button"
-                class="fc-option"
-                :class="{ active: selectedWrapperId === option.id }"
-                :aria-pressed="selectedWrapperId === option.id"
-                @click="selectWrapper(option)"
-              >
-                <span class="fc-option-swatch" :style="{ background: option.color_hex }"></span>
-                <span class="fc-option-copy">
-                  <strong>{{ option.name }}</strong>
-                  <small v-if="option.description">{{ option.description }}</small>
-                </span>
-                <span class="fc-option-price">{{ option.price ? `+ ${formatPeso(option.price)}` : "Free" }}</span>
-              </button>
-            </div>
-            <template v-else>
-              <div class="fc-swatches">
-                <button v-for="color in paperPresets" :key="color" class="fc-swatch" :class="{ active: paperColor === color }" :style="{ background: color }" @click="applyPaperColor(color)"></button>
-              </div>
-              <input v-model="paperColor" class="fc-input" type="color" @input="applyPaperColor(paperColor)" />
-            </template>
-          </section>
+                <div class="fc-control">
+                  <div class="fc-control-head">
+                    <label for="fc-turn">Turn</label>
+                    <output>{{ Math.round(selectedFlower.rotation.yDeg) }}&deg;</output>
+                  </div>
+                  <div class="fc-control-row">
+                    <button type="button" class="fc-step" aria-label="Turn left 15 degrees" @click="nudgeSelectedRotation('y', -15)"><BcIcon name="minus" /></button>
+                    <input
+                      id="fc-turn"
+                      class="fc-range"
+                      type="range"
+                      min="-180"
+                      max="180"
+                      :value="selectedFlower.rotation.yDeg"
+                      :style="rangeFill(selectedFlower.rotation.yDeg, -180, 180)"
+                      @input="updateSelectedRotation('y', Number($event.target.value))"
+                    />
+                    <button type="button" class="fc-step" aria-label="Turn right 15 degrees" @click="nudgeSelectedRotation('y', 15)"><BcIcon name="plus" /></button>
+                  </div>
+                </div>
 
-          <section class="fc-section">
-            <div class="fc-panel-head"><h2>Transform</h2><span>{{ selectedFlower ? selectedFlower.product_name : "Select a flower" }}</span></div>
-            <div v-if="!selectedFlower" class="fc-empty">Select a placed flower, then drag it on the bouquet or rotate it here.</div>
-            <div v-else class="fc-transform">
-              <div class="fc-transform-actions single">
-                <button class="fc-btn fc-btn-lock" :class="{ locked: selectedFlower.locked }" @click="toggleSelectedLock">
-                  {{ selectedFlower.locked ? "Unlock Flower Position" : "Lock Flower Position" }}
+                <div class="fc-move">
+                  <div class="fc-move-copy">
+                    <span>Position</span>
+                    <small>Moves in small steps</small>
+                  </div>
+                  <div class="fc-pad" :class="{ locked: selectedFlower.locked }">
+                    <button type="button" class="fc-pad-up" aria-label="Move up" :disabled="selectedFlower.locked" @click="nudgeSelectedPosition('up')"><BcIcon name="arrowUp" /></button>
+                    <button type="button" class="fc-pad-left" aria-label="Move left" :disabled="selectedFlower.locked" @click="nudgeSelectedPosition('left')"><BcIcon name="arrowLeft" /></button>
+                    <button type="button" class="fc-pad-right" aria-label="Move right" :disabled="selectedFlower.locked" @click="nudgeSelectedPosition('right')"><BcIcon name="arrowRight" /></button>
+                    <button type="button" class="fc-pad-down" aria-label="Move down" :disabled="selectedFlower.locked" @click="nudgeSelectedPosition('down')"><BcIcon name="arrowDown" /></button>
+                  </div>
+                </div>
+
+                <button type="button" class="fc-text-btn" @click="resetSelectedTransform">
+                  <BcIcon name="reset" /> Reset size and angle
                 </button>
               </div>
-              <div class="fc-lock-status" :class="{ locked: selectedFlower.locked }">
-                <span class="fc-lock-dot"></span>
-                <strong>{{ selectedFlower.locked ? "Movement locked" : "Movement unlocked" }}</strong>
-                <span>{{ selectedFlower.locked ? "Drag and arrow controls are disabled." : "Drag the flower or nudge it with the arrows below." }}</span>
-              </div>
-              <label class="fc-transform-row">
-                <span>Flower Size</span>
-                <strong>{{ Number(selectedFlower.scale ?? 1).toFixed(2) }}&times;</strong>
-              </label>
-              <input class="fc-range" type="range" min="0.25" max="2" step="0.01" :value="selectedFlower.scale ?? 1" @input="updateSelectedScale(Number($event.target.value))" />
-              <div class="fc-range-caption"><span>Small</span><span>Large</span></div>
-              <label class="fc-transform-row">
-                <span>Rotate X</span>
-                <strong>{{ Math.round(selectedFlower.rotation.xDeg) }}&deg;</strong>
-              </label>
-              <input class="fc-range" type="range" min="-180" max="180" :value="selectedFlower.rotation.xDeg" @input="updateSelectedRotation('x', Number($event.target.value))" />
-              <label class="fc-transform-row">
-                <span>Rotate Y</span>
-                <strong>{{ Math.round(selectedFlower.rotation.yDeg) }}&deg;</strong>
-              </label>
-              <input class="fc-range" type="range" min="-180" max="180" :value="selectedFlower.rotation.yDeg" @input="updateSelectedRotation('y', Number($event.target.value))" />
-              <div class="fc-transform-actions">
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('x', -15)">X -15&deg;</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('x', 15)">X +15&deg;</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('y', -15)">Y -15&deg;</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedRotation('y', 15)">Y +15&deg;</button>
-              </div>
-              <div class="fc-transform-grid">
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('up')">Up</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('left')">Left</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('down')">Down</button>
-                <button class="fc-btn fc-btn-light" @click="nudgeSelectedPosition('right')">Right</button>
-              </div>
-              <button class="fc-btn fc-btn-light full" @click="resetSelectedTransform">Reset Selected Flower</button>
-            </div>
-          </section>
+            </section>
 
-          <section class="fc-section">
-            <div class="fc-panel-head"><h2>Ribbon</h2><span>{{ selectedRibbon ? selectedRibbon.name : ribbonColor.toUpperCase() }}</span></div>
-            <div v-if="ribbonOptions.length" class="fc-options">
+            <section class="fc-section">
+              <div class="fc-panel-head">
+                <h2>Wrapper</h2>
+                <span>{{ wrap.outer.color || wrap.inner.color ? "Custom" : "Original paper" }}</span>
+              </div>
+
+              <div class="fc-segment" role="tablist" aria-label="Wrapper layer">
+                <button
+                  v-for="layer in WRAP_LAYERS"
+                  :key="layer.key"
+                  type="button"
+                  role="tab"
+                  class="fc-segment-btn"
+                  :class="{ active: activeWrapLayer === layer.key }"
+                  :aria-selected="activeWrapLayer === layer.key"
+                  @click="activeWrapLayer = layer.key"
+                >
+                  <span class="fc-segment-dot" :style="{ background: wrap[layer.key].color || ORIGINAL_WRAP[layer.key] }"></span>
+                  {{ layer.label }}
+                </button>
+              </div>
+
+              <div v-if="wrapperOptions.length" class="fc-options" role="radiogroup" :aria-label="`${activeWrapLayer === 'outer' ? 'Outer' : 'Inner'} wrapper`">
+                <button
+                  type="button"
+                  role="radio"
+                  class="fc-option"
+                  :class="{ active: !activeWrap.id && !activeWrap.color }"
+                  :aria-checked="!activeWrap.id && !activeWrap.color"
+                  @click="selectWrapper(activeWrapLayer, null)"
+                >
+                  <span class="fc-option-swatch" :style="{ background: ORIGINAL_WRAP[activeWrapLayer] }"></span>
+                  <span class="fc-option-copy">
+                    <strong>Original</strong>
+                    <small>The paper this bouquet comes with</small>
+                  </span>
+                  <span class="fc-option-price">Free</span>
+                  <BcIcon v-if="!activeWrap.id && !activeWrap.color" name="check" class="fc-option-check" />
+                </button>
+                <button
+                  v-for="option in wrapperOptions"
+                  :key="option.id"
+                  type="button"
+                  role="radio"
+                  class="fc-option"
+                  :class="{ active: activeWrap.id === option.id }"
+                  :aria-checked="activeWrap.id === option.id"
+                  @click="selectWrapper(activeWrapLayer, option)"
+                >
+                  <span class="fc-option-swatch" :style="{ background: option.color_hex }"></span>
+                  <span class="fc-option-copy">
+                    <strong>{{ option.name }}</strong>
+                    <small v-if="option.description">{{ option.description }}</small>
+                  </span>
+                  <span class="fc-option-price">{{ option.price ? `+${formatPeso(option.price)}` : "Free" }}</span>
+                  <BcIcon v-if="activeWrap.id === option.id" name="check" class="fc-option-check" />
+                </button>
+              </div>
+              <div v-else class="fc-swatches">
+                <button
+                  type="button"
+                  class="fc-swatch fc-swatch-original"
+                  :class="{ active: !activeWrap.color }"
+                  :style="{ background: ORIGINAL_WRAP[activeWrapLayer] }"
+                  title="Original paper"
+                  aria-label="Original paper"
+                  @click="applyWrapColor(activeWrapLayer, null)"
+                ><BcIcon name="reset" /></button>
+                <button
+                  v-for="color in paperPresets"
+                  :key="color"
+                  type="button"
+                  class="fc-swatch"
+                  :class="{ active: activeWrap.color === color }"
+                  :style="{ background: color }"
+                  :aria-label="`${activeWrapLayer === 'outer' ? 'Outer' : 'Inner'} wrapper colour ${color}`"
+                  @click="pickWrapPreset(color)"
+                ></button>
+                <label class="fc-swatch fc-swatch-custom" title="Custom colour">
+                  <span class="bc-sr-only">Custom wrapper colour</span>
+                  <input type="color" :value="activeWrap.color || ORIGINAL_WRAP[activeWrapLayer]" @input="pickWrapPreset($event.target.value)" />
+                  <BcIcon name="plus" />
+                </label>
+              </div>
+            </section>
+
+            <section class="fc-section">
+              <div class="fc-panel-head">
+                <h2>Ribbon</h2>
+                <span v-if="!ribbonOptions.length">{{ ribbonColor.toUpperCase() }}</span>
+              </div>
+              <div v-if="ribbonOptions.length" class="fc-options" role="radiogroup" aria-label="Ribbon">
+                <button
+                  v-for="option in ribbonOptions"
+                  :key="option.id"
+                  type="button"
+                  role="radio"
+                  class="fc-option"
+                  :class="{ active: selectedRibbonId === option.id }"
+                  :aria-checked="selectedRibbonId === option.id"
+                  @click="selectRibbon(option)"
+                >
+                  <span class="fc-option-swatch" :style="{ background: option.color_hex }"></span>
+                  <span class="fc-option-copy">
+                    <strong>{{ option.name }}</strong>
+                    <small v-if="option.description">{{ option.description }}</small>
+                  </span>
+                  <span class="fc-option-price">{{ option.price ? `+${formatPeso(option.price)}` : "Free" }}</span>
+                  <BcIcon v-if="selectedRibbonId === option.id" name="check" class="fc-option-check" />
+                </button>
+              </div>
+              <div v-else class="fc-swatches">
+                <button
+                  v-for="color in ribbonPresets"
+                  :key="color"
+                  type="button"
+                  class="fc-swatch"
+                  :class="{ active: ribbonColor === color }"
+                  :style="{ background: color }"
+                  :aria-label="`Ribbon colour ${color}`"
+                  @click="applyRibbonColor(color)"
+                ></button>
+                <label class="fc-swatch fc-swatch-custom" title="Custom colour">
+                  <span class="bc-sr-only">Custom ribbon colour</span>
+                  <input v-model="ribbonColor" type="color" @input="applyRibbonColor(ribbonColor)" />
+                  <BcIcon name="plus" />
+                </label>
+              </div>
+            </section>
+          </div>
+
+          <footer class="fc-order">
+            <dl class="fc-receipt">
+              <div><dt>Stems ({{ placedFlowers.length }})</dt><dd>{{ formatPeso(flowersSubtotal) }}</dd></div>
+              <div v-if="placedFillers.length"><dt>Fillers ({{ placedFillers.length }})</dt><dd>{{ formatPeso(fillersSubtotal) }}</dd></div>
+              <div v-if="selectedOuterWrapper"><dt>Outer: {{ selectedOuterWrapper.name }}</dt><dd>{{ selectedOuterWrapper.price ? formatPeso(selectedOuterWrapper.price) : "Free" }}</dd></div>
+              <div v-if="selectedInnerWrapper"><dt>Inner: {{ selectedInnerWrapper.name }}</dt><dd>{{ selectedInnerWrapper.price ? formatPeso(selectedInnerWrapper.price) : "Free" }}</dd></div>
+              <div v-if="selectedRibbon"><dt>{{ selectedRibbon.name }}</dt><dd>{{ selectedRibbon.price ? formatPeso(selectedRibbon.price) : "Free" }}</dd></div>
+              <div class="fc-receipt-total"><dt>Total</dt><dd>{{ formatPeso(totalPrice) }}</dd></div>
+            </dl>
+            <div class="fc-order-actions">
+              <button type="button" class="bc-btn bc-btn--dark fc-order-btn" :disabled="!placedFlowers.length || isCheckingOut" @click="checkout">
+                {{ isCheckingOut ? "Processing" : "Checkout" }}
+              </button>
               <button
-                v-for="option in ribbonOptions"
-                :key="option.id"
                 type="button"
-                class="fc-option"
-                :class="{ active: selectedRibbonId === option.id }"
-                :aria-pressed="selectedRibbonId === option.id"
-                @click="selectRibbon(option)"
+                class="bc-btn fc-order-btn fc-order-btn-outline"
+                :disabled="!placedFlowers.length || isCheckingOut"
+                @click="addCart"
               >
-                <span class="fc-option-swatch" :style="{ background: option.color_hex }"></span>
-                <span class="fc-option-copy">
-                  <strong>{{ option.name }}</strong>
-                  <small v-if="option.description">{{ option.description }}</small>
-                </span>
-                <span class="fc-option-price">{{ option.price ? `+ ${formatPeso(option.price)}` : "Free" }}</span>
+                <BcIcon name="bag" />
+                {{ editingCartItemId ? "Update cart" : "Add to cart" }}
               </button>
             </div>
-            <template v-else>
-              <div class="fc-swatches">
-                <button v-for="color in ribbonPresets" :key="color" class="fc-swatch" :class="{ active: ribbonColor === color }" :style="{ background: color }" @click="applyRibbonColor(color)"></button>
-              </div>
-              <input v-model="ribbonColor" class="fc-input" type="color" @input="applyRibbonColor(ribbonColor)" />
-            </template>
-          </section>
-
-          <section class="fc-section">
-            <div class="fc-panel-head"><h2>Summary</h2><span>Live total</span></div>
-            <div class="fc-summary"><span>Store</span><strong>{{ storeName || "Not set" }}</strong></div>
-            <div class="fc-summary"><span>Owner ID</span><strong>{{ vendorOwnerId || "Missing" }}</strong></div>
-            <div class="fc-summary"><span>Flowers</span><strong>{{ placedFlowers.length }}/{{ MAX_FLOWERS }}</strong></div>
-            <div v-if="placedFillers.length" class="fc-summary"><span>Fillers</span><strong>{{ placedFillers.length }}</strong></div>
-            <div v-if="selectedWrapper" class="fc-summary"><span>Wrapper</span><strong>{{ selectedWrapper.name }}{{ selectedWrapper.price ? ` (+ ${formatPeso(selectedWrapper.price)})` : "" }}</strong></div>
-            <div v-if="selectedRibbon" class="fc-summary"><span>Ribbon</span><strong>{{ selectedRibbon.name }}{{ selectedRibbon.price ? ` (+ ${formatPeso(selectedRibbon.price)})` : "" }}</strong></div>
-            <div class="fc-summary total"><span>Total</span><strong>PHP {{ totalPrice.toFixed(2) }}</strong></div>
-            <button class="fc-btn fc-btn-primary" @click="checkout" :disabled="!placedFlowers.length || isCheckingOut">{{ isCheckingOut ? "Processing..." : "Proceed to Checkout" }}</button>
-            <button class="fc-btn fc-btn-light full" @click="addCart" :disabled="!placedFlowers.length || isCheckingOut">{{ editingCartItemId ? "Update Custom Bouquet" : "Add to Cart" }}</button>
-          </section>
+            <p v-if="!placedFlowers.length" class="fc-order-hint">Add at least one stem to continue.</p>
+          </footer>
         </aside>
       </div>
     </div>
 
-    <transition name="fade"><div v-if="toast.show" class="fc-toast" :class="toast.type">{{ toast.message }}</div></transition>
+    <transition name="fc-toast">
+      <div v-if="toast.show" class="fc-toast" :class="toast.type" role="status">
+        <BcIcon :name="toast.type === 'error' ? 'info' : 'check'" />
+        <span>{{ toast.message }}</span>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, h, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import api from "../../plugins/axios.js";
+import { dressBouquet } from "../../utils/bouquetDressing.js";
 import NavHeader from "../../layouts/NavHeader.vue";
 import { useAuth } from "../../composables/useAuth";
 import { useCart } from "../../composables/useCart";
 import { toast as toastify } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
+import "../../styles/bloomcraft.css";
+
+// Line icons drawn on a 24px grid with a 1.5 stroke, matching Shop.vue.
+const ICONS = {
+  search: [["circle", { cx: 11, cy: 11, r: 6.5 }], ["path", { d: "m16 16 4 4" }]],
+  panelLeft: [["rect", { x: 3, y: 4, width: 18, height: 16, rx: 2 }], ["path", { d: "M9 4v16" }]],
+  panelRight: [["rect", { x: 3, y: 4, width: 18, height: 16, rx: 2 }], ["path", { d: "M15 4v16" }]],
+  maximize: [["path", { d: "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" }]],
+  minimize: [["path", { d: "M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" }]],
+  camera: [["path", { d: "M4 8h3l2-3h6l2 3h3v11H4z" }], ["circle", { cx: 12, cy: 13, r: 3.5 }]],
+  reset: [["path", { d: "M4 12a8 8 0 1 0 2.4-5.7L4 8.5" }], ["path", { d: "M4 4v4.5h4.5" }]],
+  rotate: [["path", { d: "M20 12a8 8 0 1 1-2.4-5.7L20 8.5" }], ["path", { d: "M20 4v4.5h-4.5" }]],
+  lock: [["rect", { x: 5, y: 11, width: 14, height: 9, rx: 2 }], ["path", { d: "M8 11V8a4 4 0 0 1 8 0v3" }]],
+  unlock: [["rect", { x: 5, y: 11, width: 14, height: 9, rx: 2 }], ["path", { d: "M8 11V8a4 4 0 0 1 7.6-1.7" }]],
+  trash: [["path", { d: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" }]],
+  arrowUp: [["path", { d: "M12 19V5M6 11l6-6 6 6" }]],
+  arrowDown: [["path", { d: "M12 5v14M6 13l6 6 6-6" }]],
+  arrowLeft: [["path", { d: "M19 12H5M11 6l-6 6 6 6" }]],
+  arrowRight: [["path", { d: "M5 12h14M13 6l6 6-6 6" }]],
+  plus: [["path", { d: "M12 5v14M5 12h14" }]],
+  minus: [["path", { d: "M5 12h14" }]],
+  check: [["path", { d: "m5 12.5 4.5 4.5L19 7.5" }]],
+  x: [["path", { d: "M6 6l12 12M18 6 6 18" }]],
+  info: [["circle", { cx: 12, cy: 12, r: 9 }], ["path", { d: "M12 11v5M12 8h.01" }]],
+  bag: [["path", { d: "M5 8h14l-1 12H6z" }], ["path", { d: "M9 8V6.5a3 3 0 0 1 6 0V8" }]],
+  move: [["path", { d: "M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" }]],
+  target: [["circle", { cx: 12, cy: 12, r: 7 }], ["circle", { cx: 12, cy: 12, r: 2 }], ["path", { d: "M12 2v3M12 19v3M2 12h3M19 12h3" }]],
+  leaf: [["path", { d: "M5 19c0-8 5-14 14-14 0 9-6 14-14 14z" }], ["path", { d: "M5 19l7.5-7.5" }]],
+  flower: [
+    ["circle", { cx: 12, cy: 9, r: 2 }],
+    ["path", { d: "M12 7a2.5 2.5 0 1 1 0-5 2.5 2.5 0 1 1 0 5M14 9a2.5 2.5 0 1 1 5 0 2.5 2.5 0 1 1-5 0M12 11a2.5 2.5 0 1 1 0 5 2.5 2.5 0 1 1 0-5M10 9a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0" }],
+    ["path", { d: "M12 16v6M12 19.5c-1.5-1.8-3.5-2.2-5-1.8" }],
+  ],
+};
+const BcIcon = (props) =>
+  h(
+    "svg",
+    { class: "fc-icon", viewBox: "0 0 24 24", "aria-hidden": "true", focusable: "false" },
+    (ICONS[props.name] || []).map(([tag, attrs]) => h(tag, attrs)),
+  );
+BcIcon.props = ["name"];
 
 const MAX_FLOWERS = 3;
 const MAX_FILLERS = 5;
 // Used only when the vendor has not added their own wrappers or ribbons.
 const paperPresets = ["#d3b18f", "#f3e9dc", "#d7d2c8", "#e2c7cf", "#c8b6a6"];
+// Approximate colours of the model's own papers, for the "Original" swatch.
+const ORIGINAL_WRAP = { outer: "#d6b68c", inner: "#ab9196" };
+const WRAP_LAYERS = [
+  { key: "outer", label: "Outer" },
+  { key: "inner", label: "Inner" },
+];
 const ribbonPresets = ["#caa6d9", "#d95f76", "#7d8f69", "#f0dfb2", "#6c5b7b"];
 
 const route = useRoute();
@@ -322,7 +618,9 @@ const flowers = ref([]);
 const fillers = ref([]);
 const wrapperOptions = ref([]);
 const ribbonOptions = ref([]);
-const selectedWrapperId = ref(null);
+// Each wrap layer: the vendor option picked (id) and its colour; null colour = original paper.
+const wrap = reactive({ outer: { id: null, color: null }, inner: { id: null, color: null } });
+const activeWrapLayer = ref("outer");
 const selectedRibbonId = ref(null);
 const loadingFlowers = ref(false);
 const search = ref("");
@@ -336,7 +634,6 @@ const isLeftSidebarCollapsed = ref(false);
 const isRightSidebarCollapsed = ref(false);
 const isFullscreen = ref(false);
 const dragFeedback = ref("");
-const paperColor = ref("#d3b18f");
 const ribbonColor = ref("#caa6d9");
 const wrapperScale = ref(1);
 const isLoading3D = ref(true);
@@ -362,19 +659,38 @@ const filteredFillers = computed(() => {
 // selectedFlowers holds every placed model; fillers are marked kind: "filler".
 const placedFlowers = computed(() => selectedFlowers.value.filter((item) => item.kind !== "filler"));
 const placedFillers = computed(() => selectedFlowers.value.filter((item) => item.kind === "filler"));
-const selectedWrapper = computed(() => wrapperOptions.value.find((option) => option.id === selectedWrapperId.value) || null);
+const findWrapper = (id) => wrapperOptions.value.find((option) => option.id === id) || null;
+const selectedOuterWrapper = computed(() => findWrapper(wrap.outer.id));
+const selectedInnerWrapper = computed(() => findWrapper(wrap.inner.id));
+const activeWrap = computed(() => wrap[activeWrapLayer.value]);
 const selectedRibbon = computed(() => ribbonOptions.value.find((option) => option.id === selectedRibbonId.value) || null);
-const extrasPrice = computed(() => Number(selectedWrapper.value?.price || 0) + Number(selectedRibbon.value?.price || 0));
+const extrasPrice = computed(
+  () => Number(selectedOuterWrapper.value?.price || 0) + Number(selectedInnerWrapper.value?.price || 0) + Number(selectedRibbon.value?.price || 0),
+);
 const totalPrice = computed(() => selectedFlowers.value.reduce((sum, flower) => sum + flower.price, 0) + extrasPrice.value);
 const selectedFlower = computed(() => selectedFlowers.value.find((flower) => flower.sceneId === selectedSceneId.value) || null);
+const flowersSubtotal = computed(() => placedFlowers.value.reduce((sum, flower) => sum + flower.price, 0));
+const fillersSubtotal = computed(() => placedFillers.value.reduce((sum, filler) => sum + filler.price, 0));
+const stemSlots = computed(() => Array.from({ length: MAX_FLOWERS }, (_, index) => placedFlowers.value[index] || null));
+const flowerImage = (flowerId) => flowers.value.find((flower) => flower.id === flowerId)?.image || null;
+const rangeFill = (value, min, max) => ({ "--fill": `${((Number(value) - min) / (max - min)) * 100}%` });
+const stageHint = computed(() => {
+  if (pendingFlower.value) return { title: `Click the wrap to place ${pendingFlower.value.product_name}`, detail: "A marker shows where it will land." };
+  if (selectedFlower.value) {
+    return selectedFlower.value.locked
+      ? { title: `${selectedFlower.value.product_name} is locked`, detail: "Unlock it in Adjust to move it again." }
+      : { title: `Drag ${selectedFlower.value.product_name} to move it`, detail: "Drag the background to rotate the view." };
+  }
+  if (placedFlowers.value.length >= MAX_FLOWERS) return { title: "All stems placed", detail: "Adjust them or choose a wrapper and ribbon." };
+  return { title: "Pick a flower, then click the wrap", detail: "Drag to rotate the view, scroll to zoom." };
+});
 
 let scene, camera, renderer, controls, bouquetRoot, flowerLayer, hoverMarker, animationFrameId = 0, pointerDown = null, transformDrag = null, toastTimer;
 const loader = new GLTFLoader();
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const bouquetTargets = [];
-const ribbonMaterials = new Set();
-const wrapperMaterials = new Set();
+let dressing = null;
 const modelCache = new Map();
 const placedObjects = new Map();
 
@@ -407,7 +723,7 @@ onUnmounted(() => {
 function initScene() {
   if (!viewerContainer.value) return;
   scene = new THREE.Scene();
-  scene.background = new THREE.Color("#b29f86");
+  scene.background = new THREE.Color("#ece6dd");
   camera = new THREE.PerspectiveCamera(42, viewerContainer.value.clientWidth / viewerContainer.value.clientHeight, 0.1, 100);
   camera.position.set(0, 2.1, 6.4);
   renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -429,11 +745,11 @@ function initScene() {
   key.shadow.mapSize.set(2048, 2048);
   const fill = new THREE.DirectionalLight(0xe2f0ff, 0.7);
   fill.position.set(-4, 3, -2);
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(10, 64), new THREE.ShadowMaterial({ opacity: 0.18 }));
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(10, 64), new THREE.ShadowMaterial({ opacity: 0.12 }));
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.02;
   ground.receiveShadow = true;
-  hoverMarker = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.45 }));
+  hoverMarker = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), new THREE.MeshStandardMaterial({ color: 0xb86558, emissive: 0xb86558, emissiveIntensity: 0.35 }));
   hoverMarker.visible = false;
   flowerLayer = new THREE.Group();
   scene.add(ambient, key, fill, ground, flowerLayer, hoverMarker);
@@ -454,23 +770,7 @@ async function loadBouquetModel() {
       child.castShadow = true;
       child.receiveShadow = true;
       bouquetTargets.push(child);
-      const materials = Array.isArray(child.material) ? child.material : [child.material];
-      const name = String(child.name || "").toLowerCase();
-      if (name.includes("ribbon") || name.includes("bow") || name.includes("lace")) {
-        materials.forEach((material) => ribbonMaterials.add(material));
-      } else if (name.includes("wrapper") || name.includes("wrap") || name.includes("paper")) {
-        materials.forEach((material) => wrapperMaterials.add(material));
-      }
     });
-
-    if (!wrapperMaterials.size) {
-      bouquetTargets.forEach((target) => {
-        const name = String(target.name || "").toLowerCase();
-        if (name.includes("ribbon") || name.includes("bow")) return;
-        const materials = Array.isArray(target.material) ? target.material : [target.material];
-        materials.forEach((material) => wrapperMaterials.add(material));
-      });
-    }
 
     const box = new THREE.Box3().setFromObject(bouquetRoot);
     const size = box.getSize(new THREE.Vector3());
@@ -482,8 +782,11 @@ async function loadBouquetModel() {
     bouquetRoot.position.y -= scaledBox.min.y;
     bouquetRoot.scale.multiplyScalar(wrapperScale.value);
     scene.add(bouquetRoot);
-    applyPaperColor(paperColor.value);
-    applyRibbonColor(ribbonColor.value);
+    // Only the two paper layers are tinted; the ribbon is generated.
+    dressing = dressBouquet(bouquetRoot);
+    dressing.outer.apply(wrap.outer.color);
+    dressing.inner.apply(wrap.inner.color);
+    dressing.applyRibbon(ribbonColor.value);
     sceneReady.value = true;
   } catch (error) {
     console.error("Failed to load bouquet base model:", error);
@@ -534,11 +837,13 @@ async function fetchCustomizationOptions() {
       model_3d_url: filler.model_url,
     }));
 
-    const savedWrapperId = Number(editingCustomization.value?.wrapper?.id || 0);
+    // Wrappers start on the bouquet's original paper unless a saved bouquet chose one.
+    const outerWrapper = findWrapper(Number(editingCustomization.value?.wrapper?.id || 0));
+    const innerWrapper = findWrapper(Number(editingCustomization.value?.inner_wrapper?.id || 0));
+    if (outerWrapper) selectWrapper("outer", outerWrapper);
+    if (innerWrapper) selectWrapper("inner", innerWrapper);
     const savedRibbonId = Number(editingCustomization.value?.ribbon?.id || 0);
-    const wrapper = wrapperOptions.value.find((option) => option.id === savedWrapperId) || wrapperOptions.value[0];
     const ribbon = ribbonOptions.value.find((option) => option.id === savedRibbonId) || ribbonOptions.value[0];
-    if (wrapper) selectWrapper(wrapper);
     if (ribbon) selectRibbon(ribbon);
   } catch (error) {
     // Fall back to the built-in colours if the vendor's items cannot be loaded.
@@ -546,9 +851,20 @@ async function fetchCustomizationOptions() {
   }
 }
 
-function selectWrapper(option) {
-  selectedWrapperId.value = option.id;
-  applyPaperColor(option.color_hex);
+// option null = the bouquet's original paper
+function selectWrapper(layer, option) {
+  wrap[layer].id = option?.id ?? null;
+  applyWrapColor(layer, option?.color_hex || null);
+}
+
+function applyWrapColor(layer, color) {
+  wrap[layer].color = color || null;
+  dressing?.[layer].apply(wrap[layer].color);
+}
+
+function pickWrapPreset(color) {
+  wrap[activeWrapLayer.value].id = null;
+  applyWrapColor(activeWrapLayer.value, color);
 }
 
 function selectRibbon(option) {
@@ -858,14 +1174,11 @@ function fitFlowerModel(model) {
   model.updateMatrixWorld(true);
 }
 
-function applyPaperColor(color) {
-  paperColor.value = color;
-  wrapperMaterials.forEach((material) => material?.color?.set(color));
-}
+
 
 function applyRibbonColor(color) {
   ribbonColor.value = color;
-  ribbonMaterials.forEach((material) => material?.color?.set(color));
+  dressing?.applyRibbon(color);
 }
 
 function removeFlower(sceneId) {
@@ -1051,11 +1364,13 @@ function buildBouquetCustomization() {
     bouquet_model_url: "/Boquet.glb",
     store_id: storeId.value,
     vendor_id: vendorOwnerId.value,
-    paper_color: paperColor.value,
+    paper_color: wrap.outer.color,
+    inner_paper_color: wrap.inner.color,
     ribbon_color: ribbonColor.value,
     wrapper_scale: wrapperScale.value,
     // Prices for these are looked up by id on the server.
-    wrapper: selectedWrapper.value ? { id: selectedWrapper.value.id, name: selectedWrapper.value.name } : null,
+    wrapper: selectedOuterWrapper.value ? { id: selectedOuterWrapper.value.id, name: selectedOuterWrapper.value.name } : null,
+    inner_wrapper: selectedInnerWrapper.value ? { id: selectedInnerWrapper.value.id, name: selectedInnerWrapper.value.name } : null,
     ribbon: selectedRibbon.value ? { id: selectedRibbon.value.id, name: selectedRibbon.value.name } : null,
     fillers: placedFillers.value.map((filler, index) => ({
       scene_id: filler.sceneId,
@@ -1142,7 +1457,8 @@ async function restoreBouquet(customization) {
       .sort(byOrder)
       .map((filler) => ({ ...filler, kind: "filler", product_id: filler.id, product_name: filler.name })),
   ];
-  applyPaperColor(selectedWrapper.value?.color_hex || customization.paper_color || paperColor.value);
+  applyWrapColor("outer", selectedOuterWrapper.value?.color_hex || customization.paper_color || null);
+  applyWrapColor("inner", selectedInnerWrapper.value?.color_hex || customization.inner_paper_color || null);
   applyRibbonColor(selectedRibbon.value?.color_hex || customization.ribbon_color || ribbonColor.value);
 
   for (const [index, savedFlower] of savedFlowers.entries()) {
@@ -1287,117 +1603,1541 @@ function showToast(message, type = "success") {
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
-* { box-sizing: border-box; font-family: "Poppins", sans-serif; }
-.fc-page { min-height: 100vh; background: radial-gradient(circle at top left, rgba(255,255,255,.5), transparent 32%), linear-gradient(135deg, #f5efe5 0%, #e9ded0 100%); color: #2f241b; }
-.fc-shell { padding: 96px 24px 24px; }
-.fc-topbar { max-width: 1500px; margin: 0 auto 18px; display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; }
-.fc-kicker { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #9e7250; }
-.fc-topbar h1 { margin: 0; font-size: 34px; line-height: 1.05; }
-.fc-subtitle { margin: 10px 0 0; color: #6c5b4b; }
-.fc-head-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
-.fc-layout { max-width: 1500px; margin: 0 auto; display: grid; grid-template-columns: 320px minmax(0,1fr) 340px; gap: 18px; min-height: calc(100vh - 160px); }
-.fc-layout.fullscreen { max-width: none; width: 100vw; min-height: 100vh; padding: 18px; background: radial-gradient(circle at top left, rgba(255,255,255,.18), transparent 34%), linear-gradient(135deg, #f5efe5 0%, #e9ded0 100%); }
-.fc-layout.left-collapsed { grid-template-columns: minmax(0,1fr) 340px; }
-.fc-layout.right-collapsed { grid-template-columns: 320px minmax(0,1fr); }
-.fc-layout.left-collapsed.right-collapsed { grid-template-columns: minmax(0,1fr); }
-.fc-panel, .fc-stage { min-height: 0; border-radius: 28px; }
-.fc-panel { background: rgba(255,255,255,.88); border: 1px solid rgba(122,92,60,.12); box-shadow: 0 18px 50px rgba(91,64,41,.08); padding: 20px; display: flex; flex-direction: column; backdrop-filter: blur(16px); }
-.fc-panel-head, .fc-row, .fc-summary, .fc-selection { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
-.fc-panel-head { margin-bottom: 14px; }
-.fc-panel-head h2, .fc-card strong, .fc-selection strong { margin: 0; font-size: 18px; }
-.fc-panel-head p, .fc-panel-head span, .fc-note { color: #7d6653; font-size: 13px; }
-.fc-pill, .fc-tag { padding: 8px 12px; border-radius: 999px; background: rgba(140,98,62,.12); color: #7e5331; font-size: 12px; font-weight: 600; }
-.fc-tag.ok { background: rgba(95,136,111,.14); color: #476653; }
-.fc-input { width: 100%; border: 1px solid rgba(122,92,60,.16); border-radius: 14px; padding: 12px 14px; background: #fff; color: #2f241b; margin-bottom: 16px; }
-.fc-list { display: grid; gap: 12px; overflow: auto; padding-right: 4px; }
-.fc-card { border: 1px solid rgba(122,92,60,.12); border-radius: 18px; padding: 16px; background: linear-gradient(180deg, #fffdf8 0%, #f6efe7 100%); cursor: pointer; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
-.fc-card:hover:not(.disabled) { transform: translateY(-2px); border-color: #c58957; box-shadow: 0 16px 30px rgba(140,98,62,.12); }
-.fc-card.active { border-color: #8b5e3c; box-shadow: 0 0 0 3px rgba(139,94,60,.12); }
-.fc-card.disabled { opacity: .45; cursor: not-allowed; }
-.fc-card.dragging { transform: scale(.98); }
-.fc-card-media { width: 100%; aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; margin-bottom: 12px; background: linear-gradient(135deg, rgba(243,233,220,.9), rgba(214,195,176,.8)); display: flex; align-items: center; justify-content: center; }
-.fc-card-image { width: 100%; height: 100%; object-fit: cover; display: block; }
-.fc-card-placeholder { font-size: 12px; font-weight: 600; letter-spacing: .04em; color: #8a6c52; text-transform: uppercase; }
-.fc-tags { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
-.fc-stage { position: relative; overflow: hidden; background: radial-gradient(circle at top, rgba(255,255,255,.24), transparent 40%), linear-gradient(180deg, #b39d83 0%, #aa9278 100%); border: 1px solid rgba(122,92,60,.14); box-shadow: inset 0 1px 0 rgba(255,255,255,.22); }
-.fc-stage.over { box-shadow: inset 0 0 0 2px rgba(255,255,255,.4), 0 0 0 4px rgba(197,137,87,.18); }
-.fc-stage-actions { position: absolute; top: 18px; right: 18px; z-index: 3; display: flex; gap: 10px; }
-.fc-stage .fc-viewer { width: 100%; height: 100%; min-height: 680px; cursor: grab; }
-.fc-stage.dragging .fc-viewer { cursor: grabbing; }
-.fc-layout:fullscreen { max-width: none; width: 100vw; height: 100vh; }
-.fc-layout:fullscreen .fc-viewer { min-height: calc(100vh - 36px); }
-.fc-layout:-webkit-full-screen { max-width: none; width: 100vw; height: 100vh; }
-.fc-layout:-webkit-full-screen .fc-viewer { min-height: calc(100vh - 36px); }
-.fc-overlay { position: absolute; left: 20px; right: 20px; pointer-events: none; display: flex; justify-content: center; }
-.fc-top { top: 20px; }
-.fc-center { inset: 0; align-items: center; }
-.fc-bottom { bottom: 20px; }
-.fc-status, .fc-modal { max-width: 460px; border-radius: 18px; padding: 14px 18px; background: rgba(255,255,255,.9); box-shadow: 0 16px 32px rgba(83,55,32,.12); backdrop-filter: blur(10px); text-align: center; }
-.fc-status { display: grid; gap: 4px; }
-.fc-status span, .fc-modal p { color: #6d5847; font-size: 13px; }
-.fc-section { border: 1px solid rgba(122,92,60,.1); border-radius: 20px; padding: 16px; background: rgba(255,252,247,.86); }
-.fc-side { gap: 16px; overflow-y: auto; padding-right: 8px; }
-.fc-selection { padding: 12px 14px; border-radius: 16px; background: #fff; border: 1px solid rgba(122,92,60,.08); cursor: pointer; transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; align-items: flex-start; }
-.fc-selection:hover { transform: translateY(-1px); border-color: rgba(139,94,60,.28); }
-.fc-selection.active { border-color: #8b5e3c; box-shadow: 0 0 0 3px rgba(139,94,60,.12); }
-.fc-selection p, .fc-card p { margin: 4px 0 0; color: #8a5b35; font-weight: 600; }
-.fc-selection-copy { min-width: 0; flex: 1; }
-.fc-selection-title { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
-.fc-selection-title strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fc-selection-actions { display: flex; gap: 8px; align-items: center; }
-.fc-lock-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: rgba(108, 159, 83, 0.12); color: #4c6d3d; font-size: 11px; font-weight: 700; white-space: nowrap; }
-.fc-lock-chip.locked { background: rgba(182, 82, 69, 0.12); color: #8a2f22; }
-.fc-icon-action { width: 42px; height: 42px; border: none; border-radius: 14px; background: rgba(95, 136, 111, 0.12); color: #476653; font-size: 18px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 10px 24px rgba(83,55,32,.08); }
-.fc-icon-action.locked { background: rgba(182, 82, 69, 0.12); color: #8a2f22; }
-.fc-icon-action.danger { background: rgba(194,92,79,.12); color: #9b4338; }
-.fc-transform { display: grid; gap: 12px; }
-.fc-transform-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #6c5a4c; }
-.fc-range { width: 100%; accent-color: #8b5e3c; }
-.fc-range-caption { display: flex; justify-content: space-between; margin-top: -8px; color: #9a8470; font-size: 11px; font-weight: 700; }
-.fc-transform-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.fc-transform-actions.single { grid-template-columns: 1fr; }
-.fc-btn-lock { border: 1px solid rgba(139, 94, 60, 0.22); background: linear-gradient(180deg, #fffaf6 0%, #f7ece1 100%); color: #6d4528; font-weight: 800; box-shadow: 0 10px 24px rgba(83,55,32,.08); }
-.fc-btn-lock.locked { border-color: rgba(126, 43, 31, 0.35); background: linear-gradient(180deg, #fff2ef 0%, #f6ddd7 100%); color: #8a2f22; }
-.fc-lock-status { display: grid; gap: 4px; padding: 12px 14px; border-radius: 16px; background: rgba(247, 236, 225, 0.8); color: #6d543f; font-size: 12px; }
-.fc-lock-status strong { display: flex; align-items: center; gap: 8px; color: #3f2b1d; font-size: 13px; }
-.fc-lock-status.locked { background: rgba(246, 221, 215, 0.9); color: #7a4036; }
-.fc-lock-dot { width: 10px; height: 10px; border-radius: 999px; background: #6c9f53; box-shadow: 0 0 0 4px rgba(108, 159, 83, 0.14); }
-.fc-lock-status.locked .fc-lock-dot { background: #b65245; box-shadow: 0 0 0 4px rgba(182, 82, 69, 0.14); }
-.fc-transform-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.fc-swatches { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-.fc-swatch { width: 34px; height: 34px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; box-shadow: 0 8px 20px rgba(57,36,17,.14); }
-.fc-swatch.active { border-color: #5e3f2a; }
-.fc-summary { padding: 10px 0; font-size: 14px; border-bottom: 1px solid rgba(122,92,60,.08); }
-.fc-summary.total { font-size: 18px; border-bottom: none; }
-.fc-btn { border: none; border-radius: 14px; cursor: pointer; transition: transform .2s ease, opacity .2s ease; padding: 10px 16px; }
-.fc-btn:disabled { opacity: .55; cursor: not-allowed; }
-.fc-icon-btn { border: none; border-radius: 999px; background: rgba(255,255,255,.92); color: #5f4734; font-size: 12px; font-weight: 600; padding: 10px 14px; cursor: pointer; box-shadow: 0 10px 24px rgba(83,55,32,.12); transition: transform .2s ease, opacity .2s ease; }
-.fc-icon-btn:disabled { opacity: .55; cursor: not-allowed; }
-.fc-btn-primary { width: 100%; margin-top: 12px; padding: 14px 16px; background: #8b5e3c; color: #fff; font-weight: 600; }
-.fc-btn-light { background: #fff; color: #60422c; box-shadow: 0 10px 30px rgba(90,60,35,.08); }
-.fc-btn-danger { background: rgba(194,92,79,.12); color: #9b4338; }
-.full { width: 100%; margin-top: 12px; }
-.fc-empty { padding: 18px; border-radius: 18px; background: rgba(142,109,73,.08); color: #6c5a4c; font-size: 14px; line-height: 1.6; }
-.fc-toast { position: fixed; right: 24px; bottom: 24px; padding: 14px 18px; border-radius: 16px; color: #fff; font-size: 14px; z-index: 40; box-shadow: 0 18px 30px rgba(63,42,26,.18); }
-.fc-toast.success { background: #587b61; }
-.fc-toast.error { background: #a5564d; }
-.fade-enter-active, .fade-leave-active { transition: opacity .2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-@media (max-width: 1220px) { .fc-layout { grid-template-columns: 280px minmax(0,1fr) 300px; } .fc-layout.left-collapsed { grid-template-columns: minmax(0,1fr) 300px; } .fc-layout.right-collapsed { grid-template-columns: 280px minmax(0,1fr); } }
-@media (max-width: 980px) { .fc-shell { padding-top: 88px; } .fc-topbar, .fc-layout, .fc-layout.left-collapsed, .fc-layout.right-collapsed, .fc-layout.left-collapsed.right-collapsed { display: grid; grid-template-columns: 1fr; } .fc-viewer { min-height: 520px; } }
-@media (max-width: 640px) { .fc-shell { padding-inline: 14px; } .fc-topbar h1 { font-size: 28px; } .fc-overlay { left: 12px; right: 12px; } }
-.fc-subhead { margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(47,36,27,.1); }
-.fc-subhead p { margin: 2px 0 0; font-size: 12px; opacity: .7; }
-.fc-desc { margin: 4px 0 0; font-size: 12px; line-height: 1.45; opacity: .75; }
-.fc-options { display: flex; flex-direction: column; gap: 8px; }
-.fc-option { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 1px solid rgba(47,36,27,.12); border-radius: 12px; background: rgba(255,255,255,.7); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .2s, background .2s; }
-.fc-option:hover { border-color: rgba(47,36,27,.3); }
-.fc-option.active { border-color: #2f241b; background: #fff; box-shadow: 0 0 0 1px #2f241b inset; }
-.fc-option:focus-visible { outline: 2px solid #2f241b; outline-offset: 2px; }
-.fc-option-swatch { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(0,0,0,.12); }
-.fc-option-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; }
-.fc-option-copy strong { font-size: 13px; font-weight: 600; }
-.fc-option-copy small { overflow: hidden; font-size: 11.5px; opacity: .7; text-overflow: ellipsis; white-space: nowrap; }
-.fc-option-price { flex-shrink: 0; font-size: 12px; font-weight: 600; }
+/* Tokens, type, buttons and skeletons come from src/styles/bloomcraft.css,
+   the same system Shop.vue uses. Only customizer layout lives here. */
+
+@layer bc-reset {
+  .fc-page :is(p, h1, h2, h3, ul, ol, dl, dd) {
+    margin: 0;
+  }
+
+  .fc-page :is(ul, ol) {
+    padding: 0;
+    list-style: none;
+  }
+}
+
+:global(body) {
+  margin: 0;
+}
+
+.fc-page {
+  /* Matches the Three.js scene background so the canvas sits flush */
+  --stage: #ece6dd;
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+
+  min-height: 100vh;
+  background: var(--ivory);
+  overflow-x: hidden;
+}
+
+.fc-page button,
+.fc-page input {
+  font-family: var(--font-sans);
+  color: inherit;
+}
+
+.fc-page :is(button, [role="button"], input, label):focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 2px;
+}
+
+.fc-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.fc-shell {
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: 116px clamp(16px, 2.4vw, 32px) 32px;
+}
+
+/* ============================================================
+   HEADER
+============================================================= */
+.fc-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.fc-store {
+  color: var(--rosewood-dark);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.fc-head h1 {
+  margin: 6px 0 10px;
+  font-size: clamp(40px, 4.4vw, 60px);
+}
+
+.fc-lede {
+  max-width: 520px;
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.fc-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-shrink: 0;
+}
+
+/* Stem slots echo the arched frame of the shop hero */
+.fc-stems {
+  display: flex;
+  gap: 8px;
+}
+
+.fc-stem {
+  width: 46px;
+  height: 58px;
+  border-radius: 999px 999px 8px 8px;
+  overflow: hidden;
+}
+
+.fc-stem-empty,
+.fc-stem button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.fc-stem-empty {
+  border: 1px dashed rgba(30, 27, 24, 0.22);
+  border-radius: inherit;
+  color: rgba(30, 27, 24, 0.28);
+}
+
+.fc-stem-empty .fc-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.fc-stem button {
+  padding: 0;
+  border: none;
+  border-radius: inherit;
+  background: var(--ivory-deep);
+  color: var(--rosewood-dark);
+  cursor: pointer;
+}
+
+.fc-stem img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fc-stem.active button {
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+.fc-head-total {
+  display: grid;
+  gap: 2px;
+  padding-left: 24px;
+  border-left: 1px solid var(--line);
+  text-align: right;
+}
+
+.fc-head-total span {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.fc-head-total strong {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* ============================================================
+   LAYOUT
+============================================================= */
+.fc-layout {
+  display: grid;
+  grid-template-columns: 312px minmax(0, 1fr) 348px;
+  gap: 16px;
+  height: calc(100vh - 140px);
+  min-height: 640px;
+}
+
+.fc-layout.left-collapsed {
+  grid-template-columns: minmax(0, 1fr) 348px;
+}
+
+.fc-layout.right-collapsed {
+  grid-template-columns: 312px minmax(0, 1fr);
+}
+
+.fc-layout.left-collapsed.right-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.fc-layout:fullscreen,
+.fc-layout.fullscreen {
+  width: 100vw;
+  height: 100vh;
+  padding: 16px;
+  background: var(--ivory);
+}
+
+.fc-layout:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  padding: 16px;
+  background: var(--ivory);
+}
+
+.fc-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--paper);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+}
+
+.fc-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.fc-panel-head h2 {
+  font-size: 24px;
+  white-space: nowrap;
+}
+
+.fc-panel-head > span {
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.fc-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-note {
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+/* ============================================================
+   CATALOG
+============================================================= */
+.fc-catalog {
+  padding: 20px 0 0;
+}
+
+.fc-catalog > .fc-panel-head,
+.fc-search {
+  margin-inline: 20px;
+}
+
+.fc-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-soft);
+  transition: border-color 0.3s;
+}
+
+.fc-search:focus-within {
+  border-color: var(--ink);
+}
+
+.fc-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.fc-search input::placeholder {
+  color: var(--ink-soft);
+  opacity: 0.8;
+}
+
+.fc-catalog-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px 20px;
+  scrollbar-width: thin;
+}
+
+.fc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 12px;
+}
+
+.fc-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.fc-tile-media {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 5;
+  margin-bottom: 10px;
+  overflow: hidden;
+  border-radius: 999px 999px var(--radius-md) var(--radius-md);
+  background: var(--ivory-deep);
+  transition: box-shadow 0.3s var(--ease-out);
+}
+
+.fc-tile-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s var(--ease-out);
+}
+
+.fc-tile-fallback {
+  width: 28px;
+  height: 28px;
+  color: var(--ink-soft);
+  opacity: 0.6;
+}
+
+.fc-tile:hover:not(.disabled) .fc-tile-media img {
+  transform: scale(1.04);
+}
+
+.fc-tile.active .fc-tile-media {
+  box-shadow: inset 0 0 0 2px var(--ink), 0 0 0 3px var(--paper), 0 0 0 4px var(--rosewood);
+}
+
+.fc-tile.disabled {
+  cursor: not-allowed;
+}
+
+.fc-tile.disabled .fc-tile-media {
+  filter: grayscale(0.7);
+  opacity: 0.55;
+}
+
+.fc-tile.dragging {
+  opacity: 0.5;
+}
+
+.fc-tile-count {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--ivory);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.fc-tile-name {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-tile-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fc-tile-stock {
+  opacity: 0.75;
+}
+
+.fc-tile-flag {
+  color: var(--rosewood-dark);
+  font-weight: 500;
+}
+
+.fc-tile.is-skeleton {
+  cursor: default;
+}
+
+.fc-tile.is-skeleton .fc-tile-media {
+  background: none;
+}
+
+.fc-skel-line {
+  height: 11px;
+  margin-top: 4px;
+  border-radius: 6px;
+}
+
+.fc-skel-line.short {
+  width: 55%;
+}
+
+.fc-subhead {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.fc-fillers {
+  display: grid;
+  gap: 6px;
+}
+
+.fc-filler {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.25s, border-color 0.25s;
+}
+
+.fc-filler:hover:not(.disabled) {
+  background: var(--ivory);
+}
+
+.fc-filler.active {
+  border-color: var(--ink);
+  background: var(--ivory);
+}
+
+.fc-filler.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.fc-filler-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--ivory-deep);
+  color: #5f7353;
+}
+
+.fc-filler-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fc-filler-copy strong {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.fc-filler-copy small,
+.fc-filler-price small {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-filler-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+/* ============================================================
+   STAGE
+============================================================= */
+.fc-stage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--stage);
+  transition: box-shadow 0.3s var(--ease-out);
+}
+
+.fc-stage.over {
+  box-shadow: inset 0 0 0 2px var(--rosewood);
+}
+
+.fc-viewer {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+
+.fc-stage.placing .fc-viewer {
+  cursor: crosshair;
+}
+
+.fc-stage.dragging .fc-viewer {
+  cursor: grabbing;
+}
+
+.fc-toolbar {
+  position: absolute;
+  top: 16px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(250, 248, 244, 0.86);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.fc-toolbar-left {
+  left: 16px;
+}
+
+.fc-toolbar-right {
+  right: 16px;
+}
+
+.fc-toolbar-rule {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--line);
+}
+
+.fc-tool {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.25s, color 0.25s;
+}
+
+.fc-tool:hover:not(:disabled) {
+  background: var(--ivory-deep);
+}
+
+.fc-tool.on {
+  color: var(--rosewood-dark);
+}
+
+.fc-tool:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Tooltip */
+.fc-tool::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--ivory);
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -4px);
+  transition: opacity 0.2s, transform 0.2s var(--ease-out);
+}
+
+.fc-toolbar-right .fc-tool:last-child::after {
+  left: auto;
+  right: 0;
+  transform: translate(0, -4px);
+}
+
+.fc-toolbar-left .fc-tool::after {
+  left: 0;
+  transform: translate(0, -4px);
+}
+
+.fc-tool:is(:hover, :focus-visible):not(:disabled)::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.fc-toolbar-right .fc-tool:last-child:is(:hover, :focus-visible)::after,
+.fc-toolbar-left .fc-tool:is(:hover, :focus-visible)::after {
+  transform: translate(0, 0);
+}
+
+.fc-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 10px 18px 10px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(250, 248, 244, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transform: translateX(-50%);
+  transition: background 0.3s, color 0.3s;
+}
+
+.fc-hint > .fc-icon {
+  color: var(--rosewood);
+}
+
+.fc-hint.live {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--ivory);
+}
+
+.fc-hint.live > .fc-icon {
+  color: var(--gold);
+}
+
+.fc-hint-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.fc-hint-copy strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.fc-hint-copy span {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.fc-hint.live .fc-hint-copy span {
+  color: rgba(244, 241, 236, 0.7);
+}
+
+.fc-hint-cancel {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-right: -8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(244, 241, 236, 0.12);
+  cursor: pointer;
+}
+
+.fc-hint-cancel .fc-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.fc-stage-center {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.fc-stage-loading {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+}
+
+.fc-skel-arch {
+  display: block;
+  width: 120px;
+  height: 160px;
+  border-radius: 999px 999px 16px 16px;
+}
+
+.fc-stage-message {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  max-width: 380px;
+  padding: 28px;
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+  text-align: center;
+  pointer-events: auto;
+}
+
+.fc-stage-message > .fc-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--rosewood-dark);
+}
+
+.fc-stage-message h3 {
+  font-size: 24px;
+}
+
+.fc-stage-message p {
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+/* ============================================================
+   INSPECTOR
+============================================================= */
+.fc-inspector {
+  overflow: hidden;
+}
+
+.fc-inspector-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.fc-section {
+  padding: 20px;
+}
+
+.fc-section + .fc-section {
+  border-top: 1px solid var(--line-soft);
+}
+
+.fc-placed {
+  display: grid;
+  gap: 4px;
+}
+
+.fc-placed-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 0;
+  border-radius: var(--radius-md);
+  transition: background 0.25s;
+}
+
+.fc-placed-row:hover {
+  background: var(--ivory);
+}
+
+.fc-placed-row.active {
+  background: var(--ivory-deep);
+}
+
+.fc-placed-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fc-placed-thumb {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 46px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 999px 999px 6px 6px;
+  background: var(--ivory-deep);
+  color: var(--ink-soft);
+}
+
+.fc-placed-row.active .fc-placed-thumb {
+  background: var(--paper);
+}
+
+.fc-placed-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fc-placed-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.fc-placed-copy strong {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-placed-copy small {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.fc-mini {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.25s, color 0.25s;
+}
+
+.fc-mini .fc-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.fc-mini:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.fc-mini.on {
+  color: var(--rosewood-dark);
+}
+
+.fc-mini.danger:hover {
+  color: var(--rosewood-dark);
+}
+
+/* Adjust */
+.fc-adjust {
+  display: grid;
+  gap: 20px;
+}
+
+.fc-switch {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.25s, background 0.25s;
+}
+
+.fc-switch:hover {
+  border-color: rgba(30, 27, 24, 0.25);
+}
+
+.fc-switch[aria-checked="true"] {
+  border-color: rgba(142, 68, 58, 0.3);
+  background: rgba(184, 101, 88, 0.06);
+}
+
+.fc-switch-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fc-switch-copy strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.fc-switch-copy strong .fc-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.fc-switch-copy small {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.fc-switch-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(30, 27, 24, 0.16);
+  transition: background 0.3s var(--ease-out);
+}
+
+.fc-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(30, 27, 24, 0.2);
+  transition: transform 0.3s var(--ease-out);
+}
+
+.fc-switch[aria-checked="true"] .fc-switch-track {
+  background: var(--rosewood);
+}
+
+.fc-switch[aria-checked="true"] .fc-switch-knob {
+  transform: translateX(16px);
+}
+
+.fc-control-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.fc-control-head label {
+  font-weight: 500;
+}
+
+.fc-control-head output {
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.fc-control-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fc-step {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+
+.fc-step:hover {
+  border-color: var(--ink);
+}
+
+.fc-step .fc-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Range: thin ink track that fills up to the thumb */
+.fc-range {
+  --fill: 50%;
+  flex: 1;
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  background: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.fc-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--ink) var(--fill), rgba(30, 27, 24, 0.14) var(--fill));
+}
+
+.fc-range::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(30, 27, 24, 0.14);
+}
+
+.fc-range::-moz-range-progress {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--ink);
+}
+
+.fc-range::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -6.5px;
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  background: var(--rosewood-dark);
+  box-shadow: 0 0 0 1px var(--rosewood-dark);
+  -webkit-appearance: none;
+}
+
+.fc-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  background: var(--rosewood-dark);
+  box-shadow: 0 0 0 1px var(--rosewood-dark);
+}
+
+.fc-move {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.fc-move-copy {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+.fc-move-copy span {
+  font-weight: 500;
+}
+
+.fc-move-copy small {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.fc-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 34px);
+  grid-template-rows: repeat(3, 34px);
+  grid-template-areas:
+    ". up ."
+    "left . right"
+    ". down .";
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+
+.fc-pad button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  transition: background 0.25s;
+}
+
+.fc-pad button:hover:not(:disabled) {
+  background: var(--ivory-deep);
+}
+
+.fc-pad button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.fc-pad .fc-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.fc-pad-up { grid-area: up; }
+.fc-pad-left { grid-area: left; }
+.fc-pad-right { grid-area: right; }
+.fc-pad-down { grid-area: down; }
+
+.fc-text-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: start;
+  padding: 0 0 3px;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.25s, border-color 0.25s;
+}
+
+.fc-text-btn:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.fc-text-btn .fc-icon {
+  width: 15px;
+  height: 15px;
+}
+
+/* Wrapper and ribbon */
+.fc-segment {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 12px;
+  border-radius: 999px;
+  background: var(--ivory-deep);
+}
+
+.fc-segment-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.25s, color 0.25s, box-shadow 0.25s;
+}
+
+.fc-segment-btn.active {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(30, 27, 24, 0.1);
+}
+
+.fc-segment-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(30, 27, 24, 0.15);
+}
+
+.fc-options {
+  display: grid;
+  gap: 6px;
+}
+
+.fc-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px 10px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.25s, background 0.25s;
+}
+
+.fc-option:hover {
+  border-color: var(--line);
+  background: var(--ivory);
+}
+
+.fc-option.active {
+  border-color: var(--ink);
+  background: var(--paper);
+}
+
+.fc-option-swatch {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(30, 27, 24, 0.12);
+}
+
+.fc-option-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fc-option-copy strong {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.fc-option-copy small {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-option-price {
+  flex-shrink: 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fc-option-check {
+  width: 16px;
+  height: 16px;
+  color: var(--rosewood-dark);
+}
+
+.fc-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.fc-swatch {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(30, 27, 24, 0.12);
+  cursor: pointer;
+  transition: box-shadow 0.25s;
+}
+
+.fc-swatch.active {
+  box-shadow: inset 0 0 0 1px rgba(30, 27, 24, 0.12), 0 0 0 2px var(--paper), 0 0 0 3px var(--ink);
+}
+
+.fc-swatch-original {
+  display: grid;
+  place-items: center;
+  color: rgba(30, 27, 24, 0.55);
+}
+
+.fc-swatch-original .fc-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.fc-swatch-custom {
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgba(30, 27, 24, 0.3);
+  box-shadow: none;
+  color: var(--ink-soft);
+}
+
+.fc-swatch-custom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.fc-swatch-custom .fc-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Order footer */
+.fc-order {
+  padding: 18px 20px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.fc-receipt {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.fc-receipt > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fc-receipt dt {
+  overflow: hidden;
+  color: var(--ink-soft);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-receipt dd {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.fc-receipt-total {
+  align-items: baseline;
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.fc-receipt-total dt {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.fc-receipt-total dd {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.fc-order-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.fc-order-btn {
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 24px;
+}
+
+.fc-order-btn-outline {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.fc-order-btn-outline:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.fc-order-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.bc-btn--dark.fc-order-btn:disabled:hover {
+  background: var(--ink);
+}
+
+.fc-order-btn .fc-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.fc-order-hint {
+  margin-top: 10px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ============================================================
+   TOAST
+============================================================= */
+.fc-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(380px, calc(100vw - 32px));
+  padding: 12px 18px 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--ink);
+  color: var(--ivory);
+  font-size: 13.5px;
+  box-shadow: 0 16px 40px rgba(30, 27, 24, 0.18);
+}
+
+.fc-toast .fc-icon {
+  color: var(--gold);
+}
+
+.fc-toast.error .fc-icon {
+  color: #e7a497;
+}
+
+.fc-toast-enter-active,
+.fc-toast-leave-active {
+  transition: opacity 0.3s var(--ease-out), transform 0.3s var(--ease-out);
+}
+
+.fc-toast-enter-from,
+.fc-toast-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+/* ============================================================
+   RESPONSIVE
+============================================================= */
+@media (max-width: 1240px) {
+  .fc-layout {
+    grid-template-columns: 272px minmax(0, 1fr) 316px;
+  }
+
+  .fc-layout.left-collapsed {
+    grid-template-columns: minmax(0, 1fr) 316px;
+  }
+
+  .fc-layout.right-collapsed {
+    grid-template-columns: 272px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 980px) {
+  .fc-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .fc-layout,
+  .fc-layout.left-collapsed,
+  .fc-layout.right-collapsed,
+  .fc-layout.left-collapsed.right-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    min-height: 0;
+  }
+
+  .fc-stage {
+    order: -1;
+    height: 62vh;
+    min-height: 420px;
+  }
+
+  .fc-catalog-scroll,
+  .fc-inspector-scroll {
+    overflow: visible;
+  }
+
+  .fc-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .fc-shell {
+    padding: 96px 16px 24px;
+  }
+
+  .fc-head-meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .fc-hint-copy span {
+    display: none;
+  }
+
+  .fc-tool::after {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fc-page *,
+  .fc-page *::before,
+  .fc-page *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
 </style>

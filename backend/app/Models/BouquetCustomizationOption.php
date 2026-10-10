@@ -64,7 +64,9 @@ class BouquetCustomizationOption extends Model
      */
     public static function resolveSelections(int $ownerId, array $customizations): array
     {
+        // 'wrapper' is the outer paper; 'inner_wrapper' the inner layer.
         $wrapperId = (int) data_get($customizations, 'wrapper.id', 0);
+        $innerWrapperId = (int) data_get($customizations, 'inner_wrapper.id', 0);
         $ribbonId = (int) data_get($customizations, 'ribbon.id', 0);
         $fillers = data_get($customizations, 'fillers', []);
         $fillers = is_array($fillers) ? array_values($fillers) : [];
@@ -74,12 +76,12 @@ class BouquetCustomizationOption extends Model
         }
 
         $ids = array_filter(array_merge(
-            [$wrapperId, $ribbonId],
+            [$wrapperId, $innerWrapperId, $ribbonId],
             array_map(fn ($filler) => (int) data_get($filler, 'id', 0), $fillers)
         ));
 
         if (!$ids) {
-            unset($customizations['wrapper'], $customizations['ribbon']);
+            unset($customizations['wrapper'], $customizations['inner_wrapper'], $customizations['ribbon']);
             $customizations['fillers'] = [];
             $customizations['extras_total'] = 0;
 
@@ -89,7 +91,13 @@ class BouquetCustomizationOption extends Model
         $options = self::forOwner($ownerId)->available()->whereIn('id', array_unique($ids))->get()->keyBy('id');
         $total = 0.0;
 
-        foreach (['wrapper' => [$wrapperId, self::TYPE_WRAPPER], 'ribbon' => [$ribbonId, self::TYPE_RIBBON]] as $key => [$id, $type]) {
+        $selections = [
+            'wrapper' => [$wrapperId, self::TYPE_WRAPPER, 'paper_color'],
+            'inner_wrapper' => [$innerWrapperId, self::TYPE_WRAPPER, 'inner_paper_color'],
+            'ribbon' => [$ribbonId, self::TYPE_RIBBON, 'ribbon_color'],
+        ];
+
+        foreach ($selections as $key => [$id, $type, $colorKey]) {
             if (!$id) {
                 unset($customizations[$key]);
                 continue;
@@ -106,7 +114,7 @@ class BouquetCustomizationOption extends Model
                 'color_hex' => $option->color_hex,
                 'price' => $option->price,
             ];
-            $customizations[$key === 'wrapper' ? 'paper_color' : 'ribbon_color'] = $option->color_hex;
+            $customizations[$colorKey] = $option->color_hex;
             $total += $option->price;
         }
 

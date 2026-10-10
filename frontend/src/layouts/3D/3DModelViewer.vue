@@ -47,6 +47,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from "vue";
 import * as THREE from "three";
+import { dressBouquet } from "../../utils/bouquetDressing.js";
 
 const props = defineProps({
   modelUrl: {
@@ -359,33 +360,6 @@ const loadBouquetArrangement = async (arrangement) => {
   if (!bouquet) throw new Error("The saved bouquet base model is unavailable.");
 
   prepareModel(bouquet);
-  const wrapperMaterials = new Set();
-  const ribbonMaterials = new Set();
-  const bouquetMeshes = [];
-
-  bouquet.traverse((child) => {
-    if (!child.isMesh) return;
-    bouquetMeshes.push(child);
-    const materials = Array.isArray(child.material) ? child.material : [child.material];
-    const name = String(child.name || "").toLowerCase();
-    if (name.includes("ribbon") || name.includes("bow") || name.includes("lace")) {
-      materials.forEach((material) => ribbonMaterials.add(material));
-    } else if (name.includes("wrapper") || name.includes("wrap") || name.includes("paper")) {
-      materials.forEach((material) => wrapperMaterials.add(material));
-    }
-  });
-
-  if (!wrapperMaterials.size) {
-    bouquetMeshes.forEach((mesh) => {
-      const name = String(mesh.name || "").toLowerCase();
-      if (name.includes("ribbon") || name.includes("bow")) return;
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      materials.forEach((material) => wrapperMaterials.add(material));
-    });
-  }
-
-  wrapperMaterials.forEach((material) => material?.color?.set(arrangement.paper_color));
-  ribbonMaterials.forEach((material) => material?.color?.set(arrangement.ribbon_color));
 
   const bouquetBox = new THREE.Box3().setFromObject(bouquet);
   const bouquetSize = bouquetBox.getSize(new THREE.Vector3());
@@ -396,6 +370,12 @@ const loadBouquetArrangement = async (arrangement) => {
   const scaledBox = new THREE.Box3().setFromObject(bouquet);
   bouquet.position.y -= scaledBox.min.y;
   bouquet.scale.multiplyScalar(Number(arrangement.wrapper_scale ?? 1));
+
+  // Tint only the outer and inner papers (empty = original) and tie the ribbon.
+  const dressing = dressBouquet(bouquet);
+  dressing.outer.apply(arrangement.paper_color || null);
+  dressing.inner.apply(arrangement.inner_paper_color || null);
+  dressing.applyRibbon(arrangement.ribbon_color || null);
 
   model = new THREE.Group();
   model.add(bouquet);
