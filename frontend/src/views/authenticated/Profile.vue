@@ -215,17 +215,6 @@
               </div>
             </div>
 
-            <!-- Plan -->
-            <div class="detail-item">
-              <span class="detail-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" /></svg>
-              </span>
-              <div class="detail-content">
-                <label>Plan</label>
-                <span class="detail-value">{{ user.plan || "Free Plan" }}</span>
-              </div>
-            </div>
-
             <!-- Gender -->
             <div class="detail-item">
               <span class="detail-icon" aria-hidden="true">
@@ -269,98 +258,98 @@
               </div>
             </div>
 
-            <!-- Address -->
-            <div class="detail-item detail-item--wide">
-              <span class="detail-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M19 10c0 5.5-7 11-7 11s-7-5.5-7-11a7 7 0 0 1 14 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>
-              </span>
-              <div class="detail-content">
-                <label :for="isEditing ? 'pf-address' : undefined">Address</label>
-                <input
-                  v-if="isEditing"
-                  id="pf-address"
-                  v-model="editData.address"
-                  type="text"
-                  class="input-field"
-                  placeholder="Address"
-                />
-                <span v-else class="detail-value">{{ user.address || "-" }}</span>
-              </div>
+          </div>
+
+          <!-- Delivery location: pin on the map fills region, city and postal code -->
+          <div class="location-block" aria-labelledby="location-title">
+            <div class="location-head">
+              <h3 id="location-title">Delivery location</h3>
+              <p>
+                {{
+                  isEditing
+                    ? "Click the map or drag the pin to where your flowers should arrive. Region, city and postal code fill in from the pin."
+                    : "Where your flowers are delivered."
+                }}
+              </p>
             </div>
 
-            <!-- Region (UI-only, drives the city list) -->
-            <div class="detail-item">
-              <span class="detail-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M9 4 3 6.5v13.5L9 17.5l6 2.5 6-2.5V4l-6 2.5L9 4Z" /><path d="M9 4v13.5M15 6.5V20" /></svg>
-              </span>
-              <div class="detail-content">
-                <label :for="isEditing ? 'pf-region' : undefined">Region</label>
-                <select
+            <div class="location-grid">
+              <div class="location-map-wrap">
+                <div ref="locationMapEl" class="location-map" role="region" aria-label="Map of your delivery location"></div>
+                <button
                   v-if="isEditing"
-                  id="pf-region"
-                  v-model="editData.region"
-                  class="input-field"
-                  @change="editData.city = ''"
+                  type="button"
+                  class="location-locate"
+                  :disabled="isLocating"
+                  @click="useCurrentLocation"
                 >
-                  <option value="">Select Region</option>
-                  <option value="NCR">National Capital Region (NCR)</option>
-                  <option value="CALABARZON">Region IV-A (CALABARZON)</option>
-                </select>
-                <span v-else class="detail-value">{{
-                  getRegionLabel(inferRegionFromCity(user.city)) || "-"
-                }}</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /><circle cx="12" cy="12" r="7" /></svg>
+                  {{ isLocating ? "Finding you..." : "Use my current location" }}
+                </button>
+                <p v-if="!isEditing && !hasSavedPin" class="location-map-empty">
+                  No location pinned yet. Choose Edit to drop a pin.
+                </p>
               </div>
-            </div>
 
-            <!-- City (depends on region) -->
-            <div class="detail-item">
-              <span class="detail-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M4 20V9l8-5 8 5v11" /><path d="M9 20v-6h6v6" /></svg>
-              </span>
-              <div class="detail-content">
-                <label :for="isEditing ? 'pf-city' : undefined">City</label>
-                <select
-                  v-if="isEditing"
-                  id="pf-city"
-                  v-model="editData.city"
-                  class="input-field"
-                  :disabled="!editData.region"
-                >
-                  <option value="">
-                    {{
-                      editData.region ? "Select City" : "Select a region first"
-                    }}
-                  </option>
-                  <option
-                    v-for="city in filteredCities"
-                    :key="city"
-                    :value="city"
-                  >
-                    {{ city }}
-                  </option>
-                </select>
-                <span v-else class="detail-value">{{ user.city || "-" }}</span>
-              </div>
-            </div>
+              <div class="location-fields">
+                <div class="location-field">
+                  <label :for="isEditing ? 'pf-address' : undefined">Street, block or unit</label>
+                  <input
+                    v-if="isEditing"
+                    id="pf-address"
+                    v-model="editData.address"
+                    type="text"
+                    class="input-field"
+                    placeholder="e.g. Blk 5 Lot 12, Sampaguita St."
+                    autocomplete="address-line1"
+                  />
+                  <span v-else class="detail-value">{{ user.address || "-" }}</span>
+                  <span v-if="isEditing && pinStreetHint" class="field-hint">
+                    Near {{ pinStreetHint }}
+                  </span>
+                </div>
 
-            <!-- Postal Code -->
-            <div class="detail-item">
-              <span class="detail-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M7 10h4M7 14h6M16 10h1" /></svg>
-              </span>
-              <div class="detail-content">
-                <label :for="isEditing ? 'pf-postal' : undefined">Postal code</label>
-                <input
-                  v-if="isEditing"
-                  id="pf-postal"
-                  v-model="editData.postal_code"
-                  type="text"
-                  class="input-field"
-                  placeholder="Postal Code"
-                />
-                <span v-else class="detail-value">{{
-                  user.postal_code || "-"
-                }}</span>
+                <div class="location-field">
+                  <label>Region</label>
+                  <span class="detail-value" :class="{ 'is-auto': isEditing }">
+                    {{ (isEditing ? editData.region : user.region) || "-" }}
+                  </span>
+                </div>
+
+                <div class="location-field">
+                  <label>City</label>
+                  <span class="detail-value" :class="{ 'is-auto': isEditing }">
+                    {{ (isEditing ? editData.city : user.city) || "-" }}
+                  </span>
+                </div>
+
+                <div class="location-field">
+                  <label :for="isEditing && postalNeedsTyping ? 'pf-postal' : undefined">Postal code</label>
+                  <!-- Only typed by hand when the map has no postal code for the pin -->
+                  <input
+                    v-if="isEditing && postalNeedsTyping"
+                    id="pf-postal"
+                    v-model="editData.postal_code"
+                    type="text"
+                    inputmode="numeric"
+                    maxlength="4"
+                    class="input-field"
+                    placeholder="e.g. 4109"
+                    autocomplete="postal-code"
+                  />
+                  <span v-else class="detail-value" :class="{ 'is-auto': isEditing }">
+                    {{ (isEditing ? editData.postal_code : user.postal_code) || "-" }}
+                  </span>
+                </div>
+
+                <p v-if="isEditing" class="location-status" :class="{ 'is-error': lookupError }" aria-live="polite">
+                  {{
+                    isLookingUp
+                      ? "Finding the address for this pin..."
+                      : lookupError ||
+                        (editData.latitude === null ? "Drop a pin on the map to fill these in." : "Filled in from your pin.")
+                  }}
+                </p>
               </div>
             </div>
           </div>
@@ -470,7 +459,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from "vue";
+import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { useRouter } from "vue-router";
 import api from "../../plugins/axios";
 import NavHeader from "../../layouts/NavHeader.vue";
@@ -485,137 +479,9 @@ import {
 } from "../../utils/imageUpload";
 
 const router = useRouter();
-const { isAuthenticated } = useAuth();
+const { isAuthenticated, user: authUser } = useAuth();
 const fileInput = ref(null);
 const { logout } = useAuth();
-
-// ─── Region / City data ───────────────────────────────────────────────────────
-const regionCities = {
-  NCR: [
-    "Manila",
-    "Quezon City",
-    "Caloocan",
-    "Las Piñas",
-    "Makati",
-    "Malabon",
-    "Mandaluyong",
-    "Marikina",
-    "Muntinlupa",
-    "Navotas",
-    "Parañaque",
-    "Pasay",
-    "Pasig",
-    "San Juan",
-    "Taguig",
-    "Valenzuela",
-  ],
-  CALABARZON: [
-    // Cavite – Cities
-    "Bacoor, Cavite",
-    "Imus, Cavite",
-    "Dasmariñas, Cavite",
-    "General Trias, Cavite",
-    "Trece Martires, Cavite",
-    "Tagaytay, Cavite",
-    "Carmona, Cavite",
-    "Cavite City, Cavite",
-    // Cavite – Municipalities
-    "Silang, Cavite",
-    "General Mariano Alvarez, Cavite",
-    "Kawit, Cavite",
-    "Noveleta, Cavite",
-    "Rosario, Cavite",
-    "Tanza, Cavite",
-    "Naic, Cavite",
-    "Maragondon, Cavite",
-    "Ternate, Cavite",
-    "Indang, Cavite",
-    "Amadeo, Cavite",
-    "Mendez, Cavite",
-    "Alfonso, Cavite",
-    "Magallanes, Cavite",
-    "General Emilio Aguinaldo, Cavite",
-    // Laguna – Cities
-    "San Pedro, Laguna",
-    "Biñan, Laguna",
-    "Santa Rosa, Laguna",
-    "Cabuyao, Laguna",
-    "Calamba, Laguna",
-    "San Pablo, Laguna",
-    // Laguna – Municipalities
-    "Los Baños, Laguna",
-    "Bay, Laguna",
-    "Calauan, Laguna",
-    "Santa Cruz, Laguna",
-    "Pila, Laguna",
-    "Victoria, Laguna",
-    "Nagcarlan, Laguna",
-    "Magdalena, Laguna",
-    "Majayjay, Laguna",
-    "Luisiana, Laguna",
-    "Lumban, Laguna",
-    "Paete, Laguna",
-    "Pakil, Laguna",
-    "Pangil, Laguna",
-    "Famy, Laguna",
-    "Mabitac, Laguna",
-    "Siniloan, Laguna",
-    "Rizal, Laguna",
-    "Kalayaan, Laguna",
-    // Batangas – Cities
-    "Batangas City, Batangas",
-    "Lipa, Batangas",
-    "Tanauan, Batangas",
-    "Sto. Tomas, Batangas",
-    "Calaca, Batangas",
-    // Rizal – City
-    "Antipolo, Rizal",
-    // Rizal – Municipalities
-    "Taytay, Rizal",
-    "Cainta, Rizal",
-    "Angono, Rizal",
-    "Binangonan, Rizal",
-    "Rodriguez, Rizal",
-    "San Mateo, Rizal",
-    "Teresa, Rizal",
-    "Baras, Rizal",
-    "Morong, Rizal",
-    "Cardona, Rizal",
-    "Jala-Jala, Rizal",
-    "Tanay, Rizal",
-    "Pililla, Rizal",
-    // Quezon – City
-    "Lucena, Quezon",
-    // Quezon – Municipalities
-    "Sariaya, Quezon",
-    "Candelaria, Quezon",
-    "Tiaong, Quezon",
-    "Lucban, Quezon",
-    "Tayabas, Quezon",
-    "Infanta, Quezon",
-    "Real, Quezon",
-    "Mauban, Quezon",
-    "Gumaca, Quezon",
-    "Lopez, Quezon",
-  ],
-};
-
-const regionLabels = {
-  NCR: "National Capital Region (NCR)",
-  CALABARZON: "Region IV-A (CALABARZON)",
-};
-
-/** Return the human-readable region label from a key */
-const getRegionLabel = (key) => regionLabels[key] || "";
-
-/** Infer the region key from a saved city value (for display in view mode) */
-const inferRegionFromCity = (city) => {
-  if (!city) return "";
-  for (const [key, cities] of Object.entries(regionCities)) {
-    if (cities.includes(city)) return key;
-  }
-  return "";
-};
 
 // ─── Contact number helpers ───────────────────────────────────────────────────
 
@@ -635,10 +501,171 @@ const contactNumberError = computed(() => {
   return "";
 });
 
-// ─── Computed: cities filtered by the currently selected region ───────────────
-const filteredCities = computed(() => {
-  if (!editData.region) return [];
-  return regionCities[editData.region] || [];
+// ─── Delivery location (map pin → region, city, postal code) ──────────────────
+const DEFAULT_CENTER = [14.2822, 120.8684]; // Cavite, where the shops are
+const locationMapEl = ref(null);
+const isLookingUp = ref(false);
+const isLocating = ref(false);
+const lookupError = ref("");
+const pinStreetHint = ref("");
+const postalNeedsTyping = ref(false);
+let locationMap = null;
+let locationMarker = null;
+let lookupTimer = null;
+let lookupRequestId = 0;
+
+const pinIcon = L.icon({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+const hasSavedPin = computed(
+  () => Number.isFinite(Number(user.latitude)) && user.latitude !== null && user.longitude !== null,
+);
+
+// Nominatim's address parts for the Philippines: city or town, the province
+// in `state` (absent in Metro Manila), and the region.
+const describePlace = (address = {}) => {
+  const town = address.city || address.town || address.municipality || address.village || "";
+  const province = address.state || address.province || "";
+  return {
+    region: address.region || address.state_district || "",
+    city: town && province && !town.includes(province) ? `${town}, ${province}` : town || province,
+    postal: address.postcode || "",
+    street: [address.road, address.quarter || address.suburb || address.neighbourhood]
+      .filter(Boolean)
+      .join(", "),
+  };
+};
+
+const lookUpPin = async (latitude, longitude) => {
+  const requestId = ++lookupRequestId;
+  isLookingUp.value = true;
+  lookupError.value = "";
+  try {
+    const params = new URLSearchParams({
+      lat: String(latitude),
+      lon: String(longitude),
+      format: "jsonv2",
+      addressdetails: "1",
+      zoom: "18",
+      "accept-language": "en",
+    });
+    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`);
+    if (!response.ok) throw new Error(`Lookup failed (${response.status})`);
+    const data = await response.json();
+    if (requestId !== lookupRequestId) return; // a newer pin replaced this one
+
+    if (data?.address?.country_code !== "ph") {
+      lookupError.value = "Pin a location in the Philippines.";
+      return;
+    }
+
+    const place = describePlace(data.address);
+    editData.region = place.region;
+    editData.city = place.city;
+    editData.postal_code = place.postal;
+    postalNeedsTyping.value = !place.postal;
+    pinStreetHint.value = place.street;
+    if (!place.city) lookupError.value = "We couldn't tell which city this is. Try moving the pin a little.";
+  } catch (error) {
+    if (requestId !== lookupRequestId) return;
+    console.error("Reverse geocoding failed:", error);
+    lookupError.value = "We couldn't look up this pin. Check your connection and try again.";
+  } finally {
+    if (requestId === lookupRequestId) isLookingUp.value = false;
+  }
+};
+
+const setPin = (latitude, longitude, { lookUp = true, pan = false } = {}) => {
+  editData.latitude = Number(latitude.toFixed(7));
+  editData.longitude = Number(longitude.toFixed(7));
+  const position = [editData.latitude, editData.longitude];
+
+  if (locationMarker) {
+    locationMarker.setLatLng(position);
+  } else if (locationMap) {
+    locationMarker = L.marker(position, { icon: pinIcon, draggable: isEditing.value }).addTo(locationMap);
+    locationMarker.on("dragend", () => {
+      const point = locationMarker.getLatLng();
+      setPin(point.lat, point.lng);
+    });
+  }
+  if (pan && locationMap) locationMap.setView(position, Math.max(locationMap.getZoom(), 16));
+
+  if (lookUp) {
+    // Nominatim allows about one request a second; wait for the pin to settle
+    clearTimeout(lookupTimer);
+    isLookingUp.value = true;
+    lookupTimer = setTimeout(() => lookUpPin(editData.latitude, editData.longitude), 600);
+  }
+};
+
+const onMapClick = (event) => {
+  if (isEditing.value) setPin(event.latlng.lat, event.latlng.lng);
+};
+
+const renderLocationMap = async () => {
+  await nextTick();
+  if (!locationMapEl.value) return;
+
+  const latitude = isEditing.value ? editData.latitude : user.latitude;
+  const longitude = isEditing.value ? editData.longitude : user.longitude;
+  const hasPin = latitude !== null && latitude !== undefined && longitude !== null && longitude !== undefined;
+  const center = hasPin ? [Number(latitude), Number(longitude)] : DEFAULT_CENTER;
+
+  if (!locationMap) {
+    locationMap = L.map(locationMapEl.value, { scrollWheelZoom: false }).setView(center, hasPin ? 16 : 11);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "© OpenStreetMap contributors",
+    }).addTo(locationMap);
+    locationMap.on("click", onMapClick);
+  } else {
+    locationMap.setView(center, hasPin ? 16 : locationMap.getZoom());
+    locationMap.invalidateSize();
+  }
+
+  locationMarker?.remove();
+  locationMarker = null;
+  if (hasPin) {
+    locationMarker = L.marker(center, { icon: pinIcon, draggable: isEditing.value }).addTo(locationMap);
+    locationMarker.on("dragend", () => {
+      const point = locationMarker.getLatLng();
+      setPin(point.lat, point.lng);
+    });
+  }
+  locationMapEl.value.classList.toggle("is-editing", isEditing.value);
+};
+
+const useCurrentLocation = () => {
+  if (!navigator.geolocation) {
+    lookupError.value = "Your browser can't share your location. Drop the pin on the map instead.";
+    return;
+  }
+  isLocating.value = true;
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => {
+      isLocating.value = false;
+      setPin(coords.latitude, coords.longitude, { pan: true });
+    },
+    () => {
+      isLocating.value = false;
+      lookupError.value = "Location access was blocked. Drop the pin on the map instead.";
+    },
+    { enableHighAccuracy: true, timeout: 10000 },
+  );
+};
+
+onBeforeUnmount(() => {
+  clearTimeout(lookupTimer);
+  locationMap?.remove();
+  locationMap = null;
 });
 
 // ─── Computed: max date for birthday (user must be ≥ 18 years old) ────────────
@@ -666,10 +693,12 @@ const user = reactive({
   gender: "",
   nationality: "",
   address: "",
+  region: "",
   city: "",
   postal_code: "",
+  latitude: null,
+  longitude: null,
   profile_picture: "",
-  plan: "",
   two_factor_passkey_configured: false,
   two_factor_enabled: false,
 });
@@ -698,7 +727,10 @@ const editData = reactive({
   city: "",
   postal_code: "",
   contact_number: "", // ✅ Added for phone editing
-  region: "", // ✅ Added for region/city cascade (UI-only; not persisted)
+  // Filled from the map pin
+  region: "",
+  latitude: null,
+  longitude: null,
 });
 
 // ─── API calls ────────────────────────────────────────────────────────────────
@@ -723,7 +755,6 @@ const fetchUserProfile = async () => {
     if (response.data.success) {
       Object.assign(user, response.data.user);
       twoFactorEnabled.value = Boolean(response.data.user.two_factor_enabled);
-      console.log("Profile loaded successfully:", user.name);
     } else {
       toast.error("Failed to load profile");
     }
@@ -767,13 +798,23 @@ const toggleEditMode = () => {
     editData.city = user.city || "";
     editData.postal_code = user.postal_code || "";
     editData.contact_number = user.contact_number || ""; // ✅ populate phone
-    editData.region = inferRegionFromCity(user.city); // ✅ infer region from saved city
+    editData.region = user.region || "";
+    editData.latitude = user.latitude ?? null;
+    editData.longitude = user.longitude ?? null;
+    lookupError.value = "";
+    pinStreetHint.value = "";
+    postalNeedsTyping.value = editData.latitude !== null && !editData.postal_code;
   }
   isEditing.value = !isEditing.value;
+  renderLocationMap();
 };
 
 const cancelEdit = () => {
+  clearTimeout(lookupTimer);
+  lookupRequestId += 1; // ignore a lookup still in flight
+  isLookingUp.value = false;
   isEditing.value = false;
+  renderLocationMap();
 };
 
 const saveProfile = async () => {
@@ -793,6 +834,16 @@ const saveProfile = async () => {
     }
   }
 
+  if (isLookingUp.value) {
+    toast.info("Still finding the address for your pin. Try again in a moment.");
+    return;
+  }
+
+  if (editData.latitude !== null && !editData.city) {
+    toast.error("Move your pin so we can tell which city it's in.");
+    return;
+  }
+
   try {
     isSaving.value = true;
     const token = localStorage.getItem("auth_token");
@@ -805,8 +856,11 @@ const saveProfile = async () => {
       gender: editData.gender || null,
       nationality: editData.nationality || null,
       address: editData.address || null,
+      region: editData.region || null,
       city: editData.city || null,
       postal_code: editData.postal_code || null,
+      latitude: editData.latitude,
+      longitude: editData.longitude,
       contact_number: editData.contact_number || null,
     };
 
@@ -821,6 +875,13 @@ const saveProfile = async () => {
     if (response.data.success) {
       Object.assign(user, response.data.user);
       isEditing.value = false;
+      renderLocationMap();
+      // Keep the signed-in user in sync so the Shop's "Close to you" uses the new pin
+      if (authUser.value) {
+        const { region, city, postal_code, address, latitude, longitude } = response.data.user;
+        authUser.value = { ...authUser.value, region, city, postal_code, address, latitude, longitude };
+        localStorage.setItem("user", JSON.stringify(authUser.value));
+      }
       toast.success("Profile updated successfully!");
     } else {
       toast.error("Failed to update profile: " + response.data.message);
@@ -1039,8 +1100,9 @@ const saveTwoFactorPasskey = async () => {
   }
 };
 
-onMounted(() => {
-  fetchUserProfile();
+onMounted(async () => {
+  await fetchUserProfile();
+  renderLocationMap(); // the map container exists once the loading skeleton is gone
 });
 </script>
 
@@ -1223,6 +1285,149 @@ onMounted(() => {
 
 .detail-item--wide {
   grid-column: 1 / -1;
+}
+
+/* ── Delivery location ─────────────────────────────────────────────── */
+.location-block {
+  margin-top: 32px;
+}
+
+.location-head h3 {
+  font-size: 26px;
+}
+
+.location-head p {
+  max-width: 62ch;
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.location-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 28px;
+  margin-top: 20px;
+  align-items: start;
+}
+
+.location-map-wrap {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+.location-map {
+  height: 320px;
+  z-index: 0; /* keep Leaflet's panes under the fixed header */
+}
+
+.location-map.is-editing {
+  cursor: crosshair;
+}
+
+.location-locate {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 14px rgba(30, 27, 24, 0.16);
+  cursor: pointer;
+}
+
+.location-locate svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.location-locate:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.location-locate:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 3px;
+}
+
+.location-map-empty {
+  position: absolute;
+  inset: auto 12px 12px;
+  z-index: 1;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(250, 248, 244, 0.94);
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.location-fields {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.location-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.location-field label {
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* Region, city and postal code come from the pin, so they read as filled-in
+   values rather than inputs */
+.detail-value.is-auto {
+  color: var(--ink);
+}
+
+.field-hint {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.location-status {
+  margin-top: 12px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.location-status.is-error {
+  color: var(--rosewood-dark);
+}
+
+@media (max-width: 760px) {
+  .location-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .location-map {
+    height: 260px;
+  }
 }
 
 .detail-icon {

@@ -1016,8 +1016,19 @@ function calculateDistanceInKm([latitudeA, longitudeA], [latitudeB, longitudeB])
   return earthRadiusInKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 }
 
+// The customer's pinned location from their profile; older accounts without
+// a pin fall back to the centre of their city.
+function getCustomerCoordinates() {
+  const latitude = Number(user.value?.latitude);
+  const longitude = Number(user.value?.longitude);
+  if (user.value?.latitude != null && Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    return [latitude, longitude];
+  }
+  return getCustomerCityCoordinates(user.value?.city);
+}
+
 function isVendorCloseToCustomer(vendor) {
-  const customerCoordinates = getCustomerCityCoordinates(user.value?.city);
+  const customerCoordinates = getCustomerCoordinates();
   const vendorLatitude = Number(vendor.store_latitude);
   const vendorLongitude = Number(vendor.store_longitude);
 
