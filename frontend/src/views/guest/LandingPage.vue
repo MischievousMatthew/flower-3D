@@ -21,17 +21,8 @@
     <div class="bg-blob blob-sage" aria-hidden="true"></div>
     <div class="grain-overlay" aria-hidden="true"></div>
 
-    <!-- ============================================================
-         PERSISTENT 3D FLOWER LAYER
-         Fixed, full-viewport, travels the entire page via GSAP
-         ScrollTrigger. Never unmounted, never disappears.
-    ============================================================= -->
+    <!-- Persistent 3D bouquet: fixed, full-viewport, driven by scroll -->
     <div ref="flowerStage" class="flower-stage-fixed" aria-hidden="true">
-      <span class="drift-petal petal-a" aria-hidden="true"></span>
-      <span class="drift-petal petal-b" aria-hidden="true"></span>
-      <span class="drift-petal petal-c" aria-hidden="true"></span>
-      <span class="drift-petal petal-d" aria-hidden="true"></span>
-      <span class="drift-petal petal-e" aria-hidden="true"></span>
       <canvas ref="flowerCanvas" class="flower-canvas"></canvas>
     </div>
 
@@ -49,14 +40,12 @@
       aria-label="Main navigation"
     >
       <router-link to="/" class="logo" @click="closeMobileMenu">
-        <span>
-          <img
-            src="/bloomcraft-blankBg.png"
-            alt="Bloomcraft Logo"
-            width="50"
-            height="50"
-          />
-        </span>
+        <img
+          src="/bloomcraft-blankBg.png"
+          alt="Bloomcraft Logo"
+          width="44"
+          height="44"
+        />
         <span class="logo-text">BloomCraft</span>
       </router-link>
       <div id="primary-nav" class="nav-links">
@@ -102,49 +91,49 @@
       </div>
     </nav>
 
-    <!-- Scroll Panels Story -->
     <main id="main-content" class="scroll-story-container" tabindex="-1">
-      <!-- Panel 1: Hero Section -->
-      <section class="panel-section hero-panel" id="top" ref="heroSection">
+      <!-- Hero -->
+      <section class="hero" id="top" ref="heroSection">
         <div class="hero-halo" aria-hidden="true">
           <span class="halo-ring halo-ring--outer"></span>
           <span class="halo-ring halo-ring--inner"></span>
         </div>
-        <div class="panel-container hero-container">
-          <div class="panel-content text-left-side hero-content">
-            <span class="hero-kicker hero-reveal"
-              >Bespoke florals, built by you</span
-            >
+        <div class="container">
+          <div class="hero-content">
+            <p class="label hero-reveal">Bespoke florals, built by you</p>
             <h1 class="hero-title" aria-label="Create your perfect bouquet">
               <span class="line" aria-hidden="true"
                 ><span class="line-inner">Create your</span></span
               >
               <span class="line" aria-hidden="true"
-                ><span class="line-inner"
-                  >perfect <span class="highlight">bouquet</span></span
-                ></span
+                ><span class="line-inner">perfect <em>bouquet</em></span></span
               >
             </h1>
             <p class="hero-desc hero-reveal">
               Where vendors meet creativity. Design custom flower arrangements
               in 3D or let our AI suggest the perfect bloom for every occasion.
             </p>
-            <div class="hero-cta-wrap hero-reveal">
-              <router-link to="/guest/register" class="btn-register btn-hero">
+            <div class="hero-actions hero-reveal">
+              <router-link to="/guest/register" class="btn btn--dark">
                 Get Started
+                <span class="btn-arrow" aria-hidden="true">→</span>
               </router-link>
+              <a
+                href="#how-it-works"
+                class="link-underline"
+                @click.prevent="navigateTo('how-it-works')"
+                >How it works</a
+              >
             </div>
           </div>
-          <div class="panel-visual spacer-right" aria-hidden="true"></div>
         </div>
-        <div class="hero-scroll-cue hero-reveal" aria-hidden="true">
-          <span>Scroll to explore</span>
-          <span class="cue-line"></span>
+        <div class="container hero-foot hero-scroll-cue hero-reveal" aria-hidden="true">
+          <span class="hero-foot-cue"><span class="cue-line"></span>Scroll to explore</span>
+          <span class="hero-foot-note">Hand-tied by local florists · Designed by you</span>
         </div>
       </section>
 
-      <!-- Bouquet Story: pinned, scroll-driven tour of the real 3D bouquet.
-           Absorbs the former 3D Designer, Features and AI Concierge panels. -->
+      <!-- Bouquet Story: pinned, scroll-driven tour of the real 3D bouquet -->
       <section
         id="bouquet-story"
         ref="storySection"
@@ -153,9 +142,9 @@
         aria-labelledby="story-heading"
       >
         <div class="story-pin">
-          <div class="story-inner">
+          <div class="container story-inner">
             <header class="story-head">
-              <span class="eyebrow">The 3D Bouquet Studio</span>
+              <p class="label">The 3D bouquet studio</p>
               <h2 id="story-heading" class="sr-only">
                 Build a bouquet in three steps
               </h2>
@@ -165,133 +154,160 @@
                   :key="step.key"
                   :class="{ 'is-active': activeStep === i }"
                 >
-                  <span class="story-index-num">0{{ i + 1 }}</span>
+                  <span class="story-index-num">{{ ["i", "ii", "iii"][i] }}</span>
                   <span class="story-index-label">{{ step.label }}</span>
                 </li>
               </ol>
             </header>
 
             <div class="story-steps" @focusin="revealFocusedStep">
-              <article id="features" class="story-step" data-step="0"
+              <article
+                id="features"
+                class="story-step"
+                data-step="0"
                 :class="{ 'is-current': activeStep === 0 }"
               >
-                <span class="story-step-num">01 — Blooms</span>
-                <h3>Choose your blooms</h3>
+                <p class="story-step-label">Blooms</p>
+                <h3>Choose your <em>blooms</em></h3>
                 <p>
-                  Pick real flowers from local vendors and arrange them in
-                  real time. Rotate, adjust and see every petal before you
-                  order.
+                  Pick real flowers from local vendors and arrange them in real
+                  time. Rotate, adjust and see every petal before you order.
                 </p>
+                <div class="bloom-picker" role="group" aria-label="Bloom variety">
+                  <button
+                    v-for="variety in bloomVarieties"
+                    :key="variety.key"
+                    type="button"
+                    class="bloom-option"
+                    :class="{ 'is-active': bloomVariety === variety.key }"
+                    :aria-pressed="bloomVariety === variety.key"
+                    @click="pickBloom(variety.key)"
+                  >
+                    {{ variety.label }}
+                  </button>
+                </div>
               </article>
 
-              <article class="story-step" data-step="1"
+              <article
+                class="story-step"
+                data-step="1"
                 :class="{ 'is-current': activeStep === 1 }"
               >
-                <span class="story-step-num">02 — Wrapper</span>
-                <h3>Wrap it your way</h3>
+                <p class="story-step-label">Wrapper</p>
+                <h3>Wrap it <em>your way</em></h3>
                 <p>
                   Switch paper and inner layers to match the occasion, from
                   kraft and linen to blush and plum.
                 </p>
-                <div class="swatch-group" role="group" aria-label="Paper colour">
-                  <button
-                    v-for="swatch in paperSwatches"
-                    :key="swatch.color"
-                    type="button"
-                    class="swatch"
-                    :class="{ 'is-active': paperColor === swatch.color }"
-                    :style="{ '--swatch': swatch.color }"
-                    :aria-label="`${swatch.name} paper`"
-                    :aria-pressed="paperColor === swatch.color"
-                    @click="pickPaper(swatch.color)"
-                  ></button>
+                <div class="swatch-row">
+                  <span class="swatch-caption">Paper</span>
+                  <div class="swatch-group" role="group" aria-label="Paper colour">
+                    <button
+                      v-for="swatch in paperSwatches"
+                      :key="swatch.color"
+                      type="button"
+                      class="swatch"
+                      :class="{ 'is-active': paperColor === swatch.color }"
+                      :style="{ '--swatch': swatch.color }"
+                      :aria-label="`${swatch.name} paper`"
+                      :aria-pressed="paperColor === swatch.color"
+                      @click="pickPaper(swatch.color)"
+                    ></button>
+                  </div>
                 </div>
-                <div class="swatch-group" role="group" aria-label="Inner layer colour">
-                  <button
-                    v-for="swatch in innerSwatches"
-                    :key="swatch.color"
-                    type="button"
-                    class="swatch swatch--small"
-                    :class="{ 'is-active': innerColor === swatch.color }"
-                    :style="{ '--swatch': swatch.color }"
-                    :aria-label="`${swatch.name} inner layer`"
-                    :aria-pressed="innerColor === swatch.color"
-                    @click="pickInner(swatch.color)"
-                  ></button>
+                <div class="swatch-row">
+                  <span class="swatch-caption">Inner layer</span>
+                  <div
+                    class="swatch-group"
+                    role="group"
+                    aria-label="Inner layer colour"
+                  >
+                    <button
+                      v-for="swatch in innerSwatches"
+                      :key="swatch.color"
+                      type="button"
+                      class="swatch"
+                      :class="{ 'is-active': innerColor === swatch.color }"
+                      :style="{ '--swatch': swatch.color }"
+                      :aria-label="`${swatch.name} inner layer`"
+                      :aria-pressed="innerColor === swatch.color"
+                      @click="pickInner(swatch.color)"
+                    ></button>
+                  </div>
                 </div>
               </article>
 
-              <article id="how-it-works" class="story-step" data-step="2"
+              <article
+                class="story-step"
+                data-step="2"
                 :class="{ 'is-current': activeStep === 2 }"
               >
-                <span class="story-step-num">03 — Fillers</span>
-                <h3>Finish with fillers</h3>
+                <p class="story-step-label">Fillers</p>
+                <h3>Finish with <em>fillers</em></h3>
                 <p>
-                  Eucalyptus, baby's breath and greenery bring it together.
-                  Not sure where to start? Our AI concierge suggests the
-                  perfect combination for the occasion, season and recipient.
+                  Eucalyptus, baby's breath and greenery bring it together. Not
+                  sure where to start? Our AI concierge suggests the perfect
+                  combination for the occasion, season and recipient.
                 </p>
               </article>
 
-              <article class="story-step story-step--reveal" data-step="3"
+              <article
+                class="story-step story-step--reveal"
+                data-step="3"
                 :class="{ 'is-current': activeStep === 3 }"
               >
-                <span class="story-step-num">Your bouquet</span>
-                <h3>Every arrangement is unique, just like your story.</h3>
+                <p class="story-step-label">Your bouquet</p>
+                <h3>Every arrangement is unique, <em>just like your story.</em></h3>
                 <ul class="story-features">
                   <li v-for="feature in features" :key="feature.id">
-                    <span class="story-feature-icon" aria-hidden="true">{{
-                      feature.icon
-                    }}</span>
-                    <span>{{ feature.title }}</span>
+                    {{ feature.title }}
                   </li>
                 </ul>
                 <button
-                  class="btn-learn-more"
+                  class="btn btn--dark btn-learn-more"
                   @click="handleLearnMore('3d-designer')"
                 >
                   Explore 3D Designer
+                  <span class="btn-arrow" aria-hidden="true">→</span>
                 </button>
               </article>
             </div>
           </div>
-          <div class="story-progress" aria-hidden="true">
-            <span ref="storyProgressFill" class="story-progress-fill"></span>
+          <div class="container story-progress-wrap" aria-hidden="true">
+            <div class="story-progress">
+              <span ref="storyProgressFill" class="story-progress-fill"></span>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- Panel 6: Stats Section -->
+      <!-- How it works -->
       <section
-        class="panel-section stats-panel"
-        id="stats"
-        ref="statsSection"
+        id="how-it-works"
+        ref="processSection"
+        class="process"
+        aria-labelledby="process-heading"
       >
-        <div class="panel-container">
-          <div class="panel-content">
-            <h2 class="reveal-fade-up">The marketplace, right now</h2>
-            <p class="reveal-fade-up stats-header-desc">
-              A snapshot of what's moving through BloomCraft today.
-            </p>
-            <div class="stats-stacked-grid">
-              <div
-                v-for="stat in statsData"
-                :key="stat.label"
-                class="stat-card-item reveal-card"
-              >
-                <div class="stat-icon">{{ stat.icon }}</div>
-                <div class="stat-number">
-                  {{ stat.number }}
-                  <span
-                    v-if="stat.live"
-                    class="live-dot"
-                    aria-hidden="true"
-                  ></span>
-                </div>
-                <div class="stat-label">{{ stat.label }}</div>
-              </div>
-            </div>
+        <div class="container">
+          <div class="section-head">
+            <p class="label">How it works</p>
+            <h2 id="process-heading">
+              From a local florist's bench <em>to your door</em>
+            </h2>
           </div>
+          <ol class="process-list">
+            <li
+              v-for="(step, i) in processSteps"
+              :key="step.title"
+              class="process-step"
+            >
+              <span class="process-num" aria-hidden="true"
+                >{{ ["i", "ii", "iii"][i] }}.</span
+              >
+              <h3>{{ step.title }}</h3>
+              <p>{{ step.text }}</p>
+            </li>
+          </ol>
         </div>
       </section>
 
@@ -305,21 +321,25 @@
       >
         <div class="plans-inner">
           <div class="plans-head">
-            <span class="eyebrow">For flower businesses</span>
-            <h2 id="plans-heading">Plans that grow with your shop</h2>
+            <p class="label">For flower businesses</p>
+            <h2 id="plans-heading">Plans that grow <em>with your shop</em></h2>
             <p>
               Start with the essentials, then grow into a connected ERP
               workspace when your operations need more.
             </p>
-            <router-link to="/pricing" class="plans-compare"
-              >Compare all features <span aria-hidden="true">→</span></router-link
+            <router-link to="/pricing" class="link-underline"
+              >Compare all features</router-link
             >
             <div class="plans-progress" aria-hidden="true">
               <span ref="plansProgressFill" class="plans-progress-fill"></span>
             </div>
           </div>
           <div ref="plansViewport" class="plans-viewport">
-            <div ref="plansTrack" class="plans-track" @focusin="revealFocusedPlan">
+            <div
+              ref="plansTrack"
+              class="plans-track"
+              @focusin="revealFocusedPlan"
+            >
               <PricingPlanCard
                 v-for="plan in subscriptionPlans"
                 :key="plan.key"
@@ -337,37 +357,37 @@
         </div>
       </section>
 
-      <!-- Panel 7: Blog Section -->
-      <section class="panel-section blog-panel" id="blog" ref="blogSection">
-        <div class="panel-container">
-          <div class="panel-content text-left-side">
-            <h2 class="reveal-fade-up">The BloomCraft Journal</h2>
-            <p class="reveal-fade-up blog-header-desc">
+      <!-- Journal -->
+      <section
+        id="blog"
+        ref="blogSection"
+        class="journal"
+        aria-labelledby="journal-heading"
+      >
+        <div class="container">
+          <div class="section-head section-head--split">
+            <div>
+              <p class="label">The BloomCraft Journal</p>
+              <h2 id="journal-heading">Notes from the <em>flower world</em></h2>
+            </div>
+            <p class="section-intro">
               Tips, trends, and stories from the world of flowers
             </p>
-            <div class="blog-stacked-grid">
-              <div
-                v-for="post in blogPosts"
-                :key="post.id"
-                class="blog-card-item reveal-card"
-              >
-                <div class="blog-image">
-                  Blog Image {{ post.id }}<br />400x250px
-                </div>
-                <div class="blog-content">
-                  <h3>{{ post.title }}</h3>
-                  <a
-                    href="#"
-                    @click.prevent="readBlog(post.id)"
-                    class="blog-link"
-                  >
-                    Read more →
-                  </a>
-                </div>
-              </div>
-            </div>
           </div>
-          <div class="panel-visual spacer-right" aria-hidden="true"></div>
+          <ul class="journal-list">
+            <li v-for="(post, i) in blogPosts" :key="post.id">
+              <a href="#" class="journal-row" @click.prevent="readBlog(post.id)">
+                <span class="journal-index">{{
+                  String(i + 1).padStart(2, "0")
+                }}</span>
+                <span class="journal-category">{{ post.category }}</span>
+                <span class="journal-title">{{ post.title }}</span>
+                <span class="journal-arrow" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                </span>
+              </a>
+            </li>
+          </ul>
         </div>
       </section>
 
@@ -378,19 +398,18 @@
         class="about-section"
         aria-labelledby="about-heading"
       >
-        <div class="about-inner">
-          <header class="about-head">
-            <span class="eyebrow">About us</span>
-            <h2 id="about-heading">The purpose behind every BloomCraft bouquet</h2>
+        <div class="container about-inner">
+          <header class="section-head about-head">
+            <p class="label">About us</p>
+            <h2 id="about-heading">The purpose behind <em>every bouquet</em></h2>
           </header>
           <div class="about-grid">
             <article
-              v-for="(statement, i) in aboutStatements"
+              v-for="statement in aboutStatements"
               :key="statement.title"
               class="about-card"
             >
-              <span class="about-num">0{{ i + 1 }}</span>
-              <h3>{{ statement.title }}</h3>
+              <h3 class="about-title">{{ statement.title }}</h3>
               <p class="about-text">
                 <span
                   v-for="(word, w) in statement.words"
@@ -405,17 +424,14 @@
         </div>
       </section>
 
-      <!-- Panel 8: CTA Section -->
-      <section class="panel-section cta-panel" ref="ctaSection">
-        <div class="panel-container cta-container">
-          <div class="cta-content">
-            <h2 class="reveal-fade-up">Ready to create something beautiful?</h2>
-            <div class="reveal-fade-up">
-              <router-link to="/guest/register" class="btn-cta">
-                Start Designing Now
-              </router-link>
-            </div>
-          </div>
+      <!-- Closing call to action -->
+      <section class="cta-panel" ref="ctaSection">
+        <div class="container cta-content">
+          <h2>Ready to create something <em>beautiful</em>?</h2>
+          <router-link to="/guest/register" class="btn btn--dark btn-cta">
+            Start Designing Now
+            <span class="btn-arrow" aria-hidden="true">→</span>
+          </router-link>
         </div>
       </section>
     </main>
@@ -453,73 +469,74 @@
 
     <!-- Footer -->
     <footer class="footer" ref="footerSection">
-      <div class="footer-content">
-        <div class="footer-brand">
-          <div class="logo">
-            <span>
+      <div class="container">
+        <div class="footer-content">
+          <div class="footer-brand">
+            <div class="footer-logo">
               <img
                 src="/bloomcraft-darkmode-removebg.png"
                 alt="Bloomcraft Logo"
-                width="60"
-                height="60"
+                width="48"
+                height="48"
               />
-            </span>
-            <span>BloomCraft</span>
+              <span>BloomCraft</span>
+            </div>
+            <p>
+              Your marketplace for custom flower arrangements. Connect with
+              local vendors and design the perfect bouquet.
+            </p>
+            <ul class="social-links">
+              <li v-for="social in socialLinks" :key="social.name">
+                <a
+                  :href="social.url"
+                  class="social-link"
+                  target="_blank"
+                  rel="noopener"
+                  >{{ social.name }}</a
+                >
+              </li>
+            </ul>
           </div>
-          <p>
-            Your marketplace for custom flower arrangements. Connect with local
-            vendors and design the perfect bouquet.
-          </p>
-          <div class="social-links">
-            <a
-              v-for="social in socialLinks"
-              :key="social.name"
-              :href="social.url"
-              class="social-link"
-              target="_blank"
-            >
-              {{ social.icon }}
-            </a>
+          <div class="footer-section">
+            <h4>Company</h4>
+            <ul>
+              <li v-for="link in companyLinks" :key="link.name">
+                <a :href="link.url" @click.prevent="handleFooterLink(link.url)">
+                  {{ link.name }}
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div class="footer-section">
+            <h4>Support</h4>
+            <ul>
+              <li v-for="link in supportLinks" :key="link.name">
+                <a :href="link.url" @click.prevent="handleFooterLink(link.url)">
+                  {{ link.name }}
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div class="footer-section">
+            <h4>Get Started</h4>
+            <ul>
+              <li><router-link to="/guest/register">Sign Up</router-link></li>
+              <li><router-link to="/guest/login">Login</router-link></li>
+              <li id="register-vendor">
+                <router-link to="/guest/vendor_register"
+                  >Become a Vendor</router-link
+                >
+              </li>
+              <li>
+                <router-link to="/pricing">Pricing</router-link>
+              </li>
+            </ul>
           </div>
         </div>
-        <div class="footer-section">
-          <h4>Company</h4>
-          <ul>
-            <li v-for="link in companyLinks" :key="link.name">
-              <a :href="link.url" @click.prevent="handleFooterLink(link.url)">
-                {{ link.name }}
-              </a>
-            </li>
-          </ul>
+        <p class="footer-wordmark" aria-hidden="true">BloomCraft</p>
+        <div class="footer-bottom">
+          <p>Copyright © {{ currentYear }} BloomCraft. All rights reserved.</p>
         </div>
-        <div class="footer-section">
-          <h4>Support</h4>
-          <ul>
-            <li v-for="link in supportLinks" :key="link.name">
-              <a :href="link.url" @click.prevent="handleFooterLink(link.url)">
-                {{ link.name }}
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div class="footer-section">
-          <h4>Get Started</h4>
-          <ul>
-            <li><router-link to="/guest/register">Sign Up</router-link></li>
-            <li><router-link to="/guest/login">Login</router-link></li>
-            <li id="register-vendor">
-              <router-link to="/guest/vendor_register"
-                >Become a Vendor</router-link
-              >
-            </li>
-            <li>
-              <router-link to="/pricing">Pricing</router-link>
-            </li>
-          </ul>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>Copyright © {{ currentYear }} BloomCraft. All rights reserved.</p>
       </div>
     </footer>
   </div>
@@ -533,6 +550,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 import { useAuth } from "../../composables/useAuth";
 import { getStoredUserToken } from "../../utils/authSession";
+import { BLOOM_VARIETIES } from "../../composables/landingFlowers";
 import {
   createLandingBouquet,
   PAPER_PRESETS,
@@ -562,7 +580,7 @@ const isAuthenticated = computed(
 const heroSection = ref(null);
 const storySection = ref(null);
 const storyProgressFill = ref(null);
-const statsSection = ref(null);
+const processSection = ref(null);
 const plansSection = ref(null);
 const plansViewport = ref(null);
 const plansTrack = ref(null);
@@ -616,6 +634,26 @@ function pickInner(color) {
   userPickedColor = true;
   innerColor.value = color;
   bouquet?.setRibbonColor(color);
+}
+
+// Bloom varieties (sculpted heads in landingFlowers.js). Scrolling through
+// the Blooms step cycles them until the visitor picks one.
+const bloomVarieties = BLOOM_VARIETIES;
+const bloomVariety = ref("signature");
+let userPickedBloom = false;
+
+function pickBloom(key) {
+  userPickedBloom = true;
+  bloomVariety.value = key;
+  bouquet?.setBloom(key);
+}
+
+function cycleBloom(index) {
+  if (userPickedBloom) return;
+  const key = BLOOM_VARIETIES[index]?.key;
+  if (!key || key === bloomVariety.value) return;
+  bloomVariety.value = key;
+  bouquet?.setBloom(key);
 }
 
 // Loading intro — shown once per browser session, driven by the real
@@ -685,18 +723,26 @@ const features = ref([
   },
 ]);
 
-const statsData = ref([
-  { icon: "🌸", number: "340", label: "Arrangements sent this week" },
-  // In production, wire this to a real vendor-presence feed rather than a static count.
-  { icon: "🧑‍🌾", number: "62", label: "Vendor studios online now", live: true },
-  { icon: "🚚", number: "48hr", label: "Average delivery window" },
-  { icon: "⭐", number: "4.9/5", label: "Rating across 5,000+ orders" },
-]);
+// How it works (replaces the old placeholder marketplace stats).
+const processSteps = [
+  {
+    title: "Find a local florist",
+    text: "Browse storefronts from flower shops near you and choose who will craft your arrangement.",
+  },
+  {
+    title: "Design it in 3D",
+    text: "Pick blooms, wrapping and fillers in the 3D studio, or let our AI concierge suggest a combination for the occasion.",
+  },
+  {
+    title: "Hand-tied and delivered",
+    text: "Your florist prepares the bouquet you designed and delivers it fresh to the door.",
+  },
+];
 
 const blogPosts = ref([
-  { id: 1, title: "Seasonal Flower Guide for Spring" },
-  { id: 2, title: "How to Care for Your Custom Bouquet" },
-  { id: 3, title: "Meet Our Featured Vendor: Petal & Co" },
+  { id: 1, title: "Seasonal Flower Guide for Spring", category: "Seasonal guide" },
+  { id: 2, title: "How to Care for Your Custom Bouquet", category: "Flower care" },
+  { id: 3, title: "Meet Our Featured Vendor: Petal & Co", category: "Vendor stories" },
 ]);
 
 const socialLinks = ref([
@@ -914,9 +960,9 @@ function onIntroFinished() {
 // Everything is created inside a gsap.context so a resize can
 // revert and rebuild it cleanly.
 // ==========================================================
-const STORY_LENGTH = 10; // timeline units
-const STEP_TIMES = [0.2, 3.2, 5.8, 8.2]; // when each story step enters
-const STORY_ANCHORS = { features: 0.18, "how-it-works": 0.68 }; // nav targets (progress)
+const STORY_LENGTH = 11; // timeline units
+const STEP_TIMES = [0.2, 4.2, 6.8, 9.2]; // when each story step enters
+const STORY_ANCHORS = { features: 0.12 }; // nav targets inside the pinned story (progress)
 let journeyCtx = null;
 let pageCtx = null; // hero intro + background parallax
 let storyTrigger = null;
@@ -1016,7 +1062,7 @@ function setupJourney() {
   const scale = isMobile ? 0.62 : 0.95;
   // Where the bouquet sits on screen in the hero and during the story.
   const heroSx = isMobile ? 0 : 0.42;
-  const heroSy = isMobile ? -0.42 : 0;
+  const heroSy = isMobile ? -0.56 : 0;
   const storySx = isMobile ? 0 : 0.36;
   const storySy = isMobile ? 0.3 : 0;
   const origin = { x: 0, y: 0, z: 0 };
@@ -1098,7 +1144,7 @@ function setupJourney() {
         scrollTrigger: {
           trigger: story,
           start: "top top",
-          end: isMobile ? "+=320%" : "+=440%",
+          end: isMobile ? "+=380%" : "+=520%",
           pin: true,
           scrub: 1,
           anticipatePin: 1,
@@ -1113,14 +1159,27 @@ function setupJourney() {
         }
       });
 
-      // 01 Blooms: zoom into the flowers, soften everything else.
-      tl.fromTo(bouquet.view, { ...overview }, { ...flowers, duration: 1.4 }, 0.4);
+      // 01 Blooms: zoom into the flowers, soften everything else, and
+      // cycle through the bloom varieties.
+      const bloomProxy = { i: 0 };
+      // immediateRender: false keeps the hero framing until the story starts.
+      tl.fromTo(bouquet.view, { ...overview }, { ...flowers, duration: 1.4, immediateRender: false }, 0.4);
       tl.to(bouquet.focus, { wrapper: 0.25, fillers: 0.35, duration: 1 }, 0.4);
+      tl.to(
+        bloomProxy,
+        {
+          i: BLOOM_VARIETIES.length - 0.01,
+          duration: 2.8,
+          ease: "none",
+          onUpdate: () => cycleBloom(Math.floor(bloomProxy.i)),
+        },
+        0.8,
+      );
 
       // 02 Wrapper: pull back and orbit to the paper; cycle swatches.
-      tl.to(bouquet.view, { ...wrapper, duration: 1.4 }, 3);
-      tl.to(rig.rotation, { y: 0.55, duration: 1.6 }, 3);
-      tl.to(bouquet.focus, { flowers: 0.35, wrapper: 1, fillers: 0.3, duration: 1 }, 3);
+      tl.to(bouquet.view, { ...wrapper, duration: 1.4 }, 4);
+      tl.to(rig.rotation, { y: 0.55, duration: 1.6 }, 4);
+      tl.to(bouquet.focus, { flowers: 0.35, wrapper: 1, fillers: 0.3, duration: 1 }, 4);
       tl.to(
         paperProxy,
         {
@@ -1129,25 +1188,25 @@ function setupJourney() {
           ease: "none",
           onUpdate: () => cyclePaper(Math.floor(paperProxy.i)),
         },
-        3.6,
+        4.6,
       );
 
       // 03 Fillers: zoom onto leaves and small plants.
-      tl.to(bouquet.view, { ...fillers, duration: 1.4 }, 5.6);
-      tl.to(rig.rotation, { y: -0.45, duration: 1.6 }, 5.6);
-      tl.to(bouquet.focus, { flowers: 0.35, wrapper: 0.25, fillers: 1, duration: 1 }, 5.6);
+      tl.to(bouquet.view, { ...fillers, duration: 1.4 }, 6.6);
+      tl.to(rig.rotation, { y: -0.45, duration: 1.6 }, 6.6);
+      tl.to(bouquet.focus, { flowers: 0.35, wrapper: 0.25, fillers: 1, duration: 1 }, 6.6);
 
       // Reveal: full bouquet, one slow turn.
-      tl.to(bouquet.view, { ...finale, duration: 1.6 }, 8);
-      tl.to(bouquet.focus, { flowers: 1, wrapper: 1, fillers: 1, duration: 1 }, 8);
-      tl.to(rig.rotation, { y: Math.PI * 2, duration: 2, ease: "power1.inOut" }, 8);
+      tl.to(bouquet.view, { ...finale, duration: 1.6 }, 9);
+      tl.to(bouquet.focus, { flowers: 1, wrapper: 1, fillers: 1, duration: 1 }, 9);
+      tl.to(rig.rotation, { y: Math.PI * 2, duration: 2, ease: "power1.inOut" }, 9);
       tl.set({}, {}, STORY_LENGTH);
 
       storyTrigger = tl.scrollTrigger;
     }
 
     // ---- After the story the bouquet steps aside for content ----
-    const stats = statsSection.value;
+    const stats = processSection.value;
     if (stats && stage) {
       gsap.to(stage, {
         autoAlpha: 0,
@@ -1283,7 +1342,7 @@ function setupJourney() {
       tl.to(".landing-page", { backgroundColor: "#1b1612", ease: "none", duration: 0.12 }, 0.6);
       tl.to(".navbar .nav-toggle-bar", { backgroundColor: "#faf8f5", ease: "none" }, 0);
       tl.fromTo(
-        footer.querySelectorAll(".footer-brand, .footer-section, .footer-bottom"),
+        footer.querySelectorAll(".footer-brand, .footer-section, .footer-wordmark, .footer-bottom"),
         { autoAlpha: 0, y: 48 },
         { autoAlpha: 1, y: 0, ease: "power2.out", stagger: 0.08, duration: 0.4 },
         0.5,
@@ -1473,7 +1532,40 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Poppins:wght@300;400;500;600&display=swap");
+
+/* ============================================================
+   DESIGN TOKENS
+============================================================= */
+.landing-page {
+  /* Dim-white base, warm like petals */
+  --ivory: #f4f1ec;
+  --ivory-deep: #ebe5dd;
+  --paper: #faf8f4;
+  --ink: #1e1b18;
+  --ink-soft: #6e6761;
+  --line: rgba(30, 27, 24, 0.12);
+  --line-soft: rgba(30, 27, 24, 0.07);
+  --rosewood: #b86558;
+  --rosewood-dark: #8e443a;
+  --gold: #d4b27a;
+  --espresso: #1b1612;
+
+  --font-display: "Cormorant Garamond", "Cormorant", Georgia, "Times New Roman", serif;
+  --font-sans: "Poppins", -apple-system, "Segoe UI", sans-serif;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --gutter: clamp(20px, 5vw, 72px);
+  --section-space: clamp(110px, 13vw, 190px);
+
+  position: relative;
+  background: var(--ivory);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-weight: 300;
+  line-height: 1.7;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
 
 * {
   margin: 0;
@@ -1486,52 +1578,157 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
-.landing-page {
-  /* Dim-white base: softer than pure white, warm like petals */
-  --ivory: #f4f1ec;
-  --ivory-deep: #ebe5dd;
-  --ink: #1e1b18;
-  --ink-soft: #6e6761;
-  --rosewood: #b86558;
-  --rosewood-dark: #8e443a;
-  --gold: #d4b27a;
-  --espresso: #1b1612;
-  --line: rgba(30, 27, 24, 0.06);
-
-  /* Glassmorphism templates */
-  --ivory-glass: rgba(250, 248, 245, 0.7);
-  --ivory-deep-glass: rgba(242, 237, 231, 0.7);
-  --espresso-glass: rgba(27, 22, 18, 0.85);
-
-  position: relative;
-  background: var(--ivory);
-  color: var(--ink);
-  font-family:
-    "Poppins",
-    -apple-system,
-    sans-serif;
-  font-weight: 300;
-  line-height: 1.7;
-  overflow-x: hidden;
+.container {
+  width: 100%;
+  max-width: calc(1240px + var(--gutter) * 2);
+  margin: 0 auto;
+  padding-inline: var(--gutter);
 }
 
+/* ============================================================
+   TYPOGRAPHY
+============================================================= */
 .landing-page h1,
 .landing-page h2,
-.landing-page h3,
-.landing-page .stat-number {
-  font-family: "Montserrat", sans-serif;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+.landing-page h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.02;
+  color: var(--ink);
 }
 
-.hero-kicker {
-  display: inline-block;
-  font-family: "Poppins", sans-serif;
-  font-size: 16px;
-  font-weight: 500;
+.landing-page h1 em,
+.landing-page h2 em,
+.landing-page h3 em {
   font-style: italic;
+  font-weight: 400;
   color: var(--rosewood-dark);
-  margin-bottom: 18px;
+}
+
+/* One quiet label style for every section */
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.label::before {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.section-head h2 {
+  margin-top: 22px;
+  font-size: clamp(44px, 5.6vw, 84px);
+  max-width: 900px;
+}
+
+.section-head--split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 48px;
+  align-items: end;
+}
+
+.section-intro {
+  max-width: 360px;
+  justify-self: end;
+  color: var(--ink-soft);
+  font-size: 15.5px;
+  line-height: 1.8;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ============================================================
+   BUTTONS + LINKS
+============================================================= */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 17px 30px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.45s var(--ease-out),
+    color 0.45s var(--ease-out),
+    border-color 0.45s var(--ease-out);
+}
+
+.btn--dark {
+  background: var(--ink);
+  color: var(--ivory);
+}
+
+.btn--dark:hover {
+  background: var(--rosewood-dark);
+}
+
+.btn-arrow {
+  display: inline-block;
+  transition: transform 0.45s var(--ease-out);
+}
+
+.btn:hover .btn-arrow {
+  transform: translateX(4px);
+}
+
+.btn:focus-visible,
+.link-underline:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 4px;
+}
+
+.link-underline {
+  position: relative;
+  padding-bottom: 4px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.link-underline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: currentColor;
+  transform-origin: right;
+  transition: transform 0.5s var(--ease-out);
+}
+
+.link-underline:hover::after {
+  transform: scaleX(0.35);
 }
 
 /* Skip link: visible only when focused */
@@ -1545,7 +1742,7 @@ onBeforeUnmount(() => {
   background: var(--ink);
   color: var(--ivory);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: none;
   transform: translateY(-160%);
   transition: transform 0.25s ease;
@@ -1555,6 +1752,12 @@ onBeforeUnmount(() => {
   transform: none;
   outline: 2px solid var(--rosewood);
   outline-offset: 3px;
+}
+
+.scroll-story-container {
+  position: relative;
+  z-index: 10;
+  width: 100%;
 }
 
 .scroll-story-container:focus {
@@ -1577,7 +1780,7 @@ onBeforeUnmount(() => {
 .scroll-progress-fill {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, var(--rosewood), var(--gold));
+  background: var(--rosewood);
   transform: scaleX(0);
   transform-origin: left;
 }
@@ -1594,8 +1797,8 @@ onBeforeUnmount(() => {
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: rgba(250, 248, 245, 0.92);
-  box-shadow: 0 10px 28px rgba(30, 27, 24, 0.14);
+  background: rgba(250, 248, 244, 0.92);
+  box-shadow: 0 10px 28px rgba(30, 27, 24, 0.12);
   color: var(--ink);
   cursor: pointer;
   opacity: 0;
@@ -1603,7 +1806,7 @@ onBeforeUnmount(() => {
   transform: translateY(12px);
   transition:
     opacity 0.35s ease,
-    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.35s var(--ease-out),
     visibility 0.35s,
     background 0.3s ease;
 }
@@ -1634,7 +1837,7 @@ onBeforeUnmount(() => {
 .btt-ring-track,
 .btt-ring-fill {
   fill: none;
-  stroke-width: 2;
+  stroke-width: 1.5;
 }
 
 .btt-ring-track {
@@ -1653,7 +1856,7 @@ onBeforeUnmount(() => {
   height: 18px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.8;
+  stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
   transition: transform 0.3s ease;
@@ -1663,20 +1866,13 @@ onBeforeUnmount(() => {
   transform: translateY(-2px);
 }
 
-@media (max-width: 640px) {
-  .back-to-top {
-    right: calc(16px + env(safe-area-inset-right, 0px));
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-    width: 46px;
-    height: 46px;
-  }
-}
-
-/* Ambient dynamic background */
+/* ============================================================
+   AMBIENT BACKGROUND + 3D LAYER
+============================================================= */
 .bg-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
+  filter: blur(90px);
   pointer-events: none;
   z-index: 0;
 }
@@ -1686,11 +1882,7 @@ onBeforeUnmount(() => {
   right: -5%;
   width: 48vw;
   height: 48vw;
-  background: radial-gradient(
-    circle,
-    rgba(184, 101, 88, 0.22),
-    transparent 70%
-  );
+  background: radial-gradient(circle, rgba(184, 101, 88, 0.16), transparent 70%);
 }
 
 .blob-sage {
@@ -1698,11 +1890,7 @@ onBeforeUnmount(() => {
   left: -10%;
   width: 42vw;
   height: 42vw;
-  background: radial-gradient(
-    circle,
-    rgba(156, 181, 145, 0.16),
-    transparent 70%
-  );
+  background: radial-gradient(circle, rgba(156, 181, 145, 0.12), transparent 70%);
 }
 
 .grain-overlay {
@@ -1710,14 +1898,11 @@ onBeforeUnmount(() => {
   inset: 0;
   z-index: 2000;
   pointer-events: none;
-  opacity: 0.04;
+  opacity: 0.035;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* ============================================================
-   PERSISTENT FLOWER CANVAS LAYER
-============================================================= */
 .flower-stage-fixed {
   position: fixed;
   inset: 0;
@@ -1732,7 +1917,7 @@ onBeforeUnmount(() => {
   display: block;
 }
 
-/* Blackout iris (Stage 6): sits above the bouquet, below the content */
+/* Blackout iris: above the bouquet, below the content */
 .blackout {
   position: fixed;
   inset: 0;
@@ -1742,39 +1927,38 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-/* Navigation — full-width at top, floating pill when scrolled */
+/* ============================================================
+   NAVIGATION — full width at top, floating pill when scrolled
+============================================================= */
 .navbar {
   position: fixed;
-  /* Always centred so width/radius can animate without jumping */
   top: 0;
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 9999px; /* effectively unrestricted at top */
-  background: var(--ivory);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  padding: 1.6rem 6%;
+  max-width: 9999px;
+  z-index: 1000;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  z-index: 1000;
-  border-radius: 0; /* flat at top */
+  padding: 1.5rem var(--gutter);
+  background: var(--ivory);
   border: 1px solid transparent;
-  box-shadow: none;
+  border-radius: 0;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   transition:
-    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    top 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    width 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    max-width 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    padding 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    border-radius 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    background 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    transform 0.5s var(--ease-out),
+    top 0.5s var(--ease-out),
+    width 0.5s var(--ease-out),
+    max-width 0.5s var(--ease-out),
+    padding 0.5s var(--ease-out),
+    border-radius 0.5s var(--ease-out),
+    border-color 0.5s var(--ease-out),
+    background 0.5s var(--ease-out),
+    box-shadow 0.5s var(--ease-out);
 }
 
-/* Hidden while scrolling down; keyboard focus always brings it back */
 .navbar--hidden {
   transform: translate(-50%, calc(-100% - 32px));
 }
@@ -1783,45 +1967,51 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
 }
 
-/* Scrolled state — floating pill */
 .navbar--scrolled {
-  top: 20px;
+  top: 18px;
   width: calc(100% - 48px);
   max-width: 1240px;
-  padding: 0.72rem 2rem;
+  padding: 0.7rem 0.8rem 0.7rem 1.6rem;
   border-radius: 999px;
-  background: rgba(250, 248, 245, 0.86);
-  border-color: rgba(30, 27, 24, 0.12);
-  box-shadow:
-    0 8px 40px rgba(30, 27, 24, 0.1),
-    0 2px 8px rgba(30, 27, 24, 0.06);
+  background: rgba(250, 248, 244, 0.86);
+  border-color: var(--line-soft);
+  box-shadow: 0 12px 40px rgba(30, 27, 24, 0.08);
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-family: "Montserrat", sans-serif;
-  font-size: 23px;
-  font-weight: 700;
+  gap: 10px;
   color: var(--ink);
   text-decoration: none;
-  letter-spacing: -0.02em;
+}
+
+.logo img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.logo-text {
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .nav-links {
   display: flex;
-  gap: 36px;
+  gap: 34px;
   align-items: center;
 }
 
 .nav-links a {
   position: relative;
+  padding-bottom: 3px;
   color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 400;
   text-decoration: none;
-  font-size: 14.5px;
-  font-weight: 500;
-  padding-bottom: 4px;
   transition: color 0.3s;
 }
 
@@ -1829,25 +2019,50 @@ onBeforeUnmount(() => {
   content: "";
   position: absolute;
   left: 0;
+  right: 0;
   bottom: 0;
-  width: 0;
-  height: 1.5px;
-  background: var(--rosewood);
-  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.nav-links a:hover {
-  color: var(--rosewood);
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.45s var(--ease-out);
 }
 
 .nav-links a:hover::after {
-  width: 100%;
+  transform: scaleX(1);
 }
 
 .nav-buttons {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
+}
+
+.btn-login {
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.btn-login:hover {
+  color: var(--rosewood-dark);
+}
+
+.btn-register {
+  display: inline-block;
+  padding: 11px 24px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--ivory);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.4s var(--ease-out);
+}
+
+.btn-register:hover {
+  background: var(--rosewood-dark);
 }
 
 .nav-links a:focus-visible,
@@ -1859,13 +2074,12 @@ onBeforeUnmount(() => {
   border-radius: 6px;
 }
 
-/* Mobile menu toggle (shown below 968px) */
 .nav-toggle {
   display: none;
   position: relative;
   width: 42px;
   height: 42px;
-  border: 1px solid rgba(30, 27, 24, 0.12);
+  border: 1px solid var(--line);
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
@@ -1876,9 +2090,8 @@ onBeforeUnmount(() => {
   left: 12px;
   right: 12px;
   height: 1.5px;
-  background: currentColor;
-  color: var(--ink);
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--ink);
+  transition: transform 0.35s var(--ease-out);
 }
 
 .nav-toggle-bar:first-child {
@@ -1901,118 +2114,108 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-.btn-login {
-  padding: 10px 28px;
-  background: transparent;
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-family: "Poppins", sans-serif;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-  text-decoration: none;
-  display: inline-block;
-}
-
-.btn-login:hover {
-  border-color: var(--ink);
-  transform: translateY(-2px);
-}
-
-.btn-register {
-  padding: 10px 28px;
-  background: var(--ink);
-  color: var(--ivory);
-  border: none;
-  border-radius: 999px;
-  font-family: "Poppins", sans-serif;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-  text-decoration: none;
-  display: inline-block;
-}
-
-.btn-register:hover {
-  background: var(--rosewood);
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(184, 101, 88, 0.25);
-}
-
 /* ============================================================
-   PANELS SCROLL STORY LAYOUT
+   HERO
 ============================================================= */
-.scroll-story-container {
+.hero {
   position: relative;
-  z-index: 10;
-  width: 100%;
-}
-
-.panel-section {
-  position: relative;
-  min-height: 100vh;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  padding: 120px 6%;
-  overflow: hidden;
-  background: transparent;
-}
-
-.panel-container {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 80px;
-  align-items: center;
-  z-index: 15;
-}
-
-.panel-content {
   display: flex;
   flex-direction: column;
   justify-content: center;
-}
-
-.text-left-side {
-  grid-column: 1;
-}
-
-.text-right-side {
-  grid-column: 2;
-}
-
-.spacer-left {
-  grid-column: 1;
-}
-
-.spacer-right {
-  grid-column: 2;
-}
-
-.panel-visual {
-  height: 100%;
-  min-height: 380px;
-  pointer-events: none;
-}
-
-/* Hero Panel */
-.hero-panel {
   min-height: 100vh;
   min-height: 100svh;
-  padding-top: 150px;
+  padding: 150px 0 140px;
 }
 
 .hero-content {
+  max-width: 640px;
   will-change: transform, opacity;
 }
 
-/* Soft gold halo framing the bouquet on the right */
+.hero-title {
+  margin: 28px 0 30px;
+  font-size: clamp(64px, 8.4vw, 136px);
+  line-height: 0.92;
+  letter-spacing: -0.025em;
+}
+
+.hero-title .line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.06em;
+}
+
+.hero-title .line-inner {
+  display: block;
+}
+
+.hero-desc {
+  max-width: 440px;
+  margin-bottom: 44px;
+  color: var(--ink-soft);
+  font-size: 16.5px;
+  line-height: 1.8;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 32px;
+}
+
+.hero-foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 36px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.hero-foot-cue {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.cue-line {
+  position: relative;
+  width: 48px;
+  height: 1px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.cue-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  transform: translateX(-100%);
+  animation: cueSweep 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes cueSweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Gold halo framing the bouquet */
 .hero-halo {
   position: absolute;
   top: 50%;
@@ -2028,14 +2231,14 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 1px solid rgba(212, 178, 122, 0.45);
+  border: 1px solid rgba(212, 178, 122, 0.35);
 }
 
 .halo-ring--inner {
   inset: 9%;
   border-style: dashed;
-  border-color: rgba(184, 101, 88, 0.22);
-  animation: haloSpin 60s linear infinite;
+  border-color: rgba(184, 101, 88, 0.16);
+  animation: haloSpin 80s linear infinite;
 }
 
 @keyframes haloSpin {
@@ -2044,174 +2247,11 @@ onBeforeUnmount(() => {
   }
 }
 
-.hero-title {
-  font-size: clamp(46px, 6.4vw, 92px);
-  line-height: 1.02;
-  margin-bottom: 28px;
-  color: var(--ink);
-}
-
-.hero-title .line {
-  display: block;
-  overflow: hidden;
-  padding-bottom: 0.08em;
-}
-
-.hero-title .line-inner {
-  display: block;
-}
-
-.hero-title .highlight {
-  color: var(--rosewood);
-  background: linear-gradient(120deg, var(--rosewood) 30%, var(--gold) 90%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.hero-desc {
-  font-size: 18px;
-  color: var(--ink-soft);
-  margin-bottom: 36px;
-  max-width: 500px;
-  line-height: 1.8;
-}
-
-.btn-hero {
-  padding: 16px 44px;
-  font-size: 15px;
-}
-
-.hero-scroll-cue {
-  position: absolute;
-  left: 50%;
-  bottom: 36px;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-  z-index: 20;
-}
-
-.cue-line {
-  position: relative;
-  width: 1px;
-  height: 48px;
-  background: rgba(30, 27, 24, 0.12);
-  overflow: hidden;
-}
-
-.cue-line::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--rosewood);
-  transform: translateY(-100%);
-  animation: cueDrop 2.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
-}
-
-@keyframes cueDrop {
-  0% {
-    transform: translateY(-100%);
-  }
-  50% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(100%);
-  }
-}
-
-@media (max-width: 968px) {
-  .hero-halo {
-    right: 50%;
-    width: 86vw;
-    transform: translate(50%, -50%);
-    opacity: 0.7;
-  }
-
-  .hero-scroll-cue {
-    display: none;
-  }
-
-  /* Copy sits at the top, the bouquet shows beneath it */
-  .hero-panel {
-    align-items: flex-start;
-    padding-top: 132px;
-  }
-
-  .hero-panel .hero-content {
-    padding: 0;
-    background: none;
-    border: none;
-    box-shadow: none;
-    backdrop-filter: none;
-  }
-
-  .hero-halo {
-    top: 72%;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .halo-ring--inner,
-  .cue-line::after {
-    animation: none;
-  }
-}
-
-.btn-learn-more {
-  padding: 14px 38px;
-  background: var(--ink);
-  color: var(--ivory);
-  border: none;
-  border-radius: 999px;
-  font-family: "Poppins", sans-serif;
-  font-size: 14.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.btn-learn-more:hover {
-  background: var(--rosewood);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(184, 101, 88, 0.25);
-}
-
 /* ============================================================
    BOUQUET STORY (pinned)
 ============================================================= */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.eyebrow {
-  display: inline-block;
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--rosewood-dark);
-}
-
 .story {
   position: relative;
-  z-index: 10;
   height: 100vh;
   height: 100svh;
 }
@@ -2225,35 +2265,34 @@ onBeforeUnmount(() => {
 .story-inner {
   position: relative;
   height: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 128px 6% 96px;
   display: grid;
-  grid-template-columns: minmax(0, 460px) 1fr;
+  grid-template-columns: minmax(0, 480px) 1fr;
   grid-template-rows: auto 1fr;
+  padding-top: 128px;
+  padding-bottom: 96px;
 }
 
 .story-head {
   grid-column: 1 / -1;
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 24px;
 }
 
 .story-index {
   list-style: none;
   display: flex;
-  gap: 32px;
+  gap: 34px;
 }
 
 .story-index li {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 10px;
   color: var(--ink-soft);
-  opacity: 0.45;
-  transition: opacity 0.4s ease, color 0.4s ease;
+  opacity: 0.4;
+  transition: opacity 0.5s ease;
 }
 
 .story-index li.is-active {
@@ -2262,22 +2301,23 @@ onBeforeUnmount(() => {
 }
 
 .story-index-num {
-  font-family: "Montserrat", sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--rosewood-dark);
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-style: italic;
 }
 
 .story-index-label {
-  font-size: 13.5px;
+  font-size: 12px;
   font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 .story-steps {
   grid-column: 1;
   position: relative;
   align-self: center;
-  min-height: 360px;
+  min-height: 380px;
 }
 
 .story-step {
@@ -2294,112 +2334,143 @@ onBeforeUnmount(() => {
   pointer-events: auto;
 }
 
-.story-step-num {
-  display: inline-block;
-  margin-bottom: 16px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
+.story-step-label {
+  margin-bottom: 18px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--rosewood-dark);
 }
 
 .story-step h3 {
-  font-size: clamp(34px, 4.2vw, 58px);
-  line-height: 1.04;
-  margin-bottom: 20px;
-  color: var(--ink);
+  margin-bottom: 24px;
+  font-size: clamp(48px, 5.4vw, 88px);
+  line-height: 0.95;
 }
 
 .story-step--reveal h3 {
-  font-size: clamp(30px, 3.4vw, 46px);
+  font-size: clamp(40px, 4.2vw, 64px);
 }
 
-.story-step p {
-  max-width: 420px;
-  margin-bottom: 28px;
-  font-size: 17px;
+.story-step p:not(.story-step-label) {
+  max-width: 400px;
+  margin-bottom: 32px;
+  color: var(--ink-soft);
+  font-size: 16px;
   line-height: 1.8;
+}
+
+/* Bloom picker: quiet text tabs */
+.bloom-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 26px;
+}
+
+.bloom-option {
+  padding: 6px 0;
+  border: none;
+  border-bottom: 1px solid transparent;
+  background: none;
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+  transition:
+    color 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.bloom-option:hover {
+  color: var(--ink);
+}
+
+.bloom-option.is-active {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.bloom-option:focus-visible,
+.swatch:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 4px;
+}
+
+.swatch-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+.swatch-caption {
+  width: 92px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--ink-soft);
 }
 
 .swatch-group {
   display: flex;
-  align-items: center;
   gap: 12px;
-  margin-bottom: 14px;
 }
 
 .swatch {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--ivory);
   border-radius: 50%;
   background: var(--swatch);
-  border: 3px solid var(--ivory);
-  box-shadow:
-    0 0 0 1px rgba(30, 27, 24, 0.14),
-    0 4px 12px rgba(30, 27, 24, 0.08);
+  box-shadow: 0 0 0 1px var(--line);
   cursor: pointer;
-  transition:
-    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.3s ease;
-}
-
-.swatch--small {
-  width: 26px;
-  height: 26px;
-  border-width: 2px;
+  transition: box-shadow 0.3s ease, transform 0.3s var(--ease-out);
 }
 
 .swatch:hover {
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
 .swatch.is-active {
-  box-shadow:
-    0 0 0 2px var(--rosewood),
-    0 6px 14px rgba(184, 101, 88, 0.25);
-}
-
-.swatch:focus-visible {
-  outline: 2px solid var(--rosewood);
-  outline-offset: 4px;
+  box-shadow: 0 0 0 1px var(--ink);
 }
 
 .story-features {
   list-style: none;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 30px;
+  gap: 6px 0;
+  margin-bottom: 36px;
+  color: var(--ink-soft);
+  font-size: 14px;
 }
 
-.story-features li {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border: 1px solid rgba(30, 27, 24, 0.1);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.45);
-  font-size: 13.5px;
-  font-weight: 500;
+.story-features li + li::before {
+  content: "·";
+  margin: 0 14px;
+  color: var(--rosewood);
+}
+
+.story-progress-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 44px;
 }
 
 .story-progress {
-  position: absolute;
-  left: max(6%, calc(50% - 600px + 6%));
-  right: max(6%, calc(50% - 600px + 6%));
-  bottom: 44px;
   height: 1px;
-  background: rgba(30, 27, 24, 0.1);
+  background: var(--line);
   overflow: hidden;
 }
 
 .story-progress-fill {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, var(--rosewood), var(--gold));
+  background: var(--ink);
   transform: scaleX(0);
   transform-origin: left;
 }
@@ -2416,9 +2487,9 @@ onBeforeUnmount(() => {
 
 .story--static .story-steps {
   display: grid;
-  gap: 64px;
+  gap: 72px;
   min-height: 0;
-  margin-top: 48px;
+  margin-top: 56px;
 }
 
 .story--static .story-step {
@@ -2426,65 +2497,55 @@ onBeforeUnmount(() => {
 }
 
 .story--static .story-index,
-.story--static .story-progress {
+.story--static .story-progress-wrap {
   display: none;
 }
 
-@media (max-width: 968px) {
-  .story-inner {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr auto;
-    padding: 96px 5% 56px;
-  }
+/* ============================================================
+   HOW IT WORKS
+============================================================= */
+.process {
+  position: relative;
+  padding-block: var(--section-space);
+}
 
-  .story-index {
-    gap: 14px;
-  }
+.process-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 88px;
+  border-top: 1px solid var(--line);
+}
 
-  .story-index-label {
-    display: none;
-  }
+.process-step {
+  padding: 44px 44px 0 0;
+}
 
-  .story-steps {
-    grid-row: 3;
-    align-self: end;
-    min-height: 0;
-  }
+.process-step + .process-step {
+  padding-left: 44px;
+  border-left: 1px solid var(--line);
+}
 
-  .story-step {
-    top: auto;
-    bottom: 0;
-    padding: 24px 22px;
-    border: 1px solid rgba(30, 27, 24, 0.08);
-    border-radius: 22px;
-    background: rgba(244, 241, 236, 0.88);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-  }
+.process-num {
+  display: block;
+  margin-bottom: 40px;
+  font-family: var(--font-display);
+  font-size: 54px;
+  font-style: italic;
+  line-height: 1;
+  color: var(--rosewood);
+}
 
-  .story-step h3,
-  .story-step--reveal h3 {
-    font-size: 28px;
-    margin-bottom: 12px;
-  }
+.process-step h3 {
+  margin-bottom: 16px;
+  font-size: clamp(28px, 2.4vw, 36px);
+}
 
-  .story-step p {
-    font-size: 15px;
-    line-height: 1.7;
-    margin-bottom: 16px;
-  }
-
-  .story-features {
-    margin-bottom: 18px;
-  }
-
-  .story-progress {
-    bottom: 28px;
-  }
-
-  .story--static .story-step {
-    position: static;
-  }
+.process-step p {
+  max-width: 330px;
+  color: var(--ink-soft);
+  font-size: 15.5px;
+  line-height: 1.8;
 }
 
 /* ============================================================
@@ -2492,7 +2553,6 @@ onBeforeUnmount(() => {
 ============================================================= */
 .plans-section {
   position: relative;
-  z-index: 10;
   min-height: 100vh;
   min-height: 100svh;
   display: flex;
@@ -2503,52 +2563,37 @@ onBeforeUnmount(() => {
 .plans-inner {
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-  gap: 56px;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: 64px;
   align-items: center;
-  padding: 120px 0 80px max(6%, calc(50% - 600px + 6%));
+  padding: 120px 0 80px max(var(--gutter), calc(50% - 620px));
 }
 
 .plans-head h2 {
-  margin: 16px 0 18px;
-  font-size: clamp(32px, 3.6vw, 52px);
-  line-height: 1.05;
+  margin: 22px 0 22px;
+  font-size: clamp(42px, 4.6vw, 72px);
 }
 
-.plans-head p {
-  margin-bottom: 24px;
+.plans-head p:not(.label) {
+  margin-bottom: 28px;
   color: var(--ink-soft);
-  font-size: 16px;
-  line-height: 1.75;
-}
-
-.plans-compare {
-  display: inline-flex;
-  gap: 8px;
-  color: var(--rosewood-dark);
-  font-size: 14.5px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: gap 0.3s ease;
-}
-
-.plans-compare:hover {
-  gap: 12px;
+  font-size: 15.5px;
+  line-height: 1.8;
 }
 
 .plans-progress {
   width: 100%;
   max-width: 220px;
-  height: 2px;
-  margin-top: 40px;
-  background: rgba(30, 27, 24, 0.1);
+  height: 1px;
+  margin-top: 48px;
+  background: var(--line);
   overflow: hidden;
 }
 
 .plans-progress-fill {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, var(--rosewood), var(--gold));
+  background: var(--ink);
   transform: scaleX(0);
   transform-origin: left;
 }
@@ -2564,14 +2609,14 @@ onBeforeUnmount(() => {
 
 .plans-track {
   display: flex;
-  gap: 24px;
+  gap: 20px;
   width: max-content;
   padding-right: 6vw;
   will-change: transform;
 }
 
 .plans-card {
-  width: clamp(300px, 26vw, 360px);
+  width: clamp(300px, 25vw, 350px);
   flex-shrink: 0;
 }
 
@@ -2580,7 +2625,7 @@ onBeforeUnmount(() => {
   max-width: 720px;
   padding: 12px 16px;
   border: 1px solid #eacb95;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #fff5df;
   color: #5b3a1e;
   font-size: 14px;
@@ -2591,7 +2636,6 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
-/* Mobile and reduced motion: native horizontal scroll with snap, no pin */
 .plans-section--static .plans-viewport {
   overflow-x: auto;
   scroll-snap-type: x mandatory;
@@ -2601,7 +2645,497 @@ onBeforeUnmount(() => {
   scroll-snap-align: start;
 }
 
+/* ============================================================
+   JOURNAL
+============================================================= */
+.journal {
+  position: relative;
+  padding-block: var(--section-space);
+}
+
+.journal-list {
+  list-style: none;
+  margin-top: 80px;
+  border-top: 1px solid var(--line);
+}
+
+.journal-row {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 72px 200px minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: 24px;
+  padding: 38px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.journal-row::before {
+  content: "";
+  position: absolute;
+  inset: 0 calc(var(--gutter) * -0.5);
+  z-index: -1;
+  background: var(--ivory-deep);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.6s var(--ease-out);
+}
+
+.journal-row:hover::before,
+.journal-row:focus-visible::before {
+  transform: scaleY(1);
+}
+
+.journal-row:focus-visible {
+  outline: none;
+}
+
+.journal-index {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-style: italic;
+  color: var(--ink-soft);
+}
+
+.journal-category {
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.journal-title {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 2.9vw, 44px);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  transition:
+    transform 0.6s var(--ease-out),
+    color 0.4s ease;
+}
+
+.journal-row:hover .journal-title,
+.journal-row:focus-visible .journal-title {
+  transform: translateX(12px);
+  color: var(--rosewood-dark);
+}
+
+.journal-arrow {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  transition:
+    background 0.4s var(--ease-out),
+    border-color 0.4s var(--ease-out);
+}
+
+.journal-arrow svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition:
+    stroke 0.4s ease,
+    transform 0.5s var(--ease-out);
+}
+
+.journal-row:hover .journal-arrow,
+.journal-row:focus-visible .journal-arrow {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.journal-row:hover .journal-arrow svg,
+.journal-row:focus-visible .journal-arrow svg {
+  stroke: var(--ivory);
+  transform: translateX(2px);
+}
+
+/* ============================================================
+   ABOUT US
+============================================================= */
+.about-section {
+  position: relative;
+  padding-block: var(--section-space);
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(235, 229, 221, 0.75) 16%,
+    rgba(235, 229, 221, 0.75) 84%,
+    transparent
+  );
+}
+
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 80px;
+  margin-top: 88px;
+}
+
+.about-card {
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+}
+
+.landing-page .about-title {
+  margin-bottom: 26px;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--rosewood-dark);
+}
+
+.about-text {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 2.15vw, 31px);
+  font-weight: 400;
+  line-height: 1.42;
+  color: var(--ink);
+}
+
+.about-rule {
+  height: 1px;
+  margin-top: 100px;
+  background: linear-gradient(90deg, var(--gold), rgba(212, 178, 122, 0));
+  transform-origin: left;
+}
+
+/* ============================================================
+   CLOSING CTA
+============================================================= */
+.cta-panel {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: 160px 0 14vh;
+  text-align: center;
+}
+
+.cta-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.cta-panel h2 {
+  max-width: 980px;
+  margin-bottom: 48px;
+  font-size: clamp(54px, 7.2vw, 120px);
+  line-height: 0.95;
+}
+
+/* ============================================================
+   FOOTER
+============================================================= */
+.footer {
+  position: relative;
+  z-index: 15;
+  padding: 120px 0 40px;
+  background: var(--espresso);
+  color: var(--ivory);
+}
+
+.footer-content {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1fr;
+  gap: 64px;
+}
+
+.footer-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.footer-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
+}
+
+.footer-logo img {
+  object-fit: contain;
+}
+
+.footer-brand p {
+  max-width: 320px;
+  color: rgba(250, 248, 245, 0.55);
+  font-size: 14.5px;
+  line-height: 1.8;
+}
+
+.social-links {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+}
+
+.social-link {
+  color: rgba(250, 248, 245, 0.65);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.social-link:hover {
+  color: var(--ivory);
+}
+
+.footer-section h4 {
+  margin-bottom: 26px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(250, 248, 245, 0.45);
+}
+
+.footer-section ul {
+  list-style: none;
+}
+
+.footer-section li {
+  margin-bottom: 14px;
+}
+
+.footer-section a {
+  color: rgba(250, 248, 245, 0.78);
+  font-size: 15px;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.footer-section a:hover {
+  color: var(--ivory);
+}
+
+.footer a:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.footer-wordmark {
+  margin: 110px 0 28px;
+  font-family: var(--font-display);
+  font-size: clamp(80px, 19.5vw, 300px);
+  font-weight: 500;
+  line-height: 0.8;
+  letter-spacing: -0.035em;
+  text-align: center;
+  white-space: nowrap;
+  color: rgba(250, 248, 245, 0.92);
+}
+
+.footer-bottom {
+  padding-top: 28px;
+  border-top: 1px solid rgba(250, 248, 245, 0.1);
+  color: rgba(250, 248, 245, 0.45);
+  font-size: 13px;
+}
+
+/* ============================================================
+   RESPONSIVE
+============================================================= */
+@media (max-width: 1100px) {
+  .nav-links {
+    gap: 24px;
+  }
+}
+
 @media (max-width: 968px) {
+  .navbar--scrolled {
+    top: 14px;
+    width: calc(100% - 32px);
+  }
+
+  .nav-toggle {
+    display: inline-block;
+  }
+
+  .nav-links {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 10px 22px;
+    border: 1px solid var(--line-soft);
+    border-radius: 22px;
+    background: rgba(250, 248, 244, 0.97);
+    box-shadow: 0 18px 40px rgba(30, 27, 24, 0.12);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease,
+      visibility 0.3s;
+  }
+
+  .navbar--menu-open .nav-links {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+
+  .nav-links a {
+    padding: 14px 0;
+    font-size: 16px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .nav-links a:last-child {
+    border-bottom: none;
+  }
+
+  .nav-links a::after {
+    display: none;
+  }
+
+  /* Hero: copy on top, bouquet beneath */
+  .hero {
+    justify-content: flex-start;
+    padding-top: 128px;
+  }
+
+  .hero-title {
+    font-size: clamp(54px, 13vw, 92px);
+  }
+
+  .hero-desc {
+    margin-bottom: 32px;
+  }
+
+  .hero-foot {
+    display: none;
+  }
+
+  .hero-halo {
+    top: 72%;
+    right: 50%;
+    width: 86vw;
+    transform: translate(50%, -50%);
+    opacity: 0.7;
+  }
+
+  /* Story: text card below the bouquet */
+  .story-inner {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+    padding-top: 92px;
+    padding-bottom: 56px;
+  }
+
+  .story-index {
+    gap: 16px;
+  }
+
+  .story-index-label {
+    display: none;
+  }
+
+  .story-steps {
+    grid-row: 3;
+    align-self: end;
+    min-height: 0;
+  }
+
+  .story-step {
+    top: auto;
+    bottom: 0;
+    padding: 26px 24px;
+    border: 1px solid var(--line-soft);
+    border-radius: 20px;
+    background: rgba(244, 241, 236, 0.9);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .story-step h3,
+  .story-step--reveal h3 {
+    margin-bottom: 12px;
+    font-size: 38px;
+  }
+
+  .story-step p:not(.story-step-label) {
+    margin-bottom: 18px;
+    font-size: 14.5px;
+    line-height: 1.7;
+  }
+
+  .story-step-label {
+    margin-bottom: 10px;
+  }
+
+  .swatch-caption {
+    width: 78px;
+  }
+
+  .story-features {
+    margin-bottom: 20px;
+  }
+
+  .story-progress-wrap {
+    bottom: 28px;
+  }
+
+  .story--static .story-step {
+    position: static;
+  }
+
+  .section-head--split {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .section-intro {
+    justify-self: start;
+  }
+
+  .process-list {
+    grid-template-columns: 1fr;
+    margin-top: 56px;
+  }
+
+  .process-step,
+  .process-step + .process-step {
+    padding: 36px 0;
+    border-left: none;
+  }
+
+  .process-step + .process-step {
+    border-top: 1px solid var(--line);
+  }
+
+  .process-num {
+    margin-bottom: 22px;
+    font-size: 44px;
+  }
+
   .plans-section {
     min-height: auto;
   }
@@ -2609,11 +3143,11 @@ onBeforeUnmount(() => {
   .plans-inner {
     grid-template-columns: 1fr;
     gap: 28px;
-    padding: 96px 0 72px 5%;
+    padding: 96px 0 72px var(--gutter);
   }
 
   .plans-head {
-    padding-right: 5%;
+    padding-right: var(--gutter);
   }
 
   .plans-progress {
@@ -2640,722 +3174,79 @@ onBeforeUnmount(() => {
   }
 
   .plans-notice {
-    margin-right: 5%;
-  }
-}
-
-/* Stats Panel */
-.stats-panel {
-  min-height: auto;
-  padding-block: 140px;
-}
-
-.stats-panel .panel-container {
-  grid-template-columns: 1fr;
-}
-
-@media (min-width: 969px) {
-  .stats-panel .stats-stacked-grid {
-    grid-template-columns: repeat(4, 1fr);
+    margin-right: var(--gutter);
   }
 
-  .stats-panel .stat-card-item,
-  .stats-panel .stat-card-item:nth-child(odd) {
-    border-left: 1px solid var(--line);
-    padding-left: 32px;
+  .journal-list {
+    margin-top: 48px;
   }
 
-  .stats-panel .stat-card-item:first-child {
-    border-left: none;
-    padding-left: 0;
-  }
-}
-
-.stats-header-desc {
-  color: var(--ink-soft);
-  font-size: 16.5px;
-  margin-bottom: 44px;
-  max-width: 460px;
-}
-
-.stats-stacked-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0;
-}
-
-.stat-card-item {
-  position: relative;
-  background: none;
-  backdrop-filter: none;
-  border: none;
-  border-left: 1px solid var(--line);
-  border-radius: 0;
-  padding: 12px 0 20px 32px;
-  text-align: left;
-  transition: none;
-}
-
-.stat-card-item:nth-child(odd) {
-  border-left: none;
-  padding-left: 0;
-}
-
-.stat-card-item:hover {
-  transform: none;
-  box-shadow: none;
-  background: none;
-}
-
-.stat-icon {
-  font-size: 20px;
-  margin-bottom: 14px;
-  opacity: 0.55;
-}
-
-.stat-number {
-  font-size: 44px;
-  margin-bottom: 6px;
-  background: linear-gradient(120deg, var(--ink) 45%, var(--rosewood) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.live-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #6f9c5f;
-  -webkit-text-fill-color: #6f9c5f;
-  flex-shrink: 0;
-  box-shadow: 0 0 0 0 rgba(111, 156, 95, 0.55);
-  animation: liveDotPulse 2.2s ease-out infinite;
-}
-
-@keyframes liveDotPulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(111, 156, 95, 0.45);
-  }
-  70% {
-    box-shadow: 0 0 0 9px rgba(111, 156, 95, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(111, 156, 95, 0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .live-dot {
-    animation: none;
-  }
-}
-
-.stat-label {
-  color: var(--ink-soft);
-  font-size: 14px;
-  letter-spacing: 0.02em;
-  font-weight: 500;
-  position: relative;
-  padding-bottom: 14px;
-}
-
-.stat-label::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  height: 2px;
-  width: 100%;
-  background: var(--rosewood);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.stat-card-item:hover .stat-label::after {
-  transform: scaleX(1);
-}
-
-/* Blog Panel */
-.blog-panel h2 {
-  font-size: clamp(30px, 3.5vw, 40px);
-  margin-bottom: 14px;
-}
-
-.blog-header-desc {
-  color: var(--ink-soft);
-  font-size: 16.5px;
-  margin-bottom: 48px;
-}
-
-.blog-stacked-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-}
-
-.blog-card-item {
-  background: none;
-  backdrop-filter: none;
-  border-radius: 4px;
-  overflow: hidden;
-  border: none;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  padding-bottom: 28px;
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.blog-card-item:last-child {
-  border-bottom: none;
-}
-
-.blog-card-item:hover {
-  transform: translateX(6px);
-  border-color: var(--line);
-  box-shadow: none;
-  background: none;
-}
-
-.blog-image {
-  width: 180px;
-  height: 130px;
-  background: linear-gradient(150deg, var(--ivory-deep), #e9ddcd);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #b7afa6;
-  font-size: 12px;
-  text-align: center;
-  padding: 20px;
-  flex-shrink: 0;
-  border-right: none;
-  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.blog-card-item:hover .blog-image {
-  opacity: 0.82;
-}
-
-.blog-content {
-  padding: 28px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.blog-content h3 {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 12px;
-  line-height: 1.35;
-}
-
-.blog-link {
-  color: var(--rosewood-dark);
-  font-size: 14px;
-  font-weight: 600;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: gap 0.3s;
-}
-
-.blog-link:hover {
-  gap: 10px;
-}
-
-/* ============================================================
-   ABOUT US
-============================================================= */
-.about-section {
-  position: relative;
-  z-index: 10;
-  padding: 170px 6%;
-  background: linear-gradient(
-    180deg,
-    transparent,
-    rgba(235, 229, 221, 0.75) 18%,
-    rgba(235, 229, 221, 0.75) 82%,
-    transparent
-  );
-}
-
-.about-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.about-head h2 {
-  max-width: 760px;
-  margin: 16px 0 80px;
-  font-size: clamp(32px, 4vw, 56px);
-  line-height: 1.06;
-}
-
-.about-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 72px;
-}
-
-.about-card {
-  padding-top: 28px;
-  border-top: 1px solid rgba(30, 27, 24, 0.14);
-}
-
-.about-num {
-  font-family: "Montserrat", sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--rosewood-dark);
-}
-
-.about-card h3 {
-  margin: 12px 0 20px;
-  font-size: 26px;
-}
-
-.about-text {
-  font-family: "Montserrat", sans-serif;
-  font-size: clamp(18px, 1.55vw, 22px);
-  font-weight: 500;
-  line-height: 1.62;
-  letter-spacing: -0.01em;
-  color: var(--ink);
-}
-
-.about-rule {
-  height: 1px;
-  margin-top: 96px;
-  background: linear-gradient(90deg, var(--gold), rgba(212, 178, 122, 0));
-  transform-origin: left;
-}
-
-@media (max-width: 968px) {
-  .about-section {
-    padding: 110px 5%;
+  .journal-row {
+    grid-template-columns: 40px minmax(0, 1fr) 44px;
+    grid-template-areas:
+      "index category arrow"
+      "index title arrow";
+    gap: 6px 16px;
+    padding: 28px 0;
   }
 
-  .about-head h2 {
-    margin-bottom: 52px;
+  .journal-index {
+    grid-area: index;
+    align-self: start;
+  }
+
+  .journal-category {
+    grid-area: category;
+  }
+
+  .journal-title {
+    grid-area: title;
+    font-size: 28px;
+  }
+
+  .journal-arrow {
+    grid-area: arrow;
+    width: 44px;
+    height: 44px;
   }
 
   .about-grid {
     grid-template-columns: 1fr;
-    gap: 52px;
+    gap: 56px;
+    margin-top: 56px;
   }
 
   .about-rule {
     margin-top: 64px;
   }
-}
-
-/* CTA Panel */
-.cta-panel {
-  display: flex;
-  justify-content: center;
-  /* Copy sits low; the bouquet returns above it */
-  align-items: flex-end;
-  text-align: center;
-  padding: 160px 6% 14vh;
-}
-
-.cta-container {
-  display: flex;
-  justify-content: center;
-}
-
-.cta-content {
-  max-width: 680px;
-}
-
-.cta-panel h2 {
-  font-size: clamp(34px, 4.6vw, 54px);
-  margin-bottom: 40px;
-  line-height: 1.15;
-  color: var(--ink);
-}
-
-.btn-cta {
-  padding: 18px 56px;
-  background: var(--ink);
-  color: var(--ivory);
-  border: none;
-  border-radius: 999px;
-  font-family: "Poppins", sans-serif;
-  font-size: 15.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-  display: inline-block;
-  text-decoration: none;
-}
-
-.btn-cta:hover {
-  background: var(--rosewood);
-  transform: translateY(-3px);
-  box-shadow: 0 20px 40px rgba(184, 101, 88, 0.3);
-}
-
-/* Petal drifts (fixed layer decorative) */
-.drift-petal {
-  position: absolute;
-  width: 14px;
-  height: 20px;
-  border-radius: 60% 0 60% 0;
-  background: linear-gradient(135deg, #f3c8bd, #e4988f);
-  opacity: 0.7;
-  z-index: 3;
-  animation: petalDrift 11s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.petal-a {
-  top: 12%;
-  left: 10%;
-  animation-delay: 0s;
-}
-
-.petal-b {
-  top: 55%;
-  right: 10%;
-  animation-delay: 2.4s;
-  transform: rotate(30deg);
-}
-
-.petal-c {
-  top: 25%;
-  right: 22%;
-  animation-delay: 4.8s;
-  transform: rotate(-20deg);
-}
-
-.petal-d {
-  top: 70%;
-  left: 20%;
-  animation-delay: 6.6s;
-  transform: rotate(12deg);
-}
-
-.petal-e {
-  top: 40%;
-  left: 65%;
-  animation-delay: 8.2s;
-  transform: rotate(-8deg);
-}
-
-@keyframes petalDrift {
-  0% {
-    transform: translate(0, 0) rotate(0deg);
-    opacity: 0.15;
-  }
-  20% {
-    opacity: 0.6;
-  }
-  50% {
-    transform: translate(-12px, 26vh) rotate(20deg);
-  }
-  80% {
-    opacity: 0.35;
-  }
-  100% {
-    transform: translate(6px, 52vh) rotate(45deg);
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .drift-petal {
-    animation: none;
-    opacity: 0.3;
-  }
-}
-
-/* Footer */
-.footer {
-  position: relative;
-  z-index: 15;
-  background: var(--espresso);
-  color: var(--ivory);
-  padding: 90px 6% 36px;
-}
-
-.footer-content {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  gap: 60px;
-  max-width: 1200px;
-  margin: 0 auto 54px;
-}
-
-.footer-brand {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.footer-brand .logo {
-  color: var(--ivory);
-  font-size: 23px;
-}
-
-.footer-brand p {
-  color: rgba(250, 248, 245, 0.55);
-  font-size: 14.5px;
-  line-height: 1.75;
-  max-width: 320px;
-}
-
-.footer-section h4 {
-  font-family: "Poppins", sans-serif;
-  font-size: 13.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  margin-bottom: 22px;
-  font-weight: 600;
-  color: rgba(250, 248, 245, 0.9);
-}
-
-.footer-section ul {
-  list-style: none;
-}
-
-.footer-section ul li {
-  margin-bottom: 14px;
-}
-
-.footer-section ul li a {
-  color: rgba(250, 248, 245, 0.6);
-  text-decoration: none;
-  font-size: 14.5px;
-  transition: color 0.3s;
-}
-
-.footer-section ul li a:hover {
-  color: var(--ivory);
-}
-
-.footer-bottom {
-  text-align: center;
-  padding-top: 36px;
-  border-top: 1px solid rgba(250, 248, 245, 0.1);
-  color: rgba(250, 248, 245, 0.45);
-  font-size: 13.5px;
-}
-
-.social-links {
-  display: flex;
-  gap: 16px;
-  margin-top: 8px;
-}
-
-.social-link {
-  width: 38px;
-  height: 38px;
-  background: rgba(250, 248, 245, 0.08);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ivory);
-  text-decoration: none;
-  transition: all 0.3s;
-}
-
-.social-link:hover {
-  background: var(--rosewood);
-  transform: translateY(-3px);
-}
-
-/* ============================================================
-   RESPONSIVE DESIGN STYLES
-============================================================= */
-@media (max-width: 968px) {
-  /* At top: still full width, just less padding */
-  .navbar {
-    padding: 1.2rem 5%;
-  }
-
-  /* Scrolled: floating pill, narrower margin */
-  .navbar--scrolled {
-    top: 14px;
-    width: calc(100% - 32px);
-    padding: 0.65rem 1.4rem;
-  }
-
-  .nav-toggle {
-    display: inline-block;
-  }
-
-  .nav-links {
-    position: absolute;
-    top: calc(100% + 10px);
-    left: 0;
-    right: 0;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    padding: 10px 22px;
-    border: 1px solid rgba(30, 27, 24, 0.08);
-    border-radius: 22px;
-    background: rgba(250, 248, 245, 0.97);
-    box-shadow: 0 18px 40px rgba(30, 27, 24, 0.12);
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-8px);
-    transition:
-      opacity 0.3s ease,
-      transform 0.3s ease,
-      visibility 0.3s;
-  }
-
-  .navbar--menu-open .nav-links {
-    opacity: 1;
-    visibility: visible;
-    transform: none;
-  }
-
-  .nav-links a {
-    padding: 14px 0;
-    font-size: 15.5px;
-    border-bottom: 1px solid rgba(30, 27, 24, 0.06);
-  }
-
-  .nav-links a:last-child {
-    border-bottom: none;
-  }
-
-  .nav-links a::after {
-    display: none;
-  }
-
-  .panel-section {
-    padding: 100px 5%;
-  }
-
-  .panel-container {
-    grid-template-columns: 1fr;
-    gap: 40px;
-  }
-
-  .panel-content {
-    max-width: 100%;
-    text-align: center;
-    padding: 44px 32px;
-    background: rgba(250, 248, 245, 0.88);
-    border-radius: 28px;
-    backdrop-filter: blur(16px);
-    border: 1px solid var(--line);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.015);
-  }
-
-  .hero-panel {
-    padding-top: 140px;
-  }
-
-  .hero-title {
-    font-size: 38px;
-  }
-
-  .hero-desc {
-    max-width: 100%;
-  }
-
-  .panel-visual {
-    display: none;
-  }
-
-  .blog-stacked-grid {
-    gap: 20px;
-  }
-
-  .blog-card-item {
-    background: rgba(250, 248, 245, 0.4);
-    padding: 20px;
-    flex-direction: column;
-  }
-
-  .blog-image {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--line);
-    padding: 15px;
-  }
-
-  .blog-content {
-    padding: 20px;
-  }
-
-  .stats-stacked-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .stat-card-item {
-    padding: 12px 0 16px 24px;
-  }
-
-  .stat-number {
-    font-size: 34px;
-  }
 
   .footer-content {
-    grid-template-columns: 1fr;
-    gap: 40px;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px 32px;
+  }
+
+  .footer-brand {
+    grid-column: 1 / -1;
+  }
+
+  .footer-wordmark {
+    margin-top: 72px;
   }
 }
 
 @media (max-width: 640px) {
-  /* At top: full width, compact padding */
   .navbar {
-    padding: 1rem 4%;
+    padding: 1rem var(--gutter);
   }
 
-  /* Scrolled: pill with very slight rounding on small screens */
   .navbar--scrolled {
     top: 10px;
     width: calc(100% - 24px);
-    padding: 0.55rem 1.1rem;
-    border-radius: 20px;
+    padding: 0.55rem 0.6rem 0.55rem 1.1rem;
   }
 
-  .panel-section {
-    padding: 80px 4%;
-  }
-
-  .panel-content {
-    padding: 32px 22px;
-  }
-
-  .hero-title {
-    font-size: 32px;
-  }
-
-  .hero-desc {
-    font-size: 16px;
-  }
-
-  .btn-hero {
-    padding: 14px 34px;
-    width: 100%;
-  }
-
-  .stats-stacked-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .nav-buttons {
-    gap: 10px;
-  }
-
-  .btn-login,
   .btn-register {
-    padding: 8px 18px;
+    padding: 9px 18px;
     font-size: 13px;
   }
 
@@ -3364,18 +3255,43 @@ onBeforeUnmount(() => {
     display: none;
   }
 
+  .nav-buttons {
+    gap: 10px;
+  }
+
   .nav-menu-login {
     display: block;
   }
 
-  .logo {
-    font-size: 19px;
-    gap: 8px;
+  .logo-text {
+    font-size: 23px;
   }
 
   .logo img {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
+  }
+
+  .hero-actions {
+    gap: 24px;
+  }
+
+  .cta-panel h2 {
+    font-size: 48px;
+  }
+
+  .back-to-top {
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    width: 46px;
+    height: 46px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .halo-ring--inner,
+  .cue-line::after {
+    animation: none;
   }
 }
 </style>

@@ -147,9 +147,9 @@ onBeforeUnmount(() => {
   display: flex;
   overflow: hidden;
   margin: 0;
-  font-family: "Montserrat", sans-serif;
+  font-family: "Cormorant Garamond", Georgia, serif;
   font-size: clamp(38px, 7vw, 76px);
-  font-weight: 800;
+  font-weight: 500;
   letter-spacing: -0.03em;
   line-height: 1.1;
 }
@@ -182,7 +182,7 @@ onBeforeUnmount(() => {
 
 .loader-count {
   min-width: 3.2ch;
-  font-family: "Montserrat", sans-serif;
+  font-family: "Cormorant Garamond", Georgia, serif;
   font-size: clamp(28px, 4vw, 44px);
   font-weight: 700;
   font-variant-numeric: tabular-nums;

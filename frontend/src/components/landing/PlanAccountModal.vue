@@ -150,9 +150,9 @@ function handleKeydown(event) {
 
 .plan-modal h2 {
   margin: 0 0 12px;
-  font-family: "Montserrat", sans-serif;
-  font-size: 24px;
-  font-weight: 800;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 32px;
+  font-weight: 500;
   line-height: 1.2;
   letter-spacing: -0.02em;
 }

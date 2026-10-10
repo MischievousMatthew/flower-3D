@@ -90,10 +90,24 @@ defineEmits(['select']);
 .plan-action--dark { color: var(--ivory, #faf8f5); background: var(--ink, #1e1b18); border-color: var(--ink, #1e1b18); }
 .plan-action--dark:hover { background: var(--rosewood, #b86558); border-color: var(--rosewood, #b86558); }
 
-.pricing-plan--landing { padding: 44px 34px 34px; background: rgba(255, 255, 255, 0.66); border-radius: 28px; }
-.pricing-plan--landing .plan-price { font-family: "Montserrat", sans-serif; font-size: clamp(34px, 3vw, 46px); font-weight: 800; }
-.pricing-plan--landing .plan-description { font-size: 15px; }
-.pricing-plan--landing .plan-highlights { font-size: 14.5px; }
-.pricing-plan--landing .plan-action { padding: 14px 20px; font-size: 14.5px; }
+/* Landing-page variant: editorial card; the featured plan inverts to espresso. */
+.pricing-plan--landing { padding: 44px 34px 34px; background: #faf8f4; border: 1px solid rgba(30, 27, 24, 0.1); border-radius: 18px; box-shadow: none; }
+.pricing-plan--landing .plan-badge { top: 26px; right: 26px; left: auto; padding: 0; background: none; color: #d4b27a; font-size: 10.5px; font-weight: 500; letter-spacing: 0.2em; }
+.pricing-plan--landing .plan-name { margin-bottom: 22px; color: #8e443a; font-size: 11.5px; font-weight: 500; letter-spacing: 0.22em; }
+.pricing-plan--landing .plan-price { font-family: "Cormorant Garamond", Georgia, serif; font-size: clamp(46px, 3.6vw, 58px); font-weight: 500; line-height: 1; letter-spacing: -0.02em; }
+.pricing-plan--landing .plan-price small { font-family: "Poppins", sans-serif; font-size: 13px; font-weight: 400; }
+.pricing-plan--landing .plan-description { min-height: 72px; margin: 18px 0 26px; font-size: 14.5px; }
+.pricing-plan--landing .plan-highlights { gap: 14px; padding-top: 26px; border-top: 1px solid rgba(30, 27, 24, 0.1); font-size: 14px; }
+.pricing-plan--landing .plan-highlights span { color: #b86558; font-weight: 400; }
+.pricing-plan--landing .plan-action { padding: 15px 20px; font-size: 14px; font-weight: 500; }
 .pricing-plan--landing .plan-action:focus-visible { outline: 2px solid var(--rosewood, #b86558); outline-offset: 3px; }
+.pricing-plan--landing.pricing-plan--featured { background: #1e1b18; border-color: #1e1b18; color: #f4f1ec; box-shadow: 0 30px 70px rgba(30, 27, 24, 0.2); }
+.pricing-plan--landing.pricing-plan--featured .plan-price { color: #f4f1ec; }
+.pricing-plan--landing.pricing-plan--featured .plan-price small,
+.pricing-plan--landing.pricing-plan--featured .plan-description { color: rgba(244, 241, 236, 0.66); }
+.pricing-plan--landing.pricing-plan--featured .plan-name { color: #d4b27a; }
+.pricing-plan--landing.pricing-plan--featured .plan-highlights { color: #f4f1ec; border-top-color: rgba(244, 241, 236, 0.14); }
+.pricing-plan--landing.pricing-plan--featured .plan-highlights span { color: #d4b27a; }
+.pricing-plan--landing.pricing-plan--featured .plan-action { color: #1e1b18; background: #f4f1ec; border-color: #f4f1ec; }
+.pricing-plan--landing.pricing-plan--featured .plan-action:hover { background: #d4b27a; border-color: #d4b27a; }
 </style>

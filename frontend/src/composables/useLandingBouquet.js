@@ -13,6 +13,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
+import { createBloomLayer } from "./landingFlowers";
 
 export const LANDING_BOUQUET_URL = "/Boquet.landing.glb";
 // Byte size of the generated landing GLB, used when the server does not send
@@ -84,9 +85,9 @@ function buildParticles(count) {
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   const material = new THREE.PointsMaterial({
     color: 0xe9b8ae,
-    size: 0.045,
+    size: 0.035,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.32,
     depthWrite: false,
   });
   return new THREE.Points(geometry, material);
@@ -137,6 +138,7 @@ export function createLandingBouquet(canvas, { onProgress, reducedMotion = false
   let running = false;
   let rafId = 0;
   let model = null;
+  let bloom = null; // sculpted flower heads (see landingFlowers.js)
 
   function resize(width = window.innerWidth, height = window.innerHeight) {
     camera.aspect = width / height;
@@ -253,6 +255,15 @@ export function createLandingBouquet(canvas, { onProgress, reducedMotion = false
           materials.forEach((material) => parts[key].materials.add(material));
         });
 
+        // The base model has bare stems where vendors' flowers would go
+        // (material "Material.001"); hide them, the sculpted heads replace them.
+        parts.flowers.meshes = parts.flowers.meshes.filter((mesh) => {
+          const name = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material)?.name;
+          if (name !== "Material.001") return true;
+          mesh.visible = false;
+          return false;
+        });
+
         // Part focus points in rig-local space (the rig is at identity here).
         PART_KEYS.forEach((key) => {
           if (!parts[key].meshes.length) return;
@@ -261,6 +272,23 @@ export function createLandingBouquet(canvas, { onProgress, reducedMotion = false
           partBox.getCenter(parts[key].center);
           partBox.getSize(parts[key].size);
         });
+
+        // Sculpted flower heads, domed inside the wrapper opening.
+        const wrapperBox = new THREE.Box3();
+        parts.wrapper.meshes.forEach((mesh) => wrapperBox.expandByObject(mesh));
+        const wSize = wrapperBox.getSize(new THREE.Vector3());
+        const wCenter = wrapperBox.getCenter(new THREE.Vector3());
+        bloom = createBloomLayer({
+          anchor: new THREE.Vector3(wCenter.x, wrapperBox.max.y - wSize.y * 0.2, wCenter.z),
+          radius: Math.max(wSize.x, wSize.z) * 0.3,
+          headSize: Math.max(wSize.x, wSize.z) * 0.24,
+          reducedMotion,
+        });
+        spinner.add(bloom.group);
+        parts.flowers.materials.add(bloom.material);
+        const bloomBox = new THREE.Box3().setFromObject(bloom.group);
+        bloomBox.getCenter(parts.flowers.center);
+        bloomBox.getSize(parts.flowers.size);
 
         const shadow = buildGroundShadow();
         shadow.position.y = -1.32;
@@ -278,6 +306,7 @@ export function createLandingBouquet(canvas, { onProgress, reducedMotion = false
 
   function dispose() {
     stop();
+    bloom?.dispose();
     document.removeEventListener("visibilitychange", handleVisibility);
     scene.traverse((object) => {
       object.geometry?.dispose();
@@ -307,6 +336,9 @@ export function createLandingBouquet(canvas, { onProgress, reducedMotion = false
     setActive,
     setPaperColor,
     setRibbonColor,
+    setBloom(variety) {
+      bloom?.setVariety(variety);
+    },
     setPointer(x, y) {
       pointer.x = x;
       pointer.y = y;
