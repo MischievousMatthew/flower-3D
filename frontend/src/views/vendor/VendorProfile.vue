@@ -148,8 +148,19 @@
         </button>
       </div>
 
-      <!-- Loading Overlay -->
-      <LoadingOverlay :visible="isLoading" :message="loadingMessage" />
+      <!-- Loading skeleton, shaped like a tab panel with a form -->
+      <div v-if="isLoading" class="tab-content profile-skeleton" aria-busy="true">
+        <span class="sr-only">Loading profile…</span>
+        <div class="bc-skeleton sk-heading"></div>
+        <div class="bc-skeleton sk-subheading"></div>
+        <div class="bc-skeleton sk-media"></div>
+        <div class="sk-fields">
+          <div v-for="n in 6" :key="n" class="sk-field">
+            <div class="bc-skeleton sk-label"></div>
+            <div class="bc-skeleton sk-input"></div>
+          </div>
+        </div>
+      </div>
 
       <!-- Tab Content -->
       <div v-if="!isLoading" class="tab-content">
@@ -163,28 +174,61 @@
           </div>
 
           <!-- ── Alert banners ── -->
-          <div class="logo-card">
-            <div class="logo-card__preview">
+          <div class="store-media">
+            <!-- Cover photo, shown across the top of the storefront -->
+            <div class="store-media__cover">
               <img
-                v-if="profileData.store_logo_url"
-                :src="profileData.store_logo_url"
-                alt="Store logo"
+                v-if="profileData.store_cover_url"
+                :src="profileData.store_cover_url"
+                alt="Store cover photo"
               />
-              <div v-else class="logo-card__fallback">BC</div>
-            </div>
-            <div class="logo-card__content">
-              <h3 class="logo-card__title">Store Logo</h3>
-              <p class="logo-card__text">
-                Update your store logo here. This uses the existing Cloudinary upload flow.
+              <p v-else class="store-media__cover-empty">
+                No cover photo yet. Customers will see a plain banner.
               </p>
+              <div class="store-media__cover-actions">
+                <button
+                  type="button"
+                  class="store-media__btn"
+                  @click="openUploadModal('cover')"
+                >
+                  {{ profileData.store_cover_url ? "Change Cover" : "Add Cover Photo" }}
+                </button>
+                <button
+                  v-if="profileData.store_cover_url"
+                  type="button"
+                  class="store-media__btn"
+                  :disabled="isRemovingCover"
+                  @click="removeStoreCover"
+                >
+                  {{ isRemovingCover ? "Removing…" : "Remove" }}
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              class="btn-secondary logo-card__action"
-              @click="openLogoUploadModal"
-            >
-              Change Logo
-            </button>
+
+            <div class="logo-card">
+              <div class="logo-card__preview">
+                <img
+                  v-if="profileData.store_logo_url"
+                  :src="profileData.store_logo_url"
+                  alt="Store logo"
+                />
+                <div v-else class="logo-card__fallback">BC</div>
+              </div>
+              <div class="logo-card__content">
+                <h3 class="logo-card__title">Store Logo &amp; Cover</h3>
+                <p class="logo-card__text">
+                  Your logo sits on your cover photo at the top of your storefront.
+                  Covers look best at 1500 × 500.
+                </p>
+              </div>
+              <button
+                type="button"
+                class="btn-secondary logo-card__action"
+                @click="openUploadModal('logo')"
+              >
+                Change Logo
+              </button>
+            </div>
           </div>
 
           <transition name="alert-slide">
@@ -958,48 +1002,52 @@
       <!-- end tab-content -->
     </main>
 
-    <!-- Store Logo Upload Modal -->
+    <!-- Store Logo / Cover Upload Modal -->
     <transition name="modal-fade">
       <div
-        v-if="showLogoUploadModal"
+        v-if="showUploadModal"
         class="modal-overlay"
-        @click="closeLogoUploadModal"
+        @click="closeUploadModal"
       >
         <div class="modal-container" @click.stop>
           <div class="modal-header">
-            <h3 class="modal-title">Update Store Logo</h3>
-            <button class="modal-close" @click="closeLogoUploadModal">✕</button>
+            <h3 class="modal-title">{{ uploadConfig.title }}</h3>
+            <button class="modal-close" @click="closeUploadModal">✕</button>
           </div>
           <div class="modal-body">
-            <div class="photo-upload-area" @click="$refs.logoInput.click()">
-              <div v-if="logoPreview" class="photo-preview">
-                <img :src="logoPreview" alt="Preview" />
+            <div
+              class="photo-upload-area"
+              :class="{ 'photo-upload-area--cover': uploadKind === 'cover' }"
+              @click="$refs.imageInput.click()"
+            >
+              <div v-if="imagePreview" class="photo-preview">
+                <img :src="imagePreview" alt="Preview" />
               </div>
               <div v-else class="photo-placeholder">
-                <span class="upload-icon">🏪</span>
-                <p class="upload-text">Click to select logo</p>
-                <p class="upload-hint">JPG, PNG • Max 2MB</p>
+                <span class="upload-icon">{{ uploadKind === "cover" ? "🖼️" : "🏪" }}</span>
+                <p class="upload-text">{{ uploadConfig.prompt }}</p>
+                <p class="upload-hint">{{ uploadConfig.hint }}</p>
               </div>
             </div>
             <input
               type="file"
-              ref="logoInput"
-              @change="handleLogoSelect"
-              accept="image/jpeg,image/jpg,image/png"
+              ref="imageInput"
+              @change="handleImageSelect"
+              :accept="uploadConfig.accept"
               class="hidden-input"
             />
           </div>
           <div class="modal-footer">
-            <button class="btn-secondary" @click="closeLogoUploadModal">
+            <button class="btn-secondary" @click="closeUploadModal">
               Cancel
             </button>
             <button
               class="btn-primary"
-              @click="uploadStoreLogo"
-              :disabled="!selectedLogo || isUploading"
+              @click="uploadStoreImage"
+              :disabled="!selectedImage || isUploading"
             >
               <span v-if="isUploading">Uploading...</span>
-              <span v-else>Upload Logo</span>
+              <span v-else>{{ uploadConfig.button }}</span>
             </button>
           </div>
         </div>
@@ -1013,7 +1061,7 @@ import { ref, reactive, computed, onMounted, onUnmounted } from "vue";
 import vendorHeader from "../../layouts/vendorHeader.vue";
 import { useRoute, useRouter } from "vue-router";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
-import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
+import "../../styles/bloomcraft.css";
 import api from "../../plugins/axios";
 import { toast } from "vue3-toastify";
 import { useFormSubmit } from "../../composables/useFormSubmit";
@@ -1036,11 +1084,12 @@ const passwordForm = useFormSubmit();
 // ── Page state ────────────────────────────────────────────────────────────
 const activeTab = ref("general");
 const isLoading = ref(false);
-const loadingMessage = ref("");
-const showLogoUploadModal = ref(false);
-const selectedLogo = ref(null);
-const logoPreview = ref(null);
+const showUploadModal = ref(false);
+const uploadKind = ref("logo");
+const selectedImage = ref(null);
+const imagePreview = ref(null);
 const isUploading = ref(false);
+const isRemovingCover = ref(false);
 const avatarDropdown = ref(null);
 const showAvatarMenu = ref(false);
 
@@ -1058,6 +1107,7 @@ const profileData = reactive({
   facebook_page: "",
   instagram_page: "",
   store_logo_url: null,
+  store_cover_url: null,
   profile_photo_url: null,
   payout_method: "",
   account_holder_name: "",
@@ -1171,7 +1221,6 @@ const onNewPasswordInput = () => {
 const fetchProfile = async () => {
   try {
     isLoading.value = true;
-    loadingMessage.value = "Loading profile...";
     const response = await api.get("/vendor/profile");
     if (response.data.success) {
       const data = response.data.data;
@@ -1401,51 +1450,105 @@ const addCutoffTime = () =>
 const removeCutoffTime = (index) =>
   formData.product.cutoff_times.splice(index, 1);
 
-// ── Logo handling ─────────────────────────────────────────────────────────
-const openLogoUploadModal = () => {
+// ── Logo & cover handling ─────────────────────────────────────────────────
+const UPLOAD_KINDS = {
+  logo: {
+    title: "Update Store Logo",
+    prompt: "Click to select logo",
+    hint: "JPG, PNG • Max 2MB",
+    accept: "image/jpeg,image/jpg,image/png",
+    types: /image\/(jpeg|jpg|png)/,
+    typeError: "Please select a JPG or PNG image",
+    maxMb: 2,
+    field: "store_logo",
+    endpoint: "/vendor/profile/store-logo",
+    button: "Upload Logo",
+    success: "Store logo updated!",
+    failure: "Failed to upload logo",
+  },
+  cover: {
+    title: "Update Cover Photo",
+    prompt: "Click to select a cover photo",
+    hint: "JPG, PNG, WEBP • Max 5MB • Best at 1500 × 500",
+    accept: "image/jpeg,image/jpg,image/png,image/webp",
+    types: /image\/(jpeg|jpg|png|webp)/,
+    typeError: "Please select a JPG, PNG or WEBP image",
+    maxMb: 5,
+    field: "store_cover",
+    endpoint: "/vendor/profile/store-cover",
+    button: "Upload Cover",
+    success: "Cover photo updated!",
+    failure: "Failed to upload cover photo",
+  },
+};
+const uploadConfig = computed(() => UPLOAD_KINDS[uploadKind.value]);
+
+const applyProfileResponse = (data) => {
+  Object.assign(profileData, data);
+  updateLocalProfile(data);
+};
+
+const openUploadModal = (kind) => {
   showAvatarMenu.value = false;
-  showLogoUploadModal.value = true;
+  uploadKind.value = kind;
+  showUploadModal.value = true;
 };
-const closeLogoUploadModal = () => {
-  showLogoUploadModal.value = false;
-  selectedLogo.value = null;
-  logoPreview.value = null;
+const closeUploadModal = () => {
+  showUploadModal.value = false;
+  selectedImage.value = null;
+  imagePreview.value = null;
 };
-const handleLogoSelect = (event) => {
+const handleImageSelect = (event) => {
   const file = event.target.files[0];
+  event.target.value = "";
   if (!file) return;
-  if (!file.type.match(/image\/(jpeg|jpg|png)/)) {
-    toast.error("Please select a JPG or PNG image");
+  const config = uploadConfig.value;
+  if (!file.type.match(config.types)) {
+    toast.error(config.typeError);
     return;
   }
-  if (file.size > 2 * 1024 * 1024) {
-    toast.error("Image size must be less than 2MB");
+  if (file.size > config.maxMb * 1024 * 1024) {
+    toast.error(`Image size must be less than ${config.maxMb}MB`);
     return;
   }
-  selectedLogo.value = file;
+  selectedImage.value = file;
   const reader = new FileReader();
-  reader.onload = (e) => (logoPreview.value = e.target.result);
+  reader.onload = (e) => (imagePreview.value = e.target.result);
   reader.readAsDataURL(file);
 };
-const uploadStoreLogo = async () => {
-  if (!selectedLogo.value) return;
+const uploadStoreImage = async () => {
+  if (!selectedImage.value) return;
+  const config = uploadConfig.value;
   try {
     isUploading.value = true;
     const data = new FormData();
-    data.append("store_logo", selectedLogo.value);
-    const response = await api.post("/vendor/profile/store-logo", data, {
+    data.append(config.field, selectedImage.value);
+    const response = await api.post(config.endpoint, data, {
       headers: { "Content-Type": "multipart/form-data" },
-      });
-      if (response.data.success) {
-        Object.assign(profileData, response.data.data);
-        updateLocalProfile(response.data.data);
-        toast.success("Store logo updated!");
-        closeLogoUploadModal();
-      }
+    });
+    if (response.data.success) {
+      applyProfileResponse(response.data.data);
+      toast.success(config.success);
+      closeUploadModal();
+    }
   } catch (error) {
-    toast.error(error.response?.data?.message || "Failed to upload logo");
+    toast.error(error.response?.data?.message || config.failure);
   } finally {
     isUploading.value = false;
+  }
+};
+const removeStoreCover = async () => {
+  try {
+    isRemovingCover.value = true;
+    const response = await api.delete("/vendor/profile/store-cover");
+    if (response.data.success) {
+      applyProfileResponse(response.data.data);
+      toast.success("Cover photo removed");
+    }
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Failed to remove cover photo");
+  } finally {
+    isRemovingCover.value = false;
   }
 };
 
@@ -1503,16 +1606,146 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
   border: 1px solid #e2e8f0;
 }
 
+/* ── Profile loading skeleton ─────────────────────────────────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.sk-heading {
+  height: 28px;
+  width: 260px;
+  max-width: 70%;
+  margin-bottom: 10px;
+}
+.sk-subheading {
+  height: 14px;
+  width: 360px;
+  max-width: 90%;
+  margin-bottom: 28px;
+}
+.sk-media {
+  height: 220px;
+  border-radius: 16px;
+  margin-bottom: 28px;
+}
+.sk-fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+.sk-label {
+  height: 12px;
+  width: 40%;
+  margin-bottom: 10px;
+}
+.sk-input {
+  height: 46px;
+}
+@media (max-width: 640px) {
+  .sk-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+.store-media {
+  margin-bottom: 22px;
+  border: 1px solid #dbe7f3;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #f8fffb 0%, #eef7ff 100%);
+}
+
+.store-media__cover {
+  position: relative;
+  aspect-ratio: 3 / 1;
+  max-height: 260px;
+  width: 100%;
+  background: linear-gradient(135deg, #e6f4ea 0%, #e8eefb 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.store-media__cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.store-media__cover-empty {
+  margin: 0;
+  padding: 0 16px;
+  color: #5f6c7b;
+  font-size: 14px;
+  text-align: center;
+}
+
+.store-media__cover-actions {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.store-media__btn {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1f2937;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.store-media__btn:hover {
+  background: #ffffff;
+}
+
+.store-media__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .logo-card {
   display: grid;
   grid-template-columns: 88px 1fr auto;
   gap: 18px;
   align-items: center;
-  padding: 20px;
-  margin-bottom: 22px;
-  border: 1px solid #dbe7f3;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #f8fffb 0%, #eef7ff 100%);
+  padding: 0 20px 20px;
+}
+
+/* The logo overlaps the bottom of the cover, as on the storefront */
+.logo-card__preview {
+  margin-top: -36px;
+  position: relative;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.photo-upload-area--cover {
+  aspect-ratio: 3 / 1;
+}
+
+@media (max-width: 640px) {
+  .logo-card {
+    grid-template-columns: 72px 1fr;
+  }
+  .store-media .logo-card__preview {
+    width: 72px;
+    height: 72px;
+  }
+  .logo-card__action {
+    grid-column: 1 / -1;
+  }
 }
 
 .logo-card__preview {

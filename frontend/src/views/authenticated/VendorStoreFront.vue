@@ -8,10 +8,43 @@
       @scroll-to-section="() => {}"
     />
 
-    <LoadingOverlay :visible="loading" message="Loading store..." />
+    <!-- Loading skeleton, shaped like the store header and product grid -->
+    <div v-if="loading" class="storefront-skeleton" aria-busy="true">
+      <span class="sr-only">Loading store…</span>
+      <section class="store-hero">
+        <div class="bc-skeleton sk-cover"></div>
+        <div class="store-hero-inner">
+          <div class="store-hero-content">
+            <div class="store-logo-wrap">
+              <div class="bc-skeleton sk-logo"></div>
+            </div>
+            <div class="store-info">
+              <div class="bc-skeleton sk-line sk-title"></div>
+              <div class="bc-skeleton sk-line"></div>
+              <div class="bc-skeleton sk-line sk-short"></div>
+            </div>
+          </div>
+          <div class="store-stats">
+            <div v-for="n in 4" :key="n" class="bc-skeleton sk-pill"></div>
+          </div>
+        </div>
+      </section>
+      <section class="products-section">
+        <div class="sk-products products-grid">
+          <div v-for="n in 6" :key="n" class="product-card product-skeleton">
+            <div class="bc-skeleton skeleton-img"></div>
+            <div class="product-info">
+              <div class="bc-skeleton skeleton-line short"></div>
+              <div class="bc-skeleton skeleton-line"></div>
+              <div class="bc-skeleton skeleton-line medium"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
 
     <!-- Error State -->
-    <div v-if="error && !loading" class="error-screen">
+    <div v-else-if="error" class="error-screen">
       <div class="error-icon">🌸</div>
       <h2>Store Not Found</h2>
       <p>{{ error }}</p>
@@ -20,14 +53,24 @@
       </button>
     </div>
 
-    <template v-else-if="!loading && vendor.store_name">
+    <template v-else-if="vendor.store_name">
       <!-- ── Store Hero Banner ─────────────────────────────────────── -->
       <section class="store-hero">
-        <div class="store-hero-inner">
+        <!-- Cover photo (set by the vendor next to their store logo) -->
+        <div class="store-cover">
+          <img
+            v-if="vendor.store_cover_url"
+            :src="vendor.store_cover_url"
+            alt=""
+            class="store-cover-img"
+            @error="vendor.store_cover_url = null"
+          />
           <button @click="$router.push('/shop')" class="back-link">
             ← Back to Shop
           </button>
+        </div>
 
+        <div class="store-hero-inner">
           <div class="store-hero-content">
             <!-- Logo -->
             <div class="store-logo-wrap">
@@ -290,11 +333,11 @@
                 :key="n"
                 class="product-card product-skeleton"
               >
-                <div class="skeleton skeleton-img"></div>
+                <div class="bc-skeleton skeleton-img"></div>
                 <div class="product-info">
-                  <div class="skeleton skeleton-line short"></div>
-                  <div class="skeleton skeleton-line"></div>
-                  <div class="skeleton skeleton-line medium"></div>
+                  <div class="bc-skeleton skeleton-line short"></div>
+                  <div class="bc-skeleton skeleton-line"></div>
+                  <div class="bc-skeleton skeleton-line medium"></div>
                 </div>
               </div>
             </div>
@@ -377,6 +420,37 @@
       <!-- ── Delivery & Info Section ──────────────────────────────── -->
       <section class="info-section">
         <div class="info-inner">
+          <!-- Pinned shop location -->
+          <div class="location-card" :class="{ 'no-pin': !hasStorePin }">
+            <div v-if="hasStorePin" ref="locationMapEl" class="location-map"></div>
+            <div class="location-details">
+              <p class="section-subtitle">Visit Us</p>
+              <h3 class="location-title">Find the shop</h3>
+              <p class="location-address">
+                {{ vendor.store_address || "Address not provided" }}
+              </p>
+              <p v-if="!hasStorePin" class="location-note">
+                This shop hasn't pinned its location on the map yet.
+              </p>
+              <div v-if="hasStorePin" class="location-actions">
+                <a
+                  :href="directionsUrl"
+                  target="_blank"
+                  rel="noopener"
+                  class="location-btn location-btn-primary"
+                  >Get directions</a
+                >
+                <a
+                  :href="openMapUrl"
+                  target="_blank"
+                  rel="noopener"
+                  class="location-btn"
+                  >Open in Maps</a
+                >
+              </div>
+            </div>
+          </div>
+
           <div class="info-cards">
             <!-- Same-day delivery -->
             <div v-if="vendor.same_day_delivery" class="info-card card-green">
@@ -681,12 +755,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import api from "../../plugins/axios";
 import NavHeader from "../../layouts/NavHeader.vue";
-import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import ModelViewer3D from "../../layouts/3D/3DModelViewer.vue";
 import { useCart } from "../../composables/useCart";
 import { useFlyToCart } from "../../composables/useFlyToCart";
@@ -714,8 +792,11 @@ const vendor = ref({
   store_name: "",
   store_description: "",
   store_logo_path: "",
+  store_cover_url: null,
   business_type: "",
   store_address: "",
+  store_latitude: null,
+  store_longitude: null,
   service_areas: [],
   operating_hours: "",
   product_types: [],
@@ -770,6 +851,58 @@ const storeCity = computed(() => {
     .map((s) => s.trim())
     .filter(Boolean);
   return parts.length ? parts[parts.length - 1] : "";
+});
+
+// ── Pinned location ────────────────────────────────────────────────────────
+const storePin = computed(() => {
+  const { store_latitude: lat, store_longitude: lng } = vendor.value;
+  if (lat === null || lat === undefined || lat === "" || lng === null || lng === undefined || lng === "") return null;
+  const latitude = Number(lat);
+  const longitude = Number(lng);
+  return Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : null;
+});
+const hasStorePin = computed(() => !!storePin.value);
+const directionsUrl = computed(() =>
+  storePin.value
+    ? `https://www.google.com/maps/dir/?api=1&destination=${storePin.value.latitude},${storePin.value.longitude}`
+    : "",
+);
+const openMapUrl = computed(() =>
+  storePin.value
+    ? `https://www.google.com/maps/search/?api=1&query=${storePin.value.latitude},${storePin.value.longitude}`
+    : "",
+);
+
+const locationMapEl = ref(null);
+let locationMap = null;
+const storeMarkerIcon = L.icon({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+const renderLocationMap = async () => {
+  await nextTick();
+  if (!storePin.value || !locationMapEl.value) return;
+  locationMap?.remove();
+  const position = [storePin.value.latitude, storePin.value.longitude];
+  locationMap = L.map(locationMapEl.value, { scrollWheelZoom: false }).setView(position, 16);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "© OpenStreetMap contributors",
+  }).addTo(locationMap);
+  L.marker(position, { icon: storeMarkerIcon })
+    .addTo(locationMap)
+    .bindPopup(vendor.value.store_name || "Shop location");
+};
+
+onBeforeUnmount(() => {
+  locationMap?.remove();
+  locationMap = null;
 });
 
 // Safely coerce service_areas — backend may return a plain string "Cavite"
@@ -877,7 +1010,10 @@ const fetchVendor = async () => {
   } finally {
     loading.value = false;
   }
-  if (!error.value) fetchProducts();
+  if (!error.value) {
+    fetchProducts();
+    renderLocationMap();
+  }
 };
 
 const fetchProducts = async () => {
@@ -1121,30 +1257,59 @@ onMounted(async () => {
 .store-hero {
   margin-top: 80px;
   background: linear-gradient(135deg, #f0f4ff 0%, #fef5ff 100%);
-  padding: 48px 5% 36px;
+  padding: 0 0 36px;
   border-bottom: 1px solid #e2e8f0;
 }
 .store-hero-inner {
   max-width: 1400px;
   margin: 0 auto;
+  padding: 0 5%;
+}
+
+/* Cover photo; falls back to a soft gradient when the vendor has none */
+.store-cover {
+  position: relative;
+  height: 300px;
+  background: linear-gradient(135deg, #c6f6d5 0%, #e9d8fd 55%, #fed7e2 100%);
+  overflow: hidden;
+}
+.store-cover-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.store-cover::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 40%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.18), transparent);
+  pointer-events: none;
 }
 
 .back-link {
+  position: absolute;
+  top: 20px;
+  left: 5%;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #48bb78;
+  color: #276749;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  background: none;
+  background: rgba(255, 255, 255, 0.92);
   border: none;
-  padding: 0;
-  margin-bottom: 24px;
-  transition: color 0.2s;
+  border-radius: 999px;
+  padding: 8px 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: background 0.2s;
 }
 .back-link:hover {
-  color: #276749;
+  background: #ffffff;
 }
 
 .store-hero-content {
@@ -1157,19 +1322,30 @@ onMounted(async () => {
 
 .store-logo-wrap {
   flex-shrink: 0;
+  margin-top: -56px; /* sits over the bottom of the cover */
+  position: relative;
+  z-index: 1;
+}
+.store-info {
+  padding-top: 20px;
+}
+.store-actions {
+  padding-top: 20px;
 }
 .store-logo {
-  width: 90px;
-  height: 90px;
-  border-radius: 14px;
+  width: 120px;
+  height: 120px;
+  border-radius: 18px;
   object-fit: cover;
-  border: 3px solid white;
+  background: white;
+  border: 4px solid white;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 .store-logo-fallback {
-  width: 90px;
-  height: 90px;
-  border-radius: 14px;
+  width: 120px;
+  height: 120px;
+  border: 4px solid white;
+  border-radius: 18px;
   background: linear-gradient(135deg, #48bb78, #38a169);
   color: white;
   font-size: 36px;
@@ -1528,12 +1704,6 @@ onMounted(async () => {
 .product-skeleton {
   pointer-events: none;
 }
-.skeleton {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
-  border-radius: 6px;
-}
 .skeleton-img {
   height: 240px;
   border-radius: 12px 12px 0 0;
@@ -1548,13 +1718,46 @@ onMounted(async () => {
 .skeleton-line.medium {
   width: 70%;
 }
-@keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
+
+/* ── Page loading skeleton ───────────────────────────────────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.sk-cover {
+  height: 300px;
+  border-radius: 0;
+}
+.sk-logo {
+  width: 120px;
+  height: 120px;
+  border-radius: 18px;
+  border: 4px solid white;
+}
+.sk-line {
+  height: 14px;
+  margin-bottom: 12px;
+  max-width: 520px;
+}
+.sk-title {
+  height: 30px;
+  width: 280px;
+  max-width: 70%;
+}
+.sk-short {
+  width: 40%;
+}
+.sk-pill {
+  height: 64px;
+  border-radius: 12px;
+}
+.sk-products {
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 /* Product grid — identical to Shop.vue */
@@ -1756,6 +1959,81 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 20px;
+}
+
+/* ── Location card ────────────────────────────────────────────────────── */
+.location-card {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  margin-bottom: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #f7fafc;
+}
+.location-card.no-pin {
+  grid-template-columns: 1fr;
+}
+.location-map {
+  min-height: 300px;
+  z-index: 0; /* keep Leaflet panes under the sticky header */
+}
+.location-details {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+.location-details .section-subtitle {
+  margin: 0;
+}
+.location-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+.location-address {
+  font-size: 15px;
+  color: #4a5568;
+  line-height: 1.6;
+  margin: 0;
+}
+.location-note {
+  font-size: 13px;
+  color: #a0aec0;
+  margin: 0;
+}
+.location-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.location-btn {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e0;
+  background: white;
+  color: #2d3748;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+.location-btn:hover {
+  border-color: #48bb78;
+  color: #276749;
+}
+.location-btn-primary {
+  background: #48bb78;
+  border-color: #48bb78;
+  color: white;
+}
+.location-btn-primary:hover {
+  background: #38a169;
+  color: white;
 }
 .info-card {
   background: #f7fafc;
@@ -2329,6 +2607,32 @@ onMounted(async () => {
   }
   .info-cards {
     grid-template-columns: 1fr;
+  }
+  .location-card {
+    grid-template-columns: 1fr;
+  }
+  .location-map {
+    min-height: 240px;
+  }
+  .store-cover,
+  .sk-cover {
+    height: 200px;
+  }
+  .sk-logo {
+    width: 96px;
+    height: 96px;
+  }
+  .store-logo-wrap {
+    margin-top: -44px;
+  }
+  .store-logo,
+  .store-logo-fallback {
+    width: 96px;
+    height: 96px;
+  }
+  .store-info,
+  .store-actions {
+    padding-top: 0;
   }
   .contact-grid {
     grid-template-columns: 1fr;

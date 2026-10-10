@@ -291,6 +291,8 @@ Route::middleware('token.auth')->group(function () {
             Route::put('/general-info',     [VendorProfileController::class, 'updateGeneralInfo']);
             Route::post('/store-logo',      [VendorProfileController::class, 'updateStoreLogo']);
             Route::delete('/store-logo',    [VendorProfileController::class, 'deleteStoreLogo']);
+            Route::post('/store-cover',     [VendorProfileController::class, 'updateStoreCover']);
+            Route::delete('/store-cover',   [VendorProfileController::class, 'deleteStoreCover']);
             Route::put('/change-password',  [VendorProfileController::class, 'changePassword']);
         });
 

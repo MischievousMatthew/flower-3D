@@ -32,7 +32,7 @@ class VendorApplication extends Model
         'bank_name', 'billing_address', 'product_types', 'price_min',
         'price_max', 'same_day_delivery', 'cutoff_times',
         'delivery_handled_by', 'max_orders_per_day', 'lead_time',
-        'cancellation_policy', 'store_logo_path', 'portfolio_photos_paths',
+        'cancellation_policy', 'store_logo_path', 'store_cover_path', 'portfolio_photos_paths',
         'facebook_page', 'instagram_page', 'status', 'verification_level',
         'resubmission_status',
         'admin_notes', 'rejection_reason', 'submitted_at', 'reviewed_at',
@@ -66,6 +66,7 @@ class VendorApplication extends Model
         'barangay_clearance_url',
         'mayor_permit_url',
         'store_logo_url',
+        'store_cover_url',
         'profile_photo_url',
         'portfolio_photos_urls',
         'formatted_business_type',
@@ -314,6 +315,11 @@ class VendorApplication extends Model
     protected function storeLogoUrl(): Attribute
     {
         return Attribute::make(get: fn () => $this->resolveLogoUrl($this->store_logo_path));
+    }
+
+    protected function storeCoverUrl(): Attribute
+    {
+        return Attribute::make(get: fn () => $this->resolveLogoUrl($this->store_cover_path));
     }
 
     protected function profilePhotoUrl(): Attribute

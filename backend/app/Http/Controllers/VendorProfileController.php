@@ -441,6 +441,90 @@ class VendorProfileController extends Controller
         }
     }
 
+    public function updateStoreCover(Request $request)
+    {
+        try {
+            if (!$this->authenticatedVendorUser()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Access denied. Vendor only.',
+                ], 403);
+            }
+
+            $vendorApplication = $this->findApprovedVendorApplication();
+
+            if (!$vendorApplication) {
+                return response()->json(['success' => false, 'message' => 'Vendor application not found'], 404);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'store_cover' => 'required|image|mimes:jpeg,jpg,png,webp|max:5120',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors'  => $validator->errors(),
+                ], 422);
+            }
+
+            if ($vendorApplication->store_cover_path) {
+                CloudinaryHelper::destroy($vendorApplication->store_cover_path);
+            }
+
+            $result = CloudinaryHelper::upload($request->file('store_cover')->getRealPath(), [
+                'folder'        => 'store_covers',
+                'resource_type' => 'image',
+            ]);
+
+            $vendorApplication->update(['store_cover_path' => $result['public_id']]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Cover photo updated successfully',
+                'data'    => $this->serializeVendorApplication($vendorApplication->fresh()),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error updating store cover', ['error' => $e->getMessage(), 'user' => Auth::id()]);
+            return response()->json(['success' => false, 'message' => 'Failed to update cover photo'], 500);
+        }
+    }
+
+    public function deleteStoreCover(Request $request)
+    {
+        try {
+            if (!$this->authenticatedVendorUser()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Access denied. Vendor only.',
+                ], 403);
+            }
+
+            $vendorApplication = $this->findApprovedVendorApplication();
+
+            if (!$vendorApplication) {
+                return response()->json(['success' => false, 'message' => 'Vendor application not found'], 404);
+            }
+
+            if ($vendorApplication->store_cover_path) {
+                CloudinaryHelper::destroy($vendorApplication->store_cover_path);
+                $vendorApplication->update(['store_cover_path' => null]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Cover photo removed',
+                'data'    => $this->serializeVendorApplication($vendorApplication->fresh()),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error deleting store cover', ['error' => $e->getMessage(), 'user' => Auth::id()]);
+            return response()->json(['success' => false, 'message' => 'Failed to remove cover photo'], 500);
+        }
+    }
+
     public function changePassword(Request $request)
     {
         try {
@@ -586,6 +670,9 @@ class VendorProfileController extends Controller
             'lead_time'                  => $this->safeVendorValue($vendorApplication, 'lead_time', ''),
             'cancellation_policy'        => $this->safeVendorValue($vendorApplication, 'cancellation_policy', ''),
             'store_logo_url'             => $this->safeVendorValue($vendorApplication, 'store_logo_url'),
+            'store_cover_url'            => $this->safeVendorValue($vendorApplication, 'store_cover_url'),
+            'store_latitude'             => $this->safeVendorValue($vendorApplication, 'store_latitude'),
+            'store_longitude'            => $this->safeVendorValue($vendorApplication, 'store_longitude'),
             'profile_photo_url'          => $this->safeVendorValue($vendorApplication, 'profile_photo_url'),
             'portfolio_photos_urls'      => $this->safeVendorArray($vendorApplication, 'portfolio_photos_urls'),
             'payment_details_completed'  => (bool) $this->safeVendorValue($vendorApplication, 'payment_details_completed', false),

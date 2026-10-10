@@ -27,6 +27,7 @@ const sharedVendorProfile = ref({
   contact_number: "",
   email: "",
   store_logo_url: null,
+  store_cover_url: null,
   profile_photo_url: null, // Same as store_logo_url
   facebook_page: "",
   instagram_page: "",
