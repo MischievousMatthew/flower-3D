@@ -666,7 +666,7 @@
 
 <script setup>
 import { ref, computed, onMounted, reactive } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import vendorHeader from "../../layouts/vendorHeader.vue";
 import { useAuth } from "../../composables/useAuth";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
@@ -676,6 +676,7 @@ import "vue3-toastify/dist/index.css";
 import api from "../../plugins/axios";
 
 const router = useRouter();
+const route = useRoute();
 const { user } = useAuth();
 const fileInput = ref(null);
 const modelFileInput = ref(null);
@@ -1134,6 +1135,10 @@ const goBack = () => {
 
 onMounted(() => {
   if (user.value) formData.owner_id = user.value.id;
+  // "Add flower" on the 3D Customization page opens this form preset for the customizer.
+  if (route.query.selling_type === "per_piece_customizable") {
+    formData.selling_type = "per_piece_customizable";
+  }
 });
 </script>
 

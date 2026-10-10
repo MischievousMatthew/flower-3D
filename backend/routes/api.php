@@ -44,6 +44,7 @@ use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\VendorFinanceDashboardController;
 use App\Http\Controllers\ProductReportController; // ← NEW
 use App\Http\Controllers\VendorSubscriptionController;
+use App\Http\Controllers\VendorCustomizationOptionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -104,6 +105,7 @@ Route::prefix('vendors')->group(function () {
 });
 
 Route::get('/stores/{storeId}/customizable-flowers', [VendorStoreFrontController::class, 'getCustomizableFlowers']);
+Route::get('/stores/{storeId}/customization-options', [VendorStoreFrontController::class, 'getCustomizationOptions']);
 
 // ── PUBLIC — Product reviews (no auth required) ───────────────────────────
 Route::get('/products/{productId}/reviews', [ProductReviewController::class, 'index'])
@@ -312,6 +314,13 @@ Route::middleware('token.auth')->group(function () {
             Route::delete('/products/{productId}/model',            [ProductController::class, 'deleteModel']);
             Route::get('/products/{productId}/reviews', [ProductReviewController::class, 'vendorProductReviews'])
                 ->whereNumber('productId');
+
+            // 3D customizer wrappers, fillers and ribbons.
+            Route::get('/customization-options',               [VendorCustomizationOptionController::class, 'index']);
+            Route::post('/customization-options',              [VendorCustomizationOptionController::class, 'store']);
+            Route::post('/customization-options/{id}',         [VendorCustomizationOptionController::class, 'update'])->whereNumber('id');
+            Route::patch('/customization-options/{id}/active', [VendorCustomizationOptionController::class, 'setActive'])->whereNumber('id');
+            Route::delete('/customization-options/{id}',       [VendorCustomizationOptionController::class, 'destroy'])->whereNumber('id');
         });
 
         Route::middleware('subscription.module:orders')->group(function () {

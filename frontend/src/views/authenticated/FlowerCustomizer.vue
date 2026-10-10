@@ -9,7 +9,7 @@
           <p class="fc-subtitle">Drag a flower or pick one, then click the bouquet to place it.</p>
         </div>
         <div class="fc-head-actions">
-          <span class="fc-pill">{{ selectedFlowers.length }}/{{ MAX_FLOWERS }} selected</span>
+          <span class="fc-pill">{{ placedFlowers.length }}/{{ MAX_FLOWERS }} selected</span>
           <button class="fc-btn fc-btn-light" @click="toggleLeftSidebar">
             {{ isLeftSidebarCollapsed ? "Open Flowers" : "Hide Flowers" }}
           </button>
@@ -31,7 +31,7 @@
               <h2>Flowers</h2>
               <p>3D vendor products only</p>
             </div>
-            <span class="fc-pill">{{ selectedFlowers.length }}/{{ MAX_FLOWERS }}</span>
+            <span class="fc-pill">{{ placedFlowers.length }}/{{ MAX_FLOWERS }}</span>
           </div>
 
           <input v-model="search" class="fc-input" type="search" placeholder="Search flowers" />
@@ -45,7 +45,7 @@
               v-for="flower in filteredFlowers"
               :key="flower.id"
               class="fc-card"
-              :class="{ active: pendingFlower?.id === flower.id, disabled: !canUseFlower(flower), dragging: draggedFlower?.id === flower.id }"
+              :class="{ active: pendingFlower?.kind !== 'filler' && pendingFlower?.id === flower.id, disabled: !canUseFlower(flower), dragging: draggedFlower?.kind !== 'filler' && draggedFlower?.id === flower.id }"
               :draggable="canUseFlower(flower)"
               @dragstart="onDragStart($event, flower)"
               @dragend="onDragEnd"
@@ -65,10 +65,42 @@
               </div>
               <div class="fc-row fc-note">
                 <span>{{ countOfFlower(flower.id) ? `${countOfFlower(flower.id)} placed` : "Click then place on bouquet" }}</span>
-                <span v-if="!canUseFlower(flower)">{{ selectedFlowers.length >= MAX_FLOWERS ? "Limit reached" : "Out of stock" }}</span>
+                <span v-if="!canUseFlower(flower)">{{ placedFlowers.length >= MAX_FLOWERS ? "Limit reached" : "Out of stock" }}</span>
               </div>
             </article>
           </div>
+
+          <template v-if="fillers.length">
+            <div class="fc-panel-head fc-subhead">
+              <div>
+                <h2>Fillers</h2>
+                <p>Greenery and small blooms</p>
+              </div>
+              <span class="fc-pill">{{ placedFillers.length }}/{{ MAX_FILLERS }}</span>
+            </div>
+            <div class="fc-list">
+              <article
+                v-for="filler in filteredFillers"
+                :key="`filler-${filler.id}`"
+                class="fc-card"
+                :class="{ active: pendingFlower?.kind === 'filler' && pendingFlower?.id === filler.id, disabled: !canUseFlower(filler), dragging: draggedFlower?.kind === 'filler' && draggedFlower?.id === filler.id }"
+                :draggable="canUseFlower(filler)"
+                @dragstart="onDragStart($event, filler)"
+                @dragend="onDragEnd"
+                @click="selectFlower(filler)"
+              >
+                <div class="fc-row">
+                  <strong>{{ filler.product_name }}</strong>
+                  <span>{{ filler.price ? `+ ${formatPeso(filler.price)}` : "Free" }}</span>
+                </div>
+                <p v-if="filler.description" class="fc-desc">{{ filler.description }}</p>
+                <div class="fc-row fc-note">
+                  <span>{{ countOfFlower(filler.id, "filler") ? `${countOfFlower(filler.id, "filler")} placed` : "Click then place on bouquet" }}</span>
+                  <span v-if="!canUseFlower(filler)">Limit reached</span>
+                </div>
+              </article>
+            </div>
+          </template>
         </aside>
 
         <main
@@ -93,7 +125,7 @@
           <div class="fc-overlay fc-top">
             <div class="fc-status">
               <strong>{{ pendingFlower ? `Ready to place: ${pendingFlower.product_name}` : draggedFlower ? `Drop ${draggedFlower.product_name} on the bouquet` : selectedFlower ? `Selected: ${selectedFlower.product_name}` : "Rotate the bouquet and pick a flower" }}</strong>
-              <span>{{ selectedFlowers.length >= MAX_FLOWERS ? "Maximum of 3 flowers only" : selectedFlower ? "Drag anywhere on the bouquet surface to move the selected flower, or rotate it from the panel." : "Click directly on the bouquet wrapper to place the model" }}</span>
+              <span>{{ placedFlowers.length >= MAX_FLOWERS ? "Maximum of 3 flowers only" : selectedFlower ? "Drag anywhere on the bouquet surface to move the selected flower, or rotate it from the panel." : "Click directly on the bouquet wrapper to place the model" }}</span>
             </div>
           </div>
           <div v-if="bouquetLoadError" class="fc-overlay fc-center"><div class="fc-modal"><h3>Unable to load bouquet.glb</h3><p>{{ bouquetLoadError }}</p></div></div>
@@ -103,7 +135,7 @@
 
         <aside v-if="!isRightSidebarCollapsed" class="fc-panel fc-side">
           <section class="fc-section">
-            <div class="fc-panel-head"><h2>Placed Flowers</h2><span>{{ selectedFlowers.length }}/{{ MAX_FLOWERS }}</span></div>
+            <div class="fc-panel-head"><h2>Placed Flowers</h2><span>{{ placedFlowers.length }}/{{ MAX_FLOWERS }}<template v-if="placedFillers.length"> · {{ placedFillers.length }} filler{{ placedFillers.length === 1 ? "" : "s" }}</template></span></div>
             <div v-if="!selectedFlowers.length" class="fc-empty">No flowers placed yet.</div>
             <div v-else class="fc-list">
               <div
@@ -122,7 +154,7 @@
                       {{ selection.locked ? "Locked" : "Unlocked" }}
                     </span>
                   </div>
-                  <p>PHP {{ selection.price.toFixed(2) }}</p>
+                  <p>PHP {{ selection.price.toFixed(2) }}<template v-if="selection.kind === 'filler'"> · Filler</template></p>
                 </div>
                 <div class="fc-selection-actions">
                   <button class="fc-icon-action" :class="{ locked: selection.locked }" @click.stop="toggleFlowerLock(selection.sceneId)">
@@ -138,11 +170,31 @@
           </section>
 
           <section class="fc-section">
-            <div class="fc-panel-head"><h2>Wrapper Color</h2><span>{{ paperColor.toUpperCase() }}</span></div>
-            <div class="fc-swatches">
-              <button v-for="color in paperPresets" :key="color" class="fc-swatch" :class="{ active: paperColor === color }" :style="{ background: color }" @click="applyPaperColor(color)"></button>
+            <div class="fc-panel-head"><h2>Wrapper</h2><span>{{ selectedWrapper ? selectedWrapper.name : paperColor.toUpperCase() }}</span></div>
+            <div v-if="wrapperOptions.length" class="fc-options">
+              <button
+                v-for="option in wrapperOptions"
+                :key="option.id"
+                type="button"
+                class="fc-option"
+                :class="{ active: selectedWrapperId === option.id }"
+                :aria-pressed="selectedWrapperId === option.id"
+                @click="selectWrapper(option)"
+              >
+                <span class="fc-option-swatch" :style="{ background: option.color_hex }"></span>
+                <span class="fc-option-copy">
+                  <strong>{{ option.name }}</strong>
+                  <small v-if="option.description">{{ option.description }}</small>
+                </span>
+                <span class="fc-option-price">{{ option.price ? `+ ${formatPeso(option.price)}` : "Free" }}</span>
+              </button>
             </div>
-            <input v-model="paperColor" class="fc-input" type="color" @input="applyPaperColor(paperColor)" />
+            <template v-else>
+              <div class="fc-swatches">
+                <button v-for="color in paperPresets" :key="color" class="fc-swatch" :class="{ active: paperColor === color }" :style="{ background: color }" @click="applyPaperColor(color)"></button>
+              </div>
+              <input v-model="paperColor" class="fc-input" type="color" @input="applyPaperColor(paperColor)" />
+            </template>
           </section>
 
           <section class="fc-section">
@@ -192,21 +244,44 @@
           </section>
 
           <section class="fc-section">
-            <div class="fc-panel-head"><h2>Ribbon Color</h2><span>{{ ribbonColor.toUpperCase() }}</span></div>
-            <div class="fc-swatches">
-              <button v-for="color in ribbonPresets" :key="color" class="fc-swatch" :class="{ active: ribbonColor === color }" :style="{ background: color }" @click="applyRibbonColor(color)"></button>
+            <div class="fc-panel-head"><h2>Ribbon</h2><span>{{ selectedRibbon ? selectedRibbon.name : ribbonColor.toUpperCase() }}</span></div>
+            <div v-if="ribbonOptions.length" class="fc-options">
+              <button
+                v-for="option in ribbonOptions"
+                :key="option.id"
+                type="button"
+                class="fc-option"
+                :class="{ active: selectedRibbonId === option.id }"
+                :aria-pressed="selectedRibbonId === option.id"
+                @click="selectRibbon(option)"
+              >
+                <span class="fc-option-swatch" :style="{ background: option.color_hex }"></span>
+                <span class="fc-option-copy">
+                  <strong>{{ option.name }}</strong>
+                  <small v-if="option.description">{{ option.description }}</small>
+                </span>
+                <span class="fc-option-price">{{ option.price ? `+ ${formatPeso(option.price)}` : "Free" }}</span>
+              </button>
             </div>
-            <input v-model="ribbonColor" class="fc-input" type="color" @input="applyRibbonColor(ribbonColor)" />
+            <template v-else>
+              <div class="fc-swatches">
+                <button v-for="color in ribbonPresets" :key="color" class="fc-swatch" :class="{ active: ribbonColor === color }" :style="{ background: color }" @click="applyRibbonColor(color)"></button>
+              </div>
+              <input v-model="ribbonColor" class="fc-input" type="color" @input="applyRibbonColor(ribbonColor)" />
+            </template>
           </section>
 
           <section class="fc-section">
             <div class="fc-panel-head"><h2>Summary</h2><span>Live total</span></div>
             <div class="fc-summary"><span>Store</span><strong>{{ storeName || "Not set" }}</strong></div>
             <div class="fc-summary"><span>Owner ID</span><strong>{{ vendorOwnerId || "Missing" }}</strong></div>
-            <div class="fc-summary"><span>Flowers</span><strong>{{ selectedFlowers.length }}/{{ MAX_FLOWERS }}</strong></div>
+            <div class="fc-summary"><span>Flowers</span><strong>{{ placedFlowers.length }}/{{ MAX_FLOWERS }}</strong></div>
+            <div v-if="placedFillers.length" class="fc-summary"><span>Fillers</span><strong>{{ placedFillers.length }}</strong></div>
+            <div v-if="selectedWrapper" class="fc-summary"><span>Wrapper</span><strong>{{ selectedWrapper.name }}{{ selectedWrapper.price ? ` (+ ${formatPeso(selectedWrapper.price)})` : "" }}</strong></div>
+            <div v-if="selectedRibbon" class="fc-summary"><span>Ribbon</span><strong>{{ selectedRibbon.name }}{{ selectedRibbon.price ? ` (+ ${formatPeso(selectedRibbon.price)})` : "" }}</strong></div>
             <div class="fc-summary total"><span>Total</span><strong>PHP {{ totalPrice.toFixed(2) }}</strong></div>
-            <button class="fc-btn fc-btn-primary" @click="checkout" :disabled="!selectedFlowers.length || isCheckingOut">{{ isCheckingOut ? "Processing..." : "Proceed to Checkout" }}</button>
-            <button class="fc-btn fc-btn-light full" @click="addCart" :disabled="!selectedFlowers.length || isCheckingOut">{{ editingCartItemId ? "Update Custom Bouquet" : "Add to Cart" }}</button>
+            <button class="fc-btn fc-btn-primary" @click="checkout" :disabled="!placedFlowers.length || isCheckingOut">{{ isCheckingOut ? "Processing..." : "Proceed to Checkout" }}</button>
+            <button class="fc-btn fc-btn-light full" @click="addCart" :disabled="!placedFlowers.length || isCheckingOut">{{ editingCartItemId ? "Update Custom Bouquet" : "Add to Cart" }}</button>
           </section>
         </aside>
       </div>
@@ -231,6 +306,8 @@ import { toast as toastify } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 
 const MAX_FLOWERS = 3;
+const MAX_FILLERS = 5;
+// Used only when the vendor has not added their own wrappers or ribbons.
 const paperPresets = ["#d3b18f", "#f3e9dc", "#d7d2c8", "#e2c7cf", "#c8b6a6"];
 const ribbonPresets = ["#caa6d9", "#d95f76", "#7d8f69", "#f0dfb2", "#6c5b7b"];
 
@@ -242,6 +319,11 @@ const cartStore = useCart();
 const viewerContainer = ref(null);
 const layoutContainer = ref(null);
 const flowers = ref([]);
+const fillers = ref([]);
+const wrapperOptions = ref([]);
+const ribbonOptions = ref([]);
+const selectedWrapperId = ref(null);
+const selectedRibbonId = ref(null);
 const loadingFlowers = ref(false);
 const search = ref("");
 const pendingFlower = ref(null);
@@ -273,7 +355,17 @@ const filteredFlowers = computed(() => {
   const term = search.value.trim().toLowerCase();
   return flowers.value.filter((flower) => !term || flower.product_name.toLowerCase().includes(term));
 });
-const totalPrice = computed(() => selectedFlowers.value.reduce((sum, flower) => sum + flower.price, 0));
+const filteredFillers = computed(() => {
+  const term = search.value.trim().toLowerCase();
+  return fillers.value.filter((filler) => !term || filler.product_name.toLowerCase().includes(term));
+});
+// selectedFlowers holds every placed model; fillers are marked kind: "filler".
+const placedFlowers = computed(() => selectedFlowers.value.filter((item) => item.kind !== "filler"));
+const placedFillers = computed(() => selectedFlowers.value.filter((item) => item.kind === "filler"));
+const selectedWrapper = computed(() => wrapperOptions.value.find((option) => option.id === selectedWrapperId.value) || null);
+const selectedRibbon = computed(() => ribbonOptions.value.find((option) => option.id === selectedRibbonId.value) || null);
+const extrasPrice = computed(() => Number(selectedWrapper.value?.price || 0) + Number(selectedRibbon.value?.price || 0));
+const totalPrice = computed(() => selectedFlowers.value.reduce((sum, flower) => sum + flower.price, 0) + extrasPrice.value);
 const selectedFlower = computed(() => selectedFlowers.value.find((flower) => flower.sceneId === selectedSceneId.value) || null);
 
 let scene, camera, renderer, controls, bouquetRoot, flowerLayer, hoverMarker, animationFrameId = 0, pointerDown = null, transformDrag = null, toastTimer;
@@ -286,14 +378,20 @@ const wrapperMaterials = new Set();
 const modelCache = new Map();
 const placedObjects = new Map();
 
-const countOfFlower = (flowerId) => selectedFlowers.value.filter((flower) => flower.id === flowerId).length;
-const canUseFlower = (flower) => !!flower?.model && selectedFlowers.value.length < MAX_FLOWERS && flower.quantity_in_stock > countOfFlower(flower.id);
+const isFiller = (item) => item?.kind === "filler";
+const countOfFlower = (flowerId, kind = "flower") =>
+  selectedFlowers.value.filter((flower) => flower.id === flowerId && (flower.kind || "flower") === kind).length;
+const canUseFlower = (flower) => {
+  if (!flower?.model) return false;
+  if (isFiller(flower)) return placedFillers.value.length < MAX_FILLERS;
+  return placedFlowers.value.length < MAX_FLOWERS && flower.quantity_in_stock > countOfFlower(flower.id);
+};
 
 onMounted(async () => {
   if (isAuthenticated.value) await cartStore.initialize?.();
   initScene();
   await loadEditingCustomization();
-  await Promise.all([loadBouquetModel(), fetchFlowers()]);
+  await Promise.all([loadBouquetModel(), fetchFlowers(), fetchCustomizationOptions()]);
   if (editingCustomization.value) await restoreBouquet(editingCustomization.value);
   window.addEventListener("resize", handleResize);
   document.addEventListener("fullscreenchange", syncFullscreenState);
@@ -415,6 +513,51 @@ async function fetchFlowers() {
   }
 }
 
+// The vendor's wrappers, ribbons and fillers from the 3D Customization page.
+async function fetchCustomizationOptions() {
+  if (!storeId.value) return;
+  try {
+    const response = await api.get(`/stores/${storeId.value}/customization-options`, {
+      params: vendorOwnerId.value ? { owner_id: vendorOwnerId.value } : {},
+    });
+    const data = response.data?.data || {};
+    const toOption = (option) => ({ ...option, id: Number(option.id), price: Number(option.price || 0) });
+    wrapperOptions.value = (data.wrappers || []).map(toOption);
+    ribbonOptions.value = (data.ribbons || []).map(toOption);
+    fillers.value = (data.fillers || []).filter((filler) => filler.model_url).map((filler) => ({
+      kind: "filler",
+      id: Number(filler.id),
+      product_name: filler.name,
+      description: filler.description || "",
+      price: Number(filler.price || 0),
+      model: filler.model_url,
+      model_3d_url: filler.model_url,
+    }));
+
+    const savedWrapperId = Number(editingCustomization.value?.wrapper?.id || 0);
+    const savedRibbonId = Number(editingCustomization.value?.ribbon?.id || 0);
+    const wrapper = wrapperOptions.value.find((option) => option.id === savedWrapperId) || wrapperOptions.value[0];
+    const ribbon = ribbonOptions.value.find((option) => option.id === savedRibbonId) || ribbonOptions.value[0];
+    if (wrapper) selectWrapper(wrapper);
+    if (ribbon) selectRibbon(ribbon);
+  } catch (error) {
+    // Fall back to the built-in colours if the vendor's items cannot be loaded.
+    console.error("Failed to fetch customization options:", error);
+  }
+}
+
+function selectWrapper(option) {
+  selectedWrapperId.value = option.id;
+  applyPaperColor(option.color_hex);
+}
+
+function selectRibbon(option) {
+  selectedRibbonId.value = option.id;
+  applyRibbonColor(option.color_hex);
+}
+
+const formatPeso = (value) => `PHP ${Number(value || 0).toFixed(2)}`;
+
 function normalizeFlower(flower) {
   const model = resolveModelUrl(flower);
   const sellingType = flower.selling_type || "per_piece";
@@ -460,6 +603,7 @@ function onDragStart(event, flower) {
     return enforceFlowerLimit(flower);
   }
   draggedFlower.value = {
+    kind: flower.kind || "flower",
     id: flower.id,
     name: flower.product_name,
     product_name: flower.product_name,
@@ -630,23 +774,27 @@ function endTransformDrag(pointerId = null) {
 }
 
 async function placeFlowerOnBouquet(flower, placement) {
-  if (selectedFlowers.value.length >= MAX_FLOWERS) {
+  const filler = isFiller(flower);
+  if (filler && placedFillers.value.length >= MAX_FILLERS) {
+    return showToast(`Maximum of ${MAX_FILLERS} fillers only.`, "error");
+  }
+  if (!filler && placedFlowers.value.length >= MAX_FLOWERS) {
     window.alert("Maximum of 3 flowers only");
     showToast("Maximum of 3 flowers only.", "error");
     return;
   }
-  if (countOfFlower(flower.id) >= Number(flower.quantity_in_stock || 0)) {
+  if (!filler && countOfFlower(flower.id) >= Number(flower.quantity_in_stock || 0)) {
     return showToast("This flower is out of stock.", "error");
   }
   if (!flower.model) {
-    return showToast("This flower has no 3D model.", "error");
+    return showToast(`This ${filler ? "filler" : "flower"} has no 3D model.`, "error");
   }
 
   try {
     const template = await loadFlowerTemplate(flower.model);
     const instance = SkeletonUtils.clone(template);
     const wrapper = new THREE.Group();
-    const sceneId = `${flower.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const sceneId = `${filler ? "filler-" : ""}${flower.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const initialRotation = {
       xDeg: -5,
       yDeg: 180,
@@ -665,6 +813,7 @@ async function placeFlowerOnBouquet(flower, placement) {
     placedObjects.set(sceneId, wrapper);
     selectedFlowers.value.push({
       sceneId,
+      kind: filler ? "filler" : "flower",
       id: flower.id,
       owner_id: flower.owner_id,
       product_name: flower.product_name || flower.name,
@@ -679,7 +828,7 @@ async function placeFlowerOnBouquet(flower, placement) {
     showToast(`${flower.product_name} placed on bouquet.`, "success");
   } catch (error) {
     console.error("Failed to place flower model:", error);
-    showToast("Failed to load the flower 3D model.", "error");
+    showToast(`Failed to load the ${filler ? "filler" : "flower"} 3D model.`, "error");
   }
 }
 
@@ -840,7 +989,10 @@ function updateFlowerState(sceneId, patch) {
 }
 
 function enforceFlowerLimit(flower) {
-  if (selectedFlowers.value.length >= MAX_FLOWERS) {
+  if (isFiller(flower)) {
+    return showToast(`Maximum of ${MAX_FILLERS} fillers only.`, "error");
+  }
+  if (placedFlowers.value.length >= MAX_FLOWERS) {
     window.alert("Maximum of 3 flowers only");
     return showToast("Maximum of 3 flowers only.", "error");
   }
@@ -857,20 +1009,20 @@ async function checkout() {
     router.push({ path: "/guest/login", query: { redirect: route.fullPath } });
     return;
   }
-  if (!selectedFlowers.value.length) return;
+  if (!placedFlowers.value.length) return;
   isCheckingOut.value = true;
   try {
     const customization = buildBouquetCustomization();
     sessionStorage.setItem(
       "directCheckout",
       JSON.stringify({
-        items: selectedFlowers.value.map((flower) => ({
+        items: placedFlowers.value.map((flower) => ({
           product_id: flower.id,
           quantity: 1,
           product_name: flower.product_name,
           price: flower.price,
         })),
-        custom_items: selectedFlowers.value.map((flower) => ({
+        custom_items: placedFlowers.value.map((flower) => ({
           product_id: flower.id,
           quantity: 1,
           vendor_id: flower.owner_id,
@@ -902,7 +1054,22 @@ function buildBouquetCustomization() {
     paper_color: paperColor.value,
     ribbon_color: ribbonColor.value,
     wrapper_scale: wrapperScale.value,
-    flowers: selectedFlowers.value.map((flower, index) => {
+    // Prices for these are looked up by id on the server.
+    wrapper: selectedWrapper.value ? { id: selectedWrapper.value.id, name: selectedWrapper.value.name } : null,
+    ribbon: selectedRibbon.value ? { id: selectedRibbon.value.id, name: selectedRibbon.value.name } : null,
+    fillers: placedFillers.value.map((filler, index) => ({
+      scene_id: filler.sceneId,
+      id: filler.id,
+      name: filler.product_name,
+      model_3d_url: filler.model_3d_url,
+      price: Number(filler.price || 0),
+      placement_order: index,
+      position: { ...filler.position },
+      rotation: { ...filler.rotation },
+      scale: Number(filler.scale ?? 1),
+      locked: filler.locked,
+    })),
+    flowers: placedFlowers.value.map((flower, index) => {
       const object = placedObjects.get(flower.sceneId);
 
       return {
@@ -927,13 +1094,13 @@ async function addCart() {
     router.push({ path: "/guest/login", query: { redirect: route.fullPath } });
     return;
   }
-  if (!selectedFlowers.value.length) return;
+  if (!placedFlowers.value.length) return;
 
   isCheckingOut.value = true;
   try {
     const customization = buildBouquetCustomization();
     const payload = {
-      product_id: selectedFlowers.value[0].id,
+      product_id: placedFlowers.value[0].id,
       quantity: 1,
       customizations: customization,
     };
@@ -968,11 +1135,15 @@ async function loadEditingCustomization() {
 
 async function restoreBouquet(customization) {
   resetDesign();
-  const savedFlowers = [...customization.flowers].sort(
-    (first, second) => Number(first.placement_order || 0) - Number(second.placement_order || 0),
-  );
-  applyPaperColor(customization.paper_color || paperColor.value);
-  applyRibbonColor(customization.ribbon_color || ribbonColor.value);
+  const byOrder = (first, second) => Number(first.placement_order || 0) - Number(second.placement_order || 0);
+  const savedFlowers = [
+    ...[...customization.flowers].sort(byOrder),
+    ...[...(Array.isArray(customization.fillers) ? customization.fillers : [])]
+      .sort(byOrder)
+      .map((filler) => ({ ...filler, kind: "filler", product_id: filler.id, product_name: filler.name })),
+  ];
+  applyPaperColor(selectedWrapper.value?.color_hex || customization.paper_color || paperColor.value);
+  applyRibbonColor(selectedRibbon.value?.color_hex || customization.ribbon_color || ribbonColor.value);
 
   for (const [index, savedFlower] of savedFlowers.entries()) {
     if (!savedFlower.model_3d_url) continue;
@@ -996,12 +1167,16 @@ async function restoreBouquet(customization) {
       wrapper.userData.sceneId = sceneId;
       flowerLayer.add(wrapper);
       placedObjects.set(sceneId, wrapper);
-      const catalogFlower = flowers.value.find((flower) => Number(flower.id) === Number(savedFlower.product_id));
+      const filler = isFiller(savedFlower);
+      const catalogFlower = (filler ? fillers.value : flowers.value).find(
+        (flower) => Number(flower.id) === Number(savedFlower.product_id),
+      );
       selectedFlowers.value.push({
         sceneId,
+        kind: filler ? "filler" : "flower",
         id: Number(savedFlower.product_id),
         owner_id: Number(savedFlower.owner_id || catalogFlower?.owner_id || vendorOwnerId.value || 0) || null,
-        product_name: savedFlower.product_name || catalogFlower?.product_name || "Flower",
+        product_name: savedFlower.product_name || catalogFlower?.product_name || (filler ? "Filler" : "Flower"),
         price: Number(savedFlower.price ?? catalogFlower?.price ?? 0),
         model_3d_url: savedFlower.model_3d_url,
         position: { x: Number(position.x || 0), y: Number(position.y || 0), z: Number(position.z || 0) },
@@ -1212,4 +1387,17 @@ function showToast(message, type = "success") {
 @media (max-width: 1220px) { .fc-layout { grid-template-columns: 280px minmax(0,1fr) 300px; } .fc-layout.left-collapsed { grid-template-columns: minmax(0,1fr) 300px; } .fc-layout.right-collapsed { grid-template-columns: 280px minmax(0,1fr); } }
 @media (max-width: 980px) { .fc-shell { padding-top: 88px; } .fc-topbar, .fc-layout, .fc-layout.left-collapsed, .fc-layout.right-collapsed, .fc-layout.left-collapsed.right-collapsed { display: grid; grid-template-columns: 1fr; } .fc-viewer { min-height: 520px; } }
 @media (max-width: 640px) { .fc-shell { padding-inline: 14px; } .fc-topbar h1 { font-size: 28px; } .fc-overlay { left: 12px; right: 12px; } }
+.fc-subhead { margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(47,36,27,.1); }
+.fc-subhead p { margin: 2px 0 0; font-size: 12px; opacity: .7; }
+.fc-desc { margin: 4px 0 0; font-size: 12px; line-height: 1.45; opacity: .75; }
+.fc-options { display: flex; flex-direction: column; gap: 8px; }
+.fc-option { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 1px solid rgba(47,36,27,.12); border-radius: 12px; background: rgba(255,255,255,.7); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .2s, background .2s; }
+.fc-option:hover { border-color: rgba(47,36,27,.3); }
+.fc-option.active { border-color: #2f241b; background: #fff; box-shadow: 0 0 0 1px #2f241b inset; }
+.fc-option:focus-visible { outline: 2px solid #2f241b; outline-offset: 2px; }
+.fc-option-swatch { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(0,0,0,.12); }
+.fc-option-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.fc-option-copy strong { font-size: 13px; font-weight: 600; }
+.fc-option-copy small { overflow: hidden; font-size: 11.5px; opacity: .7; text-overflow: ellipsis; white-space: nowrap; }
+.fc-option-price { flex-shrink: 0; font-size: 12px; font-weight: 600; }
 </style>

@@ -120,6 +120,18 @@
           <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
         </router-link>
         <router-link
+          :to="{ name: 'VendorCustomization' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('products') }"
+          :title="lockTooltip('products')"
+          @click="handleModuleNavigation($event, 'products')"
+        >
+          <span class="nav-icon">💐</span>
+          <span>3D Customization</span>
+          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
           to="/vendor/chat"
           class="nav-item"
           active-class="active"

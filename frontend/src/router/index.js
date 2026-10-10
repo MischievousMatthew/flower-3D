@@ -147,6 +147,12 @@ const routes = [
         component: () => import("../views/vendor/AddProduct.vue"),
       },
       {
+        path: "customization",
+        name: "VendorCustomization",
+        meta: { subscriptionModule: MODULE.PRODUCTS },
+        component: () => import("../views/vendor/Customization.vue"),
+      },
+      {
         path: "chat",
         name: "VendorChat",
         meta: { subscriptionModule: MODULE.CRM },

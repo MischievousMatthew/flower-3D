@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\BouquetCustomizationOption;
 use App\Models\VendorApplication;
 use App\Models\Product;
 use App\Models\User;
@@ -242,6 +243,41 @@ class VendorStorefrontController extends Controller
         } catch (\Exception $e) {
             Log::error('VendorStorefrontController@getCustomizableFlowers: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * GET /api/stores/{storeId}/customization-options
+     * The vendor's wrappers (switched on only), fillers and ribbons.
+     */
+    public function getCustomizationOptions(Request $request, $storeId)
+    {
+        $empty = ['wrappers' => [], 'fillers' => [], 'ribbons' => []];
+
+        try {
+            $ownerId = $this->resolveCustomizableOwnerId($storeId, $request);
+
+            if (!$ownerId) {
+                return response()->json(['success' => true, 'data' => $empty]);
+            }
+
+            $options = BouquetCustomizationOption::forOwner($ownerId)
+                ->available()
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get(['id', 'type', 'name', 'description', 'color_hex', 'price', 'model_url']);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'wrappers' => $options->where('type', BouquetCustomizationOption::TYPE_WRAPPER)->values(),
+                    'fillers' => $options->where('type', BouquetCustomizationOption::TYPE_FILLER)->values(),
+                    'ribbons' => $options->where('type', BouquetCustomizationOption::TYPE_RIBBON)->values(),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('VendorStorefrontController@getCustomizationOptions: ' . $e->getMessage());
+            return response()->json(['success' => true, 'data' => $empty]);
         }
     }
 

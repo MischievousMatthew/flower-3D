@@ -1,0 +1,145 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * A vendor's wrapper, filler or ribbon choice for the 3D flower customizer.
+ * Flowers stay regular products (selling_type = per_piece_customizable).
+ */
+class BouquetCustomizationOption extends Model
+{
+    public const TYPE_WRAPPER = 'wrapper';
+    public const TYPE_FILLER = 'filler';
+    public const TYPE_RIBBON = 'ribbon';
+    public const TYPES = [self::TYPE_WRAPPER, self::TYPE_FILLER, self::TYPE_RIBBON];
+
+    public const MAX_FILLERS = 5;
+
+    protected $fillable = [
+        'owner_id',
+        'type',
+        'name',
+        'description',
+        'color_hex',
+        'price',
+        'is_active',
+        'model_url',
+        'model_path',
+        'sort_order',
+    ];
+
+    protected $casts = [
+        'price' => 'float',
+        'is_active' => 'boolean',
+        'sort_order' => 'integer',
+    ];
+
+    protected $hidden = ['model_path'];
+
+    public function scopeForOwner(Builder $query, int $ownerId): Builder
+    {
+        return $query->where('owner_id', $ownerId);
+    }
+
+    /**
+     * Options a customer can pick: wrappers only when switched on, and
+     * fillers only when they have a 3D model.
+     */
+    public function scopeAvailable(Builder $query): Builder
+    {
+        return $query
+            ->where(fn ($q) => $q->where('type', '!=', self::TYPE_WRAPPER)->orWhere('is_active', true))
+            ->where(fn ($q) => $q->where('type', '!=', self::TYPE_FILLER)->orWhereNotNull('model_url'));
+    }
+
+    /**
+     * Price the wrapper, ribbon and fillers chosen in a custom bouquet from the
+     * vendor's saved options, never from client-sent prices. Returns the extra
+     * total and the customizations with the server's names, colours and prices.
+     *
+     * @return array{ok: bool, message?: string, total: float, customizations: array}
+     */
+    public static function resolveSelections(int $ownerId, array $customizations): array
+    {
+        $wrapperId = (int) data_get($customizations, 'wrapper.id', 0);
+        $ribbonId = (int) data_get($customizations, 'ribbon.id', 0);
+        $fillers = data_get($customizations, 'fillers', []);
+        $fillers = is_array($fillers) ? array_values($fillers) : [];
+
+        if (count($fillers) > self::MAX_FILLERS) {
+            return self::failure('A custom bouquet can have up to ' . self::MAX_FILLERS . ' fillers.', $customizations);
+        }
+
+        $ids = array_filter(array_merge(
+            [$wrapperId, $ribbonId],
+            array_map(fn ($filler) => (int) data_get($filler, 'id', 0), $fillers)
+        ));
+
+        if (!$ids) {
+            unset($customizations['wrapper'], $customizations['ribbon']);
+            $customizations['fillers'] = [];
+            $customizations['extras_total'] = 0;
+
+            return ['ok' => true, 'total' => 0.0, 'customizations' => $customizations];
+        }
+
+        $options = self::forOwner($ownerId)->available()->whereIn('id', array_unique($ids))->get()->keyBy('id');
+        $total = 0.0;
+
+        foreach (['wrapper' => [$wrapperId, self::TYPE_WRAPPER], 'ribbon' => [$ribbonId, self::TYPE_RIBBON]] as $key => [$id, $type]) {
+            if (!$id) {
+                unset($customizations[$key]);
+                continue;
+            }
+
+            $option = $options->get($id);
+            if (!$option || $option->type !== $type) {
+                return self::failure("The selected {$type} is no longer available.", $customizations);
+            }
+
+            $customizations[$key] = [
+                'id' => $option->id,
+                'name' => $option->name,
+                'color_hex' => $option->color_hex,
+                'price' => $option->price,
+            ];
+            $customizations[$key === 'wrapper' ? 'paper_color' : 'ribbon_color'] = $option->color_hex;
+            $total += $option->price;
+        }
+
+        $resolvedFillers = [];
+        foreach ($fillers as $index => $filler) {
+            $option = $options->get((int) data_get($filler, 'id', 0));
+            if (!$option || $option->type !== self::TYPE_FILLER) {
+                return self::failure('A selected filler is no longer available.', $customizations);
+            }
+
+            $resolvedFillers[] = [
+                'scene_id' => (string) data_get($filler, 'scene_id', "filler-{$index}"),
+                'id' => $option->id,
+                'name' => $option->name,
+                'model_3d_url' => $option->model_url,
+                'price' => $option->price,
+                'placement_order' => $index,
+                'position' => (array) data_get($filler, 'position', []),
+                'rotation' => (array) data_get($filler, 'rotation', []),
+                'scale' => (float) data_get($filler, 'scale', 1),
+                'locked' => (bool) data_get($filler, 'locked', false),
+            ];
+            $total += $option->price;
+        }
+
+        $customizations['fillers'] = $resolvedFillers;
+        $customizations['extras_total'] = round($total, 2);
+
+        return ['ok' => true, 'total' => round($total, 2), 'customizations' => $customizations];
+    }
+
+    private static function failure(string $message, array $customizations): array
+    {
+        return ['ok' => false, 'message' => $message, 'total' => 0.0, 'customizations' => $customizations];
+    }
+}

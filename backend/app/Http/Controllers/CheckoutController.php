@@ -78,6 +78,10 @@ class CheckoutController extends Controller
                         'customizations' => $customItem['customizations'] ?? [],
                     ];
                 });
+
+                if ($response = $this->applyBouquetExtras($cartItems)) {
+                    return $response;
+                }
             } elseif ($request->filled('product_id')) {
                 // Direct Checkout
                 $product = Product::with(['primaryImage', 'images', 'owner', 'models'])->findOrFail($request->product_id);
@@ -313,6 +317,10 @@ class CheckoutController extends Controller
                         'customizations' => $customItem['customizations'] ?? [],
                     ];
                 });
+
+                if ($response = $this->applyBouquetExtras($cartItems)) {
+                    return $response;
+                }
             } elseif ($request->filled('product_id')) {
                 // Direct Order
                 $product = Product::with(['owner', 'primaryImage', 'images', 'models'])->findOrFail($request->product_id);
@@ -1486,6 +1494,33 @@ class CheckoutController extends Controller
         }
 
         return rtrim($frontendUrl, '/');
+    }
+
+    /**
+     * A direct custom-bouquet checkout sends one item per flower. Price the
+     * vendor's wrapper, ribbon and fillers once, on the first item, and save
+     * the server-resolved choices on every item.
+     */
+    private function applyBouquetExtras($cartItems)
+    {
+        $first = $cartItems->first();
+        if (!$first || data_get($first->customizations, 'type') !== 'custom_flower_bouquet') {
+            return null;
+        }
+
+        $extras = BouquetCustomizationOption::resolveSelections(
+            (int) $first->product->owner_id,
+            (array) $first->customizations
+        );
+
+        if (!$extras['ok']) {
+            return response()->json(['success' => false, 'message' => $extras['message']], 422);
+        }
+
+        $cartItems->each(fn ($item) => $item->customizations = $extras['customizations']);
+        $first->price = (float) $first->price + $extras['total'];
+
+        return null;
     }
 
     private function normalizePaymentMethod(?string $paymentMethod): ?string

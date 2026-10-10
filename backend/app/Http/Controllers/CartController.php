@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\BouquetCustomizationOption;
 use App\Models\Cart;
 use App\Models\Product;
 use App\Models\VendorApplication;
@@ -154,6 +155,14 @@ class CartController extends Controller
                     }
                     $bouquetPrice += (float) ($bouquetProduct->discount_price ?: $bouquetProduct->selling_price) * $quantity;
                 }
+
+                // Wrapper, ribbon and fillers are priced from the vendor's saved options.
+                $extras = BouquetCustomizationOption::resolveSelections((int) $product->owner_id, $request->customizations);
+                if (!$extras['ok']) {
+                    return response()->json(['success' => false, 'message' => $extras['message']], 422);
+                }
+                $bouquetPrice += $extras['total'];
+                $request->merge(['customizations' => $extras['customizations']]);
             }
 
             if (!$isCustomBouquet && $product->quantity_in_stock < $request->quantity) {
@@ -293,6 +302,17 @@ class CartController extends Controller
                     }
                     $bouquetPrice += (float) ($bouquetProduct->discount_price ?: $bouquetProduct->selling_price) * $quantity;
                 }
+
+                // Wrapper, ribbon and fillers are priced from the vendor's saved options.
+                $extras = BouquetCustomizationOption::resolveSelections(
+                    (int) $product->owner_id,
+                    $request->customizations ?? $cartItem->customizations
+                );
+                if (!$extras['ok']) {
+                    return response()->json(['success' => false, 'message' => $extras['message']], 422);
+                }
+                $bouquetPrice += $extras['total'];
+                $request->merge(['customizations' => $extras['customizations']]);
             }
 
             if (!$isCustomBouquet && $product->quantity_in_stock < $request->quantity) {
