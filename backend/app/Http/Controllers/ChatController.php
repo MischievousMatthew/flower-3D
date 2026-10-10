@@ -31,9 +31,16 @@ class ChatController extends Controller
             $isVendorContext = $actor['is_vendor_context'];
             $participantId = $actor['participant_id'];
 
+            $clearedColumn = $this->clearedColumn($actor);
+
+            // Hide conversations this side deleted, unless a newer message
+            // has arrived since.
             $query = Conversation::query()
                 ->where($isVendorContext ? 'vendor_id' : 'customer_id', $participantId)
-                ->where('is_active', true);
+                ->where('is_active', true)
+                ->where(function ($q) use ($clearedColumn) {
+                    $q->whereNull($clearedColumn)->orWhereColumn('last_message_time', '>', $clearedColumn);
+                });
 
             if ($isVendorContext) {
                 $query->with(['customer:id,name,surname,email,profile_picture,contact_number,username']);
@@ -41,8 +48,13 @@ class ChatController extends Controller
                 $query->with(['vendor:id,name,surname,email,profile_picture,contact_number,username,role,vendor_data']);
             }
 
-            $query->withCount(['messages as unread_count' => function ($q) use ($participantId) {
-                $q->where('sender_id', '!=', $participantId)->where('is_read', false);
+            $query->withCount(['messages as unread_count' => function ($q) use ($participantId, $clearedColumn) {
+                $q->where('sender_id', '!=', $participantId)
+                    ->where('is_read', false)
+                    ->where(function ($inner) use ($clearedColumn) {
+                        $inner->whereNull("conversations.{$clearedColumn}")
+                            ->orWhereColumn('messages.created_at', '>', "conversations.{$clearedColumn}");
+                    });
             }]);
 
             if ($filter === 'unread') {
@@ -134,7 +146,10 @@ class ChatController extends Controller
                 return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
             }
 
+            $clearedAt = $conversation->{$this->clearedColumn($actor)};
+
             $messages = Message::where('conversation_id', $conversationId)
+                ->when($clearedAt, fn ($q) => $q->where('created_at', '>', $clearedAt))
                 ->with('sender:id,name,surname,profile_picture')
                 ->orderBy('created_at', 'asc')
                 ->get()
@@ -340,7 +355,7 @@ class ChatController extends Controller
                 $query->where('conversation_id', $conversationId);
             } else {
                 $conversationIds = Conversation::query()
-                    ->where($actor['is_vendor_context'] ? 'vendor_id' : 'customer_id', $participantId)
+                    ->where($actor['is_vendor_context'] ? 'vendor_id' : 'customer_id', $actor['participant_id'])
                     ->pluck('id');
 
                 $query->whereIn('conversation_id', $conversationIds);
@@ -516,6 +531,46 @@ class ChatController extends Controller
         }
     }
 
+    /**
+     * Delete a conversation for the current side only. The other participant
+     * keeps their copy; if they write again, the conversation reappears here
+     * with only the newer messages.
+     */
+    public function deleteConversation(Request $request, int $conversationId): JsonResponse
+    {
+        $accessResponse = $this->ensureChatAccess($request, 'delete');
+        if ($accessResponse) {
+            return $accessResponse;
+        }
+
+        try {
+            $actor = $this->resolveActor($request);
+            $conversation = Conversation::find($conversationId);
+
+            if (!$conversation) {
+                return response()->json(['success' => false, 'message' => 'Conversation not found'], 404);
+            }
+
+            if (!$this->canAccessConversation($conversation, $actor)) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+            }
+
+            $conversation->update([
+                $this->clearedColumn($actor) => now(),
+                $actor['is_vendor_context'] ? 'unread_count_vendor' : 'unread_count_customer' => 0,
+            ]);
+
+            return response()->json(['success' => true, 'message' => 'Conversation deleted']);
+        } catch (\Throwable $e) {
+            Log::error('deleteConversation error', [
+                'conversation_id' => $conversationId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
     public function searchUsers(Request $request): JsonResponse
     {
         $accessResponse = $this->ensureChatAccess(
@@ -615,6 +670,11 @@ class ChatController extends Controller
         }
 
         return null;
+    }
+
+    private function clearedColumn(array $actor): string
+    {
+        return $actor['is_vendor_context'] ? 'vendor_cleared_at' : 'customer_cleared_at';
     }
 
     private function resolveActor(Request $request): array

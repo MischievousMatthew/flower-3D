@@ -23,13 +23,17 @@ class Conversation extends Model
         'last_message_time',
         'unread_count_customer',
         'unread_count_vendor',
-        'is_active'
+        'is_active',
+        'customer_cleared_at',
+        'vendor_cleared_at',
     ];
 
     protected function casts(): array
     {
         return [
             'last_message_time' => 'datetime',
+            'customer_cleared_at' => 'datetime',
+            'vendor_cleared_at' => 'datetime',
             'is_active' => 'boolean',
             'unread_count_customer' => 'integer',
             'unread_count_vendor' => 'integer',

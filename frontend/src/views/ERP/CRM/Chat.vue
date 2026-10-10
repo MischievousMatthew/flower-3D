@@ -54,6 +54,7 @@
           counterpart-label="customers"
           :can-send-messages="canCreateCRM"
           :allow-new-chat="canCreateCRM"
+          :can-delete-conversations="canDeleteCRM"
         />
       </div>
     </div>
@@ -79,6 +80,7 @@ onUnmounted(() => window.removeEventListener("resize", updateWidth));
 const isMobile = computed(() => width.value <= 968);
 const sidebarWidth = computed(() => (isCollapsed.value ? "66px" : "250px"));
 const canCreateCRM = computed(() => can("crm", "create"));
+const canDeleteCRM = computed(() => can("crm", "delete"));
 </script>
 
 <style scoped>

@@ -78,39 +78,82 @@
           </template>
 
           <template v-else>
-            <button
+            <div
               v-for="conversation in filteredConversations"
               :key="conversation.id"
-              type="button"
-              class="conv"
-              :class="{
-                active: selectedConversation?.id === conversation.id,
-                unread: conversation.unread_count > 0,
-              }"
-              @click="selectConversation(conversation)"
+              class="conv-item"
+              :class="{ confirming: confirmDeleteId === conversation.id }"
             >
-              <span class="avatar">
-                <img
-                  v-if="getOtherUser(conversation).avatar"
-                  :src="getOtherUser(conversation).avatar"
-                  alt=""
-                />
-                <span v-else>{{ getOtherUserAvatarInitial(conversation) }}</span>
-                <i v-if="getOtherUser(conversation).online" class="presence"></i>
-              </span>
-              <span class="conv-text">
-                <span class="conv-top">
-                  <span class="conv-name">{{ getOtherUserDisplayName(conversation) }}</span>
-                  <span class="conv-time">{{ conversation.last_message_time }}</span>
-                </span>
-                <span class="conv-bottom">
-                  <span class="conv-preview">{{ conversation.last_message || "No messages yet" }}</span>
-                  <span v-if="conversation.unread_count > 0" class="count">
-                    {{ conversation.unread_count }}
+              <!-- Asking before deleting, in place of the row -->
+              <div
+                v-if="confirmDeleteId === conversation.id"
+                class="conv-confirm"
+                role="alertdialog"
+                :aria-label="`Delete conversation with ${getOtherUserDisplayName(conversation)}?`"
+              >
+                <p>
+                  Delete this conversation?
+                  <span>It's removed for you only.</span>
+                </p>
+                <div class="conv-confirm-actions">
+                  <button class="btn btn-ghost btn-sm" @click="confirmDeleteId = null">Cancel</button>
+                  <button
+                    class="btn btn-danger btn-sm"
+                    :disabled="deletingId === conversation.id"
+                    @click="deleteConversation(conversation)"
+                  >
+                    {{ deletingId === conversation.id ? "Deleting..." : "Delete" }}
+                  </button>
+                </div>
+              </div>
+
+              <template v-else>
+                <button
+                  type="button"
+                  class="conv"
+                  :class="{
+                    active: selectedConversation?.id === conversation.id,
+                    unread: conversation.unread_count > 0,
+                  }"
+                  @click="selectConversation(conversation)"
+                >
+                  <span class="avatar">
+                    <img
+                      v-if="getOtherUser(conversation).avatar"
+                      :src="getOtherUser(conversation).avatar"
+                      alt=""
+                    />
+                    <span v-else>{{ getOtherUserAvatarInitial(conversation) }}</span>
+                    <i v-if="getOtherUser(conversation).online" class="presence"></i>
                   </span>
-                </span>
-              </span>
-            </button>
+                  <span class="conv-text">
+                    <span class="conv-name">{{ getOtherUserDisplayName(conversation) }}</span>
+                    <span class="conv-preview">{{ conversation.last_message || "No messages yet" }}</span>
+                  </span>
+                  <!-- Right column: time on top, delete (and unread count) below -->
+                  <span class="conv-side">
+                    <span class="conv-time">{{ conversation.last_message_time }}</span>
+                    <span class="conv-side-bottom">
+                      <span v-if="conversation.unread_count > 0" class="count">
+                        {{ conversation.unread_count }}
+                      </span>
+                    </span>
+                  </span>
+                </button>
+                <button
+                  v-if="canDeleteConversations"
+                  type="button"
+                  class="conv-delete"
+                  :aria-label="`Delete conversation with ${getOtherUserDisplayName(conversation)}`"
+                  title="Delete conversation"
+                  @click="confirmDeleteId = conversation.id"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+                  </svg>
+                </button>
+              </template>
+            </div>
 
             <div v-if="filteredConversations.length === 0" class="list-empty">
               <p class="list-empty-title">
@@ -536,6 +579,11 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  // CRM employees need the crm delete permission; everyone else can delete
+  canDeleteConversations: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const permissionTooltip = "You don't have permission to create new records.";
@@ -594,6 +642,8 @@ const imageViewerUrl = ref(null);
 const showNewChatModal = ref(false);
 const userSearchQuery = ref("");
 const searchedUsers = ref([]);
+const confirmDeleteId = ref(null);
+const deletingId = ref(null);
 
 // Polling
 let pollingInterval = null;
@@ -787,6 +837,24 @@ const selectConversation = async (conversation) => {
   } finally {
     loadingMessages.value = false;
     nextTick(() => scrollToBottom());
+  }
+};
+
+const deleteConversation = async (conversation) => {
+  deletingId.value = conversation.id;
+  try {
+    const { data } = await api.delete(`/chat/conversations/${conversation.id}`);
+    if (data.success) {
+      conversations.value = conversations.value.filter((c) => c.id !== conversation.id);
+      if (selectedConversation.value?.id === conversation.id) closeThread();
+      toast.success("Conversation deleted");
+    }
+  } catch (error) {
+    console.error("Error deleting conversation:", error);
+    toast.error(error.response?.data?.message || "Couldn't delete the conversation.");
+  } finally {
+    deletingId.value = null;
+    confirmDeleteId.value = null;
   }
 };
 
@@ -1090,6 +1158,7 @@ watch(
 const handleEscape = (event) => {
   if (event.key !== "Escape") return;
   if (imageViewerUrl.value) closeImageViewer();
+  else if (confirmDeleteId.value) confirmDeleteId.value = null;
   else if (showNewChatModal.value) showNewChatModal.value = false;
   else if (showUserDetails.value) showUserDetails.value = false;
 };
@@ -1535,12 +1604,106 @@ onUnmounted(() => {
   min-width: 0;
 }
 
-.conv-top,
-.conv-bottom {
+.conv-item {
+  position: relative;
+}
+
+/* Time on top; the delete button sits in the reserved space under it */
+.conv-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  align-self: stretch;
+  justify-content: space-between;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.conv-side-bottom {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
+  min-height: 28px;
+  padding-right: 34px;
+}
+
+.conv-delete {
+  position: absolute;
+  right: 10px;
+  bottom: 12px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-soft);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.2s, background 0.2s, color 0.2s;
+}
+
+.conv-delete svg {
+  width: 17px;
+  height: 17px;
+}
+
+.conv-item:hover .conv-delete,
+.conv-delete:focus-visible {
+  opacity: 1;
+}
+
+.conv-delete:hover {
+  background: rgba(184, 64, 52, 0.1);
+  color: #b84034;
+}
+
+.conv-confirm {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(184, 64, 52, 0.28);
+  border-radius: 16px;
+  background: rgba(184, 64, 52, 0.05);
+}
+
+.conv-confirm p {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.conv-confirm p span {
+  display: block;
+  color: var(--c-soft);
+  font-size: 12.5px;
+  font-weight: 400;
+}
+
+.conv-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-sm {
+  padding: 7px 14px;
+  font-size: 12.5px;
+}
+
+.btn-danger {
+  background: #b84034;
+  color: #ffffff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #9a3329;
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .conv-name {
