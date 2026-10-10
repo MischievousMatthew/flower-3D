@@ -252,6 +252,11 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/search-vendors',                 [ChatController::class, 'searchUsers']);
         });
 
+        Route::middleware('employee.module:crm,edit')->group(function () {
+            Route::post('/conversations/{id}/archive',    [ChatController::class, 'archiveConversation'])->whereNumber('id');
+            Route::post('/conversations/{id}/unarchive',  [ChatController::class, 'unarchiveConversation'])->whereNumber('id');
+        });
+
         Route::middleware('employee.module:crm,delete')->group(function () {
             Route::delete('/conversations/{id}',          [ChatController::class, 'deleteConversation'])->whereNumber('id');
         });

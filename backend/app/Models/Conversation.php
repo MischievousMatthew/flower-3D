@@ -26,6 +26,8 @@ class Conversation extends Model
         'is_active',
         'customer_cleared_at',
         'vendor_cleared_at',
+        'customer_archived_at',
+        'vendor_archived_at',
     ];
 
     protected function casts(): array
@@ -34,6 +36,8 @@ class Conversation extends Model
             'last_message_time' => 'datetime',
             'customer_cleared_at' => 'datetime',
             'vendor_cleared_at' => 'datetime',
+            'customer_archived_at' => 'datetime',
+            'vendor_archived_at' => 'datetime',
             'is_active' => 'boolean',
             'unread_count_customer' => 'integer',
             'unread_count_vendor' => 'integer',

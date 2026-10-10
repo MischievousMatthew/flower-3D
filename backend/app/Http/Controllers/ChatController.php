@@ -32,6 +32,7 @@ class ChatController extends Controller
             $participantId = $actor['participant_id'];
 
             $clearedColumn = $this->clearedColumn($actor);
+            $archivedColumn = $this->archivedColumn($actor);
 
             // Hide conversations this side deleted, unless a newer message
             // has arrived since.
@@ -73,7 +74,7 @@ class ChatController extends Controller
 
             $conversations = $query->orderBy('last_message_time', 'desc')
                 ->get()
-                ->map(function ($conversation) use ($isVendorContext) {
+                ->map(function ($conversation) use ($isVendorContext, $archivedColumn) {
                     $otherUser = $isVendorContext ? $conversation->customer : $conversation->vendor;
 
                     if (!$otherUser) {
@@ -110,6 +111,7 @@ class ChatController extends Controller
                             : 'No messages',
                         'unread_count' => $conversation->unread_count,
                         'is_active' => $conversation->is_active,
+                        'is_archived' => $this->isArchived($conversation, $archivedColumn),
                     ];
                 })
                 ->filter()
@@ -571,6 +573,55 @@ class ChatController extends Controller
         }
     }
 
+    /**
+     * Archive or unarchive a conversation for the current side only.
+     */
+    public function archiveConversation(Request $request, int $conversationId): JsonResponse
+    {
+        return $this->setArchived($request, $conversationId, true);
+    }
+
+    public function unarchiveConversation(Request $request, int $conversationId): JsonResponse
+    {
+        return $this->setArchived($request, $conversationId, false);
+    }
+
+    private function setArchived(Request $request, int $conversationId, bool $archived): JsonResponse
+    {
+        $accessResponse = $this->ensureChatAccess($request, 'edit');
+        if ($accessResponse) {
+            return $accessResponse;
+        }
+
+        try {
+            $actor = $this->resolveActor($request);
+            $conversation = Conversation::find($conversationId);
+
+            if (!$conversation) {
+                return response()->json(['success' => false, 'message' => 'Conversation not found'], 404);
+            }
+
+            if (!$this->canAccessConversation($conversation, $actor)) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+            }
+
+            $conversation->update([$this->archivedColumn($actor) => $archived ? now() : null]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $archived ? 'Conversation archived' : 'Conversation moved to inbox',
+                'is_archived' => $archived,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('setArchived error', [
+                'conversation_id' => $conversationId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
     public function searchUsers(Request $request): JsonResponse
     {
         $accessResponse = $this->ensureChatAccess(
@@ -675,6 +726,20 @@ class ChatController extends Controller
     private function clearedColumn(array $actor): string
     {
         return $actor['is_vendor_context'] ? 'vendor_cleared_at' : 'customer_cleared_at';
+    }
+
+    private function archivedColumn(array $actor): string
+    {
+        return $actor['is_vendor_context'] ? 'vendor_archived_at' : 'customer_archived_at';
+    }
+
+    // Archived until a message arrives after the archive time
+    private function isArchived(Conversation $conversation, string $archivedColumn): bool
+    {
+        $archivedAt = $conversation->{$archivedColumn};
+
+        return $archivedAt !== null
+            && ($conversation->last_message_time === null || $conversation->last_message_time->lte($archivedAt));
     }
 
     private function resolveActor(Request $request): array

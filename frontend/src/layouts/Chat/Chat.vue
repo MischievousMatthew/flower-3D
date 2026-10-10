@@ -62,6 +62,14 @@
               Unread
               <span v-if="unreadCount > 0" class="count">{{ unreadCount }}</span>
             </button>
+            <button
+              role="tab"
+              :aria-selected="activeTab === 'archived'"
+              :class="{ active: activeTab === 'archived' }"
+              @click="activeTab = 'archived'"
+            >
+              Archived
+            </button>
           </div>
         </div>
 
@@ -140,18 +148,53 @@
                     </span>
                   </span>
                 </button>
-                <button
-                  v-if="canDeleteConversations"
-                  type="button"
-                  class="conv-delete"
-                  :aria-label="`Delete conversation with ${getOtherUserDisplayName(conversation)}`"
-                  title="Delete conversation"
-                  @click="confirmDeleteId = conversation.id"
+                <div
+                  v-if="canArchiveConversations || canDeleteConversations"
+                  class="conv-more"
+                  :class="{ open: openMenuId === conversation.id }"
                 >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
-                  </svg>
-                </button>
+                  <button
+                    type="button"
+                    class="conv-more-btn"
+                    aria-haspopup="menu"
+                    :aria-expanded="openMenuId === conversation.id"
+                    :aria-label="`More options for ${getOtherUserDisplayName(conversation)}`"
+                    title="More options"
+                    @click.stop="toggleMenu(conversation.id)"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <circle cx="5" cy="12" r="1.3" />
+                      <circle cx="12" cy="12" r="1.3" />
+                      <circle cx="19" cy="12" r="1.3" />
+                    </svg>
+                  </button>
+                  <div v-if="openMenuId === conversation.id" class="conv-menu" role="menu" @click.stop>
+                    <button
+                      v-if="canArchiveConversations"
+                      type="button"
+                      role="menuitem"
+                      :disabled="archivingId === conversation.id"
+                      @click="toggleArchive(conversation)"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 5h16v4H4zM5 9v10h14V9M10 13h4" />
+                      </svg>
+                      {{ conversation.is_archived ? "Move to inbox" : "Archive" }}
+                    </button>
+                    <button
+                      v-if="canDeleteConversations"
+                      type="button"
+                      role="menuitem"
+                      class="danger"
+                      @click="askDelete(conversation)"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+                      </svg>
+                      Delete
+                    </button>
+                  </div>
+                </div>
               </template>
             </div>
 
@@ -162,8 +205,13 @@
                     ? "No conversations match your search"
                     : activeTab === "unread"
                       ? "You're all caught up"
-                      : "No conversations yet"
+                      : activeTab === "archived"
+                        ? "No archived conversations"
+                        : "No conversations yet"
                 }}
+              </p>
+              <p v-if="!searchQuery && activeTab === 'archived'">
+                Archive a chat from its ⋯ menu to tuck it away here. It comes back to your inbox when a new message arrives.
               </p>
               <p v-if="!searchQuery && activeTab === 'all'">
                 {{
@@ -579,7 +627,11 @@ const props = defineProps({
     type: String,
     default: "",
   },
-  // CRM employees need the crm delete permission; everyone else can delete
+  // CRM employees need the crm edit / delete permissions; everyone else can
+  canArchiveConversations: {
+    type: Boolean,
+    default: true,
+  },
   canDeleteConversations: {
     type: Boolean,
     default: true,
@@ -644,6 +696,8 @@ const userSearchQuery = ref("");
 const searchedUsers = ref([]);
 const confirmDeleteId = ref(null);
 const deletingId = ref(null);
+const openMenuId = ref(null);
+const archivingId = ref(null);
 
 // Polling
 let pollingInterval = null;
@@ -654,7 +708,10 @@ const isNarrowScreen = () => window.matchMedia("(max-width: 768px)").matches;
 
 // Computed
 const filteredConversations = computed(() => {
-  let result = conversations.value;
+  let result =
+    activeTab.value === "archived"
+      ? conversations.value.filter((c) => c.is_archived)
+      : conversations.value.filter((c) => !c.is_archived);
 
   if (activeTab.value === "unread") {
     result = result.filter((c) => c.unread_count > 0);
@@ -677,7 +734,7 @@ const filteredConversations = computed(() => {
 });
 
 const unreadCount = computed(() =>
-  conversations.value.reduce((sum, c) => sum + (c.unread_count || 0), 0),
+  conversations.value.reduce((sum, c) => sum + (c.is_archived ? 0 : c.unread_count || 0), 0),
 );
 
 const canSend = computed(
@@ -840,6 +897,39 @@ const selectConversation = async (conversation) => {
   }
 };
 
+const toggleMenu = (id) => {
+  openMenuId.value = openMenuId.value === id ? null : id;
+};
+
+const closeMenu = () => {
+  openMenuId.value = null;
+};
+
+const askDelete = (conversation) => {
+  closeMenu();
+  confirmDeleteId.value = conversation.id;
+};
+
+const toggleArchive = async (conversation) => {
+  const archive = !conversation.is_archived;
+  archivingId.value = conversation.id;
+  try {
+    const { data } = await api.post(
+      `/chat/conversations/${conversation.id}/${archive ? "archive" : "unarchive"}`,
+    );
+    if (data.success) {
+      conversation.is_archived = archive;
+      toast.success(archive ? "Conversation archived" : "Moved back to your inbox");
+    }
+  } catch (error) {
+    console.error("Error archiving conversation:", error);
+    toast.error(error.response?.data?.message || "Couldn't update the conversation.");
+  } finally {
+    archivingId.value = null;
+    closeMenu();
+  }
+};
+
 const deleteConversation = async (conversation) => {
   deletingId.value = conversation.id;
   try {
@@ -904,6 +994,7 @@ const sendMessage = async () => {
     if (data.success) {
       data.message.is_own = true;
       selectedConversation.value.messages.push(data.message);
+      selectedConversation.value.is_archived = false; // a new message returns it to the inbox
       selectedConversation.value.last_message = formatLastMessagePreview(
         selectedConversation.value,
         data.message,
@@ -1086,6 +1177,7 @@ const pollNewMessages = async () => {
 
       if (relevantMessages.length > 0) {
         selectedConversation.value.messages.push(...relevantMessages);
+        selectedConversation.value.is_archived = false;
         const latestMessage = relevantMessages[relevantMessages.length - 1];
         selectedConversation.value.last_message = formatLastMessagePreview(
           selectedConversation.value,
@@ -1158,6 +1250,7 @@ watch(
 const handleEscape = (event) => {
   if (event.key !== "Escape") return;
   if (imageViewerUrl.value) closeImageViewer();
+  else if (openMenuId.value) closeMenu();
   else if (confirmDeleteId.value) confirmDeleteId.value = null;
   else if (showNewChatModal.value) showNewChatModal.value = false;
   else if (showUserDetails.value) showUserDetails.value = false;
@@ -1173,11 +1266,13 @@ onMounted(() => {
   fetchConversations();
   pollingInterval = setInterval(pollNewMessages, 3000);
   window.addEventListener("keydown", handleEscape);
+  document.addEventListener("click", closeMenu);
 });
 
 onUnmounted(() => {
   if (pollingInterval) clearInterval(pollingInterval);
   window.removeEventListener("keydown", handleEscape);
+  document.removeEventListener("click", closeMenu);
 });
 </script>
 
@@ -1627,10 +1722,14 @@ onUnmounted(() => {
   padding-right: 34px;
 }
 
-.conv-delete {
+/* "⋯" menu, middle-right under the time */
+.conv-more {
   position: absolute;
   right: 10px;
   bottom: 12px;
+}
+
+.conv-more-btn {
   display: grid;
   place-items: center;
   width: 28px;
@@ -1640,23 +1739,79 @@ onUnmounted(() => {
   background: transparent;
   color: var(--c-soft);
   cursor: pointer;
-  opacity: 0.55;
+  opacity: 0.6;
   transition: opacity 0.2s, background 0.2s, color 0.2s;
 }
 
-.conv-delete svg {
+.conv-more-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  stroke: none;
+}
+
+.conv-item:hover .conv-more-btn,
+.conv-more.open .conv-more-btn,
+.conv-more-btn:focus-visible {
+  opacity: 1;
+}
+
+.conv-more-btn:hover,
+.conv-more.open .conv-more-btn {
+  background: var(--c-hover);
+  color: var(--c-ink);
+}
+
+.conv-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 176px;
+  padding: 6px;
+  border: 1px solid var(--c-line);
+  border-radius: 14px;
+  background: var(--c-surface);
+  box-shadow: 0 14px 34px rgba(20, 18, 16, 0.14);
+}
+
+.conv-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--c-ink);
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.conv-menu button svg {
   width: 17px;
   height: 17px;
 }
 
-.conv-item:hover .conv-delete,
-.conv-delete:focus-visible {
-  opacity: 1;
+.conv-menu button:hover:not(:disabled) {
+  background: var(--c-hover);
 }
 
-.conv-delete:hover {
-  background: rgba(184, 64, 52, 0.1);
+.conv-menu button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.conv-menu button.danger {
   color: #b84034;
+}
+
+.conv-menu button.danger:hover {
+  background: rgba(184, 64, 52, 0.08);
 }
 
 .conv-confirm {
