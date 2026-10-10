@@ -876,10 +876,16 @@ const chatVendor = () => {
     goToLogin();
     return;
   }
+  // Chat conversations are between user accounts, so pass the vendor's
+  // user id (owner_id), not the store id.
+  if (!vendor.value?.owner_id) {
+    toast.error("This shop can't receive messages yet.", { position: "top-right" });
+    return;
+  }
   router.push({
     path: "/customer/chat",
     query: {
-      vendor_id: String(vendorId.value),
+      vendor_id: String(vendor.value.owner_id),
       vendor_name: vendor.value?.store_name || "",
     },
   });

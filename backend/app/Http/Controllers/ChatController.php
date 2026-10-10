@@ -471,6 +471,18 @@ class ChatController extends Controller
             $vendorId = $isVendorContext ? $participantId : $request->integer('vendor_id');
             $customerId = $isVendorContext ? $request->integer('customer_id') : $participantId;
 
+            // The other side must be a real counterpart: a customer can only
+            // open a chat with a vendor account, and never with themselves.
+            $counterpartId = $isVendorContext ? $customerId : $vendorId;
+            $counterpartRole = $isVendorContext ? User::ROLE_CUSTOMER : User::ROLE_VENDOR;
+            $counterpart = User::find($counterpartId);
+            if ($counterpartId === $participantId || !$counterpart || $counterpart->role !== $counterpartRole) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "That account isn't a {$counterpartRole} you can message.",
+                ], 422);
+            }
+
             $conversation = Conversation::firstOrCreate(
                 ['vendor_id' => $vendorId, 'customer_id' => $customerId],
                 ['owner_id' => $vendorId, 'is_active' => true]

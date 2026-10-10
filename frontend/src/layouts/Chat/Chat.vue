@@ -1,499 +1,496 @@
 <template>
-  <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
-  <div class="chat-layout" :class="{ embedded: isEmbeddedLayout }">
+  <div
+    class="chat-layout"
+    :class="{
+      embedded: isEmbeddedLayout,
+      'is-customer': isCustomer && !isEmbeddedLayout,
+      'bc-theme': isCustomer && !isEmbeddedLayout,
+      'is-vendor': isVendor && !isEmbeddedLayout,
+      'thread-open': !!selectedConversation,
+    }"
+  >
     <component :is="headerComponent" v-if="headerComponent" />
 
-    <div class="chat-container" :style="contentStyle">
-      <div class="chat-content">
-        <!-- Sidebar - Conversations List -->
-        <div class="conversations-sidebar" :style="sidebarStyle">
-          <div class="sidebar-header">
-            <div class="search-box">
-              <span class="search-icon">🔍</span>
-              <input
-                type="text"
-                :placeholder="`Search ${counterpartLabel}...`"
-                v-model="searchQuery"
-              />
-            </div>
-
-            <div class="tabs">
-              <button
-                class="tab"
-                :class="{ active: activeTab === 'all' }"
-                @click="activeTab = 'all'"
-              >
-                All Chats
-              </button>
-              <button
-                class="tab"
-                :class="{ active: activeTab === 'unread' }"
-                @click="activeTab = 'unread'"
-              >
-                Unread
-                <span v-if="unreadCount > 0" class="badge">{{
-                  unreadCount
-                }}</span>
-              </button>
-            </div>
+    <div class="chat-shell">
+      <!-- ── Conversation list ─────────────────────────────────────── -->
+      <aside class="chat-list" aria-label="Conversations">
+        <div class="chat-list-head">
+          <div class="chat-list-title">
+            <h1>Messages</h1>
+            <button
+              class="icon-btn"
+              :disabled="!canStartConversation"
+              :title="canStartConversation ? `New message` : permissionTooltip"
+              aria-label="New message"
+              @click="openNewChat"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 20h4L19 9l-4-4L4 16v4Z" />
+                <path d="m13.5 6.5 4 4" />
+              </svg>
+            </button>
           </div>
 
-          <div class="conversations-list">
-            <div
+          <label class="chat-search">
+            <span class="sr-only">Search {{ counterpartLabel }}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m16 16 4 4" />
+            </svg>
+            <input
+              v-model="searchQuery"
+              type="search"
+              :placeholder="`Search ${counterpartLabel}`"
+            />
+          </label>
+
+          <div class="chat-filter" role="tablist" aria-label="Filter conversations">
+            <button
+              role="tab"
+              :aria-selected="activeTab === 'all'"
+              :class="{ active: activeTab === 'all' }"
+              @click="activeTab = 'all'"
+            >
+              All
+            </button>
+            <button
+              role="tab"
+              :aria-selected="activeTab === 'unread'"
+              :class="{ active: activeTab === 'unread' }"
+              @click="activeTab = 'unread'"
+            >
+              Unread
+              <span v-if="unreadCount > 0" class="count">{{ unreadCount }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="chat-list-body">
+          <template v-if="isLoading">
+            <div v-for="n in 6" :key="n" class="conv conv--skeleton" aria-hidden="true">
+              <span class="skeleton avatar"></span>
+              <span class="conv-text">
+                <span class="skeleton line"></span>
+                <span class="skeleton line short"></span>
+              </span>
+            </div>
+            <span class="sr-only">Loading conversations…</span>
+          </template>
+
+          <template v-else>
+            <button
               v-for="conversation in filteredConversations"
               :key="conversation.id"
-              class="conversation-item"
+              type="button"
+              class="conv"
               :class="{
                 active: selectedConversation?.id === conversation.id,
                 unread: conversation.unread_count > 0,
               }"
               @click="selectConversation(conversation)"
             >
-              <div class="vendor-avatar-wrapper">
+              <span class="avatar">
                 <img
                   v-if="getOtherUser(conversation).avatar"
                   :src="getOtherUser(conversation).avatar"
-                  class="vendor-avatar"
-                  :alt="getOtherUserDisplayName(conversation)"
+                  alt=""
                 />
-                <div v-else class="vendor-avatar-placeholder">
-                  {{ getOtherUserAvatarInitial(conversation) }}
-                </div>
-                <span
-                  v-if="getOtherUser(conversation).online"
-                  class="online-indicator"
-                ></span>
-              </div>
-
-              <div class="conversation-info">
-                <div class="conversation-header">
-                  <h4 class="vendor-name">
-                    {{ getOtherUserDisplayName(conversation) }}
-                  </h4>
-                  <span class="conversation-time">{{
-                    conversation.last_message_time
-                  }}</span>
-                </div>
-                <div class="conversation-preview">
-                  <p>{{ conversation.last_message || "No messages yet" }}</p>
-
-                  <span
-                    v-if="conversation.unread_count > 0"
-                    class="unread-badge"
-                  >
+                <span v-else>{{ getOtherUserAvatarInitial(conversation) }}</span>
+                <i v-if="getOtherUser(conversation).online" class="presence"></i>
+              </span>
+              <span class="conv-text">
+                <span class="conv-top">
+                  <span class="conv-name">{{ getOtherUserDisplayName(conversation) }}</span>
+                  <span class="conv-time">{{ conversation.last_message_time }}</span>
+                </span>
+                <span class="conv-bottom">
+                  <span class="conv-preview">{{ conversation.last_message || "No messages yet" }}</span>
+                  <span v-if="conversation.unread_count > 0" class="count">
                     {{ conversation.unread_count }}
                   </span>
-                </div>
-              </div>
-            </div>
+                </span>
+              </span>
+            </button>
 
-            <!-- Empty state -->
-            <div
-              v-if="filteredConversations.length === 0"
-              class="empty-conversations"
-            >
-              <div class="empty-icon">💬</div>
-              <p>No conversations found</p>
+            <div v-if="filteredConversations.length === 0" class="list-empty">
+              <p class="list-empty-title">
+                {{
+                  searchQuery
+                    ? "No conversations match your search"
+                    : activeTab === "unread"
+                      ? "You're all caught up"
+                      : "No conversations yet"
+                }}
+              </p>
+              <p v-if="!searchQuery && activeTab === 'all'">
+                {{
+                  isVendor
+                    ? "Customers who message your shop will appear here."
+                    : "Message a shop from its storefront, or start a new chat."
+                }}
+              </p>
               <button
-                class="btn-primary"
-                @click="showNewChatModal = true"
-                :disabled="!canStartConversation"
-                :title="canStartConversation ? '' : permissionTooltip"
+                v-if="!searchQuery && activeTab === 'all' && canStartConversation"
+                class="btn btn-primary"
+                @click="openNewChat"
               >
-                Start New Chat
+                Start a new chat
               </button>
-              <p v-if="!canStartConversation" class="read-only-note">
+              <p v-if="!canStartConversation" class="muted">
                 View-only access allows reading conversations only.
               </p>
             </div>
-          </div>
+          </template>
+        </div>
+      </aside>
+
+      <!-- ── Thread ────────────────────────────────────────────────── -->
+      <section class="chat-thread" :aria-label="selectedConversation ? 'Conversation' : 'No conversation selected'">
+        <div v-if="!selectedConversation" class="thread-empty">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M8 12a4 4 0 0 1 4-4h24a4 4 0 0 1 4 4v16a4 4 0 0 1-4 4H20l-8 7v-7h0a4 4 0 0 1-4-4V12Z" />
+          </svg>
+          <h2>Your messages</h2>
+          <p>
+            Pick a {{ counterpartLabelSingular }} on the left to read and reply to your conversation.
+          </p>
+          <button
+            v-if="canStartConversation"
+            class="btn btn-primary"
+            @click="openNewChat"
+          >
+            Start a new chat
+          </button>
         </div>
 
-        <!-- Main Chat Area -->
-        <div class="main-chat-area">
-          <div v-if="!selectedConversation" class="empty-state">
-            <div class="empty-icon">💬</div>
-            <h3>Select a conversation</h3>
-            <p>
-              Choose a {{ counterpartLabelSingular }} from the list to
-              start chatting
-            </p>
-            <button
-                class="btn-primary"
-                @click="showNewChatModal = true"
-                :disabled="!canStartConversation"
-                :title="canStartConversation ? '' : permissionTooltip"
-            >
-              Start New Chat
+        <template v-else>
+          <header class="thread-head">
+            <button class="icon-btn back-btn" aria-label="Back to conversations" @click="closeThread">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
             </button>
-            <p v-if="!canStartConversation" class="read-only-note">
-              View-only access allows reading conversations only.
-            </p>
-          </div>
-
-          <div v-else class="chat-window">
-            <!-- Chat Window Header -->
-            <div class="chat-window-header">
-              <div class="vendor-info-header">
-                <div class="vendor-avatar-wrapper">
-                  <img
-                    v-if="getOtherUser(selectedConversation).avatar"
-                    :src="getOtherUser(selectedConversation).avatar"
-                    class="vendor-avatar"
-                    :alt="getOtherUserDisplayName(selectedConversation)"
-                  />
-                  <div v-else class="vendor-avatar-placeholder">
-                    {{ getOtherUserAvatarInitial(selectedConversation) }}
-                  </div>
-                  <span
-                    v-if="getOtherUser(selectedConversation).online"
-                    class="online-indicator"
-                  ></span>
-                </div>
-                <div class="vendor-details">
-                  <div class="vendor-name">
-                    {{ getOtherUserDisplayName(selectedConversation) }}
-                  </div>
-                  <div class="vendor-status">
-                    {{
-                      getOtherUser(selectedConversation).online
-                        ? "Online"
-                        : "Offline"
-                    }}
-                  </div>
-                </div>
-              </div>
-              <div class="header-actions">
-                <button
-                  class="action-btn"
-                  title="More"
-                  @click="toggleUserDetails"
-                >
-                  ⋮
-                </button>
-              </div>
-            </div>
-
-            <!-- Messages Area -->
-            <div class="messages-container" ref="messagesArea">
-              <div
-                v-if="
-                  !selectedConversation.messages ||
-                  selectedConversation.messages.length === 0
-                "
-                class="no-messages"
-              >
-                <div class="empty-icon">💬</div>
-                <p>No messages yet. Start the conversation!</p>
-              </div>
-
-              <div v-else>
-                <div class="message-date">
-                  <span>Today</span>
-                </div>
-
-                <div
-                  v-for="message in selectedConversation.messages"
-                  :key="message.id"
-                  class="message-wrapper"
-                  :class="{ sent: message.is_own, received: !message.is_own }"
-                >
-                  <div v-if="!message.is_own" class="message-avatar-wrapper">
-                    <img
-                      v-if="getOtherUser(selectedConversation).avatar"
-                      :src="getOtherUser(selectedConversation).avatar"
-                      class="message-avatar"
-                      :alt="getOtherUserDisplayName(selectedConversation)"
-                    />
-                    <div v-else class="message-avatar-placeholder">
-                      {{ getOtherUserAvatarInitial(selectedConversation) }}
-                    </div>
-                  </div>
-
-                  <div class="message-content">
-                    <div class="message-bubble">
-                      <!-- TEXT ONLY (show only if there's text and not just attachment placeholder) -->
-                      <p
-                        v-if="
-                          message.text && !isAttachmentPlaceholder(message.text)
-                        "
-                        class="message-text"
-                      >
-                        {{ message.text }}
-                      </p>
-
-                      <!-- ATTACHMENTS (images/files) -->
-                      <div
-                        v-if="
-                          message.attachments && message.attachments.length > 0
-                        "
-                        class="message-attachments"
-                      >
-                        <div
-                          v-for="(attachment, idx) in message.attachments"
-                          :key="idx"
-                          class="attachment-item"
-                        >
-                          <img
-                            v-if="isImageFile(attachment.type)"
-                            :src="attachment.url"
-                            alt="Attachment"
-                            class="attachment-image"
-                            @click="openImageViewer(attachment.url)"
-                          />
-
-                          <div v-else class="attachment-file">
-                            <span class="file-icon">
-                              {{ getFileIcon(attachment.type) }}
-                            </span>
-                            <div class="file-info">
-                              <span class="file-name">{{
-                                attachment.name
-                              }}</span>
-                              <span class="file-size">
-                                {{ formatFileSize(attachment.size) }}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="message-meta">
-                      <span class="message-time">{{ formatMessageTimestamp(message) }}</span>
-                      <span v-if="message.is_own" class="message-status">
-                        {{ message.read ? "✓✓" : "✓" }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Typing Indicator - only show when OTHER user is typing -->
-              <div v-if="isOtherUserTyping" class="typing-wrapper">
-                <div class="message-avatar-wrapper">
-                  <img
-                    v-if="getOtherUser(selectedConversation).avatar"
-                    :src="getOtherUser(selectedConversation).avatar"
-                    class="message-avatar"
-                    :alt="getOtherUserDisplayName(selectedConversation)"
-                  />
-                  <div v-else class="message-avatar-placeholder">
-                    {{ getOtherUserAvatarInitial(selectedConversation) }}
-                  </div>
-                </div>
-                <div class="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Message Input -->
-            <div class="message-input-area" :style="messageInputArea">
-              <!-- Selected Files Preview -->
-              <div v-if="selectedFiles.length > 0" class="files-preview">
-                <div
-                  v-for="(file, index) in selectedFiles"
-                  :key="index"
-                  class="file-preview-item"
-                >
-                  <span class="file-icon">{{ getFileIcon(file.type) }}</span>
-                  <span class="file-name">{{ file.name }}</span>
-                  <button class="remove-file-btn" @click="removeFile(index)" :disabled="!canSendMessages">
-                    ✕
-                  </button>
-                </div>
-              </div>
-
-              <div class="input-wrapper">
-                <button
-                  class="attach-btn"
-                  @click="openFileUpload"
-                  title="Attach file"
-                  :disabled="!canSendMessages"
-                >
-                  📎
-                </button>
-                <input
-                  type="file"
-                  ref="fileInput"
-                  @change="handleFileUpload"
-                  accept="image/*,.pdf,.doc,.docx,.txt"
-                  multiple
-                  style="display: none"
-                />
-
-                <input
-                  type="text"
-                  v-model="messageText"
-                  :placeholder="
-                    canSendMessages
-                      ? 'Type your message...'
-                      : 'You have view-only access to this chat'
-                  "
-                  @keyup.enter="sendMessage"
-                  @input="handleTyping"
-                  :disabled="!canSendMessages || isSending"
-                  :title="canSendMessages ? '' : permissionTooltip"
-                  class="message-input"
-                />
-
-                <button class="emoji-btn" title="Emoji">😊</button>
-
-                <button
-                  class="send-btn"
-                  @click="sendMessage"
-                  :disabled="!canSend"
-                  :title="canSend ? 'Send message' : permissionTooltip"
-                >
-                  ➤
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Right Sidebar - User Details -->
-        <div
-          v-if="showUserDetails && selectedConversation"
-          class="info-sidebar"
-        >
-          <div class="right-sidebar-header">
-            <h3>{{ isVendor ? "Customer" : "Vendor" }} Information</h3>
-            <button class="close-btn" @click="toggleUserDetails">✕</button>
-          </div>
-
-          <div class="vendor-profile">
-            <div class="profile-avatar-wrapper">
+            <span class="avatar">
               <img
                 v-if="getOtherUser(selectedConversation).avatar"
                 :src="getOtherUser(selectedConversation).avatar"
-                class="profile-avatar"
-                :alt="getOtherUserDisplayName(selectedConversation)"
+                alt=""
               />
-              <div v-else class="profile-avatar-placeholder">
-                {{ getOtherUserAvatarInitial(selectedConversation) }}
-              </div>
+              <span v-else>{{ getOtherUserAvatarInitial(selectedConversation) }}</span>
+              <i v-if="getOtherUser(selectedConversation).online" class="presence"></i>
+            </span>
+            <div class="thread-title">
+              <h2>{{ getOtherUserDisplayName(selectedConversation) }}</h2>
+              <p>
+                {{
+                  getOtherUser(selectedConversation).online
+                    ? "Online now"
+                    : isVendor
+                      ? "Customer"
+                      : "Flower shop"
+                }}
+              </p>
             </div>
-            <h4>{{ getOtherUserDisplayName(selectedConversation) }}</h4>
-            <p class="vendor-email">
-              {{ getOtherUser(selectedConversation).email }}
-            </p>
-            <p class="vendor-contact">
-              {{ getOtherUser(selectedConversation).contact_number }}
-            </p>
-          </div>
-
-          <div class="sidebar-section">
-            <h4 class="section-title">Quick Actions</h4>
-            <button
-              v-if="!isVendor"
-              class="action-button"
-              @click="viewVendorShop"
-            >
-              <span class="action-icon">🏪</span>
-              <span>View Shop</span>
-            </button>
-            <button v-if="!isVendor" class="action-button" @click="viewOrders">
-              <span class="action-icon">📦</span>
-              <span>My Orders</span>
-            </button>
-          </div>
-
-          <div class="sidebar-section" v-if="userDetails">
-            <h4 class="section-title">Details</h4>
-            <div class="detail-item">
-              <span class="detail-label">Address:</span>
-              <span class="detail-value">{{
-                userDetails.address || "N/A"
-              }}</span>
-            </div>
-          </div>
-
-          <div class="sidebar-section">
-            <h4 class="section-title">Shared Files</h4>
-            <div v-if="sharedFiles.length > 0" class="shared-files-grid">
-              <div
-                v-for="file in sharedFiles"
-                :key="file.name"
-                class="shared-file-item"
-                @click="downloadFile(file)"
+            <div class="thread-actions">
+              <button
+                v-if="!isVendor && selectedConversation.vendor?.store_id"
+                class="btn btn-ghost"
+                @click="viewVendorShop"
               >
-                <span class="file-icon-large">{{ file.icon }}</span>
-                <span class="file-name-small">{{ file.name }}</span>
-                <span class="file-size-small">{{ file.size }}</span>
-              </div>
+                View shop
+              </button>
+              <button
+                class="icon-btn"
+                :class="{ active: showUserDetails }"
+                :aria-pressed="showUserDetails"
+                :aria-label="`${isVendor ? 'Customer' : 'Shop'} details`"
+                @click="toggleUserDetails"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="8.5" />
+                  <path d="M12 11v5M12 8h.01" />
+                </svg>
+              </button>
             </div>
-            <div v-else class="no-shared-files">
-              <p>No shared files</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          </header>
 
-    <!-- Image Viewer Modal -->
-    <div v-if="imageViewerUrl" class="modal-overlay" @click="closeImageViewer">
-      <div class="image-viewer-modal" @click.stop>
-        <button class="close-viewer-btn" @click="closeImageViewer">✕</button>
-        <img :src="imageViewerUrl" alt="Full size image" />
-      </div>
-    </div>
-
-    <!-- New Chat Modal -->
-    <div
-      v-if="showNewChatModal"
-      class="modal-overlay"
-      @click="showNewChatModal = false"
-    >
-      <div class="new-chat-modal" @click.stop>
-        <div class="modal-header">
-          <h3>Start New Chat</h3>
-          <button class="close-btn" @click="showNewChatModal = false">✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="search-box">
-            <span class="search-icon">🔍</span>
-            <input
-              type="text"
-              :placeholder="`Search ${counterpartLabel}...`"
-              v-model="userSearchQuery"
-              @input="searchUsers"
-            />
-          </div>
-          <div class="vendors-list">
-            <div
-              v-for="user in searchedUsers"
-              :key="user.id"
-              class="vendor-item"
-              :class="{ disabled: !canStartConversation }"
-              @click="startNewConversation(user)"
-            >
-              <img
-                v-if="user.avatar"
-                :src="user.avatar"
-                class="vendor-avatar-small"
-                :alt="getSearchResultDisplayName(user)"
-              />
-              <div v-else class="vendor-avatar-placeholder-small">
-                {{ getSearchResultAvatarInitial(user) }}
+          <div ref="messagesArea" class="thread-body" aria-live="polite">
+            <template v-if="loadingMessages">
+              <div
+                v-for="n in 5"
+                :key="n"
+                class="msg-row"
+                :class="n % 2 ? 'received' : 'sent'"
+                aria-hidden="true"
+              >
+                <span class="skeleton bubble-skeleton" :style="{ width: `${36 + ((n * 17) % 30)}%` }"></span>
               </div>
-              <div class="vendor-item-info">
-                <div class="vendor-item-name">
-                  {{ getSearchResultDisplayName(user) }}
+            </template>
+
+            <div v-else-if="!selectedConversation.messages?.length" class="thread-start">
+              <p>This is the start of your conversation with {{ getOtherUserDisplayName(selectedConversation) }}.</p>
+            </div>
+
+            <template v-else>
+              <template v-for="item in messageItems" :key="item.key">
+                <div v-if="item.type === 'day'" class="day-divider">
+                  <span>{{ item.label }}</span>
                 </div>
-                <div class="vendor-item-email">{{ user.email }}</div>
-              </div>
-            </div>
-            <div
-              v-if="searchedUsers.length === 0 && userSearchQuery"
-              class="no-vendors"
-            >
-              <p>No {{ counterpartLabel }} found</p>
-            </div>
+                <div
+                  v-else
+                  class="msg-row"
+                  :class="{
+                    sent: item.message.is_own,
+                    received: !item.message.is_own,
+                    'run-start': item.runStart,
+                    'run-end': item.runEnd,
+                  }"
+                >
+                  <span v-if="!item.message.is_own" class="msg-avatar" aria-hidden="true">
+                    <template v-if="item.runEnd">
+                      <img
+                        v-if="getOtherUser(selectedConversation).avatar"
+                        :src="getOtherUser(selectedConversation).avatar"
+                        alt=""
+                      />
+                      <span v-else>{{ getOtherUserAvatarInitial(selectedConversation) }}</span>
+                    </template>
+                  </span>
+
+                  <div class="msg">
+                    <div
+                      v-if="item.message.attachments?.length"
+                      class="msg-attachments"
+                    >
+                      <template v-for="(attachment, idx) in item.message.attachments" :key="idx">
+                        <button
+                          v-if="isImageFile(attachment.type)"
+                          type="button"
+                          class="msg-image"
+                          aria-label="Open image"
+                          @click="openImageViewer(attachment.url)"
+                        >
+                          <img :src="attachment.url" alt="" loading="lazy" />
+                        </button>
+                        <a
+                          v-else
+                          :href="attachment.url"
+                          target="_blank"
+                          rel="noopener"
+                          class="msg-file"
+                        >
+                          <span class="file-badge">{{ fileExtension(attachment.name) }}</span>
+                          <span class="file-meta">
+                            <span class="file-name">{{ attachment.name }}</span>
+                            <span class="file-size">{{ formatFileSize(attachment.size) }}</span>
+                          </span>
+                        </a>
+                      </template>
+                    </div>
+
+                    <p
+                      v-if="item.message.text && !isAttachmentPlaceholder(item.message.text)"
+                      class="bubble"
+                    >{{ item.message.text }}</p>
+
+                    <span v-if="item.runEnd" class="msg-meta">
+                      {{ formatMessageTime(item.message) }}
+                      <template v-if="item.message.is_own">
+                        · {{ item.message.read ? "Seen" : "Sent" }}
+                      </template>
+                    </span>
+                  </div>
+                </div>
+              </template>
+            </template>
           </div>
+
+          <footer class="composer">
+            <div v-if="selectedFiles.length > 0" class="composer-files">
+              <span v-for="(file, index) in selectedFiles" :key="index" class="composer-file">
+                <span class="file-badge">{{ fileExtension(file.name) }}</span>
+                <span class="file-name">{{ file.name }}</span>
+                <button
+                  class="chip-remove"
+                  :aria-label="`Remove ${file.name}`"
+                  :disabled="!canSendMessages"
+                  @click="removeFile(index)"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
+                </button>
+              </span>
+            </div>
+
+            <div class="composer-row">
+              <button
+                class="icon-btn"
+                :disabled="!canSendMessages"
+                :title="canSendMessages ? 'Attach a photo or file' : permissionTooltip"
+                aria-label="Attach a photo or file"
+                @click="openFileUpload"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m20 11.5-7.8 7.8a5 5 0 0 1-7.1-7.1l8.1-8.1a3.4 3.4 0 0 1 4.8 4.8l-8.1 8.1a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4" />
+                </svg>
+              </button>
+              <input
+                ref="fileInput"
+                type="file"
+                accept="image/*,.pdf,.doc,.docx,.txt"
+                multiple
+                hidden
+                @change="handleFileUpload"
+              />
+
+              <label class="composer-field">
+                <span class="sr-only">Message</span>
+                <textarea
+                  ref="composerInput"
+                  v-model="messageText"
+                  rows="1"
+                  :placeholder="canSendMessages ? 'Write a message' : 'You have view-only access to this chat'"
+                  :disabled="!canSendMessages || isSending"
+                  :title="canSendMessages ? '' : permissionTooltip"
+                  @keydown.enter.exact.prevent="sendMessage"
+                  @input="resizeComposer"
+                ></textarea>
+              </label>
+
+              <button
+                class="send-btn"
+                :disabled="!canSend"
+                :title="canSend ? 'Send' : canSendMessages ? 'Write a message first' : permissionTooltip"
+                aria-label="Send message"
+                @click="sendMessage"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 19V5M6 11l6-6 6 6" />
+                </svg>
+              </button>
+            </div>
+            <p class="composer-hint">Enter to send, Shift + Enter for a new line</p>
+          </footer>
+        </template>
+      </section>
+
+      <!-- ── Details panel ─────────────────────────────────────────── -->
+      <aside
+        v-if="showUserDetails && selectedConversation"
+        class="chat-details"
+        :aria-label="`${isVendor ? 'Customer' : 'Shop'} details`"
+      >
+        <div class="details-head">
+          <h3>{{ isVendor ? "Customer" : "Shop" }} details</h3>
+          <button class="icon-btn" aria-label="Close details" @click="toggleUserDetails">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
+          </button>
+        </div>
+
+        <div class="details-profile">
+          <span class="avatar avatar--lg">
+            <img
+              v-if="getOtherUser(selectedConversation).avatar"
+              :src="getOtherUser(selectedConversation).avatar"
+              alt=""
+            />
+            <span v-else>{{ getOtherUserAvatarInitial(selectedConversation) }}</span>
+          </span>
+          <h4>{{ getOtherUserDisplayName(selectedConversation) }}</h4>
+          <p v-if="getOtherUser(selectedConversation).email">{{ getOtherUser(selectedConversation).email }}</p>
+          <p v-if="getOtherUser(selectedConversation).contact_number">
+            {{ getOtherUser(selectedConversation).contact_number }}
+          </p>
+        </div>
+
+        <div v-if="!isVendor" class="details-actions">
+          <button
+            v-if="selectedConversation.vendor?.store_id"
+            class="btn btn-primary"
+            @click="viewVendorShop"
+          >
+            View shop
+          </button>
+          <button class="btn btn-ghost" @click="viewOrders">My orders</button>
+        </div>
+
+        <dl v-if="userDetails" class="details-list">
+          <div>
+            <dt>Address</dt>
+            <dd>{{ userDetails.address || "Not provided" }}</dd>
+          </div>
+        </dl>
+
+        <div class="details-files">
+          <h4>Shared files</h4>
+          <ul v-if="sharedFiles.length > 0">
+            <li v-for="file in sharedFiles" :key="file.url || file.name">
+              <button type="button" class="details-file" @click="downloadFile(file)">
+                <span class="file-badge">{{ fileExtension(file.name) }}</span>
+                <span class="file-meta">
+                  <span class="file-name">{{ file.name }}</span>
+                  <span class="file-size">{{ file.size }}</span>
+                </span>
+              </button>
+            </li>
+          </ul>
+          <p v-else class="muted">Photos and files you share will show up here.</p>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Image viewer -->
+    <div v-if="imageViewerUrl" class="overlay overlay--dark" @click="closeImageViewer">
+      <button class="icon-btn viewer-close" aria-label="Close image" @click="closeImageViewer">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
+      </button>
+      <img :src="imageViewerUrl" alt="Shared image" class="viewer-image" @click.stop />
+    </div>
+
+    <!-- New chat -->
+    <div v-if="showNewChatModal" class="overlay" @click="showNewChatModal = false">
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="new-chat-title" @click.stop>
+        <div class="dialog-head">
+          <h3 id="new-chat-title">New message</h3>
+          <button class="icon-btn" aria-label="Close" @click="showNewChatModal = false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
+          </button>
+        </div>
+        <label class="chat-search">
+          <span class="sr-only">Search {{ counterpartLabel }}</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.5" />
+            <path d="m16 16 4 4" />
+          </svg>
+          <input
+            ref="newChatSearchInput"
+            v-model="userSearchQuery"
+            type="search"
+            :placeholder="`Search ${counterpartLabel} by name`"
+            @input="searchUsers"
+          />
+        </label>
+        <div class="dialog-results">
+          <button
+            v-for="result in searchedUsers"
+            :key="result.id"
+            type="button"
+            class="conv"
+            :disabled="!canStartConversation"
+            @click="startNewConversation(result)"
+          >
+            <span class="avatar">
+              <img v-if="result.avatar" :src="result.avatar" alt="" />
+              <span v-else>{{ getSearchResultAvatarInitial(result) }}</span>
+            </span>
+            <span class="conv-text">
+              <span class="conv-name">{{ getSearchResultDisplayName(result) }}</span>
+              <span class="conv-preview">{{ result.email }}</span>
+            </span>
+          </button>
+          <p v-if="searchedUsers.length === 0 && userSearchQuery" class="muted dialog-note">
+            No {{ counterpartLabel }} match "{{ userSearchQuery }}".
+          </p>
+          <p v-else-if="!userSearchQuery" class="muted dialog-note">
+            Type a name to find {{ counterpartLabel }}.
+          </p>
         </div>
       </div>
     </div>
@@ -501,22 +498,14 @@
 </template>
 
 <script setup>
-import {
-  ref,
-  computed,
-  onMounted,
-  onUnmounted,
-  nextTick,
-  watch,
-} from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import NavHeader from "../NavHeader.vue";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
-import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import { toast } from "vue3-toastify";
 import api from "../../plugins/axios";
-import { formatPhilippineDateTime } from "../../utils/philippineDateTime";
+import { formatPhilippineDate, formatPhilippineTime } from "../../utils/philippineDateTime";
 
 const props = defineProps({
   chatRole: {
@@ -567,64 +556,21 @@ const isVendor = computed(() => {
 });
 const counterpartLabel = computed(() => {
   if (props.counterpartLabel) return props.counterpartLabel;
-  return isVendor.value ? "customers" : "stores";
+  return isVendor.value ? "customers" : "shops";
 });
 const counterpartLabelSingular = computed(() =>
-  counterpartLabel.value.endsWith("s")
-    ? counterpartLabel.value.slice(0, -1)
-    : counterpartLabel.value,
+  counterpartLabel.value.endsWith("s") ? counterpartLabel.value.slice(0, -1) : counterpartLabel.value,
 );
 const canSendMessages = computed(() => props.canSendMessages);
-const canStartConversation = computed(
-  () => props.canSendMessages && props.allowNewChat,
-);
+const canStartConversation = computed(() => props.canSendMessages && props.allowNewChat);
 const normalizedInitialVendorId = computed(() => {
   const parsedVendorId = Number.parseInt(props.initialVendorId, 10);
   return Number.isFinite(parsedVendorId) ? parsedVendorId : null;
 });
 const hasHandledInitialVendor = ref(false);
 const headerComponent = computed(() => {
-  if (isEmbeddedLayout.value) {
-    return null;
-  }
-
+  if (isEmbeddedLayout.value) return null;
   return isVendor.value ? VendorSidebar : NavHeader;
-});
-
-const contentStyle = computed(() => {
-  if (isEmbeddedLayout.value) {
-    return {};
-  }
-
-  if (isCustomer.value) {
-    return { marginTop: "80px", marginLeft: "0" };
-  }
-
-  return {};
-});
-
-const sidebarStyle = computed(() => {
-  if (isEmbeddedLayout.value) {
-    return {};
-  }
-
-  if (isVendor.value) {
-    return { marginLeft: "260px" };
-  }
-
-  return {};
-});
-
-const messageInputArea = computed(() => {
-  if (isEmbeddedLayout.value) {
-    return {};
-  }
-
-  if (isCustomer.value) {
-    return { marginBottom: "80px" };
-  }
-
-  return {};
 });
 
 // State
@@ -632,15 +578,16 @@ const activeTab = ref("all");
 const searchQuery = ref("");
 const selectedConversation = ref(null);
 const messageText = ref("");
-const isOtherUserTyping = ref(false);
 const isSending = ref(false);
 const showUserDetails = ref(false);
 const messagesArea = ref(null);
+const composerInput = ref(null);
 const fileInput = ref(null);
+const newChatSearchInput = ref(null);
 const selectedFiles = ref([]);
 const conversations = ref([]);
 const isLoading = ref(false);
-const isLoadingMessage = ref("");
+const loadingMessages = ref(false);
 const sharedFiles = ref([]);
 const userDetails = ref(null);
 const imageViewerUrl = ref(null);
@@ -651,6 +598,9 @@ const searchedUsers = ref([]);
 // Polling
 let pollingInterval = null;
 const lastMessageId = ref(0);
+
+// On narrow screens the list and the thread take turns filling the screen
+const isNarrowScreen = () => window.matchMedia("(max-width: 768px)").matches;
 
 // Computed
 const filteredConversations = computed(() => {
@@ -665,9 +615,9 @@ const filteredConversations = computed(() => {
     result = result.filter((c) => {
       const otherUser = getOtherUser(c);
       return (
-        otherUser.name.toLowerCase().includes(query) ||
-        otherUser.display_name.toLowerCase().includes(query) ||
-        otherUser.email.toLowerCase().includes(query) ||
+        (otherUser.name || "").toLowerCase().includes(query) ||
+        (otherUser.display_name || "").toLowerCase().includes(query) ||
+        (otherUser.email || "").toLowerCase().includes(query) ||
         c.last_message?.toLowerCase().includes(query)
       );
     });
@@ -676,16 +626,54 @@ const filteredConversations = computed(() => {
   return result;
 });
 
-const unreadCount = computed(() => {
-  return conversations.value.reduce((sum, c) => sum + (c.unread_count || 0), 0);
-});
+const unreadCount = computed(() =>
+  conversations.value.reduce((sum, c) => sum + (c.unread_count || 0), 0),
+);
 
-const canSend = computed(() => {
-  return (
+const canSend = computed(
+  () =>
     props.canSendMessages &&
     (messageText.value.trim() || selectedFiles.value.length > 0) &&
-    !isSending.value
-  );
+    !isSending.value,
+);
+
+// Messages with day dividers, and runs of consecutive messages from the
+// same side (only the last message of a run shows the avatar and time).
+const dayLabel = (value) => {
+  const day = formatPhilippineDate(value);
+  if (day === formatPhilippineDate(new Date())) return "Today";
+  if (day === formatPhilippineDate(new Date(Date.now() - 86400000))) return "Yesterday";
+  return day;
+};
+
+const messageItems = computed(() => {
+  const messages = selectedConversation.value?.messages || [];
+  const items = [];
+  let previousDay = null;
+
+  messages.forEach((message, index) => {
+    const day = message.created_at ? formatPhilippineDate(message.created_at) : null;
+    if (day && day !== previousDay) {
+      items.push({ type: "day", key: `day-${day}`, label: dayLabel(message.created_at) });
+      previousDay = day;
+    }
+
+    const previous = messages[index - 1];
+    const next = messages[index + 1];
+    const sameDay = (other) =>
+      !other?.created_at || !message.created_at || formatPhilippineDate(other.created_at) === day;
+    const sameSide = (other) => other && !!other.is_own === !!message.is_own && sameDay(other);
+
+    items.push({
+      type: "message",
+      key: `msg-${message.id}`,
+      message,
+      runStart: !sameSide(previous),
+      runEnd: !sameSide(next),
+    });
+  });
+
+  return items;
 });
 
 // Methods
@@ -699,38 +687,21 @@ const getInitials = (name) => {
     .slice(0, 2);
 };
 
-const getStoreInitial = (storeName) =>
-  storeName?.trim()?.charAt(0)?.toUpperCase() || "?";
+const getStoreInitial = (storeName) => storeName?.trim()?.charAt(0)?.toUpperCase() || "?";
 
 const getOtherUser = (conversation) => {
-  if (!conversation)
-    return {
-      name: "",
-      email: "",
-      avatar: null,
-      online: false,
-      display_name: "",
-    };
-
-  if (isVendor.value) {
-    return conversation.customer || {};
-  } else {
-    return conversation.vendor || {};
-  }
+  if (!conversation) return { name: "", email: "", avatar: null, online: false, display_name: "" };
+  return (isVendor.value ? conversation.customer : conversation.vendor) || {};
 };
 
 // Use the same vendor display-name fallback as Cart.vue. Conversation and
 // search responses already include this data, so no additional API call is
 // needed to identify each vendor's store.
 const getVendorDisplayName = (vendor) =>
-  vendor?.display_name ||
-  vendor?.store_name ||
-  vendor?.name ||
-  "Local Vendor";
+  vendor?.display_name || vendor?.store_name || vendor?.name || "Local Vendor";
 
 const getOtherUserDisplayName = (conversation) => {
   const otherUser = getOtherUser(conversation);
-
   return isVendor.value
     ? otherUser.display_name || otherUser.name || "Customer"
     : getVendorDisplayName(otherUser);
@@ -751,13 +722,10 @@ const getSearchResultAvatarInitial = (otherUser) =>
     ? getInitials(getSearchResultDisplayName(otherUser))
     : getStoreInitial(getSearchResultDisplayName(otherUser));
 
-const isAttachmentPlaceholder = (text) => {
-  return text === "📷 Image" || text === "📎 File" || text === " ";
-};
+const isAttachmentPlaceholder = (text) => text === "📷 Image" || text === "📎 File" || text === " ";
 
 const toggleUserDetails = async () => {
   showUserDetails.value = !showUserDetails.value;
-
   if (showUserDetails.value && selectedConversation.value) {
     await loadUserDetails();
   }
@@ -785,6 +753,8 @@ const selectConversation = async (conversation) => {
   try {
     selectedConversation.value = conversation;
     showUserDetails.value = false;
+    userDetails.value = null;
+    sharedFiles.value = [];
 
     if (conversation.unread_count > 0) {
       conversation.unread_count = 0;
@@ -795,9 +765,8 @@ const selectConversation = async (conversation) => {
       return;
     }
 
-    const { data } = await api.get(
-      `/chat/conversations/${conversation.id}/messages`,
-    );
+    loadingMessages.value = true;
+    const { data } = await api.get(`/chat/conversations/${conversation.id}/messages`);
 
     if (data.success) {
       conversation.messages = data.messages || [];
@@ -809,40 +778,39 @@ const selectConversation = async (conversation) => {
       }
 
       if (conversation.messages.length > 0) {
-        lastMessageId.value = Math.max(
-          ...conversation.messages.map((m) => m.id),
-        );
+        lastMessageId.value = Math.max(lastMessageId.value, ...conversation.messages.map((m) => m.id));
       }
-
-      nextTick(() => scrollToBottom());
     }
   } catch (error) {
     console.error("Error fetching messages:", error);
-    toast.error("Failed to load messages");
+    toast.error("Couldn't load this conversation. Try again.");
+  } finally {
+    loadingMessages.value = false;
+    nextTick(() => scrollToBottom());
   }
 };
 
-const formatLastMessagePreview = (conversation, message, currentUserId) => {
-  // Check if message has sender_id and compare with current user
-  const isOwnMessage =
-    message.sender_id === currentUserId || message.is_own === true;
+const closeThread = () => {
+  selectedConversation.value = null;
+  showUserDetails.value = false;
+};
 
-  const senderName = isOwnMessage
-    ? "You"
-    : getOtherUserDisplayName(conversation);
+const formatLastMessagePreview = (conversation, message, currentUserId) => {
+  const isOwnMessage = message.sender_id === currentUserId || message.is_own === true;
+  const senderName = isOwnMessage ? "You" : getOtherUserDisplayName(conversation);
 
   if (message.attachments && message.attachments.length > 0) {
-    const allImages = message.attachments.every(
-      (a) => a.type && a.type.startsWith("image/"),
-    );
-
-    return allImages
-      ? `${senderName} sent a photo`
-      : `${senderName} sent a file`;
-  } else {
-    const messageText = message.text || "";
-    return `${senderName}: ${messageText}`;
+    const allImages = message.attachments.every((a) => a.type && a.type.startsWith("image/"));
+    return allImages ? `${senderName} sent a photo` : `${senderName} sent a file`;
   }
+  return `${senderName}: ${message.text || ""}`;
+};
+
+const resizeComposer = () => {
+  const el = composerInput.value;
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
 };
 
 const sendMessage = async () => {
@@ -858,14 +826,8 @@ const sendMessage = async () => {
 
     const formData = new FormData();
     formData.append("conversation_id", selectedConversation.value.id);
-
-    if (textToSend) {
-      formData.append("message", textToSend);
-    }
-
-    filesToSend.forEach((file) => {
-      formData.append("attachments[]", file);
-    });
+    if (textToSend) formData.append("message", textToSend);
+    filesToSend.forEach((file) => formData.append("attachments[]", file));
 
     const { data } = await api.post("chat/messages/send", formData, {
       headers: { "Content-Type": "multipart/form-data" },
@@ -874,35 +836,28 @@ const sendMessage = async () => {
     if (data.success) {
       data.message.is_own = true;
       selectedConversation.value.messages.push(data.message);
-
       selectedConversation.value.last_message = formatLastMessagePreview(
         selectedConversation.value,
         data.message,
         user.value?.id,
       );
-
       selectedConversation.value.last_message_time = "Just now";
-      lastMessageId.value = data.message.id;
+      lastMessageId.value = Math.max(lastMessageId.value, data.message.id);
       messageText.value = "";
       selectedFiles.value = [];
 
-      nextTick(() => scrollToBottom());
+      nextTick(() => {
+        resizeComposer();
+        scrollToBottom();
+        composerInput.value?.focus();
+      });
     }
   } catch (error) {
     console.error("Error sending message:", error);
-    toast.error("Failed to send message");
+    toast.error("Your message wasn't sent. Try again.");
   } finally {
     isSending.value = false;
   }
-};
-
-let typingTimeout = null;
-const handleTyping = () => {
-  if (typingTimeout) {
-    clearTimeout(typingTimeout);
-  }
-
-  typingTimeout = setTimeout(() => {}, 2000);
 };
 
 const scrollToBottom = () => {
@@ -918,15 +873,12 @@ const openFileUpload = () => {
   fileInput.value?.click();
 };
 
-const formatMessageTimestamp = (message) =>
-  message?.created_at
-    ? formatPhilippineDateTime(message.created_at)
-    : message?.time ?? "—";
+const formatMessageTime = (message) =>
+  message?.created_at ? formatPhilippineTime(message.created_at) : message?.time ?? "";
 
 const handleFileUpload = (event) => {
   if (!props.canSendMessages) return;
-  const files = Array.from(event.target.files);
-  selectedFiles.value.push(...files);
+  selectedFiles.value.push(...Array.from(event.target.files));
   event.target.value = "";
 };
 
@@ -943,18 +895,11 @@ const closeImageViewer = () => {
   imageViewerUrl.value = null;
 };
 
-const isImageFile = (type) => {
-  return type && type.startsWith("image/");
-};
+const isImageFile = (type) => type && type.startsWith("image/");
 
-const getFileIcon = (fileType) => {
-  if (!fileType) return "📎";
-  if (fileType.includes("image")) return "🖼️";
-  if (fileType.includes("pdf")) return "📄";
-  if (fileType.includes("word") || fileType.includes("document")) return "📝";
-  if (fileType.includes("sheet")) return "📊";
-  if (fileType.includes("zip") || fileType.includes("archive")) return "📦";
-  return "📎";
+const fileExtension = (name) => {
+  const ext = String(name || "").split(".").pop();
+  return ext && ext !== name ? ext.slice(0, 4).toUpperCase() : "FILE";
 };
 
 const formatFileSize = (bytes) => {
@@ -967,12 +912,8 @@ const formatFileSize = (bytes) => {
 
 const viewVendorShop = () => {
   const storeId = selectedConversation.value?.vendor?.store_id;
-
   if (storeId) {
-    router.push({
-      name: "VendorStorefront",
-      state: { storeId: String(storeId) },
-    });
+    router.push({ name: "VendorStorefront", state: { storeId: String(storeId) } });
   }
 };
 
@@ -984,25 +925,23 @@ const downloadFile = (file) => {
   window.open(file.url, "_blank");
 };
 
-const searchUsers = async () => {
-  if (!canStartConversation.value) {
-    searchedUsers.value = [];
-    return;
-  }
+const openNewChat = () => {
+  if (!canStartConversation.value) return;
+  userSearchQuery.value = "";
+  searchedUsers.value = [];
+  showNewChatModal.value = true;
+  nextTick(() => newChatSearchInput.value?.focus());
+};
 
-  if (!userSearchQuery.value.trim()) {
+const searchUsers = async () => {
+  if (!canStartConversation.value || !userSearchQuery.value.trim()) {
     searchedUsers.value = [];
     return;
   }
 
   try {
-    const endpoint = isVendor.value
-      ? "/chat/search-customers"
-      : "/chat/search-vendors";
-    const { data } = await api.get(endpoint, {
-      params: { search: userSearchQuery.value },
-    });
-
+    const endpoint = isVendor.value ? "/chat/search-customers" : "/chat/search-vendors";
+    const { data } = await api.get(endpoint, { params: { search: userSearchQuery.value } });
     if (data.success) {
       searchedUsers.value = isVendor.value ? data.customers : data.vendors;
     }
@@ -1022,21 +961,16 @@ const startNewConversation = async (otherUser) => {
 
     if (data.success) {
       showNewChatModal.value = false;
-      await fetchConversations();
+      await fetchConversations({ quiet: true });
 
-      // Select the new conversation
-      const newConv = conversations.value.find(
-        (c) => c.id === data.conversation.id,
-      );
+      const newConv = conversations.value.find((c) => c.id === data.conversation.id);
       if (newConv) {
         await selectConversation(newConv);
       }
-
-      toast.success("Conversation started!");
     }
   } catch (error) {
     console.error("Error starting conversation:", error);
-    toast.error("Failed to start conversation");
+    toast.error(error.response?.data?.message || "Couldn't start the conversation.");
   }
 };
 
@@ -1062,10 +996,7 @@ const handleInitialVendorConversation = async () => {
     return;
   }
 
-  await startNewConversation({
-    id: targetVendorId,
-    name: props.initialVendorName,
-  });
+  await startNewConversation({ id: targetVendorId, name: props.initialVendorName });
 };
 
 const pollNewMessages = async () => {
@@ -1079,55 +1010,37 @@ const pollNewMessages = async () => {
       },
     });
 
-    if (data.success && data.new_messages?.length > 0) {
+    if (data.success && data.new_messages?.length > 0 && selectedConversation.value) {
+      const knownIds = new Set((selectedConversation.value.messages || []).map((m) => m.id));
       const relevantMessages = data.new_messages.filter(
-        (msg) => msg.conversation_id === selectedConversation.value.id,
+        (msg) => msg.conversation_id === selectedConversation.value.id && !knownIds.has(msg.id),
       );
 
       if (relevantMessages.length > 0) {
         selectedConversation.value.messages.push(...relevantMessages);
-        lastMessageId.value = data.last_message_id;
-
         const latestMessage = relevantMessages[relevantMessages.length - 1];
-
         selectedConversation.value.last_message = formatLastMessagePreview(
           selectedConversation.value,
           latestMessage,
           user.value?.id,
         );
-
         selectedConversation.value.last_message_time = "Just now";
-
         nextTick(() => scrollToBottom());
-
-        isOtherUserTyping.value = true;
-        setTimeout(() => {
-          isOtherUserTyping.value = false;
-        }, 1000);
       }
+      lastMessageId.value = Math.max(lastMessageId.value, data.last_message_id || 0);
     }
 
     if (data.updated_conversations) {
       data.updated_conversations.forEach((updatedConv) => {
         const conv = conversations.value.find((c) => c.id === updatedConv.id);
-        if (conv) {
-          const lastMessage = {
-            text: updatedConv.last_message,
-            attachments: updatedConv.last_message_attachments || [],
-          };
-
-          const isOwnMessage =
-            updatedConv.last_message_sender_id === user.value?.id;
-
-          conv.last_message = formatLastMessagePreview(
-            conv,
-            lastMessage,
-            user.value?.id,
-          );
-
-          conv.last_message_time = updatedConv.last_message_time;
-          conv.unread_count = updatedConv.unread_count;
-        }
+        if (!conv) return;
+        conv.last_message = formatLastMessagePreview(
+          conv,
+          { text: updatedConv.last_message, attachments: updatedConv.last_message_attachments || [] },
+          user.value?.id,
+        );
+        conv.last_message_time = updatedConv.last_message_time;
+        conv.unread_count = conv.id === selectedConversation.value?.id ? 0 : updatedConv.unread_count;
       });
     }
   } catch (error) {
@@ -1135,33 +1048,28 @@ const pollNewMessages = async () => {
   }
 };
 
-const fetchConversations = async () => {
-  isLoading.value = true;
-  isLoadingMessage.value = "Getting your messages…";
+const fetchConversations = async ({ quiet = false } = {}) => {
+  if (!quiet) isLoading.value = true;
   try {
-    const endpoint = isVendor.value
-      ? "/chat/conversations"
-      : "/chat/my-conversations";
+    const endpoint = isVendor.value ? "/chat/conversations" : "/chat/my-conversations";
     const { data } = await api.get(endpoint);
 
     if (data.success) {
+      const previous = new Map(conversations.value.map((c) => [c.id, c.messages]));
       conversations.value = data.conversations.map((conv) => ({
         ...conv,
-        messages: [],
+        messages: previous.get(conv.id) || [],
       }));
 
       if (normalizedInitialVendorId.value && !isVendor.value) {
         await handleInitialVendorConversation();
-      } else if (
-        conversations.value.length > 0 &&
-        !selectedConversation.value
-      ) {
+      } else if (conversations.value.length > 0 && !selectedConversation.value && !isNarrowScreen()) {
         await selectConversation(conversations.value[0]);
       }
     }
   } catch (error) {
     console.error("Error fetching conversations:", error);
-    toast.error("Failed to load conversations");
+    toast.error("Couldn't load your conversations.");
   } finally {
     isLoading.value = false;
   }
@@ -1179,6 +1087,13 @@ watch(
   },
 );
 
+const handleEscape = (event) => {
+  if (event.key !== "Escape") return;
+  if (imageViewerUrl.value) closeImageViewer();
+  else if (showNewChatModal.value) showNewChatModal.value = false;
+  else if (showUserDetails.value) showUserDetails.value = false;
+};
+
 // Lifecycle
 onMounted(() => {
   if (!isAuthenticated.value) {
@@ -1188,37 +1103,61 @@ onMounted(() => {
 
   fetchConversations();
   pollingInterval = setInterval(pollNewMessages, 3000);
+  window.addEventListener("keydown", handleEscape);
 });
 
 onUnmounted(() => {
-  if (pollingInterval) {
-    clearInterval(pollingInterval);
-  }
-  if (typingTimeout) {
-    clearTimeout(typingTimeout);
-  }
+  if (pollingInterval) clearInterval(pollingInterval);
+  window.removeEventListener("keydown", handleEscape);
 });
 </script>
 
 <style scoped>
-* {
-  font-family: "Poppins", sans-serif;
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html,
-body {
-  height: 100%;
-  margin: 0;
-  overflow: hidden !important;
-}
-
+/* ── Theme ─────────────────────────────────────────────────────────────
+   One layout for every chat. The vendor portal and CRM keep their green
+   accent; the customer side uses the BloomCraft tokens (bloomcraft.css). */
 .chat-layout {
+  --c-bg: #f5f7f6;
+  --c-surface: #ffffff;
+  --c-ink: #1f2933;
+  --c-soft: #687076;
+  --c-line: rgba(15, 23, 42, 0.09);
+  --c-hover: rgba(15, 23, 42, 0.04);
+  --c-accent: #2f855a;
+  --c-accent-hover: #276749;
+  --c-accent-ink: #ffffff;
+  --c-accent-soft: #e8f5ee;
+  --c-bubble-in: #eef1f0;
+  --c-skeleton: #e9ecea;
+  --c-skeleton-hi: #f5f7f6;
+  --c-display: "Poppins", -apple-system, "Segoe UI", sans-serif;
+  --c-display-weight: 600;
+  --c-radius: 20px;
+
   display: flex;
   height: 100vh;
   overflow: hidden;
+  background: var(--c-bg);
+  color: var(--c-ink);
+  font-family: "Poppins", -apple-system, "Segoe UI", sans-serif;
+}
+
+.chat-layout.is-customer {
+  --c-bg: var(--ivory);
+  --c-surface: var(--paper);
+  --c-ink: var(--ink);
+  --c-soft: var(--ink-soft);
+  --c-line: var(--line);
+  --c-hover: rgba(30, 27, 24, 0.04);
+  --c-accent: var(--ink);
+  --c-accent-hover: var(--rosewood-dark);
+  --c-accent-ink: var(--ivory);
+  --c-accent-soft: var(--ivory-deep);
+  --c-bubble-in: #ffffff;
+  --c-skeleton: var(--ivory-deep);
+  --c-skeleton-hi: var(--paper);
+  --c-display: var(--font-display);
+  --c-display-weight: 500;
 }
 
 .chat-layout.embedded {
@@ -1226,1465 +1165,1081 @@ body {
   min-height: calc(100vh - 170px);
   border: 1px solid #e2e8f0;
   border-radius: 18px;
-  background: #fff;
+  background: var(--c-surface);
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
 }
 
-.chat-container {
-  margin-left: 0;
-  flex: 1;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.chat-layout.embedded .chat-container {
-  height: 100%;
-}
-
-.chat-content {
-  display: flex;
-  width: 100%;
-  height: 100%;
-}
-
-.read-only-note {
-  margin-top: 12px;
-  font-size: 13px;
-  color: #64748b;
-  text-align: center;
-}
-
-.conversations-sidebar {
+.chat-layout :is(h1, h2, h3, h4, p, dl, dd, ul) {
   margin: 0;
-  width: 380px;
-  background: #ffffff;
-  border-right: 1px solid #e9ecef;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
 }
 
-.sidebar-header {
-  padding: 20px 24px;
-  border-bottom: 1px solid #e9ecef;
-  background: #ffffff;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+.chat-layout ul {
+  padding: 0;
+  list-style: none;
 }
 
-.search-box {
-  background: #f8f9fa;
-  border-radius: 12px;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 2px solid transparent;
-  transition: all 0.3s ease;
-  border: 1px solid #dee2e6;
+.chat-layout button {
+  font-family: inherit;
 }
 
-.search-box:focus-within {
-  background: #ffffff;
-  border-color: #2d3748;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+.chat-layout svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.search-icon {
-  font-size: 18px;
-  color: #adb5bd;
-}
-
-.search-box input {
-  background: none;
-  border: none;
-  flex: 1;
-  outline: none;
-  color: #212529;
-  font-size: 15px;
-  font-weight: 400;
-}
-
-.search-box input::placeholder {
-  color: #adb5bd;
-}
-
-.tabs {
-  display: flex;
-  gap: 8px;
-  background: #f8f9fa;
-  padding: 6px;
-  border-radius: 12px;
-}
-
-.tab {
-  flex: 1;
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #2d3748;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition:
-    background 0.25s ease,
-    color 0.25s ease;
-}
-
-.tab:hover {
-  color: #495057;
-  background: rgba(102, 126, 234, 0.1);
-}
-
-.tab.active {
-  background: #2d3748;
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(45, 55, 72, 0.4);
-}
-
-.tab:not(.active) {
-  border: 1px solid #2d3748;
-  box-shadow: 0 4px 12px rgba(45, 55, 72, 0.4);
-}
-
-.badge {
-  background: rgba(255, 255, 255, 0.25);
-  color: #ffffff;
-  font-size: 10px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  font-weight: 700;
-  min-width: 18px;
-  text-align: center;
-}
-
-.tab:not(.active) .badge {
-  background: #2d3748;
-}
-
-.conversations-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 4px;
-}
-
-.conversations-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.conversations-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.conversations-list::-webkit-scrollbar-thumb {
-  background: #dee2e6;
-  border-radius: 10px;
-}
-
-.conversations-list::-webkit-scrollbar-thumb:hover {
-  background: #ced4da;
-}
-
-.conversation-item {
-  display: flex;
-  gap: 14px;
-  padding: 16px;
-  cursor: pointer;
-  border-radius: 12px;
-  margin-bottom: 4px;
-  transition: all 0.3s ease;
-  position: relative;
-  border: 2px solid transparent;
-}
-
-.conversation-item:hover {
-  background: #f8f9fa;
-  transform: translateX(4px);
-}
-
-.conversation-item.active {
-  background: linear-gradient(
-    135deg,
-    rgba(102, 126, 234, 0.1) 0%,
-    rgba(118, 75, 162, 0.1) 100%
-  );
-  border-color: #2d3748;
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
-}
-
-.conversation-item.unread {
-  background: linear-gradient(
-    135deg,
-    rgba(102, 126, 234, 0.05) 0%,
-    rgba(118, 75, 162, 0.05) 100%
-  );
-}
-
-.conversation-item.unread .vendor-name {
-  font-weight: 700;
-}
-
-.conversation-item.unread .conversation-preview p {
-  font-weight: 600;
-  color: #495057;
-}
-
-.vendor-avatar-wrapper {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.vendor-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.vendor-avatar-placeholder {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #2d3748;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 20px;
-  border: 3px solid #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.online-indicator {
+.sr-only {
   position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 14px;
-  height: 14px;
-  background: #10b981;
-  border: 3px solid #ffffff;
-  border-radius: 50%;
-  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
-.conversation-info {
+.muted {
+  color: var(--c-soft);
+  font-size: 13px;
+}
+
+/* ── Shell ─────────────────────────────────────────────────────────── */
+.chat-shell {
+  position: relative;
+  display: flex;
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  height: 100%;
 }
 
-.conversation-header {
-  display: flex;
-  justify-content: space-between;
+.is-customer .chat-shell {
+  height: calc(100dvh - 80px);
+  margin-top: 80px;
+}
+
+.is-vendor .chat-shell {
+  margin-left: 260px;
+}
+
+@media (max-width: 1200px) {
+  .is-vendor .chat-shell {
+    margin-left: 200px;
+  }
+}
+
+@media (max-width: 968px) {
+  .is-vendor .chat-shell {
+    margin-left: 0;
+  }
+}
+
+/* ── Shared bits ───────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-}
-
-.vendor-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: #212529;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.conversation-time {
-  font-size: 12px;
-  color: #adb5bd;
-  flex-shrink: 0;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 13.5px;
   font-weight: 500;
-}
-
-.conversation-preview {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-
-.conversation-preview p {
-  font-size: 14px;
-  color: #6c757d;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-  line-height: 1.4;
-}
-
-.unread-badge {
-  background: #2d3748;
-  color: #ffffff;
-  font-size: 11px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-weight: 700;
-  flex-shrink: 0;
-  min-width: 24px;
-  text-align: center;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
-}
-
-.empty-conversations {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  text-align: center;
-}
-
-.empty-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-conversations p {
-  color: #6c757d;
-  margin-bottom: 20px;
-  font-size: 15px;
-}
-
-.main-chat-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.empty-state {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px;
-  text-align: center;
-}
-
-.empty-state h3 {
-  font-size: 24px;
-  color: #212529;
-  margin: 16px 0 12px 0;
-  font-weight: 700;
-}
-
-.empty-state p {
-  color: #6c757d;
-  margin-bottom: 24px;
-  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.25s, border-color 0.25s, color 0.25s;
 }
 
 .btn-primary {
-  padding: 14px 32px;
-  background: #2d3748;
-  color: #ffffff;
-  border: none;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+  background: var(--c-accent);
+  color: var(--c-accent-ink);
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5);
+  background: var(--c-accent-hover);
 }
 
-.btn-primary:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.chat-window {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: #ffffff;
-  height: 100%;
-}
-
-.chat-window-header {
-  padding: 20px 28px;
-  background: #ffffff;
-  border-bottom: 1px solid #e9ecef;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  flex-shrink: 0;
-}
-
-.vendor-info-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.vendor-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.vendor-details .vendor-name {
-  font-size: 18px;
-  font-weight: 700;
-  color: #212529;
-}
-
-.vendor-status {
-  font-size: 13px;
-  color: #10b981;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.vendor-status::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  background: #10b981;
-  border-radius: 50%;
-  display: inline-block;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.action-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  border: 2px solid #e9ecef;
-  background: #ffffff;
-  color: #6c757d;
-  font-size: 18px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-}
-
-.action-btn:hover {
-  background: #2d3748;
-  border-color: #2d3748;
-  color: #ffffff;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(45, 55, 72, 1);
-}
-
-.messages-container {
-  margin-left: 10px;
-  margin-right: 10px;
-  flex: 1;
-  overflow-y: auto;
-}
-
-.messages-container::-webkit-scrollbar {
-  width: 8px;
-}
-
-.messages-container::-webkit-scrollbar-track {
+.btn-ghost {
   background: transparent;
+  border-color: var(--c-line);
+  color: var(--c-ink);
 }
 
-.messages-container::-webkit-scrollbar-thumb {
-  background-color: transparent;
+.btn-ghost:hover {
+  border-color: var(--c-ink);
 }
 
-.no-messages {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  text-align: center;
-}
-
-.no-messages p {
-  color: #6c757d;
-  margin-top: 16px;
-  font-size: 15px;
-}
-
-.message-date {
-  text-align: center;
-  margin: 28px 0;
-}
-
-.message-date span {
-  background: #ffffff;
-  padding: 8px 20px;
-  border-radius: 20px;
-  font-size: 13px;
-  color: #6c757d;
-  font-weight: 600;
-  border: 2px solid #e9ecef;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.message-wrapper {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  margin-bottom: 16px;
-  width: 100%;
-  animation: slideIn 0.3s ease;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.message-wrapper.received {
-  justify-content: flex-start;
-}
-
-.message-wrapper.sent {
-  justify-content: flex-end;
-}
-
-.message-avatar-wrapper {
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
   flex-shrink: 0;
-  align-self: flex-end;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-ink);
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
-.message-avatar {
-  width: 36px;
-  height: 36px;
+.icon-btn:hover:not(:disabled),
+.icon-btn.active {
+  background: var(--c-hover);
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--c-accent-soft);
+  color: var(--c-ink);
+  font-family: var(--c-display);
+  font-size: 19px;
+  font-weight: var(--c-display-weight);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
-.message-avatar-placeholder {
-  width: 36px;
-  height: 36px;
+.avatar--lg {
+  width: 84px;
+  height: 84px;
+  font-size: 34px;
+}
+
+.presence {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--c-surface);
   border-radius: 50%;
-  background: #2d3748;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 14px;
-  border: 2px solid #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  background: #3fa36b;
 }
 
-.message-content {
-  display: flex;
-  flex-direction: column;
-  max-width: 75%;
+.count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--c-accent);
+  color: var(--c-accent-ink);
+  font-size: 11px;
+  font-weight: 600;
 }
 
-.message-bubble {
-  padding: 14px 18px;
-  border-radius: 18px;
-  font-size: 15px;
-  line-height: 1.5;
-  display: inline-block;
-  width: fit-content;
-  max-width: 100%;
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+.skeleton {
+  display: block;
+  border-radius: 8px;
+  background: linear-gradient(100deg, var(--c-skeleton) 30%, var(--c-skeleton-hi) 50%, var(--c-skeleton) 70%);
+  background-size: 300% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
 }
 
-.message-wrapper.received .message-bubble {
-  background: #ffffff;
-  color: #212529;
-  border-top-left-radius: 4px;
-  border: 1px solid #e9ecef;
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
 }
 
-.message-wrapper.sent .message-bubble {
-  background: #2d3748;
-  color: #ffffff;
-  border-top-right-radius: 4px;
+.file-badge {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--c-accent-soft);
+  color: var(--c-ink);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
-.message-bubble p {
-  margin: 0;
-}
-
-.message-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  font-size: 12px;
-  color: #adb5bd;
-  font-weight: 500;
-}
-
-.message-wrapper.sent .message-meta {
-  justify-content: flex-end;
-}
-
-.message-time {
-  font-size: 12px;
-}
-
-.message-status {
-  color: #10b981;
-  font-size: 12px;
-}
-
-.message-attachments {
-  margin-top: 10px;
+.file-meta {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.attachment-item {
-  max-width: 100%;
-}
-
-.attachment-image {
-  max-width: 280px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: transform 0.3s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.attachment-image:hover {
-  transform: scale(1.02);
-}
-
-.attachment-file {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.attachment-file:hover {
-  background: rgba(0, 0, 0, 0.08);
-}
-
-.message-wrapper.sent .attachment-file {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.message-wrapper.sent .attachment-file:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.file-icon {
-  font-size: 28px;
-}
-
-.file-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  min-width: 0;
 }
 
 .file-name {
-  font-size: 14px;
-  font-weight: 600;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-size {
-  font-size: 12px;
-  opacity: 0.7;
+  color: var(--c-soft);
+  font-size: 11.5px;
 }
 
-.typing-wrapper {
+/* ── Conversation list ─────────────────────────────────────────────── */
+.chat-list {
   display: flex;
-  gap: 12px;
-  align-items: flex-end;
-  margin-bottom: 20px;
-  animation: slideIn 0.3s ease;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 360px;
+  min-height: 0;
+  border-right: 1px solid var(--c-line);
+  background: var(--c-surface);
 }
 
-.typing-indicator {
-  background: #ffffff;
-  padding: 14px 18px;
-  border-radius: 18px;
-  border-top-left-radius: 4px;
+.chat-list-head {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 20px 14px;
+}
+
+.chat-list-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-list-title h1 {
+  font-family: var(--c-display);
+  font-size: 30px;
+  font-weight: var(--c-display-weight);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.chat-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--c-bg);
+  color: var(--c-soft);
+  transition: border-color 0.2s;
+}
+
+.chat-search:focus-within {
+  border-color: var(--c-ink);
+}
+
+.chat-search svg {
+  width: 18px;
+  height: 18px;
+}
+
+.chat-search input {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--c-ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.chat-filter {
   display: flex;
   gap: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e9ecef;
 }
 
-.typing-indicator span {
-  width: 8px;
-  height: 8px;
-  background: #ced4da;
-  border-radius: 50%;
-  animation: typing 1.4s infinite;
-}
-
-.typing-indicator span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.typing-indicator span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-@keyframes typing {
-  0%,
-  60%,
-  100% {
-    transform: translateY(0);
-  }
-  30% {
-    transform: translateY(-10px);
-  }
-}
-
-.message-input-area {
-  padding: 20px 28px;
-  background: #ffffff;
-  border-top: 1px solid #e9ecef;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
-  flex-shrink: 0;
-}
-
-.files-preview {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.file-preview-item {
-  display: flex;
+.chat-filter button {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: #f8f9fa;
-  border: 2px solid #e9ecef;
-  border-radius: 10px;
-  font-size: 14px;
-  transition: all 0.3s ease;
-}
-
-.file-preview-item:hover {
-  border-color: #2d3748;
-  background: rgba(102, 126, 234, 0.05);
-}
-
-.file-preview-item .file-name {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--c-soft);
+  font-size: 13px;
   font-weight: 500;
-}
-
-.remove-file-btn {
-  background: none;
-  border: none;
-  color: #dc3545;
-  font-size: 18px;
   cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: all 0.2s ease;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
 
-.remove-file-btn:hover {
-  background: #dc3545;
-  color: #ffffff;
+.chat-filter button.active {
+  border-color: var(--c-ink);
+  background: var(--c-ink);
+  color: var(--c-surface);
 }
 
-.input-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: #f8f9fa;
-  border-radius: 24px;
-  padding: 10px 16px;
-  border: 2px solid #e9ecef;
-  transition: all 0.3s ease;
+.chat-filter button.active .count {
+  background: var(--c-surface);
+  color: var(--c-ink);
 }
 
-.input-wrapper:focus-within {
-  background: #ffffff;
-  border-color: #2d3748;
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
-}
-
-.attach-btn {
-  background: none;
-  border: none;
-  font-size: 22px;
-  cursor: pointer;
-  padding: 6px;
-  color: #6c757d;
-  transition: all 0.3s ease;
-  border-radius: 8px;
-}
-
-.attach-btn:hover {
-  transform: scale(1.15);
-  color: #2d3748;
-  background: rgba(102, 126, 234, 0.1);
-}
-
-.attach-btn:disabled,
-.emoji-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none;
-  background: none;
-}
-
-.message-input {
+.chat-list-body {
   flex: 1;
-  border: none;
-  background: none;
-  outline: none;
-  color: #212529;
-  font-size: 15px;
-  padding: 8px 10px;
-  font-weight: 400;
+  min-height: 0;
+  padding: 4px 10px 16px;
+  overflow-y: auto;
 }
 
-.message-input::placeholder {
-  color: #adb5bd;
-}
-
-.message-input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.emoji-btn {
-  background: none;
-  border: none;
-  font-size: 22px;
-  cursor: pointer;
-  padding: 6px;
-  transition: all 0.3s ease;
-  border-radius: 8px;
-}
-
-.emoji-btn:hover {
-  transform: scale(1.15);
-  background: rgba(102, 126, 234, 0.1);
-}
-
-.send-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  border: none;
-  background: #2d3748;
-  color: #ffffff;
-  font-size: 18px;
-  cursor: pointer;
+.conv {
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  gap: 12px;
+  width: 100%;
+  padding: 12px 10px;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--c-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
-.send-btn:hover:not(:disabled) {
-  transform: scale(1.08);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+.conv:hover:not(:disabled) {
+  background: var(--c-hover);
 }
 
-.send-btn:disabled {
+.conv.active {
+  background: var(--c-accent-soft);
+}
+
+.conv:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.info-sidebar {
-  width: 340px;
-  background: #ffffff;
-  border-left: 1px solid #e9ecef;
-  overflow-y: auto;
+.conv-text {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.05);
+  gap: 3px;
+  min-width: 0;
 }
 
-.info-sidebar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.info-sidebar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.info-sidebar::-webkit-scrollbar-thumb {
-  background: #dee2e6;
-  border-radius: 10px;
-}
-
-.info-sidebar::-webkit-scrollbar-thumb:hover {
-  background: #ced4da;
-}
-
-.right-sidebar-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid #e2e8f0;
+.conv-top,
+.conv-bottom {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  background: #ffffff;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  gap: 10px;
 }
 
-.right-sidebar-header h3 {
-  font-size: 18px;
-  font-weight: 700;
-  color: #212529;
-  margin: 0;
-}
-
-.close-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: #f8f9fa;
-  color: #6c757d;
-  font-size: 18px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-}
-
-.close-btn:hover {
-  background: #e9ecef;
-  color: #212529;
-  transform: rotate(90deg);
-}
-
-.vendor-profile {
-  padding: 32px 24px;
-  text-align: center;
-  border-bottom: 1px solid #e9ecef;
-}
-
-.profile-avatar-wrapper {
-  margin: 0 auto 16px;
-  width: 96px;
-  height: 96px;
-}
-
-.profile-avatar {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 4px solid #f8f9fa;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-}
-
-.profile-avatar-placeholder {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  background: #2d3748;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 36px;
-  border: 4px solid #f8f9fa;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-}
-
-.vendor-profile h4 {
-  font-size: 20px;
-  font-weight: 700;
-  color: #212529;
-  margin: 0 0 10px 0;
-}
-
-.vendor-email {
-  font-size: 14px;
-  color: #6c757d;
-  margin: 6px 0;
-}
-
-.vendor-contact {
-  font-size: 14px;
-  color: #6c757d;
-  margin: 6px 0;
+.conv-name {
+  overflow: hidden;
+  font-size: 14.5px;
   font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.sidebar-section {
-  padding: 24px;
-  border-bottom: 1px solid #e9ecef;
+.conv-time {
+  flex-shrink: 0;
+  color: var(--c-soft);
+  font-size: 11.5px;
 }
 
-.section-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: #212529;
-  margin: 0 0 16px 0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.conv-preview {
+  overflow: hidden;
+  color: var(--c-soft);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.action-button {
-  width: 100%;
-  padding: 14px 18px;
-  background: #f8f9fa;
-  border: 2px solid #e9ecef;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  cursor: pointer;
-  font-size: 15px;
-  color: #212529;
-  margin-bottom: 10px;
-  transition: all 0.3s ease;
-  text-align: left;
-  font-weight: 500;
-}
-
-.action-button:hover {
-  background: #2d3748;
-  border-color: #2d3748;
-  color: #ffffff;
-  transform: translateX(4px);
-  box-shadow: 0 4px 12px rgba(45, 55, 72, 1);
-}
-
-.action-icon {
-  font-size: 22px;
-}
-
-.detail-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #f8f9fa;
-}
-
-.detail-item:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
-
-.detail-label {
-  font-size: 12px;
-  color: #adb5bd;
+.conv.unread .conv-name,
+.conv.unread .conv-preview {
+  color: var(--c-ink);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
-.detail-value {
-  font-size: 14px;
-  color: #212529;
-  font-weight: 500;
+.conv--skeleton {
+  cursor: default;
 }
 
-.shared-files-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+.conv--skeleton .avatar {
+  background: none;
 }
 
-.shared-file-item {
-  padding: 16px;
-  background: #f8f9fa;
-  border: 2px solid #e9ecef;
-  border-radius: 12px;
+.conv--skeleton .line {
+  height: 12px;
+  width: 70%;
+}
+
+.conv--skeleton .line.short {
+  width: 45%;
+}
+
+.list-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.shared-file-item:hover {
-  background: rgba(102, 126, 234, 0.1);
-  border-color: #2d3748;
-  transform: translateY(-4px);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.2);
-}
-
-.file-icon-large {
-  font-size: 36px;
-}
-
-.file-name-small {
-  font-size: 12px;
-  color: #212529;
-  font-weight: 600;
+  padding: 48px 20px;
+  color: var(--c-soft);
+  font-size: 13.5px;
   text-align: center;
-  word-break: break-word;
 }
 
-.file-size-small {
-  font-size: 11px;
-  color: #adb5bd;
+.list-empty-title {
+  color: var(--c-ink);
+  font-size: 15px;
   font-weight: 500;
 }
 
-.no-shared-files {
+.list-empty .btn {
+  margin-top: 10px;
+}
+
+/* ── Thread ────────────────────────────────────────────────────────── */
+.chat-thread {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--c-bg);
+}
+
+.thread-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 24px;
+  color: var(--c-soft);
   text-align: center;
-  padding: 32px;
-  color: #adb5bd;
+}
+
+.thread-empty svg {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 6px;
+  stroke-width: 1.4;
+}
+
+.thread-empty h2 {
+  color: var(--c-ink);
+  font-family: var(--c-display);
+  font-size: 30px;
+  font-weight: var(--c-display-weight);
+}
+
+.thread-empty p {
+  max-width: 34ch;
   font-size: 14px;
 }
 
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+.thread-empty .btn {
+  margin-top: 8px;
+}
+
+.thread-head {
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  padding: 20px;
-  animation: fadeIn 0.3s ease;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--c-line);
+  background: var(--c-surface);
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.back-btn {
+  display: none;
 }
 
-.image-viewer-modal {
-  position: relative;
-  max-width: 90%;
-  max-height: 90%;
-  animation: zoomIn 0.4s ease;
-}
-
-@keyframes zoomIn {
-  from {
-    transform: scale(0.85);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-.image-viewer-modal img {
-  max-width: 100%;
-  max-height: 90vh;
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-}
-
-.close-viewer-btn {
-  position: absolute;
-  top: -48px;
-  right: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: none;
-  background: #ffffff;
-  color: #212529;
-  font-size: 22px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.close-viewer-btn:hover {
-  background: #dc3545;
-  color: #ffffff;
-  transform: scale(1.1) rotate(90deg);
-}
-
-.new-chat-modal {
-  background: #ffffff;
-  border-radius: 20px;
-  width: 90%;
-  max-width: 520px;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
-  animation: slideUp 0.4s ease;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(40px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.modal-header {
-  padding: 24px 28px;
-  border-bottom: 1px solid #e9ecef;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.modal-header h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: #212529;
-  margin: 0;
-}
-
-.modal-body {
-  padding: 24px 28px;
-  overflow-y: auto;
+.thread-title {
   flex: 1;
+  min-width: 0;
 }
 
-.modal-body .search-box {
-  margin-bottom: 20px;
+.thread-title h2 {
+  overflow: hidden;
+  font-family: var(--c-display);
+  font-size: 22px;
+  font-weight: var(--c-display-weight);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.vendors-list {
+.thread-title p {
+  color: var(--c-soft);
+  font-size: 12.5px;
+}
+
+.thread-actions {
   display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.thread-body {
+  display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 10px;
-  max-height: 420px;
+  min-height: 0;
+  padding: 24px clamp(16px, 4vw, 48px) 12px;
   overflow-y: auto;
 }
 
-.vendors-list::-webkit-scrollbar {
-  width: 6px;
+.thread-start {
+  margin: auto;
+  max-width: 40ch;
+  color: var(--c-soft);
+  font-size: 13.5px;
+  text-align: center;
 }
 
-.vendors-list::-webkit-scrollbar-track {
-  background: transparent;
+.day-divider {
+  display: flex;
+  justify-content: center;
+  margin: 18px 0 12px;
 }
 
-.vendors-list::-webkit-scrollbar-thumb {
-  background: #dee2e6;
-  border-radius: 10px;
+.day-divider span {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--c-surface);
+  color: var(--c-soft);
+  font-size: 11.5px;
+  font-weight: 500;
 }
 
-.vendor-item {
+.msg-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.msg-row.run-start {
+  margin-top: 12px;
+}
+
+.msg-row.sent {
+  justify-content: flex-end;
+}
+
+.msg-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  border-radius: 50%;
+  font-family: var(--c-display);
+  font-size: 13px;
+  font-weight: var(--c-display-weight);
+}
+
+.msg-avatar:not(:empty) {
+  background: var(--c-accent-soft);
+}
+
+.msg-row:not(.run-end) .msg-avatar {
+  margin-bottom: 0;
+}
+
+.msg-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(72%, 560px);
+}
+
+.sent .msg {
+  align-items: flex-end;
+}
+
+.bubble {
+  padding: 10px 15px;
+  border-radius: var(--c-radius);
+  background: var(--c-bubble-in);
+  color: var(--c-ink);
+  font-size: 14.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.is-customer .received .bubble {
+  box-shadow: 0 1px 0 var(--c-line);
+}
+
+.sent .bubble {
+  background: var(--c-accent);
+  color: var(--c-accent-ink);
+}
+
+/* Bubbles in a run read as one block: tighten the corners where they meet */
+.received:not(.run-start) .bubble {
+  border-top-left-radius: 6px;
+}
+
+.received:not(.run-end) .bubble {
+  border-bottom-left-radius: 6px;
+}
+
+.sent:not(.run-start) .bubble {
+  border-top-right-radius: 6px;
+}
+
+.sent:not(.run-end) .bubble {
+  border-bottom-right-radius: 6px;
+}
+
+.msg-meta {
+  padding: 0 6px;
+  color: var(--c-soft);
+  font-size: 11px;
+}
+
+.msg-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sent .msg-attachments {
+  justify-content: flex-end;
+}
+
+.msg-image {
+  padding: 0;
+  overflow: hidden;
+  border: none;
+  border-radius: 16px;
+  background: var(--c-surface);
+  cursor: zoom-in;
+}
+
+.msg-image img {
+  display: block;
+  width: 220px;
+  max-width: 100%;
+  height: 220px;
+  object-fit: cover;
+}
+
+.msg-file,
+.details-file {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px;
-  background: #f8f9fa;
-  border: 2px solid #e9ecef;
-  border-radius: 12px;
+  gap: 10px;
+  max-width: 280px;
+  padding: 10px 14px 10px 10px;
+  border: 1px solid var(--c-line);
+  border-radius: 16px;
+  background: var(--c-surface);
+  color: var(--c-ink);
+  text-decoration: none;
+}
+
+.bubble-skeleton {
+  height: 40px;
+  border-radius: var(--c-radius);
+}
+
+.msg-row:has(.bubble-skeleton) {
+  margin-top: 12px;
+}
+
+/* ── Composer ──────────────────────────────────────────────────────── */
+.composer {
+  padding: 10px clamp(12px, 3vw, 32px) 14px;
+  border-top: 1px solid var(--c-line);
+  background: var(--c-surface);
+}
+
+.composer-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.composer-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 240px;
+  padding: 6px 6px 6px 6px;
+  border: 1px solid var(--c-line);
+  border-radius: 14px;
+  background: var(--c-bg);
+}
+
+.composer-file .file-badge {
+  width: 30px;
+  height: 30px;
+  font-size: 9px;
+}
+
+.chip-remove {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-soft);
   cursor: pointer;
-  transition: all 0.3s ease;
 }
 
-.vendor-item:hover {
-  background: rgba(102, 126, 234, 0.1);
-  border-color: #2d3748;
-  transform: translateX(4px);
+.chip-remove svg {
+  width: 16px;
+  height: 16px;
 }
 
-.vendor-item.disabled {
-  opacity: 0.55;
+.composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.composer-field {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  padding: 0 16px;
+  border: 1px solid var(--c-line);
+  border-radius: 22px;
+  background: var(--c-bg);
+  transition: border-color 0.2s;
+}
+
+.composer-field:focus-within {
+  border-color: var(--c-ink);
+}
+
+.composer-field textarea {
+  flex: 1;
+  min-height: 42px;
+  max-height: 160px;
+  padding: 10px 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--c-ink);
+  font: inherit;
+  font-size: 14.5px;
+  line-height: 1.5;
+  resize: none;
+}
+
+.composer-field textarea:disabled {
   cursor: not-allowed;
 }
 
-.vendor-item.disabled:hover {
-  background: #f8f9fa;
-  border-color: #e9ecef;
-  transform: none;
+.send-btn {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: var(--c-accent);
+  color: var(--c-accent-ink);
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
 }
 
-.vendor-avatar-small {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+.send-btn:hover:not(:disabled) {
+  background: var(--c-accent-hover);
 }
 
-.vendor-avatar-placeholder-small {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: #2d3748;
+.send-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.composer-hint {
+  margin-top: 6px !important;
+  color: var(--c-soft);
+  font-size: 11px;
+  text-align: right;
+}
+
+/* ── Details panel ─────────────────────────────────────────────────── */
+.chat-details {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  flex-shrink: 0;
+  width: 320px;
+  padding: 18px 22px 28px;
+  overflow-y: auto;
+  border-left: 1px solid var(--c-line);
+  background: var(--c-surface);
+}
+
+.details-head {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 16px;
-  border: 2px solid #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  justify-content: space-between;
 }
 
-.vendor-item-info {
-  flex: 1;
-}
-
-.vendor-item-name {
+.details-head h3 {
   font-size: 15px;
   font-weight: 600;
-  color: #212529;
-  margin-bottom: 4px;
 }
 
-.vendor-item-email {
-  font-size: 13px;
-  color: #6c757d;
-}
-
-.no-vendors {
+.details-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   text-align: center;
-  padding: 48px 20px;
-  color: #adb5bd;
-  font-size: 15px;
 }
 
-/* Responsive Styles */
-@media (max-width: 1024px) {
-  .info-sidebar {
+.details-profile .avatar {
+  margin-bottom: 10px;
+}
+
+.details-profile h4 {
+  font-family: var(--c-display);
+  font-size: 22px;
+  font-weight: var(--c-display-weight);
+}
+
+.details-profile p {
+  color: var(--c-soft);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.details-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.details-actions .btn:only-child {
+  grid-column: 1 / -1;
+}
+
+.details-list > div {
+  padding: 12px 0;
+  border-top: 1px solid var(--c-line);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.details-list dt {
+  color: var(--c-soft);
+  font-size: 12px;
+}
+
+.details-list dd {
+  margin-top: 2px;
+  font-size: 13.5px;
+}
+
+.details-files h4 {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.details-files ul {
+  display: grid;
+  gap: 8px;
+}
+
+.details-file {
+  width: 100%;
+  max-width: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* ── Overlays ──────────────────────────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 16px 16px;
+  background: rgba(20, 18, 16, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.overlay--dark {
+  align-items: center;
+  padding: 24px;
+  background: rgba(15, 13, 11, 0.88);
+}
+
+.viewer-image {
+  max-width: min(92vw, 1100px);
+  max-height: 86vh;
+  border-radius: 14px;
+  object-fit: contain;
+}
+
+.viewer-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.viewer-close:hover {
+  background: rgba(255, 255, 255, 0.26) !important;
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 460px;
+  max-height: 70vh;
+  padding: 18px 18px 12px;
+  border-radius: 24px;
+  background: var(--c-surface);
+  box-shadow: 0 30px 80px rgba(20, 18, 16, 0.25);
+}
+
+.dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 4px;
+}
+
+.dialog-head h3 {
+  font-family: var(--c-display);
+  font-size: 24px;
+  font-weight: var(--c-display-weight);
+}
+
+.dialog-results {
+  min-height: 80px;
+  overflow-y: auto;
+}
+
+.dialog-note {
+  padding: 18px 6px;
+  text-align: center;
+}
+
+/* ── Focus ─────────────────────────────────────────────────────────── */
+.chat-layout :is(button, a, input, textarea):focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+.chat-search input:focus-visible,
+.composer-field textarea:focus-visible {
+  outline: none;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .chat-details {
     position: absolute;
+    top: 0;
     right: 0;
-    top: 0;
-    height: 100%;
-    z-index: 100;
-    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.15);
+    bottom: 0;
+    z-index: 5;
+    box-shadow: -16px 0 40px rgba(20, 18, 16, 0.12);
   }
 }
 
+@media (max-width: 968px) {
+  .chat-list {
+    width: 300px;
+  }
+}
+
+/* Phones: the list and the open conversation take turns */
 @media (max-width: 768px) {
-  .conversations-sidebar {
+  .chat-list {
     width: 100%;
-    position: absolute;
-    left: 0;
-    top: 0;
-    height: 100%;
-    z-index: 50;
+    border-right: none;
   }
 
-  .main-chat-area {
+  .chat-thread {
+    display: none;
+  }
+
+  .thread-open .chat-list {
+    display: none;
+  }
+
+  .thread-open .chat-thread {
+    display: flex;
+  }
+
+  .back-btn {
+    display: inline-grid;
+    margin-left: -8px;
+  }
+
+  .thread-head {
+    padding: 10px 12px;
+  }
+
+  .thread-actions .btn {
+    display: none;
+  }
+
+  .msg {
+    max-width: 84%;
+  }
+
+  .composer-hint {
+    display: none;
+  }
+
+  .chat-details {
     width: 100%;
   }
 
-  .message-wrapper {
-    max-width: 80%;
-  }
-
-  .info-sidebar {
-    width: 100%;
+  .msg-image img {
+    width: 180px;
+    height: 180px;
   }
 }
 
-@media (max-width: 480px) {
-  .conversations-sidebar {
-    width: 100%;
-  }
-
-  .message-wrapper {
-    max-width: 85%;
-  }
-
-  .vendor-avatar,
-  .vendor-avatar-placeholder {
-    width: 48px;
-    height: 48px;
-    font-size: 18px;
-  }
-
-  .message-avatar,
-  .message-avatar-placeholder {
-    width: 32px;
-    height: 32px;
-    font-size: 12px;
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
   }
 }
 </style>
