@@ -215,29 +215,93 @@ function buildRibbon(root, wrapMeshes, material) {
   ribbon.name = "GeneratedRibbon";
   ribbon.add(new THREE.Mesh(bandGeometry, material));
 
-  // Bow on the front of the band (+Z sits at a quarter turn)
-  const bow = new THREE.Group();
+  // Satin bow on the front of the band (+Z sits at a quarter turn): two
+  // flattened loops, a wrapped knot and two long tails with angled cuts.
+  // Bow space: x = side, y = up the wrap, z = out of the wrap.
+  const width = bandHeight;
+  const bowLift = width * 0.35;
   const frontPoint = outlinePoint(SECTORS / 4);
-  bow.position.copy(frontPoint).addScaledVector(front, bandHeight * 0.15);
+  const bow = new THREE.Group();
+  bow.position.copy(frontPoint).addScaledVector(front, bowLift);
   bow.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, axis, front));
 
-  const loopRadius = bandHeight * 1.35;
+  // Each loop runs out along the front, folds at the tip and comes back
+  // behind itself, pinched where it meets the knot.
+  const loopLength = width * 3.1;
+  const loopDepth = width * 0.42;
+  const loopGeometry = ribbonStrip(
+    (u) => {
+      const angle = u * Math.PI * 2;
+      const reach = (1 - Math.cos(angle)) / 2; // 0 at the knot, 1 at the tip
+      return {
+        point: new THREE.Vector3(loopLength * reach, width * 0.5 * reach, loopDepth * Math.sin(angle) * (0.35 + 0.65 * reach)),
+        width: UP,
+        half: (width / 2) * (0.4 + 0.6 * Math.sqrt(reach)),
+      };
+    },
+    { rows: 72, cup: 0.18 },
+  );
+  loopGeometry.rotateY(0.15); // tips lean back towards the wrap
   [-1, 1].forEach((direction) => {
-    const loop = new THREE.Mesh(new THREE.TorusGeometry(loopRadius, loopRadius * 0.34, 10, 40), material);
-    loop.scale.set(1, 0.62, 0.28);
-    loop.position.set(direction * loopRadius * 0.95, loopRadius * 0.12, 0);
-    loop.rotation.set(0, direction * -0.35, direction * 0.28);
+    const loop = new THREE.Mesh(loopGeometry, material);
+    loop.scale.x = direction;
     bow.add(loop);
-
-    const tail = new THREE.Mesh(new THREE.BoxGeometry(bandHeight * 0.85, loopRadius * 2.6, bandHeight * 0.08), material);
-    tail.geometry.translate(0, -loopRadius * 1.3, 0);
-    tail.rotation.set(-0.12, 0, direction * 0.32);
-    tail.position.set(direction * bandHeight * 0.18, 0, -bandHeight * 0.05);
-    bow.add(tail);
   });
-  const knot = new THREE.Mesh(new THREE.SphereGeometry(bandHeight * 0.62, 20, 16), material);
-  knot.scale.set(1, 0.9, 0.55);
-  bow.add(knot);
+
+  const knotGeometry = ribbonStrip(
+    (u) => {
+      const angle = u * Math.PI * 2;
+      return {
+        point: new THREE.Vector3(0, Math.cos(angle) * width * 0.36, Math.sin(angle) * width * 0.3 + width * 0.05),
+        width: RIGHT,
+        half: width * 0.36,
+      };
+    },
+    { rows: 32, cup: 0.25 },
+  );
+  bow.add(new THREE.Mesh(knotGeometry, material));
+
+  // Tails hang down the wrap and are kept just in front of its surface.
+  const bowZ = cz + smooth[SECTORS / 4] + lift + bowLift;
+  const clearance = lift + width * 0.05;
+  const surfaceZ = (x, y) => {
+    let highest = -Infinity;
+    samples.forEach((sample) => {
+      if (Math.abs(sample.t - (ringT + y)) < width * 0.5 && Math.abs(sample.x - (cx + x)) < width * 0.6) {
+        highest = Math.max(highest, sample.z);
+      }
+    });
+    return highest - bowZ;
+  };
+  const tailLength = Math.min(width * 7.5, (ringT - minT) * 0.85);
+  [
+    { direction: -1, spread: 0.05, sway: 0.18, twist: 0.55, phase: 0.4, reach: 1 },
+    { direction: 1, spread: 0.16, sway: 0.25, twist: -0.95, phase: 1.6, reach: 0.9 },
+  ].forEach(({ direction, spread, sway, twist, phase, reach }) => {
+    const tailDrop = tailLength * reach;
+    const STEPS = 20;
+    const path = [];
+    for (let i = 0; i <= STEPS; i += 1) {
+      const s = i / STEPS;
+      const x = direction * (width * 0.1 + tailDrop * spread * s) + Math.sin(s * Math.PI * 1.4 + phase) * width * sway * s;
+      const y = -width * 0.1 - tailDrop * s;
+      const z = Math.max(width * 0.18 * (1 - s) ** 2, surfaceZ(x, y) + clearance);
+      path.push(new THREE.Vector3(x, y, z));
+    }
+    const curve = new THREE.CatmullRomCurve3(path);
+    const tailGeometry = ribbonStrip(
+      (u) => {
+        const tangent = curve.getTangentAt(u);
+        return {
+          point: curve.getPointAt(u),
+          width: RIGHT.clone().projectOnPlane(tangent).normalize().applyAxisAngle(tangent, twist * Math.sin(u * Math.PI * 0.85)),
+          half: width * 0.45,
+        };
+      },
+      { rows: 64, cup: 0.12, cut: (width * 0.9) / tailDrop },
+    );
+    bow.add(new THREE.Mesh(tailGeometry, material));
+  });
   ribbon.add(bow);
 
   ribbon.traverse((child) => {
@@ -247,6 +311,47 @@ function buildRibbon(root, wrapMeshes, material) {
   });
   root.add(ribbon);
   return ribbon;
+}
+
+const UP = new THREE.Vector3(0, 1, 0);
+const RIGHT = new THREE.Vector3(1, 0, 0);
+
+/*
+ * Sweep a ribbon strip along a path. frame(u) gives, for u in 0..1, the
+ * centre point, the direction across the ribbon and half its width. cup
+ * curves the strip slightly across its width so satin catches the light;
+ * cut trims the far end diagonally (as a fraction of the length).
+ */
+function ribbonStrip(frame, { rows = 48, cols = 4, cup = 0, cut = 0 } = {}) {
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+  const tangent = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+  const step = 1 / (rows * 4);
+  for (let i = 0; i <= rows; i += 1) {
+    for (let j = 0; j <= cols; j += 1) {
+      const v = (j / cols) * 2 - 1;
+      const u = Math.max(0, Math.min(i / rows, 1 - (cut * (v + 1)) / 2));
+      const { point, width, half } = frame(u);
+      tangent.subVectors(frame(Math.min(1, u + step)).point, frame(Math.max(0, u - step)).point).normalize();
+      normal.crossVectors(tangent, width).normalize();
+      const vertex = point.clone().addScaledVector(width, half * v).addScaledVector(normal, cup * half * (1 - v * v));
+      positions.push(vertex.x, vertex.y, vertex.z);
+      uvs.push(j / cols, u);
+      if (i < rows && j < cols) {
+        const a = i * (cols + 1) + j;
+        const b = a + cols + 1;
+        indices.push(a, b, a + 1, a + 1, b, b + 1);
+      }
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 function principalAxis(points, centroid) {
@@ -297,12 +402,19 @@ export function dressBouquet(root) {
 
   const outer = createLayer(outerMeshes);
   const inner = createLayer(innerMeshes);
-  const ribbonMaterial = new THREE.MeshStandardMaterial({
+  // Satin: low roughness plus a sheen tinted towards white
+  const ribbonMaterial = new THREE.MeshPhysicalMaterial({
     color: "#caa6d9",
-    roughness: 0.42,
-    metalness: 0.05,
+    roughness: 0.34,
+    metalness: 0,
+    sheen: 0.7,
+    sheenRoughness: 0.32,
+    clearcoat: 0.2,
+    clearcoatRoughness: 0.45,
     side: THREE.DoubleSide,
   });
+  const tintSheen = () => ribbonMaterial.sheenColor.copy(ribbonMaterial.color).lerp(new THREE.Color("#ffffff"), 0.55);
+  tintSheen();
   const ribbon = buildRibbon(root, [...outerMeshes, ...innerMeshes], ribbonMaterial);
 
   return {
@@ -311,7 +423,10 @@ export function dressBouquet(root) {
     ribbon,
     wrapMeshes: [...outerMeshes, ...innerMeshes],
     applyRibbon(hex) {
-      if (hex) ribbonMaterial.color.set(hex);
+      if (hex) {
+        ribbonMaterial.color.set(hex);
+        tintSheen();
+      }
       if (ribbon) ribbon.visible = !!hex;
     },
   };
