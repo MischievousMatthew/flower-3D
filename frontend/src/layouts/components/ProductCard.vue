@@ -184,11 +184,7 @@
                 :disabled="submitting"
                 @click="submitReport"
               >
-                <span
-                  v-if="submitting"
-                  class="loading-spinner-small white"
-                ></span>
-                <span v-else>Submit Report</span>
+                {{ submitting ? "Submitting..." : "Submit Report" }}
               </button>
             </div>
           </div>
@@ -884,27 +880,6 @@ const handleImageError = (e) => {
 .rm-btn-submit:focus-visible {
   outline: 2px solid var(--rosewood);
   outline-offset: 3px;
-}
-
-.loading-spinner-small {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(30, 27, 24, 0.15);
-  border-top-color: var(--ink);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.loading-spinner-small.white {
-  border-color: rgba(244, 241, 236, 0.35);
-  border-top-color: var(--ivory);
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .modal-fade-enter-active,

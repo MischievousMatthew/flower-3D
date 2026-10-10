@@ -5,12 +5,37 @@
     :isAuthenticated="isAuthenticated"
     @scroll-to-section="scrollToSection"
   />
-  <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
-  <div class="profile-page">
-    <div class="profile-container">
-      <!-- Profile Header -->
-      <div class="profile-header">
-        <div class="header-content">
+  <div class="profile-page bc-theme">
+    <main class="bc-container profile-container">
+      <!-- Skeleton while the profile loads -->
+      <template v-if="isLoading">
+        <div class="profile-header" aria-label="Loading your profile">
+          <div class="profile-info">
+            <span class="bc-skeleton skeleton-avatar"></span>
+            <div class="skeleton-lines">
+              <span class="bc-skeleton skeleton-line skeleton-line--label"></span>
+              <span class="bc-skeleton skeleton-line skeleton-line--name"></span>
+              <span class="bc-skeleton skeleton-line skeleton-line--short"></span>
+            </div>
+          </div>
+        </div>
+        <section class="profile-card">
+          <span class="bc-skeleton skeleton-line skeleton-line--title"></span>
+          <div class="details-grid">
+            <div v-for="n in 8" :key="n" class="detail-item">
+              <span class="bc-skeleton skeleton-icon"></span>
+              <div class="skeleton-lines">
+                <span class="bc-skeleton skeleton-line skeleton-line--label"></span>
+                <span class="bc-skeleton skeleton-line"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </template>
+
+      <template v-else>
+        <!-- Profile header -->
+        <header class="profile-header">
           <div class="profile-info">
             <div class="avatar-wrapper">
               <img
@@ -20,7 +45,7 @@
                 class="avatar"
                 @error="handleImageError"
               />
-              <div v-else class="avatar-placeholder">
+              <div v-else class="avatar avatar-placeholder">
                 {{ getInitials(user.name, user.surname) }}
               </div>
               <input
@@ -36,580 +61,411 @@
                 class="btn-change-photo"
                 @click="triggerFileInput"
               >
-                Change Photo
+                Change photo
               </button>
             </div>
             <div class="user-details">
-              <div class="name-section">
-                <h1 class="user-name">{{ user.name }} {{ user.surname }}</h1>
+              <p class="bc-label">Your account</p>
+              <h1 class="user-name">
+                {{ user.name }} <em>{{ user.surname }}</em>
+              </h1>
+              <p class="user-meta">
+                <span>Member since {{ formatDate(user.created_at) }}</span>
                 <span v-if="user.is_verified" class="verified-badge">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path
-                      d="M5 8L7 10L11 6"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m5 12.5 4.5 4.5L19 7.5" />
                   </svg>
-                  Verified Profile
+                  Verified profile
                 </span>
-              </div>
-              <div class="start-date">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                  <line x1="16" y1="2" x2="16" y2="6" />
-                  <line x1="8" y1="2" x2="8" y2="6" />
-                  <line x1="3" y1="10" x2="21" y2="10" />
-                </svg>
-                <span>Start Date: {{ formatDate(user.created_at) }}</span>
-              </div>
+              </p>
             </div>
           </div>
-          <button class="btn-edit-header" @click="toggleEditMode">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
-              />
-              <path
-                d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
-              />
-            </svg>
-            {{ isEditing ? "Cancel Editing" : "Edit Profile" }}
+          <button
+            class="bc-btn"
+            :class="isEditing ? 'profile-btn-outline' : 'bc-btn--dark'"
+            @click="toggleEditMode"
+          >
+            {{ isEditing ? "Cancel editing" : "Edit profile" }}
           </button>
-        </div>
-      </div>
+        </header>
 
-      <!-- Profile Details -->
-      <div class="profile-details">
-        <div class="section-header">
-          <h2>Profile details</h2>
-          <button v-if="!isEditing" class="btn-edit" @click="toggleEditMode">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
-              />
-              <path
-                d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
-              />
-            </svg>
-            Edit
-          </button>
-        </div>
-
-        <div class="details-grid">
-          <!-- Full Name -->
-          <div class="detail-item">
-            <div class="detail-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-            </div>
-            <div class="detail-content">
-              <label>Full Name</label>
-              <div v-if="isEditing" class="name-fields">
-                <input
-                  v-model="editData.name"
-                  type="text"
-                  class="input-field"
-                  placeholder="First Name"
-                />
-                <input
-                  v-model="editData.surname"
-                  type="text"
-                  class="input-field"
-                  placeholder="Last Name"
-                />
-              </div>
-              <span v-else class="detail-value"
-                >{{ user.name }} {{ user.surname }}</span
-              >
-            </div>
+        <!-- Profile details -->
+        <section class="profile-card" aria-labelledby="details-title">
+          <div class="section-header">
+            <h2 id="details-title">Profile <em>details</em></h2>
+            <button v-if="!isEditing" class="bc-link btn-edit" @click="toggleEditMode">
+              Edit
+            </button>
           </div>
 
-          <!-- Email -->
-          <div class="detail-item">
-            <div class="detail-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
-                />
-                <polyline points="22,6 12,13 2,6" />
-              </svg>
-            </div>
-            <div class="detail-content">
-              <label>Email</label>
-              <div class="value-with-badge">
-                <span class="detail-value">{{ user.email }}</span>
-                <span v-if="user.email_verified_at" class="badge verified"
-                  >Email Verified</span
-                >
-              </div>
-            </div>
-          </div>
-
-          <!-- Date of Birth -->
-          <div class="detail-item">
-            <div class="detail-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                <line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" />
-                <line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-            </div>
-            <div class="detail-content">
-              <label>Date of birth</label>
-              <!-- ✅ max enforces 18+ rule: only dates ≤ 18 years ago are selectable -->
-              <input
-                v-if="isEditing"
-                v-model="editData.date_of_birth"
-                type="date"
-                class="input-field"
-                :max="maxBirthDate"
-              />
-              <span v-else class="detail-value">{{
-                formatDate(user.date_of_birth) || "-"
-              }}</span>
-            </div>
-          </div>
-
-          <!-- Username -->
-          <div class="detail-item">
-            <div class="detail-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-            </div>
-            <div class="detail-content">
-              <label>Username</label>
-              <input
-                v-if="isEditing"
-                v-model="editData.username"
-                type="text"
-                class="input-field"
-                placeholder="Username"
-              />
-              <span v-else class="detail-value">{{
-                user.username || "-"
-              }}</span>
-            </div>
-          </div>
-
-          <!-- Number (now editable) -->
-          <div class="detail-item">
-            <div class="detail-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"
-                />
-              </svg>
-            </div>
-            <div class="detail-content">
-              <label>Number</label>
-              <!-- ✅ Editable; numbers only, capped at 11 digits -->
-              <input
-                v-if="isEditing"
-                v-model="editData.contact_number"
-                type="tel"
-                class="input-field"
-                :class="{ 'input-error': contactNumberError }"
-                placeholder="e.g. 09123456789"
-                maxlength="11"
-                @input="sanitizeContactNumber"
-              />
-              <span v-if="isEditing && contactNumberError" class="field-error">
-                {{ contactNumberError }}
+          <div class="details-grid">
+            <!-- Full Name -->
+            <div class="detail-item">
+              <span class="detail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>
               </span>
-              <div v-else class="value-with-badge">
-                <span class="detail-value">{{
+              <div class="detail-content">
+                <label :for="isEditing ? 'pf-name' : undefined">Full name</label>
+                <div v-if="isEditing" class="name-fields">
+                  <input
+                    id="pf-name"
+                    v-model="editData.name"
+                    type="text"
+                    class="input-field"
+                    placeholder="First Name"
+                  />
+                  <input
+                    v-model="editData.surname"
+                    type="text"
+                    class="input-field"
+                    placeholder="Last Name"
+                    aria-label="Last name"
+                  />
+                </div>
+                <span v-else class="detail-value"
+                  >{{ user.name }} {{ user.surname }}</span
+                >
+              </div>
+            </div>
+
+            <!-- Email -->
+            <div class="detail-item">
+              <span class="detail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
+              </span>
+              <div class="detail-content">
+                <label>Email</label>
+                <div class="value-with-badge">
+                  <span class="detail-value">{{ user.email }}</span>
+                  <span v-if="user.email_verified_at" class="badge verified"
+                    >Verified</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- Date of Birth -->
+            <div class="detail-item">
+              <span class="detail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></svg>
+              </span>
+              <div class="detail-content">
+                <label :for="isEditing ? 'pf-dob' : undefined">Date of birth</label>
+                <!-- max enforces the 18+ rule -->
+                <input
+                  v-if="isEditing"
+                  id="pf-dob"
+                  v-model="editData.date_of_birth"
+                  type="date"
+                  class="input-field"
+                  :max="maxBirthDate"
+                />
+                <span v-else class="detail-value">{{
+                  formatDate(user.date_of_birth) || "-"
+                }}</span>
+              </div>
+            </div>
+
+            <!-- Username -->
+            <div class="detail-item">
+              <span class="detail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.5 7.1" /></svg>
+              </span>
+              <div class="detail-content">
+                <label :for="isEditing ? 'pf-username' : undefined">Username</label>
+                <input
+                  v-if="isEditing"
+                  id="pf-username"
+                  v-model="editData.username"
+                  type="text"
+                  class="input-field"
+                  placeholder="Username"
+                />
+                <span v-else class="detail-value">{{
+                  user.username || "-"
+                }}</span>
+              </div>
+            </div>
+
+            <!-- Contact number -->
+            <div class="detail-item">
+              <span class="detail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.5" /><path d="M11 18h2" /></svg>
+              </span>
+              <div class="detail-content">
+                <label :for="isEditing ? 'pf-number' : undefined">Number</label>
+                <!-- Numbers only, capped at 11 digits -->
+                <input
+                  v-if="isEditing"
+                  id="pf-number"
+                  v-model="editData.contact_number"
+                  type="tel"
+                  class="input-field"
+                  :class="{ 'input-error': contactNumberError }"
+                  placeholder="e.g. 09123456789"
+                  maxlength="11"
+                  @input="sanitizeContactNumber"
+                />
+                <span v-if="isEditing && contactNumberError" class="field-error">
+                  {{ contactNumberError }}
+                </span>
+                <span v-else-if="!isEditing" class="detail-value">{{
                   user.contact_number || "-"
                 }}</span>
-                <span v-if="user.contact_number" class="badge verified"
-                  >Number Verified</span
+              </div>
+            </div>
+
+            <!-- Plan -->
+            <div class="detail-item">
+              <span class="detail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" /></svg>
+              </span>
+              <div class="detail-content">
+                <label>Plan</label>
+                <span class="detail-value">{{ user.plan || "Free Plan" }}</span>
+              </div>
+            </div>
+
+            <!-- Gender -->
+            <div class="detail-item">
+              <span class="detail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /></svg>
+              </span>
+              <div class="detail-content">
+                <label :for="isEditing ? 'pf-gender' : undefined">Gender</label>
+                <select
+                  v-if="isEditing"
+                  id="pf-gender"
+                  v-model="editData.gender"
+                  class="input-field"
                 >
+                  <option value="">Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+                <span v-else class="detail-value">{{ user.gender || "-" }}</span>
+              </div>
+            </div>
+
+            <!-- Nationality -->
+            <div class="detail-item">
+              <span class="detail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5a13 13 0 0 1 0 17M12 3.5a13 13 0 0 0 0 17" /></svg>
+              </span>
+              <div class="detail-content">
+                <label :for="isEditing ? 'pf-nationality' : undefined">Nationality</label>
+                <input
+                  v-if="isEditing"
+                  id="pf-nationality"
+                  v-model="editData.nationality"
+                  type="text"
+                  class="input-field"
+                  placeholder="Nationality"
+                />
+                <span v-else class="detail-value">{{
+                  user.nationality || "-"
+                }}</span>
+              </div>
+            </div>
+
+            <!-- Address -->
+            <div class="detail-item detail-item--wide">
+              <span class="detail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M19 10c0 5.5-7 11-7 11s-7-5.5-7-11a7 7 0 0 1 14 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>
+              </span>
+              <div class="detail-content">
+                <label :for="isEditing ? 'pf-address' : undefined">Address</label>
+                <input
+                  v-if="isEditing"
+                  id="pf-address"
+                  v-model="editData.address"
+                  type="text"
+                  class="input-field"
+                  placeholder="Address"
+                />
+                <span v-else class="detail-value">{{ user.address || "-" }}</span>
+              </div>
+            </div>
+
+            <!-- Region (UI-only, drives the city list) -->
+            <div class="detail-item">
+              <span class="detail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M9 4 3 6.5v13.5L9 17.5l6 2.5 6-2.5V4l-6 2.5L9 4Z" /><path d="M9 4v13.5M15 6.5V20" /></svg>
+              </span>
+              <div class="detail-content">
+                <label :for="isEditing ? 'pf-region' : undefined">Region</label>
+                <select
+                  v-if="isEditing"
+                  id="pf-region"
+                  v-model="editData.region"
+                  class="input-field"
+                  @change="editData.city = ''"
+                >
+                  <option value="">Select Region</option>
+                  <option value="NCR">National Capital Region (NCR)</option>
+                  <option value="CALABARZON">Region IV-A (CALABARZON)</option>
+                </select>
+                <span v-else class="detail-value">{{
+                  getRegionLabel(inferRegionFromCity(user.city)) || "-"
+                }}</span>
+              </div>
+            </div>
+
+            <!-- City (depends on region) -->
+            <div class="detail-item">
+              <span class="detail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 20V9l8-5 8 5v11" /><path d="M9 20v-6h6v6" /></svg>
+              </span>
+              <div class="detail-content">
+                <label :for="isEditing ? 'pf-city' : undefined">City</label>
+                <select
+                  v-if="isEditing"
+                  id="pf-city"
+                  v-model="editData.city"
+                  class="input-field"
+                  :disabled="!editData.region"
+                >
+                  <option value="">
+                    {{
+                      editData.region ? "Select City" : "Select a region first"
+                    }}
+                  </option>
+                  <option
+                    v-for="city in filteredCities"
+                    :key="city"
+                    :value="city"
+                  >
+                    {{ city }}
+                  </option>
+                </select>
+                <span v-else class="detail-value">{{ user.city || "-" }}</span>
+              </div>
+            </div>
+
+            <!-- Postal Code -->
+            <div class="detail-item">
+              <span class="detail-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M7 10h4M7 14h6M16 10h1" /></svg>
+              </span>
+              <div class="detail-content">
+                <label :for="isEditing ? 'pf-postal' : undefined">Postal code</label>
+                <input
+                  v-if="isEditing"
+                  id="pf-postal"
+                  v-model="editData.postal_code"
+                  type="text"
+                  class="input-field"
+                  placeholder="Postal Code"
+                />
+                <span v-else class="detail-value">{{
+                  user.postal_code || "-"
+                }}</span>
               </div>
             </div>
           </div>
 
-          <!-- Plan -->
-          <div class="detail-item">
-            <div class="detail-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M3 3h18v18H3zM9 3v18" />
-              </svg>
-            </div>
-            <div class="detail-content">
-              <label>Plan</label>
-              <span class="detail-value">{{ user.plan || "Free Plan" }}</span>
-            </div>
+          <div v-if="isEditing" class="action-buttons">
+            <button class="bc-link btn-cancel" @click="cancelEdit">Cancel</button>
+            <button
+              class="bc-btn bc-btn--dark"
+              @click="saveProfile"
+              :disabled="isSaving"
+            >
+              {{ isSaving ? "Saving..." : "Save changes" }}
+            </button>
           </div>
+        </section>
 
-          <!-- Gender -->
-          <div class="detail-item">
-            <div class="detail-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <circle cx="12" cy="12" r="10" />
-              </svg>
-            </div>
-            <div class="detail-content">
-              <label>Gender</label>
-              <select
-                v-if="isEditing"
-                v-model="editData.gender"
-                class="input-field"
-              >
-                <option value="">Select Gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
-              <span v-else class="detail-value">{{ user.gender || "-" }}</span>
-            </div>
+        <!-- Two-factor authentication -->
+        <section
+          v-if="user.role === 'customer'"
+          class="profile-card two-factor-section"
+          aria-labelledby="security-title"
+        >
+          <span class="detail-icon detail-icon--lg" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+          </span>
+          <div class="two-factor-content">
+            <p class="bc-label">Security</p>
+            <h2 id="security-title">Two-factor <em>authentication</em></h2>
+            <p>
+              Add an extra layer of security to your account with two-factor
+              authentication.
+            </p>
           </div>
-
-          <!-- Nationality -->
-          <div class="detail-item">
-            <div class="detail-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="2" y1="12" x2="22" y2="12" />
-                <path
-                  d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
-                />
-              </svg>
-            </div>
-            <div class="detail-content">
-              <label>Nationality</label>
-              <input
-                v-if="isEditing"
-                v-model="editData.nationality"
-                type="text"
-                class="input-field"
-                placeholder="Nationality"
-              />
-              <span v-else class="detail-value">{{
-                user.nationality || "-"
-              }}</span>
-            </div>
-          </div>
-
-          <!-- Address -->
-          <div class="detail-item">
-            <div class="detail-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-            </div>
-            <div class="detail-content">
-              <label>Address</label>
-              <input
-                v-if="isEditing"
-                v-model="editData.address"
-                type="text"
-                class="input-field"
-                placeholder="Address"
-              />
-              <span v-else class="detail-value">{{ user.address || "-" }}</span>
-            </div>
-          </div>
-
-          <!-- Region (NEW – UI-only for city filtering, not persisted) -->
-          <div class="detail-item">
-            <div class="detail-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <polygon points="3 11 22 2 13 21 11 13 3 11" />
-              </svg>
-            </div>
-            <div class="detail-content">
-              <label>Region</label>
-              <!-- ✅ Region drives the city dropdown; selecting a new region resets city -->
-              <select
-                v-if="isEditing"
-                v-model="editData.region"
-                class="input-field"
-                @change="editData.city = ''"
-              >
-                <option value="">Select Region</option>
-                <option value="NCR">National Capital Region (NCR)</option>
-                <option value="CALABARZON">Region IV-A (CALABARZON)</option>
-              </select>
-              <span v-else class="detail-value">{{
-                getRegionLabel(inferRegionFromCity(user.city)) || "-"
-              }}</span>
-            </div>
-          </div>
-
-          <!-- City (now a dependent dropdown) -->
-          <div class="detail-item">
-            <div class="detail-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              </svg>
-            </div>
-            <div class="detail-content">
-              <label>City</label>
-              <!-- ✅ Cities filtered by selected region; disabled until region is chosen -->
-              <select
-                v-if="isEditing"
-                v-model="editData.city"
-                class="input-field"
-                :disabled="!editData.region"
-              >
-                <option value="">
-                  {{
-                    editData.region ? "Select City" : "Select a region first"
-                  }}
-                </option>
-                <option
-                  v-for="city in filteredCities"
-                  :key="city"
-                  :value="city"
-                >
-                  {{ city }}
-                </option>
-              </select>
-              <span v-else class="detail-value">{{ user.city || "-" }}</span>
-            </div>
-          </div>
-
-          <!-- Postal Code -->
-          <div class="detail-item">
-            <div class="detail-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-            </div>
-            <div class="detail-content">
-              <label>Postal Code</label>
-              <input
-                v-if="isEditing"
-                v-model="editData.postal_code"
-                type="text"
-                class="input-field"
-                placeholder="Postal Code"
-              />
-              <span v-else class="detail-value">{{
-                user.postal_code || "-"
-              }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Save/Cancel Buttons -->
-        <div v-if="isEditing" class="action-buttons">
-          <button class="btn-cancel" @click="cancelEdit">Cancel</button>
-          <button class="btn-save" @click="saveProfile" :disabled="isSaving">
-            {{ isSaving ? "Saving..." : "Save Changes" }}
-          </button>
-        </div>
-      </div>
-
-      <!-- 2-Factor Authentication -->
-      <div v-if="user.role === 'customer'" class="two-factor-section">
-        <div class="two-factor-icon">
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
+          <!-- Keyed on the modal so the switch re-syncs if it is closed early -->
+          <label
+            :key="`2fa-${twoFactorEnabled}-${showTwoFactorModal}`"
+            class="toggle-switch"
           >
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
-        </div>
-        <div class="two-factor-content">
-          <h3>2-Factor Authentication</h3>
-          <p>
-            Add an extra layer of security to your account with two-Factor
-            authentication.
-          </p>
-        </div>
-        <label class="toggle-switch two-factor-toggle">
-          <input
-            type="checkbox"
-            :checked="twoFactorEnabled"
-            :disabled="twoFactorLoading"
-            @change="beginTwoFactorChange"
-          />
-          <span class="toggle-slider"></span>
-          <span class="toggle-label">{{ twoFactorEnabled ? "ON" : "OFF" }}</span>
-        </label>
-      </div>
+            <input
+              type="checkbox"
+              role="switch"
+              :checked="twoFactorEnabled"
+              :disabled="twoFactorLoading"
+              :aria-checked="twoFactorEnabled"
+              aria-label="Two-factor authentication"
+              @change="beginTwoFactorChange"
+            />
+            <span class="toggle-slider" aria-hidden="true"></span>
+            <span class="toggle-label">{{ twoFactorEnabled ? "On" : "Off" }}</span>
+          </label>
+        </section>
+      </template>
 
       <div
         v-if="showTwoFactorModal"
         class="two-factor-modal-backdrop"
         @click.self="closeTwoFactorModal"
       >
-        <section class="two-factor-modal" role="dialog" aria-modal="true">
+        <section
+          class="two-factor-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="two-factor-title"
+        >
           <button
             class="two-factor-modal-close"
             aria-label="Close two-factor verification"
             @click="closeTwoFactorModal"
           >
-            ×
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
           </button>
 
           <template v-if="twoFactorStep === 'email'">
-            <h2>Verify your email</h2>
+            <p class="bc-label">Step one</p>
+            <h2 id="two-factor-title">Verify your <em>email</em></h2>
             <p>
               Enter the six-digit verification code sent to your registered
               email address.
             </p>
             <form @submit.prevent="verifyInitialEmailOtp">
               <div class="two-factor-code-boxes" @paste.prevent="pasteTwoFactorCode($event, 'otp')">
-                <input v-for="(_, index) in twoFactorOtp" :key="`setup-otp-${index}`" :ref="(element) => setTwoFactorInput(element, 'otp', index)" v-model="twoFactorOtp[index]" class="two-factor-code-box" inputmode="numeric" maxlength="1" autocomplete="one-time-code" @input="advanceTwoFactorCode('otp', index)" @keydown.backspace="retreatTwoFactorCode($event, 'otp', index)" />
+                <input v-for="(_, index) in twoFactorOtp" :key="`setup-otp-${index}`" :ref="(element) => setTwoFactorInput(element, 'otp', index)" v-model="twoFactorOtp[index]" class="two-factor-code-box" inputmode="numeric" maxlength="1" autocomplete="one-time-code" :aria-label="`Digit ${index + 1}`" @input="advanceTwoFactorCode('otp', index)" @keydown.backspace="retreatTwoFactorCode($event, 'otp', index)" />
               </div>
-              <button class="btn-two-factor-primary" :disabled="twoFactorLoading">
+              <button class="bc-btn bc-btn--dark btn-two-factor-primary" :disabled="twoFactorLoading">
                 {{ twoFactorLoading ? "Verifying..." : "Verify code" }}
               </button>
             </form>
           </template>
 
           <template v-else>
-            <h2>Create a security passkey</h2>
+            <p class="bc-label">Step two</p>
+            <h2 id="two-factor-title">Create a security <em>passkey</em></h2>
             <p>Choose a six-digit passkey to turn on two-factor authentication.</p>
             <form @submit.prevent="saveTwoFactorPasskey">
               <div class="two-factor-code-boxes" @paste.prevent="pasteTwoFactorCode($event, 'passkey')">
-                <input v-for="(_, index) in twoFactorPasskey" :key="`setup-passkey-${index}`" :ref="(element) => setTwoFactorInput(element, 'passkey', index)" v-model="twoFactorPasskey[index]" class="two-factor-code-box" type="password" inputmode="numeric" maxlength="1" autocomplete="new-password" @input="advanceTwoFactorCode('passkey', index)" @keydown.backspace="retreatTwoFactorCode($event, 'passkey', index)" />
+                <input v-for="(_, index) in twoFactorPasskey" :key="`setup-passkey-${index}`" :ref="(element) => setTwoFactorInput(element, 'passkey', index)" v-model="twoFactorPasskey[index]" class="two-factor-code-box" type="password" inputmode="numeric" maxlength="1" autocomplete="new-password" :aria-label="`Digit ${index + 1}`" @input="advanceTwoFactorCode('passkey', index)" @keydown.backspace="retreatTwoFactorCode($event, 'passkey', index)" />
               </div>
-              <button class="btn-two-factor-primary" :disabled="twoFactorLoading">
+              <button class="bc-btn bc-btn--dark btn-two-factor-primary" :disabled="twoFactorLoading">
                 {{ twoFactorLoading ? "Saving..." : "Save passkey" }}
               </button>
             </form>
           </template>
         </section>
       </div>
-
-      <!-- Access History -->
-      <div class="access-history">
-        <div class="history-header">
-          <h2>Access History</h2>
-          <div class="history-actions">
-            <label class="toggle-switch">
-              <input type="checkbox" v-model="newLoginAlerts" />
-              <span class="toggle-slider"></span>
-              <span class="toggle-label">New Login Alerts</span>
-            </label>
-            <button class="btn-logout-all">
-              Logout of all others sessions
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    </main>
   </div>
 </template>
 
@@ -620,7 +476,7 @@ import api from "../../plugins/axios";
 import NavHeader from "../../layouts/NavHeader.vue";
 import { useAuth } from "../../composables/useAuth";
 import { toast } from "vue3-toastify";
-import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
+import "../../styles/bloomcraft.css";
 import {
   buildMultipartFormData,
   clearFileInput,
@@ -820,9 +676,7 @@ const user = reactive({
 
 const isEditing = ref(false);
 const isLoading = ref(false);
-const isLoadingMessage = ref("");
 const isSaving = ref(false);
-const newLoginAlerts = ref(true);
 const navHeaderRef = ref(null);
 const showTwoFactorModal = ref(false);
 const twoFactorStep = ref("email");
@@ -851,7 +705,6 @@ const editData = reactive({
 const fetchUserProfile = async () => {
   try {
     isLoading.value = true;
-    isLoadingMessage.value = "Preparing your profile...";
     const token = localStorage.getItem("auth_token");
 
     if (!token) {
@@ -1059,7 +912,7 @@ const handleImageError = (event) => {
   const surname = user.surname || "";
   event.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
     name + " " + surname,
-  )}&background=7F9CF5&color=ffffff&size=128`;
+  )}&background=ebe5dd&color=8e443a&size=256`;
 };
 
 const getInitials = (name, surname) => {
@@ -1192,651 +1045,601 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.avatar-wrapper {
-  position: relative;
-  display: inline-block;
+/* Tokens, type, labels, buttons, links, skeletons and the navbar come from
+   src/styles/bloomcraft.css (shared with the landing page and shop pages). */
+
+@layer bc-reset {
+  .profile-page :is(p, h1, h2, h3) {
+    margin: 0;
+  }
 }
 
-.btn-change-photo {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  background: #2d3748;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.btn-change-photo:hover {
-  background: #38a169;
-}
-
-.name-fields {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.name-fields .input-field {
-  flex: 1;
-}
-
-.btn-save:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-* {
-  font-family: "Poppins", "Poppins", sans-serif;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 24px;
-  font-weight: 600;
-  color: #2d3748;
-  text-decoration: none;
+:global(body) {
+  margin: 0;
 }
 
 .profile-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f0f4ff 0%, #fef5ff 100%);
-  padding: 2rem;
+  background: var(--ivory);
+}
+
+.profile-page button {
+  font-family: var(--font-sans);
+}
+
+.profile-btn-outline {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.profile-btn-outline:hover {
+  border-color: var(--ink);
 }
 
 .profile-container {
-  max-width: 1200px;
-  margin-top: 70px;
-  margin-left: auto;
-  margin-right: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-top: 150px;
+  padding-bottom: var(--section-space);
 }
 
-/* Profile Header */
+/* ---- Header ---- */
 .profile-header {
-  background: white;
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  background: linear-gradient(
-    135deg,
-    rgba(72, 187, 120, 0.1) 0%,
-    rgba(85, 60, 154, 0.1) 100%
-  );
-}
-
-.header-content {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 28px;
+  margin-bottom: 32px;
 }
 
 .profile-info {
   display: flex;
-  gap: 1.5rem;
   align-items: center;
+  gap: 32px;
 }
 
 .avatar-wrapper {
   position: relative;
+  flex-shrink: 0;
 }
 
 .avatar {
-  width: 100px;
-  height: 100px;
+  width: 132px;
+  height: 132px;
   border-radius: 50%;
   object-fit: cover;
-  border: 4px solid white;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: var(--ivory-deep);
 }
 
 .avatar-placeholder {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #7f9cf5 0%, #a5b4fc 100%);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
-  font-weight: 600;
-  border: 4px solid white;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  display: grid;
+  place-items: center;
+  color: var(--rosewood-dark);
+  font-family: var(--font-display);
+  font-size: 48px;
+  font-weight: 500;
 }
 
-.user-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+.btn-change-photo {
+  position: absolute;
+  left: 50%;
+  bottom: -10px;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--ivory);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  cursor: pointer;
+  transition: background 0.3s;
 }
 
-.name-section {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+.btn-change-photo:hover {
+  background: var(--rosewood-dark);
 }
 
 .user-name {
-  font-size: 2rem;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0;
+  margin-top: 18px;
+  font-size: clamp(44px, 5vw, 76px);
+}
+
+.user-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 12px;
+  color: var(--ink-soft);
+  font-size: 14px;
 }
 
 .verified-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  background: #2d3748;
-  color: white;
-  border-radius: 20px;
-  font-size: 0.813rem;
+  gap: 5px;
+  color: var(--rosewood-dark);
+  font-size: 11px;
   font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
-.start-date {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: #718096;
-  font-size: 0.938rem;
+.verified-badge svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.btn-edit-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1.25rem;
-  background: white;
-  color: #2d3748;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 0.938rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.btn-edit-header:hover {
-  background: #f7fafc;
-  border-color: #2d3748;
-  color: #2d3748;
-}
-
-.profile-details {
-  background: white;
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+/* ---- Cards ---- */
+.profile-card {
+  padding: clamp(28px, 3vw, 44px);
+  border: 1px solid var(--line-soft);
+  border-radius: 22px;
+  background: var(--paper);
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
+  align-items: baseline;
+  margin-bottom: 26px;
 }
 
-.section-header h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0;
+.section-header h2,
+.two-factor-content h2 {
+  font-size: clamp(32px, 3vw, 44px);
 }
 
 .btn-edit {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: transparent;
-  color: #718096;
   border: none;
-  border-radius: 8px;
-  font-size: 0.938rem;
-  font-weight: 500;
+  background: none;
   cursor: pointer;
-  transition: all 0.3s;
-}
-
-.btn-edit:hover {
-  background: #f7fafc;
-  color: #2d3748;
 }
 
 .details-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 40px;
+  border-top: 1px solid var(--line);
 }
 
 .detail-item {
   display: flex;
-  gap: 1rem;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.detail-item--wide {
+  grid-column: 1 / -1;
 }
 
 .detail-icon {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f7fafc;
-  border-radius: 8px;
-  color: #718096;
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--ivory);
+  color: var(--ink);
+}
+
+.detail-icon svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.detail-icon--lg {
+  width: 52px;
+  height: 52px;
+}
+
+.detail-icon--lg svg {
+  width: 22px;
+  height: 22px;
 }
 
 .detail-content {
-  flex: 1;
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 4px;
   min-width: 0;
 }
 
 .detail-content label {
-  font-size: 0.813rem;
-  color: #718096;
+  color: var(--ink-soft);
+  font-size: 11px;
   font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 .detail-value {
-  font-size: 0.938rem;
-  color: #2d3748;
-  font-weight: 500;
-  word-wrap: break-word;
+  font-size: 15px;
+  word-break: break-word;
 }
 
 .value-with-badge {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
   flex-wrap: wrap;
+  gap: 10px;
 }
 
 .badge {
-  padding: 0.25rem 0.625rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(125, 143, 105, 0.14);
+  color: #5d7150;
+  font-size: 10.5px;
   font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
-.badge.verified {
-  background: rgba(45, 55, 72, 0.4);
-  color: #2d3748;
+.name-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 .input-field {
-  padding: 0.625rem 0.75rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 0.938rem;
-  color: #2d3748;
-  transition: all 0.3s;
   width: 100%;
+  margin-top: 4px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
 }
 
 .input-field:focus {
   outline: none;
-  border-color: #2d3748;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
+  border-color: var(--ink);
 }
 
-/* ✅ Inline field error */
-.field-error {
-  font-size: 0.75rem;
-  color: #e53e3e;
-  margin-top: 0.25rem;
+.input-field:disabled {
+  background: var(--ivory);
+  color: var(--ink-soft);
+  cursor: not-allowed;
 }
 
 .input-error {
-  border-color: #e53e3e !important;
-  box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.1) !important;
+  border-color: var(--rosewood-dark);
 }
 
-/* ✅ Disabled select styling for locked city dropdown */
-.input-field:disabled {
-  background: #f7fafc;
-  color: #a0aec0;
-  cursor: not-allowed;
-  border-color: #e2e8f0;
+.field-error {
+  color: var(--rosewood-dark);
+  font-size: 12.5px;
 }
 
 .action-buttons {
   display: flex;
   justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 2rem;
-  padding-top: 2rem;
-  border-top: 1px solid #e2e8f0;
+  align-items: center;
+  gap: 24px;
+  margin-top: 28px;
 }
 
 .btn-cancel {
-  padding: 0.625rem 1.5rem;
-  background: #f7fafc;
-  color: #2d3748;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 0.938rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.btn-cancel:hover {
-  background: #e2e8f0;
-}
-
-.btn-save {
-  padding: 0.625rem 1.5rem;
-  background: #2d3748;
-  color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 0.938rem;
-  font-weight: 500;
+  background: none;
   cursor: pointer;
-  transition: all 0.3s;
 }
 
-.btn-save:hover {
-  background: #38a169;
+.action-buttons .bc-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-/* 2-Factor Authentication */
+/* ---- Two-factor ---- */
 .two-factor-section {
-  background: white;
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  background: rgba(72, 187, 120, 0.05);
-}
-
-.two-factor-icon {
-  width: 56px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #2d3748;
-  border-radius: 12px;
-  color: white;
-  flex-shrink: 0;
+  gap: 24px;
 }
 
 .two-factor-content {
+  display: flex;
   flex: 1;
-}
-
-.two-factor-content h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0 0 0.375rem 0;
-}
-
-.two-factor-content p {
-  font-size: 0.938rem;
-  color: #718096;
-  margin: 0;
-}
-
-.btn-manage {
-  padding: 0.625rem 2rem;
-  background: #2d3748;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.938rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.btn-manage:hover {
-  background: #38a169;
-}
-
-.btn-manage:disabled,
-.btn-two-factor-primary:disabled,
-.btn-two-factor-secondary:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
-}
-
-.two-factor-modal-backdrop {
-  align-items: center;
-  background: rgba(45, 55, 72, 0.55);
-  display: flex;
-  inset: 0;
-  justify-content: center;
-  padding: 1rem;
-  position: fixed;
-  z-index: 1000;
-}
-
-.two-factor-modal {
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
-  max-width: 440px;
-  padding: 2rem;
-  position: relative;
-  width: 100%;
-}
-
-.two-factor-modal h2 {
-  color: #2d3748;
-  font-size: 1.35rem;
-  margin: 0 0 0.75rem;
-}
-
-.two-factor-modal p,
-.two-factor-modal label {
-  color: #718096;
-  display: block;
-  font-size: 0.938rem;
-  line-height: 1.5;
-  margin: 0 0 1.25rem;
-}
-
-.two-factor-modal-close {
-  background: transparent;
-  border: 0;
-  color: #718096;
-  cursor: pointer;
-  font-size: 1.75rem;
-  line-height: 1;
-  position: absolute;
-  right: 1rem;
-  top: 1rem;
-}
-
-.two-factor-code-boxes {
-  display: flex;
+  flex-direction: column;
   gap: 8px;
-  justify-content: center;
-  margin-bottom: 1rem;
 }
 
-.two-factor-code-box {
-  border: 1px solid #cbd5e0;
-  border-radius: 8px;
-  box-sizing: border-box;
-  font-size: 1.125rem;
-  height: 48px;
-  text-align: center;
-  width: 42px;
+.two-factor-content h2 {
+  margin-top: 6px;
 }
 
-.two-factor-code-box:focus {
-  border-color: #48bb78;
-  outline: none;
-}
-
-.btn-two-factor-primary,
-.btn-two-factor-secondary {
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.938rem;
-  font-weight: 600;
-  padding: 0.75rem 1rem;
-  width: 100%;
-}
-
-.btn-two-factor-primary {
-  background: #48bb78;
-  border: 1px solid #48bb78;
-  color: #fff;
-}
-
-.btn-two-factor-secondary {
-  background: #fff;
-  border: 1px solid #cbd5e0;
-  color: #4a5568;
-  margin-top: 0.75rem;
-}
-
-/* Access History */
-.access-history {
-  background: white;
-  border-radius: 16px;
-  padding: 2rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.history-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.history-header h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0;
-}
-
-.history-actions {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
+.two-factor-content p:last-child {
+  max-width: 520px;
+  color: var(--ink-soft);
+  font-size: 14.5px;
 }
 
 .toggle-switch {
-  display: flex;
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 12px;
+  flex-shrink: 0;
   cursor: pointer;
 }
 
 .toggle-switch input {
   position: absolute;
   opacity: 0;
+  width: 1px;
+  height: 1px;
 }
 
 .toggle-slider {
   position: relative;
   width: 48px;
-  height: 24px;
-  background: #e2e8f0;
-  border-radius: 24px;
-  transition: all 0.3s;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--line);
+  transition: background 0.3s;
 }
 
-.toggle-slider::before {
+.toggle-slider::after {
   content: "";
   position: absolute;
-  width: 20px;
-  height: 20px;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background: white;
-  top: 2px;
-  left: 2px;
-  transition: all 0.3s;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(30, 27, 24, 0.18);
+  transition: transform 0.35s var(--ease-out);
 }
 
 .toggle-switch input:checked + .toggle-slider {
-  background: #2d3748;
+  background: var(--ink);
 }
 
-.toggle-switch input:checked + .toggle-slider::before {
-  transform: translateX(24px);
+.toggle-switch input:checked + .toggle-slider::after {
+  transform: translateX(20px);
+}
+
+.toggle-switch input:disabled + .toggle-slider {
+  opacity: 0.5;
+}
+
+.toggle-switch input:focus-visible + .toggle-slider {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 3px;
 }
 
 .toggle-label {
-  font-size: 0.938rem;
-  color: #2d3748;
+  min-width: 26px;
+  font-size: 12px;
   font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
-.btn-logout-all {
-  padding: 0.625rem 1.25rem;
-  background: white;
-  color: #e53e3e;
-  border: 1px solid #e53e3e;
-  border-radius: 8px;
-  font-size: 0.938rem;
-  font-weight: 500;
+/* ---- Two-factor modal ---- */
+.two-factor-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(27, 22, 18, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.two-factor-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 460px;
+  padding: 40px 34px 32px;
+  border-radius: 26px;
+  background: var(--paper);
+  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
+}
+
+.two-factor-modal h2 {
+  font-size: 34px;
+}
+
+.two-factor-modal > p:not(.bc-label) {
+  margin-bottom: 8px;
+  color: var(--ink-soft);
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+
+.two-factor-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: var(--ivory);
+  color: var(--ink);
   cursor: pointer;
-  transition: all 0.3s;
 }
 
-.btn-logout-all:hover {
-  background: #e53e3e;
-  color: white;
+.two-factor-modal-close svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
 }
 
-/* Responsive */
-@media (max-width: 1024px) {
-  .details-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.two-factor-code-boxes {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
 }
 
+.two-factor-code-box {
+  width: 100%;
+  height: 56px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 26px;
+  text-align: center;
+}
+
+.two-factor-code-box:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+
+.btn-two-factor-primary {
+  justify-content: center;
+  width: 100%;
+}
+
+.btn-two-factor-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-change-photo:focus-visible,
+.btn-edit:focus-visible,
+.btn-cancel:focus-visible,
+.two-factor-modal-close:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 3px;
+}
+
+/* ---- Skeleton ---- */
+.skeleton-avatar {
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+}
+
+.skeleton-lines {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton-line {
+  display: block;
+  height: 13px;
+}
+
+.skeleton-line--label {
+  width: 90px;
+  height: 10px;
+}
+
+.skeleton-line--name {
+  width: 280px;
+  max-width: 60vw;
+  height: 44px;
+}
+
+.skeleton-line--short {
+  width: 160px;
+}
+
+.skeleton-line--title {
+  width: 220px;
+  height: 32px;
+  margin-bottom: 26px;
+}
+
+.skeleton-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+}
+
+/* ---- Responsive ---- */
 @media (max-width: 768px) {
-  .profile-page {
-    padding: 1rem;
+  .profile-container {
+    padding-top: 120px;
   }
 
-  .header-content {
+  .profile-info {
     flex-direction: column;
-    gap: 1rem;
+    align-items: flex-start;
+    gap: 22px;
+  }
+
+  .avatar,
+  .skeleton-avatar {
+    width: 104px;
+    height: 104px;
   }
 
   .details-grid {
     grid-template-columns: 1fr;
   }
 
-  .history-header {
+  .name-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .two-factor-section {
     flex-direction: column;
-    gap: 1rem;
     align-items: flex-start;
   }
 
-  .history-actions {
-    flex-direction: column;
-    align-items: flex-start;
-    width: 100%;
-    gap: 1rem;
+  .action-buttons {
+    flex-direction: column-reverse;
+    align-items: stretch;
   }
 
-  .btn-logout-all {
-    width: 100%;
+  .action-buttons .bc-btn {
+    justify-content: center;
+  }
+
+  .btn-cancel {
+    align-self: center;
+  }
+
+  .two-factor-modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .two-factor-modal {
+    border-radius: 22px 22px 0 0;
   }
 }
 </style>

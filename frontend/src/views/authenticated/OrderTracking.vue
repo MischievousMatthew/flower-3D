@@ -5,12 +5,13 @@
     :isAuthenticated="isAuthenticated"
     @scroll-to-section="scrollToSection"
   />
-  <div class="ot-page">
+  <div class="ot-page bc-theme">
     <!-- ── Sub-header ───────────────────────────────────────────────────────── -->
     <div class="ot-header">
       <div class="ot-header__inner">
         <div>
-          <h1 class="ot-header__title">My Orders</h1>
+          <p class="bc-label">Your orders</p>
+          <h1 class="ot-header__title">My <em>orders</em></h1>
           <p class="ot-header__sub">Track and manage your deliveries</p>
         </div>
         <div class="ot-search-wrap">
@@ -32,6 +33,7 @@
           <input
             v-model="search"
             class="ot-search"
+            aria-label="Search orders or stores"
             placeholder="Search orders or stores…"
             @input="debounceSearch"
           />
@@ -67,7 +69,9 @@
 
       <!-- Error -->
       <div v-else-if="error" class="ot-empty">
-        <span class="ot-empty__ico">⚠️</span>
+        <span class="ot-empty__ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 4 3 20h18L12 4Z" /><path d="M12 10v4M12 17h.01" /></svg>
+        </span>
         <p class="ot-empty__title">Could not load orders</p>
         <p class="ot-empty__sub">{{ error }}</p>
         <button class="ot-btn ot-btn--green" @click="fetchOrders()">
@@ -77,8 +81,10 @@
 
       <!-- Empty -->
       <div v-else-if="!orders.length" class="ot-empty">
-        <span class="ot-empty__ico">📦</span>
-        <p class="ot-empty__title">No orders yet</p>
+        <span class="ot-empty__ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4V8Z" /><path d="M4 8l8 4 8-4M12 12v8" /></svg>
+        </span>
+        <p class="ot-empty__title">No orders <em>yet</em></p>
         <p class="ot-empty__sub">
           When you place an order it will appear here.
         </p>
@@ -94,7 +100,15 @@
             :class="{ 'ot-card--open': expandedId === order.id }"
           >
             <!-- ── Card summary ─────────────────────────────────────────────── -->
-            <div class="ot-card__top" @click="toggle(order.id)">
+            <div
+              class="ot-card__top"
+              role="button"
+              tabindex="0"
+              :aria-expanded="expandedId === order.id"
+              @click="toggle(order.id)"
+              @keydown.enter.prevent="toggle(order.id)"
+              @keydown.space.prevent="toggle(order.id)"
+            >
               <div class="ot-card__info">
                 <div class="ot-card__row">
                   <span class="ot-card__num">{{ order.order_number }}</span>
@@ -576,7 +590,9 @@
                         :alt="item.product_name"
                         class="ot-item__img"
                       />
-                      <div v-else class="ot-item__img ot-item__img--ph">🌸</div>
+                      <div v-else class="ot-item__img ot-item__img--ph">
+                        {{ item.product_name?.charAt(0) || "B" }}
+                      </div>
                       <div class="ot-item__body">
                         <span class="ot-item__name">{{
                           item.product_name
@@ -584,7 +600,10 @@
                         <span class="ot-item__meta">
                           <span v-if="item.color">{{ item.color }}</span>
                           <span v-if="item.size"> · {{ item.size }}</span>
-                          <span> · Qty {{ item.quantity }}</span>
+                          <span
+                            ><template v-if="item.color || item.size"> · </template
+                            >Qty {{ item.quantity }}</span
+                          >
                         </span>
                       </div>
                       <span class="ot-item__price"
@@ -865,22 +884,6 @@
               :disabled="reqModal.submitting"
               @click="submitRequest"
             >
-              <svg
-                v-if="reqModal.submitting"
-                class="ot-spinner"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-dasharray="32"
-                  stroke-linecap="round"
-                />
-              </svg>
               {{
                 reqModal.submitting
                   ? "Submitting…"
@@ -902,7 +905,17 @@
         @click.self="confirmModal.show = false"
       >
         <div class="ot-modal ot-modal--sm">
-          <div class="ot-modal__ico-lg">{{ confirmModal.icon }}</div>
+          <div
+            class="ot-modal__ico-lg"
+            :class="{ 'ot-modal__ico-lg--danger': confirmModal.variant === 'danger' }"
+            aria-hidden="true"
+          >
+            <svg v-if="confirmModal.variant === 'danger'" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M9 9l6 6M15 9l-6 6" />
+            </svg>
+            <svg v-else viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
+          </div>
           <h3 class="ot-modal__title">{{ confirmModal.title }}</h3>
           <p class="ot-modal__confirm-body">{{ confirmModal.body }}</p>
           <div class="ot-modal__footer">
@@ -944,6 +957,7 @@ import api from "../../plugins/axios";
 import { useAuth } from "../../composables/useAuth";
 import NavHeader from "../../layouts/NavHeader.vue";
 import ReviewModal from "../../layouts/components/ReviewModal.vue";
+import "../../styles/bloomcraft.css";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 
@@ -1414,1252 +1428,1310 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* ── Tokens ──────────────────────────────────────────────────────────────── */
-.ot-page {
-  --green: #48bb78;
-  --green-dk: #38a169;
-  --green-lt: #f0fff4;
-  --orange: #ed8936;
-  --orange-lt: #fffaf0;
-  --dark: #2d3748;
-  --dark2: #4a5568;
-  --muted: #718096;
-  --pale: #a0aec0;
-  --border: #e2e8f0;
-  --surface: #fff;
-  --bg: #f7f8fa;
-  --radius: 12px;
-  --r-sm: 8px;
-  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.05);
-  --shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --font: "Poppins", sans-serif;
+/* Tokens, type, labels, buttons, skeletons and the navbar come from
+   src/styles/bloomcraft.css (shared with the landing page and shop pages). */
 
-  min-height: 100vh;
-  background: var(--bg);
-  padding-top: 80px;
-  font-family: var(--font);
-  color: var(--dark);
+@layer bc-reset {
+  .ot-page :is(p, h1, h2, h3, h4) {
+    margin: 0;
+  }
 }
 
-/* ── Sub-header ──────────────────────────────────────────────────────────── */
-.ot-header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
-  position: sticky;
-  top: 80px;
-  z-index: 30;
-}
-.ot-header__inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 48px 12px;
-  flex-wrap: wrap;
-}
-.ot-header__title {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: #1a202c;
+:global(body) {
   margin: 0;
 }
+
+.ot-page {
+  /* Status colours (muted to sit with the ivory palette) */
+  --ok: #5d7150;
+  --ok-bg: rgba(125, 143, 105, 0.14);
+  --warn: #8a6420;
+  --warn-bg: rgba(212, 178, 122, 0.2);
+  --info: #4b6075;
+  --info-bg: rgba(75, 96, 117, 0.1);
+  --bad: var(--rosewood-dark);
+  --bad-bg: rgba(184, 101, 88, 0.1);
+
+  min-height: 100vh;
+  padding: 150px var(--gutter) var(--section-space);
+  background: var(--ivory);
+}
+
+.ot-page button {
+  font-family: var(--font-sans);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.ot-header {
+  max-width: 1240px;
+  margin: 0 auto 40px;
+}
+
+.ot-header__inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-bottom: 36px;
+}
+
+.ot-header__title {
+  margin-top: 22px;
+  font-size: clamp(48px, 5.6vw, 84px);
+}
+
 .ot-header__sub {
-  font-size: 0.78rem;
-  color: var(--pale);
-  margin: 2px 0 0;
+  margin-top: 10px;
+  color: var(--ink-soft);
+  font-size: 15px;
 }
 
-/* search */
 .ot-search-wrap {
-  position: relative;
-  flex: 1;
-  max-width: 320px;
-}
-.ot-search-ico {
-  position: absolute;
-  left: 11px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 15px;
-  height: 15px;
-  color: var(--pale);
-  pointer-events: none;
-}
-.ot-search {
-  width: 100%;
-  padding: 9px 12px 9px 34px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  font-family: inherit;
-  font-size: 0.875rem;
-  color: var(--dark);
-  outline: none;
-  transition: border-color 0.2s;
-}
-.ot-search::placeholder {
-  color: var(--pale);
-}
-.ot-search:focus {
-  border-color: var(--green);
-  background: var(--surface);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 340px);
+  padding: 0 4px 10px;
+  border-bottom: 1px solid var(--line);
+  transition: border-color 0.3s;
 }
 
-/* tabs */
+.ot-search-wrap:focus-within {
+  border-color: var(--ink);
+}
+
+.ot-search-ico {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--ink-soft);
+}
+
+.ot-search {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+}
+
+.ot-search::placeholder {
+  color: var(--ink-soft);
+}
+
 .ot-tabs {
   display: flex;
-  gap: 2px;
-  padding: 0 48px;
+  gap: 28px;
   overflow-x: auto;
+  border-bottom: 1px solid var(--line);
   scrollbar-width: none;
 }
+
 .ot-tabs::-webkit-scrollbar {
   display: none;
 }
+
 .ot-tab {
-  padding: 10px 18px;
-  font-family: inherit;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--muted);
-  background: transparent;
+  flex-shrink: 0;
+  padding: 0 0 14px;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-bottom: 1px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  font-weight: 500;
   cursor: pointer;
-  white-space: nowrap;
   transition:
-    color 0.2s,
-    border-color 0.2s;
+    color 0.3s,
+    border-color 0.3s;
 }
+
 .ot-tab:hover {
-  color: var(--dark);
+  color: var(--ink);
 }
+
 .ot-tab.active {
-  color: var(--dark);
-  border-bottom-color: var(--green);
-  font-weight: 600;
+  color: var(--ink);
+  border-bottom-color: var(--ink);
 }
 
 /* ── Content ─────────────────────────────────────────────────────────────── */
 .ot-content {
-  padding: 24px 48px 60px;
+  max-width: 1240px;
+  margin: 0 auto;
 }
 
-/* ── Skeleton ────────────────────────────────────────────────────────────── */
+.ot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Skeleton */
 .ot-skeletons {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
+
 .ot-skel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px 22px;
+  padding: 28px 30px;
+  border: 1px solid var(--line-soft);
+  border-radius: 20px;
+  background: var(--paper);
 }
+
 .ot-skel__top {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 26px;
 }
-.ot-skel__line {
-  height: 12px;
-  border-radius: 6px;
-  background: linear-gradient(90deg, #f0f2f5 25%, #e2e8f0 50%, #f0f2f5 75%);
-  background-size: 200%;
-  animation: shimmer 1.4s infinite;
+
+.ot-skel__line,
+.ot-skel__step {
+  border-radius: 10px;
+  background: linear-gradient(100deg, var(--ivory-deep) 30%, var(--paper) 50%, var(--ivory-deep) 70%);
+  background-size: 300% 100%;
+  animation: otShimmer 1.6s ease-in-out infinite;
 }
+
 .ot-skel__line--title {
-  width: 42%;
-  height: 16px;
+  width: 36%;
+  height: 22px;
 }
+
 .ot-skel__line--badge {
-  width: 70px;
+  width: 90px;
+  height: 22px;
+  border-radius: 999px;
 }
+
 .ot-skel__row {
   display: flex;
-  gap: 8px;
+  gap: 12px;
 }
+
 .ot-skel__step {
   flex: 1;
-  height: 40px;
-  border-radius: 6px;
-  background: linear-gradient(90deg, #f0f2f5 25%, #e2e8f0 50%, #f0f2f5 75%);
-  background-size: 200%;
-  animation: shimmer 1.4s infinite;
+  height: 10px;
 }
-@keyframes shimmer {
-  0% {
-    background-position: 200% 0;
+
+@keyframes otShimmer {
+  from {
+    background-position: 100% 0;
   }
-  100% {
-    background-position: -200% 0;
+  to {
+    background-position: 0 0;
   }
 }
 
-/* ── Empty / Error ───────────────────────────────────────────────────────── */
+/* Empty / error */
 .ot-empty {
-  text-align: center;
-  padding: 64px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
+  padding: 80px 20px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-align: center;
 }
+
 .ot-empty__ico {
-  font-size: 2.8rem;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 6px;
+  color: var(--ink-soft);
 }
+
+.ot-empty__ico svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .ot-empty__title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin: 0;
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 500;
+  line-height: 1.1;
 }
+
 .ot-empty__sub {
-  font-size: 0.875rem;
-  color: var(--muted);
-  margin: 0;
+  margin-bottom: 14px;
+  color: var(--ink-soft);
 }
 
-/* ── Cards ───────────────────────────────────────────────────────────────── */
-.ot-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
+/* ── Card ────────────────────────────────────────────────────────────────── */
 .ot-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  transition:
-    box-shadow 0.22s,
-    border-color 0.22s;
-}
-.ot-card:hover {
-  box-shadow: var(--shadow);
-}
-.ot-card--open {
-  border-color: var(--green);
+  border: 1px solid var(--line-soft);
+  border-radius: 20px;
+  background: var(--paper);
+  transition: border-color 0.3s;
 }
 
-/* card top */
+.ot-card--open {
+  border-color: var(--line);
+}
+
 .ot-card__top {
   display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 18px 22px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 26px 30px 20px;
   cursor: pointer;
-  user-select: none;
 }
+
 .ot-card__info {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  min-width: 0;
 }
+
 .ot-card__row {
   display: flex;
   align-items: center;
-  gap: 8px;
   flex-wrap: wrap;
+  gap: 12px;
 }
+
 .ot-card__row--sm {
-  gap: 5px;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 13px;
 }
+
 .ot-card__num {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #1a202c;
-}
-.ot-ico-store {
-  width: 12px;
-  height: 12px;
-  color: var(--pale);
-  flex-shrink: 0;
-}
-.ot-card__store {
-  font-size: 0.8rem;
+  font-family: var(--font-display);
+  font-size: 26px;
   font-weight: 500;
-  color: var(--dark2);
+  line-height: 1.1;
 }
+
+.ot-ico-store {
+  width: 14px;
+  height: 14px;
+}
+
+.ot-card__store {
+  color: var(--ink);
+  font-weight: 500;
+}
+
 .ot-dot {
-  color: var(--border);
-  font-size: 0.75rem;
-}
-.ot-card__date,
-.ot-card__count {
-  font-size: 0.78rem;
-  color: var(--pale);
+  color: var(--rosewood);
 }
 
 .ot-card__aside {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 7px;
+  align-items: center;
+  gap: 18px;
   flex-shrink: 0;
+  text-align: right;
 }
+
 .ot-card__total-lbl {
-  font-size: 0.68rem;
-  color: var(--pale);
+  color: var(--ink-soft);
+  font-size: 11px;
   font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
+
 .ot-card__total {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #1a202c;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.1;
 }
+
 .ot-chevron {
-  width: 18px;
-  height: 18px;
-  color: var(--pale);
-  transition: transform 0.22s;
+  width: 20px;
+  height: 20px;
+  color: var(--ink-soft);
+  transition: transform 0.35s var(--ease-out);
 }
+
 .ot-chevron.up {
   transform: rotate(180deg);
 }
 
-/* chips */
-.ot-chip {
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+/* Status chips */
+.ot-chip,
+.ot-pay-chip,
+.ot-req-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  flex-shrink: 0;
+  white-space: nowrap;
 }
+
+.chip--green,
+.pay--green,
+.req-badge--green {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.chip--orange,
+.pay--yellow,
+.req-badge--yellow {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
 .chip--blue {
-  background: #ebf8ff;
-  color: #2b6cb0;
-}
-.chip--green {
-  background: var(--green-lt);
-  color: #276749;
-}
-.chip--orange {
-  background: var(--orange-lt);
-  color: #c05621;
-}
-.chip--red {
-  background: #fff5f5;
-  color: #9b2c2c;
+  background: var(--info-bg);
+  color: var(--info);
 }
 
-.ot-pay-chip {
-  padding: 2px 9px;
-  border-radius: 20px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.pay--green {
-  background: var(--green-lt);
-  color: #276749;
-}
-.pay--yellow {
-  background: #fefcbf;
-  color: #744210;
-}
-.pay--red {
-  background: #fff5f5;
-  color: #9b2c2c;
+.chip--red,
+.pay--red,
+.req-badge--red {
+  background: var(--bad-bg);
+  color: var(--bad);
 }
 
-/* ── Track section ───────────────────────────────────────────────────────── */
+/* ── Tracking stepper ────────────────────────────────────────────────────── */
 .ot-track {
-  border-top: 1px solid #f0f2f5;
-  padding: 16px 22px 18px;
+  padding: 20px 30px 26px;
+  border-top: 1px solid var(--line-soft);
 }
+
 .ot-track__head {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
-}
-.ot-track__label {
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
+  align-items: center;
+  margin-bottom: 22px;
 }
 
-/* stepper */
+.ot-track__label {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
 .ot-stepper {
   display: flex;
   align-items: flex-start;
 }
-.ot-conn {
-  flex: 1;
-  height: 2px;
-  background: var(--border);
-  margin-top: 17px;
-  transition: background 0.3s;
-}
-.ot-conn.filled {
-  background: var(--green);
-}
+
 .ot-step {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 8px;
+  width: 92px;
   flex-shrink: 0;
-  min-width: 64px;
+  text-align: center;
 }
+
 .ot-dot-circle {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #f0f2f5;
-  border: 2px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.25s;
   position: relative;
-  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper);
 }
+
 .ot-dot-circle svg {
-  width: 16px;
-  height: 16px;
-}
-.ot-step.done .ot-dot-circle {
-  background: var(--green);
-  border-color: var(--green);
-}
-.ot-step.active .ot-dot-circle {
-  background: var(--surface);
-  border-color: var(--green);
-  border-width: 2.5px;
-  box-shadow: 0 0 0 5px rgba(72, 187, 120, 0.12);
-}
-.ot-pulse {
   width: 12px;
   height: 12px;
+}
+
+.ot-step.done .ot-dot-circle {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.ot-step.active .ot-dot-circle {
+  border-color: var(--ink);
+}
+
+.ot-pulse {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: var(--green);
-  animation: pulse 1.6s infinite;
+  background: var(--rosewood);
+  animation: otPulse 1.8s ease-out infinite;
 }
-@keyframes pulse {
-  0%,
+
+@keyframes otPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(184, 101, 88, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(184, 101, 88, 0);
+  }
   100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.4);
-    opacity: 0.6;
+    box-shadow: 0 0 0 0 rgba(184, 101, 88, 0);
   }
 }
+
+.ot-conn {
+  flex: 1;
+  height: 1px;
+  margin-top: 12px;
+  background: var(--line);
+}
+
+.ot-conn.filled {
+  background: var(--ink);
+}
+
 .ot-step__lbl {
-  font-size: 0.7rem;
-  font-weight: 500;
-  color: var(--pale);
-  margin-top: 7px;
-  text-align: center;
+  color: var(--ink-soft);
+  font-size: 12px;
   line-height: 1.3;
 }
+
 .ot-step.done .ot-step__lbl,
 .ot-step.active .ot-step__lbl {
-  color: var(--dark);
-  font-weight: 600;
-}
-.ot-step__ts {
-  font-size: 0.64rem;
-  color: var(--green);
-  font-weight: 600;
-  margin-top: 3px;
-  text-align: center;
-  min-height: 14px;
+  color: var(--ink);
+  font-weight: 500;
 }
 
-/* note bar */
+.ot-step__ts {
+  color: var(--ink-soft);
+  font-size: 10.5px;
+}
+
 .ot-note {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
-  background: #f0f9ff;
-  border: 1px solid #bfdbfe;
-  border-radius: var(--r-sm);
-  padding: 12px 14px;
-  margin-top: 16px;
+  margin-top: 22px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--ivory);
+  color: var(--ink-soft);
+  font-size: 13px;
 }
+
 .ot-note__ico {
-  width: 17px;
-  height: 17px;
-  color: #3b82f6;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
-  margin-top: 1px;
 }
-.ot-note__text {
-  flex: 1;
-  font-size: 0.8rem;
-  color: #1e40af;
-}
+
 .ot-note__text strong {
-  font-weight: 600;
+  color: var(--ink);
+  font-weight: 500;
 }
+
 .ot-barcode {
-  font-family: monospace;
-  font-size: 0.7rem;
-  color: var(--muted);
-  background: var(--surface);
-  padding: 2px 7px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  flex-shrink: 0;
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12px;
 }
 
-/* ── Expand ───────────────────────────────────────────────────────────────── */
-.expand-enter-active,
-.expand-leave-active {
-  transition:
-    max-height 0.28s ease,
-    opacity 0.22s ease;
-  overflow: hidden;
-  max-height: 2000px;
-}
-.expand-enter-from,
-.expand-leave-to {
-  max-height: 0;
-  opacity: 0;
-}
-
-/* ── Detail panel ────────────────────────────────────────────────────────── */
+/* ── Expanded detail ─────────────────────────────────────────────────────── */
 .ot-detail {
-  border-top: 1px solid #f0f2f5;
-  background: #fafbfc;
-  padding: 20px 22px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 28px;
+  padding: 26px 30px 30px;
+  border-top: 1px solid var(--line-soft);
 }
 
-/* actions row */
 .ot-actions {
   display: flex;
-  gap: 10px;
   flex-wrap: wrap;
-}
-
-/* request status pill */
-.ot-request-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 16px;
-  border-radius: var(--r-sm);
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-.ot-request-status--return {
-  background: var(--orange-lt);
-  color: #c05621;
-}
-.ot-request-status--refund {
-  background: #ebf8ff;
-  color: #2b6cb0;
-}
-
-/* submitted request cards */
-.ot-request-cards {
-  display: flex;
-  flex-direction: column;
   gap: 10px;
 }
-.ot-req-card {
-  background: var(--surface);
-  border-radius: var(--r-sm);
-  border: 1px solid var(--border);
-  padding: 14px 16px;
-}
-.ot-req-card--return {
-  border-left: 3px solid var(--orange);
-}
-.ot-req-card--refund {
-  border-left: 3px solid var(--green);
-}
-.ot-req-card__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.ot-req-card__type {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--dark);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.ot-req-badge {
-  padding: 2px 9px;
-  border-radius: 20px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-.req-badge--yellow {
-  background: #fefcbf;
-  color: #744210;
-}
-.req-badge--green {
-  background: var(--green-lt);
-  color: #276749;
-}
-.req-badge--red {
-  background: #fff5f5;
-  color: #9b2c2c;
-}
-.ot-req-card__reason {
-  font-size: 0.875rem;
-  color: var(--dark2);
-  margin: 0 0 10px;
-  line-height: 1.5;
-}
-.ot-req-card__media {
-  margin-top: 8px;
-}
-.ot-media-preview {
-  max-width: 100%;
-  max-height: 200px;
-  border-radius: var(--r-sm);
-  object-fit: cover;
-  border: 1px solid var(--border);
-}
 
-/* detail section */
 .ot-sec {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
+
 .ot-sec__title {
-  font-size: 0.7rem;
-  font-weight: 700;
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--pale);
-  margin: 0;
 }
 
 .ot-info-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
 }
+
 .ot-info-cell {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-}
-.ot-info-lbl {
-  font-size: 0.7rem;
-  color: var(--pale);
-  font-weight: 500;
-}
-.ot-info-val {
-  font-size: 0.875rem;
-  color: var(--dark);
-  line-height: 1.4;
+  gap: 2px;
+  padding: 12px 20px 12px 0;
+  border-bottom: 1px solid var(--line-soft);
 }
 
-/* timeline */
+.ot-info-lbl {
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.ot-info-val {
+  font-size: 14.5px;
+  word-break: break-word;
+}
+
+/* Requests */
+.ot-request-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.ot-req-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.ot-req-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.ot-req-card__type {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.ot-req-card__reason {
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.ot-media-preview {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 10px;
+}
+
+.ot-request-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+/* Timeline */
 .ot-tl {
   display: flex;
   flex-direction: column;
 }
+
 .ot-tl__item {
+  position: relative;
   display: flex;
-  gap: 12px;
-  position: relative;
-  padding-bottom: 14px;
+  gap: 16px;
+  padding-bottom: 18px;
 }
-.ot-tl__item:last-child {
-  padding-bottom: 0;
-}
+
 .ot-tl__dot {
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: var(--green);
   flex-shrink: 0;
-  margin-top: 4px;
-  position: relative;
-  z-index: 1;
+  width: 9px;
+  height: 9px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--ink);
 }
+
+.ot-tl__item:not(:first-child) .ot-tl__dot {
+  background: var(--paper);
+  border: 1px solid var(--ink-soft);
+}
+
 .ot-tl__line {
   position: absolute;
-  left: 6px;
-  top: 17px;
+  top: 18px;
   bottom: 0;
-  width: 2px;
-  background: var(--border);
+  left: 4px;
+  width: 1px;
+  background: var(--line);
 }
+
 .ot-tl__body {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
+
 .ot-tl__status {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--dark);
-}
-.ot-tl__ts {
-  font-size: 0.78rem;
-  color: var(--pale);
-}
-.ot-tl__notes {
-  font-size: 0.8rem;
-  color: var(--muted);
-  font-style: italic;
+  font-size: 14px;
+  font-weight: 500;
 }
 
-/* items */
+.ot-tl__ts,
+.ot-tl__notes {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+/* Items */
 .ot-items {
+  border-top: 1px solid var(--line);
+}
+
+.ot-item {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.ot-item__img {
+  width: 56px;
+  height: 70px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--ivory-deep);
+}
+
+.ot-item__img--ph {
+  display: grid;
+  place-items: center;
+  color: var(--rosewood-dark);
+  font-family: var(--font-display);
+  font-size: 24px;
+}
+
+.ot-item__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ot-item__name {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.15;
+}
+
+.ot-item__meta {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  text-transform: capitalize;
+}
+
+.ot-item__price {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 500;
+}
+
+/* Totals */
+.ot-totals {
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-.ot-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  background: var(--surface);
-  border: 1px solid #f0f2f5;
-  border-radius: var(--r-sm);
-}
-.ot-item__img {
-  width: 46px;
-  height: 46px;
-  object-fit: cover;
-  border-radius: 7px;
-  background: #f0f2f5;
-  flex-shrink: 0;
-}
-.ot-item__img--ph {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.3rem;
-}
-.ot-item__body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.ot-item__name {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--dark);
-}
-.ot-item__meta {
-  font-size: 0.76rem;
-  color: var(--pale);
-}
-.ot-item__price {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--dark);
-  flex-shrink: 0;
+  align-self: flex-end;
+  width: min(100%, 320px);
 }
 
-/* totals */
-.ot-totals {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  padding: 14px 18px;
-}
 .ot-totals__row {
   display: flex;
   justify-content: space-between;
-  font-size: 0.875rem;
-  color: var(--muted);
-  padding: 4px 0;
-}
-.ot-totals__row--bold {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #1a202c;
-  border-top: 1px solid var(--border);
-  margin-top: 8px;
-  padding-top: 12px;
+  color: var(--ink-soft);
+  font-size: 14px;
 }
 
-/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.ot-totals__row--bold {
+  align-items: baseline;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.ot-totals__row--bold span:last-child {
+  font-family: var(--font-display);
+  font-size: 30px;
+}
+
+/* Pager */
+.ot-pager {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin-top: 48px;
+}
+
+.ot-pager__info {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+/* ── Buttons (same shape and motion as .bc-btn) ──────────────────────────── */
 .ot-btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 10px 18px;
-  border-radius: var(--r-sm);
-  font-family: inherit;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-}
-.ot-btn--green {
-  background: var(--green);
-  color: #fff;
-}
-.ot-btn--green:hover:not(:disabled) {
-  background: var(--green-dk);
-}
-.ot-btn--orange {
-  background: var(--orange);
-  color: #fff;
-}
-.ot-btn--orange:hover:not(:disabled) {
-  background: #dd6b20;
-}
-.ot-btn--cancel {
-  color: #b42318;
-  background: #fff1f0;
-  border: 1px solid #f5c6c2;
-}
-.ot-btn--cancel:hover:not(:disabled) {
-  background: #ffe2df;
-}
-.ot-btn--outline {
-  background: var(--surface);
-  color: var(--dark);
-  border: 1.5px solid var(--border);
-}
-.ot-btn--outline:hover:not(:disabled) {
-  border-color: var(--green);
-  color: var(--green);
-}
-.ot-btn--ghost {
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
   background: transparent;
-  color: var(--dark2);
-  border: 1.5px solid var(--border);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.45s var(--ease-out),
+    color 0.45s var(--ease-out),
+    border-color 0.45s var(--ease-out);
 }
-.ot-btn--ghost:hover:not(:disabled) {
-  background: var(--bg);
+
+.ot-btn:hover:not(:disabled) {
+  border-color: var(--ink);
 }
-/* ④ Rate Products button style */
-.ot-btn--star {
-  background: linear-gradient(135deg, #f6ad55, #ed8936);
-  color: #fff;
-}
-.ot-btn--star:hover:not(:disabled) {
-  background: linear-gradient(135deg, #ed8936, #dd6b20);
-}
-/* Rated/disabled state */
-.ot-btn--star-done,
-.ot-btn--star:disabled {
-  background: #e2e8f0 !important;
-  color: #718096 !important;
-  cursor: not-allowed !important;
-  opacity: 1 !important;
-}
+
 .ot-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
+
 .ot-btn__ico {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
 }
 
-/* ── Pagination ──────────────────────────────────────────────────────────── */
-.ot-pager {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  margin-top: 24px;
-}
-.ot-pager__info {
-  font-size: 0.875rem;
-  color: var(--muted);
+/* Primary action */
+.ot-btn--green {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--ivory);
 }
 
-/* ── Overlay & Modals ────────────────────────────────────────────────────── */
+.ot-btn--green:hover:not(:disabled) {
+  background: var(--rosewood-dark);
+  border-color: var(--rosewood-dark);
+}
+
+/* Destructive */
+.ot-btn--cancel {
+  border-color: rgba(142, 68, 58, 0.35);
+  color: var(--rosewood-dark);
+}
+
+.ot-btn--cancel:hover:not(:disabled) {
+  background: var(--rosewood-dark);
+  border-color: var(--rosewood-dark);
+  color: var(--ivory);
+}
+
+/* Secondary (return) and tertiary (refund / review / ghost) */
+.ot-btn--orange {
+  border-color: rgba(212, 178, 122, 0.8);
+  color: var(--warn);
+}
+
+.ot-btn--orange:hover:not(:disabled) {
+  border-color: var(--warn);
+}
+
+.ot-btn--star .ot-btn__ico {
+  color: var(--gold) !important;
+}
+
+.ot-btn:focus-visible,
+.ot-tab:focus-visible,
+.ot-card__top:focus-visible,
+.ot-modal__close:focus-visible,
+.ot-dropzone__remove:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 3px;
+}
+
+/* ── Modals ──────────────────────────────────────────────────────────────── */
 .ot-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
   padding: 20px;
-  overflow-y: auto;
+  background: rgba(27, 22, 18, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
-/* Return / refund modal */
 .ot-modal {
-  background: var(--surface);
-  border-radius: 16px;
-  width: 100%;
-  max-width: 500px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 540px;
+  max-height: calc(100vh - 40px);
   overflow: hidden;
-  max-height: 90vh;
-}
-.ot-modal--sm {
-  max-width: 400px;
-  padding: 32px 28px;
-  align-items: center;
-  text-align: center;
-  gap: 14px;
-}
-.ot-modal__ico-lg {
-  font-size: 2.4rem;
+  border-radius: 24px;
+  background: var(--paper);
+  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
 }
 
-/* modal header */
+.ot-modal--sm {
+  max-width: 420px;
+  align-items: center;
+  gap: 10px;
+  padding: 36px 32px 28px;
+  text-align: center;
+}
+
 .ot-modal__head {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 20px 24px;
-  flex-shrink: 0;
-}
-.ot-modal__head--orange {
-  background: linear-gradient(135deg, #fffaf0, #feebc8);
-}
-.ot-modal__head--green {
-  background: linear-gradient(135deg, #f0fff4, #c6f6d5);
-}
-.ot-modal__head-ico {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.ot-modal__head-ico svg {
-  width: 22px;
-  height: 22px;
-  color: var(--dark);
-}
-.ot-modal__title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #1a202c;
-  margin: 0;
-}
-.ot-modal__sub {
-  font-size: 0.78rem;
-  color: var(--muted);
-  margin: 2px 0 0;
-}
-.ot-modal__close {
-  margin-left: auto;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: none;
-  background: rgba(255, 255, 255, 0.6);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s;
-  flex-shrink: 0;
-}
-.ot-modal__close:hover {
-  background: rgba(255, 255, 255, 0.9);
-}
-.ot-modal__close svg {
-  width: 14px;
-  height: 14px;
-  color: var(--dark);
+  padding: 24px 26px 18px;
+  border-bottom: 1px solid var(--line-soft);
 }
 
-/* modal body */
+.ot-modal__head-ico {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--ivory);
+  color: var(--ink);
+}
+
+.ot-modal__head--orange .ot-modal__head-ico {
+  color: var(--warn);
+}
+
+.ot-modal__head-ico svg {
+  width: 20px;
+  height: 20px;
+}
+
+.ot-modal__title {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.ot-modal__sub {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.ot-modal__close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  border: none;
+  border-radius: 50%;
+  background: var(--ivory);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.ot-modal__close svg {
+  width: 16px;
+  height: 16px;
+}
+
 .ot-modal__body {
-  padding: 20px 24px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
+  padding: 22px 26px;
   overflow-y: auto;
-  flex: 1;
-}
-.ot-modal__confirm-body {
-  font-size: 0.875rem;
-  color: var(--muted);
-  margin: 0;
-  line-height: 1.5;
-  text-align: center;
 }
 
-/* modal footer */
+.ot-modal__ico-lg {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: var(--ivory);
+  color: var(--ink);
+}
+
+.ot-modal__ico-lg--danger {
+  color: var(--rosewood-dark);
+}
+
+.ot-modal__ico-lg svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ot-modal__confirm-body {
+  color: var(--ink-soft);
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+
 .ot-modal__footer {
   display: flex;
-  gap: 10px;
-  padding: 16px 24px;
-  border-top: 1px solid var(--border);
   justify-content: flex-end;
-  flex-shrink: 0;
+  gap: 10px;
+  padding: 18px 26px 24px;
+  border-top: 1px solid var(--line-soft);
 }
 
-/* ── Form fields ─────────────────────────────────────────────────────────── */
+.ot-modal--sm .ot-modal__footer {
+  justify-content: center;
+  width: 100%;
+  margin-top: 14px;
+  padding: 18px 0 0;
+}
+
+/* Form */
 .ot-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
+
 .ot-field__lbl {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--dark);
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
+
 .ot-field__req {
-  color: #e53e3e;
+  color: var(--rosewood-dark);
 }
+
 .ot-field__optional {
-  font-size: 0.75rem;
-  color: var(--pale);
-  font-weight: 400;
-}
-.ot-field__err {
-  font-size: 0.75rem;
-  color: #e53e3e;
-}
-.ot-field__hint {
-  font-size: 0.72rem;
-  color: var(--pale);
-  text-align: right;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .ot-textarea {
   width: 100%;
-  padding: 10px 12px;
-  background: var(--bg);
-  border: 1.5px solid var(--border);
-  border-radius: var(--r-sm);
-  font-family: inherit;
-  font-size: 0.875rem;
-  color: var(--dark);
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
   resize: vertical;
-  outline: none;
-  transition: border-color 0.2s;
-  box-sizing: border-box;
-}
-.ot-textarea:focus {
-  border-color: var(--green);
-  background: var(--surface);
-}
-.ot-textarea--err {
-  border-color: #e53e3e;
 }
 
-/* ── Drop zone ───────────────────────────────────────────────────────────── */
+.ot-textarea:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+
+.ot-textarea--err {
+  border-color: var(--rosewood-dark);
+}
+
+.ot-field__err {
+  color: var(--rosewood-dark);
+  font-size: 12.5px;
+}
+
+.ot-field__hint {
+  align-self: flex-end;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
 .ot-dropzone {
-  border: 2px dashed var(--border);
-  border-radius: var(--r-sm);
-  background: var(--bg);
-  cursor: pointer;
-  transition: all 0.2s;
   position: relative;
-  min-height: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 22px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    border-color 0.3s,
+    background 0.3s;
 }
-.ot-dropzone:hover {
-  border-color: var(--green);
-  background: #f0fff4;
-}
+
+.ot-dropzone:hover,
 .ot-dropzone--drag {
-  border-color: var(--green);
-  background: #f0fff4;
-  box-shadow: 0 0 0 4px rgba(72, 187, 120, 0.12);
+  border-color: var(--ink);
+  background: var(--ivory);
 }
+
 .ot-dropzone--err {
-  border-color: #e53e3e;
+  border-color: var(--rosewood-dark);
 }
+
+.ot-dropzone--filled {
+  border-style: solid;
+}
+
 .ot-dropzone__input {
   position: absolute;
   inset: 0;
   opacity: 0;
   cursor: pointer;
-  width: 100%;
-  height: 100%;
 }
+
 .ot-dropzone__placeholder {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  padding: 24px;
-  pointer-events: none;
-}
-.ot-dropzone__ico {
-  width: 48px;
-  height: 48px;
-  color: var(--pale);
-}
-.ot-dropzone__text {
-  font-size: 0.875rem;
-  color: var(--muted);
+  color: var(--ink-soft);
   text-align: center;
-  margin: 0;
-  line-height: 1.5;
-}
-.ot-dropzone__text strong {
-  color: var(--dark);
-}
-.ot-dropzone__hint {
-  font-size: 0.75rem;
-  color: var(--pale);
 }
 
-/* file preview */
+.ot-dropzone__ico {
+  width: 40px;
+  height: 40px;
+}
+
+.ot-dropzone__text {
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.ot-dropzone__text strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.ot-dropzone__hint {
+  font-size: 12px;
+}
+
 .ot-dropzone__preview {
-  width: 100%;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
   position: relative;
-}
-.ot-preview-media {
-  width: 100%;
-  max-height: 200px;
-  object-fit: cover;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--border);
-}
-.ot-dropzone__file-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
 }
-.ot-dropzone__file-name {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--dark);
+
+.ot-preview-media {
+  width: 84px;
+  height: 84px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.ot-dropzone__file-info {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ot-dropzone__file-name {
   overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .ot-dropzone__file-size {
-  font-size: 0.75rem;
-  color: var(--pale);
-  flex-shrink: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
 }
+
 .ot-dropzone__remove {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5);
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
   border: none;
+  border-radius: 50%;
+  background: var(--ivory);
+  color: var(--ink);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s;
 }
-.ot-dropzone__remove:hover {
-  background: rgba(0, 0, 0, 0.7);
-}
+
 .ot-dropzone__remove svg {
-  width: 12px;
-  height: 12px;
-  color: #fff;
+  width: 14px;
+  height: 14px;
 }
 
-/* spinner */
-.ot-spinner {
-  width: 16px;
-  height: 16px;
-  animation: spin 0.8s linear infinite;
-  flex-shrink: 0;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+/* ── Transitions ─────────────────────────────────────────────────────────── */
+.expand-enter-active,
+.expand-leave-active {
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s var(--ease-out);
 }
 
-/* ── Modal transitions ───────────────────────────────────────────────────── */
+.expand-enter-from,
+.expand-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
 .modal-enter-active,
 .modal-leave-active {
-  transition:
-    opacity 0.2s,
-    transform 0.2s;
+  transition: opacity 0.3s ease;
 }
+
+.modal-enter-active .ot-modal,
+.modal-leave-active .ot-modal {
+  transition: transform 0.4s var(--ease-out);
+}
+
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
-  transform: scale(0.97);
+}
+
+.modal-enter-from .ot-modal,
+.modal-leave-to .ot-modal {
+  transform: translateY(16px);
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .ot-page {
-    padding-top: 72px;
+    padding-top: 120px;
   }
-  .ot-header {
-    top: 72px;
-  }
-  .ot-header__inner {
-    padding: 14px 16px 10px;
-  }
-  .ot-tabs {
-    padding: 0 16px;
-  }
-  .ot-content {
-    padding: 16px 16px 48px;
-  }
-  .ot-card__top {
-    padding: 14px 16px;
-  }
-  .ot-track {
-    padding: 14px 16px 16px;
-  }
-  .ot-detail {
-    padding: 16px;
-  }
+
   .ot-search-wrap {
-    max-width: none;
+    width: 100%;
   }
-  .ot-step {
-    min-width: 48px;
-  }
-  .ot-step__lbl {
-    font-size: 0.62rem;
-  }
-  .ot-dot-circle {
-    width: 28px;
-    height: 28px;
-  }
-  .ot-conn {
-    margin-top: 14px;
-  }
-  .ot-modal__head,
-  .ot-modal__body,
-  .ot-modal__footer {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-  .ot-actions {
+
+  .ot-card__top {
     flex-direction: column;
+    align-items: stretch;
+    padding: 22px 20px 16px;
+  }
+
+  .ot-card__aside {
+    justify-content: space-between;
+    text-align: left;
+  }
+
+  .ot-track,
+  .ot-detail {
+    padding-inline: 20px;
+  }
+
+  /* Five steps fit on a phone: narrower columns, smaller labels */
+  .ot-step {
+    width: 52px;
+    gap: 6px;
+  }
+
+  .ot-step__lbl {
+    font-size: 10.5px;
+  }
+
+  .ot-step__ts {
+    display: none;
+  }
+
+  .ot-conn {
+    min-width: 6px;
+  }
+
+  .ot-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ot-actions .ot-btn {
+    flex: 1 1 auto;
+  }
+
+  .ot-totals {
+    width: 100%;
+  }
+
+  .ot-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .ot-modal {
+    max-height: 94vh;
+    border-radius: 22px 22px 0 0;
+  }
+
+  .ot-modal--sm {
+    border-radius: 22px 22px 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ot-skel__line,
+  .ot-skel__step,
+  .ot-pulse {
+    animation: none;
+  }
+
+  .expand-enter-active,
+  .expand-leave-active,
+  .modal-enter-active,
+  .modal-leave-active,
+  .modal-enter-active .ot-modal,
+  .modal-leave-active .ot-modal {
+    transition: none;
   }
 }
 </style>

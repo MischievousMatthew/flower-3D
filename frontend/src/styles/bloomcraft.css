@@ -59,7 +59,9 @@
 /* ============================================================
    TYPOGRAPHY
 ============================================================= */
-.bc-theme :is(h1, h2, h3) {
+/* Headings that carry .bc-label keep the label style (:where keeps the
+   specificity unchanged, so component heading rules still win) */
+.bc-theme :is(h1, h2, h3):where(:not(.bc-label)) {
   font-family: var(--font-display);
   font-weight: 500;
   letter-spacing: -0.015em;

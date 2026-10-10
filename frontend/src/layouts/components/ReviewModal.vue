@@ -1,12 +1,15 @@
 <template>
   <Teleport to="body">
     <Transition name="modal-fade">
-      <div v-if="show" class="rm-backdrop" @click.self="$emit('close')">
+      <div v-if="show" class="rm-backdrop bc-theme" @click.self="$emit('close')">
         <div class="rm-modal" role="dialog" aria-modal="true">
           <!-- Loading -->
-          <div v-if="loadingProducts" class="rm-loading">
-            <span class="rm-spinner rm-spinner--dark"></span>
-            <p>Loading…</p>
+          <div v-if="loadingProducts" class="rm-loading" aria-label="Loading products">
+            <span class="bc-skeleton rm-skel rm-skel--title"></span>
+            <span v-for="n in 2" :key="n" class="rm-skel-row">
+              <span class="bc-skeleton rm-skel rm-skel--thumb"></span>
+              <span class="bc-skeleton rm-skel"></span>
+            </span>
           </div>
 
           <!-- No products -->
@@ -14,7 +17,7 @@
             <div class="rm-header">
               <div>
                 <p class="rm-label">Rate Your Order</p>
-                <h3 class="rm-product-name" style="font-size: 15px">
+                <h3 class="rm-product-name">
                   No products to review
                 </h3>
               </div>
@@ -62,7 +65,7 @@
             <div class="rm-header">
               <div>
                 <p class="rm-label">Rate Your Order</p>
-                <h3 class="rm-product-name" style="font-size: 15px">
+                <h3 class="rm-product-name">
                   Select a product to review
                 </h3>
                 <p class="rm-order-ref">Order #{{ orderNumber }}</p>
@@ -366,10 +369,13 @@
                 @click="submit"
                 type="button"
               >
-                <span v-if="submitting" class="rm-spinner"></span>
-                <span v-else>{{
-                  isEditing ? "Update Review" : "Submit Review"
-                }}</span>
+                {{
+                  submitting
+                    ? "Submitting…"
+                    : isEditing
+                      ? "Update Review"
+                      : "Submit Review"
+                }}
               </button>
             </div>
           </template>
@@ -633,7 +639,7 @@ function fullReset() {
   flex-direction: column;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
   overflow: hidden;
-  font-family: "Poppins", sans-serif;
+  font-family: var(--font-sans, "Poppins", sans-serif);
 }
 .rm-loading {
   flex: 1;
@@ -643,7 +649,7 @@ function fullReset() {
   justify-content: center;
   gap: 12px;
   padding: 48px 24px;
-  color: #718096;
+  color: var(--ink-soft, #6e6761);
   font-size: 14px;
 }
 .rm-header {
@@ -651,7 +657,7 @@ function fullReset() {
   align-items: flex-start;
   justify-content: space-between;
   padding: 20px 22px 16px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--ivory, #f4f1ec);
   gap: 12px;
   flex-shrink: 0;
 }
@@ -668,19 +674,19 @@ function fullReset() {
   border-radius: 10px;
   object-fit: cover;
   flex-shrink: 0;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line, rgba(30, 27, 24, 0.12));
 }
 .rm-product-img--placeholder {
-  background: #f8fafc;
+  background: var(--ivory, #f4f1ec);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
+  color: var(--ink-soft, #6e6761);
 }
 .rm-label {
   font-size: 11px;
   font-weight: 600;
-  color: #48bb78;
+  color: var(--ink, #1e1b18);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin: 0 0 2px;
@@ -688,7 +694,7 @@ function fullReset() {
 .rm-product-name {
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--ink, #1e1b18);
   margin: 0 0 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -696,7 +702,7 @@ function fullReset() {
 }
 .rm-order-ref {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--ink-soft, #6e6761);
   margin: 0;
 }
 .rm-close {
@@ -704,7 +710,7 @@ function fullReset() {
   border: none;
   cursor: pointer;
   padding: 6px;
-  color: #94a3b8;
+  color: var(--ink-soft, #6e6761);
   border-radius: 6px;
   line-height: 0;
   flex-shrink: 0;
@@ -713,8 +719,8 @@ function fullReset() {
     background 0.15s;
 }
 .rm-close:hover {
-  color: #ef4444;
-  background: #fef2f2;
+  color: var(--rosewood-dark, #8e443a);
+  background: var(--ivory, #f4f1ec);
 }
 .rm-body {
   flex: 1;
@@ -734,7 +740,7 @@ function fullReset() {
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid var(--line, rgba(30, 27, 24, 0.12));
   border-radius: 10px;
   cursor: pointer;
   transition:
@@ -742,8 +748,8 @@ function fullReset() {
     background 0.15s;
 }
 .rm-product-row:hover {
-  border-color: #48bb78;
-  background: #f0fff4;
+  border-color: var(--ink, #1e1b18);
+  background: var(--ivory, #f4f1ec);
 }
 .rm-product-row__info {
   flex: 1;
@@ -755,14 +761,14 @@ function fullReset() {
 .rm-product-row__name {
   font-size: 13px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--ink, #1e1b18);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .rm-product-row__qty {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--ink-soft, #6e6761);
 }
 .rm-product-row__status {
   flex-shrink: 0;
@@ -770,16 +776,16 @@ function fullReset() {
 .rm-reviewed-badge {
   font-size: 11px;
   font-weight: 600;
-  color: #276749;
-  background: #f0fff4;
-  border: 1px solid #c6f6d5;
+  color: var(--rosewood-dark, #8e443a);
+  background: var(--ivory, #f4f1ec);
+  border: 1px solid var(--ivory-deep, #ebe5dd);
   border-radius: 20px;
   padding: 3px 10px;
 }
 .rm-rate-cta {
   font-size: 12px;
   font-weight: 600;
-  color: #48bb78;
+  color: var(--ink, #1e1b18);
 }
 .rm-section {
   display: flex;
@@ -789,15 +795,15 @@ function fullReset() {
 .rm-field-label {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--ink, #1e1b18);
 }
 .rm-required {
-  color: #ef4444;
+  color: var(--rosewood-dark, #8e443a);
   margin-left: 2px;
 }
 .rm-optional {
   font-weight: 400;
-  color: #94a3b8;
+  color: var(--ink-soft, #6e6761);
   font-size: 12px;
 }
 .rm-stars-row {
@@ -821,34 +827,34 @@ function fullReset() {
 .rm-rating-label {
   font-size: 13px;
   font-weight: 500;
-  color: #f59e0b;
+  color: var(--gold, #d4b27a);
   margin-left: 6px;
   min-width: 72px;
 }
 .rm-textarea {
   width: 100%;
   padding: 10px 12px;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid var(--line, rgba(30, 27, 24, 0.12));
   border-radius: 8px;
-  font-family: "Poppins", sans-serif;
+  font-family: var(--font-sans, "Poppins", sans-serif);
   font-size: 13px;
-  color: #1e293b;
+  color: var(--ink, #1e1b18);
   resize: vertical;
   transition:
     border-color 0.15s,
     box-shadow 0.15s;
   box-sizing: border-box;
   line-height: 1.6;
-  background: #f8fafc;
+  background: var(--ivory, #f4f1ec);
 }
 .rm-textarea:focus {
   outline: none;
-  border-color: #48bb78;
+  border-color: var(--ink, #1e1b18);
   box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.12);
   background: #fff;
 }
 .rm-textarea--error {
-  border-color: #ef4444;
+  border-color: var(--rosewood-dark, #8e443a);
 }
 .rm-textarea-footer {
   display: flex;
@@ -857,41 +863,41 @@ function fullReset() {
 }
 .rm-char-count {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--ink-soft, #6e6761);
 }
 .rm-upload-zone {
-  border: 2px dashed #e2e8f0;
+  border: 2px dashed var(--line, rgba(30, 27, 24, 0.12));
   border-radius: 10px;
   padding: 24px 16px;
   cursor: pointer;
   text-align: center;
-  background: #f8fafc;
+  background: var(--ivory, #f4f1ec);
   transition:
     border-color 0.15s,
     background 0.15s;
 }
 .rm-upload-zone:hover,
 .rm-upload-zone--drag {
-  border-color: #48bb78;
+  border-color: var(--ink, #1e1b18);
   background: rgba(72, 187, 120, 0.04);
 }
 .rm-upload-icon {
-  color: #94a3b8;
+  color: var(--ink-soft, #6e6761);
   margin: 0 auto 8px;
   display: block;
 }
 .rm-upload-text {
   font-size: 13px;
-  color: #64748b;
+  color: var(--ink-soft, #6e6761);
   margin: 0 0 4px;
 }
 .rm-upload-text span {
-  color: #48bb78;
+  color: var(--ink, #1e1b18);
   font-weight: 600;
 }
 .rm-upload-hint {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--ink-soft, #6e6761);
   margin: 0;
 }
 .rm-img-preview {
@@ -899,7 +905,7 @@ function fullReset() {
   display: inline-block;
   border-radius: 10px;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line, rgba(30, 27, 24, 0.12));
 }
 .rm-preview-img {
   display: block;
@@ -930,7 +936,7 @@ function fullReset() {
   display: none;
 }
 .rm-anon-row {
-  background: #f8fafc;
+  background: var(--ivory, #f4f1ec);
   border-radius: 10px;
   padding: 14px;
 }
@@ -944,14 +950,14 @@ function fullReset() {
 .rm-toggle {
   width: 40px;
   height: 22px;
-  background: #e2e8f0;
+  background: var(--line, rgba(30, 27, 24, 0.12));
   border-radius: 999px;
   position: relative;
   flex-shrink: 0;
   transition: background 0.2s;
 }
 .rm-toggle--on {
-  background: #48bb78;
+  background: var(--ink, #1e1b18);
 }
 .rm-toggle-knob {
   position: absolute;
@@ -970,37 +976,37 @@ function fullReset() {
 .rm-toggle-text {
   font-size: 13px;
   font-weight: 500;
-  color: #374151;
+  color: var(--ink, #1e1b18);
 }
 .rm-toggle-sub {
   display: block;
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--ink-soft, #6e6761);
   margin-top: 2px;
 }
 .rm-error {
   font-size: 12px;
-  color: #ef4444;
+  color: var(--rosewood-dark, #8e443a);
   margin: 0;
 }
 .rm-global-error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--ivory, #f4f1ec);
+  border: 1px solid var(--rosewood, #b86558);
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 13px;
-  color: #b91c1c;
+  color: var(--rosewood-dark, #8e443a);
 }
 .rm-footer {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
   padding: 14px 22px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--ivory, #f4f1ec);
   flex-shrink: 0;
 }
 .rm-btn {
-  font-family: "Poppins", sans-serif;
+  font-family: var(--font-sans, "Poppins", sans-serif);
   font-size: 13px;
   font-weight: 600;
   border: none;
@@ -1013,39 +1019,22 @@ function fullReset() {
   transition: all 0.15s;
 }
 .rm-btn--cancel {
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--ivory, #f4f1ec);
+  color: var(--ink-soft, #6e6761);
 }
 .rm-btn--cancel:hover {
-  background: #e2e8f0;
+  background: var(--line, rgba(30, 27, 24, 0.12));
 }
 .rm-btn--submit {
-  background: #48bb78;
+  background: var(--ink, #1e1b18);
   color: #fff;
 }
 .rm-btn--submit:hover:not(:disabled) {
-  background: #38a169;
+  background: var(--rosewood-dark, #8e443a);
 }
 .rm-btn--submit:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-}
-.rm-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-  flex-shrink: 0;
-}
-.rm-spinner--dark {
-  width: 20px;
-  height: 20px;
-  border: 2px solid #e2e8f0;
-  border-top-color: #48bb78;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
 }
 .modal-fade-enter-active,
 .modal-fade-leave-active {
@@ -1077,5 +1066,48 @@ function fullReset() {
     align-items: flex-end;
     padding: 0;
   }
+}
+
+/* BloomCraft: modal surface, serif headings, skeleton */
+.rm-modal {
+  background: var(--paper, #faf8f4);
+  border-radius: 24px;
+}
+.rm-backdrop {
+  background: rgba(27, 22, 18, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.rm-modal :is(h2, h3) {
+  font-family: var(--font-display, "Cormorant Garamond", Georgia, serif);
+  font-weight: 500;
+}
+.rm-modal .rm-product-name {
+  font-size: 24px;
+  line-height: 1.15;
+}
+.rm-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 32px 28px;
+}
+.rm-skel {
+  display: block;
+  height: 14px;
+}
+.rm-skel--title {
+  width: 50%;
+  height: 26px;
+}
+.rm-skel-row {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+.rm-skel--thumb {
+  height: 56px;
+  border-radius: 10px;
 }
 </style>

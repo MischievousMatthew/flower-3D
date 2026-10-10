@@ -1,5 +1,4 @@
 <template>
-  <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
   <!-- Same bar as the landing page (src/styles/bloomcraft.css) -->
   <nav
     class="navbar bc-theme bc-navbar"
@@ -227,15 +226,12 @@
               @click.prevent="handleLogout"
               :class="{ 'logout-loading': isLoading }"
             >
-              <svg
-                v-if="!isLoading"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9" />
               </svg>
-              <span v-else class="logout-spinner"></span>
-              <span>{{ isLoading ? "Logging out..." : "Logout" }}</span>
+              <span aria-live="polite">{{
+                isLoading ? "Logging out..." : "Logout"
+              }}</span>
             </a>
           </div>
         </div>
@@ -264,7 +260,6 @@ import { useCart } from "../composables/useCart";
 import { useChatNotifications } from "../composables/useChatNotifications";
 import api from "../plugins/axios";
 import { toast } from "vue3-toastify";
-import LoadingOverlay from "../layouts/components/LoadingOverlay.vue";
 import "../styles/bloomcraft.css";
 
 const router = useRouter();
@@ -277,7 +272,6 @@ const cartPulse = ref(false);
 const userProfile = ref(null);
 const loadingProfile = ref(false);
 const loadingNotifications = ref(false);
-const isLoadingMessage = ref("Loading...");
 const isLoading = ref(null);
 const orderNotifications = ref([]);
 const seenOrderNotificationIds = ref(new Set());
@@ -488,9 +482,7 @@ const handleLogout = async () => {
   if (isLoading.value) return;
 
   try {
-    isLoadingMessage.value = "Logging out...";
     isLoading.value = isLoggingOut.value = true;
-    showUserDropdown.value = false;
 
     await logout();
 
@@ -503,6 +495,7 @@ const handleLogout = async () => {
 
     await router.push("/guest/login");
 
+    showUserDropdown.value = false;
     toast.success("Logged out successfully!");
   } catch {
     toast.error("Logout failed");
@@ -1107,21 +1100,6 @@ onUnmounted(() => {
 .logout-loading {
   pointer-events: none;
   opacity: 0.6;
-}
-
-.logout-spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--line);
-  border-top-color: var(--ink);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* ---- Responsive ---- */

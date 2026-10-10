@@ -1,14 +1,14 @@
 <!-- frontend/src/views/authenticated/Cart.vue -->
 <template>
-  <div class="cart-page">
+  <div class="cart-page bc-theme">
     <NavHeader :cartCount="cartStore.count.value" />
 
-    <!-- ✅ Profile Incomplete Modal -->
+    <!-- Profile incomplete modal (teleported, so it carries .bc-theme itself) -->
     <Teleport to="body">
       <Transition name="modal-fade">
         <div
           v-if="showProfileModal"
-          class="modal-backdrop"
+          class="modal-backdrop bc-theme"
           @click.self="showProfileModal = false"
         >
           <div
@@ -17,20 +17,10 @@
             aria-modal="true"
             aria-labelledby="modal-title"
           >
-            <div class="modal-icon">
-              <svg
-                width="48"
-                height="48"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.5"
-              >
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-            </div>
-            <h2 id="modal-title" class="modal-title">Complete Your Profile</h2>
+            <p class="bc-label">Almost there</p>
+            <h2 id="modal-title" class="modal-title">
+              Complete your <em>profile</em>
+            </h2>
             <p class="modal-message">
               Before you can check out, please add your
               <strong>{{ missingProfileFields }}</strong> to your profile so we
@@ -38,56 +28,77 @@
             </p>
             <div class="modal-actions">
               <button
-                class="modal-btn-secondary"
+                class="bc-btn cart-btn-outline"
                 @click="showProfileModal = false"
               >
-                Back to Cart
+                Back to cart
               </button>
-              <button class="modal-btn-primary" @click="goToProfile">
-                Complete Profile
+              <button class="bc-btn bc-btn--dark" @click="goToProfile">
+                Complete profile
               </button>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
-    <!-- ✅ End Modal -->
 
-    <div class="cart-container">
-      <div class="cart-header">
-        <h1>Shopping Cart</h1>
-        <p class="cart-count">
+    <main class="bc-container cart-container">
+      <header class="cart-header">
+        <p class="bc-label">Your selection</p>
+        <h1>Shopping <em>cart</em></h1>
+        <p v-if="!isLoading" class="cart-count">
           {{ cartItems.length }} {{ cartItems.length === 1 ? "item" : "items" }}
         </p>
+        <span v-else class="bc-skeleton cart-count-skeleton"></span>
+      </header>
+
+      <!-- Skeleton while the cart loads -->
+      <div v-if="isLoading" class="cart-content" aria-label="Loading your cart">
+        <div class="cart-items">
+          <div v-for="n in 3" :key="n" class="cart-item cart-item--skeleton">
+            <span class="bc-skeleton skeleton-check"></span>
+            <span class="bc-skeleton skeleton-image"></span>
+            <div class="skeleton-lines">
+              <span class="bc-skeleton skeleton-line skeleton-line--title"></span>
+              <span class="bc-skeleton skeleton-line skeleton-line--short"></span>
+              <span class="bc-skeleton skeleton-line skeleton-line--qty"></span>
+            </div>
+            <span class="bc-skeleton skeleton-line skeleton-price"></span>
+          </div>
+        </div>
+        <aside class="order-summary">
+          <span class="bc-skeleton skeleton-line skeleton-line--title"></span>
+          <span class="bc-skeleton skeleton-line"></span>
+          <span class="bc-skeleton skeleton-line"></span>
+          <span class="bc-skeleton skeleton-line skeleton-total"></span>
+          <span class="bc-skeleton skeleton-button"></span>
+        </aside>
       </div>
 
-      <div v-if="cartItems.length === 0 && !isLoading" class="empty-cart">
-        <div class="empty-icon">🛒</div>
-        <h2>Your cart is empty</h2>
+      <div v-else-if="cartItems.length === 0" class="empty-cart">
+        <h2>Your cart is <em>empty</em></h2>
         <p>Looks like you haven't added anything to your cart yet</p>
-        <button class="btn-shop" @click="$router.push('/shop')">
-          Continue Shopping
+        <button class="bc-btn bc-btn--dark" @click="$router.push('/shop')">
+          Continue shopping
+          <span class="bc-btn-arrow" aria-hidden="true">→</span>
         </button>
       </div>
 
-      <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
-
-      <div v-if="cartItems.length > 0" class="cart-content">
+      <div v-else class="cart-content">
         <div class="cart-items">
           <div
             v-if="hasLowStockItems || hasOutOfStockItems"
             class="stock-alert-banner"
+            :class="{ 'stock-alert-banner--error': hasOutOfStockItems }"
+            role="status"
           >
-            <div class="alert-icon">⚠️</div>
-            <div class="alert-content">
-              <p v-if="hasOutOfStockItems">
-                Some items in your cart are out of stock. Please remove them to
-                continue.
-              </p>
-              <p v-else-if="hasLowStockItems">
-                Some items in your cart have low stock. Order soon!
-              </p>
-            </div>
+            <p v-if="hasOutOfStockItems">
+              Some items in your cart are out of stock. Please remove them to
+              continue.
+            </p>
+            <p v-else-if="hasLowStockItems">
+              Some items in your cart have low stock. Order soon!
+            </p>
           </div>
 
           <div class="select-all-section">
@@ -97,8 +108,7 @@
                 v-model="selectAll"
                 @change="toggleSelectAll"
               />
-              <span class="checkmark"></span>
-              <span class="checkbox-label">Select All</span>
+              <span class="checkbox-label">Select all</span>
             </label>
             <span class="selected-count"
               >{{ selectedItems.length }} of
@@ -106,24 +116,22 @@
             >
           </div>
 
-          <div
+          <section
             v-for="vendor in vendorGroups"
             :key="vendor.id"
             class="vendor-group"
+            :aria-label="vendor.name"
           >
             <div class="vendor-header">
               <label class="checkbox-container">
                 <input
                   type="checkbox"
                   :checked="isVendorSelected(vendor.id)"
+                  :aria-label="`Select all items from ${vendor.name}`"
                   @change="toggleVendorSelect(vendor.id)"
                 />
-                <span class="checkmark"></span>
               </label>
-              <div class="vendor-info">
-                <span class="vendor-icon">🏪</span>
-                <span class="vendor-name">{{ vendor.name }}</span>
-              </div>
+              <span class="vendor-name">{{ vendor.name }}</span>
               <span class="vendor-item-count"
                 >{{ vendor.items.length }} item{{
                   vendor.items.length > 1 ? "s" : ""
@@ -131,240 +139,189 @@
               >
             </div>
 
-            <div class="vendor-items">
-              <div
-                v-for="item in vendor.items"
-                :key="item.id"
-                class="cart-item"
-                :class="{
-                  'out-of-stock': item.product?.quantity_in_stock === 0,
-                }"
-              >
-                <label class="checkbox-container item-checkbox">
-                  <input
-                    type="checkbox"
-                    :value="item.id"
-                    v-model="selectedItems"
-                    :disabled="item.product?.quantity_in_stock === 0"
-                  />
-                  <span class="checkmark"></span>
-                </label>
+            <article
+              v-for="item in vendor.items"
+              :key="item.id"
+              class="cart-item"
+              :class="{
+                'out-of-stock': item.product?.quantity_in_stock === 0,
+              }"
+            >
+              <label class="checkbox-container item-checkbox">
+                <input
+                  type="checkbox"
+                  :value="item.id"
+                  v-model="selectedItems"
+                  :disabled="item.product?.quantity_in_stock === 0"
+                  :aria-label="`Select ${getProductName(item.product, item)}`"
+                />
+              </label>
 
-                <div class="item-image">
-                  <img
-                    :src="
-                      getProductImage(item.product) ||
-                      'https://via.placeholder.com/150'
-                    "
-                    :alt="getProductName(item.product, item)"
-                    @error="handleImageError"
-                  />
+              <div class="item-image">
+                <img
+                  :src="getProductImage(item.product) || FALLBACK_IMAGE"
+                  :alt="getProductName(item.product, item)"
+                  @error="handleImageError"
+                />
+              </div>
+
+              <div class="item-details">
+                <div class="item-header">
+                  <div>
+                    <p class="item-category">
+                      {{ getProductCategory(item.product, item) }}
+                    </p>
+                    <h3 class="item-name">
+                      {{ getProductName(item.product, item) }}
+                    </h3>
+                    <p
+                      v-if="item.product?.color || item.product?.variety"
+                      class="item-specifications"
+                    >
+                      <span v-if="item.product.color">{{
+                        item.product.color
+                      }}</span>
+                      <span v-if="item.product.variety">{{
+                        item.product.variety
+                      }}</span>
+                    </p>
+                  </div>
+                  <button
+                    class="btn-remove"
+                    @click="removeFromCart(item.id)"
+                    title="Remove item"
+                    :aria-label="`Remove ${getProductName(item.product, item)}`"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" />
+                    </svg>
+                  </button>
                 </div>
 
-                <div class="item-details">
-                  <div class="item-header">
-                    <div>
-                      <h3 class="item-name">
-                        {{ getProductName(item.product, item) }}
-                      </h3>
-                      <p class="item-category">
-                        {{ getProductCategory(item.product, item) }}
-                      </p>
-                    </div>
-                    <button
-                      class="btn-remove"
-                      @click="removeFromCart(item.id)"
-                      title="Remove item"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          fill="currentColor"
-                          d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6zM8 9h8v10H8zm7.5-5l-1-1h-5l-1 1H5v2h14V4z"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-
-                  <div class="item-specifications" v-if="item.product">
-                    <div class="spec-item" v-if="item.product.color">
-                      <span class="spec-icon">🎨</span>
-                      <span class="spec-value">{{ item.product.color }}</span>
-                    </div>
-                    <div class="spec-item" v-if="item.product.variety">
-                      <span class="spec-icon">🌱</span>
-                      <span class="spec-value">{{ item.product.variety }}</span>
-                    </div>
-                  </div>
-
-                  <div class="item-footer">
-                    <div class="quantity-control-wrapper">
-                      <div
-                        class="stock-warning"
-                        v-if="getStockStatus(item.product) === 'Out of stock'"
-                      >
-                        <span class="warning-icon">⛔</span>
-                        <span class="warning-text">Out of stock</span>
-                      </div>
-                      <div
-                        class="stock-warning low-stock"
-                        v-else-if="getStockStatus(item.product) === 'Low stock'"
-                      >
-                        <span class="warning-icon">⚠️</span>
-                        <span class="warning-text"
-                          >Only {{ item.product?.quantity_in_stock }} left</span
-                        >
-                      </div>
-
-                      <div class="quantity-control">
-                        <button
-                          class="qty-btn"
-                          @click="decreaseQuantity(item.id)"
-                          :disabled="
-                            isCustomBouquet(item) || getStockStatus(item.product) === 'Out of stock'
-                          "
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                          >
-                            <path fill="currentColor" d="M19 13H5v-2h14z" />
-                          </svg>
-                        </button>
-                        <input
-                          type="text"
-                          :value="item.quantity"
-                          @input="handleQuantityInput(item.id, $event)"
-                          class="qty-input"
-                          :disabled="
-                            isCustomBouquet(item) || getStockStatus(item.product) === 'Out of stock'
-                          "
-                        />
-                        <button
-                          class="qty-btn"
-                          @click="increaseQuantity(item.id)"
-                          :disabled="
-                            isCustomBouquet(item) || getStockStatus(item.product) === 'Out of stock'
-                          "
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              fill="currentColor"
-                              d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                      <div
-                        v-if="pendingUpdates[item.id]"
-                        class="sync-indicator"
-                      >
-                        <span class="sync-dot"></span>
-                        <span class="sync-text">Syncing...</span>
-                      </div>
-                    </div>
-
-                    <div class="item-actions">
+                <div class="item-footer">
+                  <div class="quantity-control-wrapper">
+                    <div class="quantity-control">
                       <button
-                        v-if="isCustomBouquet(item)"
-                        class="btn-customize"
-                        @click="viewBouquet(item)"
-                      >
-                        <span>View 3D</span>
-                      </button>
-                      <button
-                        v-if="isCustomBouquet(item)"
-                        class="btn-customize"
-                        @click="editBouquet(item)"
-                        :disabled="getStockStatus(item.product) === 'Out of stock'"
-                      >
-                        <span>Edit</span>
-                      </button>
-                      <button
-                        v-else
-                        class="btn-customize"
-                        @click="customizeItem(item)"
+                        class="qty-btn"
+                        aria-label="Decrease quantity"
+                        @click="decreaseQuantity(item.id)"
                         :disabled="
-                          item.quantity > 1 ||
+                          isCustomBouquet(item) ||
                           getStockStatus(item.product) === 'Out of stock'
                         "
-                        :title="
-                          item.quantity > 1
-                            ? 'Can only customize one item at a time'
-                            : 'Customize this flower'
+                      >
+                        &#x2212;
+                      </button>
+                      <input
+                        type="text"
+                        inputmode="numeric"
+                        :value="item.quantity"
+                        aria-label="Quantity"
+                        @input="handleQuantityInput(item.id, $event)"
+                        class="qty-input"
+                        :disabled="
+                          isCustomBouquet(item) ||
+                          getStockStatus(item.product) === 'Out of stock'
+                        "
+                      />
+                      <button
+                        class="qty-btn"
+                        aria-label="Increase quantity"
+                        @click="increaseQuantity(item.id)"
+                        :disabled="
+                          isCustomBouquet(item) ||
+                          getStockStatus(item.product) === 'Out of stock'
                         "
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        >
-                          <path d="M12 20h9" />
-                          <path
-                            d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"
-                          />
-                        </svg>
-                        <span>Customize</span>
+                        +
                       </button>
-
-                      <div class="item-pricing">
-                        <!-- With discount -->
-                        <div v-if="hasDiscount(item)" class="price-discount">
-                          <span class="price-original"
-                            >₱{{ formatPrice(originalPrice(item)) }}</span
-                          >
-                          <span class="price-current"
-                            >₱{{ formatPrice(effectivePrice(item)) }}</span
-                          >
-                          <span class="price-badge"
-                            >{{ discountPercent(item) }}% OFF</span
-                          >
-                        </div>
-                        <!-- No discount -->
-                        <div v-else class="price-regular">
-                          <span class="price-current"
-                            >₱{{ formatPrice(effectivePrice(item)) }}</span
-                          >
-                        </div>
-
-                        <div class="item-subtotal">
-                          Subtotal: ₱{{ formatPrice(lineTotal(item)) }}
-                          <span
-                            v-if="hasDiscount(item) && item.quantity > 1"
-                            class="subtotal-saving"
-                          >
-                            (save ₱{{ formatPrice(lineSaving(item)) }})
-                          </span>
-                        </div>
-                      </div>
                     </div>
+                    <span
+                      v-if="getStockStatus(item.product) === 'Out of stock'"
+                      class="stock-warning"
+                      >Out of stock</span
+                    >
+                    <span
+                      v-else-if="getStockStatus(item.product) === 'Low stock'"
+                      class="stock-warning stock-warning--low"
+                      >Only {{ item.product?.quantity_in_stock }} left</span
+                    >
+                    <span
+                      v-if="pendingUpdates[item.id]"
+                      class="sync-indicator"
+                      aria-live="polite"
+                      >Saving...</span
+                    >
+                  </div>
+
+                  <div class="item-actions">
+                    <button
+                      v-if="isCustomBouquet(item)"
+                      class="item-action"
+                      @click="viewBouquet(item)"
+                    >
+                      View 3D
+                    </button>
+                    <button
+                      v-if="isCustomBouquet(item)"
+                      class="item-action"
+                      @click="editBouquet(item)"
+                      :disabled="getStockStatus(item.product) === 'Out of stock'"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      v-else
+                      class="item-action"
+                      @click="customizeItem(item)"
+                      :disabled="
+                        item.quantity > 1 ||
+                        getStockStatus(item.product) === 'Out of stock'
+                      "
+                      :title="
+                        item.quantity > 1
+                          ? 'Can only customize one item at a time'
+                          : 'Customize this flower'
+                      "
+                    >
+                      Customize
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
+
+              <div class="item-pricing">
+                <template v-if="hasDiscount(item)">
+                  <span class="price-current"
+                    >₱{{ formatPrice(effectivePrice(item)) }}</span
+                  >
+                  <span class="price-original"
+                    >₱{{ formatPrice(originalPrice(item)) }}</span
+                  >
+                  <span class="price-badge"
+                    >{{ discountPercent(item) }}% off</span
+                  >
+                </template>
+                <span v-else class="price-current"
+                  >₱{{ formatPrice(effectivePrice(item)) }}</span
+                >
+                <span class="item-subtotal">
+                  Subtotal ₱{{ formatPrice(lineTotal(item)) }}
+                  <span
+                    v-if="hasDiscount(item) && item.quantity > 1"
+                    class="subtotal-saving"
+                  >
+                    (save ₱{{ formatPrice(lineSaving(item)) }})
+                  </span>
+                </span>
+              </div>
+            </article>
+          </section>
         </div>
 
         <!-- Order Summary -->
-        <div class="order-summary">
-          <h2>Order Summary</h2>
+        <aside class="order-summary" aria-labelledby="summary-title">
+          <h2 id="summary-title">Order <em>summary</em></h2>
 
           <div class="summary-section">
             <div class="summary-row">
@@ -379,7 +336,6 @@
             </div>
           </div>
 
-          <!-- Per-item discount breakdown -->
           <div
             v-if="discountedSelectedItems.length > 0"
             class="discount-breakdown"
@@ -404,58 +360,57 @@
             >
           </div>
 
-          <div class="promo-section">
-            <input
-              type="text"
-              v-model="promoCode"
-              placeholder="Enter promo code"
-              class="promo-input"
-            />
-            <button class="btn-apply-promo" @click="applyPromoCode">
-              Apply
-            </button>
-          </div>
-
           <div class="summary-actions">
             <button
-              class="btn-continue-shopping"
-              @click="$router.push('/shop')"
-            >
-              Continue Shopping
-            </button>
-            <button
-              class="btn-checkout"
+              class="bc-btn bc-btn--dark btn-checkout"
               @click="proceedToCheckout"
               :disabled="selectedItems.length === 0 || hasSelectedOutOfStock"
             >
               Checkout ({{ selectedItems.length }})
+              <span class="bc-btn-arrow" aria-hidden="true">→</span>
+            </button>
+            <button class="bc-link btn-continue-shopping" @click="$router.push('/shop')">
+              Continue shopping
             </button>
           </div>
 
-          <div class="payment-methods">
-            <p>We accept:</p>
-            <div class="payment-icons">
-              <span class="payment-icon">💳</span>
-              <span class="payment-icon">🏦</span>
-              <span class="payment-icon">📱</span>
-            </div>
-          </div>
-        </div>
+          <p class="payment-methods">
+            Pay with an e-wallet via PayMongo, or cash on delivery.
+          </p>
+        </aside>
       </div>
-    </div>
+    </main>
 
-    <div v-if="show3DModal" class="bouquet-modal" @click.self="close3DModal">
-      <div class="bouquet-modal-content">
+    <div
+      v-if="show3DModal"
+      class="bouquet-modal bc-theme"
+      @click.self="close3DModal"
+    >
+      <div
+        class="bouquet-modal-content"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bouquet-modal-title"
+      >
         <div class="bouquet-modal-header">
-          <h3>Custom Bouquet</h3>
-          <button class="btn-remove" @click="close3DModal" title="Close">×</button>
+          <h3 id="bouquet-modal-title">Custom <em>bouquet</em></h3>
+          <button
+            class="btn-remove"
+            @click="close3DModal"
+            title="Close"
+            aria-label="Close"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
         </div>
         <ThreeDModelViewer
           v-if="viewingArrangement"
           model-url="/Boquet.glb"
           model-type="glb"
           :arrangement="viewingArrangement"
-          background-color="#1a1a2e"
+          background-color="#ebe5dd"
         />
       </div>
     </div>
@@ -472,7 +427,7 @@ import NavHeader from "../../layouts/NavHeader.vue";
 import api from "../../plugins/axios"; // ✅ needed to fetch profile
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
-import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
+import "../../styles/bloomcraft.css";
 import ThreeDModelViewer from "../../layouts/3D/3DModelViewer.vue";
 
 const router = useRouter();
@@ -491,9 +446,7 @@ const {
 const cartItems = ref([]);
 const selectedItems = ref([]);
 const selectAll = ref(false);
-const promoCode = ref("");
 const isLoading = ref(true);
-const isLoadingMessage = ref("");
 const pendingUpdates = ref({});
 const updateTimeouts = ref({});
 const show3DModal = ref(false);
@@ -684,10 +637,7 @@ onMounted(async () => {
 
 const loadCart = async (showLoading = true) => {
   try {
-    if (showLoading) {
-      isLoading.value = true;
-      isLoadingMessage.value = "Preparing your cart...";
-    }
+    if (showLoading) isLoading.value = true;
     await cartStore.refreshCart();
     hydrateCartItems(cartStore.items.value);
     if (cartItems.value.length > 0) {
@@ -863,13 +813,6 @@ const getProductImage = (product) => {
   return null;
 };
 
-const applyPromoCode = () => {
-  if (promoCode.value.trim()) {
-    toast.info(`Promo code "${promoCode.value}" applied!`);
-    promoCode.value = "";
-  }
-};
-
 // ✅ Modified: profile check runs first; no checkout API is called if incomplete
 const proceedToCheckout = async () => {
   if (selectedItems.value.length === 0) {
@@ -896,258 +839,208 @@ const proceedToCheckout = async () => {
   router.push("/customer/checkout");
 };
 
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=300&h=375&fit=crop";
 const handleImageError = (e) => {
-  e.target.src = "https://via.placeholder.com/150";
+  if (e.target.src !== FALLBACK_IMAGE) e.target.src = FALLBACK_IMAGE;
 };
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
+/* Tokens, type, labels, buttons, links, skeletons and the navbar come from
+   src/styles/bloomcraft.css (shared with the landing page and Shop). */
 
-* {
-  font-family: "Poppins", sans-serif;
-  box-sizing: border-box;
+/* Resets live in a cascade layer so they only replace browser defaults. */
+@layer bc-reset {
+  .cart-page :is(p, h1, h2, h3) {
+    margin: 0;
+  }
+}
+
+/* Same body reset the landing and shop pages apply (UA 8px margin). */
+:global(body) {
+  margin: 0;
 }
 
 .cart-page {
   min-height: 100vh;
-  background: #f5f7fa;
-  padding-top: 80px;
-}
-.cart-container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 40px 20px;
-}
-.cart-header {
-  margin-bottom: 32px;
-}
-.cart-header h1 {
-  font-size: 32px;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0 0 8px 0;
-}
-.cart-count {
-  font-size: 16px;
-  color: #718096;
-  margin: 0;
+  background: var(--ivory);
 }
 
+.cart-page button {
+  font-family: var(--font-sans);
+}
+
+.cart-btn-outline {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.cart-btn-outline:hover {
+  border-color: var(--ink);
+}
+
+.cart-container {
+  padding-top: 150px;
+  padding-bottom: var(--section-space);
+}
+
+/* ---- Header ---- */
+.cart-header {
+  margin-bottom: 56px;
+}
+
+.cart-header h1 {
+  margin-top: 22px;
+  font-size: clamp(48px, 5.6vw, 84px);
+}
+
+.cart-count {
+  margin-top: 10px;
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+.cart-count-skeleton {
+  display: block;
+  width: 80px;
+  height: 14px;
+  margin-top: 16px;
+}
+
+/* ---- Empty ---- */
 .empty-cart {
-  background: white;
-  border-radius: 16px;
-  padding: 80px 40px;
+  padding: 80px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
   text-align: center;
 }
-.empty-icon {
-  font-size: 80px;
-  margin-bottom: 24px;
-  opacity: 0.5;
-}
+
 .empty-cart h2 {
-  font-size: 28px;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0 0 12px 0;
-}
-.empty-cart p {
-  font-size: 16px;
-  color: #718096;
-  margin: 0 0 32px 0;
-}
-.btn-shop {
-  padding: 14px 32px;
-  background: #48bb78;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-.btn-shop:hover {
-  background: #38a169;
-  transform: translateY(-2px);
+  font-size: clamp(36px, 4vw, 56px);
 }
 
+.empty-cart p {
+  margin: 14px 0 32px;
+  color: var(--ink-soft);
+}
+
+/* ---- Layout ---- */
 .cart-content {
   display: grid;
-  grid-template-columns: 1fr 400px;
-  gap: 32px;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: clamp(32px, 4vw, 64px);
   align-items: start;
-}
-.cart-items {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
 }
 
 .stock-alert-banner {
-  background: #fef3c7;
-  border: 1px solid #fbbf24;
-  border-radius: 12px;
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.alert-icon {
-  font-size: 24px;
-}
-.alert-content p {
-  margin: 0;
-  color: #92400e;
+  margin-bottom: 20px;
+  padding: 14px 18px;
+  border: 1px solid rgba(212, 178, 122, 0.6);
+  border-radius: 14px;
+  background: rgba(212, 178, 122, 0.12);
+  color: #7a5a1e;
   font-size: 14px;
-  font-weight: 500;
+}
+
+.stock-alert-banner--error {
+  border-color: rgba(142, 68, 58, 0.35);
+  background: rgba(184, 101, 88, 0.08);
+  color: var(--rosewood-dark);
 }
 
 .select-all-section {
-  background: white;
-  border-radius: 12px;
-  padding: 16px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-.selected-count {
-  font-size: 14px;
-  color: #718096;
-  font-weight: 500;
+  padding: 0 0 18px;
+  border-bottom: 1px solid var(--line);
 }
 
 .checkbox-container {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 12px;
-  position: relative;
   cursor: pointer;
-  user-select: none;
 }
+
 .checkbox-container input {
-  position: absolute;
-  opacity: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--ink);
   cursor: pointer;
-  height: 0;
-  width: 0;
 }
-.checkmark {
-  height: 20px;
-  width: 20px;
-  background-color: white;
-  border: 2px solid #cbd5e0;
-  border-radius: 4px;
-  transition: all 0.3s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.checkbox-container:hover .checkmark {
-  border-color: #48bb78;
-}
-.checkbox-container input:checked ~ .checkmark {
-  background-color: #48bb78;
-  border-color: #48bb78;
-}
-.checkmark:after {
-  content: "";
-  display: none;
-  width: 5px;
-  height: 10px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-.checkbox-container input:checked ~ .checkmark:after {
-  display: block;
-}
-.checkbox-container input:disabled ~ .checkmark {
-  background-color: #f7fafc;
-  border-color: #e2e8f0;
+
+.checkbox-container input:disabled {
   cursor: not-allowed;
 }
+
 .checkbox-label {
   font-size: 14px;
   font-weight: 500;
-  color: #2d3748;
 }
 
-.vendor-group {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
-}
-.vendor-header {
-  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border-bottom: 1px solid #e2e8f0;
-}
-.vendor-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-}
-.vendor-icon {
-  font-size: 20px;
-}
-.vendor-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #2d3748;
-}
-.vendor-item-count {
+.selected-count {
+  color: var(--ink-soft);
   font-size: 13px;
-  color: #718096;
-  background: white;
-  padding: 4px 12px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
 }
 
-.vendor-items {
-  padding: 12px;
+/* ---- Vendor groups ---- */
+.vendor-group {
+  padding-top: 26px;
+}
+
+.vendor-header {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 12px;
+  padding-bottom: 6px;
 }
 
+.vendor-name {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.vendor-item-count {
+  margin-left: auto;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* ---- Item row ---- */
 .cart-item {
-  padding: 16px;
   display: grid;
-  grid-template-columns: auto 120px 1fr;
-  gap: 16px;
-  border-radius: 8px;
-  transition: all 0.3s;
-  background: #fafafa;
+  grid-template-columns: 18px 104px minmax(0, 1fr) auto;
+  gap: 22px;
+  align-items: start;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
 }
-.cart-item:hover {
-  background: #f7fafc;
-}
-.cart-item.out-of-stock {
-  opacity: 0.6;
+
+.cart-item.out-of-stock .item-image,
+.cart-item.out-of-stock .item-details {
+  opacity: 0.55;
 }
 
 .item-checkbox {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding-top: 40px;
+  margin-top: 4px;
 }
+
 .item-image {
-  width: 120px;
-  height: 120px;
-  border-radius: 8px;
+  width: 104px;
+  aspect-ratio: 4 / 5;
   overflow: hidden;
-  background: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: var(--ivory-deep);
 }
+
 .item-image img {
   width: 100%;
   height: 100%;
@@ -1157,644 +1050,549 @@ const handleImageError = (e) => {
 .item-details {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+  min-width: 0;
 }
+
 .item-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-}
-.item-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0 0 4px 0;
-}
-.item-category {
-  font-size: 12px;
-  color: #48bb78;
-  font-weight: 600;
-  text-transform: uppercase;
-  margin: 0;
+  gap: 12px;
 }
 
-.btn-remove {
-  width: 36px;
-  height: 36px;
-  border: none;
-  background: #fee2e2;
-  color: #991b1b;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.item-category {
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
-.btn-remove:hover {
-  background: #fecaca;
-  transform: scale(1.05);
+
+.cart-page .item-name {
+  margin-top: 4px;
+  font-size: 26px;
+  line-height: 1.1;
 }
 
 .item-specifications {
-  display: flex;
-  gap: 16px;
-  padding: 8px 0;
-}
-.spec-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  margin-top: 6px;
+  color: var(--ink-soft);
   font-size: 13px;
+  text-transform: capitalize;
 }
-.spec-icon {
-  font-size: 14px;
+
+.item-specifications span + span::before {
+  content: "·";
+  margin: 0 8px;
+  color: var(--rosewood);
 }
-.spec-value {
-  color: #4a5568;
-  font-weight: 500;
+
+.btn-remove {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.25s, color 0.25s;
+}
+
+.btn-remove:hover {
+  background: var(--ivory-deep);
+  color: var(--rosewood-dark);
+}
+
+.btn-remove svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .item-footer {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
 }
+
 .quantity-control-wrapper {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.stock-warning {
-  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  background: #fee2e2;
-  border-radius: 6px;
-  font-size: 12px;
-  color: #991b1b;
-  font-weight: 500;
-  width: fit-content;
-}
-.stock-warning.low-stock {
-  background: #fef3c7;
-  color: #92400e;
-}
-.warning-icon {
-  font-size: 14px;
-}
-
-.sync-indicator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: #718096;
-}
-.sync-dot {
-  width: 6px;
-  height: 6px;
-  background-color: #48bb78;
-  border-radius: 50%;
-  animation: pulse 1.5s infinite;
-}
-.sync-text {
-  font-size: 11px;
-  font-weight: 500;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  flex-wrap: wrap;
+  gap: 14px;
 }
 
 .quantity-control {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  overflow: hidden;
-  width: fit-content;
-  background: white;
+  border: 1px solid var(--line);
+  border-radius: 999px;
 }
+
 .qty-btn {
-  width: 40px;
-  height: 40px;
-  background: white;
+  width: 36px;
+  height: 38px;
   border: none;
-  color: #2d3748;
+  background: none;
+  color: var(--ink);
+  font-size: 16px;
   cursor: pointer;
-  transition: all 0.3s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
-.qty-btn:hover:not(:disabled) {
-  background: #f7fafc;
-}
+
 .qty-btn:disabled {
-  opacity: 0.4;
+  color: var(--line);
   cursor: not-allowed;
 }
+
 .qty-input {
-  width: 60px;
-  height: 40px;
+  width: 34px;
   border: none;
-  border-left: 1px solid #e2e8f0;
-  border-right: 1px solid #e2e8f0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
   text-align: center;
-  font-size: 15px;
-  font-weight: 600;
-  color: #2d3748;
-  background: white;
 }
+
 .qty-input:focus {
   outline: none;
-  background: #f7fafc;
 }
+
 .qty-input:disabled {
-  background: #f7fafc;
-  color: #a0aec0;
+  color: var(--ink-soft);
+}
+
+.stock-warning {
+  color: var(--rosewood-dark);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.stock-warning--low {
+  color: #9a6a1f;
+}
+
+.sync-indicator {
+  color: var(--ink-soft);
+  font-size: 12px;
 }
 
 .item-actions {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
+  gap: 18px;
 }
 
-.btn-customize {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: #48bb78;
-  color: white;
+.item-action {
+  padding: 0 0 3px;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-bottom: 1px solid currentColor;
+  background: none;
+  color: var(--ink);
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: color 0.3s;
 }
-.btn-customize:hover:not(:disabled) {
-  background: #38a169;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+
+.item-action:hover:not(:disabled) {
+  color: var(--rosewood-dark);
 }
-.btn-customize:disabled {
-  background: #cbd5e0;
-  color: #718096;
+
+.item-action:disabled {
+  color: var(--ink-soft);
+  opacity: 0.5;
   cursor: not-allowed;
-  transform: none;
 }
-
-.bouquet-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgba(15, 23, 42, 0.7);
-}
-
-.bouquet-modal-content {
-  width: min(760px, 100%);
-  height: min(680px, 88vh);
-  padding: 18px;
-  border-radius: 16px;
-  background: white;
-}
-
-.bouquet-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.bouquet-modal-header h3 { margin: 0; }
 
 .item-pricing {
-  text-align: right;
   display: flex;
   flex-direction: column;
-  gap: 4px;
   align-items: flex-end;
-}
-.price-discount {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-.price-original {
-  font-size: 13px;
-  color: #a0aec0;
-  text-decoration: line-through;
-}
-.price-current {
-  font-size: 18px;
-  font-weight: 700;
-  color: #48bb78;
-}
-.price-badge {
-  padding: 2px 8px;
-  background: #fee2e2;
-  color: #991b1b;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-}
-.price-regular .price-current {
-  font-size: 18px;
-  font-weight: 700;
-  color: #2d3748;
-}
-.item-subtotal {
-  font-size: 13px;
-  color: #718096;
-  font-weight: 500;
-}
-.subtotal-saving {
-  color: #38a169;
-  font-weight: 600;
-  margin-left: 4px;
+  gap: 4px;
+  /* Fixed width keeps every row's remove button and actions aligned */
+  width: 150px;
+  text-align: right;
 }
 
-/* Order Summary */
-.order-summary {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  position: sticky;
-  top: 100px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+.price-current {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1;
 }
+
+.price-original {
+  color: var(--ink-soft);
+  font-size: 13px;
+  text-decoration: line-through;
+}
+
+.price-badge {
+  color: var(--rosewood-dark);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.item-subtotal {
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.subtotal-saving {
+  color: var(--rosewood-dark);
+}
+
+/* ---- Summary ---- */
+.order-summary {
+  position: sticky;
+  top: 110px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 32px 30px;
+  border: 1px solid var(--line-soft);
+  border-radius: 20px;
+  background: var(--paper);
+}
+
 .order-summary h2 {
-  font-size: 20px;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0 0 20px 0;
+  font-size: 34px;
 }
 
 .summary-section {
-  padding: 16px 0;
-  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
 }
+
 .summary-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+  gap: 12px;
+  color: var(--ink-soft);
   font-size: 14px;
-  color: #718096;
 }
-.summary-row:last-child {
-  margin-bottom: 0;
+
+.summary-row span:last-child {
+  color: var(--ink);
 }
-.discount-row {
-  color: #e53e3e;
-}
-.discount-amount {
-  font-weight: 600;
+
+.discount-amount,
+.breakdown-saving {
+  color: var(--rosewood-dark) !important;
 }
 
 .discount-breakdown {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  border-radius: 8px;
-  padding: 12px 14px;
-  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--ivory);
 }
+
 .breakdown-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: #166534;
-  margin: 0 0 8px 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
+
 .breakdown-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  gap: 10px;
   font-size: 13px;
-  color: #4b5563;
-  padding: 3px 0;
 }
+
 .breakdown-name {
-  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-right: 12px;
-}
-.breakdown-saving {
-  color: #16a34a;
-  font-weight: 600;
   white-space: nowrap;
 }
 
 .summary-total {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 20px 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #2d3748;
-}
-.total-amount {
-  font-size: 24px;
-  color: #48bb78;
-}
-
-.promo-section {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-.promo-input {
-  flex: 1;
-  padding: 10px 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
-}
-.promo-input:focus {
-  outline: none;
-  border-color: #48bb78;
-}
-.btn-apply-promo {
-  padding: 10px 20px;
-  background: #2d3748;
-  color: white;
-  border: none;
-  border-radius: 8px;
+  align-items: baseline;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
   font-size: 14px;
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
 }
-.btn-apply-promo:hover {
-  background: #1a202c;
+
+.total-amount {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 500;
+  line-height: 1;
 }
 
 .summary-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
+  align-items: center;
+  gap: 16px;
 }
-.btn-continue-shopping {
-  padding: 12px 24px;
-  background: white;
-  color: #2d3748;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-.btn-continue-shopping:hover {
-  background: #f7fafc;
-  border-color: #48bb78;
-}
+
 .btn-checkout {
-  padding: 14px 24px;
-  background: #48bb78;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
+  justify-content: center;
+  width: 100%;
 }
-.btn-checkout:hover:not(:disabled) {
-  background: #38a169;
-  transform: translateY(-2px);
-}
+
 .btn-checkout:disabled {
-  background: #cbd5e0;
+  opacity: 0.45;
   cursor: not-allowed;
-  transform: none;
+}
+
+.btn-continue-shopping {
+  border: none;
+  background: none;
+  cursor: pointer;
 }
 
 .payment-methods {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.6;
   text-align: center;
-  padding-top: 20px;
-  border-top: 1px solid #e2e8f0;
-}
-.payment-methods p {
-  font-size: 12px;
-  color: #718096;
-  margin: 0 0 8px 0;
-}
-.payment-icons {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  font-size: 24px;
 }
 
-/* ✅ Profile Incomplete Modal */
-.modal-backdrop {
+.qty-btn:focus-visible,
+.btn-remove:focus-visible,
+.item-action:focus-visible,
+.checkbox-container input:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 3px;
+}
+
+/* ---- Skeleton ---- */
+.cart-item--skeleton {
+  align-items: center;
+}
+
+.skeleton-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+}
+
+.skeleton-image {
+  width: 104px;
+  aspect-ratio: 4 / 5;
+  border-radius: 12px;
+}
+
+.skeleton-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeleton-line {
+  display: block;
+  height: 13px;
+}
+
+.skeleton-line--title {
+  width: 70%;
+  height: 22px;
+}
+
+.skeleton-line--short {
+  width: 40%;
+}
+
+.skeleton-line--qty {
+  width: 120px;
+  height: 36px;
+  border-radius: 999px;
+}
+
+.skeleton-price {
+  width: 80px;
+  height: 22px;
+}
+
+.skeleton-total {
+  height: 34px;
+  margin-top: 8px;
+}
+
+.skeleton-button {
+  display: block;
+  height: 54px;
+  border-radius: 999px;
+}
+
+/* ---- Modals ---- */
+.modal-backdrop,
+.bouquet-modal {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
   padding: 20px;
+  background: rgba(27, 22, 18, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .modal-card {
-  background: white;
-  border-radius: 20px;
-  padding: 40px 36px;
-  max-width: 440px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
-  text-align: center;
-}
-
-.modal-icon {
-  width: 80px;
-  height: 80px;
-  background: linear-gradient(
-    135deg,
-    rgba(72, 187, 120, 0.12) 0%,
-    rgba(45, 55, 72, 0.08) 100%
-  );
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 20px;
-  color: #2d3748;
+  max-width: 460px;
+  padding: 40px 34px 32px;
+  border-radius: 26px;
+  background: var(--paper);
+  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
 }
 
 .modal-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #2d3748;
-  margin: 0 0 12px;
+  margin: 14px 0 12px;
+  font-size: 36px;
 }
 
 .modal-message {
-  font-size: 15px;
-  color: #718096;
-  line-height: 1.6;
-  margin: 0 0 28px;
+  margin-bottom: 26px;
+  color: var(--ink-soft);
+  font-size: 14.5px;
+  line-height: 1.7;
 }
 
 .modal-message strong {
-  color: #2d3748;
-  font-weight: 600;
+  color: var(--ink);
+  font-weight: 500;
 }
 
 .modal-actions {
-  display: flex;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
-.modal-btn-secondary {
-  flex: 1;
-  padding: 12px 20px;
-  background: white;
-  color: #2d3748;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: "Poppins", sans-serif;
-}
-.modal-btn-secondary:hover {
-  background: #f7fafc;
-  border-color: #cbd5e0;
+.modal-actions .bc-btn {
+  justify-content: center;
+  padding-inline: 18px;
 }
 
-.modal-btn-primary {
-  flex: 1;
-  padding: 12px 20px;
-  background: #2d3748;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: "Poppins", sans-serif;
-}
-.modal-btn-primary:hover {
-  background: #38a169;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(56, 161, 105, 0.3);
-}
-
-/* Transition */
 .modal-fade-enter-active,
 .modal-fade-leave-active {
-  transition: opacity 0.25s ease;
+  transition: opacity 0.3s ease;
 }
-.modal-fade-enter-active .modal-card,
-.modal-fade-leave-active .modal-card {
-  transition:
-    transform 0.25s ease,
-    opacity 0.25s ease;
-}
+
 .modal-fade-enter-from,
 .modal-fade-leave-to {
   opacity: 0;
 }
-.modal-fade-enter-from .modal-card,
-.modal-fade-leave-to .modal-card {
-  transform: translateY(16px);
-  opacity: 0;
+
+.bouquet-modal-content {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 880px;
+  height: min(80vh, 680px);
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--paper);
+  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
 }
 
-@media (max-width: 1200px) {
+.bouquet-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.bouquet-modal-header h3 {
+  font-size: 30px;
+}
+
+.bouquet-modal-content > :last-child {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 1024px) {
   .cart-content {
     grid-template-columns: 1fr;
   }
+
   .order-summary {
     position: static;
   }
 }
-@media (max-width: 768px) {
-  .cart-item {
-    grid-template-columns: auto 100px 1fr;
-    gap: 12px;
-    padding: 12px;
-  }
-  .item-image {
-    width: 100px;
-    height: 100px;
-  }
-  .item-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .btn-customize {
-    justify-content: center;
-  }
-  .item-pricing {
-    text-align: left;
-    align-items: flex-start;
-  }
-  .price-discount {
-    justify-content: flex-start;
-  }
-  .vendor-header {
-    flex-wrap: wrap;
-  }
-  .modal-card {
-    padding: 28px 20px;
-  }
-  .modal-actions {
-    flex-direction: column;
-  }
-}
+
 @media (max-width: 640px) {
   .cart-container {
-    padding: 24px 16px;
+    padding-top: 120px;
   }
-  .cart-header h1 {
-    font-size: 24px;
+
+  .cart-item {
+    grid-template-columns: 18px 84px minmax(0, 1fr);
+    gap: 14px;
   }
-  .item-specifications {
-    flex-direction: column;
-    gap: 8px;
+
+  .item-image,
+  .skeleton-image {
+    width: 84px;
   }
-  .select-all-section {
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
+
+  .item-pricing {
+    width: auto;
+    grid-column: 2 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 10px;
+    text-align: left;
+  }
+
+  .item-subtotal {
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .cart-page .item-name {
+    font-size: 22px;
+  }
+
+  .modal-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .skeleton-price {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-fade-enter-active,
+  .modal-fade-leave-active {
+    transition: none;
   }
 }
 </style>

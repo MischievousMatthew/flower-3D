@@ -800,15 +800,13 @@
                 "
                 class="bc-btn shop-btn-outline modal-btn"
               >
-                <span
-                  v-if="addingToCartModal"
-                  class="loading-spinner-small"
-                ></span>
-                <span v-else>{{
-                  selectedProduct.quantity_in_stock > 0
-                    ? "Add to cart"
-                    : "Out of stock"
-                }}</span>
+                {{
+                  addingToCartModal
+                    ? "Adding..."
+                    : selectedProduct.quantity_in_stock > 0
+                      ? "Add to cart"
+                      : "Out of stock"
+                }}
               </button>
               <button
                 @click="buyNow"
@@ -817,11 +815,7 @@
                 "
                 class="bc-btn bc-btn--dark modal-btn"
               >
-                <span
-                  v-if="addingToCartModal"
-                  class="loading-spinner-small loading-spinner-small--light"
-                ></span>
-                <span v-else>Buy now</span>
+                {{ addingToCartModal ? "Please wait..." : "Buy now" }}
               </button>
             </div>
 
@@ -2782,27 +2776,6 @@ onUnmounted(() => {
 .modal-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.loading-spinner-small {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--line);
-  border-top-color: var(--ink);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.loading-spinner-small--light {
-  border-color: rgba(244, 241, 236, 0.35);
-  border-top-color: var(--ivory);
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .guest-notice {
