@@ -465,6 +465,12 @@ import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import {
+  isInServiceArea,
+  serviceAreaBounds,
+  serviceAreaRings,
+  SERVICE_AREA_MESSAGE,
+} from "../../utils/serviceArea";
 import { useRouter } from "vue-router";
 import api from "../../plugins/axios";
 import NavHeader from "../../layouts/NavHeader.vue";
@@ -514,15 +520,21 @@ let locationMarker = null;
 let lookupTimer = null;
 let lookupRequestId = 0;
 
-// Deliveries cover Cavite and Metro Manila only. The box keeps the map (and
-// quick pin checks) to that area; the address lookup decides exactly.
-const SERVICE_AREA_BOUNDS = L.latLngBounds([13.95, 120.55], [14.82, 121.2]);
-const OUTSIDE_AREA_MESSAGE = "We deliver within Cavite and Metro Manila only. Move the pin inside those areas.";
-const isInServiceArea = (address = {}) =>
+// Deliveries cover Cavite and Metro Manila only. Clicks are checked against
+// the real outline (src/assets/serviceArea.json) before the pin moves; the
+// address lookup is a second check right at the border.
+const SERVICE_AREA_LIMITS = L.latLngBounds(serviceAreaBounds);
+const isInAddressArea = (address = {}) =>
   /cavite/i.test(address.state || address.province || "") ||
   /metro manila|national capital/i.test(address.region || "");
 
-// The last pin that passed the area check, restored when a new pin fails it
+// One toast at a time, however many times the customer clicks outside
+const warnOutsideArea = () => {
+  toast.error(SERVICE_AREA_MESSAGE, { toastId: "outside-service-area", autoClose: 3500 });
+};
+
+// The last pin that passed both checks, restored if the address lookup
+// rejects a new one
 let lastValidPin = null;
 const rememberValidPin = () => {
   lastValidPin =
@@ -536,15 +548,14 @@ const rememberValidPin = () => {
           postal_code: editData.postal_code,
         };
 };
-const rejectPin = (message) => {
-  lookupError.value = message;
+const restoreLastValidPin = () => {
   pinStreetHint.value = "";
   if (lastValidPin) {
     editData.region = lastValidPin.region;
     editData.city = lastValidPin.city;
     editData.postal_code = lastValidPin.postal_code;
     postalNeedsTyping.value = !lastValidPin.postal_code;
-    setPin(lastValidPin.latitude, lastValidPin.longitude, { lookUp: false, pan: true });
+    setPin(lastValidPin.latitude, lastValidPin.longitude, { lookUp: false });
   } else {
     editData.latitude = null;
     editData.longitude = null;
@@ -604,14 +615,17 @@ const lookUpPin = async (latitude, longitude) => {
     const data = await response.json();
     if (requestId !== lookupRequestId) return; // a newer pin replaced this one
 
-    if (data?.address?.country_code !== "ph" || !isInServiceArea(data.address)) {
-      rejectPin(OUTSIDE_AREA_MESSAGE);
+    // Right on the border the map outline and the address can disagree
+    if (data?.address?.country_code !== "ph" || !isInAddressArea(data.address)) {
+      warnOutsideArea();
+      restoreLastValidPin();
       return;
     }
 
     const place = describePlace(data.address);
     if (!place.city) {
-      rejectPin("We couldn't tell which city this is. Try moving the pin a little.");
+      lookupError.value = "We couldn't tell which city this is. Try moving the pin a little.";
+      restoreLastValidPin();
       return;
     }
     editData.region = place.region;
@@ -623,10 +637,20 @@ const lookUpPin = async (latitude, longitude) => {
   } catch (error) {
     if (requestId !== lookupRequestId) return;
     console.error("Reverse geocoding failed:", error);
-    rejectPin("We couldn't look up this pin. Check your connection and try again.");
+    lookupError.value = "We couldn't look up this pin. Check your connection and try again.";
+    restoreLastValidPin();
   } finally {
     if (requestId === lookupRequestId) isLookingUp.value = false;
   }
+};
+
+let dragStartPosition = null;
+const addMarker = (position) => {
+  locationMarker = L.marker(position, { icon: pinIcon, draggable: isEditing.value }).addTo(locationMap);
+  locationMarker.on("dragstart", () => {
+    dragStartPosition = locationMarker.getLatLng();
+  });
+  locationMarker.on("dragend", onMarkerDragEnd);
 };
 
 const setPin = (latitude, longitude, { lookUp = true, pan = false } = {}) => {
@@ -634,14 +658,8 @@ const setPin = (latitude, longitude, { lookUp = true, pan = false } = {}) => {
   editData.longitude = Number(longitude.toFixed(7));
   const position = [editData.latitude, editData.longitude];
 
-  if (locationMarker) {
-    locationMarker.setLatLng(position);
-  } else if (locationMap) {
-    locationMarker = L.marker(position, { icon: pinIcon, draggable: isEditing.value }).addTo(locationMap);
-    locationMarker.on("dragend", () => {
-      onMarkerDragEnd();
-    });
-  }
+  if (locationMarker) locationMarker.setLatLng(position);
+  else if (locationMap) addMarker(position);
   if (pan && locationMap) locationMap.setView(position, Math.max(locationMap.getZoom(), 16));
 
   if (lookUp) {
@@ -652,10 +670,10 @@ const setPin = (latitude, longitude, { lookUp = true, pan = false } = {}) => {
   }
 };
 
-// Quick check before asking the address service: far outside the area?
+// Outside the area the pin doesn't move at all; the customer gets a toast
 const placePin = (latitude, longitude, options = {}) => {
-  if (!SERVICE_AREA_BOUNDS.contains([latitude, longitude])) {
-    lookupError.value = OUTSIDE_AREA_MESSAGE;
+  if (!isInServiceArea(latitude, longitude)) {
+    warnOutsideArea();
     return;
   }
   lookupError.value = "";
@@ -666,15 +684,35 @@ const onMapClick = (event) => {
   if (isEditing.value) placePin(event.latlng.lat, event.latlng.lng);
 };
 
-// A pin dragged outside the area snaps back to the last valid spot
-const onMarkerDragEnd = () => {
+// A pin dropped outside the area goes back to where the drag started
+function onMarkerDragEnd() {
   const point = locationMarker.getLatLng();
-  if (!SERVICE_AREA_BOUNDS.contains(point)) {
-    rejectPin(OUTSIDE_AREA_MESSAGE);
+  if (!isInServiceArea(point.lat, point.lng)) {
+    warnOutsideArea();
+    if (dragStartPosition) locationMarker.setLatLng(dragStartPosition);
     return;
   }
   lookupError.value = "";
   setPin(point.lat, point.lng);
+}
+
+// Red line along the Cavite / Metro Manila border, with everything outside
+// it lightly tinted red
+const drawServiceArea = () => {
+  const world = [
+    [-85, -180],
+    [-85, 180],
+    [85, 180],
+    [85, -180],
+  ];
+  L.polygon([world, ...serviceAreaRings], {
+    color: "#c53030",
+    weight: 2,
+    opacity: 0.9,
+    fillColor: "#c53030",
+    fillOpacity: 0.12,
+    interactive: false, // clicks fall through to the map, which shows the toast
+  }).addTo(locationMap);
 };
 
 const renderLocationMap = async () => {
@@ -690,7 +728,7 @@ const renderLocationMap = async () => {
     locationMap = L.map(locationMapEl.value, {
       scrollWheelZoom: false,
       // Keep the map on Cavite and Metro Manila
-      maxBounds: SERVICE_AREA_BOUNDS.pad(0.15),
+      maxBounds: SERVICE_AREA_LIMITS.pad(0.2),
       maxBoundsViscosity: 1,
       minZoom: 9,
     }).setView(center, hasPin ? 16 : 10);
@@ -698,6 +736,7 @@ const renderLocationMap = async () => {
       maxZoom: 19,
       attribution: "© OpenStreetMap contributors",
     }).addTo(locationMap);
+    drawServiceArea();
     locationMap.on("click", onMapClick);
   } else {
     locationMap.setView(center, hasPin ? 16 : locationMap.getZoom());
@@ -706,12 +745,7 @@ const renderLocationMap = async () => {
 
   locationMarker?.remove();
   locationMarker = null;
-  if (hasPin) {
-    locationMarker = L.marker(center, { icon: pinIcon, draggable: isEditing.value }).addTo(locationMap);
-    locationMarker.on("dragend", () => {
-      onMarkerDragEnd();
-    });
-  }
+  if (hasPin) addMarker(center);
   locationMapEl.value.classList.toggle("is-editing", isEditing.value);
 };
 
