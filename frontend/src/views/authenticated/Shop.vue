@@ -121,6 +121,72 @@
           </label>
         </div>
 
+        <!-- Stores near the customer's pinned location (within 5 km) -->
+        <section
+          v-if="nearbyStores.length"
+          class="near-you"
+          aria-labelledby="near-you-title"
+        >
+          <div class="near-you-copy">
+            <p class="bc-label">Near you</p>
+            <h3 id="near-you-title">
+              You're {{ formatDistance(nearbyStores[0].distance_km) }} {{ nearbyByRoad ? "by road " : "" }}from
+              {{ nearbyStores[0].store_name }}
+            </h3>
+            <p>
+              {{
+                nearbyStores.length > 1
+                  ? `${nearbyStores.length} shops are`
+                  : "This shop is"
+              }}
+              within {{ nearbyRadiusKm }} km {{ nearbyByRoad ? "by road" : "" }} of the location pinned in your profile.
+            </p>
+          </div>
+          <ul class="near-you-list">
+            <li v-for="store in nearbyStores" :key="store.id">
+              <button
+                type="button"
+                class="near-you-store"
+                @click="goToStorefront(store.id)"
+              >
+                <span class="store-logo store-logo--small">
+                  <img
+                    v-if="store.store_logo_path"
+                    :src="store.store_logo_path"
+                    alt=""
+                    @error="handleVendorLogoError"
+                  />
+                  <span v-else class="store-logo-fallback">{{
+                    store.store_name?.charAt(0) || "B"
+                  }}</span>
+                </span>
+                <span class="near-you-store-text">
+                  <span class="near-you-name">{{ store.store_name }}</span>
+                  <span class="near-you-distance"
+                    >{{ formatDistance(store.distance_km) }}{{ nearbyByRoad ? "" : " away" }}<template v-if="nearbyByRoad && store.drive_minutes"> · {{ store.drive_minutes }} min drive</template></span
+                  >
+                </span>
+                <span class="near-you-arrow" aria-hidden="true">→</span>
+              </button>
+            </li>
+          </ul>
+        </section>
+        <p
+          v-else-if="isAuthenticated && nearbyLoaded && !nearbyHasPin"
+          class="near-you-prompt"
+        >
+          Pin your location in your profile to see shops near you.
+          <router-link to="/customer/profile" class="bc-link"
+            >Pin my location</router-link
+          >
+        </p>
+        <p
+          v-else-if="isAuthenticated && nearbyLoaded && nearbyHasPin"
+          class="near-you-prompt"
+        >
+          No shops within {{ nearbyRadiusKm }} km {{ nearbyByRoad ? "by road " : "" }}of your pinned location yet.
+        </p>
+
         <div v-if="loadingVendors" class="stores-grid" aria-label="Loading stores">
           <div v-for="n in 4" :key="n" class="store-card store-card--skeleton">
             <span class="bc-skeleton store-skeleton-logo"></span>
@@ -168,8 +234,11 @@
               {{ truncateDescription(vendor.store_description, 55) }}
             </p>
             <ul class="store-meta">
+              <li v-if="nearbyDistance(vendor) !== null">
+                {{ formatDistance(nearbyDistance(vendor)) }} {{ nearbyByRoad ? "by road" : "away" }}
+              </li>
               <li
-                v-if="isVendorCloseToCustomer(vendor)"
+                v-else-if="!nearbyHasPin && isVendorCloseToCustomer(vendor)"
                 title="Approximate distance from your selected city"
               >
                 Close to you
@@ -1180,6 +1249,36 @@ const clearVendorFilter = () => {
   pagination.value.current_page = 1;
   fetchProducts();
 };
+// ── Stores near the customer's pinned location ────────────────────────────
+const nearbyStores = ref([]);
+const nearbyHasPin = ref(false);
+const nearbyLoaded = ref(false);
+const nearbyRadiusKm = ref(5);
+const nearbyByRoad = ref(true); // false only if the routing service was unavailable
+const nearbyDistanceById = computed(
+  () => new Map(nearbyStores.value.map((store) => [store.id, store.distance_km])),
+);
+const nearbyDistance = (vendor) => nearbyDistanceById.value.get(vendor.id) ?? null;
+const formatDistance = (km) =>
+  km < 1 ? `${Math.max(100, Math.round((km * 1000) / 100) * 100)} m` : `${km} km`;
+
+const fetchNearbyStores = async () => {
+  if (!isAuthenticated.value) return;
+  try {
+    const { data } = await api.get("/stores/nearby");
+    if (data.success) {
+      nearbyStores.value = data.data || [];
+      nearbyHasPin.value = !!data.has_pin;
+      nearbyRadiusKm.value = data.radius_km || 5;
+      nearbyByRoad.value = data.distance_type !== "straight";
+    }
+  } catch (error) {
+    console.error("fetchNearbyStores:", error);
+  } finally {
+    nearbyLoaded.value = true;
+  }
+};
+
 const goToStorefront = (storeId) =>
   router.push({
     name: "VendorStorefront",
@@ -1614,7 +1713,7 @@ const buyNowDirect = async (product) => {
 onMounted(async () => {
   await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors()]);
   if (isAuthenticated.value) {
-    await loadCart();
+    await Promise.all([loadCart(), fetchNearbyStores()]);
   } else {
     await loadPendingActionFromStorage();
   }
@@ -1827,6 +1926,114 @@ onUnmounted(() => {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px;
   margin-top: 64px;
+}
+
+/* ── Near you ──────────────────────────────────────────────────────── */
+.near-you {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: clamp(24px, 4vw, 56px);
+  align-items: center;
+  margin-top: 48px;
+  padding: clamp(24px, 3vw, 36px);
+  border-radius: 22px;
+  background: var(--ivory-deep);
+}
+
+.near-you + .stores-grid {
+  margin-top: 40px;
+}
+
+.shop-page .near-you-copy h3 {
+  margin-top: 14px;
+  font-size: clamp(28px, 3vw, 40px);
+}
+
+.near-you-copy p:last-child {
+  margin-top: 10px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.near-you-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.near-you-store {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px 12px 12px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.near-you-store:hover {
+  border-color: var(--ink);
+}
+
+.near-you-store:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 3px;
+}
+
+.near-you-store-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.near-you-name {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.near-you-distance {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.near-you-arrow {
+  color: var(--ink-soft);
+  transition: transform 0.3s var(--ease-out);
+}
+
+.near-you-store:hover .near-you-arrow {
+  transform: translateX(3px);
+}
+
+.near-you-prompt {
+  margin-top: 40px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.near-you-prompt .bc-link {
+  margin-left: 8px;
+}
+
+.near-you-prompt + .stores-grid {
+  margin-top: 28px;
+}
+
+@media (max-width: 968px) {
+  .near-you {
+    grid-template-columns: 1fr;
+  }
 }
 
 .store-card {

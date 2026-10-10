@@ -48,4 +48,11 @@ return [
         'key' => env('BREVO_API_KEY'),
     ],
 
+    // Road distances for "stores near you". The public OSRM server is a demo
+    // with a fair-use limit; point OSRM_URL at your own instance for heavy use.
+    'osrm' => [
+        'url'     => env('OSRM_URL', 'https://router.project-osrm.org'),
+        'timeout' => (int) env('OSRM_TIMEOUT', 8),
+    ],
+
 ];

@@ -267,7 +267,7 @@
               <p>
                 {{
                   isEditing
-                    ? "Click the map or drag the pin to where your flowers should arrive. Region, city and postal code fill in from the pin."
+                    ? "Click the map or drag the pin to where your flowers should arrive, anywhere in Cavite or Metro Manila. Region, city and postal code fill in from the pin."
                     : "Where your flowers are delivered."
                 }}
               </p>
@@ -514,6 +514,49 @@ let locationMarker = null;
 let lookupTimer = null;
 let lookupRequestId = 0;
 
+// Deliveries cover Cavite and Metro Manila only. The box keeps the map (and
+// quick pin checks) to that area; the address lookup decides exactly.
+const SERVICE_AREA_BOUNDS = L.latLngBounds([13.95, 120.55], [14.82, 121.2]);
+const OUTSIDE_AREA_MESSAGE = "We deliver within Cavite and Metro Manila only. Move the pin inside those areas.";
+const isInServiceArea = (address = {}) =>
+  /cavite/i.test(address.state || address.province || "") ||
+  /metro manila|national capital/i.test(address.region || "");
+
+// The last pin that passed the area check, restored when a new pin fails it
+let lastValidPin = null;
+const rememberValidPin = () => {
+  lastValidPin =
+    editData.latitude === null
+      ? null
+      : {
+          latitude: editData.latitude,
+          longitude: editData.longitude,
+          region: editData.region,
+          city: editData.city,
+          postal_code: editData.postal_code,
+        };
+};
+const rejectPin = (message) => {
+  lookupError.value = message;
+  pinStreetHint.value = "";
+  if (lastValidPin) {
+    editData.region = lastValidPin.region;
+    editData.city = lastValidPin.city;
+    editData.postal_code = lastValidPin.postal_code;
+    postalNeedsTyping.value = !lastValidPin.postal_code;
+    setPin(lastValidPin.latitude, lastValidPin.longitude, { lookUp: false, pan: true });
+  } else {
+    editData.latitude = null;
+    editData.longitude = null;
+    editData.region = "";
+    editData.city = "";
+    editData.postal_code = "";
+    postalNeedsTyping.value = false;
+    locationMarker?.remove();
+    locationMarker = null;
+  }
+};
+
 const pinIcon = L.icon({
   iconUrl: markerIcon,
   iconRetinaUrl: markerIcon2x,
@@ -561,22 +604,26 @@ const lookUpPin = async (latitude, longitude) => {
     const data = await response.json();
     if (requestId !== lookupRequestId) return; // a newer pin replaced this one
 
-    if (data?.address?.country_code !== "ph") {
-      lookupError.value = "Pin a location in the Philippines.";
+    if (data?.address?.country_code !== "ph" || !isInServiceArea(data.address)) {
+      rejectPin(OUTSIDE_AREA_MESSAGE);
       return;
     }
 
     const place = describePlace(data.address);
+    if (!place.city) {
+      rejectPin("We couldn't tell which city this is. Try moving the pin a little.");
+      return;
+    }
     editData.region = place.region;
     editData.city = place.city;
     editData.postal_code = place.postal;
     postalNeedsTyping.value = !place.postal;
     pinStreetHint.value = place.street;
-    if (!place.city) lookupError.value = "We couldn't tell which city this is. Try moving the pin a little.";
+    rememberValidPin();
   } catch (error) {
     if (requestId !== lookupRequestId) return;
     console.error("Reverse geocoding failed:", error);
-    lookupError.value = "We couldn't look up this pin. Check your connection and try again.";
+    rejectPin("We couldn't look up this pin. Check your connection and try again.");
   } finally {
     if (requestId === lookupRequestId) isLookingUp.value = false;
   }
@@ -592,8 +639,7 @@ const setPin = (latitude, longitude, { lookUp = true, pan = false } = {}) => {
   } else if (locationMap) {
     locationMarker = L.marker(position, { icon: pinIcon, draggable: isEditing.value }).addTo(locationMap);
     locationMarker.on("dragend", () => {
-      const point = locationMarker.getLatLng();
-      setPin(point.lat, point.lng);
+      onMarkerDragEnd();
     });
   }
   if (pan && locationMap) locationMap.setView(position, Math.max(locationMap.getZoom(), 16));
@@ -606,8 +652,29 @@ const setPin = (latitude, longitude, { lookUp = true, pan = false } = {}) => {
   }
 };
 
+// Quick check before asking the address service: far outside the area?
+const placePin = (latitude, longitude, options = {}) => {
+  if (!SERVICE_AREA_BOUNDS.contains([latitude, longitude])) {
+    lookupError.value = OUTSIDE_AREA_MESSAGE;
+    return;
+  }
+  lookupError.value = "";
+  setPin(latitude, longitude, options);
+};
+
 const onMapClick = (event) => {
-  if (isEditing.value) setPin(event.latlng.lat, event.latlng.lng);
+  if (isEditing.value) placePin(event.latlng.lat, event.latlng.lng);
+};
+
+// A pin dragged outside the area snaps back to the last valid spot
+const onMarkerDragEnd = () => {
+  const point = locationMarker.getLatLng();
+  if (!SERVICE_AREA_BOUNDS.contains(point)) {
+    rejectPin(OUTSIDE_AREA_MESSAGE);
+    return;
+  }
+  lookupError.value = "";
+  setPin(point.lat, point.lng);
 };
 
 const renderLocationMap = async () => {
@@ -620,7 +687,13 @@ const renderLocationMap = async () => {
   const center = hasPin ? [Number(latitude), Number(longitude)] : DEFAULT_CENTER;
 
   if (!locationMap) {
-    locationMap = L.map(locationMapEl.value, { scrollWheelZoom: false }).setView(center, hasPin ? 16 : 11);
+    locationMap = L.map(locationMapEl.value, {
+      scrollWheelZoom: false,
+      // Keep the map on Cavite and Metro Manila
+      maxBounds: SERVICE_AREA_BOUNDS.pad(0.15),
+      maxBoundsViscosity: 1,
+      minZoom: 9,
+    }).setView(center, hasPin ? 16 : 10);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: "© OpenStreetMap contributors",
@@ -636,8 +709,7 @@ const renderLocationMap = async () => {
   if (hasPin) {
     locationMarker = L.marker(center, { icon: pinIcon, draggable: isEditing.value }).addTo(locationMap);
     locationMarker.on("dragend", () => {
-      const point = locationMarker.getLatLng();
-      setPin(point.lat, point.lng);
+      onMarkerDragEnd();
     });
   }
   locationMapEl.value.classList.toggle("is-editing", isEditing.value);
@@ -652,7 +724,7 @@ const useCurrentLocation = () => {
   navigator.geolocation.getCurrentPosition(
     ({ coords }) => {
       isLocating.value = false;
-      setPin(coords.latitude, coords.longitude, { pan: true });
+      placePin(coords.latitude, coords.longitude, { pan: true });
     },
     () => {
       isLocating.value = false;
@@ -804,6 +876,7 @@ const toggleEditMode = () => {
     lookupError.value = "";
     pinStreetHint.value = "";
     postalNeedsTyping.value = editData.latitude !== null && !editData.postal_code;
+    rememberValidPin(); // the saved pin is where a rejected pin snaps back to
   }
   isEditing.value = !isEditing.value;
   renderLocationMap();

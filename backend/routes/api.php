@@ -229,6 +229,9 @@ Route::middleware('token.auth')->group(function () {
     Route::put('/reviews/{id}',    [ProductReviewController::class, 'update'])->whereNumber('id');
     Route::delete('/reviews/{id}', [ProductReviewController::class, 'destroy'])->whereNumber('id');
 
+    // ── Stores near the customer's pinned location ────────────────────────
+    Route::get('/stores/nearby', [VendorStoreFrontController::class, 'nearby']);
+
     // ── Vendor follow/unfollow ────────────────────────────────────────────
     Route::post('/vendors/{vendorId}/follow',   [VendorStoreFrontController::class, 'follow']);
     Route::post('/vendors/{vendorId}/unfollow', [VendorStoreFrontController::class, 'unfollow']);

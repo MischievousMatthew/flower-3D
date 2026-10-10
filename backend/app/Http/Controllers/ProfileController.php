@@ -67,6 +67,21 @@ class ProfileController extends Controller
                 'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             ]);
 
+            // A pinned address must be in Cavite or Metro Manila: inside the same
+            // box as the profile map, with a region/city filled from the pin.
+            if (isset($validated['latitude'])) {
+                $inBox = $validated['latitude'] >= 13.95 && $validated['latitude'] <= 14.82
+                    && $validated['longitude'] >= 120.55 && $validated['longitude'] <= 121.2;
+                $inMetroManila = preg_match('/metro manila|national capital/i', (string) ($validated['region'] ?? ''));
+                $inCavite = preg_match('/cavite$/i', trim((string) ($validated['city'] ?? '')));
+
+                if (!$inBox || (!$inMetroManila && !$inCavite)) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'latitude' => 'We deliver within Cavite and Metro Manila only.',
+                    ]);
+                }
+            }
+
             if ($request->hasFile('profile_picture')) {
                 $result = CloudinaryHelper::uploadImage(
                     $request->file('profile_picture'),

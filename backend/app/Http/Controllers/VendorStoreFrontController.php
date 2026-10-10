@@ -10,13 +10,166 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use App\Helpers\CloudinaryHelper;
 
 class VendorStorefrontController extends Controller
 {
+    /** How far a store can be from the customer's pin to be suggested */
+    private const NEARBY_RADIUS_KM = 5;
+
+    /**
+     * GET /api/stores/nearby
+     * Approved stores within NEARBY_RADIUS_KM of the signed-in customer's
+     * pinned location, closest first. Uses the saved pin, so no coordinates
+     * travel in the URL.
+     */
+    public function nearby(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user instanceof User || $user->latitude === null || $user->longitude === null) {
+                return response()->json(['success' => true, 'has_pin' => false, 'data' => []]);
+            }
+
+            $latitude = (float) $user->latitude;
+            $longitude = (float) $user->longitude;
+
+            // Cheap bounding box first (1° latitude ≈ 111 km), exact distance after
+            $latDelta = self::NEARBY_RADIUS_KM / 111;
+            $lngDelta = self::NEARBY_RADIUS_KM / (111 * max(cos(deg2rad($latitude)), 0.01));
+
+            // Driving distance is never shorter than the straight line, so the
+            // straight-line check safely narrows the stores to ask the router about.
+            $candidates = VendorApplication::where('status', 'approved')
+                ->whereBetween('store_latitude', [$latitude - $latDelta, $latitude + $latDelta])
+                ->whereBetween('store_longitude', [$longitude - $lngDelta, $longitude + $lngDelta])
+                ->get()
+                ->filter(fn ($vendor) => $this->distanceKm(
+                    $latitude,
+                    $longitude,
+                    (float) $vendor->store_latitude,
+                    (float) $vendor->store_longitude
+                ) <= self::NEARBY_RADIUS_KM)
+                ->values();
+
+            $routes = $this->drivingDistances($latitude, $longitude, $candidates);
+            $byRoad = $routes !== null;
+
+            $stores = $candidates
+                ->map(function ($vendor, $index) use ($routes, $byRoad, $latitude, $longitude) {
+                    $route = $byRoad ? ($routes[$index] ?? null) : null;
+
+                    return [
+                        'vendor'   => $vendor,
+                        // A store the router can't reach by road is left out
+                        'distance' => $byRoad
+                            ? ($route ? $route['km'] : null)
+                            : $this->distanceKm($latitude, $longitude, (float) $vendor->store_latitude, (float) $vendor->store_longitude),
+                        'minutes'  => $route['minutes'] ?? null,
+                    ];
+                })
+                ->filter(fn ($row) => $row['distance'] !== null && $row['distance'] <= self::NEARBY_RADIUS_KM)
+                ->sortBy('distance')
+                ->take(6)
+                ->map(fn ($row) => array_merge($this->formatVendor($row['vendor']), [
+                    'distance_km'     => round($row['distance'], 1),
+                    'drive_minutes'   => $row['minutes'],
+                ]))
+                ->values();
+
+            return response()->json([
+                'success'       => true,
+                'has_pin'       => true,
+                'radius_km'     => self::NEARBY_RADIUS_KM,
+                // 'road' normally; 'straight' only if the routing service was unavailable
+                'distance_type' => $byRoad ? 'road' : 'straight',
+                'data'          => $stores,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Nearby stores error', ['error' => $e->getMessage()]);
+
+            return response()->json(['success' => false, 'message' => 'Failed to find nearby stores'], 500);
+        }
+    }
+
+    /**
+     * Driving distance and time from the pin to each store, in the same order
+     * as $stores, via OSRM's table service (one request for all stores).
+     * Cached for six hours per pin and store set. Returns null if the router
+     * can't be reached, so the caller can fall back to straight-line distance.
+     *
+     * @return array<int, array{km: float, minutes: int}|null>|null
+     */
+    private function drivingDistances(float $latitude, float $longitude, $stores): ?array
+    {
+        if ($stores->isEmpty()) {
+            return [];
+        }
+
+        $points = collect([[$longitude, $latitude]])
+            ->concat($stores->map(fn ($s) => [(float) $s->store_longitude, (float) $s->store_latitude]))
+            ->map(fn ($p) => sprintf('%.6f,%.6f', $p[0], $p[1]))
+            ->implode(';');
+
+        $cacheKey = 'osrm:table:' . md5($points);
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        try {
+            $response = Http::timeout(config('services.osrm.timeout', 8))
+                ->acceptJson()
+                ->get(rtrim(config('services.osrm.url'), '/') . "/table/v1/driving/{$points}", [
+                    'sources'     => 0,
+                    'annotations' => 'distance,duration',
+                ]);
+
+            if (!$response->ok() || $response->json('code') !== 'Ok') {
+                Log::warning('OSRM table request failed', ['status' => $response->status(), 'code' => $response->json('code')]);
+
+                return null;
+            }
+
+            $distances = $response->json('distances.0', []);
+            $durations = $response->json('durations.0', []);
+
+            // Index 0 is the customer's pin itself; stores start at 1
+            $routes = $stores->keys()->map(function ($index) use ($distances, $durations) {
+                $metres = $distances[$index + 1] ?? null;
+
+                return $metres === null ? null : [
+                    'km'      => $metres / 1000,
+                    'minutes' => (int) max(1, round(($durations[$index + 1] ?? 0) / 60)),
+                ];
+            })->all();
+
+            Cache::put($cacheKey, $routes, now()->addHours(6));
+
+            return $routes;
+        } catch (\Throwable $e) {
+            Log::warning('OSRM unavailable, using straight-line distance', ['error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /** Great-circle distance in kilometres (haversine) */
+    private function distanceKm(float $latA, float $lngA, float $latB, float $lngB): float
+    {
+        $dLat = deg2rad($latB - $latA);
+        $dLng = deg2rad($lngB - $lngA);
+        $h = sin($dLat / 2) ** 2 + cos(deg2rad($latA)) * cos(deg2rad($latB)) * sin($dLng / 2) ** 2;
+
+        return 6371 * 2 * atan2(sqrt($h), sqrt(1 - $h));
+    }
+
     /**
      * GET /api/vendors
      * Paginated list of approved vendors for the Shop browse section.
