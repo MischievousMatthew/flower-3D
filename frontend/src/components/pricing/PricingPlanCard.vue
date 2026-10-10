@@ -1,5 +1,5 @@
 <template>
-  <article class="pricing-plan" :class="{ 'pricing-plan--featured': plan.featured }">
+  <article class="pricing-plan" :class="{ 'pricing-plan--featured': plan.featured, 'pricing-plan--landing': variant === 'landing' }">
     <span v-if="plan.featured" class="plan-badge">Most popular</span>
     <p class="plan-name">{{ plan.name }}</p>
     <div class="plan-price">
@@ -28,6 +28,11 @@ defineProps({
   },
   loading: Boolean,
   actionLabel: String,
+  // "landing" = larger glass card for the landing page's horizontal track.
+  variant: {
+    type: String,
+    default: "default",
+  },
 });
 
 defineEmits(['select']);
@@ -84,4 +89,11 @@ defineEmits(['select']);
 .plan-action:disabled { cursor: wait; opacity: .65; transform: none; }
 .plan-action--dark { color: var(--ivory, #faf8f5); background: var(--ink, #1e1b18); border-color: var(--ink, #1e1b18); }
 .plan-action--dark:hover { background: var(--rosewood, #b86558); border-color: var(--rosewood, #b86558); }
+
+.pricing-plan--landing { padding: 44px 34px 34px; background: rgba(255, 255, 255, 0.66); border-radius: 28px; }
+.pricing-plan--landing .plan-price { font-family: "Montserrat", sans-serif; font-size: clamp(34px, 3vw, 46px); font-weight: 800; }
+.pricing-plan--landing .plan-description { font-size: 15px; }
+.pricing-plan--landing .plan-highlights { font-size: 14.5px; }
+.pricing-plan--landing .plan-action { padding: 14px 20px; font-size: 14.5px; }
+.pricing-plan--landing .plan-action:focus-visible { outline: 2px solid var(--rosewood, #b86558); outline-offset: 3px; }
 </style>

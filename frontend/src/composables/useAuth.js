@@ -12,6 +12,7 @@ import {
   getStoredUserToken,
 } from "../utils/authSession";
 import { clearSubscriptionAccess } from "./useSubscriptionAccess";
+import { readPendingPlan } from "../constants/subscriptionPlans";
 
 const user = ref(null);
 const loading = ref(false);
@@ -64,6 +65,17 @@ export function useAuth() {
     delete api.defaults.headers.common["Authorization"];
 
     user.value = null;
+  };
+
+  // A vendor who picked a plan on the landing page before logging in goes
+  // straight to that plan's checkout on /pricing. Every other user keeps the
+  // server-provided redirect.
+  const resolveUserRedirect = (userData, serverRedirect) => {
+    if (userData?.role === "vendor") {
+      const planKey = readPendingPlan();
+      if (planKey) return { path: "/pricing", query: { plan: planKey } };
+    }
+    return serverRedirect || "/shop";
   };
 
   // ================= EMPLOYEE LOGIN =================
@@ -161,7 +173,7 @@ export function useAuth() {
         "user",
       );
 
-      const redirectUrl = data?.redirect_url || "/shop";
+      const redirectUrl = resolveUserRedirect(userData, data?.redirect_url);
       await router.push(redirectUrl);
       toast.success(`Welcome back, ${userData?.name || "User"}!`);
 
@@ -236,7 +248,7 @@ export function useAuth() {
         { ...userData, type: userData?.role || "customer" },
         "user",
       );
-      await router.push(data.redirect_url || "/shop");
+      await router.push(resolveUserRedirect(userData, data.redirect_url));
       toast.success(`Welcome back, ${userData?.name || "User"}!`);
       return { success: true };
     } catch (err) {

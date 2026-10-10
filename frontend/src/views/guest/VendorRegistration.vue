@@ -1200,6 +1200,10 @@
           </p>
           <p>Please save this ID for future reference.</p>
           <p>You will receive an email confirmation shortly.</p>
+          <p v-if="pendingPlanName">
+            After approval, log in and we'll take you straight to checkout for
+            the <strong>{{ pendingPlanName }}</strong> plan.
+          </p>
           <div class="modal-actions">
             <button @click="closeModal" class="action-btn secondary">
               Close
@@ -1229,6 +1233,7 @@ import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import { findPlan, readPendingPlan } from "../../constants/subscriptionPlans";
 
 const router = useRouter();
 const currentStep = ref(1);
@@ -1236,6 +1241,8 @@ const totalSteps = 5;
 const isSubmitting = ref(false);
 const showApplicationModal = ref(false);
 const applicationId = ref("");
+// Plan picked on the landing page before registering (see subscriptionPlans.js).
+const pendingPlanName = ref(findPlan(readPendingPlan())?.name || "");
 const saveInterval = ref(null);
 const activeModal = ref(null);
 

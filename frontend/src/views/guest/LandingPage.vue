@@ -1,5 +1,22 @@
 <template>
   <div class="landing-page">
+    <LandingLoader
+      v-if="showLoader"
+      :progress="loaderProgress"
+      :done="loaderDone"
+      :reduced-motion="reducedMotionPref"
+      @finished="onIntroFinished"
+    />
+
+    <a href="#main-content" class="skip-link" @click.prevent="skipToContent"
+      >Skip to content</a
+    >
+
+    <!-- Page scroll progress -->
+    <div class="scroll-progress" aria-hidden="true">
+      <span ref="scrollProgressFill" class="scroll-progress-fill"></span>
+    </div>
+
     <div class="bg-blob blob-rose" aria-hidden="true"></div>
     <div class="bg-blob blob-sage" aria-hidden="true"></div>
     <div class="grain-overlay" aria-hidden="true"></div>
@@ -9,7 +26,7 @@
          Fixed, full-viewport, travels the entire page via GSAP
          ScrollTrigger. Never unmounted, never disappears.
     ============================================================= -->
-    <div class="flower-stage-fixed" aria-hidden="true">
+    <div ref="flowerStage" class="flower-stage-fixed" aria-hidden="true">
       <span class="drift-petal petal-a" aria-hidden="true"></span>
       <span class="drift-petal petal-b" aria-hidden="true"></span>
       <span class="drift-petal petal-c" aria-hidden="true"></span>
@@ -18,34 +35,51 @@
       <canvas ref="flowerCanvas" class="flower-canvas"></canvas>
     </div>
 
-    <!-- Navigation -->
-    <nav class="navbar" :class="{ 'navbar--scrolled': navScrolled }">
-      <router-link to="/" class="logo">
+    <!-- Cinematic blackout: an espresso iris that closes the page into the footer -->
+    <div ref="blackoutLayer" class="blackout" aria-hidden="true"></div>
+
+    <!-- Navigation: hides while scrolling down, returns on scroll up -->
+    <nav
+      class="navbar"
+      :class="{
+        'navbar--scrolled': navScrolled,
+        'navbar--hidden': navHidden,
+        'navbar--menu-open': mobileMenuOpen,
+      }"
+      aria-label="Main navigation"
+    >
+      <router-link to="/" class="logo" @click="closeMobileMenu">
         <span>
           <img
-            src="../../../public/bloomcraft-blankBg.png"
+            src="/bloomcraft-blankBg.png"
             alt="Bloomcraft Logo"
             width="50"
             height="50"
           />
         </span>
-        <span>BloomCraft</span>
+        <span class="logo-text">BloomCraft</span>
       </router-link>
-      <div class="nav-links">
-        <router-link to="/shop">Shop</router-link>
-        <router-link to="/pricing">Pricing</router-link>
-        <a href="#features" @click.prevent="scrollToSection('features')"
+      <div id="primary-nav" class="nav-links">
+        <router-link to="/shop" @click="closeMobileMenu">Shop</router-link>
+        <router-link to="/pricing" @click="closeMobileMenu"
+          >Pricing</router-link
+        >
+        <a href="#features" @click.prevent="navigateTo('features')"
           >Features</a
         >
-        <a href="#how-it-works" @click.prevent="scrollToSection('how-it-works')"
+        <a href="#how-it-works" @click.prevent="navigateTo('how-it-works')"
           >How It Works</a
         >
-        <a
-          href="#vendors"
-          @click.prevent="scrollAndHighlight('register-vendor')"
-          >For Vendors</a
+        <a href="#plans" @click.prevent="navigateTo('plans')">For Vendors</a>
+        <a href="#blog" @click.prevent="navigateTo('blog')">Blog</a>
+        <a href="#about" @click.prevent="navigateTo('about')">About</a>
+        <router-link
+          v-if="!isAuthenticated"
+          to="/guest/login"
+          class="nav-menu-login"
+          @click="closeMobileMenu"
+          >Login</router-link
         >
-        <a href="#blog" @click.prevent="scrollToSection('blog')">Blog</a>
       </div>
       <div class="nav-buttons">
         <template v-if="!isAuthenticated">
@@ -54,155 +88,187 @@
             >Register</router-link
           >
         </template>
+        <button
+          type="button"
+          class="nav-toggle"
+          :aria-expanded="mobileMenuOpen"
+          aria-controls="primary-nav"
+          :aria-label="mobileMenuOpen ? 'Close menu' : 'Open menu'"
+          @click="mobileMenuOpen = !mobileMenuOpen"
+        >
+          <span class="nav-toggle-bar" aria-hidden="true"></span>
+          <span class="nav-toggle-bar" aria-hidden="true"></span>
+        </button>
       </div>
     </nav>
 
     <!-- Scroll Panels Story -->
-    <div class="scroll-story-container">
+    <main id="main-content" class="scroll-story-container" tabindex="-1">
       <!-- Panel 1: Hero Section -->
-      <section class="panel-section hero-panel" ref="heroSection">
-        <div class="panel-container hero-collapse-container">
-          <div class="panel-content text-left-side hero-collapse-content">
-            <span class="hero-kicker reveal-fade-up"
+      <section class="panel-section hero-panel" id="top" ref="heroSection">
+        <div class="hero-halo" aria-hidden="true">
+          <span class="halo-ring halo-ring--outer"></span>
+          <span class="halo-ring halo-ring--inner"></span>
+        </div>
+        <div class="panel-container hero-container">
+          <div class="panel-content text-left-side hero-content">
+            <span class="hero-kicker hero-reveal"
               >Bespoke florals, built by you</span
             >
-            <h1 class="hero-title reveal-fade-up">
-              Create your perfect
-              <span class="highlight">bouquet</span>
+            <h1 class="hero-title" aria-label="Create your perfect bouquet">
+              <span class="line" aria-hidden="true"
+                ><span class="line-inner">Create your</span></span
+              >
+              <span class="line" aria-hidden="true"
+                ><span class="line-inner"
+                  >perfect <span class="highlight">bouquet</span></span
+                ></span
+              >
             </h1>
-            <p class="hero-desc reveal-fade-up">
+            <p class="hero-desc hero-reveal">
               Where vendors meet creativity. Design custom flower arrangements
               in 3D or let our AI suggest the perfect bloom for every occasion.
             </p>
-            <div class="hero-cta-wrap reveal-fade-up">
+            <div class="hero-cta-wrap hero-reveal">
               <router-link to="/guest/register" class="btn-register btn-hero">
                 Get Started
               </router-link>
             </div>
-            <span class="scroll-cue reveal-fade-up hero-scroll-cue"
-              >Scroll to explore</span
-            >
           </div>
           <div class="panel-visual spacer-right" aria-hidden="true"></div>
         </div>
-      </section>
-
-      <!-- Panel 2: Clients Section -->
-      <section class="panel-section clients-panel" ref="clientsSection">
-        <div class="panel-container">
-          <div class="panel-visual spacer-left" aria-hidden="true"></div>
-          <div class="panel-content text-right-side">
-            <h2 class="reveal-fade-up">Trusted by Flower Lovers</h2>
-            <p class="reveal-fade-up">
-              The florists and boutique growers behind every arrangement.
-            </p>
-            <div class="clients-grid">
-              <div v-for="n in 5" :key="n" class="client-logo reveal-card">
-                Logo {{ n }}
-              </div>
-            </div>
-          </div>
+        <div class="hero-scroll-cue hero-reveal" aria-hidden="true">
+          <span>Scroll to explore</span>
+          <span class="cue-line"></span>
         </div>
       </section>
 
-      <!-- Panel 3: Content Section 1 (3D Design Studio) -->
-      <section class="panel-section content-panel" ref="contentSection1">
-        <div class="panel-container">
-          <div class="panel-content text-left-side">
-            <h2 class="reveal-fade-up">Design in 3D, deliver with love</h2>
-            <p class="reveal-fade-up">
-              Our revolutionary 3D customization tool lets you become the
-              designer. Choose flowers, arrange them in real-time, adjust colors
-              and sizes, and visualize your perfect bouquet before placing your
-              order.
-            </p>
-            <p class="reveal-fade-up">
-              Every arrangement is unique, just like your story.
-            </p>
-            <div class="reveal-fade-up">
-              <button
-                class="btn-learn-more"
-                @click="handleLearnMore('3d-designer')"
-              >
-                Explore 3D Designer
-              </button>
-            </div>
-          </div>
-          <div class="panel-visual spacer-right" aria-hidden="true"></div>
-        </div>
-      </section>
-
-      <!-- Panel 4: Features Section -->
+      <!-- Bouquet Story: pinned, scroll-driven tour of the real 3D bouquet.
+           Absorbs the former 3D Designer, Features and AI Concierge panels. -->
       <section
-        class="panel-section features-panel"
-        id="features"
-        ref="featuresSection"
+        id="bouquet-story"
+        ref="storySection"
+        class="story"
+        :class="{ 'story--static': storyStatic }"
+        aria-labelledby="story-heading"
       >
-        <div class="panel-container">
-          <div class="panel-visual spacer-left" aria-hidden="true"></div>
-          <div class="panel-content text-right-side">
-            <h2 class="reveal-fade-up">Everything you need to bloom</h2>
-            <p class="reveal-fade-up features-header-desc">
-              Powerful features for vendors and delightful experiences for
-              customers
-            </p>
-            <div class="features-stacked-grid">
-              <div
-                v-for="feature in features"
-                :key="feature.id"
-                class="feature-card-item reveal-card"
+        <div class="story-pin">
+          <div class="story-inner">
+            <header class="story-head">
+              <span class="eyebrow">The 3D Bouquet Studio</span>
+              <h2 id="story-heading" class="sr-only">
+                Build a bouquet in three steps
+              </h2>
+              <ol class="story-index" aria-hidden="true">
+                <li
+                  v-for="(step, i) in storySteps"
+                  :key="step.key"
+                  :class="{ 'is-active': activeStep === i }"
+                >
+                  <span class="story-index-num">0{{ i + 1 }}</span>
+                  <span class="story-index-label">{{ step.label }}</span>
+                </li>
+              </ol>
+            </header>
+
+            <div class="story-steps" @focusin="revealFocusedStep">
+              <article id="features" class="story-step" data-step="0"
+                :class="{ 'is-current': activeStep === 0 }"
               >
-                <div class="feature-icon">{{ feature.icon }}</div>
-                <div class="feature-info">
-                  <h3>{{ feature.title }}</h3>
-                  <p>{{ feature.description }}</p>
+                <span class="story-step-num">01 — Blooms</span>
+                <h3>Choose your blooms</h3>
+                <p>
+                  Pick real flowers from local vendors and arrange them in
+                  real time. Rotate, adjust and see every petal before you
+                  order.
+                </p>
+              </article>
+
+              <article class="story-step" data-step="1"
+                :class="{ 'is-current': activeStep === 1 }"
+              >
+                <span class="story-step-num">02 — Wrapper</span>
+                <h3>Wrap it your way</h3>
+                <p>
+                  Switch paper and inner layers to match the occasion, from
+                  kraft and linen to blush and plum.
+                </p>
+                <div class="swatch-group" role="group" aria-label="Paper colour">
+                  <button
+                    v-for="swatch in paperSwatches"
+                    :key="swatch.color"
+                    type="button"
+                    class="swatch"
+                    :class="{ 'is-active': paperColor === swatch.color }"
+                    :style="{ '--swatch': swatch.color }"
+                    :aria-label="`${swatch.name} paper`"
+                    :aria-pressed="paperColor === swatch.color"
+                    @click="pickPaper(swatch.color)"
+                  ></button>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+                <div class="swatch-group" role="group" aria-label="Inner layer colour">
+                  <button
+                    v-for="swatch in innerSwatches"
+                    :key="swatch.color"
+                    type="button"
+                    class="swatch swatch--small"
+                    :class="{ 'is-active': innerColor === swatch.color }"
+                    :style="{ '--swatch': swatch.color }"
+                    :aria-label="`${swatch.name} inner layer`"
+                    :aria-pressed="innerColor === swatch.color"
+                    @click="pickInner(swatch.color)"
+                  ></button>
+                </div>
+              </article>
 
-      <!-- Panel 5: Content Section 2 (AI Concierge) -->
-      <section
-        class="panel-section content-panel"
-        id="how-it-works"
-        ref="contentSection2"
-      >
-        <div class="panel-container">
-          <div class="panel-content text-left-side">
-            <h2 class="reveal-fade-up">Meet your AI concierge</h2>
-            <p class="reveal-fade-up">
-              Don't know where to start? Our intelligent AI analyzes the
-              occasion, season, recipient preferences, and current trends to
-              suggest the perfect arrangement.
-            </p>
-            <p class="reveal-fade-up">
-              Get inspired by thousands of beautiful combinations, or let our AI
-              create something uniquely yours.
-            </p>
-            <div class="reveal-fade-up">
-              <button
-                class="btn-learn-more"
-                @click="handleLearnMore('ai-designer')"
+              <article id="how-it-works" class="story-step" data-step="2"
+                :class="{ 'is-current': activeStep === 2 }"
               >
-                Try AI Designer
-              </button>
+                <span class="story-step-num">03 — Fillers</span>
+                <h3>Finish with fillers</h3>
+                <p>
+                  Eucalyptus, baby's breath and greenery bring it together.
+                  Not sure where to start? Our AI concierge suggests the
+                  perfect combination for the occasion, season and recipient.
+                </p>
+              </article>
+
+              <article class="story-step story-step--reveal" data-step="3"
+                :class="{ 'is-current': activeStep === 3 }"
+              >
+                <span class="story-step-num">Your bouquet</span>
+                <h3>Every arrangement is unique, just like your story.</h3>
+                <ul class="story-features">
+                  <li v-for="feature in features" :key="feature.id">
+                    <span class="story-feature-icon" aria-hidden="true">{{
+                      feature.icon
+                    }}</span>
+                    <span>{{ feature.title }}</span>
+                  </li>
+                </ul>
+                <button
+                  class="btn-learn-more"
+                  @click="handleLearnMore('3d-designer')"
+                >
+                  Explore 3D Designer
+                </button>
+              </article>
             </div>
           </div>
-          <div class="panel-visual spacer-right" aria-hidden="true"></div>
+          <div class="story-progress" aria-hidden="true">
+            <span ref="storyProgressFill" class="story-progress-fill"></span>
+          </div>
         </div>
       </section>
 
       <!-- Panel 6: Stats Section -->
       <section
         class="panel-section stats-panel"
-        id="vendors"
+        id="stats"
         ref="statsSection"
       >
         <div class="panel-container">
-          <div class="panel-visual spacer-left" aria-hidden="true"></div>
-          <div class="panel-content text-right-side">
+          <div class="panel-content">
             <h2 class="reveal-fade-up">The marketplace, right now</h2>
             <p class="reveal-fade-up stats-header-desc">
               A snapshot of what's moving through BloomCraft today.
@@ -226,6 +292,48 @@
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- Plans: pinned horizontal track of subscription cards -->
+      <section
+        id="plans"
+        ref="plansSection"
+        class="plans-section"
+        :class="{ 'plans-section--static': storyStatic }"
+        aria-labelledby="plans-heading"
+      >
+        <div class="plans-inner">
+          <div class="plans-head">
+            <span class="eyebrow">For flower businesses</span>
+            <h2 id="plans-heading">Plans that grow with your shop</h2>
+            <p>
+              Start with the essentials, then grow into a connected ERP
+              workspace when your operations need more.
+            </p>
+            <router-link to="/pricing" class="plans-compare"
+              >Compare all features <span aria-hidden="true">→</span></router-link
+            >
+            <div class="plans-progress" aria-hidden="true">
+              <span ref="plansProgressFill" class="plans-progress-fill"></span>
+            </div>
+          </div>
+          <div ref="plansViewport" class="plans-viewport">
+            <div ref="plansTrack" class="plans-track" @focusin="revealFocusedPlan">
+              <PricingPlanCard
+                v-for="plan in subscriptionPlans"
+                :key="plan.key"
+                class="plans-card"
+                variant="landing"
+                :plan="plan"
+                @select="handlePlanSelect"
+              />
+            </div>
+          </div>
+          <p v-if="planNotice" class="plans-notice" role="status">
+            {{ planNotice }}
+            <router-link to="/guest/vendor_register">Become a vendor</router-link>
+          </p>
         </div>
       </section>
 
@@ -263,6 +371,40 @@
         </div>
       </section>
 
+      <!-- About Us: Vision and Mission -->
+      <section
+        id="about"
+        ref="aboutSection"
+        class="about-section"
+        aria-labelledby="about-heading"
+      >
+        <div class="about-inner">
+          <header class="about-head">
+            <span class="eyebrow">About us</span>
+            <h2 id="about-heading">The purpose behind every BloomCraft bouquet</h2>
+          </header>
+          <div class="about-grid">
+            <article
+              v-for="(statement, i) in aboutStatements"
+              :key="statement.title"
+              class="about-card"
+            >
+              <span class="about-num">0{{ i + 1 }}</span>
+              <h3>{{ statement.title }}</h3>
+              <p class="about-text">
+                <span
+                  v-for="(word, w) in statement.words"
+                  :key="w"
+                  class="about-word"
+                  >{{ word }}{{ " " }}</span
+                >
+              </p>
+            </article>
+          </div>
+          <div class="about-rule" aria-hidden="true"></div>
+        </div>
+      </section>
+
       <!-- Panel 8: CTA Section -->
       <section class="panel-section cta-panel" ref="ctaSection">
         <div class="panel-container cta-container">
@@ -276,7 +418,38 @@
           </div>
         </div>
       </section>
-    </div>
+    </main>
+
+    <button
+      type="button"
+      class="back-to-top"
+      :class="{ 'is-visible': showBackToTop }"
+      aria-label="Back to top"
+      :tabindex="showBackToTop ? 0 : -1"
+      :aria-hidden="!showBackToTop"
+      @click="scrollToTop"
+    >
+      <svg class="btt-ring" viewBox="0 0 52 52" aria-hidden="true">
+        <circle class="btt-ring-track" cx="26" cy="26" r="24" />
+        <circle
+          ref="backToTopRing"
+          class="btt-ring-fill"
+          cx="26"
+          cy="26"
+          r="24"
+        />
+      </svg>
+      <svg class="btt-arrow" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 19V5M5 12l7-7 7 7" />
+      </svg>
+    </button>
+
+    <PlanAccountModal
+      :plan="accountModalPlan"
+      @close="accountModalPlan = null"
+      @login="continueWithLogin"
+      @register="continueWithRegister"
+    />
 
     <!-- Footer -->
     <footer class="footer" ref="footerSection">
@@ -285,7 +458,7 @@
           <div class="logo">
             <span>
               <img
-                src="../../../public/bloomcraft-darkmode-removebg.png"
+                src="/bloomcraft-darkmode-removebg.png"
                 alt="Bloomcraft Logo"
                 width="60"
                 height="60"
@@ -353,33 +526,139 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
-import * as THREE from "three";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
+import { useAuth } from "../../composables/useAuth";
+import { getStoredUserToken } from "../../utils/authSession";
+import {
+  createLandingBouquet,
+  PAPER_PRESETS,
+  RIBBON_PRESETS,
+} from "../../composables/useLandingBouquet";
+import LandingLoader from "../../components/landing/LandingLoader.vue";
+import PlanAccountModal from "../../components/landing/PlanAccountModal.vue";
+import PricingPlanCard from "../../components/pricing/PricingPlanCard.vue";
+import {
+  SUBSCRIPTION_PLANS,
+  savePendingPlan,
+} from "../../constants/subscriptionPlans";
 
 gsap.registerPlugin(ScrollTrigger);
 
 const router = useRouter();
 
-// Auth check placeholder (preserved and declared to prevent template warning)
-const isAuthenticated = ref(false);
+// The landing route is public, so the router guard never loads the user here.
+// A stored user token plus the persisted user record means a live session.
+const { user: authUser } = useAuth();
+const hasStoredSession = ref(false);
+const isAuthenticated = computed(
+  () => !!getStoredUserToken() && (!!authUser.value || hasStoredSession.value),
+);
 
 // Panel section refs
 const heroSection = ref(null);
-const clientsSection = ref(null);
-const featuresSection = ref(null);
-const contentSection1 = ref(null);
+const storySection = ref(null);
+const storyProgressFill = ref(null);
 const statsSection = ref(null);
-const contentSection2 = ref(null);
+const plansSection = ref(null);
+const plansViewport = ref(null);
+const plansTrack = ref(null);
+const plansProgressFill = ref(null);
 const blogSection = ref(null);
+const aboutSection = ref(null);
+
+// BloomCraft's Vision and Mission, verbatim.
+const VISION =
+  "To create a trusted and innovative online platform for flower shops in Cavite by providing a convenient, personalized, and interactive floral shopping experience that connects customers with quality floral arrangements and reliable flower shop services, while helping businesses embrace modern digital solutions.";
+const MISSION =
+  "Our mission is to enhance the operations of flower shops by providing a reliable digital platform that simplifies inventory management, order processing, sales reporting, and customer communication. We aim to provide customers with a convenient and interactive way to explore, customize, and order floral arrangements while supporting flower shops in making better business decisions and delivering quality services.";
+const aboutStatements = [
+  { title: "Our Vision", words: VISION.split(" ") },
+  { title: "Our Mission", words: MISSION.split(" ") },
+];
 const ctaSection = ref(null);
 const footerSection = ref(null);
 
 const flowerCanvas = ref(null);
+const flowerStage = ref(null);
+const blackoutLayer = ref(null);
+
+// Bouquet story state
+const storyStatic = ref(false);
+const activeStep = ref(0);
+const storySteps = [
+  { key: "flowers", label: "Blooms" },
+  { key: "wrapper", label: "Wrapper" },
+  { key: "fillers", label: "Fillers" },
+];
+const paperSwatches = PAPER_PRESETS.map((color, i) => ({
+  color,
+  name: ["Kraft", "Ivory", "Linen", "Blush", "Mocha"][i],
+}));
+const innerSwatches = RIBBON_PRESETS.map((color, i) => ({
+  color,
+  name: ["Lilac", "Rose", "Sage", "Butter", "Plum"][i],
+}));
+const paperColor = ref(null);
+const innerColor = ref(null);
+let userPickedColor = false;
+
+function pickPaper(color) {
+  userPickedColor = true;
+  paperColor.value = color;
+  bouquet?.setPaperColor(color);
+}
+
+function pickInner(color) {
+  userPickedColor = true;
+  innerColor.value = color;
+  bouquet?.setRibbonColor(color);
+}
+
+// Loading intro — shown once per browser session, driven by the real
+// bouquet download progress, capped so a slow network never blocks the page.
+const INTRO_SEEN_KEY = "bloomcraft_intro_seen";
+const INTRO_MAX_WAIT_MS = 8000;
+const showLoader = ref(false);
+const loaderProgress = ref(0);
+const loaderDone = ref(false);
+const reducedMotionPref = ref(false);
+let introTimeout = null;
 const navScrolled = ref(false);
+const navHidden = ref(false);
+const showBackToTop = ref(false);
+const scrollProgressFill = ref(null);
+const backToTopRing = ref(null);
+const RING_LENGTH = 2 * Math.PI * 24; // circumference of the r=24 ring
+const mobileMenuOpen = ref(false);
+const NAV_HIDE_AFTER = 120; // px from the top before the bar may hide
+const NAV_SCROLL_DELTA = 8; // ignore tiny scroll jitter
+let lastScrollY = 0;
+
+function closeMobileMenu() {
+  mobileMenuOpen.value = false;
+}
+
+function navigateTo(sectionId) {
+  closeMobileMenu();
+  scrollToSection(sectionId);
+}
+
+// While the mobile menu is open, Escape or a click outside the bar closes it.
+function handleMenuDismiss(event) {
+  if (event.type === "keydown" && event.key !== "Escape") return;
+  if (event.type === "pointerdown" && event.target.closest(".navbar")) return;
+  closeMobileMenu();
+}
+
+watch(mobileMenuOpen, (open) => {
+  const method = open ? "addEventListener" : "removeEventListener";
+  document[method]("keydown", handleMenuDismiss);
+  document[method]("pointerdown", handleMenuDismiss);
+});
 
 // Reactive Data
 const features = ref([
@@ -445,23 +724,88 @@ const supportLinks = ref([
 const currentYear = computed(() => new Date().getFullYear());
 
 // Methods (unchanged)
-const scrollToSection = (sectionId) => {
-  const element = document.getElementById(sectionId);
-  if (element) {
-    element.scrollIntoView({ behavior: "smooth" });
-  }
+// Scroll to a y position (Lenis when active, native otherwise).
+const scrollToY = (y) => {
+  if (lenis) lenis.scrollTo(y);
+  else window.scrollTo({ top: y, behavior: prefersReducedMotion ? "auto" : "smooth" });
 };
 
-const scrollAndHighlight = (sectionId) => {
-  const element = document.getElementById(sectionId);
-  if (element) {
-    element.scrollIntoView({ behavior: "smooth" });
-    element.classList.add("highlight-vendor");
-    setTimeout(() => {
-      element.classList.remove("highlight-vendor");
-    }, 2000);
-  }
+// Keyboard focus moved somewhere off screen: jump there instantly, after the
+// browser has finished its own focus scrolling.
+const jumpToY = (y) => {
+  requestAnimationFrame(() => {
+    if (lenis) lenis.scrollTo(y, { immediate: true, force: true });
+    else window.scrollTo({ top: y, behavior: "auto" });
+  });
 };
+
+const scrollToElement = (element) => {
+  if (lenis) lenis.scrollTo(element, { offset: -80 });
+  else element.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth" });
+};
+
+const scrollToSection = (sectionId) => {
+  // Story steps live inside the pinned section, so jump to their scroll
+  // position along the pin rather than to the element itself.
+  if (storyTrigger && sectionId in STORY_ANCHORS) {
+    const { start, end } = storyTrigger;
+    scrollToY(start + (end - start) * STORY_ANCHORS[sectionId]);
+    return;
+  }
+  const element = document.getElementById(sectionId);
+  if (element) scrollToElement(element);
+};
+
+// ---- Subscription plans ----
+// Logged-in vendors go straight to the existing checkout on /pricing. Guests
+// are asked whether they have a vendor account; the chosen plan is kept so
+// their next vendor login lands on that checkout (see useAuth).
+const subscriptionPlans = SUBSCRIPTION_PLANS;
+const accountModalPlan = ref(null);
+const planNotice = ref("");
+
+function storedUserRole() {
+  try {
+    return JSON.parse(localStorage.getItem("user") || "null")?.role || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function handlePlanSelect(plan) {
+  planNotice.value = "";
+  if (getStoredUserToken()) {
+    const role = authUser.value?.role || storedUserRole();
+    if (role === "vendor") {
+      router.push({ path: "/pricing", query: { plan: plan.key } });
+      return;
+    }
+    if (role) {
+      planNotice.value =
+        "Subscriptions are for vendor accounts. Register your flower shop to choose a plan.";
+      return;
+    }
+  }
+  accountModalPlan.value = plan;
+}
+
+// Freeze smooth scrolling behind the open modal.
+watch(accountModalPlan, (plan) => {
+  if (plan) lenis?.stop();
+  else lenis?.start();
+});
+
+function continueWithLogin() {
+  savePendingPlan(accountModalPlan.value?.key);
+  accountModalPlan.value = null;
+  router.push("/guest/login");
+}
+
+function continueWithRegister() {
+  savePendingPlan(accountModalPlan.value?.key);
+  accountModalPlan.value = null;
+  router.push("/guest/vendor_register");
+}
 
 const handleLearnMore = (type) => {
   console.log("Learn more about:", type);
@@ -473,180 +817,25 @@ const readBlog = (postId) => {
 };
 
 const handleFooterLink = (url) => {
+  if (url === "#about") {
+    scrollToSection("about");
+    return;
+  }
   console.log("Footer link clicked:", url);
 };
 
 // ==========================================================
-// PERSISTENT 3D FLOWER — scene, journey across the whole page,
-// pointer interaction.
+// PERSISTENT 3D BOUQUET — the real bouquet model (see
+// composables/useLandingBouquet.js), its journey across the
+// page, and pointer interaction.
 // ==========================================================
-let renderer = null;
-let scene = null;
+let bouquet = null;
+let rig = null; // bouquet.rig — position/rotation/scale driven by scroll
 let camera = null;
-let rig = null; // outer group — position/rotation driven by scroll journey
-let flowerGroup = null; // inner group — idle bob + pointer tilt + slow spin
-let flowerRings = [];
-let particles = null;
-let rafId = null;
 let lenis = null;
-let lenisRafId = null;
 let prefersReducedMotion = false;
-let isTouchDevice = false;
 
-let isScrolling = false;
 let scrollIdleTimeout = null;
-const pointer = { x: 0, y: 0 };
-const tilt = { x: 0, z: 0 };
-const journeyTriggers = [];
-
-function petalMaterial(color) {
-  return new THREE.MeshStandardMaterial({
-    color,
-    roughness: 0.45,
-    metalness: 0.1,
-    side: THREE.DoubleSide,
-  });
-}
-
-function buildFlower() {
-  const group = new THREE.Group();
-  const rings = [];
-
-  const ringConfigs = [
-    { count: 6, spin: 0.0, tilt: 0.3, length: 0.9, color: 0xf7ddd4 },
-    { count: 8, spin: 0.35, tilt: 0.7, length: 1.25, color: 0xefbdb3 },
-    { count: 10, spin: 0.18, tilt: 1.1, length: 1.55, color: 0xe4988f },
-  ];
-
-  ringConfigs.forEach(({ count, spin, tilt: ringTilt, length, color }) => {
-    const material = petalMaterial(color);
-    const petalGeo = new THREE.SphereGeometry(1, 20, 20);
-    const ringGroup = new THREE.Group();
-
-    for (let i = 0; i < count; i++) {
-      const pivot = new THREE.Object3D();
-      pivot.rotation.y = (i / count) * Math.PI * 2 + spin;
-
-      const petal = new THREE.Mesh(petalGeo, material);
-      petal.scale.set(0.42, length, 0.1);
-      petal.position.set(0, length * 0.42, 0);
-      petal.rotation.x = ringTilt;
-
-      petal.castShadow = true;
-      petal.receiveShadow = true;
-
-      pivot.add(petal);
-      ringGroup.add(pivot);
-    }
-
-    group.add(ringGroup);
-    rings.push(ringGroup);
-  });
-
-  const center = new THREE.Mesh(
-    new THREE.SphereGeometry(0.3, 24, 24),
-    new THREE.MeshStandardMaterial({
-      color: 0xf2c879,
-      roughness: 0.5,
-      metalness: 0.1,
-    }),
-  );
-  center.castShadow = true;
-  center.receiveShadow = true;
-  group.add(center);
-
-  const leafMaterial = new THREE.MeshStandardMaterial({
-    color: 0x8fae82,
-    roughness: 0.5,
-    side: THREE.DoubleSide,
-  });
-  const leafGeo = new THREE.SphereGeometry(1, 16, 16);
-  for (let i = 0; i < 3; i++) {
-    const pivot = new THREE.Object3D();
-    pivot.rotation.y = (i / 3) * Math.PI * 2 + 0.4;
-
-    const leaf = new THREE.Mesh(leafGeo, leafMaterial);
-    leaf.scale.set(0.3, 0.9, 0.06);
-    leaf.position.set(0, -0.85, 0);
-    leaf.rotation.x = -1.3;
-
-    leaf.castShadow = true;
-    leaf.receiveShadow = true;
-
-    pivot.add(leaf);
-    group.add(pivot);
-  }
-
-  group.scale.setScalar(1.35);
-  return { group, rings };
-}
-
-function radialTexture(innerColor, outerColor) {
-  const size = 256;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  const gradient = ctx.createRadialGradient(
-    size / 2,
-    size / 2,
-    0,
-    size / 2,
-    size / 2,
-    size / 2,
-  );
-  gradient.addColorStop(0, innerColor);
-  gradient.addColorStop(1, outerColor);
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, size, size);
-  return new THREE.CanvasTexture(canvas);
-}
-
-function buildGroundShadow() {
-  const texture = radialTexture("rgba(30,20,18,0.25)", "rgba(30,20,18,0)");
-  const material = new THREE.MeshBasicMaterial({
-    map: texture,
-    transparent: true,
-    depthWrite: false,
-  });
-  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 2.6), material);
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.position.y = -1.9;
-  return shadow;
-}
-
-function buildBloomGlow() {
-  const texture = radialTexture("rgba(255,225,210,0.8)", "rgba(255,225,210,0)");
-  const material = new THREE.SpriteMaterial({
-    map: texture,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  const sprite = new THREE.Sprite(material);
-  sprite.scale.set(5.5, 5.5, 1);
-  sprite.position.set(0, 0.2, -0.6);
-  return sprite;
-}
-
-function buildParticles() {
-  const count = 70;
-  const positions = new Float32Array(count * 3);
-  for (let i = 0; i < count; i++) {
-    positions[i * 3] = (Math.random() - 0.5) * 7;
-    positions[i * 3 + 1] = (Math.random() - 0.5) * 5.5;
-    positions[i * 3 + 2] = (Math.random() - 0.5) * 4;
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  const material = new THREE.PointsMaterial({
-    color: 0xf5c6c0,
-    size: 0.05,
-    transparent: true,
-    opacity: 0.6,
-  });
-  return new THREE.Points(geometry, material);
-}
 
 function initThreeScene() {
   const canvas = flowerCanvas.value;
@@ -655,293 +844,458 @@ function initThreeScene() {
   prefersReducedMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
   ).matches;
-  isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+  storyStatic.value = prefersReducedMotion;
 
-  const width = window.innerWidth;
-  const height = window.innerHeight;
-
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
-  camera.position.set(0, 0, 6);
-
-  renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-  renderer.setSize(width, height);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-  scene.add(new THREE.AmbientLight(0xfff2ec, 0.7));
-
-  const key = new THREE.DirectionalLight(0xffffff, 1.4);
-  key.position.set(3, 4, 5);
-  key.castShadow = true;
-  key.shadow.mapSize.width = 1024;
-  key.shadow.mapSize.height = 1024;
-  key.shadow.camera.near = 0.5;
-  key.shadow.camera.far = 15;
-  key.shadow.camera.left = -3;
-  key.shadow.camera.right = 3;
-  key.shadow.camera.top = 3;
-  key.shadow.camera.bottom = -3;
-  key.shadow.bias = -0.0005;
-  scene.add(key);
-
-  const rimLight = new THREE.PointLight(0xffd9c9, 0.8, 10);
-  rimLight.position.set(-3, 1, -2);
-  scene.add(rimLight);
-
-  scene.add(buildBloomGlow());
-  scene.add(buildGroundShadow());
-
-  const built = buildFlower();
-  flowerGroup = built.group;
-  flowerRings = built.rings;
-
-  // The petals are built to open along local +Y (upward), but the camera
-  // sits level with the flower on the Z axis. This wrapper reorients the
-  // whole bloom to face +Z (toward the camera) without touching
-  // flowerGroup's own rotation, which animateFrame() drives every frame
-  // for the idle spin and pointer-tilt effect.
-  const flowerOrient = new THREE.Group();
-  flowerOrient.rotation.x = Math.PI / 2;
-  flowerOrient.add(flowerGroup);
-
-  rig = new THREE.Group();
-  rig.add(flowerOrient);
-  scene.add(rig);
-
-  particles = buildParticles();
-  scene.add(particles);
-
-  animateFrame();
-}
-
-function animateFrame() {
-  rafId = requestAnimationFrame(animateFrame);
-  if (!renderer || !scene || !camera) return;
-
-  if (flowerGroup) {
-    // Gentle floating
-    flowerGroup.position.y = Math.sin(Date.now() * 0.0006) * 0.08;
-
-    // Gentle bounded sway around the face-forward orientation — this
-    // oscillates rather than accumulating, so the bloom always stays
-    // within a front-facing range no matter how long the user scrolls
-    // or lingers. (The rig's own yaw, driven by scroll position below,
-    // is what actually steers the flower left/right toward the text.)
-    flowerGroup.rotation.y = Math.sin(Date.now() * 0.00035) * 0.12;
-
-    if (!isScrolling && !isTouchDevice) {
-      tilt.x += (pointer.y * 0.22 - tilt.x) * 0.04;
-      tilt.z += (pointer.x * -0.18 - tilt.z) * 0.04;
-    }
-    flowerGroup.rotation.x = tilt.x;
-    flowerGroup.rotation.z = tilt.z;
-  }
-
-  if (flowerRings.length) {
-    flowerRings.forEach((ringGroup, i) => {
-      ringGroup.rotation.y += 0.0004 * (i + 1) * (i % 2 === 0 ? 1 : -1);
-    });
-  }
-
-  if (particles) {
-    particles.rotation.y += 0.0006;
-  }
-
-  renderer.render(scene, camera);
-}
-
-// Calculate the precise X coordinate for aligning with left/right column
-function getSpreadX() {
-  if (!camera) return 1.5;
-  const vw = window.innerWidth;
-  if (vw < 968) return 0; // Stack layout: center
-  const aspect = vw / window.innerHeight;
-  const halfVisibleWidth = Math.tan((camera.fov * Math.PI) / 360) * 6 * aspect;
-  return halfVisibleWidth * 0.42; // Perfect horizontal column alignment
-}
-
-function setupFlowerJourney() {
-  if (!rig || !camera || prefersReducedMotion) return;
-
-  // Clear existing triggers to make it perfectly resize-proof
-  journeyTriggers.forEach((st) => st && st.kill());
-  journeyTriggers.length = 0;
-
-  const spread = getSpreadX();
-  const isMobile = window.innerWidth < 968;
-  const scaleBase = isMobile ? 0.58 : 0.95;
-
-  // Setup scroll behavior to record scrolling state
-  const scrollUpdateTrigger = ScrollTrigger.create({
-    trigger: ".scroll-story-container",
-    start: "top top",
-    end: "bottom bottom",
-    onUpdate: () => {
-      isScrolling = true;
-      clearTimeout(scrollIdleTimeout);
-      scrollIdleTimeout = setTimeout(() => {
-        isScrolling = false;
-      }, 150);
+  gsap.set(canvas, { autoAlpha: 0 });
+  bouquet = createLandingBouquet(canvas, {
+    reducedMotion: prefersReducedMotion,
+    onProgress: (ratio) => {
+      loaderProgress.value = ratio;
     },
   });
-  journeyTriggers.push(scrollUpdateTrigger);
+  rig = bouquet.rig;
+  camera = bouquet.camera;
 
-  // Maximum yaw the flower ever turns — enough to read as "looking toward"
-  // the text on whichever side it's paired with, never far enough to swing
-  // past a front-facing view into the profile.
-  const maxYaw = 0.42;
+  bouquet.ready
+    .then(() => {
+      // Rebuild now that part positions are known, so the story can zoom
+      // onto the real flowers, wrapper and fillers.
+      setupJourney();
+      ScrollTrigger.refresh();
+      gsap.to(canvas, { autoAlpha: 1, duration: prefersReducedMotion ? 0 : 1.2, ease: "power2.out" });
+    })
+    .catch((error) => {
+      // The page stays fully usable without the model: the glow, petals and
+      // all content still render.
+      console.error("Failed to load the landing bouquet model:", error);
+    })
+    .finally(() => {
+      loaderDone.value = true;
+    });
+}
 
-  // Set initial Hero Section position — flower starts on the right,
-  // so it starts yawed to look back toward the headline on the left.
-  gsap.set(rig.position, { x: spread, y: isMobile ? -0.2 : 0, z: 0 });
-  gsap.set(rig.scale, { x: scaleBase, y: scaleBase, z: scaleBase });
-  gsap.set(rig.rotation, { x: 0, y: -maxYaw, z: 0 });
-  if (flowerCanvas.value) {
-    gsap.set(flowerCanvas.value, { opacity: 1 });
+function startIntro() {
+  let seen = false;
+  try {
+    seen = sessionStorage.getItem(INTRO_SEEN_KEY) === "1";
+  } catch (_) {
+    // Storage can be unavailable (private mode); just show the intro.
   }
 
-  // Helper for adding timeline scrolls. Yaw is derived from the target
-  // x position rather than passed in: whichever side the flower sits on,
-  // it turns toward the opposite side (where the text column is) by at
-  // most maxYaw — so it's always "looking toward" the content, and always
-  // facing front enough to read as the bloom rather than its profile.
-  const addScrollJourney = (trigger, toX, toScaleMul = 1.0) => {
-    if (!trigger) return;
-    const toYaw = spread ? -(toX / spread) * maxYaw : 0;
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger,
-        start: "top 90%",
-        end: "top 20%",
-        scrub: 1.0,
-      },
-    });
+  if (seen) {
+    onIntroFinished();
+    return;
+  }
 
-    tl.to(rig.position, { x: toX, ease: "power2.inOut" }, 0);
-    tl.to(rig.rotation, { y: toYaw, ease: "power2.inOut" }, 0);
-    tl.to(
-      rig.scale,
-      {
-        x: scaleBase * toScaleMul,
-        y: scaleBase * toScaleMul,
-        z: scaleBase * toScaleMul,
-        ease: "power2.inOut",
-      },
-      0,
-    );
+  showLoader.value = true;
+  document.documentElement.style.overflow = "hidden";
+  introTimeout = setTimeout(() => {
+    loaderDone.value = true;
+  }, INTRO_MAX_WAIT_MS);
+}
 
-    journeyTriggers.push(tl.scrollTrigger);
+function onIntroFinished() {
+  clearTimeout(introTimeout);
+  showLoader.value = false;
+  document.documentElement.style.overflow = "";
+  try {
+    sessionStorage.setItem(INTRO_SEEN_KEY, "1");
+  } catch (_) {
+    // Ignore storage failures.
+  }
+  pageCtx?.add(() => setupSectionReveals());
+  initSmoothScroll();
+  ScrollTrigger.refresh();
+}
+
+// ==========================================================
+// BOUQUET JOURNEY — one camera-driven story across the page.
+// The bouquet stays at the origin; the camera moves around it.
+// Everything is created inside a gsap.context so a resize can
+// revert and rebuild it cleanly.
+// ==========================================================
+const STORY_LENGTH = 10; // timeline units
+const STEP_TIMES = [0.2, 3.2, 5.8, 8.2]; // when each story step enters
+const STORY_ANCHORS = { features: 0.18, "how-it-works": 0.68 }; // nav targets (progress)
+let journeyCtx = null;
+let pageCtx = null; // hero intro + background parallax
+let storyTrigger = null;
+let plansTrigger = null;
+
+function skipToContent() {
+  const main = document.getElementById("main-content");
+  if (!main) return;
+  scrollToElement(main);
+  main.focus({ preventScroll: true });
+}
+
+// Keyboard focus landing in a story step that is not on screen: scroll the
+// pinned story to that step.
+function revealFocusedStep(event) {
+  const step = event.target.closest(".story-step");
+  if (!step || !storyTrigger) return;
+  const index = Number(step.dataset.step);
+  if (index === activeStep.value) return;
+  const { start, end } = storyTrigger;
+  jumpToY(start + (end - start) * ((STEP_TIMES[index] + 0.5) / STORY_LENGTH));
+}
+
+// Keyboard users tabbing through the pinned plans track: scroll the page so
+// the focused card is the one in view.
+function revealFocusedPlan(event) {
+  const card = event.target.closest(".plans-card");
+  const track = plansTrack.value;
+  const viewport = plansViewport.value;
+  if (!card || !track || !viewport) return;
+  viewport.scrollLeft = 0; // the browser may scroll the clipped viewport itself
+  if (!plansTrigger) return;
+  const max = track.scrollWidth - viewport.clientWidth;
+  if (max <= 0) return;
+  const ratio = Math.min(card.offsetLeft / max, 1);
+  const { start, end } = plansTrigger;
+  jumpToY(start + (end - start) * ratio);
+}
+
+function halfVisible(distance) {
+  const halfH = Math.tan((camera.fov * Math.PI) / 360) * distance;
+  return { halfH, halfW: halfH * camera.aspect };
+}
+
+// Camera frame that keeps `target` at a fixed screen offset. sx / sy are
+// fractions of the half-viewport (+sx = right of centre, +sy = above centre).
+// `lift` raises the camera slightly so it looks down onto the target.
+function frameAt(target, distance, sx = 0, sy = 0, lift = 0) {
+  const { halfH, halfW } = halfVisible(distance);
+  const ox = halfW * sx;
+  const oy = halfH * sy;
+  return {
+    x: target.x - ox,
+    y: target.y - oy + lift,
+    z: target.z + distance,
+    tx: target.x - ox,
+    ty: target.y - oy,
+    tz: target.z,
   };
+}
 
-  // Journey Steps mapping: alternates left/right side columns
-  // Panel 2: Clients (Left)
-  addScrollJourney(clientsSection.value, -spread, 0.9);
+function partFrame(key, scale, sx, sy, minDistance, maxDistance = 4.6) {
+  const part = bouquet?.parts[key];
+  if (!part || !part.meshes.length) return null;
+  const center = part.center.clone().multiplyScalar(scale);
+  const size = Math.max(part.size.x, part.size.y, part.size.z) * scale;
+  const distance = Math.min(Math.max(size * 2.4, minDistance), maxDistance);
+  return frameAt(center, distance, sx, sy, 0.25);
+}
 
-  // Panel 3: Content Section 1 (Right)
-  addScrollJourney(contentSection1.value, spread, 1.05);
+function stepAt(time) {
+  let index = 0;
+  STEP_TIMES.forEach((start, i) => {
+    if (time >= start - 0.2) index = i;
+  });
+  return index;
+}
 
-  // Panel 4: Features Section (Left)
-  addScrollJourney(featuresSection.value, -spread, 0.95);
+function cyclePaper(index) {
+  if (userPickedColor) return;
+  const paper = PAPER_PRESETS[index];
+  const inner = RIBBON_PRESETS[index];
+  if (paperColor.value === paper) return;
+  paperColor.value = paper;
+  innerColor.value = inner;
+  bouquet?.setPaperColor(paper);
+  bouquet?.setRibbonColor(inner);
+}
 
-  // Panel 5: Content Section 2 (Right)
-  addScrollJourney(contentSection2.value, spread, 1.05);
+function setupJourney() {
+  journeyCtx?.revert();
+  storyTrigger = null;
+  plansTrigger = null;
+  if (!bouquet) return;
 
-  // Panel 6: Stats Section (Left)
-  addScrollJourney(statsSection.value, -spread, 0.9);
+  const isMobile = window.innerWidth < 968;
+  const scale = isMobile ? 0.62 : 0.95;
+  // Where the bouquet sits on screen in the hero and during the story.
+  const heroSx = isMobile ? 0 : 0.42;
+  const heroSy = isMobile ? -0.42 : 0;
+  const storySx = isMobile ? 0 : 0.36;
+  const storySy = isMobile ? 0.3 : 0;
+  const origin = { x: 0, y: 0, z: 0 };
+  const heroFrame = frameAt(origin, 6, heroSx, heroSy);
 
-  // Panel 7: Blog Section (Right)
-  addScrollJourney(blogSection.value, spread, 1.05);
+  journeyCtx = gsap.context(() => {
+    const stage = flowerStage.value;
+    gsap.set(rig.position, { x: 0, y: 0, z: 0 });
+    gsap.set(rig.scale, { x: scale, y: scale, z: scale });
+    gsap.set(rig.rotation, { x: 0, y: prefersReducedMotion ? 0 : -0.35, z: 0 });
+    gsap.set(bouquet.view, heroFrame);
+    gsap.set(bouquet.focus, { flowers: 1, wrapper: 1, fillers: 1 });
 
-  // Panel 8: CTA Section (Center / Showcased) — centered, so it faces
-  // dead-on rather than turning toward either side.
-  if (ctaSection.value) {
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: ctaSection.value,
-        start: "top 90%",
-        end: "top 25%",
-        scrub: 1.0,
+    // Pause pointer tilt while scrolling.
+    ScrollTrigger.create({
+      start: 0,
+      end: "max",
+      onUpdate: () => {
+        bouquet.setInteractionPaused(true);
+        clearTimeout(scrollIdleTimeout);
+        scrollIdleTimeout = setTimeout(() => bouquet?.setInteractionPaused(false), 150);
       },
     });
-    tl.to(
-      rig.position,
-      { x: 0, y: isMobile ? 0.35 : 0.45, ease: "power2.inOut" },
-      0,
-    );
-    tl.to(rig.rotation, { y: 0, ease: "power2.inOut" }, 0);
-    tl.to(
-      rig.scale,
-      {
-        x: scaleBase * 1.35,
-        y: scaleBase * 1.35,
-        z: scaleBase * 1.35,
-        ease: "power2.inOut",
-      },
-      0,
-    );
-    journeyTriggers.push(tl.scrollTrigger);
-  }
 
-  // Footer Section: tilts the flower's face up slightly as it approaches,
-  // then fades out the canvas and transitions background & navbar to dark theme.
-  // NOTE: the sign on rotation.x below is a best guess at which way reads as
-  // "tilting up" — since this can't be rendered here, flip it to +0.25 if it
-  // ends up tilting down instead.
-  if (footerSection.value) {
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: footerSection.value,
-        start: "top 95%",
-        end: "top 45%",
-        scrub: 1.0,
-      },
-    });
-    tl.to(rig.rotation, { x: -0.25, ease: "none" }, 0);
-    if (flowerCanvas.value) {
-      tl.to(flowerCanvas.value, { opacity: 0, ease: "none" }, 0);
+    if (prefersReducedMotion) {
+      if (stage && heroSection.value) {
+        ScrollTrigger.create({
+          trigger: heroSection.value,
+          start: "bottom 40%",
+          onEnter: () => {
+            gsap.set(stage, { autoAlpha: 0 });
+            bouquet.setActive(false);
+          },
+          onLeaveBack: () => {
+            gsap.set(stage, { autoAlpha: 1 });
+            bouquet.setActive(true);
+          },
+        });
+      }
+      return;
     }
-    tl.to(".landing-page", { backgroundColor: "#1b1612", ease: "none" }, 0);
-    tl.to(".cta-panel h2", { color: "#faf8f5", ease: "none" }, 0);
-    tl.to(
-      ".btn-cta",
-      { backgroundColor: "#faf8f5", color: "#1b1612", ease: "none" },
-      0,
-    );
-    // Navbar Transitions
-    tl.to(
-      ".navbar",
-      {
-        backgroundColor: "#1b1612",
-        borderColor: "rgba(250, 248, 245, 0.15)",
+
+    // ---- Hero exit: copy lifts away, camera dollies in ----
+    const hero = heroSection.value;
+    if (hero) {
+      const heroTl = gsap.timeline({
+        scrollTrigger: { trigger: hero, start: "top top", end: "bottom top", scrub: 1 },
+      });
+      heroTl.to(hero.querySelector(".hero-content"), { yPercent: -18, autoAlpha: 0, ease: "power1.in" }, 0);
+      heroTl.to(hero.querySelector(".hero-scroll-cue"), { autoAlpha: 0, ease: "none", duration: 0.3 }, 0);
+      heroTl.to(hero.querySelector(".hero-halo"), { scale: 1.35, autoAlpha: 0, ease: "power1.in" }, 0);
+      heroTl.fromTo(bouquet.view, { ...heroFrame }, { ...frameAt(origin, 5, storySx, storySy), ease: "power1.inOut" }, 0);
+      heroTl.to(rig.rotation, { y: 0, ease: "power1.inOut" }, 0);
+    }
+
+    // ---- Pinned bouquet story ----
+    const story = storySection.value;
+    if (story) {
+      const steps = gsap.utils.toArray(story.querySelectorAll(".story-step"));
+      gsap.set(steps, { opacity: 0, y: 40 });
+
+      const overview = frameAt(origin, 5, storySx, storySy);
+      const flowers = partFrame("flowers", scale, storySx, storySy, ...(isMobile ? [4.2, 5.4] : [2.2])) || overview;
+      const wrapper = partFrame("wrapper", scale, storySx, storySy, ...(isMobile ? [5, 6] : [3])) || overview;
+      const fillers = partFrame("fillers", scale, storySx, storySy, ...(isMobile ? [4.6, 5.8] : [2.4])) || overview;
+      const finale = frameAt(origin, 5.6, storySx, storySy);
+      const paperProxy = { i: 0 };
+
+      const tl = gsap.timeline({
+        defaults: { ease: "power2.inOut" },
+        // Driven by the scrubbed playhead (not raw scroll) so the index and
+        // progress line stay in sync with what is on screen.
+        onUpdate: () => {
+          activeStep.value = stepAt(tl.time());
+          if (storyProgressFill.value) {
+            storyProgressFill.value.style.transform = `scaleX(${tl.progress()})`;
+          }
+        },
+        scrollTrigger: {
+          trigger: story,
+          start: "top top",
+          end: isMobile ? "+=320%" : "+=440%",
+          pin: true,
+          scrub: 1,
+          anticipatePin: 1,
+        },
+      });
+
+      // Step copy cross-fades.
+      steps.forEach((step, i) => {
+        tl.to(step, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, STEP_TIMES[i]);
+        if (i < steps.length - 1) {
+          tl.to(step, { opacity: 0, y: -40, duration: 0.5, ease: "power2.in" }, STEP_TIMES[i + 1] - 0.6);
+        }
+      });
+
+      // 01 Blooms: zoom into the flowers, soften everything else.
+      tl.fromTo(bouquet.view, { ...overview }, { ...flowers, duration: 1.4 }, 0.4);
+      tl.to(bouquet.focus, { wrapper: 0.25, fillers: 0.35, duration: 1 }, 0.4);
+
+      // 02 Wrapper: pull back and orbit to the paper; cycle swatches.
+      tl.to(bouquet.view, { ...wrapper, duration: 1.4 }, 3);
+      tl.to(rig.rotation, { y: 0.55, duration: 1.6 }, 3);
+      tl.to(bouquet.focus, { flowers: 0.35, wrapper: 1, fillers: 0.3, duration: 1 }, 3);
+      tl.to(
+        paperProxy,
+        {
+          i: PAPER_PRESETS.length - 0.01,
+          duration: 2,
+          ease: "none",
+          onUpdate: () => cyclePaper(Math.floor(paperProxy.i)),
+        },
+        3.6,
+      );
+
+      // 03 Fillers: zoom onto leaves and small plants.
+      tl.to(bouquet.view, { ...fillers, duration: 1.4 }, 5.6);
+      tl.to(rig.rotation, { y: -0.45, duration: 1.6 }, 5.6);
+      tl.to(bouquet.focus, { flowers: 0.35, wrapper: 0.25, fillers: 1, duration: 1 }, 5.6);
+
+      // Reveal: full bouquet, one slow turn.
+      tl.to(bouquet.view, { ...finale, duration: 1.6 }, 8);
+      tl.to(bouquet.focus, { flowers: 1, wrapper: 1, fillers: 1, duration: 1 }, 8);
+      tl.to(rig.rotation, { y: Math.PI * 2, duration: 2, ease: "power1.inOut" }, 8);
+      tl.set({}, {}, STORY_LENGTH);
+
+      storyTrigger = tl.scrollTrigger;
+    }
+
+    // ---- After the story the bouquet steps aside for content ----
+    const stats = statsSection.value;
+    if (stats && stage) {
+      gsap.to(stage, {
+        autoAlpha: 0,
         ease: "none",
-      },
-      0,
-    );
-    tl.to(
-      ".navbar .logo, .navbar .nav-links a",
-      { color: "#faf8f5", ease: "none" },
-      0,
-    );
-    tl.to(
-      ".navbar .btn-login",
-      {
-        color: "#faf8f5",
-        borderColor: "rgba(250, 248, 245, 0.35)",
-        ease: "none",
-      },
-      0,
-    );
-    tl.to(
-      ".navbar .btn-register",
-      { backgroundColor: "#faf8f5", color: "#1b1612", ease: "none" },
-      0,
-    );
-    journeyTriggers.push(tl.scrollTrigger);
-  }
+        scrollTrigger: { trigger: stats, start: "top 85%", end: "top 35%", scrub: 1 },
+      });
+      // Nothing to draw while it is hidden: pause the render loop until the
+      // About section brings it back.
+      const aboutEl = aboutSection.value;
+      if (aboutEl) {
+        ScrollTrigger.create({
+          trigger: stats,
+          start: "top 20%",
+          endTrigger: aboutEl,
+          end: "top 85%",
+          onToggle: (self) => bouquet?.setActive(!self.isActive),
+        });
+      }
+    }
+
+    // ---- Plans: vertical scroll drives the horizontal card track ----
+    const plansEl = plansSection.value;
+    const track = plansTrack.value;
+    const viewport = plansViewport.value;
+    if (plansEl && track && viewport && !isMobile) {
+      const distance = () => Math.max(track.scrollWidth - viewport.clientWidth, 0);
+      if (distance() > 0) {
+        const plansTl = gsap.timeline({
+          scrollTrigger: {
+            trigger: plansEl,
+            start: "top top",
+            end: () => `+=${distance()}`,
+            pin: true,
+            scrub: 1,
+            invalidateOnRefresh: true,
+          },
+          onUpdate: () => {
+            if (plansProgressFill.value) {
+              plansProgressFill.value.style.transform = `scaleX(${plansTl.progress()})`;
+            }
+          },
+        });
+        plansTl.to(track, { x: () => -distance(), ease: "none" });
+        plansTrigger = plansTl.scrollTrigger;
+      }
+    }
+
+    // ---- About: words brighten as you read; bouquet becomes a soft backdrop ----
+    const about = aboutSection.value;
+    if (about) {
+      about.querySelectorAll(".about-card").forEach((card) => {
+        gsap.fromTo(
+          card.querySelectorAll(".about-word"),
+          { opacity: 0.16 },
+          {
+            opacity: 1,
+            ease: "none",
+            stagger: 0.05,
+            scrollTrigger: { trigger: card, start: "top 80%", end: "bottom 45%", scrub: 1 },
+          },
+        );
+      });
+      gsap.fromTo(
+        about.querySelector(".about-rule"),
+        { scaleX: 0 },
+        {
+          scaleX: 1,
+          ease: "none",
+          scrollTrigger: { trigger: about, start: "center 70%", end: "bottom 60%", scrub: 1 },
+        },
+      );
+      if (stage) {
+        gsap.fromTo(
+          stage,
+          { autoAlpha: 0, filter: "blur(0px)" },
+          {
+            autoAlpha: 0.22,
+            filter: isMobile ? "blur(0px)" : "blur(8px)",
+            ease: "none",
+            immediateRender: false,
+            scrollTrigger: { trigger: about, start: "top 80%", end: "top 30%", scrub: 1 },
+          },
+        );
+      }
+    }
+
+    // ---- CTA: the bouquet returns, centred above the heading ----
+    const cta = ctaSection.value;
+    if (cta && stage) {
+      const ctaTl = gsap.timeline({
+        scrollTrigger: { trigger: cta, start: "top 90%", end: "top 25%", scrub: 1 },
+      });
+      ctaTl.fromTo(
+        stage,
+        { autoAlpha: about ? 0.22 : 0, filter: about && !isMobile ? "blur(8px)" : "blur(0px)" },
+        { autoAlpha: 1, filter: "blur(0px)", ease: "none", immediateRender: false },
+        0,
+      );
+      ctaTl.fromTo(
+        bouquet.view,
+        { ...frameAt(origin, 5.6, storySx, storySy) },
+        { ...frameAt(origin, isMobile ? 8.4 : 7.5, 0, isMobile ? 0.5 : 0.42), ease: "power2.out", immediateRender: false },
+        0,
+      );
+    }
+
+    // ---- Blackout into the footer ----
+    // An espresso iris opens from the CTA while the bouquet shrinks into the
+    // dark; then the footer columns rise in. Rendering pauses once covered.
+    const footer = footerSection.value;
+    if (footer) {
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: footer,
+          start: "top bottom",
+          end: "top 30%",
+          scrub: 1,
+          onLeave: () => bouquet?.setActive(false),
+          onEnterBack: () => bouquet?.setActive(true),
+        },
+      });
+      const blackout = blackoutLayer.value;
+      if (blackout) {
+        tl.fromTo(
+          blackout,
+          { clipPath: "circle(0% at 50% 62%)" },
+          { clipPath: "circle(150% at 50% 62%)", ease: "power2.in", duration: 0.7 },
+          0,
+        );
+      }
+      if (stage) tl.to(stage, { autoAlpha: 0, ease: "power1.in", duration: 0.6, immediateRender: false }, 0);
+      tl.to(rig.scale, { x: scale * 0.55, y: scale * 0.55, z: scale * 0.55, ease: "power1.in", duration: 0.6 }, 0);
+      tl.to(".landing-page", { backgroundColor: "#1b1612", ease: "none", duration: 0.12 }, 0.6);
+      tl.to(".navbar .nav-toggle-bar", { backgroundColor: "#faf8f5", ease: "none" }, 0);
+      tl.fromTo(
+        footer.querySelectorAll(".footer-brand, .footer-section, .footer-bottom"),
+        { autoAlpha: 0, y: 48 },
+        { autoAlpha: 1, y: 0, ease: "power2.out", stagger: 0.08, duration: 0.4 },
+        0.5,
+      );
+      tl.to(".cta-panel h2", { color: "#faf8f5", ease: "none", duration: 0.2 }, 0.22);
+      tl.to(".btn-cta", { backgroundColor: "#faf8f5", color: "#1b1612", ease: "none", duration: 0.2 }, 0.22);
+      tl.to(".navbar", { backgroundColor: "#1b1612", borderColor: "rgba(250, 248, 245, 0.15)", ease: "none" }, 0);
+      tl.to(".navbar .logo, .navbar .nav-links a", { color: "#faf8f5", ease: "none" }, 0);
+      tl.to(".navbar .btn-login", { color: "#faf8f5", borderColor: "rgba(250, 248, 245, 0.35)", ease: "none" }, 0);
+      tl.to(".navbar .btn-register", { backgroundColor: "#faf8f5", color: "#1b1612", ease: "none" }, 0);
+    }
+  });
 }
 
 function setupSectionReveals() {
@@ -950,21 +1304,34 @@ function setupSectionReveals() {
   // played once on load rather than re-triggered as the visitor scrolls.
   if (!heroSection.value) return;
 
-  const heroEls = heroSection.value.querySelectorAll(".reveal-fade-up");
-  if (heroEls.length) {
-    gsap.fromTo(
-      heroEls,
-      { autoAlpha: 0, y: 18 },
-      {
-        autoAlpha: 1,
-        y: 0,
-        duration: 0.75,
-        ease: "power2.out",
-        stagger: 0.08,
-        delay: 0.15,
-      },
-    );
+  const lines = heroSection.value.querySelectorAll(".hero-title .line-inner");
+  const reveals = heroSection.value.querySelectorAll(".hero-reveal");
+  const halo = heroSection.value.querySelector(".hero-halo");
+
+  if (prefersReducedMotion) {
+    gsap.set([lines, reveals, halo], { clearProps: "all" });
+    return;
   }
+
+  gsap
+    .timeline({ delay: 0.1 })
+    .fromTo(
+      lines,
+      { yPercent: 110 },
+      { yPercent: 0, duration: 1.1, ease: "expo.out", stagger: 0.12 },
+    )
+    .fromTo(
+      reveals,
+      { autoAlpha: 0, y: 18 },
+      { autoAlpha: 1, y: 0, duration: 0.8, ease: "power2.out", stagger: 0.08 },
+      "-=0.75",
+    )
+    .fromTo(
+      halo,
+      { scale: 0.8, autoAlpha: 0 },
+      { scale: 1, autoAlpha: 1, duration: 1.4, ease: "power3.out" },
+      0,
+    );
 }
 
 function setupBackgroundParallax() {
@@ -991,119 +1358,92 @@ function setupBackgroundParallax() {
   });
 }
 
+function updateScrollProgress(y) {
+  const max = document.documentElement.scrollHeight - window.innerHeight;
+  const progress = max > 0 ? Math.min(Math.max(y / max, 0), 1) : 0;
+  if (scrollProgressFill.value) {
+    scrollProgressFill.value.style.transform = `scaleX(${progress})`;
+  }
+  if (backToTopRing.value) {
+    backToTopRing.value.style.strokeDashoffset = String(RING_LENGTH * (1 - progress));
+  }
+  showBackToTop.value = y > window.innerHeight;
+}
+
+function scrollToTop() {
+  if (lenis) lenis.scrollTo(0, { duration: 1.6 });
+  else window.scrollTo({ top: 0, behavior: prefersReducedMotion ? "auto" : "smooth" });
+  // Return keyboard focus to the start of the page.
+  document.querySelector(".navbar .logo")?.focus({ preventScroll: true });
+}
+
 function handleWindowScroll() {
-  navScrolled.value = window.scrollY > 24;
+  const y = window.scrollY;
+  navScrolled.value = y > 24;
+  updateScrollProgress(y);
+
+  if (y <= NAV_HIDE_AFTER || mobileMenuOpen.value) {
+    navHidden.value = false;
+    lastScrollY = y;
+    return;
+  }
+  const delta = y - lastScrollY;
+  if (Math.abs(delta) < NAV_SCROLL_DELTA) return;
+  navHidden.value = delta > 0;
+  lastScrollY = y;
 }
 
 function handlePointerMove(event) {
-  pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-  pointer.y = (event.clientY / window.innerHeight) * 2 - 1;
+  bouquet?.setPointer(
+    (event.clientX / window.innerWidth) * 2 - 1,
+    (event.clientY / window.innerHeight) * 2 - 1,
+  );
 }
 
-function handleResize() {
-  if (!renderer || !camera) return;
-  const width = window.innerWidth;
-  const height = window.innerHeight;
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
-  renderer.setSize(width, height);
+let resizeTimeout = null;
+let lastWidth = 0;
 
-  // Recalculate GSAP coordinates dynamically
-  setupFlowerJourney();
-  setupHeroCollapse();
-  ScrollTrigger.refresh();
+function handleResize() {
+  if (!bouquet) return;
+  bouquet.resize(window.innerWidth, window.innerHeight);
+
+  // Mobile browsers fire resize when the URL bar shows/hides; only rebuild
+  // the scroll story when the width actually changes.
+  if (window.innerWidth === lastWidth) return;
+  lastWidth = window.innerWidth;
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    setupJourney();
+    ScrollTrigger.refresh();
+  }, 200);
+}
+
+function lenisTick(time) {
+  lenis?.raf(time * 1000);
 }
 
 function initSmoothScroll() {
+  if (lenis || prefersReducedMotion) return;
   lenis = new Lenis({
     duration: 1.2,
     easing: (t) => 1 - Math.pow(1 - t, 3),
   });
-
-  const raf = (time) => {
-    lenis.raf(time);
-    ScrollTrigger.update();
-    lenisRafId = requestAnimationFrame(raf);
-  };
-  lenisRafId = requestAnimationFrame(raf);
   lenis.on("scroll", ScrollTrigger.update);
+  gsap.ticker.add(lenisTick);
+  gsap.ticker.lagSmoothing(0);
 }
 
-// ============================================================
-// HERO COLLAPSE — scroll-driven shrink of the hero panel
-// No content is removed; layout compresses proportionally.
-// ============================================================
-let heroCollapseTrigger = null;
-
-function setupHeroCollapse() {
-  if (!heroSection.value || prefersReducedMotion) return;
-
-  // Kill any previous instance on resize
-  if (heroCollapseTrigger) {
-    heroCollapseTrigger.kill();
-    heroCollapseTrigger = null;
-  }
-
-  const panel = heroSection.value;
-  const container = panel.querySelector(".hero-collapse-container");
-  const content = panel.querySelector(".hero-collapse-content");
-  const cue = panel.querySelector(".hero-scroll-cue");
-
-  if (!container || !content) return;
-
-  const isMobile = window.innerWidth < 968;
-
-  // Animate hero panel padding (top/bottom) and content scale
-  const tl = gsap.timeline({
-    scrollTrigger: {
-      trigger: panel,
-      start: "top top",
-      // End when the hero has scrolled 65vh — feels natural for a banner collapse
-      end: isMobile ? "+=55vh" : "+=65vh",
-      scrub: 1.2,
-      // Do NOT pin — let the page scroll naturally while the hero compresses
-    },
-  });
-
-  // Shrink hero panel top-padding (pushes content up toward navbar)
-  tl.fromTo(
-    panel,
-    { paddingTop: isMobile ? "140px" : "180px", paddingBottom: "120px" },
-    {
-      paddingTop: isMobile ? "90px" : "96px",
-      paddingBottom: isMobile ? "40px" : "48px",
-      ease: "none",
-    },
-    0,
-  );
-
-  // Scale down and fade-shift the content block
-  tl.fromTo(
-    content,
-    { scale: 1, transformOrigin: "left center" },
-    {
-      scale: isMobile ? 0.78 : 0.72,
-      transformOrigin: "left center",
-      ease: "none",
-    },
-    0,
-  );
-
-  // Fade out the scroll cue
-  if (cue) {
-    tl.fromTo(cue, { autoAlpha: 0.65 }, { autoAlpha: 0, ease: "none" }, 0);
-  }
-
-  heroCollapseTrigger = tl.scrollTrigger;
-}
 
 onMounted(() => {
+  hasStoredSession.value = !!localStorage.getItem("user");
+  reducedMotionPref.value = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  lastWidth = window.innerWidth;
   initThreeScene();
-  setupFlowerJourney();
-  setupSectionReveals();
-  setupBackgroundParallax();
-  setupHeroCollapse();
-  initSmoothScroll();
+  setupJourney();
+  pageCtx = gsap.context(() => setupBackgroundParallax());
+  startIntro();
   window.addEventListener("mousemove", handlePointerMove, { passive: true });
   window.addEventListener("resize", handleResize);
   window.addEventListener("scroll", handleWindowScroll, { passive: true });
@@ -1114,15 +1454,21 @@ onBeforeUnmount(() => {
   window.removeEventListener("mousemove", handlePointerMove);
   window.removeEventListener("resize", handleResize);
   window.removeEventListener("scroll", handleWindowScroll);
+  document.removeEventListener("keydown", handleMenuDismiss);
+  document.removeEventListener("pointerdown", handleMenuDismiss);
   clearTimeout(scrollIdleTimeout);
+  clearTimeout(introTimeout);
+  clearTimeout(resizeTimeout);
+  document.documentElement.style.overflow = "";
 
-  if (rafId) cancelAnimationFrame(rafId);
-  if (lenisRafId) cancelAnimationFrame(lenisRafId);
+  gsap.ticker.remove(lenisTick);
+  gsap.ticker.lagSmoothing(500, 33); // GSAP defaults
   if (lenis) lenis.destroy();
-  if (heroCollapseTrigger) heroCollapseTrigger.kill();
-  journeyTriggers.forEach((st) => st && st.kill());
-  ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
-  if (renderer) renderer.dispose();
+  lenis = null;
+  // Revert only this page's animations and triggers.
+  journeyCtx?.revert();
+  pageCtx?.revert();
+  if (bouquet) bouquet.dispose();
 });
 </script>
 
@@ -1135,9 +1481,15 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
 }
 
+/* Same body reset the pricing page applies; removes the UA 8px margin. */
+:global(body) {
+  margin: 0;
+}
+
 .landing-page {
-  --ivory: #faf8f5;
-  --ivory-deep: #f2ede7;
+  /* Dim-white base: softer than pure white, warm like petals */
+  --ivory: #f4f1ec;
+  --ivory-deep: #ebe5dd;
   --ink: #1e1b18;
   --ink-soft: #6e6761;
   --rosewood: #b86558;
@@ -1178,8 +1530,146 @@ onBeforeUnmount(() => {
   font-size: 16px;
   font-weight: 500;
   font-style: italic;
-  color: var(--rosewood);
+  color: var(--rosewood-dark);
   margin-bottom: 18px;
+}
+
+/* Skip link: visible only when focused */
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 3100;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--ivory);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 0.25s ease;
+}
+
+.skip-link:focus {
+  transform: none;
+  outline: 2px solid var(--rosewood);
+  outline-offset: 3px;
+}
+
+.scroll-story-container:focus {
+  outline: none;
+}
+
+/* ============================================================
+   SCROLL PROGRESS + BACK TO TOP
+============================================================= */
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1100;
+  height: 2px;
+  pointer-events: none;
+}
+
+.scroll-progress-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--rosewood), var(--gold));
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.back-to-top {
+  position: fixed;
+  right: calc(24px + env(safe-area-inset-right, 0px));
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  z-index: 1050;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(250, 248, 245, 0.92);
+  box-shadow: 0 10px 28px rgba(30, 27, 24, 0.14);
+  color: var(--ink);
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px);
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0.35s,
+    background 0.3s ease;
+}
+
+.back-to-top.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+.back-to-top:hover {
+  background: #ffffff;
+}
+
+.back-to-top:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 3px;
+}
+
+.btt-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.btt-ring-track,
+.btt-ring-fill {
+  fill: none;
+  stroke-width: 2;
+}
+
+.btt-ring-track {
+  stroke: rgba(30, 27, 24, 0.08);
+}
+
+.btt-ring-fill {
+  stroke: var(--rosewood);
+  stroke-linecap: round;
+  stroke-dasharray: 150.8; /* 2πr, r = 24 */
+  stroke-dashoffset: 150.8;
+}
+
+.btt-arrow {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.3s ease;
+}
+
+.back-to-top:hover .btt-arrow {
+  transform: translateY(-2px);
+}
+
+@media (max-width: 640px) {
+  .back-to-top {
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    width: 46px;
+    height: 46px;
+  }
 }
 
 /* Ambient dynamic background */
@@ -1242,6 +1732,16 @@ onBeforeUnmount(() => {
   display: block;
 }
 
+/* Blackout iris (Stage 6): sits above the bouquet, below the content */
+.blackout {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  background: var(--espresso);
+  clip-path: circle(0% at 50% 62%);
+  pointer-events: none;
+}
+
 /* Navigation — full-width at top, floating pill when scrolled */
 .navbar {
   position: fixed;
@@ -1251,7 +1751,7 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
   width: 100%;
   max-width: 9999px; /* effectively unrestricted at top */
-  background: #ffffff;
+  background: var(--ivory);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   padding: 1.6rem 6%;
@@ -1263,6 +1763,7 @@ onBeforeUnmount(() => {
   border: 1px solid transparent;
   box-shadow: none;
   transition:
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
     top 0.5s cubic-bezier(0.16, 1, 0.3, 1),
     width 0.5s cubic-bezier(0.16, 1, 0.3, 1),
     max-width 0.5s cubic-bezier(0.16, 1, 0.3, 1),
@@ -1273,6 +1774,15 @@ onBeforeUnmount(() => {
     box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Hidden while scrolling down; keyboard focus always brings it back */
+.navbar--hidden {
+  transform: translate(-50%, calc(-100% - 32px));
+}
+
+.navbar--hidden:focus-within {
+  transform: translateX(-50%);
+}
+
 /* Scrolled state — floating pill */
 .navbar--scrolled {
   top: 20px;
@@ -1280,7 +1790,7 @@ onBeforeUnmount(() => {
   max-width: 1240px;
   padding: 0.72rem 2rem;
   border-radius: 999px;
-  background: #ffffff;
+  background: rgba(250, 248, 245, 0.86);
   border-color: rgba(30, 27, 24, 0.12);
   box-shadow:
     0 8px 40px rgba(30, 27, 24, 0.1),
@@ -1301,7 +1811,7 @@ onBeforeUnmount(() => {
 
 .nav-links {
   display: flex;
-  gap: 44px;
+  gap: 36px;
   align-items: center;
 }
 
@@ -1336,7 +1846,59 @@ onBeforeUnmount(() => {
 
 .nav-buttons {
   display: flex;
+  align-items: center;
   gap: 16px;
+}
+
+.nav-links a:focus-visible,
+.nav-buttons a:focus-visible,
+.logo:focus-visible,
+.nav-toggle:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+/* Mobile menu toggle (shown below 968px) */
+.nav-toggle {
+  display: none;
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(30, 27, 24, 0.12);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.nav-toggle-bar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: 1.5px;
+  background: currentColor;
+  color: var(--ink);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-toggle-bar:first-child {
+  transform: translateY(-4px);
+}
+
+.nav-toggle-bar:last-child {
+  transform: translateY(4px);
+}
+
+.navbar--menu-open .nav-toggle-bar:first-child {
+  transform: rotate(45deg);
+}
+
+.navbar--menu-open .nav-toggle-bar:last-child {
+  transform: rotate(-45deg);
+}
+
+.nav-menu-login {
+  display: none;
 }
 
 .btn-login {
@@ -1441,33 +2003,69 @@ onBeforeUnmount(() => {
 
 /* Hero Panel */
 .hero-panel {
-  padding-top: 180px;
-  will-change: padding;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding-top: 150px;
 }
 
-/* Hero collapse content wrapper — GSAP will scale this */
-.hero-collapse-content {
-  transform-origin: left center;
-  will-change: transform;
+.hero-content {
+  will-change: transform, opacity;
 }
 
-@media (max-width: 968px) {
-  .hero-collapse-content {
-    transform-origin: center center;
+/* Soft gold halo framing the bouquet on the right */
+.hero-halo {
+  position: absolute;
+  top: 50%;
+  right: 6%;
+  width: min(44vw, 620px);
+  aspect-ratio: 1;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.halo-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 178, 122, 0.45);
+}
+
+.halo-ring--inner {
+  inset: 9%;
+  border-style: dashed;
+  border-color: rgba(184, 101, 88, 0.22);
+  animation: haloSpin 60s linear infinite;
+}
+
+@keyframes haloSpin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
 .hero-title {
-  font-size: clamp(44px, 5.8vw, 78px);
-  line-height: 1.08;
-  margin-bottom: 24px;
+  font-size: clamp(46px, 6.4vw, 92px);
+  line-height: 1.02;
+  margin-bottom: 28px;
   color: var(--ink);
+}
+
+.hero-title .line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+}
+
+.hero-title .line-inner {
+  display: block;
 }
 
 .hero-title .highlight {
   color: var(--rosewood);
   background: linear-gradient(120deg, var(--rosewood) 30%, var(--gold) 90%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -1475,7 +2073,7 @@ onBeforeUnmount(() => {
   font-size: 18px;
   color: var(--ink-soft);
   margin-bottom: 36px;
-  max-width: 520px;
+  max-width: 500px;
   line-height: 1.8;
 }
 
@@ -1484,86 +2082,88 @@ onBeforeUnmount(() => {
   font-size: 15px;
 }
 
-.scroll-cue {
-  display: block;
-  margin-top: 48px;
-  font-size: 11.5px;
+.hero-scroll-cue {
+  position: absolute;
+  left: 50%;
+  bottom: 36px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--ink-soft);
-  opacity: 0.65;
-  animation: pulseCue 2s infinite ease-in-out;
+  z-index: 20;
 }
 
-/* When GSAP is fading the scroll cue out, keep its animation playing */
-.hero-scroll-cue {
-  will-change: opacity;
+.cue-line {
+  position: relative;
+  width: 1px;
+  height: 48px;
+  background: rgba(30, 27, 24, 0.12);
+  overflow: hidden;
 }
 
-@keyframes pulseCue {
-  0%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.45;
+.cue-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--rosewood);
+  transform: translateY(-100%);
+  animation: cueDrop 2.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes cueDrop {
+  0% {
+    transform: translateY(-100%);
   }
   50% {
-    transform: translateY(6px);
-    opacity: 0.8;
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(100%);
   }
 }
 
-/* Clients Panel */
-.clients-panel h2 {
-  font-size: clamp(28px, 3.2vw, 38px);
-  margin-bottom: 12px;
+@media (max-width: 968px) {
+  .hero-halo {
+    right: 50%;
+    width: 86vw;
+    transform: translate(50%, -50%);
+    opacity: 0.7;
+  }
+
+  .hero-scroll-cue {
+    display: none;
+  }
+
+  /* Copy sits at the top, the bouquet shows beneath it */
+  .hero-panel {
+    align-items: flex-start;
+    padding-top: 132px;
+  }
+
+  .hero-panel .hero-content {
+    padding: 0;
+    background: none;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .hero-halo {
+    top: 72%;
+  }
 }
 
-.clients-panel p {
-  color: var(--ink-soft);
-  margin-bottom: 40px;
-  font-size: 16px;
-}
-
-.clients-grid {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.client-logo {
-  padding: 14px 24px;
-  background: rgba(250, 248, 245, 0.5);
-  border-radius: 12px;
-  color: var(--ink-soft);
-  font-size: 13px;
-  font-weight: 500;
-  border: 1px solid var(--line);
-  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-  backdrop-filter: blur(6px);
-}
-
-.client-logo:hover {
-  background: rgba(250, 248, 245, 0.85);
-  border-color: var(--rosewood);
-  transform: translateY(-4px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.03);
-}
-
-/* Content Panels */
-.content-panel h2 {
-  font-size: clamp(30px, 3.5vw, 40px);
-  margin-bottom: 24px;
-  line-height: 1.2;
-}
-
-.content-panel p {
-  color: var(--ink-soft);
-  font-size: 16.5px;
-  line-height: 1.85;
-  margin-bottom: 28px;
-  max-width: 500px;
+@media (prefers-reduced-motion: reduce) {
+  .halo-ring--inner,
+  .cue-line::after {
+    animation: none;
+  }
 }
 
 .btn-learn-more {
@@ -1585,84 +2185,492 @@ onBeforeUnmount(() => {
   box-shadow: 0 12px 28px rgba(184, 101, 88, 0.25);
 }
 
-/* Features Panel */
-.features-panel h2 {
-  font-size: clamp(30px, 3.5vw, 40px);
-  margin-bottom: 14px;
+/* ============================================================
+   BOUQUET STORY (pinned)
+============================================================= */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-.features-header-desc {
-  color: var(--ink-soft);
-  font-size: 16.5px;
-  margin-bottom: 48px;
+.eyebrow {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--rosewood-dark);
 }
 
-.features-stacked-grid {
-  display: flex;
-  flex-direction: column;
+.story {
+  position: relative;
+  z-index: 10;
+  height: 100vh;
+  height: 100svh;
+}
+
+.story-pin {
+  position: relative;
+  height: 100%;
   width: 100%;
 }
 
-.feature-card-item {
+.story-inner {
+  position: relative;
+  height: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 128px 6% 96px;
   display: grid;
-  grid-template-columns: 68px 1fr;
-  gap: 28px;
-  align-items: flex-start;
-  padding: 34px 4px;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
-  background: none;
-  backdrop-filter: none;
-  transition: padding-left 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  grid-template-columns: minmax(0, 460px) 1fr;
+  grid-template-rows: auto 1fr;
 }
 
-.feature-card-item:last-child {
-  border-bottom: 1px solid var(--line);
+.story-head {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 24px;
 }
 
-.feature-card-item:hover {
-  padding-left: 16px;
-  transform: none;
-  box-shadow: none;
-  border-top-color: var(--line);
+.story-index {
+  list-style: none;
+  display: flex;
+  gap: 32px;
 }
 
-.feature-icon {
-  width: 58px;
-  height: 58px;
-  background: linear-gradient(145deg, var(--rosewood), var(--gold));
-  color: var(--ivory);
-  border-radius: 50%;
+.story-index li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--ink-soft);
+  opacity: 0.45;
+  transition: opacity 0.4s ease, color 0.4s ease;
+}
+
+.story-index li.is-active {
+  opacity: 1;
+  color: var(--ink);
+}
+
+.story-index-num {
+  font-family: "Montserrat", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rosewood-dark);
+}
+
+.story-index-label {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.story-steps {
+  grid-column: 1;
+  position: relative;
+  align-self: center;
+  min-height: 360px;
+}
+
+.story-step {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  /* Steps overlap; only the one on screen takes clicks */
+  pointer-events: none;
+}
+
+.story-step.is-current,
+.story--static .story-step {
+  pointer-events: auto;
+}
+
+.story-step-num {
+  display: inline-block;
+  margin-bottom: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rosewood-dark);
+}
+
+.story-step h3 {
+  font-size: clamp(34px, 4.2vw, 58px);
+  line-height: 1.04;
+  margin-bottom: 20px;
+  color: var(--ink);
+}
+
+.story-step--reveal h3 {
+  font-size: clamp(30px, 3.4vw, 46px);
+}
+
+.story-step p {
+  max-width: 420px;
+  margin-bottom: 28px;
+  font-size: 17px;
+  line-height: 1.8;
+  color: var(--ink-soft);
+}
+
+.swatch-group {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  flex-shrink: 0;
-  box-shadow: 0 10px 24px rgba(184, 101, 88, 0.28);
-  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
-.feature-card-item:hover .feature-icon {
-  transform: rotate(-8deg) scale(1.06);
+.swatch {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--swatch);
+  border: 3px solid var(--ivory);
+  box-shadow:
+    0 0 0 1px rgba(30, 27, 24, 0.14),
+    0 4px 12px rgba(30, 27, 24, 0.08);
+  cursor: pointer;
+  transition:
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s ease;
 }
 
-.feature-info {
-  text-align: left;
+.swatch--small {
+  width: 26px;
+  height: 26px;
+  border-width: 2px;
 }
 
-.feature-info h3 {
-  font-size: 19.5px;
-  margin-bottom: 8px;
+.swatch:hover {
+  transform: scale(1.1);
 }
 
-.feature-info p {
+.swatch.is-active {
+  box-shadow:
+    0 0 0 2px var(--rosewood),
+    0 6px 14px rgba(184, 101, 88, 0.25);
+}
+
+.swatch:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 4px;
+}
+
+.story-features {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 30px;
+}
+
+.story-features li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid rgba(30, 27, 24, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.45);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.story-progress {
+  position: absolute;
+  left: max(6%, calc(50% - 600px + 6%));
+  right: max(6%, calc(50% - 600px + 6%));
+  bottom: 44px;
+  height: 1px;
+  background: rgba(30, 27, 24, 0.1);
+  overflow: hidden;
+}
+
+.story-progress-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--rosewood), var(--gold));
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+/* Reduced motion: no pin, steps stack as regular content */
+.story--static {
+  height: auto;
+}
+
+.story--static .story-inner {
+  height: auto;
+  grid-template-rows: auto auto;
+}
+
+.story--static .story-steps {
+  display: grid;
+  gap: 64px;
+  min-height: 0;
+  margin-top: 48px;
+}
+
+.story--static .story-step {
+  position: static;
+}
+
+.story--static .story-index,
+.story--static .story-progress {
+  display: none;
+}
+
+@media (max-width: 968px) {
+  .story-inner {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+    padding: 96px 5% 56px;
+  }
+
+  .story-index {
+    gap: 14px;
+  }
+
+  .story-index-label {
+    display: none;
+  }
+
+  .story-steps {
+    grid-row: 3;
+    align-self: end;
+    min-height: 0;
+  }
+
+  .story-step {
+    top: auto;
+    bottom: 0;
+    padding: 24px 22px;
+    border: 1px solid rgba(30, 27, 24, 0.08);
+    border-radius: 22px;
+    background: rgba(244, 241, 236, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .story-step h3,
+  .story-step--reveal h3 {
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+
+  .story-step p {
+    font-size: 15px;
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+
+  .story-features {
+    margin-bottom: 18px;
+  }
+
+  .story-progress {
+    bottom: 28px;
+  }
+
+  .story--static .story-step {
+    position: static;
+  }
+}
+
+/* ============================================================
+   PLANS (pinned horizontal track)
+============================================================= */
+.plans-section {
+  position: relative;
+  z-index: 10;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.plans-inner {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 56px;
+  align-items: center;
+  padding: 120px 0 80px max(6%, calc(50% - 600px + 6%));
+}
+
+.plans-head h2 {
+  margin: 16px 0 18px;
+  font-size: clamp(32px, 3.6vw, 52px);
+  line-height: 1.05;
+}
+
+.plans-head p {
+  margin-bottom: 24px;
   color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.plans-compare {
+  display: inline-flex;
+  gap: 8px;
+  color: var(--rosewood-dark);
   font-size: 14.5px;
-  line-height: 1.7;
-  max-width: 420px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: gap 0.3s ease;
+}
+
+.plans-compare:hover {
+  gap: 12px;
+}
+
+.plans-progress {
+  width: 100%;
+  max-width: 220px;
+  height: 2px;
+  margin-top: 40px;
+  background: rgba(30, 27, 24, 0.1);
+  overflow: hidden;
+}
+
+.plans-progress-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--rosewood), var(--gold));
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.plans-viewport {
+  overflow: hidden;
+  /* Room for card shadows; cards fade in/out at the left edge */
+  padding: 56px 0 64px 24px;
+  margin: -56px 0 -64px -24px;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 56px);
+  mask-image: linear-gradient(90deg, transparent 0, #000 56px);
+}
+
+.plans-track {
+  display: flex;
+  gap: 24px;
+  width: max-content;
+  padding-right: 6vw;
+  will-change: transform;
+}
+
+.plans-card {
+  width: clamp(300px, 26vw, 360px);
+  flex-shrink: 0;
+}
+
+.plans-notice {
+  grid-column: 1 / -1;
+  max-width: 720px;
+  padding: 12px 16px;
+  border: 1px solid #eacb95;
+  border-radius: 12px;
+  background: #fff5df;
+  color: #5b3a1e;
+  font-size: 14px;
+}
+
+.plans-notice a {
+  color: var(--rosewood-dark);
+  font-weight: 600;
+}
+
+/* Mobile and reduced motion: native horizontal scroll with snap, no pin */
+.plans-section--static .plans-viewport {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+
+.plans-section--static .plans-card {
+  scroll-snap-align: start;
+}
+
+@media (max-width: 968px) {
+  .plans-section {
+    min-height: auto;
+  }
+
+  .plans-inner {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 96px 0 72px 5%;
+  }
+
+  .plans-head {
+    padding-right: 5%;
+  }
+
+  .plans-progress {
+    display: none;
+  }
+
+  .plans-viewport {
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding: 20px 0 32px;
+    margin: 0;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .plans-viewport::-webkit-scrollbar {
+    display: none;
+  }
+
+  .plans-card {
+    width: min(82vw, 340px);
+    scroll-snap-align: start;
+  }
+
+  .plans-notice {
+    margin-right: 5%;
+  }
 }
 
 /* Stats Panel */
+.stats-panel {
+  min-height: auto;
+  padding-block: 140px;
+}
+
+.stats-panel .panel-container {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 969px) {
+  .stats-panel .stats-stacked-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .stats-panel .stat-card-item,
+  .stats-panel .stat-card-item:nth-child(odd) {
+    border-left: 1px solid var(--line);
+    padding-left: 32px;
+  }
+
+  .stats-panel .stat-card-item:first-child {
+    border-left: none;
+    padding-left: 0;
+  }
+}
+
 .stats-header-desc {
   color: var(--ink-soft);
   font-size: 16.5px;
@@ -1771,21 +2779,6 @@ onBeforeUnmount(() => {
   transform: scaleX(1);
 }
 
-.highlight-vendor {
-  animation: vendorGlow 2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes vendorGlow {
-  0% {
-    background-color: rgba(212, 178, 122, 0.25);
-    border-color: var(--gold);
-  }
-  100% {
-    background-color: rgba(250, 248, 245, 0.5);
-    border-color: var(--line);
-  }
-}
-
 /* Blog Panel */
 .blog-panel h2 {
   font-size: clamp(30px, 3.5vw, 40px);
@@ -1863,7 +2856,7 @@ onBeforeUnmount(() => {
 }
 
 .blog-link {
-  color: var(--rosewood);
+  color: var(--rosewood-dark);
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
@@ -1877,13 +2870,100 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 
+/* ============================================================
+   ABOUT US
+============================================================= */
+.about-section {
+  position: relative;
+  z-index: 10;
+  padding: 170px 6%;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(235, 229, 221, 0.75) 18%,
+    rgba(235, 229, 221, 0.75) 82%,
+    transparent
+  );
+}
+
+.about-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.about-head h2 {
+  max-width: 760px;
+  margin: 16px 0 80px;
+  font-size: clamp(32px, 4vw, 56px);
+  line-height: 1.06;
+}
+
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 72px;
+}
+
+.about-card {
+  padding-top: 28px;
+  border-top: 1px solid rgba(30, 27, 24, 0.14);
+}
+
+.about-num {
+  font-family: "Montserrat", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rosewood-dark);
+}
+
+.about-card h3 {
+  margin: 12px 0 20px;
+  font-size: 26px;
+}
+
+.about-text {
+  font-family: "Montserrat", sans-serif;
+  font-size: clamp(18px, 1.55vw, 22px);
+  font-weight: 500;
+  line-height: 1.62;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.about-rule {
+  height: 1px;
+  margin-top: 96px;
+  background: linear-gradient(90deg, var(--gold), rgba(212, 178, 122, 0));
+  transform-origin: left;
+}
+
+@media (max-width: 968px) {
+  .about-section {
+    padding: 110px 5%;
+  }
+
+  .about-head h2 {
+    margin-bottom: 52px;
+  }
+
+  .about-grid {
+    grid-template-columns: 1fr;
+    gap: 52px;
+  }
+
+  .about-rule {
+    margin-top: 64px;
+  }
+}
+
 /* CTA Panel */
 .cta-panel {
   display: flex;
   justify-content: center;
-  align-items: center;
+  /* Copy sits low; the bouquet returns above it */
+  align-items: flex-end;
   text-align: center;
-  padding: 160px 6%;
+  padding: 160px 6% 14vh;
 }
 
 .cta-container {
@@ -2109,7 +3189,49 @@ onBeforeUnmount(() => {
     padding: 0.65rem 1.4rem;
   }
 
+  .nav-toggle {
+    display: inline-block;
+  }
+
   .nav-links {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 10px 22px;
+    border: 1px solid rgba(30, 27, 24, 0.08);
+    border-radius: 22px;
+    background: rgba(250, 248, 245, 0.97);
+    box-shadow: 0 18px 40px rgba(30, 27, 24, 0.12);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease,
+      visibility 0.3s;
+  }
+
+  .navbar--menu-open .nav-links {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+
+  .nav-links a {
+    padding: 14px 0;
+    font-size: 15.5px;
+    border-bottom: 1px solid rgba(30, 27, 24, 0.06);
+  }
+
+  .nav-links a:last-child {
+    border-bottom: none;
+  }
+
+  .nav-links a::after {
     display: none;
   }
 
@@ -2149,16 +3271,8 @@ onBeforeUnmount(() => {
     display: none;
   }
 
-  .clients-grid {
-    justify-content: center;
-  }
-
   .blog-stacked-grid {
     gap: 20px;
-  }
-
-  .feature-card-item {
-    padding: 26px 4px;
   }
 
   .blog-card-item {
@@ -2243,6 +3357,25 @@ onBeforeUnmount(() => {
   .btn-register {
     padding: 8px 18px;
     font-size: 13px;
+  }
+
+  /* Login moves into the menu; Register stays in the bar */
+  .nav-buttons .btn-login {
+    display: none;
+  }
+
+  .nav-menu-login {
+    display: block;
+  }
+
+  .logo {
+    font-size: 19px;
+    gap: 8px;
+  }
+
+  .logo img {
+    width: 38px;
+    height: 38px;
   }
 }
 </style>

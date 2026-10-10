@@ -77,6 +77,7 @@ import api from "../../plugins/axios";
 import { useAuth } from "../../composables/useAuth";
 import { getStoredUserToken } from "../../utils/authSession";
 import { useSubscriptionAccess } from "../../composables/useSubscriptionAccess";
+import { SUBSCRIPTION_PLANS, findPlan, clearPendingPlan } from "../../constants/subscriptionPlans";
 
 const year = new Date().getFullYear();
 const router = useRouter();
@@ -94,12 +95,7 @@ const actionLabel = (plan) => {
   return "Continue to Payment";
 };
 
-const plans = [
-  { key: "starter", name: "STARTER", price: "₱999", priceSuffix: "/month", description: "Essential ecommerce and day-to-day business tools for getting started.", highlights: ["Ecommerce functionality", "Products, reservations, calendar, and chat", "Basic business management"], action: "Get started" },
-  { key: "business", name: "BUSINESS", price: "₱2,999", priceSuffix: "/month", description: "Everything in Starter with the foundational ERP tools for a connected business.", highlights: ["Everything in Starter", "Basic ERP functionality", "Finance, procurement, and supplier workflows"], action: "Choose Business" },
-  { key: "professional", name: "PROFESSIONAL", price: "₱6,999", priceSuffix: "/month", description: "The complete normal BloomCraft ERP for teams running end-to-end operations.", highlights: ["Everything in Business", "Full ERP functionality", "Warehouse, supply chain, CRM, and HR"], action: "Choose Professional", featured: true },
-  { key: "enterprise", name: "ENTERPRISE", price: "₱15,000+", priceSuffix: "/month", description: "Professional ERP capabilities with enterprise-scale flexibility and support.", highlights: ["Everything in Professional", "Multi-branch and multi-warehouse", "Custom integrations and dedicated support"], action: "Talk to us" },
-];
+const plans = SUBSCRIPTION_PLANS;
 
 async function selectPlan(plan) {
   subscriptionMessage.value = "";
@@ -148,12 +144,24 @@ onMounted(async () => {
         await loadSubscriptionAccess();
         const planKey = subscriptionAccess.value?.plan_key;
         await router.replace({ path: "/vendor/profile", query: { subscription_success: planKey } });
+      } else if (route.query.plan) {
+        // Plan picked on the landing page: start that plan's existing
+        // checkout flow. Payment-return states above always take precedence.
+        await startRequestedPlan(String(route.query.plan));
       }
     }
   } catch (_) {
     // A public pricing page remains available if the stored session is stale.
   }
 });
+
+async function startRequestedPlan(planKey) {
+  clearPendingPlan();
+  const { plan: _plan, ...query } = route.query;
+  await router.replace({ path: "/pricing", query });
+  const plan = findPlan(planKey);
+  if (plan) await selectPlan(plan);
+}
 
 async function waitForConfirmedCheckout(checkoutId) {
   if (!checkoutId) return;
