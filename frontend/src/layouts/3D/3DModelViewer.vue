@@ -48,6 +48,7 @@
 import { ref, onMounted, onUnmounted, watch } from "vue";
 import * as THREE from "three";
 import { dressBouquet } from "../../utils/bouquetDressing.js";
+import { createCard } from "../../utils/bouquetCard.js";
 
 const props = defineProps({
   modelUrl: {
@@ -409,6 +410,24 @@ const loadBouquetArrangement = async (arrangement) => {
       : Number(flower.scale?.x ?? 1);
     placement.scale.setScalar(savedScale);
     model.add(placement);
+  }
+
+  // Message card, as the customer left it (open or closed)
+  const savedCard = arrangement.card;
+  if (savedCard) {
+    const card = createCard({ size: savedCard.size, message: savedCard.message, open: savedCard.open });
+    card.position.set(
+      Number(savedCard.position?.x || 0),
+      Number(savedCard.position?.y || 0),
+      Number(savedCard.position?.z || 0),
+    );
+    card.rotation.set(
+      THREE.MathUtils.degToRad(Number(savedCard.rotation?.xDeg || 0)),
+      THREE.MathUtils.degToRad(Number(savedCard.rotation?.yDeg || 0)),
+      THREE.MathUtils.degToRad(Number(savedCard.rotation?.zDeg || 0)),
+    );
+    card.scale.setScalar(Number(savedCard.scale ?? 1));
+    model.add(card);
   }
 
   originalModelRotation = { x: 0, y: 0, z: 0 };

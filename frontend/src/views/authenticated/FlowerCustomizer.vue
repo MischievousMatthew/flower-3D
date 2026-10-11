@@ -136,6 +136,50 @@
                 </li>
               </ul>
             </template>
+
+            <!-- Message cards (one per bouquet) -->
+            <template v-if="cards.length">
+              <div class="fc-panel-head fc-subhead">
+                <h2>Cards</h2>
+                <span>{{ placedCard ? "1 of 1 used" : "Add one message card" }}</span>
+              </div>
+              <ul class="fc-cards">
+                <li v-for="card in cards" :key="`card-${card.id}`">
+                  <div
+                    role="button"
+                    tabindex="0"
+                    class="fc-card-option"
+                    :class="{
+                      active: pendingFlower?.kind === 'card' && pendingFlower?.id === card.id,
+                      placed: placedCard?.id === card.id,
+                      disabled: !canUseFlower(card),
+                      dragging: draggedFlower?.kind === 'card' && draggedFlower?.id === card.id,
+                    }"
+                    :aria-disabled="!canUseFlower(card)"
+                    :draggable="canUseFlower(card)"
+                    @dragstart="onDragStart($event, card)"
+                    @dragend="onDragEnd"
+                    @click="selectFlower(card)"
+                    @keydown.enter.prevent="selectFlower(card)"
+                    @keydown.space.prevent="selectFlower(card)"
+                  >
+                    <span class="fc-card-photo">
+                      <img v-if="card.image" :src="card.image" :alt="card.product_name" />
+                      <BcIcon v-else name="card" />
+                    </span>
+                    <span class="fc-card-copy">
+                      <strong>{{ card.product_name }}</strong>
+                      <small>Up to {{ card.limit }} {{ card.limit_type }}</small>
+                      <small>{{ card.sizes.map((size) => size.label).join(", ") }}</small>
+                    </span>
+                    <span class="fc-filler-price">
+                      {{ cardPriceLabel(card) }}
+                      <small v-if="placedCard?.id === card.id">On bouquet</small>
+                    </span>
+                  </div>
+                </li>
+              </ul>
+            </template>
           </div>
         </aside>
 
@@ -238,12 +282,13 @@
                 >
                   <button type="button" class="fc-placed-main" @click="selectPlacedFlower(selection.sceneId)">
                     <span class="fc-placed-thumb">
-                      <img v-if="selection.kind !== 'filler' && flowerImage(selection.id)" :src="flowerImage(selection.id)" alt="" />
-                      <BcIcon v-else :name="selection.kind === 'filler' ? 'leaf' : 'flower'" />
+                      <img v-if="selection.kind === 'card' && selection.image" :src="selection.image" alt="" />
+                      <img v-else-if="isStem(selection) && flowerImage(selection.id)" :src="flowerImage(selection.id)" alt="" />
+                      <BcIcon v-else :name="selection.kind === 'filler' ? 'leaf' : selection.kind === 'card' ? 'card' : 'flower'" />
                     </span>
                     <span class="fc-placed-copy">
                       <strong>{{ selection.product_name }}</strong>
-                      <small>{{ selection.kind === "filler" ? "Filler" : "Stem" }} · {{ formatPeso(selection.price) }}</small>
+                      <small>{{ placedKindLabel(selection) }} · {{ formatPeso(selection.price) }}</small>
                     </span>
                   </button>
                   <button
@@ -367,6 +412,57 @@
                 <button type="button" class="fc-text-btn" @click="resetSelectedTransform">
                   <BcIcon name="reset" /> Reset size and angle
                 </button>
+              </div>
+            </section>
+
+            <section v-if="cards.length" class="fc-section">
+              <div class="fc-panel-head">
+                <h2>Card</h2>
+                <span v-if="placedCard" class="fc-truncate">{{ placedCard.product_name }}</span>
+              </div>
+              <p v-if="!placedCard" class="fc-note">Pick a card on the left, then click the bouquet to place it.</p>
+
+              <div v-else class="fc-card-settings">
+                <div class="fc-control">
+                  <div class="fc-control-head">
+                    <span id="fc-card-size-label">Size</span>
+                    <output>{{ placedCard.price ? formatPeso(placedCard.price) : "Free" }}</output>
+                  </div>
+                  <div class="fc-segment" role="radiogroup" aria-labelledby="fc-card-size-label">
+                    <button
+                      v-for="size in placedCard.sizes"
+                      :key="size.label"
+                      type="button"
+                      role="radio"
+                      class="fc-segment-btn"
+                      :class="{ active: placedCard.size === size.label }"
+                      :aria-checked="placedCard.size === size.label"
+                      @click="setPlacedCardSize(size.label)"
+                    >
+                      {{ size.label }}
+                    </button>
+                  </div>
+                </div>
+
+                <button type="button" class="fc-switch" role="switch" :aria-checked="placedCard.open" @click="setPlacedCardOpen(!placedCard.open)">
+                  <span class="fc-switch-copy">
+                    <strong><BcIcon name="card" /> {{ placedCard.open ? "Card open" : "Card closed" }}</strong>
+                    <small>{{ placedCard.open ? "Your message shows on the inside." : "Open it to show your message." }}</small>
+                  </span>
+                  <span class="fc-switch-track"><span class="fc-switch-knob"></span></span>
+                </button>
+
+                <div class="fc-card-message">
+                  <div class="fc-control-head">
+                    <span>Message</span>
+                    <output>{{ cardUsage(placedCard) }} / {{ placedCard.limit }} {{ placedCard.limit_type }}</output>
+                  </div>
+                  <p :class="{ empty: !placedCard.message }">{{ placedCard.message || "No message yet." }}</p>
+                  <button type="button" class="fc-text-btn" @click="openCardEditor(placedCard.sceneId)">
+                    <BcIcon name="card" /> {{ placedCard.message ? "Edit message" : "Write message" }}
+                  </button>
+                  <small class="fc-card-tip">Tip: double-click the card on the bouquet to write.</small>
+                </div>
               </div>
             </section>
 
@@ -508,6 +604,7 @@
               <div v-if="selectedOuterWrapper"><dt>Outer: {{ selectedOuterWrapper.name }}</dt><dd>{{ selectedOuterWrapper.price ? formatPeso(selectedOuterWrapper.price) : "Free" }}</dd></div>
               <div v-if="selectedInnerWrapper"><dt>Inner: {{ selectedInnerWrapper.name }}</dt><dd>{{ selectedInnerWrapper.price ? formatPeso(selectedInnerWrapper.price) : "Free" }}</dd></div>
               <div v-if="selectedRibbon"><dt>{{ selectedRibbon.name }}</dt><dd>{{ selectedRibbon.price ? formatPeso(selectedRibbon.price) : "Free" }}</dd></div>
+              <div v-if="placedCard"><dt>Card: {{ placedCard.product_name }} ({{ placedCard.size }})</dt><dd>{{ placedCard.price ? formatPeso(placedCard.price) : "Free" }}</dd></div>
               <div class="fc-receipt-total"><dt>Total</dt><dd>{{ formatPeso(totalPrice) }}</dd></div>
             </dl>
             <div class="fc-order-actions">
@@ -530,6 +627,54 @@
       </div>
     </div>
 
+    <!-- Card message editor (opened by double-clicking the card) -->
+    <div v-if="cardEditor.open" class="fc-modal-backdrop" @click.self="closeCardEditor">
+      <form
+        class="fc-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fc-card-editor-title"
+        @submit.prevent="saveCardMessage"
+        @keydown.esc="closeCardEditor"
+      >
+        <div class="fc-modal-head">
+          <div>
+            <p class="bc-label">{{ cardEditor.name }} · {{ cardEditor.size }}</p>
+            <h2 id="fc-card-editor-title">Write your card</h2>
+          </div>
+          <button type="button" class="fc-modal-close" aria-label="Close" @click="closeCardEditor">
+            <BcIcon name="x" />
+          </button>
+        </div>
+
+        <label class="fc-modal-field">
+          <span class="bc-sr-only">Card message</span>
+          <textarea
+            ref="cardMessageInput"
+            :value="cardEditor.draft"
+            rows="6"
+            maxlength="2000"
+            :placeholder="`Up to ${cardEditor.limit} ${cardEditor.limitType}`"
+            :aria-describedby="'fc-card-counter'"
+            @input="onCardDraftInput"
+          ></textarea>
+        </label>
+        <div class="fc-modal-meta">
+          <span id="fc-card-counter" class="fc-card-counter" :class="{ full: cardDraftUsed >= cardEditor.limit }" aria-live="polite">
+            {{ cardDraftUsed }} / {{ cardEditor.limit }} {{ cardEditor.limitType }}
+          </span>
+          <span v-if="cardEditor.capped" class="fc-card-capped">
+            This card allows up to {{ cardEditor.limit }} {{ cardEditor.limitType }}.
+          </span>
+        </div>
+
+        <div class="fc-modal-actions">
+          <button type="button" class="bc-link fc-modal-cancel" @click="closeCardEditor">Cancel</button>
+          <button type="submit" class="bc-btn bc-btn--dark">Save message</button>
+        </div>
+      </form>
+    </div>
+
     <transition name="fc-toast">
       <div v-if="toast.show" class="fc-toast" :class="toast.type" role="status">
         <BcIcon :name="toast.type === 'error' ? 'info' : 'check'" />
@@ -540,7 +685,7 @@
 </template>
 
 <script setup>
-import { computed, h, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, h, nextTick, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -548,6 +693,15 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import api from "../../plugins/axios.js";
 import { dressBouquet } from "../../utils/bouquetDressing.js";
+import {
+  clampCardMessage,
+  countCardMessage,
+  createCard,
+  disposeCard,
+  setCardMessage,
+  setCardOpen,
+  setCardSize,
+} from "../../utils/bouquetCard.js";
 import NavHeader from "../../layouts/NavHeader.vue";
 import { useAuth } from "../../composables/useAuth";
 import { useCart } from "../../composables/useCart";
@@ -581,6 +735,7 @@ const ICONS = {
   move: [["path", { d: "M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" }]],
   target: [["circle", { cx: 12, cy: 12, r: 7 }], ["circle", { cx: 12, cy: 12, r: 2 }], ["path", { d: "M12 2v3M12 19v3M2 12h3M19 12h3" }]],
   leaf: [["path", { d: "M5 19c0-8 5-14 14-14 0 9-6 14-14 14z" }], ["path", { d: "M5 19l7.5-7.5" }]],
+  card: [["rect", { x: 3, y: 6, width: 18, height: 13, rx: 2 }], ["path", { d: "m3.5 7.5 8.5 6 8.5-6" }]],
   flower: [
     ["circle", { cx: 12, cy: 9, r: 2 }],
     ["path", { d: "M12 7a2.5 2.5 0 1 1 0-5 2.5 2.5 0 1 1 0 5M14 9a2.5 2.5 0 1 1 5 0 2.5 2.5 0 1 1-5 0M12 11a2.5 2.5 0 1 1 0 5 2.5 2.5 0 1 1 0-5M10 9a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0" }],
@@ -616,6 +771,7 @@ const viewerContainer = ref(null);
 const layoutContainer = ref(null);
 const flowers = ref([]);
 const fillers = ref([]);
+const cards = ref([]);
 const wrapperOptions = ref([]);
 const ribbonOptions = ref([]);
 // Each wrap layer: the vendor option picked (id) and its colour; null colour = original paper.
@@ -641,6 +797,9 @@ const sceneReady = ref(false);
 const bouquetLoadError = ref("");
 const isCheckingOut = ref(false);
 const toast = reactive({ show: false, message: "", type: "success" });
+// Card message editor; the draft is capped at the card's word/letter allowance
+const cardEditor = reactive({ open: false, sceneId: null, name: "", size: "", draft: "", limit: 0, limitType: "words", capped: false });
+const cardMessageInput = ref(null);
 
 const editingCartItemId = computed(() => String(route.query.cart_item_id || ""));
 const editingCustomization = ref(null);
@@ -656,9 +815,22 @@ const filteredFillers = computed(() => {
   const term = search.value.trim().toLowerCase();
   return fillers.value.filter((filler) => !term || filler.product_name.toLowerCase().includes(term));
 });
-// selectedFlowers holds every placed model; fillers are marked kind: "filler".
-const placedFlowers = computed(() => selectedFlowers.value.filter((item) => item.kind !== "filler"));
+// selectedFlowers holds every placed object: stems (kind "flower"), fillers
+// (kind "filler") and at most one message card (kind "card").
+const isStem = (item) => (item?.kind || "flower") === "flower";
+const placedFlowers = computed(() => selectedFlowers.value.filter(isStem));
 const placedFillers = computed(() => selectedFlowers.value.filter((item) => item.kind === "filler"));
+const placedCard = computed(() => selectedFlowers.value.find((item) => item.kind === "card") || null);
+const cardDraftUsed = computed(() => countCardMessage(cardEditor.draft, cardEditor.limitType));
+const cardUsage = (card) => countCardMessage(card.message, card.limit_type);
+const placedKindLabel = (item) =>
+  item.kind === "filler" ? "Filler" : item.kind === "card" ? `Card · ${item.size}` : "Stem";
+const cardPriceLabel = (card) => {
+  const prices = card.sizes.map((size) => size.price);
+  const lowest = Math.min(...prices);
+  if (!lowest) return prices.some(Boolean) ? "From free" : "Free";
+  return prices.length > 1 ? `From ${formatPeso(lowest)}` : `+${formatPeso(lowest)}`;
+};
 const findWrapper = (id) => wrapperOptions.value.find((option) => option.id === id) || null;
 const selectedOuterWrapper = computed(() => findWrapper(wrap.outer.id));
 const selectedInnerWrapper = computed(() => findWrapper(wrap.inner.id));
@@ -676,6 +848,9 @@ const flowerImage = (flowerId) => flowers.value.find((flower) => flower.id === f
 const rangeFill = (value, min, max) => ({ "--fill": `${((Number(value) - min) / (max - min)) * 100}%` });
 const stageHint = computed(() => {
   if (pendingFlower.value) return { title: `Click the wrap to place ${pendingFlower.value.product_name}`, detail: "A marker shows where it will land." };
+  if (selectedFlower.value?.kind === "card") {
+    return { title: "Double-click the card to write your message", detail: "Drag it to move it, or open it in the Card panel." };
+  }
   if (selectedFlower.value) {
     return selectedFlower.value.locked
       ? { title: `${selectedFlower.value.product_name} is locked`, detail: "Unlock it in Adjust to move it again." }
@@ -695,9 +870,11 @@ const modelCache = new Map();
 const placedObjects = new Map();
 
 const isFiller = (item) => item?.kind === "filler";
+const isCard = (item) => item?.kind === "card";
 const countOfFlower = (flowerId, kind = "flower") =>
   selectedFlowers.value.filter((flower) => flower.id === flowerId && (flower.kind || "flower") === kind).length;
 const canUseFlower = (flower) => {
+  if (isCard(flower)) return !placedCard.value; // one card per bouquet
   if (!flower?.model) return false;
   if (isFiller(flower)) return placedFillers.value.length < MAX_FILLERS;
   return placedFlowers.value.length < MAX_FLOWERS && flower.quantity_in_stock > countOfFlower(flower.id);
@@ -836,6 +1013,18 @@ async function fetchCustomizationOptions() {
       model: filler.model_url,
       model_3d_url: filler.model_url,
     }));
+    cards.value = (data.cards || [])
+      .map((card) => ({
+        kind: "card",
+        id: Number(card.id),
+        product_name: card.name,
+        description: card.description || "",
+        image: card.image_url || null,
+        limit_type: card.card_limit_type === "letters" ? "letters" : "words",
+        limit: Number(card.card_limit || 0),
+        sizes: (card.card_sizes || []).map((size) => ({ label: size.label, price: Number(size.price || 0) })),
+      }))
+      .filter((card) => card.sizes.length && card.limit > 0);
 
     // Wrappers start on the bouquet's original paper unless a saved bouquet chose one.
     const outerWrapper = findWrapper(Number(editingCustomization.value?.wrapper?.id || 0));
@@ -917,6 +1106,12 @@ function onDragStart(event, flower) {
   if (!canUseFlower(flower)) {
     event.preventDefault();
     return enforceFlowerLimit(flower);
+  }
+  if (isCard(flower)) {
+    draggedFlower.value = { ...flower };
+    dragFeedback.value = `Drop the ${flower.product_name} card on the bouquet`;
+    event.dataTransfer.effectAllowed = "copy";
+    return;
   }
   draggedFlower.value = {
     kind: flower.kind || "flower",
@@ -1040,6 +1235,15 @@ function setupCanvasInteractions() {
     endTransformDrag(event.pointerId);
     pointerDown = null;
   });
+  // Double-click the card to write its message
+  canvas.addEventListener("dblclick", (event) => {
+    const hit = getPlacedFlowerHit(event.clientX, event.clientY);
+    const entry = hit && selectedFlowers.value.find((item) => item.sceneId === hit.sceneId);
+    if (entry?.kind === "card") {
+      event.preventDefault();
+      openCardEditor(entry.sceneId);
+    }
+  });
 }
 
 function getPlacement(clientX, clientY) {
@@ -1090,6 +1294,7 @@ function endTransformDrag(pointerId = null) {
 }
 
 async function placeFlowerOnBouquet(flower, placement) {
+  if (isCard(flower)) return placeCardOnBouquet(flower, placement);
   const filler = isFiller(flower);
   if (filler && placedFillers.value.length >= MAX_FILLERS) {
     return showToast(`Maximum of ${MAX_FILLERS} fillers only.`, "error");
@@ -1176,6 +1381,128 @@ function fitFlowerModel(model) {
 
 
 
+// ── Message card ──────────────────────────────────────────────────────────
+// The card faces the viewer, unlike flower models which face -Z.
+const CARD_ROTATION = { xDeg: -8, yDeg: 0, zDeg: 0 };
+
+// `saved` restores a card from a saved bouquet (cart edit)
+function placeCardOnBouquet(card, placement, saved = null) {
+  if (placedCard.value) return enforceFlowerLimit(card);
+
+  const size = card.sizes.find((entry) => entry.label === saved?.size) || card.sizes[0];
+  const message = clampCardMessage(saved?.message || "", card.limit_type, card.limit);
+  const open = Boolean(saved?.open);
+  const rotation = saved?.rotation
+    ? { xDeg: Number(saved.rotation.xDeg || 0), yDeg: Number(saved.rotation.yDeg || 0), zDeg: Number(saved.rotation.zDeg || 0) }
+    : { ...CARD_ROTATION };
+  const scale = Number(saved?.scale ?? 1);
+  const sceneId = saved?.scene_id || `card-${card.id}-${Date.now()}`;
+
+  const object = createCard({ size: size.label, message, open });
+  object.position.copy(placement.point);
+  object.rotation.set(
+    THREE.MathUtils.degToRad(rotation.xDeg),
+    THREE.MathUtils.degToRad(rotation.yDeg),
+    THREE.MathUtils.degToRad(rotation.zDeg),
+  );
+  object.scale.setScalar(scale);
+  object.userData.sceneId = sceneId;
+  flowerLayer.add(object);
+  placedObjects.set(sceneId, object);
+
+  selectedFlowers.value.push({
+    sceneId,
+    kind: "card",
+    id: card.id,
+    product_name: card.product_name,
+    image: card.image,
+    sizes: card.sizes,
+    size: size.label,
+    price: size.price,
+    limit_type: card.limit_type,
+    limit: card.limit,
+    message,
+    open,
+    position: { x: placement.point.x, y: placement.point.y, z: placement.point.z },
+    rotation,
+    scale,
+    locked: Boolean(saved?.locked),
+  });
+  selectedSceneId.value = sceneId;
+
+  if (!saved) {
+    showToast(`${card.product_name} card placed. Write your message.`, "success");
+    openCardEditor(sceneId);
+  }
+}
+
+function setPlacedCardSize(label) {
+  const card = placedCard.value;
+  const size = card?.sizes.find((entry) => entry.label === label);
+  const object = card ? placedObjects.get(card.sceneId) : null;
+  if (!card || !size || !object) return;
+  setCardSize(object, size.label);
+  updateFlowerState(card.sceneId, { size: size.label, price: size.price });
+}
+
+function setPlacedCardOpen(open) {
+  const card = placedCard.value;
+  const object = card ? placedObjects.get(card.sceneId) : null;
+  if (!card || !object) return;
+  setCardOpen(object, open);
+  updateFlowerState(card.sceneId, { open });
+}
+
+function openCardEditor(sceneId) {
+  const card = selectedFlowers.value.find((entry) => entry.sceneId === sceneId && entry.kind === "card");
+  if (!card) return;
+  selectedSceneId.value = sceneId;
+  Object.assign(cardEditor, {
+    open: true,
+    sceneId,
+    name: card.product_name,
+    size: card.size,
+    draft: card.message || "",
+    limit: card.limit,
+    limitType: card.limit_type,
+    capped: false,
+  });
+  nextTick(() => {
+    const input = cardMessageInput.value;
+    input?.focus();
+    input?.setSelectionRange(input.value.length, input.value.length);
+  });
+}
+
+function closeCardEditor() {
+  cardEditor.open = false;
+}
+
+// Typing or pasting past the allowance is cut off at the limit
+function onCardDraftInput(event) {
+  const value = event.target.value;
+  const clamped = clampCardMessage(value, cardEditor.limitType, cardEditor.limit);
+  cardEditor.capped = clamped !== value;
+  if (cardEditor.capped) {
+    const caret = Math.min(event.target.selectionStart ?? clamped.length, clamped.length);
+    event.target.value = clamped;
+    event.target.setSelectionRange(caret, caret);
+  }
+  cardEditor.draft = clamped;
+}
+
+function saveCardMessage() {
+  const object = placedObjects.get(cardEditor.sceneId);
+  if (!object) return closeCardEditor();
+  const message = clampCardMessage(cardEditor.draft, cardEditor.limitType, cardEditor.limit).trim();
+  setCardMessage(object, message);
+  updateFlowerState(cardEditor.sceneId, { message });
+  // Open the card so the customer sees what they wrote
+  if (message && !placedCard.value?.open) setPlacedCardOpen(true);
+  closeCardEditor();
+  showToast(message ? "Card message saved." : "Card message cleared.", "success");
+}
+
 function applyRibbonColor(color) {
   ribbonColor.value = color;
   dressing?.applyRibbon(color);
@@ -1189,15 +1516,20 @@ function removeFlower(sceneId) {
   const object = placedObjects.get(sceneId);
   if (object) {
     flowerLayer.remove(object);
+    if (object.userData.isCard) disposeCard(object);
     placedObjects.delete(sceneId);
   }
+  if (cardEditor.sceneId === sceneId) closeCardEditor();
 }
 
 function resetDesign() {
   selectedFlowers.value.forEach((flower) => {
     const object = placedObjects.get(flower.sceneId);
-    if (object) flowerLayer.remove(object);
+    if (!object) return;
+    flowerLayer.remove(object);
+    if (object.userData.isCard) disposeCard(object);
   });
+  closeCardEditor();
   selectedFlowers.value = [];
   selectedSceneId.value = null;
   placedObjects.clear();
@@ -1252,7 +1584,7 @@ function resetSelectedTransform() {
   const flower = selectedFlower.value;
   const object = flower ? placedObjects.get(flower.sceneId) : null;
   if (!flower || !object) return;
-  const resetRotation = { xDeg: -5, yDeg: 180, zDeg: 0 };
+  const resetRotation = flower.kind === "card" ? { ...CARD_ROTATION } : { xDeg: -5, yDeg: 180, zDeg: 0 };
   object.rotation.set(
     THREE.MathUtils.degToRad(resetRotation.xDeg),
     THREE.MathUtils.degToRad(resetRotation.yDeg),
@@ -1302,6 +1634,9 @@ function updateFlowerState(sceneId, patch) {
 }
 
 function enforceFlowerLimit(flower) {
+  if (isCard(flower)) {
+    return showToast("A bouquet can have one card. Remove the current card to choose another.", "error");
+  }
   if (isFiller(flower)) {
     return showToast(`Maximum of ${MAX_FILLERS} fillers only.`, "error");
   }
@@ -1372,6 +1707,22 @@ function buildBouquetCustomization() {
     wrapper: selectedOuterWrapper.value ? { id: selectedOuterWrapper.value.id, name: selectedOuterWrapper.value.name } : null,
     inner_wrapper: selectedInnerWrapper.value ? { id: selectedInnerWrapper.value.id, name: selectedInnerWrapper.value.name } : null,
     ribbon: selectedRibbon.value ? { id: selectedRibbon.value.id, name: selectedRibbon.value.name } : null,
+    // The card's price comes from its size on the server, and the message is
+    // checked against the card's allowance there too.
+    card: placedCard.value
+      ? {
+          scene_id: placedCard.value.sceneId,
+          id: placedCard.value.id,
+          name: placedCard.value.product_name,
+          size: placedCard.value.size,
+          message: placedCard.value.message,
+          open: placedCard.value.open,
+          position: { ...placedCard.value.position },
+          rotation: { ...placedCard.value.rotation },
+          scale: Number(placedCard.value.scale ?? 1),
+          locked: placedCard.value.locked,
+        }
+      : null,
     fillers: placedFillers.value.map((filler, index) => ({
       scene_id: filler.sceneId,
       id: filler.id,
@@ -1504,6 +1855,21 @@ async function restoreBouquet(customization) {
       console.error("Failed to restore saved flower:", error);
     }
   }
+
+  // The saved card, if the shop still offers it
+  const savedCard = customization.card;
+  const catalogCard = savedCard && cards.value.find((card) => card.id === Number(savedCard.id));
+  if (catalogCard) {
+    const position = savedCard.position || {};
+    placeCardOnBouquet(
+      catalogCard,
+      { point: new THREE.Vector3(Number(position.x || 0), Number(position.y || 1.5), Number(position.z || 0.6)) },
+      savedCard,
+    );
+  } else if (savedCard) {
+    showToast("The card on this bouquet is no longer offered by the shop.", "error");
+  }
+
   selectedSceneId.value = selectedFlowers.value[0]?.sceneId || null;
 }
 
@@ -2107,6 +2473,241 @@ function showToast(message, type = "success") {
   flex-shrink: 0;
   font-size: 12.5px;
   font-weight: 500;
+}
+
+/* ── Message cards ─────────────────────────────────────────────────── */
+.fc-cards {
+  display: grid;
+  gap: 6px;
+}
+
+.fc-card-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.25s, border-color 0.25s;
+}
+
+.fc-card-option:hover:not(.disabled) {
+  background: var(--ivory);
+}
+
+.fc-card-option.active,
+.fc-card-option.placed {
+  border-color: var(--ink);
+  background: var(--ivory);
+}
+
+.fc-card-option.disabled:not(.placed) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.fc-card-option:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 2px;
+}
+
+.fc-card-photo {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 46px;
+  height: 58px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--ivory-deep);
+  color: var(--ink-soft);
+}
+
+.fc-card-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fc-card-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fc-card-copy strong {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.fc-card-copy small {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-card-settings {
+  display: grid;
+  gap: 16px;
+}
+
+/* One segment per size the shop offers (1 to 3) */
+.fc-card-settings .fc-segment {
+  grid-template-columns: none;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  margin-bottom: 0;
+}
+
+.fc-card-message {
+  display: grid;
+  gap: 8px;
+}
+
+.fc-card-message p {
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-style: italic;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.fc-card-message p.empty {
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-style: normal;
+}
+
+.fc-card-tip {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+/* Card message editor */
+.fc-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(27, 22, 18, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.fc-modal {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  max-width: 480px;
+  padding: 26px 26px 22px;
+  border-radius: 22px;
+  background: var(--paper);
+  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
+}
+
+.fc-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fc-modal-head h2 {
+  margin-top: 8px;
+  font-size: 32px;
+}
+
+.fc-modal-close {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: var(--ivory-deep);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.fc-modal-field textarea {
+  width: 100%;
+  min-height: 150px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #ffffff;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-style: italic;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.fc-modal-field textarea:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+
+.fc-modal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  margin-top: -4px;
+}
+
+.fc-card-counter {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fc-card-counter.full,
+.fc-card-capped {
+  color: var(--rosewood-dark);
+}
+
+.fc-card-capped {
+  font-size: 12.5px;
+}
+
+.fc-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 20px;
+  margin-top: 4px;
+}
+
+.fc-modal-cancel {
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.fc-modal-close:focus-visible,
+.fc-modal-cancel:focus-visible {
+  outline: 2px solid var(--rosewood);
+  outline-offset: 3px;
 }
 
 /* ============================================================

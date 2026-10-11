@@ -405,7 +405,7 @@ class VendorStorefrontController extends Controller
      */
     public function getCustomizationOptions(Request $request, $storeId)
     {
-        $empty = ['wrappers' => [], 'fillers' => [], 'ribbons' => []];
+        $empty = ['wrappers' => [], 'fillers' => [], 'ribbons' => [], 'cards' => []];
 
         try {
             $ownerId = $this->resolveCustomizableOwnerId($storeId, $request);
@@ -418,7 +418,10 @@ class VendorStorefrontController extends Controller
                 ->available()
                 ->orderBy('sort_order')
                 ->orderBy('id')
-                ->get(['id', 'type', 'name', 'description', 'color_hex', 'price', 'model_url']);
+                ->get([
+                    'id', 'type', 'name', 'description', 'color_hex', 'price', 'model_url',
+                    'image_url', 'card_limit_type', 'card_limit', 'card_sizes',
+                ]);
 
             return response()->json([
                 'success' => true,
@@ -426,6 +429,7 @@ class VendorStorefrontController extends Controller
                     'wrappers' => $options->where('type', BouquetCustomizationOption::TYPE_WRAPPER)->values(),
                     'fillers' => $options->where('type', BouquetCustomizationOption::TYPE_FILLER)->values(),
                     'ribbons' => $options->where('type', BouquetCustomizationOption::TYPE_RIBBON)->values(),
+                    'cards' => $options->where('type', BouquetCustomizationOption::TYPE_CARD)->values(),
                 ],
             ]);
         } catch (\Exception $e) {

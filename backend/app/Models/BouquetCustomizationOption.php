@@ -6,17 +6,24 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A vendor's wrapper, filler or ribbon choice for the 3D flower customizer.
- * Flowers stay regular products (selling_type = per_piece_customizable).
+ * A vendor's wrapper, filler, ribbon or message card for the 3D flower
+ * customizer. Flowers stay regular products (selling_type =
+ * per_piece_customizable).
  */
 class BouquetCustomizationOption extends Model
 {
     public const TYPE_WRAPPER = 'wrapper';
     public const TYPE_FILLER = 'filler';
     public const TYPE_RIBBON = 'ribbon';
-    public const TYPES = [self::TYPE_WRAPPER, self::TYPE_FILLER, self::TYPE_RIBBON];
+    public const TYPE_CARD = 'card';
+    public const TYPES = [self::TYPE_WRAPPER, self::TYPE_FILLER, self::TYPE_RIBBON, self::TYPE_CARD];
 
     public const MAX_FILLERS = 5;
+
+    // A card's message is capped by words or by letters (spaces don't count)
+    public const CARD_LIMIT_WORDS = 'words';
+    public const CARD_LIMIT_LETTERS = 'letters';
+    public const CARD_SIZES = ['Small', 'Medium', 'Large'];
 
     protected $fillable = [
         'owner_id',
@@ -28,6 +35,11 @@ class BouquetCustomizationOption extends Model
         'is_active',
         'model_url',
         'model_path',
+        'image_url',
+        'image_path',
+        'card_limit_type',
+        'card_limit',
+        'card_sizes',
         'sort_order',
     ];
 
@@ -35,9 +47,24 @@ class BouquetCustomizationOption extends Model
         'price' => 'float',
         'is_active' => 'boolean',
         'sort_order' => 'integer',
+        'card_limit' => 'integer',
+        'card_sizes' => 'array',
     ];
 
-    protected $hidden = ['model_path'];
+    protected $hidden = ['model_path', 'image_path'];
+
+    /** How much of the card's allowance a message uses */
+    public static function countCardMessage(string $message, ?string $limitType): int
+    {
+        $trimmed = trim($message);
+        if ($trimmed === '') {
+            return 0;
+        }
+
+        return $limitType === self::CARD_LIMIT_LETTERS
+            ? mb_strlen(preg_replace('/\s+/u', '', $trimmed))
+            : count(preg_split('/\s+/u', $trimmed));
+    }
 
     public function scopeForOwner(Builder $query, int $ownerId): Builder
     {
@@ -68,6 +95,7 @@ class BouquetCustomizationOption extends Model
         $wrapperId = (int) data_get($customizations, 'wrapper.id', 0);
         $innerWrapperId = (int) data_get($customizations, 'inner_wrapper.id', 0);
         $ribbonId = (int) data_get($customizations, 'ribbon.id', 0);
+        $cardId = (int) data_get($customizations, 'card.id', 0);
         $fillers = data_get($customizations, 'fillers', []);
         $fillers = is_array($fillers) ? array_values($fillers) : [];
 
@@ -76,12 +104,12 @@ class BouquetCustomizationOption extends Model
         }
 
         $ids = array_filter(array_merge(
-            [$wrapperId, $innerWrapperId, $ribbonId],
+            [$wrapperId, $innerWrapperId, $ribbonId, $cardId],
             array_map(fn ($filler) => (int) data_get($filler, 'id', 0), $fillers)
         ));
 
         if (!$ids) {
-            unset($customizations['wrapper'], $customizations['inner_wrapper'], $customizations['ribbon']);
+            unset($customizations['wrapper'], $customizations['inner_wrapper'], $customizations['ribbon'], $customizations['card']);
             $customizations['fillers'] = [];
             $customizations['extras_total'] = 0;
 
@@ -141,6 +169,50 @@ class BouquetCustomizationOption extends Model
         }
 
         $customizations['fillers'] = $resolvedFillers;
+
+        // Message card: price from the chosen size, message within the cap
+        if ($cardId) {
+            $option = $options->get($cardId);
+            if (!$option || $option->type !== self::TYPE_CARD) {
+                return self::failure('The selected card is no longer available.', $customizations);
+            }
+
+            $sizeLabel = (string) data_get($customizations, 'card.size', '');
+            $size = collect($option->card_sizes ?? [])->first(fn ($s) => ($s['label'] ?? null) === $sizeLabel);
+            if (!$size) {
+                return self::failure("{$option->name} isn't available in that size any more. Choose another size.", $customizations);
+            }
+
+            $message = trim((string) data_get($customizations, 'card.message', ''));
+            $used = self::countCardMessage($message, $option->card_limit_type);
+            if ($option->card_limit && $used > $option->card_limit) {
+                return self::failure(
+                    "Your card message is {$used} {$option->card_limit_type}; this card allows up to {$option->card_limit}.",
+                    $customizations
+                );
+            }
+
+            $customizations['card'] = [
+                'scene_id' => (string) data_get($customizations, 'card.scene_id', 'card'),
+                'id' => $option->id,
+                'name' => $option->name,
+                'image_url' => $option->image_url,
+                'size' => $size['label'],
+                'price' => (float) $size['price'],
+                'limit_type' => $option->card_limit_type,
+                'limit' => $option->card_limit,
+                'message' => $message,
+                'open' => (bool) data_get($customizations, 'card.open', false),
+                'position' => (array) data_get($customizations, 'card.position', []),
+                'rotation' => (array) data_get($customizations, 'card.rotation', []),
+                'scale' => (float) data_get($customizations, 'card.scale', 1),
+                'locked' => (bool) data_get($customizations, 'card.locked', false),
+            ];
+            $total += (float) $size['price'];
+        } else {
+            unset($customizations['card']);
+        }
+
         $customizations['extras_total'] = round($total, 2);
 
         return ['ok' => true, 'total' => round($total, 2), 'customizations' => $customizations];

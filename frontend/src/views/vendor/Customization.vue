@@ -125,6 +125,104 @@
             <span v-if="errors.name" class="cz-error">{{ errors.name }}</span>
           </label>
 
+          <!-- Card: photo, message allowance, and a price per size -->
+          <template v-if="current.isCard">
+            <div class="cz-field">
+              <span class="cz-label">Card photo <small>(what customers see when choosing)</small></span>
+              <label class="cz-upload cz-upload--image" :class="{ invalid: errors.image_file, filled: form.imagePreview }">
+                <input type="file" accept="image/jpeg,image/png,image/webp" class="bc-sr-only" @change="onImageSelected" />
+                <img v-if="form.imagePreview" :src="form.imagePreview" alt="" class="cz-upload-preview" />
+                <span v-else class="cz-upload-icon" aria-hidden="true">⬆</span>
+                <span class="cz-upload-text">
+                  <strong>{{ form.imagePreview ? (form.imageFile ? form.imageFile.name : "Current photo kept") : "Upload a photo of the card" }}</strong>
+                  <small>{{ form.imagePreview ? "Click to replace" : "JPG, PNG or WEBP · Max 5 MB" }}</small>
+                </span>
+              </label>
+              <span v-if="errors.image_file" class="cz-error">{{ errors.image_file }}</span>
+            </div>
+
+            <div class="cz-field">
+              <span class="cz-label">Message allowance</span>
+              <div class="cz-allowance">
+                <div class="cz-segment" role="radiogroup" aria-label="Count the message by">
+                  <button
+                    v-for="mode in LIMIT_TYPES"
+                    :key="mode.value"
+                    type="button"
+                    role="radio"
+                    :aria-checked="form.limitType === mode.value"
+                    :class="{ active: form.limitType === mode.value }"
+                    @click="form.limitType = mode.value"
+                  >
+                    {{ mode.label }}
+                  </button>
+                </div>
+                <label class="cz-allowance-count">
+                  <span>Up to</span>
+                  <input
+                    v-model="form.limit"
+                    class="cz-input"
+                    :class="{ invalid: errors.card_limit }"
+                    type="number"
+                    min="1"
+                    max="1000"
+                    step="1"
+                    inputmode="numeric"
+                    placeholder="50"
+                    :aria-label="`Maximum ${form.limitType}`"
+                  />
+                  <span>{{ form.limitType }}</span>
+                </label>
+              </div>
+              <span class="cz-hint">
+                {{ form.limitType === "letters" ? "Letters and symbols count; spaces don't." : "Words are counted by the spaces between them." }}
+                Customers can't write past this.
+              </span>
+              <span v-if="errors.card_limit" class="cz-error">{{ errors.card_limit }}</span>
+            </div>
+
+            <div class="cz-field">
+              <span class="cz-label">Sizes and prices</span>
+              <div class="cz-sizes">
+                <div v-for="(size, index) in form.sizes" :key="index" class="cz-size-row">
+                  <select v-model="size.label" class="cz-input" :aria-label="`Size ${index + 1}`">
+                    <option v-for="label in CARD_SIZES" :key="label" :value="label" :disabled="isSizeTaken(label, index)">
+                      {{ label }}
+                    </option>
+                  </select>
+                  <div class="cz-money">
+                    <span aria-hidden="true">₱</span>
+                    <input
+                      v-model="size.price"
+                      class="cz-input"
+                      :class="{ invalid: errors[`card_sizes.${index}.price`] }"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputmode="decimal"
+                      placeholder="0.00"
+                      :aria-label="`${size.label} price`"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    class="cz-icon-btn"
+                    :disabled="form.sizes.length === 1"
+                    :aria-label="`Remove ${size.label}`"
+                    title="Remove size"
+                    @click="form.sizes.splice(index, 1)"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+              <button v-if="form.sizes.length < CARD_SIZES.length" type="button" class="cz-link cz-add-size" @click="addSize">
+                + Add size
+              </button>
+              <span v-if="errors.card_sizes" class="cz-error">{{ errors.card_sizes }}</span>
+            </div>
+          </template>
+
           <!-- Colour: picker, hex code and sliders all edit the same value. -->
           <div v-if="current.hasColor" class="cz-field">
             <span class="cz-label">Colour</span>
@@ -191,7 +289,7 @@
             <span v-if="errors.model_file" class="cz-error">{{ errors.model_file }}</span>
           </div>
 
-          <label class="cz-field">
+          <label v-if="!current.isCard" class="cz-field">
             <span class="cz-label">Price <small>(added to the bouquet, optional)</small></span>
             <div class="cz-money">
               <span aria-hidden="true">₱</span>
@@ -261,20 +359,27 @@
               class="cz-row"
               :class="{ editing: editingId === item.id, off: item.type === 'wrapper' && !item.is_active }"
             >
+              <img v-if="item.type === 'card' && item.image_url" :src="item.image_url" alt="" class="cz-card-thumb" />
               <span
-                v-if="item.color_hex"
+                v-else-if="item.color_hex"
                 class="cz-dot"
                 :style="{ background: item.color_hex }"
                 aria-hidden="true"
               ></span>
-              <span v-else class="cz-dot cz-dot--model" aria-hidden="true">3D</span>
+              <span v-else class="cz-dot cz-dot--model" aria-hidden="true">{{ item.type === "card" ? "✉" : "3D" }}</span>
 
               <div class="cz-item-body">
                 <div class="cz-item-title">
                   <h3>{{ item.name }}</h3>
-                  <span class="cz-price">{{ Number(item.price) ? `+ ${formatPrice(item.price)}` : "Free" }}</span>
+                  <span class="cz-price">{{ itemPriceLabel(item) }}</span>
                 </div>
                 <p v-if="item.color_hex" class="cz-hexline">{{ item.color_hex.toUpperCase() }}</p>
+                <div v-if="item.type === 'card'" class="cz-meta">
+                  <span class="cz-chip">Up to {{ item.card_limit }} {{ item.card_limit_type }}</span>
+                  <span v-for="size in item.card_sizes || []" :key="size.label" class="cz-chip">
+                    {{ size.label }} · {{ Number(size.price) ? formatPrice(size.price) : "Free" }}
+                  </span>
+                </div>
                 <p class="cz-desc" :class="{ muted: !item.description }">
                   {{ item.description || "No description." }}
                 </p>
@@ -330,7 +435,15 @@ const TABS = [
   { key: "flowers", label: "Flowers" },
   { key: "filler", label: "Fillers" },
   { key: "ribbon", label: "Ribbons" },
+  { key: "card", label: "Cards" },
 ];
+
+const CARD_SIZES = ["Small", "Medium", "Large"];
+const LIMIT_TYPES = [
+  { value: "words", label: "Words" },
+  { value: "letters", label: "Letters" },
+];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const TYPE_CONFIG = {
   wrapper: {
@@ -359,6 +472,14 @@ const TYPE_CONFIG = {
     descriptionPlaceholder: "e.g. 1-inch satin ribbon",
     defaultColor: "#caa6d9",
   },
+  card: {
+    label: "Cards",
+    singular: "card",
+    isCard: true,
+    hint: "Message cards customers can add to a bouquet and write on. Customers see your photo when choosing; on the 3D bouquet the card is plain white.",
+    namePlaceholder: "e.g. Folded greeting card",
+    descriptionPlaceholder: "e.g. Thick matte card stock with an envelope",
+  },
 };
 
 const SLIDERS = [
@@ -370,7 +491,7 @@ const SLIDERS = [
 const MAX_MODEL_BYTES = 50 * 1024 * 1024;
 
 const activeTab = ref("wrapper");
-const options = reactive({ wrapper: [], filler: [], ribbon: [] });
+const options = reactive({ wrapper: [], filler: [], ribbon: [], card: [] });
 const flowers = ref([]);
 const loadingOptions = ref(true);
 const loadingFlowers = ref(true);
@@ -382,7 +503,20 @@ const confirmingId = ref(null);
 const deletingId = ref(null);
 const errors = reactive({});
 
-const form = reactive({ name: "", description: "", price: "", color: "#d3b18f", modelFile: null, modelUrl: null });
+const form = reactive({
+  name: "",
+  description: "",
+  price: "",
+  color: "#d3b18f",
+  modelFile: null,
+  modelUrl: null,
+  // Cards
+  imageFile: null,
+  imagePreview: null,
+  limitType: "words",
+  limit: "",
+  sizes: [{ label: "Small", price: "" }],
+});
 const hexInput = ref("D3B18F");
 const hsl = reactive({ h: 0, s: 0, l: 0 });
 
@@ -529,6 +663,11 @@ function resetForm() {
   form.price = "";
   form.modelFile = null;
   form.modelUrl = null;
+  form.imageFile = null;
+  form.imagePreview = null;
+  form.limitType = "words";
+  form.limit = "";
+  form.sizes = [{ label: "Small", price: "" }];
   uploadProgress.value = 0;
   Object.keys(errors).forEach((key) => delete errors[key]);
   setColorFromHex(current.value.defaultColor || "#d3b18f");
@@ -543,6 +682,13 @@ function startEdit(item) {
   form.price = Number(item.price) ? String(item.price) : "";
   form.modelUrl = item.model_url || null;
   if (item.color_hex) setColorFromHex(item.color_hex);
+  if (item.type === "card") {
+    form.imagePreview = item.image_url || null;
+    form.limitType = item.card_limit_type || "words";
+    form.limit = item.card_limit ? String(item.card_limit) : "";
+    form.sizes = (item.card_sizes || []).map((size) => ({ label: size.label, price: String(size.price ?? "") }));
+    if (!form.sizes.length) form.sizes = [{ label: "Small", price: "" }];
+  }
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -563,9 +709,59 @@ function onModelSelected(event) {
   form.modelFile = file;
 }
 
+// ---- Cards ----
+function onImageSelected(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+    errors.image_file = "Choose a JPG, PNG or WEBP image.";
+    return;
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    errors.image_file = "The image is larger than 5 MB.";
+    return;
+  }
+  delete errors.image_file;
+  form.imageFile = file;
+  const reader = new FileReader();
+  reader.onload = (e) => (form.imagePreview = e.target.result);
+  reader.readAsDataURL(file);
+}
+
+const isSizeTaken = (label, index) => form.sizes.some((size, i) => i !== index && size.label === label);
+
+function addSize() {
+  const next = CARD_SIZES.find((label) => !form.sizes.some((size) => size.label === label));
+  if (next) form.sizes.push({ label: next, price: "" });
+}
+
+function itemPriceLabel(item) {
+  if (item.type === "card") {
+    const prices = (item.card_sizes || []).map((size) => Number(size.price || 0));
+    const lowest = prices.length ? Math.min(...prices) : 0;
+    if (!lowest) return prices.some(Boolean) ? "From free" : "Free";
+    return prices.length > 1 ? `From ${formatPrice(lowest)}` : `+ ${formatPrice(lowest)}`;
+  }
+  return Number(item.price) ? `+ ${formatPrice(item.price)}` : "Free";
+}
+
 function validate() {
   Object.keys(errors).forEach((key) => delete errors[key]);
   if (!form.name) errors.name = "Enter a name.";
+  if (current.value.isCard) {
+    if (!form.imageFile && !form.imagePreview) errors.image_file = "Upload a photo of the card.";
+    const limit = Number(form.limit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 1000) {
+      errors.card_limit = `Enter how many ${form.limitType} customers can write (1 to 1000).`;
+    }
+    form.sizes.forEach((size, index) => {
+      if (size.price === "" || Number.isNaN(Number(size.price)) || Number(size.price) < 0) {
+        errors[`card_sizes.${index}.price`] = "Enter 0 or a positive amount.";
+        errors.card_sizes = "Give every size a price (0 for free).";
+      }
+    });
+  }
   if (current.value.hasColor && !/^#[0-9a-f]{6}$/i.test(form.color)) errors.color_hex = "Enter a 6-digit hex code.";
   if (current.value.hasModel && !form.modelFile && !form.modelUrl) errors.model_file = "Upload a 3D model for this filler.";
   if (form.price !== "" && (Number.isNaN(Number(form.price)) || Number(form.price) < 0)) {
@@ -582,7 +778,17 @@ async function submitForm() {
   if (!editingId.value) payload.append("type", type);
   payload.append("name", form.name);
   payload.append("description", form.description.trim());
-  payload.append("price", form.price === "" ? "0" : String(Number(form.price)));
+  if (current.value.isCard) {
+    if (form.imageFile) payload.append("image_file", form.imageFile);
+    payload.append("card_limit_type", form.limitType);
+    payload.append("card_limit", String(Number(form.limit)));
+    form.sizes.forEach((size, index) => {
+      payload.append(`card_sizes[${index}][label]`, size.label);
+      payload.append(`card_sizes[${index}][price]`, String(Number(size.price)));
+    });
+  } else {
+    payload.append("price", form.price === "" ? "0" : String(Number(form.price)));
+  }
   if (current.value.hasColor) payload.append("color_hex", form.color);
   if (form.modelFile) payload.append("model_file", form.modelFile);
 
@@ -1176,6 +1382,120 @@ const formatSize = (bytes) =>
   color: #2b6cb0;
   font-size: 12px;
   font-weight: 600;
+}
+
+/* ── Cards ─────────────────────────────────────────────────────────── */
+.cz-card-thumb {
+  flex-shrink: 0;
+  width: 44px;
+  height: 56px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.cz-upload-preview {
+  flex-shrink: 0;
+  width: 56px;
+  height: 72px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #fff;
+}
+
+.cz-allowance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.cz-segment {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: #edf2f7;
+}
+
+.cz-segment button {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #4a5568;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.cz-segment button.active {
+  background: #fff;
+  color: #2d3748;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.cz-segment button:focus-visible,
+.cz-icon-btn:focus-visible {
+  outline: 2px solid #48bb78;
+  outline-offset: 2px;
+}
+
+.cz-allowance-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #4a5568;
+  font-size: 13px;
+}
+
+.cz-allowance-count .cz-input {
+  width: 84px;
+}
+
+.cz-hint {
+  color: #718096;
+  font-size: 12px;
+}
+
+.cz-sizes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cz-size-row {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) 36px;
+  gap: 8px;
+  align-items: center;
+}
+
+.cz-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #718096;
+  cursor: pointer;
+}
+
+.cz-icon-btn:hover:not(:disabled) {
+  border-color: #e53e3e;
+  color: #e53e3e;
+}
+
+.cz-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cz-add-size {
+  align-self: flex-start;
+  margin-top: 4px;
 }
 
 .cz-item-body {

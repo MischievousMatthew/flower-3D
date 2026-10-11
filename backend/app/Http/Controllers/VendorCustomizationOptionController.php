@@ -60,6 +60,9 @@ class VendorCustomizationOptionController extends Controller
             if ($type === Option::TYPE_FILLER) {
                 $this->storeModel($option, $request->file('model_file'));
             }
+            if ($type === Option::TYPE_CARD) {
+                $this->storeImage($option, $request->file('image_file'));
+            }
 
             $option->save();
 
@@ -90,16 +93,23 @@ class VendorCustomizationOptionController extends Controller
 
         try {
             $previousModelPath = $option->model_path;
+            $previousImagePath = $option->image_path;
             $option->fill($this->payload($request, $option->type));
 
             if ($option->type === Option::TYPE_FILLER && $request->hasFile('model_file')) {
                 $this->storeModel($option, $request->file('model_file'));
+            }
+            if ($option->type === Option::TYPE_CARD && $request->hasFile('image_file')) {
+                $this->storeImage($option, $request->file('image_file'));
             }
 
             $option->save();
 
             if ($previousModelPath && $previousModelPath !== $option->model_path) {
                 $this->destroyModel($previousModelPath);
+            }
+            if ($previousImagePath && $previousImagePath !== $option->image_path) {
+                $this->destroyImage($previousImagePath);
             }
 
             return response()->json(['success' => true, 'data' => $option, 'message' => 'Changes saved.']);
@@ -141,9 +151,13 @@ class VendorCustomizationOptionController extends Controller
         }
 
         $modelPath = $option->model_path;
+        $imagePath = $option->image_path;
         $option->delete();
         if ($modelPath) {
             $this->destroyModel($modelPath);
+        }
+        if ($imagePath) {
+            $this->destroyImage($imagePath);
         }
 
         return response()->json(['success' => true, 'message' => 'Item removed.']);
@@ -170,6 +184,17 @@ class VendorCustomizationOptionController extends Controller
             // GLB is often sent as application/octet-stream, so check the
             // extension instead of the MIME type (as products do).
             $rules['model_file'] = ($creating ? 'required' : 'nullable') . '|file|max:51200';
+        }
+
+        if ($type === Option::TYPE_CARD) {
+            // Each size the card comes in has its own price; the card's
+            // `price` is kept as the lowest of them for listings.
+            $rules['image_file'] = ($creating ? 'required' : 'nullable') . '|image|mimes:jpg,jpeg,png,webp|max:5120';
+            $rules['card_limit_type'] = "{$required}|in:" . Option::CARD_LIMIT_WORDS . ',' . Option::CARD_LIMIT_LETTERS;
+            $rules['card_limit'] = "{$required}|integer|min:1|max:1000";
+            $rules['card_sizes'] = "{$required}|array|min:1|max:" . count(Option::CARD_SIZES);
+            $rules['card_sizes.*.label'] = ['required', 'distinct', Rule::in(Option::CARD_SIZES)];
+            $rules['card_sizes.*.price'] = 'required|numeric|min:0|max:100000';
         }
 
         return $rules;
@@ -206,7 +231,46 @@ class VendorCustomizationOptionController extends Controller
             $data['is_active'] = $request->boolean('is_active');
         }
 
+        if ($type === Option::TYPE_CARD) {
+            if ($request->has('card_limit_type')) {
+                $data['card_limit_type'] = $request->input('card_limit_type');
+            }
+            if ($request->has('card_limit')) {
+                $data['card_limit'] = (int) $request->input('card_limit');
+            }
+            if ($request->has('card_sizes')) {
+                // Stored smallest first, whatever order the vendor entered them in
+                $sizes = collect($request->input('card_sizes'))
+                    ->map(fn ($size) => ['label' => $size['label'], 'price' => round((float) $size['price'], 2)])
+                    ->sortBy(fn ($size) => array_search($size['label'], Option::CARD_SIZES, true))
+                    ->values()
+                    ->all();
+                $data['card_sizes'] = $sizes;
+                $data['price'] = collect($sizes)->min('price') ?? 0;
+            }
+        }
+
         return $data;
+    }
+
+    private function storeImage(Option $option, UploadedFile $file): void
+    {
+        $result = CloudinaryHelper::upload($file, [
+            'folder' => 'customization_cards',
+            'resource_type' => 'image',
+        ]);
+
+        $option->image_url = $result['secure_url'];
+        $option->image_path = $result['public_id'];
+    }
+
+    private function destroyImage(string $path): void
+    {
+        try {
+            CloudinaryHelper::destroy($path);
+        } catch (\Throwable $e) {
+            Log::warning('Could not delete card image ' . $path . ': ' . $e->getMessage());
+        }
     }
 
     private function storeModel(Option $option, UploadedFile $file): void
