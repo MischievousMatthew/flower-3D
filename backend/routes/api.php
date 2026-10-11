@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Customer\CustomerProductController;
 use App\Http\Controllers\Admin\VendorApplicationController;
 use App\Http\Controllers\Admin\LoginAuditLogController;
+use App\Http\Controllers\Admin\SubscriptionRevenueController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\VendorApplicationResubmissionController;
@@ -675,6 +676,13 @@ Route::middleware('token.auth')->group(function () {
 
     Route::prefix('admin')->group(function () {
         Route::get('/login-logs', [LoginAuditLogController::class, 'index']);
+
+        Route::middleware('role:admin')->prefix('subscriptions')->group(function () {
+            Route::get('/revenue', [SubscriptionRevenueController::class, 'overview']);
+            Route::get('/transactions', [SubscriptionRevenueController::class, 'transactions']);
+            Route::get('/transactions/export', [SubscriptionRevenueController::class, 'export']);
+            Route::get('/subscribers', [SubscriptionRevenueController::class, 'subscribers']);
+        });
     });
 
 }); // end auth:sanctum

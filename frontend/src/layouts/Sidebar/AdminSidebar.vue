@@ -39,6 +39,15 @@
         </router-link>
 
         <router-link
+          to="/admin/subscription-revenue"
+          class="nav-item"
+          active-class="active"
+        >
+          <span class="nav-icon">💳</span>
+          <span>Subscription Revenue</span>
+        </router-link>
+
+        <router-link
           to="/admin/vendor-requests"
           class="nav-item"
           active-class="active"
