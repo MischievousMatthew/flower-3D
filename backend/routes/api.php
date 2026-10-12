@@ -16,6 +16,7 @@ use App\Http\Controllers\SiteContentController;
 use App\Http\Controllers\Admin\AdminSupportController;
 use App\Http\Controllers\Admin\SecurityController;
 use App\Http\Controllers\Admin\AdminReportsController;
+use App\Http\Controllers\Admin\AdminReviewController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\ProductTaxonomyController;
@@ -888,7 +889,16 @@ Route::middleware(['token.auth', 'role:admin', 'admin.audit'])->prefix('admin')-
     });
 
     // ── Product reports ───────────────────────────────────────────────────
-    Route::get('/reports',              [ProductReportController::class, 'index'])->middleware('admin.can:products.view');
+    // ── Review management: customer reviews + reported listings ─────────────
+    Route::middleware('admin.can:products.view')->group(function () {
+        Route::get('/reviews/summary', [AdminReviewController::class, 'summary']);
+        Route::get('/reviews/reports', [AdminReviewController::class, 'reports']);
+        Route::get('/reviews', [AdminReviewController::class, 'index']);
+    });
+    Route::middleware('admin.can:products.moderate')->group(function () {
+        Route::post('/reviews/{id}/hide', [AdminReviewController::class, 'hide'])->whereNumber('id');
+        Route::post('/reviews/{id}/restore', [AdminReviewController::class, 'restore'])->whereNumber('id');
+    });
     Route::post('/reports/{id}/review', [ProductReportController::class, 'review'])->middleware('admin.can:products.moderate');
 
     // ── Listings: moderation only; vendors keep editing their own products ──

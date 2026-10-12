@@ -13,7 +13,7 @@
             </svg>
           </button>
           <div>
-            <h1 class="page-title">Subscription Revenue</h1>
+            <h1 class="page-title">Subscription Management</h1>
             <p class="page-subtitle">
               What vendors pay for their BloomCraft plan
               <template v-if="overview">· updated {{ updatedLabel }}</template>

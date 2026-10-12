@@ -33,12 +33,12 @@ class AdminRole extends Model
             'customers.manage' => 'Suspend and reactivate customers',
         ],
         'Products' => [
-            'products.view' => 'See products and reports',
-            'products.moderate' => 'Approve, hide and remove listings; review reports',
+            'products.view' => 'See products, reviews and reports',
+            'products.moderate' => 'Approve, hide and remove listings; moderate reviews and reports',
             'products.taxonomy' => 'Manage categories, flower types and occasions',
         ],
         'Website & support' => [
-            'content.manage' => 'Manage website content',
+            'content.manage' => 'Manage promotions, banners, the journal and website info',
             'support.view' => 'See alerts, support requests and activity',
             'support.reply' => 'Reply to support requests',
             'support.broadcast' => 'Send announcements',

@@ -192,20 +192,12 @@ class ProductReportController extends Controller
                 'updated_at' => now(),
             ];
 
-            // Only set reviewer fields if the columns exist
-            try {
-                \DB::table('product_reports')
-                    ->where('id', $id)
-                    ->update(array_merge($updateData, [
-                        'reviewer_id' => $admin?->id,
-                        'reviewed_at' => now(),
-                    ]));
-            } catch (\Exception $e) {
-                // reviewer_id / reviewed_at columns may not exist — update without them
-                \DB::table('product_reports')
-                    ->where('id', $id)
-                    ->update($updateData);
-            }
+            \DB::table('product_reports')
+                ->where('id', $id)
+                ->update(array_merge($updateData, [
+                    'reviewed_by' => $admin?->id,
+                    'reviewed_at' => now(),
+                ]));
 
             $report->refresh();
 
@@ -257,7 +249,7 @@ class ProductReportController extends Controller
             \Log::error('ProductReport review error: ' . $e->getMessage() . ' | ' . $e->getTraceAsString());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to review report: ' . $e->getMessage(),
+                'message' => 'The report could not be reviewed. Please try again.',
             ], 500);
         }
     }

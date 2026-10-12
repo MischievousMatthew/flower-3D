@@ -41,7 +41,11 @@ class LoginAuditLogController extends Controller
         }
 
         $perPage = min(max((int) $request->input('per_page', 20), 1), 100);
-        $logs = $query->paginate($perPage);
+        // Only what the sign-in history shows (no email or exact coordinates)
+        $logs = $query->paginate($perPage, [
+            'id', 'actor_type', 'actor_name', 'username', 'role', 'ip_address',
+            'device_name', 'browser', 'platform', 'location_label', 'logged_in_at',
+        ]);
 
         return response()->json([
             'success' => true,

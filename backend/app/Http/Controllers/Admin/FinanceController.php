@@ -212,9 +212,31 @@ class FinanceController extends Controller
         $customers = User::query()->whereIn('id', $refunds->pluck('customer_id')->filter()->unique())
             ->get(['id', 'name', 'surname'])->keyBy('id');
 
+        $allRefunds = $this->refundEvents();
+        $since = now()->subDays(30);
+        $requestCounts = OrderRequest::query()->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
+        $oldestOpen = OrderRequest::query()->where('status', 'pending')->min('created_at');
+        $decided = OrderRequest::query()->whereIn('status', ['approved', 'rejected'])->where('updated_at', '>=', now()->subDays(90))->get(['created_at', 'updated_at']);
+
         return response()->json([
             'success' => true,
             'data' => [
+                'summary' => [
+                    'refunded_total' => round((float) $allRefunds->sum('amount'), 2),
+                    'refund_count' => $allRefunds->count(),
+                    'refunded_30d' => round((float) $allRefunds->filter(fn ($r) => $r->at->gte($since))->sum('amount'), 2),
+                    'refund_count_30d' => $allRefunds->filter(fn ($r) => $r->at->gte($since))->count(),
+                    'not_debited' => $allRefunds->where('vendor_debited', false)->count(),
+                    'requests' => [
+                        'pending' => (int) ($requestCounts['pending'] ?? 0),
+                        'approved' => (int) ($requestCounts['approved'] ?? 0),
+                        'rejected' => (int) ($requestCounts['rejected'] ?? 0),
+                    ],
+                    'oldest_open_at' => $oldestOpen ? \Carbon\Carbon::parse($oldestOpen)->toIso8601String() : null,
+                    'avg_decision_hours_90d' => $decided->count()
+                        ? round($decided->avg(fn ($d) => $d->created_at->diffInMinutes($d->updated_at) / 60), 1)
+                        : null,
+                ],
                 'refunds' => $refunds->map(fn ($r) => [
                     'order_id' => $r->order_id,
                     'order_number' => $r->order_number,

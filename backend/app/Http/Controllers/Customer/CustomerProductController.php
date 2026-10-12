@@ -322,6 +322,7 @@ class CustomerProductController extends Controller
         // Query 1: review stats per product
         $reviewStats = DB::table('product_reviews')
             ->whereIn('product_id', $productIds)
+            ->whereNull('hidden_at')
             ->groupBy('product_id')
             ->select([
                 'product_id',

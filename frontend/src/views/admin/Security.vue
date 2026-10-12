@@ -9,16 +9,16 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
           <div>
-            <h1 class="page-title">Security &amp; system</h1>
-            <p class="page-subtitle">Administrators, permissions, audit trail, sign-ins, platform settings and system health</p>
+            <h1 class="page-title">{{ SECTIONS[sectionKey].title }}</h1>
+            <p class="page-subtitle">{{ SECTIONS[sectionKey].subtitle }}</p>
           </div>
         </div>
-        <span v-if="!canManage" class="readonly-chip">View only · your role can't change these</span>
+        <span v-if="readOnly" class="readonly-chip">View only · your role can't change these</span>
       </header>
 
       <div class="page-body">
-        <nav class="tabs" role="tablist">
-          <button v-for="t in TABS" :key="t.key" type="button" role="tab" class="tab" :class="{ active: tab === t.key }" :aria-selected="tab === t.key" @click="setTab(t.key)">
+        <nav v-if="visibleTabs.length > 1" class="tabs" role="tablist">
+          <button v-for="t in visibleTabs" :key="t.key" type="button" role="tab" class="tab" :class="{ active: tab === t.key }" :aria-selected="tab === t.key" @click="setTab(t.key)">
             {{ t.label }}
             <span v-if="t.key === 'health' && health && health.overall !== 'ok'" class="dot" :class="health.overall"></span>
           </button>
@@ -209,7 +209,7 @@
                     <span class="sub">{{ formatDateTime(s.at) }}</span>
                   </li>
                 </ul>
-                <router-link to="/admin/login-logs" class="link-btn">All sign-ins →</router-link>
+                <button type="button" class="link-btn" @click="setTab('history')">All sign-ins →</button>
               </div>
             </section>
             <section class="panel">
@@ -343,6 +343,99 @@
             </section>
           </template>
         </template>
+
+        <!-- ═══ Sign-in history ═══ -->
+        <section v-else-if="tab === 'history'" class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Sign-in history</h2>
+              <p class="panel-sub">Every successful sign-in by admins, vendors, customers and staff.</p>
+            </div>
+          </div>
+          <div class="toolbar">
+            <input v-model="historyFilters.search" type="search" class="input grow" placeholder="Search name, username, device, location or IP" />
+            <select v-model="historyFilters.actor_type" class="input">
+              <option value="">All accounts</option>
+              <option value="admin">Admins</option>
+              <option value="vendor">Vendors</option>
+              <option value="customer">Customers</option>
+              <option value="employee">Staff</option>
+            </select>
+          </div>
+          <div v-if="loading.history && !history.length" class="sk-list"><span v-for="n in 6" :key="n" class="sk sk-row"></span></div>
+          <p v-else-if="!history.length" class="empty">No sign-ins match these filters.</p>
+          <div v-else class="table-scroll" :class="{ dim: loading.history }">
+            <table class="data-table">
+              <thead><tr><th>Account</th><th>Type</th><th>When</th><th>Device</th><th>Location</th><th>IP address</th></tr></thead>
+              <tbody>
+                <tr v-for="l in history" :key="l.id">
+                  <td>
+                    <span class="strong">{{ l.actor_name || "Unknown" }}</span>
+                    <span v-if="l.username" class="sub">@{{ l.username }}</span>
+                  </td>
+                  <td><span class="pill" :class="ACTOR_TONE[l.actor_type]">{{ ACTOR_LABEL[l.actor_type] ?? l.actor_type }}</span></td>
+                  <td class="muted">{{ formatDateTime(l.logged_in_at) }}<span class="sub">{{ timeAgo(l.logged_in_at) }}</span></td>
+                  <td>{{ l.device_name || "Unknown device" }}<span class="sub">{{ [l.browser, l.platform].filter(Boolean).join(" · ") }}</span></td>
+                  <td class="muted">{{ l.location_label || "—" }}</td>
+                  <td class="mono muted">{{ l.ip_address || "—" }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-if="historyMeta.last_page > 1" class="pager">
+            <span class="sub">{{ historyMeta.total }} sign-ins</span>
+            <div class="row-actions">
+              <button type="button" class="mini-btn" :disabled="historyMeta.current_page <= 1" @click="fetchHistory(historyMeta.current_page - 1)">Previous</button>
+              <span class="sub">{{ historyMeta.current_page }} / {{ historyMeta.last_page }}</span>
+              <button type="button" class="mini-btn" :disabled="historyMeta.current_page >= historyMeta.last_page" @click="fetchHistory(historyMeta.current_page + 1)">Next</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══ Website info ═══ -->
+        <section v-else-if="tab === 'website'" class="split website">
+          <form class="panel" @submit.prevent="saveWebsite">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Website information</h2>
+                <p class="panel-sub">Shown in the shop and landing page footers and on the journal.</p>
+              </div>
+            </div>
+            <div v-if="!website" class="sk-list"><span v-for="n in 4" :key="n" class="sk sk-row"></span></div>
+            <fieldset v-else class="form-grid" :disabled="!canEditWebsite">
+              <label class="field"><span>Site name *</span><input v-model="website.site_name" class="input" maxlength="60" required /></label>
+              <label class="field"><span>Tagline</span><input v-model="website.tagline" class="input" maxlength="140" /></label>
+              <label class="field full"><span>About (footer text)</span><textarea v-model="website.about" class="input" rows="3" maxlength="600"></textarea></label>
+              <label class="field"><span>Contact email</span><input v-model="website.contact_email" type="email" class="input" /></label>
+              <label class="field"><span>Contact phone</span><input v-model="website.contact_phone" class="input" maxlength="40" /></label>
+              <label class="field full"><span>Address</span><input v-model="website.address" class="input" maxlength="255" /></label>
+              <label class="field"><span>Business hours</span><input v-model="website.business_hours" class="input" placeholder="Mon–Sat, 8 AM–6 PM" maxlength="120" /></label>
+              <label class="field"><span>Footer note</span><input v-model="website.footer_note" class="input" placeholder="All rights reserved." maxlength="200" /></label>
+              <label v-for="so in SOCIALS" :key="so.key" class="field"><span>{{ so.label }}</span><input v-model="website.socials[so.key]" type="url" class="input" :placeholder="so.placeholder" /></label>
+            </fieldset>
+            <p v-if="websiteError" class="form-error">{{ websiteError }}</p>
+            <div v-if="canEditWebsite" class="form-actions">
+              <button type="submit" class="primary-btn" :disabled="busy || !website">{{ busy ? "Saving…" : "Save changes" }}</button>
+            </div>
+          </form>
+          <div class="panel preview-panel">
+            <h2 class="panel-title">Footer preview</h2>
+            <div v-if="website" class="footer-preview">
+              <span class="fp-name">{{ website.site_name || "BloomCraft" }}</span>
+              <p>{{ website.about || website.tagline || "Your marketplace for custom flower arrangements." }}</p>
+              <ul>
+                <li v-if="website.contact_email">✉ {{ website.contact_email }}</li>
+                <li v-if="website.contact_phone">☏ {{ website.contact_phone }}</li>
+                <li v-if="website.address">⌂ {{ website.address }}</li>
+                <li v-if="website.business_hours">◷ {{ website.business_hours }}</li>
+              </ul>
+              <div class="fp-socials">
+                <span v-for="so in SOCIALS.filter((x) => website.socials?.[x.key])" :key="so.key">{{ so.label }}</span>
+              </div>
+              <small>© {{ new Date().getFullYear() }} {{ website.site_name || "BloomCraft" }}. {{ website.footer_note || "All rights reserved." }}</small>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
 
@@ -428,13 +521,34 @@ const route = useRoute();
 const router = useRouter();
 const adminAccess = useAdminAccess();
 
+const props = defineProps({ section: { type: String, default: "access" } });
+
+// One component, four sidebar pages
+const SECTIONS = {
+  access: { title: "Admin Users & Permissions", subtitle: "Who can sign in to the admin console, and what each role allows", tabs: ["admins", "roles"] },
+  audit: { title: "Audit Logs", subtitle: "Every change and export an admin made, and every sign-in", tabs: ["audit", "signins", "history"] },
+  settings: { title: "System Settings", subtitle: "Platform switches, sign-in protection and the website's public information", tabs: ["settings", "website"] },
+  health: { title: "System Health", subtitle: "Database, storage, integrations and server errors", tabs: ["health"] },
+};
 const TABS = [
   { key: "admins", label: "Administrators" },
   { key: "roles", label: "Roles & permissions" },
-  { key: "audit", label: "Audit log" },
-  { key: "signins", label: "Sign-ins" },
-  { key: "settings", label: "Platform settings" },
+  { key: "audit", label: "Admin actions" },
+  { key: "signins", label: "Sign-in monitoring" },
+  { key: "history", label: "Sign-in history" },
+  { key: "settings", label: "Platform" },
+  { key: "website", label: "Website info" },
   { key: "health", label: "System health" },
+];
+// Tabs that need something other than security.view
+const TAB_PERMISSION = { website: "content.manage" };
+const ACTOR_LABEL = { admin: "Admin", vendor: "Vendor", customer: "Customer", employee: "Staff" };
+const ACTOR_TONE = { admin: "super", vendor: "ok", customer: "", employee: "warn" };
+const SOCIALS = [
+  { key: "facebook", label: "Facebook", placeholder: "https://facebook.com/…" },
+  { key: "instagram", label: "Instagram", placeholder: "https://instagram.com/…" },
+  { key: "tiktok", label: "TikTok", placeholder: "https://tiktok.com/@…" },
+  { key: "x", label: "X", placeholder: "https://x.com/…" },
 ];
 const REASON = { unknown_account: "Unknown account", wrong_password: "Wrong password", locked: "Blocked while locked", suspended: "Suspended account", unverified: "Unverified account" };
 const AREAS = {
@@ -443,6 +557,7 @@ const AREAS = {
   AdminCustomerController: "Customers",
   AdminProductController: "Products & categories",
   ProductReportController: "Product reports",
+  AdminReviewController: "Customer reviews",
   AdminOrderController: "Orders",
   AdminContentController: "Website content",
   AdminSupportController: "Support & announcements",
@@ -470,6 +585,8 @@ const ACTIONS = {
   "AdminProductController@destroyTaxonomy": "Deleted a category / type / occasion",
   "AdminProductController@reorderTaxonomies": "Reordered a list",
   "ProductReportController@review": "Reviewed a product report",
+  "AdminReviewController@hide": "Hid a customer review",
+  "AdminReviewController@restore": "Restored a customer review",
   "AdminOrderController@addNote": "Added an order note",
   "AdminContentController@saveBanner": "Saved a banner",
   "AdminContentController@deleteBanner": "Deleted a banner",
@@ -502,8 +619,16 @@ const ACTIONS = {
 
 const access = adminAccess.access;
 const canManage = computed(() => adminAccess.can("security.manage"));
-const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : "admins");
-const loading = reactive({ admins: false, roles: false, audit: false });
+const canEditWebsite = computed(() => adminAccess.can("content.manage"));
+const sectionKey = computed(() => (SECTIONS[props.section] ? props.section : "access"));
+const visibleTabs = computed(() =>
+  TABS.filter((t) => SECTIONS[sectionKey.value].tabs.includes(t.key) && adminAccess.can(TAB_PERMISSION[t.key] ?? "security.view")),
+);
+const readOnly = computed(() =>
+  tab.value === "website" ? !canEditWebsite.value : ["admins", "roles", "settings"].includes(tab.value) && !canManage.value,
+);
+const tab = ref(null);
+const loading = reactive({ admins: false, roles: false, audit: false, history: false });
 const busy = ref(false);
 
 // ── Admins & roles ───────────────────────────────────────────────
@@ -725,6 +850,8 @@ const loadTab = (key) => {
   if (key === "audit") fetchAudit(1);
   if (key === "signins") fetchSignins();
   if (key === "settings") fetchSettings();
+  if (key === "history") fetchHistory(1);
+  if (key === "website" && !website.value) fetchWebsite();
   if (key === "health") {
     fetchHealth();
     fetchErrors();
@@ -735,6 +862,68 @@ const setTab = (key) => {
   router.replace({ query: { ...route.query, tab: key } });
   loadTab(key);
 };
+
+// ── Sign-in history ──────────────────────────────────────────────
+const history = ref([]);
+const historyMeta = ref({ current_page: 1, last_page: 1, total: 0 });
+const historyFilters = reactive({ search: "", actor_type: "" });
+const fetchHistory = async (page = 1) => {
+  loading.history = true;
+  try {
+    const params = { page, per_page: 25, search: historyFilters.search || undefined, actor_type: historyFilters.actor_type || undefined };
+    const page = (await api.get("/admin/login-logs", { params })).data.data;
+    history.value = page.data;
+    historyMeta.value = { current_page: page.current_page, last_page: page.last_page, total: page.total };
+  } catch {
+    toast.error("Sign-in history couldn't be loaded.");
+  } finally {
+    loading.history = false;
+  }
+};
+let historyTimer = null;
+watch(
+  () => ({ ...historyFilters }),
+  () => {
+    clearTimeout(historyTimer);
+    historyTimer = setTimeout(() => fetchHistory(1), 300);
+  },
+);
+
+// ── Website info ─────────────────────────────────────────────────
+const website = ref(null);
+const websiteError = ref("");
+const fetchWebsite = async () => {
+  try {
+    const { data } = await api.get("/admin/content/settings");
+    website.value = { ...data.data, socials: data.data.socials ?? {} };
+  } catch {
+    toast.error("Website information couldn't be loaded.");
+  }
+};
+const saveWebsite = async () => {
+  busy.value = true;
+  websiteError.value = "";
+  try {
+    const socials = Object.fromEntries(SOCIALS.map((so) => [so.key, website.value.socials?.[so.key]?.trim() || null]));
+    const { data } = await api.put("/admin/content/settings", { ...website.value, socials });
+    website.value = { ...data.data, socials: data.data.socials ?? {} };
+    toast.success(data.message);
+  } catch (e) {
+    const errors = e.response?.data?.errors;
+    websiteError.value = errors ? Object.values(errors)[0]?.[0] : e.response?.data?.message || "Website information couldn't be saved.";
+  } finally {
+    busy.value = false;
+  }
+};
+
+// Pick the tab from ?tab= when this page allows it, else the first one
+const openSection = () => {
+  const keys = visibleTabs.value.map((t) => t.key);
+  tab.value = keys.includes(route.query.tab) ? route.query.tab : keys[0] ?? null;
+  if (tab.value) loadTab(tab.value);
+};
+// The four pages reuse this component, so switching between them changes the prop
+watch(() => props.section, openSection);
 
 // ── Formatting ───────────────────────────────────────────────────
 const initials = (name) => (name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
@@ -751,7 +940,7 @@ const timeAgo = (v) => {
 
 onMounted(async () => {
   await adminAccess.load().catch(() => {});
-  loadTab(tab.value);
+  openSection();
 });
 </script>
 
@@ -1514,6 +1703,72 @@ onMounted(async () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+.field.full {
+  grid-column: 1 / -1;
+}
+textarea.input {
+  resize: vertical;
+  font-family: inherit;
+}
+.split.website {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+}
+.preview-panel {
+  position: sticky;
+  top: 96px;
+}
+.footer-preview {
+  margin-top: 12px;
+  padding: 22px;
+  border-radius: 12px;
+  background: #1b1612;
+  color: rgba(250, 248, 244, 0.78);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fp-name {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 28px;
+  color: #faf8f4;
+}
+.footer-preview p {
+  margin: 0;
+}
+.footer-preview ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fp-socials {
+  display: flex;
+  gap: 12px;
+  color: #d4b27a;
+}
+.footer-preview small {
+  border-top: 1px solid rgba(250, 248, 244, 0.12);
+  padding-top: 10px;
+  font-size: 11px;
+}
+.link-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
 }
 
 @media (max-width: 1280px) {

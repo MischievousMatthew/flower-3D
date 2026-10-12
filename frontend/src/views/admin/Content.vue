@@ -9,8 +9,8 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
           <div>
-            <h1 class="page-title">Website</h1>
-            <p class="page-subtitle">Everything here shows on the shop, landing page and journal as soon as you save.</p>
+            <h1 class="page-title">Promotion Management</h1>
+            <p class="page-subtitle">Banners, featured products, promotions, announcements and the journal. Changes show on the shop as soon as you save.</p>
           </div>
         </div>
         <div class="header-right">
@@ -185,79 +185,6 @@
           </div>
         </section>
 
-        <!-- ═══ Categories & occasions ═══ -->
-        <section v-else-if="tab === 'taxonomies'" class="panel">
-          <div class="panel-head">
-            <div>
-              <h2 class="panel-title">Flower categories &amp; occasions</h2>
-              <p class="panel-sub">
-                One list powers the vendor product form, the shop's "Shop by category" and "Shop by occasion" sections, and the shop filters.
-                Rename, reorder or switch them off in Products → Categories &amp; tags.
-              </p>
-            </div>
-            <router-link :to="{ path: '/admin/product-approval', query: { view: 'lists' } }" class="primary-btn">Manage the lists →</router-link>
-          </div>
-          <div class="tax-preview">
-            <div>
-              <h3>Categories on the shop</h3>
-              <div class="chips">
-                <span v-for="c in linkOptions.categories ?? []" :key="c.value" class="chip">{{ c.label }}</span>
-              </div>
-            </div>
-            <div>
-              <h3>Occasions on the shop</h3>
-              <div class="chips">
-                <span v-for="o in linkOptions.occasions ?? []" :key="o.value" class="chip">{{ o.label }}</span>
-              </div>
-            </div>
-          </div>
-          <p class="sub note">The shop only shows a category or occasion once at least one live product uses it.</p>
-        </section>
-
-        <!-- ═══ Website information ═══ -->
-        <section v-else-if="tab === 'settings'" class="split">
-          <form class="panel" @submit.prevent="saveSettings">
-            <div class="panel-head">
-              <div>
-                <h2 class="panel-title">Website information</h2>
-                <p class="panel-sub">Used in the shop and landing page footers and on the journal.</p>
-              </div>
-            </div>
-            <SkeletonRows v-if="loading.settings" />
-            <div v-else class="form-grid">
-              <label class="field"><span>Site name *</span><input v-model="settings.site_name" class="input" maxlength="60" required /></label>
-              <label class="field"><span>Tagline</span><input v-model="settings.tagline" class="input" maxlength="140" /></label>
-              <label class="field full"><span>About (footer text)</span><textarea v-model="settings.about" class="input" rows="3" maxlength="600"></textarea></label>
-              <label class="field"><span>Contact email</span><input v-model="settings.contact_email" type="email" class="input" /></label>
-              <label class="field"><span>Contact phone</span><input v-model="settings.contact_phone" class="input" maxlength="40" /></label>
-              <label class="field full"><span>Address</span><input v-model="settings.address" class="input" maxlength="255" /></label>
-              <label class="field"><span>Business hours</span><input v-model="settings.business_hours" class="input" placeholder="Mon–Sat, 8 AM–6 PM" maxlength="120" /></label>
-              <label class="field"><span>Footer note</span><input v-model="settings.footer_note" class="input" placeholder="All rights reserved." maxlength="200" /></label>
-              <label v-for="s in SOCIALS" :key="s.key" class="field"><span>{{ s.label }}</span><input v-model="settings.socials[s.key]" type="url" class="input" :placeholder="s.placeholder" /></label>
-            </div>
-            <p v-if="settingsError" class="form-error">{{ settingsError }}</p>
-            <div class="form-actions">
-              <button type="submit" class="primary-btn" :disabled="saving || loading.settings">{{ saving ? "Saving…" : "Save changes" }}</button>
-            </div>
-          </form>
-          <div class="panel preview-panel">
-            <h2 class="panel-title">Footer preview</h2>
-            <div class="footer-preview">
-              <span class="fp-name">{{ settings.site_name || "BloomCraft" }}</span>
-              <p>{{ settings.about || settings.tagline || "Your marketplace for custom flower arrangements." }}</p>
-              <ul>
-                <li v-if="settings.contact_email">✉ {{ settings.contact_email }}</li>
-                <li v-if="settings.contact_phone">☏ {{ settings.contact_phone }}</li>
-                <li v-if="settings.address">⌂ {{ settings.address }}</li>
-                <li v-if="settings.business_hours">◷ {{ settings.business_hours }}</li>
-              </ul>
-              <div class="fp-socials">
-                <span v-for="s in SOCIALS.filter((x) => settings.socials?.[x.key])" :key="s.key">{{ s.label }}</span>
-              </div>
-              <small>© {{ new Date().getFullYear() }} {{ settings.site_name || "BloomCraft" }}. {{ settings.footer_note || "All rights reserved." }}</small>
-            </div>
-          </div>
-        </section>
       </div>
     </main>
 
@@ -431,8 +358,6 @@ const TABS = [
   { key: "featured", label: "Featured products", icon: svg('<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>') },
   { key: "journal", label: "Journal", icon: svg('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>') },
   { key: "announcements", label: "Announcements & promos", icon: svg('<path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>') },
-  { key: "taxonomies", label: "Categories & occasions", icon: svg('<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>') },
-  { key: "settings", label: "Website info", icon: svg('<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>') },
 ];
 const STATE = { showing: "Showing", scheduled: "Scheduled", ended: "Ended", off: "Off" };
 const ARTICLE_STATE = { draft: "Draft", scheduled: "Scheduled", published: "Published" };
@@ -452,15 +377,8 @@ const TONES = [
   { value: "success", label: "Green" },
   { value: "warning", label: "Amber" },
 ];
-const SOCIALS = [
-  { key: "facebook", label: "Facebook", placeholder: "https://facebook.com/…" },
-  { key: "instagram", label: "Instagram", placeholder: "https://instagram.com/…" },
-  { key: "tiktok", label: "TikTok", placeholder: "https://tiktok.com/@…" },
-  { key: "x", label: "X", placeholder: "https://x.com/…" },
-];
-
 const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : "banners");
-const loading = reactive({ banners: false, featured: false, search: false, articles: false, announcements: false, settings: false });
+const loading = reactive({ banners: false, featured: false, search: false, articles: false, announcements: false });
 const saving = ref(false);
 const overview = ref(null);
 const linkOptions = ref({});
@@ -473,8 +391,6 @@ const articles = ref([]);
 const articleCategories = ref({ care: "Flower care", guide: "Seasonal guide", trends: "Trends", stories: "Vendor stories", news: "News" });
 const articleFilter = ref("");
 const announcements = ref([]);
-const settings = ref({ socials: {} });
-const settingsError = ref("");
 
 const badge = (key) => {
   const o = overview.value;
@@ -517,10 +433,6 @@ const fetchArticles = async () => {
   if (data?.categories) articleCategories.value = data.categories;
 };
 const fetchAnnouncements = () => get("announcements", "/admin/content/announcements", announcements);
-const fetchSettings = async () => {
-  await get("settings", "/admin/content/settings", settings);
-  settings.value.socials ??= {};
-};
 let searchTimer = null;
 const searchProducts = async () => {
   loading.search = true;
@@ -546,7 +458,6 @@ const loadTab = (key) => {
   }
   if (key === "journal") fetchArticles();
   if (key === "announcements") fetchAnnouncements();
-  if (key === "settings") fetchSettings();
 };
 const setTab = (key) => {
   tab.value = key;
@@ -793,22 +704,6 @@ const doDelete = async () => {
   }
 };
 
-// ── Settings ─────────────────────────────────────────────────────
-const saveSettings = async () => {
-  settingsError.value = "";
-  saving.value = true;
-  try {
-    const socials = Object.fromEntries(SOCIALS.map((s) => [s.key, settings.value.socials?.[s.key]?.trim() || null]));
-    const { data } = await api.put("/admin/content/settings", { ...settings.value, socials });
-    settings.value = { ...data.data, socials: data.data.socials ?? {} };
-    toast.success(data.message);
-  } catch (e) {
-    settingsError.value = firstError(e);
-  } finally {
-    saving.value = false;
-  }
-};
-
 // ── Formatting ───────────────────────────────────────────────────
 const peso = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
 const money = (v) => peso.format(Number(v || 0));
@@ -840,6 +735,8 @@ const describeLink = (item) => {
 onMounted(() => {
   fetchOverview();
   fetchLinkOptions();
+  if (route.query.tab === "settings") return router.replace({ path: "/admin/settings", query: { tab: "website" } });
+  if (route.query.tab === "taxonomies") return router.replace("/admin/categories");
   loadTab(tab.value);
 });
 </script>
@@ -1290,17 +1187,6 @@ onMounted(() => {
 }
 
 /* Taxonomy preview */
-.tax-preview {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-}
-.tax-preview h3 {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1e2739;
-  margin: 0 0 10px;
-}
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -1430,47 +1316,6 @@ textarea.input {
 }
 
 /* Footer preview */
-.preview-panel {
-  position: sticky;
-  top: 96px;
-}
-.footer-preview {
-  margin-top: 12px;
-  padding: 22px;
-  border-radius: 12px;
-  background: #1b1612;
-  color: rgba(250, 248, 244, 0.78);
-  font-size: 13px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.fp-name {
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 28px;
-  color: #faf8f4;
-}
-.footer-preview p {
-  margin: 0;
-}
-.footer-preview ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.fp-socials {
-  display: flex;
-  gap: 12px;
-  color: #d4b27a;
-}
-.footer-preview small {
-  border-top: 1px solid rgba(250, 248, 244, 0.12);
-  padding-top: 10px;
-  font-size: 11px;
-}
 
 /* Drawer */
 .drawer-backdrop,
@@ -1688,9 +1533,6 @@ textarea.input {
   .split.even {
     grid-template-columns: minmax(0, 1fr);
   }
-  .preview-panel {
-    position: static;
-  }
 }
 @media (max-width: 968px) {
   .main-content {
@@ -1708,8 +1550,7 @@ textarea.input {
     padding: 14px 16px 32px;
   }
   .form-grid,
-  .two,
-  .tax-preview {
+  .two {
     grid-template-columns: minmax(0, 1fr);
   }
   .media-list li {

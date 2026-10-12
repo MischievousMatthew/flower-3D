@@ -380,7 +380,7 @@ class AdminSupportController extends Controller
 
         $add('stale_orders', 'warning', 'Orders stuck in pending', 'Pending for more than ' . \App\Support\PlatformSettings::get('stale_pending_days') . ' days.', (int) ($issues['stale_pending']['count'] ?? 0), ['path' => '/admin/orders', 'query' => ['tab' => 'issues']]);
         $add('disputes', 'warning', 'Open return & refund requests', 'Waiting on the vendor to decide.', OrderRequest::where('status', 'pending')->count(), ['path' => '/admin/orders', 'query' => ['tab' => 'disputes']]);
-        $add('reports', 'warning', 'Product reports to review', 'Customers flagged listings.', ProductReport::where('status', 'pending')->count(), ['path' => '/admin/reports']);
+        $add('reports', 'warning', 'Product reports to review', 'Customers flagged listings.', ProductReport::where('status', 'pending')->count(), ['path' => '/admin/reviews', 'query' => ['tab' => 'reports']]);
 
         $suspendedWithOrders = Order::query()->whereIn('vendor_id', User::where('is_suspended', true)->select('id'))->whereIn('status', ['pending', 'processing', 'out_for_delivery'])->count();
         $add('suspended_orders', 'warning', 'Open orders at suspended stores', 'These customers are waiting on stores that can\'t sign in.', $suspendedWithOrders, ['path' => '/admin/vendor-requests', 'query' => ['tab' => 'suspended']]);
@@ -398,7 +398,7 @@ class AdminSupportController extends Controller
         $add('applications', 'info', 'Vendor applications to review', 'New stores waiting to be approved.', VendorApplication::where('status', 'pending')->count(), ['path' => '/admin/vendor-requests', 'query' => ['tab' => 'pending']]);
 
         $errors = count($this->recentErrors());
-        $add('system_errors', $errors >= 10 ? 'critical' : 'warning', 'Server errors in the last 24 hours', 'Errors the backend logged. See the list below.', $errors, ['path' => '/admin/support', 'query' => ['tab' => 'alerts']]);
+        $add('system_errors', $errors >= 10 ? 'critical' : 'warning', 'Server errors in the last 24 hours', 'Requests that ended in a server error. Details are in System Health.', $errors, ['path' => '/admin/health']);
 
         $rank = ['critical' => 0, 'warning' => 1, 'info' => 2];
         usort($alerts, fn ($a, $b) => [$rank[$a['severity']], -$a['count']] <=> [$rank[$b['severity']], -$b['count']]);

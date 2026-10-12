@@ -273,7 +273,7 @@ class AdminReportsController extends Controller
         }
         $details = VendorDirectory::details($ids);
         $ratings = DB::table('product_reviews')->join('products', 'products.id', '=', 'product_reviews.product_id')
-            ->whereIn('products.owner_id', $ids)
+            ->whereIn('products.owner_id', $ids)->whereNull('product_reviews.hidden_at')
             ->selectRaw('products.owner_id, avg(product_reviews.rating) as rating, count(*) as reviews')
             ->groupBy('products.owner_id')->get()->keyBy('owner_id');
         $total = (float) $sales->sum('total_amount') ?: 1;

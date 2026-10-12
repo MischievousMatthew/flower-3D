@@ -16,11 +16,15 @@ class ProductReview extends Model
         'comment',
         'image_path',
         'is_anonymous',
+        'hidden_at',
+        'hidden_reason',
+        'hidden_by',
     ];
 
     protected $casts = [
         'rating'       => 'integer',
         'is_anonymous' => 'boolean',
+        'hidden_at'    => 'datetime',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────
@@ -69,6 +73,12 @@ class ProductReview extends Model
     public function scopeForProduct($query, int $productId)
     {
         return $query->where('product_id', $productId);
+    }
+
+    /** Reviews an admin hasn't hidden (what shoppers and ratings count) */
+    public function scopeShown($query)
+    {
+        return $query->whereNull('product_reviews.hidden_at');
     }
 
     public function scopeVisible($query)

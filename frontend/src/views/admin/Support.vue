@@ -9,8 +9,8 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
           <div>
-            <h1 class="page-title">Notifications &amp; Support</h1>
-            <p class="page-subtitle">Alerts, help requests, complaints, activity and announcements in one place</p>
+            <h1 class="page-title">Support Tickets</h1>
+            <p class="page-subtitle">Support requests, complaints, alerts, activity and announcements</p>
           </div>
         </div>
         <button type="button" class="ghost-btn" @click="refresh">
@@ -81,7 +81,7 @@
                   <h2 class="panel-title">Failed payments</h2>
                   <p class="panel-sub">Last 30 days. Gateway references are masked.</p>
                 </div>
-                <router-link :to="{ path: '/admin/finance' }" class="link-btn">Finance →</router-link>
+                <router-link :to="{ path: '/admin/finance' }" class="link-btn">Transactions →</router-link>
               </div>
               <p v-if="!alerts.failed.length" class="empty">No failed payments.</p>
               <ul v-else class="row-list">
@@ -348,9 +348,9 @@ const route = useRoute();
 const router = useRouter();
 
 const TABS = [
-  { key: "alerts", label: "Alerts" },
-  { key: "inbox", label: "Support inbox" },
+  { key: "inbox", label: "Tickets" },
   { key: "complaints", label: "Complaints" },
+  { key: "alerts", label: "Alerts" },
   { key: "activity", label: "Activity" },
   { key: "announcements", label: "Announcements" },
 ];
@@ -388,7 +388,7 @@ const AUDIENCES = [
 ];
 const AUDIENCE_LABEL = { vendors: "Vendors", customers: "Customers", all: "Everyone" };
 
-const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : "alerts");
+const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : "inbox");
 const loading = reactive({ alerts: false, tickets: false, complaints: false, events: false, broadcasts: false });
 const busy = ref(false);
 const summary = ref(null);
@@ -505,7 +505,7 @@ const fetchComplaints = async () => {
   }
 };
 watch(complaintStatus, fetchComplaints);
-const openComplaint = (c) => (c.order_id ? router.push({ path: "/admin/orders", query: { order: c.order_id } }) : router.push("/admin/reports"));
+const openComplaint = (c) => (c.order_id ? router.push({ path: "/admin/orders", query: { order: c.order_id } }) : router.push({ path: "/admin/reviews", query: { tab: "reports" } }));
 
 // ── Activity ─────────────────────────────────────────────────────
 const events = ref([]);

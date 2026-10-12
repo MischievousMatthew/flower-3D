@@ -9,15 +9,17 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
           <div>
-            <h1 class="page-title">Products</h1>
-            <p class="page-subtitle">Every listing on BloomCraft. Vendors manage their own details, prices and stock.</p>
+            <h1 class="page-title">{{ view === "lists" ? "Category Management" : "Product Management" }}</h1>
+            <p class="page-subtitle">
+              {{
+                view === "lists"
+                  ? "The categories, flower types and occasions vendors pick from and shoppers filter by."
+                  : "Every listing on BloomCraft. Vendors manage their own details, prices and stock."
+              }}
+            </p>
           </div>
         </div>
         <div class="header-right">
-          <div class="view-switch" role="tablist">
-            <button type="button" role="tab" :class="{ active: view === 'listings' }" @click="view = 'listings'">Listings</button>
-            <button type="button" role="tab" :class="{ active: view === 'lists' }" @click="openLists">Categories &amp; tags</button>
-          </div>
           <button type="button" class="ghost-btn" :disabled="loading" @click="refresh">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
             <span>{{ loading ? "Refreshing" : "Refresh" }}</span>
@@ -310,7 +312,7 @@
             <div class="box">
               <div class="box-head">
                 <span class="box-label">Reports</span>
-                <router-link v-if="detail.reports.length" to="/admin/reports" class="link-btn">Review in Reported Products →</router-link>
+                <router-link v-if="detail.reports.length" :to="{ path: '/admin/reviews', query: { tab: 'reports' } }" class="link-btn">Review in Review Management →</router-link>
               </div>
               <p v-if="!detail.reports.length" class="sub">No customer has reported this listing.</p>
               <ul v-else class="mini-list">
@@ -464,7 +466,9 @@ const LISTS = [
 ];
 
 // ── Listings ─────────────────────────────────────────────────────
-const view = ref(route.query.view === "lists" ? "lists" : "listings");
+const props = defineProps({ section: { type: String, default: "listings" } });
+// Product Management and Category Management share this page
+const view = computed(() => (props.section === "lists" ? "lists" : "listings"));
 const summary = ref(null);
 const products = ref([]);
 const meta = ref({ current_page: 1, last_page: 1, per_page: 12, total: 0 });
@@ -623,11 +627,19 @@ const fetchLists = async () => {
   }
 };
 
-const openLists = () => {
-  view.value = "lists";
-  if (!lists.loaded) fetchLists();
+let listingsLoaded = false;
+const loadSection = () => {
+  if (view.value === "lists") {
+    if (!lists.loaded) fetchLists();
+    return;
+  }
+  if (!listingsLoaded) {
+    listingsLoaded = true;
+    fetchSummary();
+    fetchProducts();
+  }
 };
-watch(view, (v) => router.replace({ query: { ...route.query, view: v === "lists" ? "lists" : undefined } }));
+watch(view, loadSection);
 
 const afterListChange = () => {
   reloadTaxonomies(); // keep this page's filters in step
@@ -719,9 +731,12 @@ const onKeydown = (e) => {
 };
 
 onMounted(() => {
-  fetchSummary();
-  fetchProducts();
-  if (view.value === "lists") fetchLists();
+  // Old links to the lists used ?view=lists on this page
+  if (view.value === "listings" && route.query.view === "lists") {
+    router.replace("/admin/categories");
+    return;
+  }
+  loadSection();
   const productId = Number(route.query.product);
   if (productId) openProduct(productId);
   window.addEventListener("keydown", onKeydown);

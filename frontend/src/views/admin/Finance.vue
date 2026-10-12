@@ -13,9 +13,9 @@
             </svg>
           </button>
           <div>
-            <h1 class="page-title">Finance</h1>
+            <h1 class="page-title">Transaction Management</h1>
             <p class="page-subtitle">
-              Payments, refunds and earnings across BloomCraft
+              PayMongo and cash-on-delivery payments, vendor sales and platform earnings
               <template v-if="overview">· updated {{ updatedLabel }}</template>
             </p>
           </div>
@@ -118,6 +118,7 @@
                 <span class="kpi-value">{{ money(k.refunds) }}</span>
                 <div class="kpi-footer">
                   <span class="kpi-note">{{ plural(k.refund_count, "refund") }} · {{ plural(k.open_disputes, "open dispute") }}</span>
+                  <router-link to="/admin/refunds" class="kpi-link">Refund Management →</router-link>
                 </div>
               </div>
             </template>
@@ -152,7 +153,7 @@
                 <span class="metric-value">{{ money(k.vendor_balances) }}</span>
                 <span class="metric-note">Owed to vendors right now</span>
               </div>
-              <router-link class="metric-card link" to="/admin/orders?tab=disputes">
+              <router-link class="metric-card link" to="/admin/refunds">
                 <span class="metric-label">Open disputes</span>
                 <span class="metric-value">{{ k.open_disputes }}</span>
                 <span class="metric-note">Review in Orders →</span>
@@ -259,7 +260,6 @@
                 <button v-for="t in TABS" :key="t.key" type="button" role="tab" class="tab" :class="{ active: tab === t.key }" :aria-selected="tab === t.key" @click="tab = t.key">
                   {{ t.label }}
                   <span v-if="t.key === 'transactions' && meta.total" class="tab-count">{{ meta.total }}</span>
-                  <span v-if="t.key === 'refunds' && openDisputeCount" class="tab-count warn">{{ openDisputeCount }}</span>
                 </button>
               </div>
               <button v-if="tab === 'transactions'" type="button" class="ghost-btn" :disabled="exporting.transactions || !meta.total" @click="exportTransactions">
@@ -441,64 +441,6 @@
               </div>
             </template>
 
-            <!-- Refunds & disputes -->
-            <template v-else>
-              <p class="info-note">
-                Refunds and return requests are decided by the vendor, so refunds and balance changes go through their
-                checks. Open an order to read the full history or leave an admin note.
-              </p>
-
-              <div class="sub-head">
-                <h3>Refunds</h3>
-                <span class="sub">{{ plural(refundData.refunds.length, "refund") }}</span>
-              </div>
-              <div v-if="refundsLoading && !refundsLoaded" class="sk sk-line" style="height: 40px"></div>
-              <p v-else-if="!refundData.refunds.length" class="empty-msg small">No refunds yet.</p>
-              <ul v-else class="row-list">
-                <li v-for="r in refundData.refunds" :key="`${r.order_id}-${r.refunded_at}`" tabindex="0" @click="goToOrder(r.order_id)" @keydown.enter="goToOrder(r.order_id)">
-                  <VendorAvatar :vendor="r.vendor" :size="32" />
-                  <div class="row-main">
-                    <span class="cell-main mono">{{ r.order_number }}</span>
-                    <span class="sub">{{ r.vendor.store_name }} → {{ r.customer || "customer" }} · {{ r.method_label }}</span>
-                  </div>
-                  <span class="pill" :class="r.vendor_debited ? 'ps-successful' : 'ps-failed'" :title="r.vendor_debited ? 'Taken back from the vendor balance' : 'No vendor balance entry found for this refund'">
-                    {{ r.vendor_debited ? "Vendor debited" : "Not debited" }}
-                  </span>
-                  <div class="row-right">
-                    <span class="strong neg">−{{ money(r.amount) }}</span>
-                    <span class="sub">{{ formatDate(r.refunded_at) }}</span>
-                  </div>
-                </li>
-              </ul>
-
-              <div class="sub-head">
-                <h3>Return &amp; refund requests</h3>
-                <div class="seg">
-                  <button v-for="f in DISPUTE_FILTERS" :key="f.value" type="button" class="seg-btn" :class="{ active: disputeStatus === f.value }" @click="disputeStatus = f.value">
-                    {{ f.label }}
-                  </button>
-                </div>
-              </div>
-              <div v-if="refundsLoading && !refundsLoaded" class="sk sk-line" style="height: 60px"></div>
-              <p v-else-if="!refundData.disputes.length" class="empty-msg small">No requests{{ disputeStatus ? " with this status" : "" }}.</p>
-              <ul v-else class="row-list">
-                <li v-for="d in refundData.disputes" :key="d.id" tabindex="0" @click="goToOrder(d.order_id, 'disputes')" @keydown.enter="goToOrder(d.order_id, 'disputes')">
-                  <VendorAvatar :vendor="d.vendor" :size="32" />
-                  <div class="row-main">
-                    <span class="cell-main">
-                      {{ d.type === "refund" ? "Refund" : "Return" }} request · <span class="mono">{{ d.order_number }}</span>
-                    </span>
-                    <span class="sub ellipsis">“{{ d.reason }}” — {{ d.customer || "customer" }}</span>
-                    <span v-if="d.vendor_response" class="sub ellipsis">Vendor: {{ d.vendor_response }}</span>
-                  </div>
-                  <span class="pill" :class="`rq-${d.status}`">{{ humanize(d.status) }}</span>
-                  <div class="row-right">
-                    <span class="strong">{{ money(d.amount) }}</span>
-                    <span class="sub">{{ d.status === "pending" ? `waiting ${timeAgo(d.created_at)}` : formatDate(d.updated_at) }}</span>
-                  </div>
-                </li>
-              </ul>
-            </template>
           </section>
         </template>
       </div>
@@ -508,7 +450,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
@@ -516,6 +458,7 @@ import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
 
 const { toggleMobile } = useSidebarState();
+const route = useRoute();
 const router = useRouter();
 
 const RANGES = [
@@ -529,7 +472,6 @@ const RANGES = [
 const TABS = [
   { key: "transactions", label: "Transactions" },
   { key: "vendors", label: "Vendor sales" },
-  { key: "refunds", label: "Refunds & disputes" },
 ];
 const STATE_LABELS = {
   successful: "Successful",
@@ -540,12 +482,6 @@ const STATE_LABELS = {
 };
 const METHOD_LABELS = { cod: "Cash on delivery", ewallet: "E-wallet", bank_transfer: "Bank transfer", gcash: "GCash", maya: "Maya", card: "Card" };
 const METHOD_COLORS = ["#f59e0b", "#7c6ff7", "#38bdf8", "#22c55e", "#f43f5e", "#94a3b8"];
-const DISPUTE_FILTERS = [
-  { value: "", label: "All" },
-  { value: "pending", label: "Open" },
-  { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
-];
 
 // ── Overview ─────────────────────────────────────────────────────
 const range = ref("30d");
@@ -599,7 +535,6 @@ const refresh = () => {
   fetchOverview();
   fetchTransactions(meta.value.current_page);
   if (vendorsLoaded) fetchVendors();
-  if (refundsLoaded.value) fetchRefunds();
 };
 
 // ── Charts ───────────────────────────────────────────────────────
@@ -776,29 +711,8 @@ const fetchVendors = async () => {
   }
 };
 
-// Refunds & disputes
-const refundData = ref({ refunds: [], disputes: [] });
-const refundsLoading = ref(false);
-const refundsLoaded = ref(false);
-const disputeStatus = ref("");
-const openDisputeCount = computed(() => k.value.open_disputes || 0);
-const fetchRefunds = async () => {
-  refundsLoading.value = true;
-  try {
-    const { data } = await api.get("/admin/finance/refunds", { params: { dispute_status: disputeStatus.value || undefined } });
-    refundData.value = data.data;
-    refundsLoaded.value = true;
-  } catch {
-    toast.error("Refunds couldn't be loaded.");
-  } finally {
-    refundsLoading.value = false;
-  }
-};
-watch(disputeStatus, fetchRefunds);
-
 watch(tab, (value) => {
   if (value === "vendors" && !vendorsLoaded) fetchVendors();
-  if (value === "refunds" && !refundsLoaded.value) fetchRefunds();
 });
 
 // ── Exports ──────────────────────────────────────────────────────
@@ -861,6 +775,9 @@ const timeAgo = (v) => {
 // ── Lifecycle ────────────────────────────────────────────────────
 let clock = null;
 onMounted(() => {
+  // Refunds moved to their own page
+  if (route.query.tab === "refunds") return router.replace("/admin/refunds");
+  if (route.query.tab === "vendors") tab.value = "vendors";
   fetchOverview();
   fetchTransactions();
   clock = setInterval(() => (now.value = Date.now()), 30_000);
@@ -1621,9 +1538,6 @@ onBeforeUnmount(() => {
 .ps-failed { background: #fee2e2; color: #b91c1c; }
 .ps-refunded { background: #ede9fe; color: #6d28d9; }
 .ps-voided { background: #f1f5f9; color: #64748b; }
-.rq-pending { background: #fef3c7; color: #b45309; }
-.rq-approved { background: #dcfce7; color: #15803d; }
-.rq-rejected { background: #f1f5f9; color: #64748b; }
 
 /* ── Pager ──────────────────────────────────────────── */
 .pager {
@@ -1646,81 +1560,24 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 
-/* ── Refunds & disputes ─────────────────────────────── */
-.info-note {
-  margin: 0 0 6px;
-  padding: 10px 12px;
-  font-size: 12.5px;
-  color: #475569;
-  background: #eef2ff;
-  border-radius: 10px;
-}
-.sub-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin: 18px 0 8px;
-}
-.sub-head h3 {
-  margin: 0;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #1e2739;
-}
-.row-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: 1px solid #eef1f6;
-  border-radius: 12px;
-  overflow: hidden;
-}
-.row-list li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-bottom: 1px solid #f1f5f9;
-  cursor: pointer;
-  transition: background 0.12s;
-}
-.row-list li:last-child {
-  border-bottom: none;
-}
-.row-list li:hover,
-.row-list li:focus-visible {
-  background: #fafaff;
-  outline: none;
-}
-.row-main {
-  flex: 1;
-  min-width: 0;
-}
-.row-main .cell-main {
-  max-width: none;
-}
-.ellipsis {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.row-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  text-align: right;
-  font-size: 13px;
-  white-space: nowrap;
-}
-
 /* ── Responsive ─────────────────────────────────────── */
 @media (max-width: 1400px) {
   .metric-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+.kpi-link {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #6d5ff0;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.kpi-link:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 1280px) {
   .main-content {
     margin-left: 200px;

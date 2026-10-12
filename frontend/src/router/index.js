@@ -611,40 +611,36 @@ const routes = [
   },
 
   // ===== ADMIN =====
+  // Order follows the admin sidebar. Some pages share a component and show
+  // the part named by `section`.
   {
     path: "/admin",
     meta: { requiresAuth: true, requiresAdmin: true },
     redirect: "/admin/dashboard",
     children: [
+      // Overview
       {
         path: "dashboard",
         name: "AdminDashboard",
         component: () => import("../views/admin/Dashboard.vue"),
       },
-      {
-        path: "analytics",
-        name: "AdminAnalytics",
-        component: () => import("../views/admin/Analytics.vue"),
-      },
-      {
-        path: "subscription-revenue",
-        name: "AdminSubscriptionRevenue",
-        component: () => import("../views/admin/SubscriptionRevenue.vue"),
-      },
+      // Marketplace
       {
         path: "orders",
         name: "AdminOrders",
         component: () => import("../views/admin/Orders.vue"),
       },
       {
-        path: "finance",
-        name: "AdminFinance",
-        component: () => import("../views/admin/Finance.vue"),
+        path: "product-approval",
+        name: "ProductApproval",
+        component: () => import("../views/admin/Products.vue"),
+        props: { section: "listings" },
       },
       {
-        path: "customers",
-        name: "AdminCustomers",
-        component: () => import("../views/admin/Customers.vue"),
+        path: "categories",
+        name: "AdminCategories",
+        component: () => import("../views/admin/Products.vue"),
+        props: { section: "lists" },
       },
       {
         path: "website",
@@ -652,34 +648,79 @@ const routes = [
         component: () => import("../views/admin/Content.vue"),
       },
       {
-        path: "support",
-        name: "AdminSupport",
-        component: () => import("../views/admin/Support.vue"),
+        path: "reviews",
+        name: "AdminReviews",
+        component: () => import("../views/admin/Reviews.vue"),
+      },
+      // Finance
+      {
+        path: "finance",
+        name: "AdminFinance",
+        component: () => import("../views/admin/Finance.vue"),
       },
       {
-        path: "security",
-        name: "AdminSecurity",
-        component: () => import("../views/admin/Security.vue"),
+        path: "refunds",
+        name: "AdminRefunds",
+        component: () => import("../views/admin/Refunds.vue"),
       },
+      {
+        path: "subscription-revenue",
+        name: "AdminSubscriptionRevenue",
+        component: () => import("../views/admin/SubscriptionRevenue.vue"),
+      },
+      {
+        path: "analytics",
+        name: "AdminAnalytics",
+        component: () => import("../views/admin/Analytics.vue"),
+      },
+      // People & operations
       {
         path: "vendor-requests",
         name: "VendorRequest",
         component: () => import("../views/admin/VendorRequest.vue"),
       },
       {
-        path: "product-approval",
-        name: "ProductApproval",
-        component: () => import("../views/admin/Products.vue"),
+        path: "customers",
+        name: "AdminCustomers",
+        component: () => import("../views/admin/Customers.vue"),
       },
       {
+        path: "support",
+        name: "AdminSupport",
+        component: () => import("../views/admin/Support.vue"),
+      },
+      {
+        path: "audit-logs",
+        name: "AdminAuditLogs",
+        component: () => import("../views/admin/Security.vue"),
+        props: { section: "audit" },
+      },
+      {
+        path: "security",
+        name: "AdminSecurity",
+        component: () => import("../views/admin/Security.vue"),
+        props: { section: "access" },
+      },
+      {
+        path: "settings",
+        name: "AdminSettings",
+        component: () => import("../views/admin/Security.vue"),
+        props: { section: "settings" },
+      },
+      {
+        path: "health",
+        name: "AdminHealth",
+        component: () => import("../views/admin/Security.vue"),
+        props: { section: "health" },
+      },
+      // Older pages, now merged into the ones above
+      {
         path: "reports",
-        name: "ReportedProducts",
-        component: () => import("../views/admin/ReportedProducts.vue"),
+        redirect: (to) => ({ path: "/admin/reviews", query: { ...to.query, tab: "reports" } }),
       },
       {
         path: "login-logs",
-        name: "AdminLoginLogs",
-        component: () => import("../views/admin/LoginLogs.vue"),
+        redirect: (to) => ({ path: "/admin/audit-logs", query: { ...to.query, tab: "history" } }),
       },
     ],
   },

@@ -13,7 +13,7 @@
             </svg>
           </button>
           <div>
-            <h1 class="page-title">Orders</h1>
+            <h1 class="page-title">Order Management</h1>
             <p class="page-subtitle">Every order across all vendors</p>
           </div>
         </div>

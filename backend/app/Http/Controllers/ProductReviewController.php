@@ -37,6 +37,7 @@ class ProductReviewController extends Controller
 
         $reviews = ProductReview::with('user:id,name')
             ->where('product_id', $productId)
+            ->shown()
             ->orderBy($orderCol, $orderDir)
             ->paginate($request->input('per_page', 10));
 
@@ -416,7 +417,7 @@ class ProductReviewController extends Controller
 
     private function buildSummary(int $productId): array
     {
-        $base = ProductReview::where('product_id', $productId);
+        $base = ProductReview::where('product_id', $productId)->shown();
 
         $total   = (clone $base)->count();
         $average = $total ? round((clone $base)->avg('rating'), 1) : 0;
@@ -490,6 +491,9 @@ class ProductReviewController extends Controller
             'display_name'  => $r->is_anonymous ? 'Anonymous User' : ($r->user?->name ?? 'Customer'),
             'created_at'    => $r->created_at?->toIso8601String(),
             'updated_at'    => $r->updated_at?->toIso8601String(),
+            // Only the vendor's own review list includes hidden reviews
+            'is_hidden'     => $r->hidden_at !== null,
+            'hidden_reason' => $r->hidden_at ? $r->hidden_reason : null,
         ];
     }
     /**

@@ -8,21 +8,28 @@ import api from "../plugins/axios";
 const access = reactive({ loaded: false, id: null, role: null, isSuperAdmin: false, permissions: [], name: null });
 let request = null;
 
-/** Admin pages in sidebar order, with the permission each one needs */
+/**
+ * Admin pages in sidebar order, with the permission each one needs.
+ * An array means any one of them is enough.
+ */
 export const ADMIN_PAGES = [
   { path: "/admin/dashboard", permission: "dashboard.view" },
-  { path: "/admin/analytics", permission: "reports.view" },
-  { path: "/admin/subscription-revenue", permission: "revenue.view" },
   { path: "/admin/orders", permission: "orders.view" },
+  { path: "/admin/product-approval", permission: "products.view" },
+  { path: "/admin/categories", permission: "products.taxonomy" },
+  { path: "/admin/website", permission: "content.manage" },
+  { path: "/admin/reviews", permission: "products.view" },
   { path: "/admin/finance", permission: "finance.view" },
+  { path: "/admin/refunds", permission: "finance.view" },
+  { path: "/admin/subscription-revenue", permission: "revenue.view" },
+  { path: "/admin/analytics", permission: "reports.view" },
   { path: "/admin/vendor-requests", permission: "vendors.view" },
   { path: "/admin/customers", permission: "customers.view" },
-  { path: "/admin/product-approval", permission: "products.view" },
-  { path: "/admin/reports", permission: "products.view" },
   { path: "/admin/support", permission: "support.view" },
-  { path: "/admin/website", permission: "content.manage" },
+  { path: "/admin/audit-logs", permission: "security.view" },
   { path: "/admin/security", permission: "security.view" },
-  { path: "/admin/login-logs", permission: "security.view" },
+  { path: "/admin/settings", permission: ["security.view", "content.manage"] },
+  { path: "/admin/health", permission: "security.view" },
 ];
 
 const load = (force = false) => {
@@ -47,7 +54,8 @@ const load = (force = false) => {
   return request;
 };
 
-const can = (permission) => access.isSuperAdmin || access.permissions.includes(permission);
+const can = (permission) =>
+  Array.isArray(permission) ? permission.some((p) => can(p)) : access.isSuperAdmin || access.permissions.includes(permission);
 
 const permissionForPath = (path) => ADMIN_PAGES.find((p) => path === p.path || path.startsWith(`${p.path}/`))?.permission ?? null;
 

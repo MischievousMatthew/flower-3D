@@ -9,7 +9,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
           <div>
-            <h1 class="page-title">Customers</h1>
+            <h1 class="page-title">Customer Management</h1>
             <p class="page-subtitle">Accounts, order history and complaints. Personal details stay masked unless you need them.</p>
           </div>
         </div>
@@ -155,7 +155,7 @@
           </div>
           <p class="info-note">
             Return and refund requests are decided by the vendor, so refunds and stock stay with their checks.
-            Product reports are reviewed in Reported Products. Open a customer to see their full history.
+            Product reports are reviewed in Review Management. Open a customer to see their full history.
           </p>
           <template v-if="complaints.loading && !complaints.loaded">
             <div v-for="n in 5" :key="n" class="sk sk-line" style="height: 52px; margin-bottom: 8px"></div>
@@ -175,7 +175,7 @@
               <div class="complaint-right">
                 <span class="pill" :class="`cs-${item.status}`">{{ COMPLAINT_STATUS[item.status] ?? item.status }}</span>
                 <router-link v-if="item.order_id" :to="{ path: '/admin/orders', query: { order: item.order_id } }" class="link-btn">Open order →</router-link>
-                <router-link v-else to="/admin/reports" class="link-btn">Open report →</router-link>
+                <router-link v-else :to="{ path: '/admin/reviews', query: { tab: 'reports' } }" class="link-btn">Open report →</router-link>
               </div>
             </li>
           </ul>
@@ -308,7 +308,7 @@
               <div class="box-foot">
                 <span class="sub">{{ formatDateTime(item.created_at) }}</span>
                 <router-link v-if="item.order_id" :to="{ path: '/admin/orders', query: { order: item.order_id } }" class="link-btn">Open order →</router-link>
-                <router-link v-else to="/admin/reports" class="link-btn">Open in Reported Products →</router-link>
+                <router-link v-else :to="{ path: '/admin/reviews', query: { tab: 'reports' } }" class="link-btn">Open in Review Management →</router-link>
               </div>
             </article>
           </template>

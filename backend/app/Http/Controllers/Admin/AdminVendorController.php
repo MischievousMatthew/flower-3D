@@ -190,7 +190,7 @@ class AdminVendorController extends Controller
             ->selectRaw("owner_id, count(*) as total, sum(case when status = 'active' then 1 else 0 end) as active")
             ->groupBy('owner_id')->get()->keyBy('owner_id');
         $ratings = DB::table('product_reviews')->join('products', 'products.id', '=', 'product_reviews.product_id')
-            ->whereIn('products.owner_id', $ids)
+            ->whereIn('products.owner_id', $ids)->whereNull('product_reviews.hidden_at')
             ->selectRaw('products.owner_id, avg(product_reviews.rating) as rating, count(*) as reviews')
             ->groupBy('products.owner_id')->get()->keyBy('owner_id');
         $disputes = OrderRequest::query()->join('orders', 'orders.id', '=', 'order_requests.order_id')
@@ -281,7 +281,7 @@ class AdminVendorController extends Controller
             ->whereIn('orders.payment_status', ['paid', 'refunded'])
             ->selectRaw('order_items.product_id, sum(order_items.quantity) as qty')
             ->groupBy('order_items.product_id')->pluck('qty', 'product_id');
-        $ratings = DB::table('product_reviews')->whereIn('product_id', $products->pluck('id'))
+        $ratings = DB::table('product_reviews')->whereIn('product_id', $products->pluck('id'))->whereNull('hidden_at')
             ->selectRaw('product_id, avg(rating) as rating, count(*) as reviews')->groupBy('product_id')->get()->keyBy('product_id');
 
         return $products->map(fn (Product $p) => [

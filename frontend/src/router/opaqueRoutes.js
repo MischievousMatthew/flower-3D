@@ -82,8 +82,6 @@ export const opaqueRouteTokens = Object.freeze({
   AdminDashboard: "oRIhs7pPjhYwqPH84jejXYkicL9Esil81A6e8lk4Pue",
   VendorRequest: "c6BWSjvm0XuZrvnuzv2jly60ezf9eWLwtafVFqExRIx",
   ProductApproval: "uVPMMoMDJKj8r5bgvtZiy0CwpqLj01OuNOS0II8F8df",
-  ReportedProducts: "Xc0lVXU2Gk1Heqo2xSQq6eDeykBhWFaDmEG7KfXgZHo",
-  AdminLoginLogs: "flT7j84vI1rfPg0hEfgGJ6Ln7dosXYsXbVHHRJcYV5t",
   VendorCustomization: "9t5m2OwWYbCmDcdPs4usf2S8rhRD0zkU5UPnUms3iHE",
   AdminSubscriptionRevenue: "4qrAVSdgX6Rd2cga2cnUue4CwxUMSwm0vgdizsMnANo",
   AdminOrders: "dgvpQOjwKBWiOzhx4TjZXlD38NruAZX3assW60GD99s",
@@ -95,6 +93,12 @@ export const opaqueRouteTokens = Object.freeze({
   CustomerSupport: "rn3g2QTOxvbqz2rqMZVdzPgvCvgp89JNFoxi1kS7PRg",
   AdminSecurity: "2WK1GnosRgtJjr56hMCxXx_qftcfMCV0bMv5gkxNsqA",
   AdminAnalytics: "ZH0Zo247jRErklGpuqotDN0itJ-1SyqjafRhT_6Ra_o",
+  AdminCategories: "14RBVMP5TrxDyfC4RhCPEiidB7cx0Mhmo0iZTqntZrM",
+  AdminReviews: "bLVF1AI145vN4hzmIqlRYPS3tFo2FDHp5h-YQeS-kdU",
+  AdminRefunds: "d_6o6iU1OmtZm-MBqXD1ubnBAEmMtpVikuMDRrVrwd4",
+  AdminAuditLogs: "Sj7hrsOHST__Qs_U51RElaIg8GzzwWz9839okzSlKfk",
+  AdminSettings: "OpuQ5BbQ9RdDvJrdDESPfS_q-h1b3uFDK6lk5FwSGgc",
+  AdminHealth: "fyfL2JkE0--iisB4Y4VS4YGMX_StDSmFzqceX7M9z_E",
 });
 
 export const opaquePathFor = (name, parameterPath = "") => {

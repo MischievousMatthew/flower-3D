@@ -138,7 +138,7 @@ class AdminProductController extends Controller
         $labels = $this->taxonomyLabels();
         $row = $this->formatRow($product, $vendors, $suspended, $this->soldCounts(collect([$product->id])), $labels);
 
-        $reviews = DB::table('product_reviews')->where('product_id', $product->id);
+        $reviews = DB::table('product_reviews')->where('product_id', $product->id)->whereNull('hidden_at');
         $reports = ProductReport::query()->with('reporter:id,name,surname')->where('product_id', $product->id)->latest()->orderByDesc('id')->get();
 
         return response()->json([

@@ -436,7 +436,7 @@ const attentionItems = computed(() => {
   if (!a) return [];
   return [
     { key: "apps", count: a.vendor_applications, label: "vendor applications", to: "/admin/vendor-requests", tone: "violet" },
-    { key: "reports", count: a.product_reports, label: "product reports", to: "/admin/reports", tone: "red" },
+    { key: "reports", count: a.product_reports, label: "product reports", to: "/admin/reviews?tab=reports", tone: "red" },
     { key: "disputes", count: a.open_disputes, label: "open disputes", to: "/admin/orders?tab=disputes", tone: "rose" },
     { key: "issues", count: a.order_issues, label: "orders need a look", to: "/admin/orders?tab=issues", tone: "amber" },
   ].filter((item) => item.count > 0);
