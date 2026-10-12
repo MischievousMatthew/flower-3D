@@ -441,23 +441,17 @@
                   </div>
                 </template>
 
-                <!-- Six-way movement, relative to the current view -->
+                <!-- Up, down, left, right as seen on screen; forward/back via the handles or E / Q -->
                 <div class="fc-move">
                   <div class="fc-move-copy">
                     <span>Move</span>
-                    <small>Follows the way you're looking. Hold Shift for small steps.</small>
+                    <small>Hold Shift for small steps. E / Q move it away from or toward you.</small>
                   </div>
-                  <div class="fc-move-controls" :class="{ locked: moveLocked }">
-                    <div class="fc-pad">
-                      <button type="button" class="fc-pad-up" aria-label="Move forward" title="Forward (↑)" :disabled="moveLocked" @click="nudgeSelectedPosition('forward', $event)"><BcIcon name="arrowUp" /></button>
-                      <button type="button" class="fc-pad-left" aria-label="Move left" title="Left (←)" :disabled="moveLocked" @click="nudgeSelectedPosition('left', $event)"><BcIcon name="arrowLeft" /></button>
-                      <button type="button" class="fc-pad-right" aria-label="Move right" title="Right (→)" :disabled="moveLocked" @click="nudgeSelectedPosition('right', $event)"><BcIcon name="arrowRight" /></button>
-                      <button type="button" class="fc-pad-down" aria-label="Move backward" title="Backward (↓)" :disabled="moveLocked" @click="nudgeSelectedPosition('backward', $event)"><BcIcon name="arrowDown" /></button>
-                    </div>
-                    <div class="fc-lift">
-                      <button type="button" aria-label="Move up" title="Up (Page Up or E)" :disabled="moveLocked" @click="nudgeSelectedPosition('up', $event)"><BcIcon name="arrowUp" /><span>Up</span></button>
-                      <button type="button" aria-label="Move down" title="Down (Page Down or Q)" :disabled="moveLocked" @click="nudgeSelectedPosition('down', $event)"><BcIcon name="arrowDown" /><span>Down</span></button>
-                    </div>
+                  <div class="fc-pad" :class="{ locked: moveLocked }">
+                    <button type="button" class="fc-pad-up" aria-label="Move up" title="Up (↑)" :disabled="moveLocked" @click="nudgeSelectedPosition('up', $event)"><BcIcon name="arrowUp" /></button>
+                    <button type="button" class="fc-pad-left" aria-label="Move left" title="Left (←)" :disabled="moveLocked" @click="nudgeSelectedPosition('left', $event)"><BcIcon name="arrowLeft" /></button>
+                    <button type="button" class="fc-pad-right" aria-label="Move right" title="Right (→)" :disabled="moveLocked" @click="nudgeSelectedPosition('right', $event)"><BcIcon name="arrowRight" /></button>
+                    <button type="button" class="fc-pad-down" aria-label="Move down" title="Down (↓)" :disabled="moveLocked" @click="nudgeSelectedPosition('down', $event)"><BcIcon name="arrowDown" /></button>
                   </div>
                 </div>
 
@@ -472,8 +466,8 @@
                   <summary>Keyboard shortcuts</summary>
                   <dl>
                     <div><dt>G / R / S</dt><dd>Move, rotate or size with the handles</dd></div>
-                    <div><dt>Arrow keys</dt><dd>Forward, back, left, right</dd></div>
-                    <div><dt>Page Up / Down, E / Q</dt><dd>Up and down</dd></div>
+                    <div><dt>Arrow keys</dt><dd>Up, down, left, right</dd></div>
+                    <div><dt>E / Q</dt><dd>Away from you / toward you</dd></div>
                     <div><dt>Shift</dt><dd>Smaller steps</dd></div>
                     <div><dt>F</dt><dd>Focus the view on the selection</dd></div>
                     <div><dt>Delete</dt><dd>Remove the selected item</dd></div>
@@ -1881,15 +1875,14 @@ function focusSelection() {
   controls.update();
 }
 
+// Arrow keys match the on-screen pad; E / Q move away from / toward you
 const MOVE_KEYS = {
-  arrowup: "forward",
-  arrowdown: "backward",
+  arrowup: "up",
+  arrowdown: "down",
   arrowleft: "left",
   arrowright: "right",
-  pageup: "up",
-  e: "up",
-  pagedown: "down",
-  q: "down",
+  e: "forward",
+  q: "backward",
 };
 
 function onKeydown(event) {
@@ -3622,6 +3615,10 @@ function showToast(message, type = "success") {
   background: var(--ivory-deep);
 }
 
+.fc-pad.locked {
+  opacity: 0.6;
+}
+
 .fc-pad button:disabled {
   opacity: 0.3;
   cursor: not-allowed;
@@ -3636,46 +3633,6 @@ function showToast(message, type = "success") {
 .fc-pad-left { grid-area: left; }
 .fc-pad-right { grid-area: right; }
 .fc-pad-down { grid-area: down; }
-
-.fc-move-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.fc-lift {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.fc-lift button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 10px 6px 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: none;
-  color: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.25s;
-}
-
-.fc-lift button:hover:not(:disabled) {
-  background: var(--ivory-deep);
-}
-
-.fc-lift button:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.fc-lift .fc-icon {
-  width: 14px;
-  height: 14px;
-}
 
 .fc-keys {
   font-size: 12px;
