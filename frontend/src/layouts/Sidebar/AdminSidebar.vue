@@ -82,6 +82,15 @@
         </router-link>
 
         <router-link
+          to="/admin/product-approval"
+          class="nav-item"
+          active-class="active"
+        >
+          <span class="nav-icon">🌷</span>
+          <span>Products</span>
+        </router-link>
+
+        <router-link
           to="/admin/reports"
           class="nav-item"
           active-class="active"

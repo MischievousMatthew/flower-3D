@@ -9,6 +9,8 @@ use App\Http\Controllers\Admin\SubscriptionRevenueController;
 use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminVendorController;
+use App\Http\Controllers\Admin\AdminProductController;
+use App\Http\Controllers\ProductTaxonomyController;
 use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VendorController;
@@ -111,6 +113,9 @@ Route::prefix('vendors')->group(function () {
 
 Route::get('/stores/{storeId}/customizable-flowers', [VendorStoreFrontController::class, 'getCustomizableFlowers']);
 Route::get('/stores/{storeId}/customization-options', [VendorStoreFrontController::class, 'getCustomizationOptions']);
+
+// Choices for the vendor product form (managed by admins)
+Route::get('/product-taxonomies', [ProductTaxonomyController::class, 'index']);
 
 // ── PUBLIC — Product reviews (no auth required) ───────────────────────────
 Route::get('/products/{productId}/reviews', [ProductReviewController::class, 'index'])
@@ -721,10 +726,10 @@ Route::middleware('token.auth')->group(function () {
 }); // end auth:sanctum
 
 // ============================================================
-// 7. ADMIN (add 'role:admin' middleware before production)
+// 7. ADMIN — vendor applications, reports, products (admins only)
 // ============================================================
 
-Route::prefix('admin')->group(function () {
+Route::middleware(['token.auth', 'role:admin'])->prefix('admin')->group(function () {
 
     // ── Vendor applications ───────────────────────────────────────────────
     Route::get('/vendor-applications',             [VendorApplicationController::class, 'index']);
@@ -743,11 +748,19 @@ Route::prefix('admin')->group(function () {
     Route::get('/reports',                   [ProductReportController::class, 'index']);   // ← NEW
     Route::post('/reports/{id}/review',      [ProductReportController::class, 'review']); // ← NEW
 
-    // ── Admin product management ──────────────────────────────────────────
-    Route::get('/products',                    [ProductController::class, 'index']);
-    Route::get('/products/statistics',         [ProductController::class, 'statistics']);
-    Route::post('/products/{id}/toggle-status',[ProductController::class, 'toggleStatus']);
-    Route::delete('/products/{id}',            [ProductController::class, 'destroy']);
+    // ── Listings: moderation only; vendors keep editing their own products ──
+    Route::get('/products/summary',            [AdminProductController::class, 'summary']);
+    Route::get('/products',                    [AdminProductController::class, 'index']);
+    Route::get('/products/{id}',               [AdminProductController::class, 'show'])->whereNumber('id');
+    Route::post('/products/{id}/{action}',     [AdminProductController::class, 'moderate'])
+        ->whereNumber('id')->whereIn('action', ['approve', 'hide', 'remove', 'restore']);
+
+    // ── Categories, flower types, occasions ───────────────────────────────
+    Route::get('/taxonomies',                  [AdminProductController::class, 'taxonomies']);
+    Route::post('/taxonomies',                 [AdminProductController::class, 'storeTaxonomy']);
+    Route::post('/taxonomies/reorder',         [AdminProductController::class, 'reorderTaxonomies']);
+    Route::put('/taxonomies/{id}',             [AdminProductController::class, 'updateTaxonomy'])->whereNumber('id');
+    Route::delete('/taxonomies/{id}',          [AdminProductController::class, 'destroyTaxonomy'])->whereNumber('id');
 
 }); // end admin prefix
 

@@ -13,10 +13,33 @@ class Product extends Model
 {
     use BelongsToOwner, SoftDeletes;
 
-    /** Leave out products of suspended vendors (for anything customers see) */
-    public function scopeFromActiveVendors($query)
+    // BloomCraft's moderation of a listing (the vendor's own `status` is separate)
+    public const MODERATION_PENDING = 'pending';         // new, live, not reviewed yet
+    public const MODERATION_APPROVED = 'approved';       // reviewed, live
+    public const MODERATION_HIDDEN = 'hidden';           // taken down until the vendor fixes it
+    public const MODERATION_RESUBMITTED = 'resubmitted'; // fixed by the vendor, still down until reviewed
+    public const MODERATION_REMOVED = 'removed';         // taken down for good
+    public const MODERATION_LIVE = [self::MODERATION_PENDING, self::MODERATION_APPROVED];
+
+    /**
+     * Products customers may see: not taken down by BloomCraft and not from a
+     * suspended vendor. Callers still check the vendor's own status.
+     */
+    public function scopeListedForCustomers($query)
     {
-        return $query->whereNotIn('owner_id', User::query()->where('is_suspended', true)->select('id'));
+        return $query
+            ->whereIn('moderation_status', self::MODERATION_LIVE)
+            ->whereNotIn('owner_id', User::query()->where('is_suspended', true)->select('id'));
+    }
+
+    public function reports(): HasMany
+    {
+        return $this->hasMany(ProductReport::class);
+    }
+
+    public function isTakenDown(): bool
+    {
+        return !in_array($this->moderation_status ?? self::MODERATION_APPROVED, self::MODERATION_LIVE, true);
     }
 
     protected $fillable = [
@@ -68,6 +91,7 @@ class Product extends Model
     ];
 
     protected $casts = [
+        'moderated_at'           => 'datetime',
         'is_fragile'             => 'boolean',
         'requires_refrigeration' => 'boolean',
         'has_discount'           => 'boolean',   // Cast handles 0/1 → false/true automatically

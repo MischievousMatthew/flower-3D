@@ -551,7 +551,7 @@ class VendorStorefrontController extends Controller
             $query->withoutGlobalScope(SoftDeletingScope::class);
         }
 
-        return $query->fromActiveVendors()->where('owner_id', $ownerId);
+        return $query->listedForCustomers()->where('owner_id', $ownerId);
     }
 
     /**

@@ -389,7 +389,7 @@
                   <span v-if="isOnSale(product)" class="sale-dot">SALE</span>
                 </div>
                 <div class="p-meta">
-                  <span class="p-name">{{ product.product_name }}</span>
+                  <span class="p-name">{{ product.product_name }}<ModerationNotice :product="product" /></span>
                   <span class="p-season">{{
                     formatSeason(product.season)
                   }}</span>
@@ -622,6 +622,7 @@
             <button class="btn-close" @click="closeViewDetailsModal">✕</button>
           </div>
           <div class="modal-bd scroll" v-if="selectedProduct">
+            <ModerationNotice :product="selectedProduct" variant="banner" />
             <div v-if="isOnSale(selectedProduct)" class="sale-banner">
               <span>🏷️</span>
               <div>
@@ -964,16 +965,7 @@
                         :class="{ 'is-invalid': editErrors.category }"
                       >
                         <option value="">Select category</option>
-                        <option value="roses">Roses</option>
-                        <option value="tulips">Tulips</option>
-                        <option value="lilies">Lilies</option>
-                        <option value="orchids">Orchids</option>
-                        <option value="sunflowers">Sunflowers</option>
-                        <option value="mixed-bouquets">Mixed Bouquets</option>
-                        <option value="arrangements">Arrangements</option>
-                        <option value="plants">Plants</option>
-                        <option value="gifts">Gifts & Add-ons</option>
-                        <option value="seasonal">Seasonal Flowers</option>
+                        <option v-for="c in withCurrent(taxonomies.categories, editFormData.category)" :key="c.value" :value="c.value">{{ c.label }}</option>
                       </select>
                       <span v-if="editErrors.category" class="error-text">{{
                         editErrors.category
@@ -986,11 +978,7 @@
                         class="form-select"
                       >
                         <option value="">Select flower type</option>
-                        <option value="focal">Focal Flowers</option>
-                        <option value="secondary">Secondary Flowers</option>
-                        <option value="filler">Filler Flowers</option>
-                        <option value="line">Line Flowers</option>
-                        <option value="greenery">Greenery</option>
+                        <option v-for="t in withCurrent(taxonomies.flower_types, editFormData.flower_type)" :key="t.value" :value="t.value">{{ t.label }}</option>
                       </select>
                     </div>
                     <div class="form-group">
@@ -1593,7 +1581,9 @@ import {
   reactive,
 } from "vue";
 import { useRouter } from "vue-router";
+import ModerationNotice from "../../../../components/product/ModerationNotice.vue";
 import api from "../../../../plugins/axios";
+import { useProductTaxonomies } from "../../../../composables/useProductTaxonomies";
 import { useAuth } from "../../../../composables/useAuth";
 import {
   PERMISSION_TOOLTIPS,
@@ -1601,6 +1591,8 @@ import {
 } from "../../../../composables/useAssignment";
 import { toast } from "vue3-toastify";
 import { clearStoredAuth } from "../../../../utils/authSession";
+
+const { taxonomies, withCurrent } = useProductTaxonomies();
 
 const router = useRouter();
 const { user } = useAuth();
@@ -1831,27 +1823,14 @@ const formatSeason = (s) =>
     winter: "Winter",
   })[s] || s;
 
-const knownTags = [
-  "Wedding",
-  "Birthday",
-  "Anniversary",
-  "Funeral",
-  "Get Well",
-  "Congratulations",
-  "Sympathy",
-  "Valentine",
-  "Mother's Day",
-  "Christmas",
-  "Corporate",
-  "Just Because",
-];
+const knownTags = computed(() => taxonomies.occasions.map((o) => o.value));
 const cleanedOccasionTags = computed(() => {
   const raw = selectedProduct.value?.occasion_tags;
   if (!raw) return [];
   const j = (Array.isArray(raw) ? raw.join(" ") : raw)
     .replace(/[\[\]\\"]/g, "")
     .trim();
-  return knownTags.filter((t) => new RegExp(`\\b${t}\\b`, "i").test(j));
+  return knownTags.value.filter((t) => new RegExp(`\\b${t}\\b`, "i").test(j));
 });
 
 const toggleMenu = (id, event) => {
@@ -2000,8 +1979,8 @@ const switchToEdit = () => {
 };
 const populateEditForm = (p) => {
   const tags = Array.isArray(p.occasion_tags)
-    ? p.occasion_tags.filter((t) => knownTags.includes(t))
-    : knownTags.filter((tag) => {
+    ? p.occasion_tags.filter((t) => knownTags.value.includes(t))
+    : knownTags.value.filter((tag) => {
         const joined = (p.occasion_tags || "").replace(/[\[\]\\"]/g, "");
         return new RegExp(`\\b${tag}\\b`, "i").test(joined);
       });

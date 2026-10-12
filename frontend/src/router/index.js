@@ -619,7 +619,7 @@ const routes = [
       {
         path: "product-approval",
         name: "ProductApproval",
-        component: () => import("../views/admin/ProductApproval.vue"),
+        component: () => import("../views/admin/Products.vue"),
       },
       {
         path: "reports",

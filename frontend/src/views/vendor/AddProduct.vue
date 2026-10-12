@@ -96,16 +96,7 @@
                   required
                 >
                   <option value="">Select category</option>
-                  <option value="roses">Roses</option>
-                  <option value="tulips">Tulips</option>
-                  <option value="lilies">Lilies</option>
-                  <option value="orchids">Orchids</option>
-                  <option value="sunflowers">Sunflowers</option>
-                  <option value="mixed-bouquets">Mixed Bouquets</option>
-                  <option value="arrangements">Arrangements</option>
-                  <option value="plants">Plants</option>
-                  <option value="gifts">Gifts & Add-ons</option>
-                  <option value="seasonal">Seasonal Flowers</option>
+                  <option v-for="c in withCurrent(taxonomies.categories, formData.category)" :key="c.value" :value="c.value">{{ c.label }}</option>
                 </select>
                 <span v-if="errors.category" class="error-text">{{
                   errors.category
@@ -121,15 +112,7 @@
                   required
                 >
                   <option value="">Select flower type</option>
-                  <option value="focal">Focal Flowers (Main attraction)</option>
-                  <option value="secondary">
-                    Secondary Flowers (Support & volume)
-                  </option>
-                  <option value="filler">Filler Flowers (Small texture)</option>
-                  <option value="line">
-                    Line Flowers (Height & direction)
-                  </option>
-                  <option value="greenery">Greenery (Foliage)</option>
+                  <option v-for="t in withCurrent(taxonomies.flower_types, formData.flower_type)" :key="t.value" :value="t.value">{{ t.label }}{{ t.description ? ` (${t.description})` : "" }}</option>
                 </select>
                 <span v-if="errors.flower_type" class="error-text">{{
                   errors.flower_type
@@ -674,6 +657,9 @@ import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import api from "../../plugins/axios";
+import { useProductTaxonomies } from "../../composables/useProductTaxonomies";
+
+const { taxonomies, withCurrent } = useProductTaxonomies();
 
 const router = useRouter();
 const route = useRoute();
@@ -716,20 +702,7 @@ const formData = reactive({
 
 const productImages = ref([]);
 
-const occasionTags = [
-  "Wedding",
-  "Birthday",
-  "Anniversary",
-  "Funeral",
-  "Get Well",
-  "Congratulations",
-  "Sympathy",
-  "Valentine",
-  "Mother's Day",
-  "Christmas",
-  "Corporate",
-  "Just Because",
-];
+const occasionTags = computed(() => taxonomies.occasions.map((o) => o.value));
 
 // ── Computed ───────────────────────────────────────────────────────────────
 

@@ -132,6 +132,14 @@ class CheckoutController extends Controller
                 ], 422);
             }
 
+            $takenDown = $cartItems->first(fn ($item) => $item->product?->isTakenDown());
+            if ($takenDown) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "{$takenDown->product->product_name} is no longer available. Remove it from your cart to continue.",
+                ], 422);
+            }
+
             $vendorApplication = VendorApplication::where('email', $vendor->email)
                 ->where('status', 'approved')
                 ->first();
@@ -376,6 +384,14 @@ class CheckoutController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => "This store isn't taking orders right now. Remove its items from your cart to continue.",
+                ], 422);
+            }
+
+            $takenDown = $cartItems->first(fn ($item) => $item->product?->isTakenDown());
+            if ($takenDown) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "{$takenDown->product->product_name} is no longer available. Remove it from your cart to continue.",
                 ], 422);
             }
 

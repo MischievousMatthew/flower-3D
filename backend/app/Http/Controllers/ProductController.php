@@ -6,6 +6,9 @@ use App\Models\Employee;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductModel;
+use App\Models\ProductTaxonomy;
+use App\Services\ProductModerationService;
+use Illuminate\Validation\Rule;
 use App\Traits\ResolvesOwner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -160,8 +163,8 @@ class ProductController extends Controller
                 'product_name'           => 'required|string|max:255',
                 'description'            => 'required|string',
                 'sku'                    => 'required|string|max:255|unique:products,sku',
-                'category'               => 'required|string|max:255',
-                'flower_type'            => 'required|in:focal,secondary,filler,line,greenery',
+                'category'               => ['required', 'string', Rule::in(ProductTaxonomy::activeValues(ProductTaxonomy::CATEGORY))],
+                'flower_type'            => ['required', Rule::in(ProductTaxonomy::activeValues(ProductTaxonomy::FLOWER_TYPE))],
                 'color'                  => 'required|in:white,yellow,red,pink,purple,orange,blue,green,cream,other',
                 'color_other'            => 'required_if:color,other|nullable|string|max:100',
                 'purchase_price'         => 'required|numeric|min:0',
@@ -178,7 +181,7 @@ class ProductController extends Controller
                 'supplier_sku'           => 'nullable|string|max:255',
                 'care_instructions'      => 'nullable|string',
                 'occasion_tags'          => 'nullable|array|max:2',
-                'occasion_tags.*'        => 'string',
+                'occasion_tags.*'        => ['string', Rule::in(ProductTaxonomy::activeValues(ProductTaxonomy::OCCASION))],
                 'notes'                  => 'nullable|string',
                 'is_fragile'             => 'nullable|boolean',
                 'requires_refrigeration' => 'nullable|boolean',
@@ -191,6 +194,9 @@ class ProductController extends Controller
                 'selling_price.gt'  => 'Selling price must be greater than purchase price',
                 'discount_price.lt' => 'Discount price must be less than selling price',
                 'occasion_tags.max' => 'You can only select up to 2 occasion tags',
+                'category.in'       => 'Choose one of the listed categories.',
+                'flower_type.in'    => 'Choose one of the listed flower types.',
+                'occasion_tags.*.in' => 'Choose occasions from the list.',
                 'images.required'   => 'At least one product image is required',
                 'images.min'        => 'At least one product image is required',
             ]);
@@ -222,6 +228,7 @@ class ProductController extends Controller
 
             // ── Create the product (no file columns here) ─────────────────
             $product = Product::create($data);
+            app(ProductModerationService::class)->markNew($product);
 
             Log::info('Product created', ['product_id' => $product->id]);
 
@@ -289,8 +296,9 @@ class ProductController extends Controller
                 'product_name'           => 'nullable|string|max:255',
                 'description'            => 'nullable|string',
                 'sku'                    => 'nullable|string|max:255|unique:products,sku,' . $id,
-                'category'               => 'nullable|string|max:255',
-                'flower_type'            => 'nullable|in:focal,secondary,filler,line,greenery',
+                // A value the product already has stays allowed even if it has since been switched off
+                'category'               => ['nullable', 'string', Rule::in([...ProductTaxonomy::activeValues(ProductTaxonomy::CATEGORY), $product->category])],
+                'flower_type'            => ['nullable', Rule::in([...ProductTaxonomy::activeValues(ProductTaxonomy::FLOWER_TYPE), $product->flower_type])],
                 'color'                  => 'nullable|in:white,yellow,red,pink,purple,orange,blue,green,cream,other',
                 'color_other'            => 'required_if:color,other|nullable|string|max:100',
                 'purchase_price'         => 'nullable|numeric|min:0',
@@ -307,6 +315,7 @@ class ProductController extends Controller
                 'supplier_sku'           => 'nullable|string|max:255',
                 'care_instructions'      => 'nullable|string',
                 'occasion_tags'          => 'nullable|array|max:2',
+                'occasion_tags.*'        => ['string', Rule::in([...ProductTaxonomy::activeValues(ProductTaxonomy::OCCASION), ...((array) $product->occasion_tags)])],
                 'notes'                  => 'nullable|string',
                 'is_fragile'             => 'nullable|boolean',
                 'requires_refrigeration' => 'nullable|boolean',
@@ -364,6 +373,7 @@ class ProductController extends Controller
 
             unset($data['has_discount'], $data['discount_price']);
             $product->update($data);
+            app(ProductModerationService::class)->markEdited($product);
 
             DB::table('products')->where('id', $product->id)->update([
                 'has_discount'   => $hasDiscount ? 1 : 0,

@@ -216,10 +216,13 @@ class ProductReportController extends Controller
                 $product = $report->product;
                 $owner   = $product?->owner;
 
-                if ($product) {
-                    \DB::table('products')
-                        ->where('id', $product->id)
-                        ->update(['status' => 'banned', 'updated_at' => now()]);
+                // Taken down through moderation; the vendor's own status is left alone
+                if ($product && $product->moderation_status !== \App\Models\Product::MODERATION_REMOVED) {
+                    app(\App\Services\ProductModerationService::class)->remove(
+                        $product,
+                        $admin,
+                        'Removed after a customer report was upheld: ' . ($report->reason ?? 'inappropriate listing'),
+                    );
                 }
 
                 if ($owner) {
