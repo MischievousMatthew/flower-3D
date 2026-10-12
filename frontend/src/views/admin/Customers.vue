@@ -100,13 +100,13 @@
                   <tr><td colspan="7" class="empty-cell">{{ hasFilters || filters.tab !== "all" ? "No customers match." : "No customers yet." }}</td></tr>
                 </tbody>
                 <tbody v-else :class="{ dim: loading }">
-                  <tr v-for="c in rows" :key="c.id" class="click-row" :class="{ selected: drawer.id === c.id }" tabindex="0" @click="openCustomer(c.id)" @keydown.enter="openCustomer(c.id)">
+                  <tr v-for="(c, i) in rows" :key="c.id" class="click-row" :class="{ selected: drawer.id === c.id }" tabindex="0" @click="openCustomer(c.id)" @keydown.enter="openCustomer(c.id)">
                     <td>
                       <div class="person">
                         <Avatar :name="c.name" :src="c.avatar_url" />
                         <div>
                           <span class="cell-main">{{ c.name }}</span>
-                          <span class="sub">#{{ c.id }} · {{ c.email_masked }}</span>
+                          <span class="sub">No. {{ String((meta.current_page - 1) * meta.per_page + i + 1).padStart(3, "0") }} · {{ c.email_masked }}</span>
                         </div>
                       </div>
                     </td>
@@ -195,7 +195,7 @@
               <div class="drawer-meta">
                 <span class="pill" :class="detail.status === 'suspended' ? 'st-suspended' : 'st-active'">{{ detail.status === "suspended" ? "Suspended" : "Active" }}</span>
                 <span v-if="detail.verified" class="pill st-verified">Verified</span>
-                <span class="sub">#{{ detail.id }} · joined {{ formatDate(detail.joined_at) }}</span>
+                <span class="sub">Joined {{ formatDate(detail.joined_at) }}</span>
               </div>
             </div>
           </template>
@@ -407,6 +407,7 @@ import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
+import { linkedId } from "../../utils/hiddenIds";
 
 const { toggleMobile } = useSidebarState();
 const route = useRoute();
@@ -575,8 +576,7 @@ const closeCustomer = () => {
   drawer.id = null;
   revealed.value = null; // details are never kept around after closing
   detailRequest++;
-  const { customer, ...rest } = route.query;
-  router.replace({ query: rest });
+  router.replace({ query: { ...route.query, customer: null } });
   lastFocus?.focus?.();
 };
 
@@ -649,7 +649,7 @@ onMounted(() => {
   fetchSummary();
   fetchCustomers();
   if (view.value === "complaints") fetchComplaints();
-  const customerId = Number(route.query.customer);
+  const customerId = linkedId("customer");
   if (customerId) openCustomer(customerId);
   window.addEventListener("keydown", onKeydown);
 });

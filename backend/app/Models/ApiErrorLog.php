@@ -9,7 +9,7 @@ class ApiErrorLog extends Model
 {
     public const UPDATED_AT = null;
 
-    protected $fillable = ['method', 'path', 'status_code', 'exception', 'message', 'user_id', 'ip_address', 'duration_ms'];
+    protected $fillable = ['method', 'path', 'action', 'status_code', 'exception', 'message', 'user_id', 'ip_address', 'duration_ms'];
 
     protected $casts = ['created_at' => 'datetime'];
 }

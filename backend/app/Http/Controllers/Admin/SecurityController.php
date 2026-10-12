@@ -8,6 +8,8 @@ use App\Models\AdminRole;
 use App\Models\ApiErrorLog;
 use App\Models\LoginAttempt;
 use App\Models\User;
+use App\Support\ApiAreas;
+use App\Support\AuditTargets;
 use App\Support\PaymentLedger;
 use App\Support\PlatformSettings;
 use Carbon\CarbonImmutable;
@@ -263,23 +265,22 @@ class SecurityController extends Controller
         }
         if ($search = trim((string) $request->input('search'))) {
             $like = '%' . mb_strtolower($search) . '%';
-            $query->where(fn ($q) => $q->whereRaw('lower(path) like ?', [$like])->orWhereRaw('lower(admin_name) like ?', [$like])->orWhere('target_id', $search));
+            $query->where(fn ($q) => $q->whereRaw('lower(admin_name) like ?', [$like])->orWhereRaw('lower(target_label) like ?', [$like]));
         }
 
         $page = $query->paginate(min(max((int) $request->input('per_page', 25), 10), 100));
 
         return response()->json([
             'success' => true,
+            // No database IDs or API paths: the record is named instead
             'data' => collect($page->items())->map(fn ($l) => [
                 'id' => $l->id,
-                'admin_id' => $l->admin_id,
                 'admin_name' => $l->admin_name,
                 'action' => $l->action,
-                'method' => $l->method,
-                'path' => $l->path,
-                'target_id' => $l->target_id,
+                'target' => $l->target_label ?? ($l->target_id ? AuditTargets::label($l->action, $l->target_id) : null),
+                'had_target' => $l->target_id !== null || $l->target_label !== null,
                 'status_code' => $l->status_code,
-                'details' => $l->details,
+                'details' => AuditTargets::details($l->details),
                 'ip_address' => $l->ip_address,
                 'device' => $this->device($l->user_agent),
                 'created_at' => $l->created_at?->toIso8601String(),
@@ -470,16 +471,17 @@ class SecurityController extends Controller
                 'total' => (clone $rows)->count(),
                 'bucket' => $bucket,
                 'series' => $series,
-                'by_endpoint' => (clone $rows)->selectRaw('method, path, count(*) as total, max(created_at) as last_at')
-                    ->groupBy('method', 'path')->orderByDesc('total')->limit(10)->get()
-                    ->map(fn ($r) => ['method' => $r->method, 'path' => $r->path, 'total' => (int) $r->total, 'last_at' => CarbonImmutable::parse($r->last_at)->toIso8601String()]),
+                // Grouped by feature, never by API path
+                'by_feature' => (clone $rows)->get(['method', 'path', 'action', 'created_at'])
+                    ->groupBy(fn ($e) => $this->feature($e))
+                    ->map(fn ($group, $feature) => ['feature' => $feature, 'total' => $group->count(), 'last_at' => $group->max('created_at')->toIso8601String()])
+                    ->sortByDesc('total')->take(10)->values(),
                 'recent' => (clone $rows)->latest('created_at')->limit(50)->get()->map(fn ($e) => [
                     'id' => $e->id,
-                    'method' => $e->method,
-                    'path' => $e->path,
+                    'feature' => $this->feature($e),
                     'status' => $e->status_code,
                     'exception' => $e->exception ? class_basename($e->exception) : null,
-                    'message' => $e->message,
+                    'message' => ApiAreas::cleanMessage($e->message),
                     'duration_ms' => $e->duration_ms,
                     'at' => $e->created_at?->toIso8601String(),
                 ]),
@@ -488,6 +490,11 @@ class SecurityController extends Controller
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────
+
+    private function feature(ApiErrorLog $e): string
+    {
+        return ApiAreas::fromAction($e->action) ?? ApiAreas::fromPath($e->method, $e->path);
+    }
 
     private function findAdmin(int $id): ?User
     {

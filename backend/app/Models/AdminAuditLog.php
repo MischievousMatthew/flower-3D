@@ -10,7 +10,7 @@ class AdminAuditLog extends Model
     public const UPDATED_AT = null;
 
     protected $fillable = [
-        'admin_id', 'admin_name', 'action', 'method', 'path', 'target_id',
+        'admin_id', 'admin_name', 'action', 'method', 'path', 'target_id', 'target_label',
         'status_code', 'details', 'ip_address', 'user_agent',
     ];
 

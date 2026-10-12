@@ -172,7 +172,7 @@
                 >
                   <td>
                     <span class="order-no">{{ order.order_number }}</span>
-                    <span class="sub">#{{ order.id }} · {{ formatDateTime(order.created_at) }}</span>
+                    <span class="sub">{{ formatDateTime(order.created_at) }}</span>
                   </td>
                   <td>
                     <span class="cell-main">{{ order.customer.name || "—" }}</span>
@@ -507,6 +507,7 @@ import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
+import { linkedId } from "../../utils/hiddenIds";
 
 const { toggleMobile } = useSidebarState();
 const route = useRoute();
@@ -677,8 +678,7 @@ const closeOrder = () => {
   drawer.id = null;
   detail.value = null;
   detailRequest++;
-  const { order, ...rest } = route.query;
-  router.replace({ query: rest });
+  router.replace({ query: { ...route.query, order: null } });
   lastFocused?.focus?.();
 };
 
@@ -726,7 +726,7 @@ const onKeydown = (event) => {
 onMounted(() => {
   fetchSummary();
   fetchOrders();
-  const fromLink = Number(route.query.order);
+  const fromLink = linkedId("order");
   if (fromLink) openOrder(fromLink);
   window.addEventListener("keydown", onKeydown);
 });

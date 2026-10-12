@@ -34,6 +34,7 @@ class LogApiErrors
             ApiErrorLog::create([
                 'method' => $request->method(),
                 'path' => Str::limit('/' . ltrim($request->path(), '/'), 250, ''),
+                'action' => $request->route() ? Str::limit($request->route()->getActionName(), 185, '') : null,
                 'status_code' => $response->getStatusCode(),
                 'exception' => $exception ? Str::limit(get_class($exception), 185, '') : null,
                 'message' => $message ? Str::limit(trim(preg_replace('/\s+/', ' ', (string) $message)), 495) : null,

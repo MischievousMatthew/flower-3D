@@ -8,6 +8,7 @@ import {
 } from "../utils/authSession";
 import { opaquePathFor, opaqueRouteTokens } from "./opaqueRoutes";
 import { useAdminAccess } from "../composables/useAdminAccess";
+import { HIDDEN_ID_KEYS, hideIdsInLocation } from "../utils/hiddenIds";
 
 const adminAccess = useAdminAccess();
 import { loadSubscriptionAccess, subscriptionAllowsModule } from "../composables/useSubscriptionAccess";
@@ -831,9 +832,21 @@ const resolveOpaqueTarget = (location) => {
 
 const rawPush = router.push.bind(router);
 const rawReplace = router.replace.bind(router);
-router.resolve = (location, currentLocation) => rawResolve(resolveOpaqueTarget(location), currentLocation);
-router.push = (location) => rawPush(resolveOpaqueTarget(location));
-router.replace = (location) => rawReplace(resolveOpaqueTarget(location));
+// Record IDs in a link (?order=5) move into history state so the address
+// bar never shows them. Pages read them back with linkedId().
+const asObject = (location) => {
+  if (typeof location !== "string" || !location.includes("?")) return location;
+  const { path, query, hash } = rawResolve(location);
+  return { path, query, hash };
+};
+const normalizeTarget = (location) => {
+  const target = asObject(resolveOpaqueTarget(location));
+  const state = typeof location === "object" ? location?.state : undefined;
+  return hideIdsInLocation(state && typeof target === "object" ? { ...target, state: { ...state, ...(target.state ?? {}) } } : target);
+};
+router.resolve = (location, currentLocation) => rawResolve(normalizeTarget(location), currentLocation);
+router.push = (location) => rawPush(normalizeTarget(location));
+router.replace = (location) => rawReplace(normalizeTarget(location));
 
 // Existing RBAC keys for direct employee page navigation. Subscription access
 // is checked separately from this map by the Stage 3 guard above.
@@ -865,6 +878,11 @@ const employeeModuleForPath = (path) => {
  * Global Route Guard
  */
 router.beforeEach(async (to, from, next) => {
+  // A URL opened directly (bookmark, new tab) may still carry IDs: move them out
+  if (HIDDEN_ID_KEYS.some((key) => key in to.query)) {
+    return next({ ...hideIdsInLocation({ path: to.path, query: to.query, hash: to.hash }), replace: true });
+  }
+
   const auth = useAuth();
   const canonicalPath = to.meta.canonicalPath || to.path;
   const authContext = to.meta.authContext || canonicalPath;

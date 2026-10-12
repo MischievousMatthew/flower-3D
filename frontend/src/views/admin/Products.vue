@@ -407,6 +407,7 @@ import { useProductTaxonomies } from "../../composables/useProductTaxonomies";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
+import { linkedId } from "../../utils/hiddenIds";
 
 const { toggleMobile } = useSidebarState();
 const { taxonomies, reload: reloadTaxonomies } = useProductTaxonomies();
@@ -576,8 +577,7 @@ const openProduct = async (id) => {
 const closeProduct = () => {
   drawer.id = null;
   detailRequest++;
-  const { product, ...rest } = route.query;
-  router.replace({ query: rest });
+  router.replace({ query: { ...route.query, product: null } });
   lastFocus?.focus?.();
 };
 
@@ -737,7 +737,7 @@ onMounted(() => {
     return;
   }
   loadSection();
-  const productId = Number(route.query.product);
+  const productId = linkedId("product");
   if (productId) openProduct(productId);
   window.addEventListener("keydown", onKeydown);
 });

@@ -118,7 +118,7 @@
             </div>
           </div>
           <div class="toolbar">
-            <input v-model="auditFilters.search" type="search" class="input grow" placeholder="Search path, admin or record #" />
+            <input v-model="auditFilters.search" type="search" class="input grow" placeholder="Search by admin or by who / what was changed" />
             <select v-model="auditFilters.admin_id" class="input"><option value="">All admins</option><option v-for="a in auditAdmins" :key="a.id" :value="a.id">{{ a.name }}</option></select>
             <select v-model="auditFilters.area" class="input"><option value="">All areas</option><option v-for="(label, key) in AREAS" :key="key" :value="key">{{ label }}</option></select>
             <select v-model="auditFilters.outcome" class="input"><option value="">Any outcome</option><option value="done">Done</option><option value="refused">Refused / failed</option></select>
@@ -129,14 +129,16 @@
           <p v-else-if="!audit.length" class="empty">Nothing recorded for these filters yet.</p>
           <div v-else class="table-scroll" :class="{ dim: loading.audit }">
             <table class="data-table">
-              <thead><tr><th>When</th><th>Admin</th><th>What</th><th>Details</th><th>Result</th><th>From</th></tr></thead>
+              <thead><tr><th>No.</th><th>When</th><th>Admin</th><th>What</th><th>Details</th><th>Result</th><th>From</th></tr></thead>
               <tbody>
-                <tr v-for="l in audit" :key="l.id">
+                <tr v-for="(l, i) in audit" :key="l.id">
+                  <td class="muted mono">{{ rowNumber(auditMeta, i) }}</td>
                   <td class="muted">{{ formatDateTime(l.created_at) }}</td>
                   <td class="strong">{{ l.admin_name || "—" }}</td>
                   <td>
                     <span class="strong">{{ actionLabel(l) }}</span>
-                    <span class="sub mono">{{ l.method }} {{ l.path }}</span>
+                    <span v-if="l.target" class="sub">{{ l.target }}</span>
+                    <span v-else-if="l.had_target" class="sub">A record that no longer exists</span>
                   </td>
                   <td>
                     <div class="chips">
@@ -304,7 +306,7 @@
               <div class="panel-head">
                 <div>
                   <h3 class="panel-title">API errors</h3>
-                  <p class="panel-sub">Requests that ended in a server error (5xx)</p>
+                  <p class="panel-sub">Actions that failed because of a server error. Full technical details stay in the server logs.</p>
                 </div>
                 <select v-model.number="errorHours" class="input"><option :value="1">Last hour</option><option :value="24">Last 24 hours</option><option :value="168">Last 7 days</option><option :value="720">Last 30 days</option></select>
               </div>
@@ -319,10 +321,10 @@
                   </div>
                   <div class="split tight">
                     <div>
-                      <h4 class="mini-title">Most affected endpoints</h4>
+                      <h4 class="mini-title">Most affected features</h4>
                       <ul class="mini-list">
-                        <li v-for="e in apiErrors.by_endpoint" :key="e.method + e.path">
-                          <span class="mono strong">{{ e.method }} {{ e.path }}</span>
+                        <li v-for="e in apiErrors.by_feature" :key="e.feature">
+                          <span class="strong">{{ e.feature }}</span>
                           <span class="sub">{{ e.total }}× · last {{ timeAgo(e.last_at) }}</span>
                         </li>
                       </ul>
@@ -331,7 +333,7 @@
                       <h4 class="mini-title">Latest</h4>
                       <ul class="mini-list">
                         <li v-for="e in apiErrors.recent.slice(0, 12)" :key="e.id">
-                          <span class="mono strong">{{ e.status }} {{ e.method }} {{ e.path }}</span>
+                          <span class="strong">{{ e.feature }} <span class="pill bad">Error {{ e.status }}</span></span>
                           <span class="sub">{{ e.exception ? e.exception + ": " : "" }}{{ e.message || "No message" }}</span>
                           <span class="sub">{{ formatDateTime(e.at) }}<template v-if="e.duration_ms"> · {{ e.duration_ms }} ms</template></span>
                         </li>
@@ -366,9 +368,10 @@
           <p v-else-if="!history.length" class="empty">No sign-ins match these filters.</p>
           <div v-else class="table-scroll" :class="{ dim: loading.history }">
             <table class="data-table">
-              <thead><tr><th>Account</th><th>Type</th><th>When</th><th>Device</th><th>Location</th><th>IP address</th></tr></thead>
+              <thead><tr><th>No.</th><th>Account</th><th>Type</th><th>When</th><th>Device</th><th>Location</th><th>IP address</th></tr></thead>
               <tbody>
-                <tr v-for="l in history" :key="l.id">
+                <tr v-for="(l, i) in history" :key="l.id">
+                  <td class="muted mono">{{ rowNumber(historyMeta, i) }}</td>
                   <td>
                     <span class="strong">{{ l.actor_name || "Unknown" }}</span>
                     <span v-if="l.username" class="sub">@{{ l.username }}</span>
@@ -713,11 +716,17 @@ watch(
     auditTimer = setTimeout(() => fetchAudit(1), 300);
   },
 );
-const actionLabel = (l) => {
-  const base = ACTIONS[l.action] ?? l.action.replace(/Controller@/, " · ");
-  const target = l.target_id ? ` #${l.target_id}` : "";
-  return l.action === "AdminProductController@moderate" && l.details?.action ? `${base} (${l.details.action})${target}` : `${base}${target}`;
+// "SomethingController@doThing" → "Do thing" when there's no friendlier label
+const humanize = (action) => {
+  const method = (action.split("@")[1] || "Made a change").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+  return method.charAt(0).toUpperCase() + method.slice(1);
 };
+const actionLabel = (l) => {
+  const base = ACTIONS[l.action] ?? humanize(l.action);
+  return l.action === "AdminProductController@moderate" && l.details?.action ? `${base} (${l.details.action})` : base;
+};
+// Lists number their rows 001, 002… instead of showing record IDs
+const rowNumber = (meta, index) => String((meta.current_page - 1) * meta.per_page + index + 1).padStart(3, "0");
 
 // ── Sign-ins ─────────────────────────────────────────────────────
 const signins = ref(null);
@@ -865,7 +874,7 @@ const setTab = (key) => {
 
 // ── Sign-in history ──────────────────────────────────────────────
 const history = ref([]);
-const historyMeta = ref({ current_page: 1, last_page: 1, total: 0 });
+const historyMeta = ref({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
 const historyFilters = reactive({ search: "", actor_type: "" });
 const fetchHistory = async (page = 1) => {
   loading.history = true;
@@ -873,7 +882,7 @@ const fetchHistory = async (page = 1) => {
     const params = { page, per_page: 25, search: historyFilters.search || undefined, actor_type: historyFilters.actor_type || undefined };
     const page = (await api.get("/admin/login-logs", { params })).data.data;
     history.value = page.data;
-    historyMeta.value = { current_page: page.current_page, last_page: page.last_page, total: page.total };
+    historyMeta.value = { current_page: page.current_page, last_page: page.last_page, per_page: page.per_page, total: page.total };
   } catch {
     toast.error("Sign-in history couldn't be loaded.");
   } finally {

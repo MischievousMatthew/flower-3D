@@ -342,6 +342,7 @@ import { toast } from "vue3-toastify";
 import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import api from "../../plugins/axios";
+import { linkedId } from "../../utils/hiddenIds";
 
 const { toggleMobile } = useSidebarState();
 const route = useRoute();
@@ -425,7 +426,7 @@ const openPayment = (p) => (p.source === "order" ? router.push({ path: "/admin/o
 // ── Inbox ────────────────────────────────────────────────────────
 const tickets = ref([]);
 const ticket = ref(null);
-const openTicketId = ref(Number(route.query.ticket) || null);
+const openTicketId = ref(linkedId("ticket"));
 const ticketFilters = reactive({ search: "", status: "active", role: "" });
 const replyText = ref("");
 const replyStatus = ref("waiting");
@@ -594,8 +595,7 @@ const loadTab = (key) => {
 };
 const setTab = (key) => {
   tab.value = key;
-  const { ticket: _t, ...rest } = route.query;
-  router.replace({ query: { ...(key === "inbox" ? route.query : rest), tab: key } });
+  router.replace({ query: { ...route.query, tab: key, ...(key === "inbox" ? {} : { ticket: null }) } });
   loadTab(key);
 };
 const refresh = () => {

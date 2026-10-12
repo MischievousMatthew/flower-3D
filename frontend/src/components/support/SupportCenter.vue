@@ -112,6 +112,7 @@ import { onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import api from "../../plugins/axios";
+import { linkedId } from "../../utils/hiddenIds";
 
 /** Raise and follow support requests (used by vendors and customers) */
 const props = defineProps({
@@ -245,7 +246,7 @@ const formatDateTime = (v) =>
 
 onMounted(async () => {
   await loadList();
-  const fromLink = Number(route.query.ticket);
+  const fromLink = linkedId("ticket");
   if (fromLink) open(fromLink);
   else if (!tickets.value.length) startNew();
 });

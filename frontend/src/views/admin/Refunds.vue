@@ -95,7 +95,7 @@
                 <div class="row-main">
                   <span class="strong">
                     <span class="type-tag" :class="d.type">{{ d.type === "refund" ? "Refund" : "Return" }}</span>
-                    <span class="mono">{{ d.order_number || `#${d.order_id}` }}</span>
+                    <span class="mono">{{ d.order_number || "—" }}</span>
                     <span class="muted"> · {{ d.vendor.store_name }}</span>
                   </span>
                   <span class="sub ellipsis">“{{ d.reason || "No reason given" }}” — {{ d.customer || "customer" }}</span>

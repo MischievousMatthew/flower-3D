@@ -39,7 +39,7 @@ class AdminReviewController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = ProductReview::query()
-            ->with(['user:id,name,surname', 'product' => fn ($q) => $q->withTrashed()->select('id', 'product_name', 'owner_id')->with('primaryImage')])
+            ->with(['user:id,name,surname', 'order:id,order_number', 'product' => fn ($q) => $q->withTrashed()->select('id', 'product_name', 'owner_id')->with('primaryImage')])
             ->latest()->orderByDesc('id');
 
         if ($rating = (int) $request->input('rating')) {
@@ -77,8 +77,7 @@ class AdminReviewController extends Controller
                 'is_anonymous' => $r->is_anonymous,
                 // Admins see who wrote it (name only); shoppers see "Anonymous"
                 'reviewer' => trim(($r->user?->name ?? 'Customer') . ' ' . ($r->user?->surname ?? '')),
-                'customer_id' => $r->user_id,
-                'order_id' => $r->order_id,
+                'order_number' => $r->order?->order_number,
                 'created_at' => $r->created_at?->toIso8601String(),
                 'edited' => $r->updated_at && $r->created_at && $r->updated_at->gt($r->created_at->addMinute()) && !$r->hidden_at,
                 'product' => [

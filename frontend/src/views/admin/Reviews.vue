@@ -96,7 +96,7 @@
                     <span class="stars" :aria-label="`${r.rating} out of 5`">
                       <span v-for="n in 5" :key="n" :class="{ on: n <= r.rating }">★</span>
                     </span>
-                    <span class="sub-inline">{{ r.reviewer }}<template v-if="r.is_anonymous"> · posted anonymously</template> · order #{{ r.order_id }} · {{ formatDate(r.created_at) }}<template v-if="r.edited"> · edited</template></span>
+                    <span class="sub-inline">{{ r.reviewer }}<template v-if="r.is_anonymous"> · posted anonymously</template> · order {{ r.order_number || "—" }} · {{ formatDate(r.created_at) }}<template v-if="r.edited"> · edited</template></span>
                   </div>
                   <p class="comment" :class="{ none: !r.comment }">{{ r.comment || "No written comment." }}</p>
                   <a v-if="r.image_url" :href="r.image_url" target="_blank" rel="noopener" class="photo"><img :src="r.image_url" alt="Photo attached to the review" /></a>

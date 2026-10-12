@@ -570,6 +570,7 @@ import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import VendorApplicationDetails from "./components/VendorApplicationDetails.vue";
 import api from "../../plugins/axios";
+import { linkedId } from "../../utils/hiddenIds";
 
 const { toggleMobile } = useSidebarState();
 const route = useRoute();
@@ -797,8 +798,7 @@ const setVendorTab = async (key) => {
 const closeDrawer = () => {
   drawer.open = false;
   vendorRequest++;
-  const { vendor, ...rest } = route.query;
-  router.replace({ query: rest });
+  router.replace({ query: { ...route.query, vendor: null } });
   lastFocus?.focus?.();
 };
 
@@ -951,7 +951,7 @@ const onKeydown = (e) => {
 onMounted(() => {
   fetchSummary();
   fetchList();
-  const vendorId = Number(route.query.vendor);
+  const vendorId = linkedId("vendor");
   if (vendorId) openVendor(vendorId);
   window.addEventListener("keydown", onKeydown);
 });
