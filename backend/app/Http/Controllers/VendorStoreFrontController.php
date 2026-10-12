@@ -46,7 +46,7 @@ class VendorStorefrontController extends Controller
 
             // Driving distance is never shorter than the straight line, so the
             // straight-line check safely narrows the stores to ask the router about.
-            $candidates = VendorApplication::where('status', 'approved')
+            $candidates = VendorApplication::notSuspended()->where('status', 'approved')
                 ->whereBetween('store_latitude', [$latitude - $latDelta, $latitude + $latDelta])
                 ->whereBetween('store_longitude', [$longitude - $lngDelta, $longitude + $lngDelta])
                 ->get()
@@ -177,7 +177,7 @@ class VendorStorefrontController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = VendorApplication::where('status', 'approved');
+            $query = VendorApplication::notSuspended()->where('status', 'approved');
 
             if ($request->filled('search')) {
                 $s = '%' . $request->search . '%';
@@ -241,7 +241,7 @@ class VendorStorefrontController extends Controller
     public function show($id)
     {
         try {
-            $vendor = VendorApplication::find($id);
+            $vendor = VendorApplication::notSuspended()->find($id);
 
             if (!$vendor) {
                 Log::warning("VendorStorefront@show: vendor id={$id} not found in vendor_applications table");
@@ -286,7 +286,7 @@ class VendorStorefrontController extends Controller
     public function getProducts(Request $request, $vendorId)
     {
         try {
-            $vendor = VendorApplication::find($vendorId);
+            $vendor = VendorApplication::notSuspended()->find($vendorId);
             if (!$vendor) {
                 return response()->json(['success' => true, 'data' => []]);
             }
@@ -521,7 +521,7 @@ class VendorStorefrontController extends Controller
     private function resolveCustomizableOwnerId(mixed $storeId, Request $request): ?int
     {
         $requestedOwnerId = $request->integer('owner_id');
-        $vendor = VendorApplication::find($storeId);
+        $vendor = VendorApplication::notSuspended()->find($storeId);
 
         if ($vendor && $vendor->status === 'approved') {
             return $this->resolveVendorOwnerId($vendor)
@@ -551,7 +551,7 @@ class VendorStorefrontController extends Controller
             $query->withoutGlobalScope(SoftDeletingScope::class);
         }
 
-        return $query->where('owner_id', $ownerId);
+        return $query->fromActiveVendors()->where('owner_id', $ownerId);
     }
 
     /**

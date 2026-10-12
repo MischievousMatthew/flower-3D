@@ -13,6 +13,12 @@ class Product extends Model
 {
     use BelongsToOwner, SoftDeletes;
 
+    /** Leave out products of suspended vendors (for anything customers see) */
+    public function scopeFromActiveVendors($query)
+    {
+        return $query->whereNotIn('owner_id', User::query()->where('is_suspended', true)->select('id'));
+    }
+
     protected $fillable = [
         // Identity
         'product_name',

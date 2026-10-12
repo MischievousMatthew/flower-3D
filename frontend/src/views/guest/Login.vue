@@ -219,6 +219,17 @@ const cancelTwoFactorLogin = () => {
 };
 
 onMounted(() => {
+  // Shown after being signed out, e.g. when a store is suspended
+  try {
+    const notice = sessionStorage.getItem("auth_notice");
+    if (notice) {
+      errorMessage.value = notice;
+      sessionStorage.removeItem("auth_notice");
+    }
+  } catch {
+    // storage unavailable
+  }
+
   // Check if user is already logged in
   const token = getPreferredAuthToken(window.location.pathname);
   const userType = getPreferredUserType(window.location.pathname);

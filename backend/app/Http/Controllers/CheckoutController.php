@@ -125,6 +125,13 @@ class CheckoutController extends Controller
             $vendorId = $vendorIds->first();
             $vendor = \App\Models\User::find($vendorId);
 
+            if ($vendor?->is_suspended) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "This store isn't taking orders right now. Remove its items from your cart to continue.",
+                ], 422);
+            }
+
             $vendorApplication = VendorApplication::where('email', $vendor->email)
                 ->where('status', 'approved')
                 ->first();
@@ -364,6 +371,13 @@ class CheckoutController extends Controller
             $vendorId = $vendorUserIds->first();
             $vendorUser = \App\Models\User::find($vendorId);
             $paymentMethod = $this->normalizePaymentMethod($request->payment_method);
+
+            if ($vendorUser?->is_suspended) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "This store isn't taking orders right now. Remove its items from your cart to continue.",
+                ], 422);
+            }
 
             $vendor = VendorApplication::where('email', $vendorUser->email)
                 ->where('status', 'approved')

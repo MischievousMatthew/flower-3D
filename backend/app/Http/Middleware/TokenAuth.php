@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\VendorAccountService;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -39,6 +40,14 @@ class TokenAuth
                 'success' => false,
                 'message' => 'Unauthenticated',
             ], 401);
+        }
+
+        if (VendorAccountService::isBlocked($authenticatable)) {
+            return response()->json([
+                'success' => false,
+                'code' => 'account_suspended',
+                'message' => VendorAccountService::BLOCKED_MESSAGE,
+            ], 403);
         }
 
         Auth::setUser($authenticatable);

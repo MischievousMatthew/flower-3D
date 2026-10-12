@@ -6,1565 +6,1005 @@
       <header class="content-header">
         <div class="header-left">
           <button class="mobile-toggle" @click="toggleMobile" aria-label="Toggle Menu">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1 class="page-title">Vendor Registration</h1>
+          <div>
+            <h1 class="page-title">Vendors</h1>
+            <p class="page-subtitle">Review applications and manage every store on BloomCraft</p>
+          </div>
         </div>
-
-        <div class="header-actions">
-          <div class="search-box">
-            <input
-              type="text"
-              placeholder="Search vendors..."
-              v-model="searchQuery"
-              @input="onSearch"
-            />
-            <span class="search-icon">🔍</span>
-          </div>
-          <button class="icon-btn">🔔</button>
-          <button class="icon-btn">⚙️</button>
-          <div class="user-profile">
-            <div class="admin-avatar">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-            </div>
-            <div class="profile-info">
-              <span class="profile-name">{{ user?.name ?? "Admin" }}</span>
-              <span class="profile-role">Administrator</span>
-            </div>
-          </div>
+        <div class="header-right">
+          <button v-if="isApplicationTab" type="button" class="ghost-btn" :disabled="exporting" @click="exportApplications">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+            <span>{{ exporting ? "Exporting…" : "Export CSV" }}</span>
+          </button>
+          <button type="button" class="ghost-btn" :disabled="listLoading" @click="refresh">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
+            <span>{{ listLoading ? "Refreshing" : "Refresh" }}</span>
+          </button>
         </div>
       </header>
 
-      <div class="tabs">
-        <button
-          class="tab-btn"
-          :class="{ active: activeTab === 'pending' }"
-          @click="setTab('pending')"
-        >
-          Vendor requests ({{ stats.pending || 0 }})
-        </button>
-        <button
-          class="tab-btn"
-          :class="{ active: activeTab === 'approved' }"
-          @click="setTab('approved')"
-        >
-          Approved vendors ({{ stats.approved || 0 }})
-        </button>
-        <button
-          class="tab-btn"
-          :class="{ active: activeTab === 'rejected' }"
-          @click="setTab('rejected')"
-        >
-          Rejected vendors ({{ stats.rejected || 0 }})
-        </button>
-      </div>
-
-      <div class="content-body">
-        <div class="content-actions">
-          <h2 class="section-title">Vendor Registration Requests</h2>
-          <div class="action-buttons">
-            <button class="btn-filter" @click="toggleFilters">
-              <span>⚡</span>
-              <span>Filter</span>
-            </button>
-            <button class="btn-export" @click="exportData">
-              <span>📥</span>
-              <span>Export</span>
-            </button>
-          </div>
-        </div>
-
-        <div v-if="showFilters" class="filters-panel">
-          <div class="filter-group">
-            <label>Business Type:</label>
-            <select v-model="filters.business_type" @change="fetchApplications">
-              <option value="">All</option>
-              <option value="individual">Individual</option>
-              <option value="partnership">Partnership</option>
-              <option value="corporation">Corporation</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label>Date Range:</label>
-            <input
-              type="date"
-              v-model="filters.start_date"
-              @change="fetchApplications"
-            />
-            <span>to</span>
-            <input
-              type="date"
-              v-model="filters.end_date"
-              @change="fetchApplications"
-            />
-          </div>
-          <div class="filter-group">
-            <button class="btn-clear-filters" @click="clearFilters">
-              Clear Filters
-            </button>
-          </div>
-        </div>
-
-        <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
-
-        <div v-if="vendorApplications.length === 0" class="empty-state">
-          <p>No vendor applications found.</p>
-        </div>
-
-        <div v-else class="requests-table">
-          <div class="table-header">
-            <div class="th" style="flex: 2">Store Name</div>
-            <div class="th" style="flex: 1.5">Owner Name</div>
-            <div class="th" style="flex: 1">Business Type</div>
-            <div class="th" style="flex: 1">Date Submitted</div>
-            <div class="th" style="flex: 1">Status</div>
-            <div class="th" style="width: 100px">Actions</div>
-          </div>
-
-          <div
-            v-for="application in vendorApplications"
-            :key="application.id"
-            class="table-row"
-            @click="viewDetails(application)"
+      <div class="page-body">
+        <!-- Status cards / tabs -->
+        <section class="tab-grid" role="tablist" aria-label="Vendor status">
+          <button
+            v-for="t in TABS"
+            :key="t.key"
+            type="button"
+            role="tab"
+            class="tab-card"
+            :class="[`tone-${t.tone}`, { active: tab === t.key }]"
+            :aria-selected="tab === t.key"
+            @click="setTab(t.key)"
           >
-            <div class="td" style="flex: 2">
-              <div class="store-info">
-                <div class="store-avatar">
-                  {{ application.store_name?.charAt(0) || "?" }}
-                </div>
-                <div>
-                  <div class="store-name">{{ application.store_name }}</div>
-                  <div class="store-location">
-                    {{ extractLocation(application.store_address) }}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="td" style="flex: 1.5">{{ application.owner_name }}</div>
-            <div class="td" style="flex: 1">
-              {{ formatBusinessType(application.business_type) }}
-            </div>
-            <div class="td" style="flex: 1">
-              {{ formatDate(application.submitted_at) }}
-            </div>
-            <div class="td" style="flex: 1">
-              <span
-                class="status-badge"
-                :class="application.status.toLowerCase()"
-              >
-                {{ formatStatus(application.status === 'pending' ? (application.resubmission_status || application.status) : application.status) }}
+            <span class="tab-icon" v-html="t.icon"></span>
+            <span class="tab-text">
+              <span class="tab-label">{{ t.label }}</span>
+              <span class="tab-count">
+                <template v-if="summary">{{ summary[t.key] }}</template>
+                <span v-else class="sk sk-inline"></span>
               </span>
+            </span>
+            <span class="tab-hint">{{ t.hint }}</span>
+          </button>
+        </section>
+
+        <section class="panel">
+          <div class="toolbar">
+            <div class="search-wrap">
+              <svg class="search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+              <input v-model="search" type="search" class="search-input" placeholder="Store, owner or email" aria-label="Search vendors" />
             </div>
-            <div class="td" style="width: 100px">
-              <div class="action-buttons-cell">
-                <button
-                  v-if="application.status === 'pending'"
-                  class="btn-action-sm btn-approve-sm"
-                  @click.stop="showApproveConfirmation(application)"
-                  title="Approve"
-                >
-                  ✓
-                </button>
-                <button
-                  v-if="application.status === 'pending'"
-                  class="btn-action-sm btn-deny-sm"
-                  @click.stop="showRejectModal(application)"
-                  title="Reject"
-                >
-                  ✕
-                </button>
-                <button
-                  v-if="application.status === 'pending' && !['needs_resubmission', 'pending_review'].includes(application.resubmission_status)"
-                  class="btn-action-sm btn-resubmit-sm"
-                  @click.stop="showResubmissionModal(application)"
-                  title="Request resubmission"
-                >
-                  ↻
-                </button>
-                <button class="btn-more" @click.stop="viewDetails(application)">
-                  ⋯
-                </button>
-              </div>
+            <div class="toolbar-filters">
+              <template v-if="isApplicationTab">
+                <select v-model="appFilters.business_type" class="select" aria-label="Business type">
+                  <option value="">Any business type</option>
+                  <option value="individual">Sole proprietor</option>
+                  <option value="partnership">Partnership</option>
+                  <option value="corporation">Corporation</option>
+                </select>
+                <label class="date-field"><span>From</span><input v-model="appFilters.start_date" type="date" class="select" /></label>
+                <label class="date-field"><span>To</span><input v-model="appFilters.end_date" type="date" class="select" /></label>
+              </template>
+              <select v-else v-model="vendorSort" class="select" aria-label="Sort vendors">
+                <option value="newest">Newest first</option>
+                <option value="sales">Top sales (30 days)</option>
+                <option value="orders">Most orders (30 days)</option>
+                <option value="rating">Best rated</option>
+                <option value="name">Name A–Z</option>
+              </select>
+              <button v-if="hasFilters" type="button" class="link-btn" @click="clearFilters">Clear</button>
             </div>
           </div>
-        </div>
 
-        <div
-          v-if="vendorApplications.length > 0 && pagination.last_page > 1"
-          class="pagination"
-        >
-          <button
-            class="page-btn"
-            :disabled="pagination.current_page === 1"
-            @click="changePage(pagination.current_page - 1)"
-          >
-            Prev
-          </button>
+          <!-- Applications (pending / rejected) -->
+          <div v-if="isApplicationTab" class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Store</th>
+                  <th>Owner</th>
+                  <th>Business type</th>
+                  <th>Submitted</th>
+                  <th>Status</th>
+                  <th class="right">{{ tab === "pending" ? "Review" : "" }}</th>
+                </tr>
+              </thead>
+              <tbody v-if="listLoading && !applications.length">
+                <tr v-for="n in 6" :key="n"><td v-for="c in 6" :key="c"><div class="sk sk-line"></div></td></tr>
+              </tbody>
+              <tbody v-else-if="!applications.length">
+                <tr><td colspan="6" class="empty-cell">{{ tab === "pending" ? "No applications waiting. You're all caught up." : "No rejected applications." }}</td></tr>
+              </tbody>
+              <tbody v-else :class="{ dim: listLoading }">
+                <tr v-for="a in applications" :key="a.id" class="click-row" tabindex="0" @click="openApplication(a)" @keydown.enter="openApplication(a)">
+                  <td>
+                    <div class="vendor-cell">
+                      <VendorAvatar :vendor="{ store_name: a.store_name, logo_url: a.store_logo_url }" :size="34" />
+                      <div>
+                        <span class="cell-main">{{ a.store_name }}</span>
+                        <span class="sub">{{ shortAddress(a.store_address) }}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="cell-main">{{ a.owner_name }}</span>
+                    <span class="sub">{{ a.email }}</span>
+                  </td>
+                  <td class="muted">{{ businessType(a.business_type) }}</td>
+                  <td class="muted">{{ formatDate(a.submitted_at) }}<span class="sub">{{ timeAgo(a.submitted_at) }}</span></td>
+                  <td><span class="pill" :class="`ap-${appStatus(a)}`">{{ APP_STATUS_LABELS[appStatus(a)] ?? appStatus(a) }}</span></td>
+                  <td class="right" @click.stop>
+                    <div v-if="a.status === 'pending'" class="row-actions">
+                      <button type="button" class="icon-action ok" title="Approve" aria-label="Approve" @click="askApprove(a)">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><polyline points="20 6 9 17 4 12" /></svg>
+                      </button>
+                      <button
+                        v-if="!['needs_resubmission', 'pending_review'].includes(a.resubmission_status)"
+                        type="button"
+                        class="icon-action"
+                        title="Ask for corrections"
+                        aria-label="Ask for corrections"
+                        @click="askResubmission(a)"
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+                      </button>
+                      <button type="button" class="icon-action bad" title="Reject" aria-label="Reject" @click="askReject(a)">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      </button>
+                    </div>
+                    <svg v-else class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6" /></svg>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-          <button
-            v-for="page in visiblePages"
-            :key="page"
-            class="page-btn"
-            :class="{ active: pagination.current_page === page }"
-            @click="changePage(page)"
-          >
-            {{ page }}
-          </button>
+          <!-- Vendors (active / suspended) -->
+          <div v-else class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Store</th>
+                  <th>Plan</th>
+                  <th class="num">Products</th>
+                  <th class="num">Orders · 30d</th>
+                  <th class="num">Sales · 30d</th>
+                  <th>Rating</th>
+                  <th>Flags</th>
+                  <th class="right"></th>
+                </tr>
+              </thead>
+              <tbody v-if="listLoading && !vendors.length">
+                <tr v-for="n in 6" :key="n"><td v-for="c in 8" :key="c"><div class="sk sk-line"></div></td></tr>
+              </tbody>
+              <tbody v-else-if="!pagedVendors.length">
+                <tr><td colspan="8" class="empty-cell">{{ tab === "suspended" ? "No suspended vendors." : search ? "No vendors match your search." : "No vendors yet." }}</td></tr>
+              </tbody>
+              <tbody v-else :class="{ dim: listLoading }">
+                <tr v-for="v in pagedVendors" :key="v.id" class="click-row" :class="{ selected: drawer.vendorId === v.id }" tabindex="0" @click="openVendor(v.id)" @keydown.enter="openVendor(v.id)">
+                  <td>
+                    <div class="vendor-cell">
+                      <VendorAvatar :vendor="v" :size="34" />
+                      <div>
+                        <span class="cell-main">{{ v.store_name }}</span>
+                        <span class="sub">{{ v.owner_name }} · {{ v.email }}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span v-if="v.subscription" class="pill" :class="`sub-${v.subscription.status}`">{{ v.subscription.plan_name }}</span>
+                    <span v-else class="sub">No plan</span>
+                    <span v-if="v.subscription" class="sub">{{ SUB_STATUS[v.subscription.status] ?? v.subscription.status }}</span>
+                  </td>
+                  <td class="num">{{ v.products_active }}<span class="sub">of {{ v.products_total }}</span></td>
+                  <td class="num">{{ v.orders_30d }}<span class="sub">{{ v.orders }} total</span></td>
+                  <td class="num strong">{{ money(v.sales_30d) }}<span class="sub">{{ money(v.sales) }} total</span></td>
+                  <td>
+                    <span v-if="v.rating !== null" class="rating">★ {{ v.rating.toFixed(1) }}</span>
+                    <span v-else class="sub">No reviews</span>
+                    <span v-if="v.reviews" class="sub">{{ plural(v.reviews, "review") }}</span>
+                  </td>
+                  <td>
+                    <div class="flags">
+                      <span v-if="v.open_disputes" class="flag rose">{{ v.open_disputes }} dispute{{ v.open_disputes === 1 ? "" : "s" }}</span>
+                      <span v-if="v.pending_orders" class="flag amber">{{ v.pending_orders }} pending</span>
+                      <span v-if="v.strikes" class="flag red" :title="`${v.strikes} banned product(s); 3 suspends the store`">{{ v.strikes }}/3 strikes</span>
+                      <span v-if="!v.open_disputes && !v.pending_orders && !v.strikes" class="sub">—</span>
+                    </div>
+                  </td>
+                  <td class="right" @click.stop>
+                    <button v-if="v.status === 'active'" type="button" class="mini-btn danger" @click="askSuspend(v)">Suspend</button>
+                    <button v-else type="button" class="mini-btn ok" @click="askReactivate(v)">Reactivate</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-          <span v-if="showEndEllipsis" class="page-dots">...</span>
-
-          <button
-            v-if="showLastPage"
-            class="page-btn"
-            :class="{
-              active: pagination.current_page === pagination.last_page,
-            }"
-            @click="changePage(pagination.last_page)"
-          >
-            {{ pagination.last_page }}
-          </button>
-
-          <button
-            class="page-btn"
-            :disabled="pagination.current_page === pagination.last_page"
-            @click="changePage(pagination.current_page + 1)"
-          >
-            Next
-          </button>
-
-          <span class="pagination-info">
-            Showing {{ pagination.from }}-{{ pagination.to }} of
-            {{ pagination.total }}
-          </span>
-        </div>
+          <div v-if="pager.total > pager.perPage" class="pager">
+            <span class="pager-info">{{ (pager.page - 1) * pager.perPage + 1 }}–{{ Math.min(pager.page * pager.perPage, pager.total) }} of {{ pager.total }}</span>
+            <div class="pager-btns">
+              <button type="button" class="ghost-btn" :disabled="pager.page <= 1 || listLoading" @click="goToPage(pager.page - 1)">Previous</button>
+              <span class="pager-info">{{ pager.page }} / {{ pager.lastPage }}</span>
+              <button type="button" class="ghost-btn" :disabled="pager.page >= pager.lastPage || listLoading" @click="goToPage(pager.page + 1)">Next</button>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
 
-    <!-- Detail Modal -->
-    <div v-if="showDetailModal" class="modal-overlay" @click="closeModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h2>Vendor Registration Details</h2>
-          <button class="btn-close" @click="closeModal">✕</button>
-        </div>
+    <!-- ═══ Drawer ═══ -->
+    <Transition name="fade"><div v-if="drawer.open" class="drawer-backdrop" @click="closeDrawer"></div></Transition>
+    <Transition name="slide">
+      <aside v-if="drawer.open" ref="drawerEl" class="drawer" role="dialog" aria-modal="true" tabindex="-1" @keydown.esc="closeDrawer">
+        <!-- Application -->
+        <template v-if="drawer.mode === 'application' && drawer.application">
+          <header class="drawer-head">
+            <VendorAvatar :vendor="{ store_name: drawer.application.store_name, logo_url: drawer.application.store_logo_url }" :size="46" />
+            <div class="drawer-title">
+              <h2>{{ drawer.application.store_name }}</h2>
+              <div class="drawer-meta">
+                <span class="pill" :class="`ap-${appStatus(drawer.application)}`">{{ APP_STATUS_LABELS[appStatus(drawer.application)] }}</span>
+                <span class="sub">{{ drawer.application.owner_name }} · applied {{ timeAgo(drawer.application.submitted_at) }}</span>
+              </div>
+            </div>
+            <button type="button" class="icon-btn" aria-label="Close" @click="closeDrawer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button>
+          </header>
+          <div class="drawer-body">
+            <VendorApplicationDetails
+              :app="drawer.application"
+              :resubmissions="drawer.resubmissions"
+              :actionable="drawer.application.status === 'pending'"
+              @view-document="openDocument"
+              @approve-resubmission="approveResubmission"
+              @request-again="askAgain"
+            />
+          </div>
+          <footer v-if="drawer.application.status === 'pending'" class="drawer-foot">
+            <button type="button" class="ghost-btn danger-text" @click="askReject(drawer.application)">Reject</button>
+            <button
+              v-if="!['needs_resubmission', 'pending_review'].includes(drawer.application.resubmission_status)"
+              type="button"
+              class="ghost-btn"
+              @click="askResubmission(drawer.application)"
+            >
+              Ask for corrections
+            </button>
+            <button type="button" class="primary-btn ok" @click="askApprove(drawer.application)">Approve vendor</button>
+          </footer>
+        </template>
 
-        <div class="modal-body">
-          <div v-if="selectedApplication" class="details-grid">
-            <section class="detail-section">
-              <h3 class="section-heading">Store Information</h3>
-              <div class="detail-group">
-                <div class="detail-item">
-                  <label>Store Name</label>
-                  <p>{{ selectedApplication.store_name }}</p>
-                </div>
-                <div class="detail-item">
-                  <label>Store Description</label>
-                  <p>{{ selectedApplication.store_description }}</p>
-                </div>
-                <div class="detail-item">
-                  <label>Business Type</label>
-                  <p>
-                    {{ formatBusinessType(selectedApplication.business_type) }}
-                  </p>
-                </div>
-                <div class="detail-item">
-                  <label>Physical Store Address</label>
-                  <p>{{ selectedApplication.store_address }}</p>
-                </div>
-                <div class="detail-item">
-                  <label>Service Areas</label>
-                  <p>{{ selectedApplication.service_areas }}</p>
-                </div>
-                <div class="detail-item">
-                  <label>Operating Hours</label>
-                  <p>{{ selectedApplication.operating_hours }}</p>
+        <!-- Vendor -->
+        <template v-else-if="drawer.mode === 'vendor'">
+          <header class="drawer-head">
+            <template v-if="profile">
+              <VendorAvatar :vendor="profile.vendor" :size="46" />
+              <div class="drawer-title">
+                <h2>{{ profile.vendor.store_name }}</h2>
+                <div class="drawer-meta">
+                  <span class="pill" :class="profile.vendor.status === 'suspended' ? 'st-suspended' : 'st-active'">{{ profile.vendor.status === "suspended" ? "Suspended" : "Active" }}</span>
+                  <span v-if="profile.vendor.subscription" class="pill" :class="`sub-${profile.vendor.subscription.status}`">{{ profile.vendor.subscription.plan_name }}</span>
+                  <span class="sub">Vendor since {{ formatDate(profile.vendor.joined_at) }}</span>
                 </div>
               </div>
-            </section>
+            </template>
+            <div v-else class="drawer-title">
+              <div class="sk sk-line" style="width: 200px; height: 18px"></div>
+              <div class="sk sk-line" style="width: 140px"></div>
+            </div>
+            <button type="button" class="icon-btn" aria-label="Close" @click="closeDrawer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button>
+          </header>
 
-            <section class="detail-section">
-              <h3 class="section-heading">
-                Owner / Representative Information
-              </h3>
-              <div class="detail-group">
-                <div class="detail-item">
-                  <label>Owner's Full Name</label>
-                  <p>{{ selectedApplication.owner_name }}</p>
-                </div>
-                <div class="detail-item">
-                  <label>Position / Role</label>
-                  <p>{{ selectedApplication.position }}</p>
-                </div>
-                <div class="detail-item">
-                  <label>Contact Number</label>
-                  <p>{{ selectedApplication.contact_number }}</p>
-                </div>
-                <div class="detail-item">
-                  <label>Email Address</label>
-                  <p>{{ selectedApplication.email }}</p>
-                </div>
+          <div v-if="profile?.vendor.status === 'suspended'" class="suspended-banner">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></svg>
+            <div>
+              <strong>Store suspended</strong>
+              <span v-if="lastSuspension">{{ lastSuspension.reason }} · {{ lastSuspension.by }}, {{ formatDate(lastSuspension.at) }}</span>
+              <span>Hidden from customers; the owner and staff can't sign in.</span>
+            </div>
+            <button type="button" class="mini-btn ok" @click="askReactivate(profile.vendor)">Reactivate</button>
+          </div>
+
+          <nav class="drawer-tabs" role="tablist">
+            <button v-for="t in VENDOR_TABS" :key="t.key" type="button" role="tab" class="drawer-tab" :class="{ active: drawer.tab === t.key }" :aria-selected="drawer.tab === t.key" @click="setVendorTab(t.key)">
+              {{ t.label }}
+            </button>
+          </nav>
+
+          <div class="drawer-body">
+            <p v-if="drawer.error" class="empty-msg">{{ drawer.error }}</p>
+
+            <template v-else-if="!profile">
+              <div v-for="n in 4" :key="n" class="card"><div class="sk sk-line" style="width: 40%"></div><div class="sk sk-line"></div></div>
+            </template>
+
+            <!-- Performance -->
+            <template v-else-if="drawer.tab === 'performance'">
+              <div class="stat-grid">
+                <div class="stat"><span class="stat-label">Lifetime sales</span><span class="stat-value">{{ money(perf.sales) }}</span><span class="sub">{{ plural(perf.paid_orders, "paid order") }}</span></div>
+                <div class="stat"><span class="stat-label">Avg. order value</span><span class="stat-value">{{ money(perf.average_order_value) }}</span><span class="sub">Paid orders</span></div>
+                <div class="stat"><span class="stat-label">Rating</span><span class="stat-value">{{ profile.vendor.rating !== null ? "★ " + profile.vendor.rating.toFixed(1) : "—" }}</span><span class="sub">{{ plural(profile.vendor.reviews, "review") }}</span></div>
+                <div class="stat"><span class="stat-label">Avg. fulfilment</span><span class="stat-value">{{ fulfilment(perf.avg_fulfilment_hours) }}</span><span class="sub">Order to delivered</span></div>
               </div>
-            </section>
 
-            <section class="detail-section">
-              <h3 class="section-heading">Identity & Verification</h3>
-              <div class="detail-group">
-                <div class="detail-item">
-                  <label>Government ID Number</label>
-                  <p>{{ selectedApplication.government_id_number || "N/A" }}</p>
+              <div class="card">
+                <div class="card-head">
+                  <span class="card-label">Order outcomes</span>
+                  <span class="sub">{{ plural(perf.finished_orders, "finished order") }}</span>
                 </div>
-                <div class="detail-item">
-                  <label>Government-Issued ID</label>
-                  <div
-                    v-if="selectedApplication.government_id_url"
-                    role="button"
-                    tabindex="0"
-                    class="document-preview"
-                    @click="viewDocument(selectedApplication.government_id_url, 'Valid ID')"
-                    @keydown.enter="viewDocument(selectedApplication.government_id_url, 'Valid ID')"
-                    @keydown.space.prevent="viewDocument(selectedApplication.government_id_url, 'Valid ID')"
-                    aria-label="View uploaded document in full screen">
-                    <iframe v-if="isEmbeddedDocument(selectedApplication.government_id_url)" :src="selectedApplication.government_id_url" title="Government-issued ID preview"></iframe>
-                    <img v-else :src="selectedApplication.government_id_url" alt="Government-issued ID preview" />
-                  </div>
-                  <p v-else>Not uploaded</p>
+                <div v-for="r in outcomeRates" :key="r.label" class="rate-row">
+                  <span class="rate-label">{{ r.label }}</span>
+                  <div class="rate-bar"><span :style="{ width: (r.value ?? 0) + '%', background: r.color }"></span></div>
+                  <span class="rate-value">{{ r.value === null ? "—" : r.value + "%" }}</span>
                 </div>
-                <div class="detail-item">
-                  <label>Selfie with Government ID</label>
-                  <div
-                    v-if="selectedApplication.selfie_with_id_url"
-                    role="button"
-                    tabindex="0"
-                    class="document-preview"
-                    @click="
-                      viewDocument(selectedApplication.selfie_with_id_url, 'Selfie with Valid ID')
-                    "
-                    @keydown.enter="viewDocument(selectedApplication.selfie_with_id_url, 'Selfie with Valid ID')"
-                    @keydown.space.prevent="viewDocument(selectedApplication.selfie_with_id_url, 'Selfie with Valid ID')"
-                    aria-label="View uploaded document in full screen">
-                    <iframe v-if="isEmbeddedDocument(selectedApplication.selfie_with_id_url)" :src="selectedApplication.selfie_with_id_url" title="Selfie with government ID preview"></iframe>
-                    <img v-else :src="selectedApplication.selfie_with_id_url" alt="Selfie with government ID preview" />
-                  </div>
-                  <p v-else>Not uploaded</p>
-                </div>
-                <div class="detail-item">
-                  <label>Proof of Address</label>
-                  <div
-                    v-if="selectedApplication.proof_of_address_url"
-                    role="button"
-                    tabindex="0"
-                    class="document-preview"
-                    @click="
-                      viewDocument(selectedApplication.proof_of_address_url, 'Proof of Address')
-                    "
-                    @keydown.enter="viewDocument(selectedApplication.proof_of_address_url, 'Proof of Address')"
-                    @keydown.space.prevent="viewDocument(selectedApplication.proof_of_address_url, 'Proof of Address')"
-                    aria-label="View uploaded document in full screen">
-                    <iframe v-if="isEmbeddedDocument(selectedApplication.proof_of_address_url)" :src="selectedApplication.proof_of_address_url" title="Proof of address preview"></iframe>
-                    <img v-else :src="selectedApplication.proof_of_address_url" alt="Proof of address preview" />
-                  </div>
-                  <p v-else>Not uploaded</p>
-                </div>
+                <p v-if="perf.stale_pending" class="callout warn">{{ plural(perf.stale_pending, "order") }} pending for more than 3 days.</p>
+                <p v-if="profile.vendor.open_disputes" class="callout rose">{{ plural(profile.vendor.open_disputes, "open return/refund request") }}.</p>
+                <p v-if="profile.vendor.strikes" class="callout red">{{ profile.vendor.strikes }}/3 strikes from banned products. The third suspends the store automatically.</p>
               </div>
-            </section>
 
-            <section class="detail-section">
-              <h3 class="section-heading">Business Registration</h3>
-              <div class="detail-group">
-                <div class="detail-item">
-                  <label>DTI Registration Number</label>
-                  <p>{{ selectedApplication.dti_number || "N/A" }}</p>
+              <div class="card">
+                <div class="card-head">
+                  <span class="card-label">Last 6 months</span>
+                  <span class="sub">Bars: sales · dots: orders</span>
                 </div>
-                <div class="detail-item">
-                  <label>SEC Registration Number</label>
-                  <p>{{ selectedApplication.sec_number || "N/A" }}</p>
-                </div>
-                <div class="detail-item">
-                  <label>Barangay Clearance Number</label>
-                  <p>
-                    {{ selectedApplication.barangay_clearance_number || "N/A" }}
-                  </p>
-                </div>
-                <div class="detail-item">
-                  <label>Barangay Clearance</label>
-                  <div
-                    v-if="selectedApplication.barangay_clearance_url"
-                    role="button"
-                    tabindex="0"
-                    class="document-preview"
-                    @click="
-                      viewDocument(selectedApplication.barangay_clearance_url, 'Barangay Permit')
-                    "
-                    @keydown.enter="viewDocument(selectedApplication.barangay_clearance_url, 'Barangay Permit')"
-                    @keydown.space.prevent="viewDocument(selectedApplication.barangay_clearance_url, 'Barangay Permit')"
-                    aria-label="View uploaded document in full screen">
-                    <iframe v-if="isEmbeddedDocument(selectedApplication.barangay_clearance_url)" :src="selectedApplication.barangay_clearance_url" title="Barangay clearance preview"></iframe>
-                    <img v-else :src="selectedApplication.barangay_clearance_url" alt="Barangay clearance preview" />
-                  </div>
-                  <p v-else>Not uploaded</p>
-                </div>
-                <div class="detail-item">
-                  <label>Mayor's Permit Number</label>
-                  <p>{{ selectedApplication.mayor_permit_number || "N/A" }}</p>
-                </div>
-                <div class="detail-item">
-                  <label>Mayor's Permit</label>
-                  <div
-                    v-if="selectedApplication.mayor_permit_url"
-                    role="button"
-                    tabindex="0"
-                    class="document-preview"
-                    @click="viewDocument(selectedApplication.mayor_permit_url, 'Business Permit')"
-                    @keydown.enter="viewDocument(selectedApplication.mayor_permit_url, 'Business Permit')"
-                    @keydown.space.prevent="viewDocument(selectedApplication.mayor_permit_url, 'Business Permit')"
-                    aria-label="View uploaded document in full screen">
-                    <iframe v-if="isEmbeddedDocument(selectedApplication.mayor_permit_url)" :src="selectedApplication.mayor_permit_url" title="Mayor's permit preview"></iframe>
-                    <img v-else :src="selectedApplication.mayor_permit_url" alt="Mayor's permit preview" />
-                  </div>
-                  <p v-else>Not uploaded</p>
-                </div>
-                <div class="detail-item">
-                  <label>BIR Registration / TIN</label>
-                  <p>{{ selectedApplication.bir_tin || "N/A" }}</p>
-                </div>
-              </div>
-            </section>
-
-            <section class="detail-section">
-              <h3 class="section-heading">Profile Completion Status</h3>
-              <div class="detail-group">
-                <div class="detail-item full-width">
-                  <div class="completion-card">
-                    <div class="completion-header">
-                      <span class="completion-label">Profile Completion</span>
-                      <span class="completion-percentage"
-                        >{{
-                          selectedApplication.profile_completion_percentage ||
-                          0
-                        }}%</span
-                      >
+                <div class="month-chart">
+                  <div v-for="m in perf.months" :key="m.label" class="month">
+                    <div class="month-bar-wrap">
+                      <span class="month-orders" :style="{ bottom: barPct(m.orders, maxMonthOrders) + '%' }" :title="`${m.orders} orders`"></span>
+                      <span class="month-bar" :style="{ height: barPct(m.sales, maxMonthSales) + '%' }" :title="money(m.sales)"></span>
                     </div>
-                    <div class="completion-bar">
-                      <div
-                        class="completion-fill"
-                        :style="{
-                          width:
-                            (selectedApplication.profile_completion_percentage ||
-                              0) + '%',
-                        }"
-                      ></div>
+                    <span class="month-label">{{ m.label }}</span>
+                    <span class="month-value">{{ moneyShort(m.sales) }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Products -->
+            <template v-else-if="drawer.tab === 'products'">
+              <p v-if="!profile.products.length" class="empty-msg">This vendor hasn't added products yet.</p>
+              <div v-else class="product-grid">
+                <article v-for="p in profile.products" :key="p.id" class="product">
+                  <div class="product-img">
+                    <img v-if="p.image" :src="p.image" :alt="p.name" loading="lazy" />
+                    <span v-else>🌸</span>
+                    <span class="pill product-status" :class="`pr-${p.status}`">{{ humanize(p.status) }}</span>
+                  </div>
+                  <div class="product-body">
+                    <span class="cell-main">{{ p.name }}</span>
+                    <span class="sub">{{ humanize(p.category) }}</span>
+                    <div class="product-row">
+                      <span class="strong">{{ money(p.price) }}</span>
+                      <span v-if="p.rating !== null" class="rating small">★ {{ p.rating.toFixed(1) }}</span>
                     </div>
-                    <div class="completion-items">
-                      <div class="completion-item">
-                        <span
-                          class="completion-icon"
-                          :class="{
-                            completed:
-                              selectedApplication.payment_details_completed,
-                          }"
-                          >{{
-                            selectedApplication.payment_details_completed
-                              ? "✓"
-                              : "○"
-                          }}</span
-                        >
-                        <span>Payment Details</span>
-                      </div>
-                      <div class="completion-item">
-                        <span
-                          class="completion-icon"
-                          :class="{
-                            completed:
-                              selectedApplication.product_details_completed,
-                          }"
-                          >{{
-                            selectedApplication.product_details_completed
-                              ? "✓"
-                              : "○"
-                          }}</span
-                        >
-                        <span>Product Details</span>
-                      </div>
-                      <div class="completion-item">
-                        <span
-                          class="completion-icon"
-                          :class="{
-                            completed:
-                              selectedApplication.delivery_details_completed,
-                          }"
-                          >{{
-                            selectedApplication.delivery_details_completed
-                              ? "✓"
-                              : "○"
-                          }}</span
-                        >
-                        <span>Delivery Details</span>
-                      </div>
+                    <div class="product-row sub">
+                      <span :class="{ low: p.low_stock }">{{ p.stock }} in stock</span>
+                      <span>{{ p.sold }} sold</span>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section
-              v-if="selectedApplication.payment_details_completed"
-              class="detail-section"
-            >
-              <h3 class="section-heading">Payment & Payout Details</h3>
-              <div class="detail-group">
-                <div class="detail-item">
-                  <label>Preferred Payout Method</label>
-                  <p>
-                    {{
-                      formatPayoutMethod(selectedApplication.payout_method) ||
-                      "Not set"
-                    }}
-                  </p>
-                </div>
-                <div class="detail-item">
-                  <label>Account Holder Name</label>
-                  <p>{{ selectedApplication.account_holder_name || "N/A" }}</p>
-                </div>
-                <div class="detail-item">
-                  <label>Account Number</label>
-                  <p>
-                    {{ selectedApplication.decrypted_account_number || "N/A" }}
-                  </p>
-                </div>
-                <div class="detail-item">
-                  <label>Bank Name / E-Wallet Provider</label>
-                  <p>{{ selectedApplication.bank_name || "N/A" }}</p>
-                </div>
-                <div class="detail-item">
-                  <label>Billing Address</label>
-                  <p>{{ selectedApplication.billing_address || "N/A" }}</p>
-                </div>
-              </div>
-            </section>
-
-            <section
-              v-if="selectedApplication.product_details_completed"
-              class="detail-section"
-            >
-              <h3 class="section-heading">Products & Pricing</h3>
-              <div class="detail-group">
-                <div class="detail-item">
-                  <label>Types of Products Offered</label>
-                  <p>
-                    {{
-                      formatProductTypes(selectedApplication.product_types) ||
-                      "N/A"
-                    }}
-                  </p>
-                </div>
-                <div class="detail-item">
-                  <label>Price Range</label>
-                  <p>
-                    {{
-                      selectedApplication.formatted_price_range ||
-                      formatPriceRange(
-                        selectedApplication.price_min,
-                        selectedApplication.price_max,
-                      ) ||
-                      "N/A"
-                    }}
-                  </p>
-                </div>
-                <div class="detail-item">
-                  <label>Same-Day Delivery</label>
-                  <p>
-                    {{
-                      selectedApplication.same_day_delivery !== null
-                        ? selectedApplication.same_day_delivery
-                          ? "Yes"
-                          : "No"
-                        : "N/A"
-                    }}
-                  </p>
-                </div>
-                <div class="detail-item">
-                  <label>Order Cutoff Times</label>
-                  <div v-if="selectedApplication.cutoff_times?.length">
-                    <p
-                      v-for="(cutoff, idx) in selectedApplication.cutoff_times"
-                      :key="idx"
-                    >
-                      {{ formatCutoffTime(cutoff) }}
-                    </p>
-                  </div>
-                  <p v-else>N/A</p>
-                </div>
-              </div>
-            </section>
-
-            <section
-              v-if="selectedApplication.delivery_details_completed"
-              class="detail-section"
-            >
-              <h3 class="section-heading">Delivery & Operations</h3>
-              <div class="detail-group">
-                <div class="detail-item">
-                  <label>Delivery Handled By</label>
-                  <p>
-                    {{
-                      formatDeliveryHandler(
-                        selectedApplication.delivery_handled_by,
-                      ) || "N/A"
-                    }}
-                  </p>
-                </div>
-                <div class="detail-item">
-                  <label>Delivery Fee</label>
-                  <p>{{ selectedApplication.delivery_fee || "N/A" }}</p>
-                </div>
-                <div class="detail-item">
-                  <label>Maximum Orders Per Day</label>
-                  <p>{{ selectedApplication.max_orders_per_day || "N/A" }}</p>
-                </div>
-                <div class="detail-item">
-                  <label>Lead Time Required</label>
-                  <p>{{ selectedApplication.lead_time || "N/A" }}</p>
-                </div>
-                <div class="detail-item full-width">
-                  <label>Cancellation & Refund Policy</label>
-                  <p>{{ selectedApplication.cancellation_policy || "N/A" }}</p>
-                </div>
-              </div>
-            </section>
-
-            <section class="detail-section">
-              <h3 class="section-heading">Optional Information</h3>
-              <div class="detail-group">
-                <div class="detail-item">
-                  <label>Store Logo</label>
-                  <div
-                    v-if="selectedApplication.store_logo_url"
-                    role="button"
-                    tabindex="0"
-                    class="document-preview"
-                    @click="viewDocument(selectedApplication.store_logo_url, 'Store Logo')"
-                    @keydown.enter="viewDocument(selectedApplication.store_logo_url, 'Store Logo')"
-                    @keydown.space.prevent="viewDocument(selectedApplication.store_logo_url, 'Store Logo')"
-                    aria-label="View uploaded document in full screen">
-                    <iframe v-if="isEmbeddedDocument(selectedApplication.store_logo_url)" :src="selectedApplication.store_logo_url" title="Store logo preview"></iframe>
-                    <img v-else :src="selectedApplication.store_logo_url" alt="Store logo preview" />
-                  </div>
-                  <p v-else>Not uploaded</p>
-                </div>
-                <div class="detail-item">
-                  <label>Portfolio Photos</label>
-                  <div
-                    v-if="selectedApplication.portfolio_photos_urls?.length"
-                    class="portfolio-grid"
-                  >
-                    <button
-                      v-for="(
-                        photo, index
-                      ) in selectedApplication.portfolio_photos_urls"
-                      :key="index"
-                      type="button"
-                      class="portfolio-item"
-                      @click="viewDocument(photo, `Portfolio Photo ${index + 1}`)"
-                    >
-                      <img :src="photo" :alt="`Portfolio photo ${index + 1}`" />
-                    </button>
-                  </div>
-                  <p v-else>Not uploaded</p>
-                </div>
-                <div class="detail-item">
-                  <label>Facebook Page</label>
-                  <p>{{ selectedApplication.facebook_page || "N/A" }}</p>
-                </div>
-                <div class="detail-item">
-                  <label>Instagram Page</label>
-                  <p>{{ selectedApplication.instagram_page || "N/A" }}</p>
-                </div>
-              </div>
-            </section>
-
-            <section
-              v-if="selectedApplication.admin_notes"
-              class="detail-section"
-            >
-              <h3 class="section-heading">Admin Notes</h3>
-              <div class="detail-group">
-                <div class="detail-item full-width">
-                  <p>{{ selectedApplication.admin_notes }}</p>
-                </div>
-              </div>
-            </section>
-
-            <section
-              v-if="selectedApplication.rejection_reason"
-              class="detail-section"
-            >
-              <h3 class="section-heading">Rejection Reason</h3>
-              <div class="detail-group">
-                <div class="detail-item full-width">
-                  <p>{{ selectedApplication.rejection_reason }}</p>
-                </div>
-              </div>
-            </section>
-
-            <section v-if="resubmissionItems.length" class="detail-section">
-              <h3 class="section-heading">Resubmitted Requirements</h3>
-              <div class="resubmission-list">
-                <article v-for="item in resubmissionItems" :key="item.id" class="resubmission-card">
-                  <div class="resubmission-card-header">
-                    <strong>{{ item.label }}</strong>
-                    <span class="status-badge" :class="item.status">{{ formatStatus(item.status) }}</span>
-                  </div>
-                  <p v-if="item.rejection_reason"><strong>Reason:</strong> {{ item.rejection_reason }}</p>
-                  <div v-if="item.type === 'file'" class="resubmission-values">
-                    <button v-if="item.original_url" class="btn-link" @click="viewDocument(item.original_url)">View original</button>
-                    <button v-if="item.resubmitted_url" class="btn-link" @click="viewDocument(item.resubmitted_url)">View updated</button>
-                  </div>
-                  <div v-else class="resubmission-values">
-                    <p><strong>Original:</strong> {{ item.original_value || '—' }}</p>
-                    <p v-if="item.resubmitted_value"><strong>Updated:</strong> {{ item.resubmitted_value }}</p>
-                  </div>
-                  <div v-if="item.status === 'resubmitted'" class="resubmission-actions">
-                    <button class="btn-action btn-approve" @click="approveResubmission(item)">Approve</button>
-                    <button class="btn-action btn-deny" @click="requestResubmissionAgain(item)">Request Again</button>
                   </div>
                 </article>
               </div>
-            </section>
+            </template>
+
+            <!-- Orders -->
+            <template v-else-if="drawer.tab === 'orders'">
+              <div class="chip-row">
+                <span v-for="(count, status) in profile.orders.counts" :key="status" class="count-chip"><span class="pill" :class="`st-${status}`">{{ ORDER_STATUS[status] ?? status }}</span> {{ count }}</span>
+                <span v-if="!Object.keys(profile.orders.counts).length" class="sub">No orders yet.</span>
+              </div>
+              <ul v-if="profile.orders.recent.length" class="row-list">
+                <li v-for="o in profile.orders.recent" :key="o.id" tabindex="0" @click="goToOrder(o.id)" @keydown.enter="goToOrder(o.id)">
+                  <div class="row-main">
+                    <span class="cell-main mono">{{ o.order_number }}</span>
+                    <span class="sub">{{ o.customer || "Customer" }} · {{ plural(o.items_count, "item") }} · {{ o.method_label }} · {{ timeAgo(o.created_at) }}</span>
+                  </div>
+                  <div class="row-right">
+                    <span class="strong">{{ money(o.total_amount) }}</span>
+                    <span class="pill" :class="`st-${o.status}`">{{ ORDER_STATUS[o.status] ?? o.status }}</span>
+                  </div>
+                </li>
+              </ul>
+              <router-link v-if="profile.orders.recent.length" to="/admin/orders" class="link-btn block">Open Orders to search all of them →</router-link>
+            </template>
+
+            <!-- Subscription -->
+            <template v-else-if="drawer.tab === 'subscription'">
+              <div v-if="profile.subscription.current" class="plan-card" :class="`sub-${profile.subscription.current.status}`">
+                <div>
+                  <span class="card-label">Current plan</span>
+                  <span class="plan-name">{{ profile.subscription.current.plan_name }}</span>
+                  <span class="pill" :class="`sub-${profile.subscription.current.status}`">{{ SUB_STATUS[profile.subscription.current.status] ?? profile.subscription.current.status }}</span>
+                </div>
+                <dl class="facts compact">
+                  <dt>Started</dt><dd>{{ formatDate(profile.subscription.current.started_at) }}</dd>
+                  <dt>{{ profile.subscription.current.status === "trialing" ? "Trial ends" : "Renews / ends" }}</dt><dd>{{ formatDate(profile.subscription.current.ends_at) }}</dd>
+                  <dt>Last paid</dt><dd>{{ profile.subscription.current.paid_amount !== null ? money(profile.subscription.current.paid_amount) : "—" }}</dd>
+                  <dt>Lifetime paid</dt><dd>{{ money(profile.subscription.lifetime_paid) }}</dd>
+                </dl>
+                <div v-if="profile.subscription.current.resource_limits" class="limits">
+                  <span v-for="(limit, key) in profile.subscription.current.resource_limits" :key="key" class="limit">
+                    <b>{{ limit === null ? "∞" : limit }}</b> {{ LIMIT_LABELS[key] ?? key }}
+                  </span>
+                </div>
+              </div>
+              <p v-else class="empty-msg">No subscription yet.</p>
+
+              <div class="card">
+                <span class="card-label">Subscription payments</span>
+                <p v-if="!profile.subscription.payments.length" class="sub">No payments started.</p>
+                <ul v-else class="row-list flat">
+                  <li v-for="p in profile.subscription.payments" :key="p.id">
+                    <div class="row-main">
+                      <span class="cell-main">{{ p.plan_name }}</span>
+                      <span class="sub mono">{{ p.reference }} · {{ formatDate(p.paid_at || p.created_at) }}</span>
+                    </div>
+                    <div class="row-right">
+                      <span class="strong">{{ money(p.amount) }}</span>
+                      <span class="pill" :class="`pay-${p.status}`">{{ PAYMENT_STATUS[p.status] ?? p.status }}</span>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            </template>
+
+            <!-- Registration -->
+            <template v-else-if="drawer.tab === 'registration'">
+              <template v-if="registration.loading">
+                <div v-for="n in 3" :key="n" class="card"><div class="sk sk-line" style="width: 40%"></div><div class="sk sk-line"></div></div>
+              </template>
+              <p v-else-if="!registration.app" class="empty-msg">No registration on file for this vendor.</p>
+              <VendorApplicationDetails v-else :app="registration.app" :resubmissions="registration.resubmissions" @view-document="openDocument" />
+            </template>
+
+            <!-- History -->
+            <template v-else-if="drawer.tab === 'history'">
+              <ol class="timeline">
+                <li v-for="e in profile.history" :key="e.id" :class="`ev-${e.action}`">
+                  <span class="ev-dot"></span>
+                  <div>
+                    <span class="cell-main">{{ e.action === "suspended" ? "Suspended" : "Reactivated" }} by {{ e.by }}</span>
+                    <span v-if="e.reason" class="ev-reason">“{{ e.reason }}”</span>
+                    <span class="sub">{{ formatDateTime(e.at) }}</span>
+                  </div>
+                </li>
+                <li class="ev-joined">
+                  <span class="ev-dot"></span>
+                  <div>
+                    <span class="cell-main">Approved as a vendor</span>
+                    <span class="sub">{{ formatDateTime(profile.vendor.joined_at) }}</span>
+                  </div>
+                </li>
+              </ol>
+            </template>
           </div>
-        </div>
 
-        <div
-          v-if="selectedApplication && selectedApplication.status === 'pending'"
-          class="modal-footer"
-        >
-          <button
-            class="btn-action btn-deny"
-            @click="showRejectModal(selectedApplication)"
-          >
-            Deny Request
-          </button>
-          <button
-            v-if="!['needs_resubmission', 'pending_review'].includes(selectedApplication.resubmission_status)"
-            class="btn-action btn-resubmit"
-            @click="showResubmissionModal(selectedApplication)"
-          >
-            Request Resubmission
-          </button>
-          <button
-            class="btn-action btn-approve"
-            @click="showApproveConfirmation(selectedApplication)"
-          >
-            Approve Request
-          </button>
-        </div>
-      </div>
-    </div>
+          <footer v-if="profile && profile.vendor.status === 'active'" class="drawer-foot">
+            <span class="sub foot-note">Suspending hides the store and signs out the owner and staff.</span>
+            <button type="button" class="ghost-btn danger-text" @click="askSuspend(profile.vendor)">Suspend vendor</button>
+          </footer>
+        </template>
+      </aside>
+    </Transition>
 
-    <!-- Approve Confirmation Modal -->
-    <div
-      v-if="showApproveModal"
-      class="modal-overlay confirmation-modal"
-      @click="closeApproveModal"
-    >
-      <div class="modal-content confirmation-content" @click.stop>
-        <div class="modal-header">
-          <h2>Approve Vendor Application</h2>
-          <button class="btn-close" @click="closeApproveModal">✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="confirmation-icon success">✓</div>
-          <p class="confirmation-text">
-            Are you sure you want to approve the vendor application for
-            <strong>{{ pendingAction?.store_name }}</strong
-            >?
-          </p>
-          <p class="confirmation-subtext">
-            The vendor will be notified via email and can proceed to complete
-            their profile setup.
-          </p>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-action btn-cancel" @click="closeApproveModal" :disabled="isProcessingAction">
-            Cancel
-          </button>
-          <button class="btn-action btn-approve" @click="confirmApprove" :disabled="isProcessingAction">
-            <span v-if="isProcessingAction" class="spinner"></span>
-            {{ isProcessingAction ? 'Approving...' : 'Yes, Approve' }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- ═══ Dialogs ═══ -->
+    <Transition name="fade">
+      <div v-if="dialog.type" class="dialog-backdrop" @click.self="closeDialog">
+        <div class="dialog" role="dialog" aria-modal="true" @keydown.esc="closeDialog">
+          <!-- Approve -->
+          <template v-if="dialog.type === 'approve'">
+            <span class="dialog-icon ok"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><polyline points="20 6 9 17 4 12" /></svg></span>
+            <h3>Approve {{ dialog.target.store_name }}?</h3>
+            <p>A vendor account is created and the owner is emailed so they can finish setting up their store.</p>
+          </template>
 
-    <!-- Reject Modal with Reason -->
-    <div
-      v-if="showRejectReasonModal"
-      class="modal-overlay confirmation-modal"
-      @click="closeRejectModal"
-    >
-      <div class="modal-content confirmation-content" @click.stop>
-        <div class="modal-header">
-          <h2>Reject Vendor Application</h2>
-          <button class="btn-close" @click="closeRejectModal">✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="confirmation-icon danger">✕</div>
-          <p class="confirmation-text">
-            Are you sure you want to reject the vendor application for
-            <strong>{{ pendingAction?.store_name }}</strong
-            >?
-          </p>
-          <div class="input-group">
-            <label>Reason for Rejection *</label>
-            <textarea
-              v-model="rejectionReason"
-              placeholder="Please provide a reason for rejecting this application..."
-              rows="4"
-              class="form-input"
-              :class="{ error: rejectionReasonError }"
-            ></textarea>
-            <div v-if="rejectionReasonError" class="error-message">
-              {{ rejectionReasonError }}
+          <!-- Reject -->
+          <template v-else-if="dialog.type === 'reject'">
+            <span class="dialog-icon bad"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></span>
+            <h3>Reject {{ dialog.target.store_name }}?</h3>
+            <p>The owner gets this reason by email.</p>
+            <textarea v-model="dialog.text" rows="4" placeholder="Explain what's missing or wrong (at least 10 characters)" :class="{ invalid: dialog.error }"></textarea>
+          </template>
+
+          <!-- Ask for corrections -->
+          <template v-else-if="dialog.type === 'resubmission'">
+            <h3>Ask {{ dialog.target.store_name }} for corrections</h3>
+            <p>Pick only what needs fixing. The owner gets a link to resubmit those items.</p>
+            <div v-if="dialog.loading" class="sk sk-line" style="height: 120px"></div>
+            <div v-else class="field-list">
+              <div v-for="field in dialog.fields" :key="field.field_name" class="field-row">
+                <label class="check">
+                  <input v-model="dialog.selected" type="checkbox" :value="field.field_name" />
+                  <span>{{ field.label }}</span>
+                </label>
+                <textarea v-if="dialog.selected.includes(field.field_name)" v-model="dialog.reasons[field.field_name]" rows="2" :placeholder="`What's wrong with the ${field.label.toLowerCase()}? (optional)`"></textarea>
+              </div>
             </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-action btn-cancel" @click="closeRejectModal" :disabled="isProcessingAction">
-            Cancel
-          </button>
-          <button class="btn-action btn-deny" @click="confirmReject" :disabled="isProcessingAction">
-            <span v-if="isProcessingAction" class="spinner"></span>
-            {{ isProcessingAction ? 'Rejecting...' : 'Reject Application' }}
-          </button>
-        </div>
-      </div>
-    </div>
+          </template>
 
-    <div v-if="showResubmissionRequestModal" class="modal-overlay confirmation-modal" @click="closeResubmissionModal">
-      <div class="modal-content confirmation-content" @click.stop>
-        <div class="modal-header">
-          <h2>Request Resubmission</h2>
-          <button class="btn-close" @click="closeResubmissionModal">×</button>
-        </div>
-        <div class="modal-body">
-          <p class="confirmation-text">Select only the requirements that need to be corrected.</p>
-          <div v-for="field in resubmissionFields" :key="field.field_name" class="resubmission-select-row">
-            <label class="resubmission-checkbox">
-              <input type="checkbox" v-model="selectedResubmissionFields" :value="field.field_name" />
-              <span>{{ field.label }}</span>
-            </label>
-            <textarea v-if="selectedResubmissionFields.includes(field.field_name)" v-model="resubmissionReasons[field.field_name]" class="form-input" rows="2" :placeholder="`Optional reason for ${field.label}`"></textarea>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-action btn-cancel" @click="closeResubmissionModal" :disabled="isProcessingAction">Cancel</button>
-          <button class="btn-action btn-resubmit" @click="submitResubmissionRequest" :disabled="isProcessingAction || !selectedResubmissionFields.length">{{ isProcessingAction ? 'Sending...' : 'Send Request' }}</button>
-        </div>
-      </div>
-    </div>
+          <!-- Ask again for one item -->
+          <template v-else-if="dialog.type === 'again'">
+            <h3>Ask again for {{ dialog.target.label }}</h3>
+            <p>The owner will be asked to resubmit this item.</p>
+            <textarea v-model="dialog.text" rows="3" placeholder="What's still wrong? (optional)"></textarea>
+          </template>
 
-    <!-- Document Viewer Modal -->
-    <div
-      v-if="showDocumentViewer"
-      class="modal-overlay"
-      @click="closeDocumentViewer"
-    >
-      <div class="modal-content document-viewer" @click.stop>
-        <div class="modal-header">
-          <h2>{{ currentDocumentTitle }}</h2>
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <a 
-              v-if="currentDocument" 
-              :href="currentDocument" 
-              target="_blank" 
-              class="btn-action-sm btn-approve"
-              style="width: auto; padding: 4px 12px; font-size: 13px; text-decoration: none; border-radius: 6px; white-space: nowrap;"
-            >
-              Open in New Tab ↗
-            </a>
-            <button class="btn-close" @click="closeDocumentViewer">✕</button>
-          </div>
-        </div>
-        <div class="modal-body">
-          <iframe 
-            v-if="currentDocument && (currentDocument.toLowerCase().includes('.pdf') || currentDocument.toLowerCase().includes('/raw/'))"
-            :src="currentDocument"
-            class="document-image"
-            style="min-height: 60vh; border: none; width: 100%;"
-          ></iframe>
-          <img
-            v-else-if="currentDocument"
-            :src="currentDocument"
-            alt="Document"
-            class="document-image"
-            @error="console.error('Image failed to load:', currentDocument)"
-          />
-          <div v-else class="no-document">
-            <p>Document not found or could not be loaded</p>
+          <!-- Suspend -->
+          <template v-else-if="dialog.type === 'suspend'">
+            <span class="dialog-icon bad"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></svg></span>
+            <h3>Suspend {{ dialog.target.store_name }}?</h3>
+            <ul class="impact">
+              <li>The store and its products disappear from the shop, and no new orders can be placed.</li>
+              <li>The owner and all their staff are signed out and can't sign back in.</li>
+              <li v-if="dialog.target.pending_orders">{{ plural(dialog.target.pending_orders, "pending order") }} will wait until the store is reactivated.</li>
+              <li>Payments, balances and past orders are kept as they are.</li>
+            </ul>
+            <textarea v-model="dialog.text" rows="3" placeholder="Reason (kept in the vendor's history)" :class="{ invalid: dialog.error }"></textarea>
+          </template>
+
+          <!-- Reactivate -->
+          <template v-else-if="dialog.type === 'reactivate'">
+            <span class="dialog-icon ok"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg></span>
+            <h3>Reactivate {{ dialog.target.store_name }}?</h3>
+            <p>The store becomes visible again and the owner and staff can sign in.<template v-if="dialog.target.strikes"> They still have {{ dialog.target.strikes }}/3 strikes.</template></p>
+            <textarea v-model="dialog.text" rows="2" placeholder="Note for the history (optional)"></textarea>
+          </template>
+
+          <p v-if="dialog.error" class="dialog-error">{{ dialog.error }}</p>
+          <div class="dialog-actions">
+            <button type="button" class="ghost-btn" :disabled="dialog.busy" @click="closeDialog">Cancel</button>
+            <button type="button" class="primary-btn" :class="dialogTone" :disabled="dialog.busy || dialogDisabled" @click="confirmDialog">
+              {{ dialog.busy ? "Working…" : DIALOG_CONFIRM[dialog.type] }}
+            </button>
           </div>
         </div>
       </div>
-    </div>
+    </Transition>
+
+    <!-- Document viewer -->
+    <Transition name="fade">
+      <div v-if="doc.url" class="dialog-backdrop" @click.self="doc.url = null">
+        <div class="viewer" role="dialog" aria-modal="true">
+          <header>
+            <span class="cell-main">{{ doc.title }}</span>
+            <div class="viewer-actions">
+              <a :href="doc.url" target="_blank" rel="noopener" class="ghost-btn">Open in new tab ↗</a>
+              <button type="button" class="icon-btn" aria-label="Close" @click="doc.url = null"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button>
+            </div>
+          </header>
+          <iframe v-if="/\.pdf|\/raw\//i.test(doc.url)" :src="doc.url" title="Document"></iframe>
+          <img v-else :src="doc.url" :alt="doc.title" />
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
+
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import { useAuth } from "../../composables/useAuth";
-import { useSidebarState } from "../../composables/useSidebarState";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
+import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
+import VendorAvatar from "./components/VendorAvatar.vue";
+import VendorApplicationDetails from "./components/VendorApplicationDetails.vue";
 import api from "../../plugins/axios";
 
-const { user } = useAuth();
 const { toggleMobile } = useSidebarState();
+const route = useRoute();
+const router = useRouter();
 
-// State
-const searchQuery = ref("");
-const activeTab = ref("pending");
-const showDetailModal = ref(false);
-const showDocumentViewer = ref(false);
-const showFilters = ref(false);
-const showApproveModal = ref(false);
-const showRejectReasonModal = ref(false);
-const showResubmissionRequestModal = ref(false);
-const isProcessingAction = ref(false);
-const isLoading = ref(false);
-const isLoadingMessage = ref("");
-const selectedApplication = ref(null);
-const currentDocument = ref(null);
-const currentDocumentTitle = ref("Document");
-const pendingAction = ref(null);
-const rejectionReason = ref("");
-const rejectionReasonError = ref("");
-const resubmissionFields = ref([]);
-const selectedResubmissionFields = ref([]);
-const resubmissionReasons = ref({});
-const resubmissionItems = ref([]);
-const vendorApplications = ref([]);
-const stats = ref({
-  pending: 0,
-  approved: 0,
-  rejected: 0,
-  under_review: 0,
-});
+const icon = (path) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${path}</svg>`;
+const TABS = [
+  { key: "pending", label: "Applications", hint: "Waiting for review", tone: "violet", icon: icon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>') },
+  { key: "active", label: "Active vendors", hint: "Selling on BloomCraft", tone: "green", icon: icon('<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>') },
+  { key: "suspended", label: "Suspended", hint: "Hidden and signed out", tone: "red", icon: icon('<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>') },
+  { key: "rejected", label: "Rejected", hint: "Applications turned down", tone: "gray", icon: icon('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>') },
+];
+const VENDOR_TABS = [
+  { key: "performance", label: "Performance" },
+  { key: "products", label: "Products" },
+  { key: "orders", label: "Orders" },
+  { key: "subscription", label: "Subscription" },
+  { key: "registration", label: "Registration" },
+  { key: "history", label: "History" },
+];
+const APP_STATUS_LABELS = {
+  pending: "New",
+  needs_resubmission: "Waiting for corrections",
+  pending_review: "Corrections received",
+  approved: "Approved",
+  rejected: "Rejected",
+  under_review: "Under review",
+};
+const ORDER_STATUS = { pending: "Pending", processing: "Processing", out_for_delivery: "Out for delivery", completed: "Completed", cancelled: "Cancelled", failed: "Failed", returned: "Returned", refunded: "Refunded" };
+const SUB_STATUS = { active: "Paid", trialing: "Free trial", expired: "Expired", cancelled: "Cancelled", past_due: "Past due", pending: "Pending" };
+const PAYMENT_STATUS = { paid: "Paid", pending: "Not completed", failed: "Failed", cancelled: "Cancelled" };
+const LIMIT_LABELS = { branches: "branches", warehouses: "warehouses", staff_employees: "staff" };
+const DIALOG_CONFIRM = { approve: "Approve", reject: "Reject application", resubmission: "Send request", again: "Ask again", suspend: "Suspend vendor", reactivate: "Reactivate" };
 
-const filters = ref({
-  business_type: "",
-  start_date: "",
-  end_date: "",
-});
-
-const pagination = ref({
-  current_page: 1,
-  last_page: 1,
-  from: 0,
-  to: 0,
-  total: 0,
-  per_page: 10,
-});
-
-// Computed
-const visiblePages = computed(() => {
-  const pages = [];
-  const totalPages = pagination.value.last_page;
-  const current = pagination.value.current_page;
-
-  if (totalPages <= 7) {
-    for (let i = 1; i <= totalPages; i++) {
-      pages.push(i);
-    }
-  } else {
-    if (current <= 4) {
-      for (let i = 1; i <= 5; i++) pages.push(i);
-    } else if (current >= totalPages - 3) {
-      for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
-    } else {
-      for (let i = current - 2; i <= current + 2; i++) pages.push(i);
-    }
-  }
-
-  return pages;
-});
-
-const showEndEllipsis = computed(() => {
-  return (
-    pagination.value.last_page > 7 &&
-    pagination.value.current_page < pagination.value.last_page - 3
-  );
-});
-
-const showLastPage = computed(() => {
-  return (
-    pagination.value.last_page > 7 &&
-    pagination.value.current_page < pagination.value.last_page - 2
-  );
-});
-
-// Lifecycle
-onMounted(() => {
-  fetchApplications();
-  fetchStatistics();
-});
-
-// Watchers
-watch(activeTab, () => {
-  pagination.value.current_page = 1;
-  fetchApplications();
-});
-
-// Methods
-const fetchApplications = async () => {
-  isLoading.value = true;
+// ── Summary ──────────────────────────────────────────────────────
+const summary = ref(null);
+const fetchSummary = async () => {
   try {
-    isLoadingMessage.value = "Loading vendor applications...";
-    const response = await api.get('/admin/vendor-applications', {
-      params: {
-        status: activeTab.value,
-        page: pagination.value.current_page,
-        per_page: pagination.value.per_page,
-        ...filters.value,
-        ...(searchQuery.value && { search: searchQuery.value })
-      }
-    });
+    const { data } = await api.get("/admin/vendors/summary");
+    summary.value = data.data;
+  } catch {
+    // the cards just show no counts
+  }
+};
 
-    const data = response.data;
+// ── Lists ────────────────────────────────────────────────────────
+const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : "pending");
+const isApplicationTab = computed(() => tab.value === "pending" || tab.value === "rejected");
+const search = ref("");
+const appFilters = reactive({ business_type: "", start_date: "", end_date: "" });
+const vendorSort = ref("newest");
+const applications = ref([]);
+const vendors = ref([]);
+const listLoading = ref(false);
+const pager = reactive({ page: 1, lastPage: 1, total: 0, perPage: 12 });
 
-    if (data.data) {
-      vendorApplications.value = data.data;
-      pagination.value = data.meta || {
-        current_page: 1,
-        last_page: 1,
-        from: 0,
-        to: 0,
-        total: 0,
-        per_page: 10,
-      };
+const hasFilters = computed(() => Boolean(search.value.trim() || appFilters.business_type || appFilters.start_date || appFilters.end_date));
+const pagedVendors = computed(() => vendors.value.slice((pager.page - 1) * pager.perPage, pager.page * pager.perPage));
+
+let listRequest = 0;
+const fetchList = async (page = 1) => {
+  const id = ++listRequest;
+  listLoading.value = true;
+  try {
+    if (isApplicationTab.value) {
+      const { data } = await api.get("/admin/vendor-applications", {
+        params: {
+          status: tab.value,
+          page,
+          per_page: pager.perPage,
+          search: search.value.trim() || undefined,
+          ...Object.fromEntries(Object.entries(appFilters).filter(([, v]) => v)),
+        },
+      });
+      if (id !== listRequest) return;
+      applications.value = data.data ?? [];
+      Object.assign(pager, { page: data.meta?.current_page ?? 1, lastPage: data.meta?.last_page ?? 1, total: data.meta?.total ?? applications.value.length });
     } else {
-      vendorApplications.value = data.applications || data || [];
+      const { data } = await api.get("/admin/vendors", {
+        params: { status: tab.value, search: search.value.trim() || undefined, sort: vendorSort.value },
+      });
+      if (id !== listRequest) return;
+      vendors.value = data.data ?? [];
+      Object.assign(pager, { page, total: vendors.value.length, lastPage: Math.max(1, Math.ceil(vendors.value.length / pager.perPage)) });
     }
-  } catch (error) {
-    console.error("Error fetching applications:", error);
-    toast.error("Failed to load vendor applications");
-    vendorApplications.value = [];
-    pagination.value = {
-      current_page: 1,
-      last_page: 1,
-      from: 0,
-      to: 0,
-      total: 0,
-      per_page: 10,
-    };
+  } catch {
+    if (id === listRequest) toast.error("The list couldn't be loaded.");
   } finally {
-    isLoading.value = false;
+    if (id === listRequest) listLoading.value = false;
   }
 };
 
-const fetchStatistics = async () => {
-  try {
-    const response = await api.get('/admin/vendor-applications/statistics');
-    const data = response.data;
-    stats.value = data;
-  } catch (error) {
-    console.error("Error fetching statistics:", error);
-    stats.value = {
-      pending: 0,
-      approved: 0,
-      rejected: 0,
-      under_review: 0,
-    };
-  }
+const goToPage = (page) => {
+  if (isApplicationTab.value) fetchList(page);
+  else pager.page = page;
 };
 
-const getApiErrorMessage = (error, fallback) => {
-  const data = error?.response?.data;
-
-  if (typeof data?.message === "string" && data.message.trim()) {
-    return data.message.trim();
-  }
-
-  if (typeof data?.error === "string" && data.error.trim()) {
-    return data.error.trim();
-  }
-
-  if (typeof error?.message === "string" && error.message.trim()) {
-    return error.message.trim();
-  }
-
-  return fallback;
-};
-
-const setTab = (tab) => {
-  activeTab.value = tab;
-};
-
-const changePage = (page) => {
-  if (page >= 1 && page <= pagination.value.last_page) {
-    pagination.value.current_page = page;
-    fetchApplications();
-  }
-};
-
-const toggleFilters = () => {
-  showFilters.value = !showFilters.value;
+const setTab = (key) => {
+  if (tab.value === key) return;
+  tab.value = key;
+  applications.value = [];
+  vendors.value = [];
+  pager.page = 1;
+  router.replace({ query: { ...route.query, tab: key } });
+  fetchList();
 };
 
 const clearFilters = () => {
-  filters.value = {
-    business_type: "",
-    start_date: "",
-    end_date: "",
-  };
-  fetchApplications();
+  search.value = "";
+  Object.assign(appFilters, { business_type: "", start_date: "", end_date: "" });
 };
 
-const onSearch = debounce(() => {
-  pagination.value.current_page = 1;
-  fetchApplications();
-}, 500);
+const refresh = () => {
+  fetchSummary();
+  fetchList(isApplicationTab.value ? pager.page : 1);
+  if (drawer.mode === "vendor" && drawer.vendorId) loadVendor(drawer.vendorId);
+};
 
-const exportData = async () => {
+let searchTimer = null;
+watch(search, () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => fetchList(1), 300);
+});
+watch(() => ({ ...appFilters }), () => fetchList(1));
+watch(vendorSort, () => fetchList(1));
+
+// ── Export ───────────────────────────────────────────────────────
+const exporting = ref(false);
+const exportApplications = async () => {
+  exporting.value = true;
   try {
-    toast.info("Preparing export...");
-    const params = {
-      status: activeTab.value,
-      ...filters.value,
-    };
-
-    const response = await api.get('/admin/vendor-applications/export', {
-      params,
-      responseType: 'blob' // Important for file downloads
+    const response = await api.get("/admin/vendor-applications/export", {
+      params: { status: tab.value, ...Object.fromEntries(Object.entries(appFilters).filter(([, v]) => v)) },
+      responseType: "blob",
     });
-
-    const blob = new Blob([response.data], { type: response.headers['content-type'] });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `vendor-applications-${activeTab.value}-${
-      new Date().toISOString().split("T")[0]
-    }.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-    toast.success("Export completed successfully!");
-  } catch (error) {
-    console.error("Error exporting data:", error);
-    toast.error("Failed to export data");
-  }
-};
-
-const viewDetails = (application) => {
-  selectedApplication.value = application;
-  loadResubmissions(application.id);
-  showDetailModal.value = true;
-  document.body.style.overflow = "hidden";
-};
-
-const closeModal = () => {
-  showDetailModal.value = false;
-  selectedApplication.value = null;
-  resubmissionItems.value = [];
-  document.body.style.overflow = "auto";
-};
-
-const loadResubmissions = async (applicationId) => {
-  try {
-    const { data } = await api.get(`/admin/vendor-applications/${applicationId}/resubmissions`);
-    resubmissionItems.value = data.items || [];
-  } catch (error) {
-    console.error("Error loading resubmissions:", error);
-    resubmissionItems.value = [];
-  }
-};
-
-const showResubmissionModal = async (application) => {
-  pendingAction.value = application;
-  selectedResubmissionFields.value = [];
-  resubmissionReasons.value = {};
-  try {
-    const { data } = await api.get('/admin/vendor-resubmission-fields');
-    resubmissionFields.value = data.fields || [];
-    showResubmissionRequestModal.value = true;
-    document.body.style.overflow = "hidden";
-  } catch (error) {
-    toast.error(getApiErrorMessage(error, "Unable to load resubmission fields"));
-  }
-};
-
-const closeResubmissionModal = () => {
-  showResubmissionRequestModal.value = false;
-  pendingAction.value = null;
-  selectedResubmissionFields.value = [];
-  resubmissionReasons.value = {};
-  document.body.style.overflow = "auto";
-};
-
-const submitResubmissionRequest = async () => {
-  if (!pendingAction.value || !selectedResubmissionFields.value.length || isProcessingAction.value) return;
-  isProcessingAction.value = true;
-  try {
-    const { data } = await api.post(`/admin/vendor-applications/${pendingAction.value.id}/resubmission-requests`, {
-      fields: selectedResubmissionFields.value.map((field_name) => ({
-        field_name,
-        rejection_reason: resubmissionReasons.value[field_name]?.trim() || null,
-      })),
-    });
-    toast.success(data.message || "Resubmission request sent.");
-    closeResubmissionModal();
-    if (showDetailModal.value) closeModal();
-    fetchApplications();
-  } catch (error) {
-    toast.error(getApiErrorMessage(error, "Unable to send resubmission request"));
+    const url = URL.createObjectURL(new Blob([response.data], { type: response.headers["content-type"] || "text/csv" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `vendor-applications-${tab.value}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    toast.error("The export couldn't be created.");
   } finally {
-    isProcessingAction.value = false;
+    exporting.value = false;
   }
+};
+
+// ── Drawer ───────────────────────────────────────────────────────
+const drawer = reactive({ open: false, mode: null, application: null, resubmissions: [], vendorId: null, tab: "performance", error: "" });
+const drawerEl = ref(null);
+const profile = ref(null);
+const registration = reactive({ loading: false, app: null, resubmissions: [], loadedFor: null });
+let lastFocus = null;
+
+const perf = computed(() => profile.value?.performance ?? {});
+const lastSuspension = computed(() => profile.value?.history.find((e) => e.action === "suspended"));
+const maxMonthSales = computed(() => Math.max(0, ...(perf.value.months ?? []).map((m) => m.sales)));
+const maxMonthOrders = computed(() => Math.max(0, ...(perf.value.months ?? []).map((m) => m.orders)));
+const outcomeRates = computed(() => [
+  { label: "Completed", value: perf.value.completion_rate, color: "#22c55e" },
+  { label: "Cancelled", value: perf.value.cancellation_rate, color: "#94a3b8" },
+  { label: "Returned / refunded", value: perf.value.return_rate, color: "#8b5cf6" },
+]);
+
+const showDrawer = async () => {
+  if (!drawer.open) lastFocus = document.activeElement;
+  drawer.open = true;
+  await nextTick();
+  drawerEl.value?.focus();
+};
+
+const openApplication = async (application) => {
+  Object.assign(drawer, { mode: "application", application, resubmissions: [], vendorId: null, error: "" });
+  showDrawer();
+  try {
+    const { data } = await api.get(`/admin/vendor-applications/${application.id}/resubmissions`);
+    if (drawer.application?.id === application.id) drawer.resubmissions = data.items || [];
+  } catch {
+    // resubmissions are optional detail
+  }
+};
+
+let vendorRequest = 0;
+const loadVendor = async (id) => {
+  const requestId = ++vendorRequest;
+  drawer.error = "";
+  try {
+    const { data } = await api.get(`/admin/vendors/${id}`);
+    if (requestId === vendorRequest) profile.value = data.data;
+  } catch (error) {
+    if (requestId === vendorRequest) drawer.error = error.response?.status === 404 ? "This vendor no longer exists." : "This vendor couldn't be loaded.";
+  }
+};
+
+const openVendor = (id, vendorTab = "performance") => {
+  if (drawer.vendorId !== id) {
+    profile.value = null;
+    Object.assign(registration, { app: null, resubmissions: [], loadedFor: null });
+  }
+  Object.assign(drawer, { mode: "vendor", vendorId: id, application: null, tab: vendorTab });
+  router.replace({ query: { ...route.query, vendor: id } });
+  showDrawer();
+  loadVendor(id);
+};
+
+const setVendorTab = async (key) => {
+  drawer.tab = key;
+  if (key !== "registration" || !profile.value?.application_id || registration.loadedFor === profile.value.application_id) return;
+  const appId = profile.value.application_id;
+  registration.loading = true;
+  try {
+    const [{ data: app }, resub] = await Promise.all([
+      api.get(`/admin/vendor-applications/${appId}`),
+      api.get(`/admin/vendor-applications/${appId}/resubmissions`).catch(() => ({ data: { items: [] } })),
+    ]);
+    Object.assign(registration, { app, resubmissions: resub.data.items || [], loadedFor: appId });
+  } catch {
+    toast.error("The registration details couldn't be loaded.");
+  } finally {
+    registration.loading = false;
+  }
+};
+
+const closeDrawer = () => {
+  drawer.open = false;
+  vendorRequest++;
+  const { vendor, ...rest } = route.query;
+  router.replace({ query: rest });
+  lastFocus?.focus?.();
+};
+
+const goToOrder = (id) => router.push({ path: "/admin/orders", query: { order: id } });
+
+// ── Documents ────────────────────────────────────────────────────
+const doc = reactive({ url: null, title: "" });
+const openDocument = (url, title) => {
+  if (!url) return toast.error("This document isn't available.");
+  Object.assign(doc, { url, title: title || "Document" });
+};
+
+// ── Dialogs ──────────────────────────────────────────────────────
+const blankDialog = () => ({ type: null, target: null, text: "", error: "", busy: false, loading: false, fields: [], selected: [], reasons: {} });
+const dialog = reactive(blankDialog());
+const dialogTone = computed(() => (["reject", "suspend"].includes(dialog.type) ? "danger" : ["approve", "reactivate"].includes(dialog.type) ? "ok" : ""));
+const dialogDisabled = computed(() => dialog.type === "resubmission" && !dialog.selected.length);
+
+const openDialog = (type, target, extra = {}) => Object.assign(dialog, blankDialog(), { type, target }, extra);
+const closeDialog = () => {
+  if (!dialog.busy) Object.assign(dialog, blankDialog());
+};
+
+const askApprove = (a) => openDialog("approve", a);
+const askReject = (a) => openDialog("reject", a);
+const askSuspend = (v) => openDialog("suspend", v);
+const askReactivate = (v) => openDialog("reactivate", v);
+const askAgain = (item) => openDialog("again", item, { text: item.rejection_reason || "" });
+const askResubmission = async (a) => {
+  openDialog("resubmission", a, { loading: true });
+  try {
+    const { data } = await api.get("/admin/vendor-resubmission-fields");
+    dialog.fields = data.fields || [];
+  } catch {
+    toast.error("The list of requirements couldn't be loaded.");
+    Object.assign(dialog, blankDialog());
+  } finally {
+    dialog.loading = false;
+  }
+};
+
+const apiMessage = (error, fallback) => error?.response?.data?.message || error?.response?.data?.error || fallback;
+
+const afterApplicationChange = async () => {
+  if (drawer.mode === "application") closeDrawer();
+  await Promise.all([fetchList(pager.page), fetchSummary()]);
+};
+
+const confirmDialog = async () => {
+  const { type, target } = dialog;
+  const text = dialog.text.trim();
+  dialog.error = "";
+
+  if (type === "reject" && text.length < 10) return (dialog.error = "Give a reason of at least 10 characters.");
+  if (type === "suspend" && text.length < 5) return (dialog.error = "Give a reason of at least 5 characters.");
+
+  dialog.busy = true;
+  try {
+    let message = "";
+    if (type === "approve") {
+      ({ data: { message } } = await api.post(`/admin/vendor-applications/${target.id}/approve`));
+      await afterApplicationChange();
+    } else if (type === "reject") {
+      ({ data: { message } } = await api.post(`/admin/vendor-applications/${target.id}/reject`, { rejection_reason: text }));
+      await afterApplicationChange();
+    } else if (type === "resubmission") {
+      ({ data: { message } } = await api.post(`/admin/vendor-applications/${target.id}/resubmission-requests`, {
+        fields: dialog.selected.map((field_name) => ({ field_name, rejection_reason: dialog.reasons[field_name]?.trim() || null })),
+      }));
+      await afterApplicationChange();
+    } else if (type === "again") {
+      ({ data: { message } } = await api.post(`/admin/vendor-application-resubmissions/${target.id}/request-again`, { rejection_reason: text || null }));
+      await reloadResubmissions();
+      fetchList(pager.page);
+    } else if (type === "suspend" || type === "reactivate") {
+      const body = type === "suspend" ? { reason: text } : { note: text || null };
+      ({ data: { message } } = await api.post(`/admin/vendors/${target.id}/${type}`, body));
+      await Promise.all([fetchList(1), fetchSummary(), drawer.vendorId === target.id ? loadVendor(target.id) : null]);
+    }
+    toast.success(message || "Done.");
+    dialog.busy = false;
+    closeDialog();
+  } catch (error) {
+    dialog.busy = false;
+    dialog.error = apiMessage(error, "That didn't work. Try again.");
+  }
+};
+
+const reloadResubmissions = async () => {
+  if (!drawer.application) return;
+  const { data } = await api.get(`/admin/vendor-applications/${drawer.application.id}/resubmissions`);
+  drawer.resubmissions = data.items || [];
 };
 
 const approveResubmission = async (item) => {
   try {
     const { data } = await api.post(`/admin/vendor-application-resubmissions/${item.id}/approve`);
-    toast.success(data.message || "Requirement approved.");
-    await loadResubmissions(selectedApplication.value.id);
-    fetchApplications();
+    toast.success(data.message || "Requirement accepted.");
+    await reloadResubmissions();
+    fetchList(pager.page);
   } catch (error) {
-    toast.error(getApiErrorMessage(error, "Unable to approve requirement"));
+    toast.error(apiMessage(error, "The requirement couldn't be accepted."));
   }
 };
 
-const requestResubmissionAgain = async (item) => {
-  const reason = window.prompt(`Optional updated reason for ${item.label}:`, item.rejection_reason || "");
-  if (reason === null) return;
-  try {
-    const { data } = await api.post(`/admin/vendor-application-resubmissions/${item.id}/request-again`, {
-      rejection_reason: reason.trim() || null,
-    });
-    toast.success(data.message || "Vendor notified to resubmit again.");
-    await loadResubmissions(selectedApplication.value.id);
-    fetchApplications();
-  } catch (error) {
-    toast.error(getApiErrorMessage(error, "Unable to request another submission"));
-  }
+// ── Formatting ───────────────────────────────────────────────────
+const appStatus = (a) => (a.status === "pending" && a.resubmission_status ? a.resubmission_status : a.status);
+const peso = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
+const money = (v) => (v === null || v === undefined ? "—" : peso.format(Number(v)));
+const moneyShort = (value) => {
+  const n = Number(value) || 0;
+  if (n >= 1_000_000) return `₱${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `₱${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return `₱${n.toFixed(0)}`;
+};
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const humanize = (s) => (s ? String(s).replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase()) : "—");
+const businessType = (t) => ({ individual: "Sole proprietor", partnership: "Partnership", corporation: "Corporation" })[t] ?? t ?? "—";
+const shortAddress = (address) => {
+  if (!address) return "No address";
+  const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
+  return parts.slice(-2).join(", ");
+};
+const barPct = (value, max) => (max > 0 ? Math.max(value > 0 ? 6 : 0, Math.round((value / max) * 100)) : 0);
+const fulfilment = (hours) => {
+  if (hours === null || hours === undefined) return "—";
+  return hours < 48 ? `${Math.round(hours)} h` : `${(hours / 24).toFixed(1)} days`;
+};
+const formatDate = (v) => (v ? new Date(v).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—");
+const formatDateTime = (v) =>
+  v ? new Date(v).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
+const timeAgo = (v) => {
+  if (!v) return "";
+  const days = Math.floor((Date.now() - new Date(v)) / 86_400_000);
+  if (days < 1) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 31) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  return months < 12 ? `${months} month${months === 1 ? "" : "s"} ago` : `${Math.floor(months / 12)} year${months >= 24 ? "s" : ""} ago`;
 };
 
-const viewDocument = (url, title = "") => {
-  if (url) {
-    currentDocument.value = url;
-    currentDocumentTitle.value = title || decodeURIComponent(url.split("/").pop()?.split("?")[0] || "Document");
-    showDocumentViewer.value = true;
-  } else {
-    toast.error("Document URL is not available");
-  }
+// ── Lifecycle ────────────────────────────────────────────────────
+const onKeydown = (e) => {
+  if (e.key !== "Escape") return;
+  if (doc.url) doc.url = null;
+  else if (dialog.type) closeDialog();
+  else if (drawer.open) closeDrawer();
 };
 
-const isEmbeddedDocument = (url) => {
-  const normalizedUrl = String(url || "").toLowerCase();
-
-  return normalizedUrl.includes(".pdf") || normalizedUrl.includes("/raw/");
-};
-
-const closeDocumentViewer = () => {
-  showDocumentViewer.value = false;
-  currentDocument.value = null;
-  currentDocumentTitle.value = "Document";
-};
-
-// Approve confirmation
-const showApproveConfirmation = (application) => {
-  pendingAction.value = application;
-  showApproveModal.value = true;
-  document.body.style.overflow = "hidden";
-};
-
-const closeApproveModal = () => {
-  showApproveModal.value = false;
-  pendingAction.value = null;
-  document.body.style.overflow = "auto";
-};
-
-const confirmApprove = async () => {
-  if (!pendingAction.value || isProcessingAction.value) return;
-
-  isProcessingAction.value = true;
-  try {
-    const response = await api.post(
-      `/admin/vendor-applications/${pendingAction.value.id}/approve`
-    );
-
-    const data = response.data;
-    const approvedApplication = { ...pendingAction.value, ...(data.application || {}), status: "approved" };
-    const applicationIndex = vendorApplications.value.findIndex(
-      (application) => application.id === approvedApplication.id,
-    );
-    if (applicationIndex !== -1) vendorApplications.value[applicationIndex] = approvedApplication;
-    if (selectedApplication.value?.id === approvedApplication.id) selectedApplication.value = approvedApplication;
-    toast.success(data.message || "Vendor application approved successfully!");
-
-    closeApproveModal();
-    if (showDetailModal.value) {
-      closeModal();
-    }
-    activeTab.value = "approved";
-    await Promise.all([fetchApplications(), fetchStatistics()]);
-  } catch (error) {
-    console.error("Error approving application:", error);
-    toast.error(getApiErrorMessage(error, "Failed to approve application"));
-  } finally {
-    isProcessingAction.value = false;
-  }
-};
-
-// Reject with reason
-const showRejectModal = (application) => {
-  pendingAction.value = application;
-  rejectionReason.value = "";
-  rejectionReasonError.value = "";
-  showRejectReasonModal.value = true;
-  document.body.style.overflow = "hidden";
-};
-
-const closeRejectModal = () => {
-  showRejectReasonModal.value = false;
-  pendingAction.value = null;
-  rejectionReason.value = "";
-  rejectionReasonError.value = "";
-  document.body.style.overflow = "auto";
-};
-
-const confirmReject = async () => {
-  if (!pendingAction.value || isProcessingAction.value) return;
-
-  // Validate rejection reason
-  if (!rejectionReason.value.trim()) {
-    rejectionReasonError.value = "Please provide a reason for rejection";
-    return;
-  }
-
-  if (rejectionReason.value.trim().length < 10) {
-    rejectionReasonError.value =
-      "Please provide a more detailed reason (at least 10 characters)";
-    return;
-  }
-
-  rejectionReasonError.value = "";
-  isProcessingAction.value = true;
-
-  try {
-    const response = await api.post(`/admin/vendor-applications/${pendingAction.value.id}/reject`, {
-      rejection_reason: rejectionReason.value.trim()
-    });
-
-    const data = response.data;
-    toast.success(data.message || "Vendor application rejected successfully!");
-
-    closeRejectModal();
-    if (showDetailModal.value) {
-      closeModal();
-    }
-    fetchApplications();
-    fetchStatistics();
-  } catch (error) {
-    console.error("Error rejecting application:", error);
-    toast.error(getApiErrorMessage(error, "Failed to reject application"));
-  } finally {
-    isProcessingAction.value = false;
-  }
-};
-
-// Formatting functions
-const formatBusinessType = (type) => {
-  const types = {
-    individual: "Sole Proprietor",
-    partnership: "Partnership",
-    corporation: "Corporation",
-  };
-  return types[type] || type;
-};
-
-const formatStatus = (status) => {
-  const statuses = {
-    pending: "Pending",
-    approved: "Approved",
-    rejected: "Rejected",
-    under_review: "Under Review",
-    needs_resubmission: "Needs Resubmission",
-    pending_review: "Pending Review",
-    pending_resubmission: "Pending Resubmission",
-    resubmitted: "Resubmitted",
-    completed: "Pending Approval",
-  };
-  return statuses[status] || status;
-};
-
-const formatPayoutMethod = (method) => {
-  const methods = {
-    bank: "Bank Transfer",
-    gcash: "GCash",
-    maya: "Maya",
-  };
-  return methods[method] || method;
-};
-
-const formatDeliveryHandler = (handler) => {
-  return handler === "vendor" ? "Vendor" : "Platform";
-};
-
-const formatProductTypes = (productTypes) => {
-  if (!productTypes) return "N/A";
-
-  if (Array.isArray(productTypes)) {
-    return productTypes.join(", ");
-  }
-
-  try {
-    const parsed = JSON.parse(productTypes);
-    if (Array.isArray(parsed)) {
-      return parsed.join(", ");
-    }
-    return parsed;
-  } catch (e) {
-    return productTypes;
-  }
-};
-
-const formatPriceRange = (min, max) => {
-  if (min === null || min === undefined || max === null || max === undefined)
-    return null;
-  const minNum = Number(min);
-  const maxNum = Number(max);
-  if (!Number.isFinite(minNum) || !Number.isFinite(maxNum)) return null;
-  const fmt = (n) =>
-    `₱${n.toLocaleString("en-PH", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  return `${fmt(minNum)} - ${fmt(maxNum)}`;
-};
-
-const formatCutoffTime = (cutoff) => {
-  if (!cutoff) return "N/A";
-  const day = cutoff.day || cutoff.Day || cutoff.weekday || cutoff.weekDay;
-  const time = cutoff.time || cutoff.Time || cutoff.cutoff || cutoff.cutoff_time;
-  if (!day && !time) return "N/A";
-  if (day && time) return `${day}: ${time}`;
-  return String(day || time);
-};
-
-const formatDate = (dateString) => {
-  if (!dateString) return "N/A";
-
-  try {
-    const date = new Date(dateString);
-    return date
-      .toLocaleDateString("en-US", {
-        month: "2-digit",
-        day: "2-digit",
-        year: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-      .replace(",", " at");
-  } catch (e) {
-    return dateString;
-  }
-};
-
-const extractLocation = (address) => {
-  if (!address) return "Location not specified";
-
-  const parts = address.split(",");
-  if (parts.length >= 2) {
-    const city = parts[parts.length - 2]?.trim();
-    const country = parts[parts.length - 1]?.trim();
-    return `${city}, ${country}`;
-  }
-
-  return address;
-};
-
-// Utility function
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}
+onMounted(() => {
+  fetchSummary();
+  fetchList();
+  const vendorId = Number(route.query.vendor);
+  if (vendorId) openVendor(vendorId);
+  window.addEventListener("keydown", onKeydown);
+});
+onBeforeUnmount(() => {
+  clearTimeout(searchTimer);
+  window.removeEventListener("keydown", onKeydown);
+});
 </script>
+
 <style scoped>
 * {
   font-family: "Poppins", "Segoe UI", sans-serif;
   box-sizing: border-box;
 }
-
 .admin-layout {
   display: flex;
   min-height: 100vh;
-  background: #f5f7fa;
+  background: #f8fafc;
 }
-
-.admin-avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #48bb78, #2f855a);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.admin-avatar svg {
-  width: 18px;
-  height: 18px;
-  color: white;
-  stroke: white;
-}
-
-.profile-role {
-  font-size: 11px;
-  color: #48bb78;
-  font-weight: 600;
-}
-
-/* Main Content */
 .main-content {
   margin-left: 240px;
   flex: 1;
-  padding: 24px;
-  transition: margin-left 0.3s ease;
+  min-width: 0;
+  min-height: 100vh;
+  transition: margin-left 0.3s;
+}
+.page-body {
+  padding: 0 28px 40px;
+}
+.page-body > section {
+  margin-top: 18px;
 }
 
+/* Header */
 .content-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 20px 28px;
+  background: #fff;
+  border-bottom: 1px solid #e9edf3;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
-
-.header-left {
+.header-left,
+.header-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
 }
-
 .mobile-toggle {
   display: none;
   background: transparent;
@@ -1572,961 +1012,1160 @@ function debounce(func, wait) {
   color: #64748b;
   cursor: pointer;
   padding: 4px;
-  border-radius: 6px;
-  transition: all 0.2s;
 }
-
-.mobile-toggle:hover {
-  background: #f1f5f9;
-  color: #1e293b;
-}
-
-@media (max-width: 968px) {
-  .mobile-toggle {
-    display: flex;
-  }
-}
-
 .page-title {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 600;
-  color: #2d3748;
+  color: #1e2739;
   margin: 0;
+  line-height: 1.2;
+}
+.page-subtitle {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 2px 0 0;
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.search-box {
-  position: relative;
-}
-
-.search-box input {
-  width: 280px;
-  padding: 10px 40px 10px 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
-  transition: all 0.3s;
-}
-
-.search-box input:focus {
-  outline: none;
-  border-color: #48bb78;
-}
-
-.search-icon {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 16px;
-  color: #a0aec0;
-}
-
-.icon-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  background: white;
-  cursor: pointer;
-  font-size: 18px;
-  display: flex;
+/* Buttons */
+.ghost-btn,
+.primary-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s;
-}
-
-.icon-btn:hover {
-  background: #f7fafc;
-  border-color: #cbd5e0;
-}
-
-.user-profile {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-left: 16px;
-  border-left: 1px solid #e2e8f0;
-}
-
-.profile-img {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-}
-
-.profile-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.profile-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: #2d3748;
-}
-
-.profile-email {
-  font-size: 12px;
-  color: #718096;
-}
-
-/* Tabs */
-.tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
-  border-bottom: 2px solid #e2e8f0;
-}
-
-.tab-btn {
-  padding: 12px 24px;
-  background: transparent;
-  border: none;
-  border-bottom: 3px solid transparent;
-  color: #718096;
-  font-size: 15px;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s;
-  margin-bottom: -2px;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-
-.tab-btn:hover {
-  color: #2d3748;
-}
-
-.tab-btn.active {
-  color: #2d3748;
-  border-bottom-color: #48bb78;
-}
-
-/* Content Body */
-.content-body {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-}
-
-.content-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.section-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 12px;
-}
-
-.btn-filter,
-.btn-export {
-  padding: 10px 20px;
-  background: white;
+.ghost-btn {
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.3s;
+  background: #fff;
+  color: #475569;
 }
-
-.btn-filter:hover,
-.btn-export:hover {
-  background: #f7fafc;
-  border-color: #48bb78;
-  color: #48bb78;
+.ghost-btn:hover:not(:disabled) {
+  border-color: #c7c2fb;
+  color: #5b4fc9;
 }
-
-/* Filters Panel */
-.filters-panel {
-  background: #f7fafc;
-  padding: 16px;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+.ghost-btn.danger-text {
+  color: #b91c1c;
 }
-
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.ghost-btn.danger-text:hover:not(:disabled) {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
 }
-
-.filter-group label {
-  font-size: 13px;
-  font-weight: 500;
-  color: #718096;
-}
-
-.filter-group select,
-.filter-group input {
-  padding: 8px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-.filter-group input[type="date"] {
-  width: 100%;
-}
-
-.btn-clear-filters {
-  padding: 8px 16px;
-  background: #e53e3e;
-  color: white;
+.primary-btn {
   border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background 0.3s;
+  background: #7c6ff7;
+  color: #fff;
 }
-
-.btn-clear-filters:hover {
-  background: #c53030;
+.primary-btn:hover:not(:disabled) {
+  background: #5b4fc9;
 }
-
-.empty-state {
-  text-align: center;
-  padding: 48px;
-  color: #718096;
-  font-size: 16px;
-  border: 2px dashed #e2e8f0;
-  border-radius: 8px;
-  margin: 20px 0;
+.primary-btn.ok {
+  background: #16a34a;
 }
-
-/* Table */
-.requests-table {
-  width: 100%;
+.primary-btn.ok:hover:not(:disabled) {
+  background: #15803d;
 }
-
-.table-header {
-  display: flex;
-  padding: 12px 16px;
-  background: #f7fafc;
-  border-radius: 8px;
-  margin-bottom: 8px;
+.primary-btn.danger {
+  background: #dc2626;
 }
-
-.th {
-  font-size: 13px;
-  font-weight: 600;
-  color: #718096;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.primary-btn.danger:hover:not(:disabled) {
+  background: #b91c1c;
 }
-
-.table-row {
-  display: flex;
-  padding: 16px;
-  border-bottom: 1px solid #f7fafc;
-  align-items: center;
-  cursor: pointer;
-  transition: all 0.3s;
+.ghost-btn:disabled,
+.primary-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
-
-.table-row:hover {
-  background: #f7fafc;
-}
-
-.td {
-  font-size: 14px;
-  color: #2d3748;
-  display: flex;
-  align-items: center;
-}
-
-.store-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.store-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #48bb78;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 16px;
-}
-
-.store-name {
+.link-btn {
+  border: none;
+  background: none;
+  color: #6d5ff0;
+  font-size: 12.5px;
   font-weight: 500;
-  color: #2d3748;
+  cursor: pointer;
+  padding: 4px 6px;
+  text-decoration: none;
 }
-
-.store-location {
-  font-size: 12px;
-  color: #718096;
+.link-btn:hover {
+  text-decoration: underline;
 }
-
-.status-badge {
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
+.link-btn.block {
   display: inline-block;
+  margin-top: 10px;
 }
-
-.status-badge.pending {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.status-badge.approved {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.status-badge.rejected {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.action-buttons-cell {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.btn-action-sm {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  display: flex;
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s;
+  cursor: pointer;
+  flex-shrink: 0;
 }
-
-.btn-approve-sm {
-  background: #d1fae5;
-  color: #065f46;
+.mini-btn {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 11px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
 }
-
-.btn-approve-sm:hover {
-  background: #a7f3d0;
+.mini-btn.danger {
+  color: #b91c1c;
 }
-
-.btn-deny-sm {
-  background: #fee2e2;
-  color: #991b1b;
+.mini-btn.danger:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
 }
-
-.btn-deny-sm:hover {
-  background: #fecaca;
+.mini-btn.ok {
+  background: #16a34a;
+  border-color: transparent;
+  color: #fff;
 }
-
-.btn-more {
+.icon-action {
   width: 32px;
   height: 32px;
-  border: none;
-  background: transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 20px;
-  font-weight: bold;
-  transition: all 0.3s;
-}
-
-.btn-more:hover {
-  background: #f7fafc;
-}
-
-/* Pagination */
-.pagination {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 8px;
-  margin-top: 24px;
-}
-
-.page-btn {
-  padding: 8px 12px;
-  background: white;
+  border-radius: 9px;
   border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
+  background: #fff;
+  color: #6d5ff0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: all 0.3s;
-  min-width: 36px;
+  transition: background 0.15s, color 0.15s;
+}
+.icon-action.ok {
+  color: #16a34a;
+}
+.icon-action.ok:hover {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+.icon-action.bad {
+  color: #dc2626;
+}
+.icon-action.bad:hover {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+.icon-action:not(.ok):not(.bad):hover {
+  background: #ede9fe;
 }
 
-.page-btn:hover:not(:disabled) {
-  border-color: #48bb78;
-  color: #48bb78;
+/* Skeleton */
+.sk {
+  border-radius: 6px;
+  background: linear-gradient(100deg, #eef1f6 30%, #f8fafc 50%, #eef1f6 70%);
+  background-size: 300% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+.sk-line {
+  height: 12px;
+  margin: 6px 0;
+}
+.sk-inline {
+  display: inline-block;
+  width: 28px;
+  height: 20px;
+  vertical-align: middle;
+}
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
 }
 
-.page-btn.active {
-  background: #2d3748;
-  color: white;
-  border-color: #2d3748;
+/* Tab cards */
+.tab-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
-
-.page-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.tab-card {
+  --c: #7c6ff7;
+  --bg: #f5f3ff;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #e9edf3;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
-
-.page-dots {
-  padding: 0 4px;
-  color: #718096;
+.tab-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
 }
-
-.pagination-info {
-  margin-left: 16px;
-  font-size: 14px;
-  color: #718096;
+.tab-card.active {
+  border-color: var(--c);
+  background: var(--bg);
 }
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
+.tab-card::after {
+  content: "";
+  position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 3000;
-  padding: 20px;
-  animation: fadeIn 0.3s ease;
+  height: 3px;
+  background: var(--c);
+  opacity: 0;
 }
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.tab-card.active::after {
+  opacity: 1;
 }
-
-.modal-content {
-  background: white;
-  border-radius: 12px;
-  max-width: 1000px;
-  width: 100%;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  animation: slideUp 0.3s ease;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(30px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.modal-header h2 {
-  font-size: 22px;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0;
-}
-
-.btn-close {
-  width: 36px;
-  height: 36px;
-  border: none;
-  background: #f7fafc;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 18px;
-  color: #718096;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s;
-}
-
-.btn-close:hover {
-  background: #e2e8f0;
-  color: #2d3748;
-}
-
-.modal-body {
-  padding: 24px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.details-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-}
-
-.detail-section {
-  border-bottom: 1px solid #e2e8f0;
-  padding-bottom: 24px;
-}
-
-.detail-section:last-child {
-  border-bottom: none;
-}
-
-.section-heading {
-  font-size: 18px;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0 0 16px 0;
-}
-
-.detail-group {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-}
-
-.detail-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.detail-item.full-width {
-  grid-column: 1 / -1;
-}
-
-.detail-item label {
-  font-size: 13px;
-  font-weight: 500;
-  color: #718096;
-}
-
-.detail-item p {
-  font-size: 14px;
-  color: #2d3748;
-  margin: 0;
-}
-
-.document-preview {
-  margin-top: 4px;
-  display: block;
-  width: 100%;
-  height: 180px;
-  padding: 0;
-  overflow: hidden;
-  background: #f7fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.document-preview img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.document-preview iframe {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border: 0;
-  pointer-events: none;
-}
-
-.document-preview:hover,
-.document-preview:focus-visible {
-  border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.2);
-  outline: none;
-}
-
-.portfolio-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.portfolio-item {
-  width: 100%;
-  aspect-ratio: 1;
-  padding: 0;
-  overflow: hidden;
-  background: #f7fafc;
-  border: 1px dashed #e2e8f0;
-  border-radius: 6px;
-  text-align: center;
-  font-size: 12px;
-  color: #718096;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.portfolio-item img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.portfolio-item:hover {
-  border-color: #48bb78;
-  color: #48bb78;
-}
-
-.modal-footer {
-  display: flex;
-  gap: 12px;
-  padding: 24px;
-  border-top: 1px solid #e2e8f0;
-  justify-content: flex-end;
-}
-
-.btn-action {
-  padding: 12px 32px;
-  border: none;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
+.tab-icon {
+  grid-row: span 2;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: var(--bg);
+  color: var(--c);
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
-
-.btn-action:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
+.tab-card.active .tab-icon {
+  background: #fff;
 }
-
-.spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top-color: #ffffff;
-  animation: spin 1s ease-in-out infinite;
-  margin-right: 8px;
-}
-
-.btn-deny .spinner {
-  border: 2px solid rgba(229, 62, 62, 0.3);
-  border-top-color: #e53e3e;
-}
-
-.btn-cancel .spinner,
-.btn-cancel:disabled {
-  opacity: 0.7;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.btn-deny {
-  background: white;
-  color: #e53e3e;
-  border: 1px solid #e53e3e;
-}
-
-.btn-deny:hover {
-  background: #fff5f5;
-}
-
-.btn-approve {
-  background: #48bb78;
-  color: white;
-}
-
-.btn-approve:hover {
-  background: #38a169;
-  transform: translateY(-1px);
-}
-
-.btn-resubmit,
-.btn-resubmit-sm {
-  background: #9e7250;
-  color: white;
-}
-
-.btn-resubmit:hover,
-.btn-resubmit-sm:hover {
-  background: #805939;
-}
-
-.btn-resubmit-sm { font-size: 15px; }
-
-.resubmission-select-row,
-.resubmission-card {
-  border: 1px solid #eadfd5;
-  border-radius: 10px;
-  padding: 12px;
-  margin-top: 10px;
-  text-align: left;
-}
-
-.resubmission-checkbox { display: flex; gap: 8px; align-items: center; font-weight: 600; }
-.resubmission-select-row textarea { width: 100%; margin-top: 10px; }
-.resubmission-card-header, .resubmission-actions, .resubmission-values { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.resubmission-card-header { justify-content: space-between; }
-.resubmission-card p { margin: 8px 0; }
-.resubmission-actions { margin-top: 12px; }
-.resubmission-actions .btn-action { padding: 8px 12px; }
-.btn-link { border: 0; background: transparent; color: #9e7250; padding: 0; cursor: pointer; text-decoration: underline; }
-
-.btn-cancel {
-  background: white;
-  color: #718096;
-  border: 1px solid #e2e8f0;
-}
-
-.btn-cancel:hover {
-  background: #f7fafc;
-  border-color: #cbd5e0;
-}
-
-/* Confirmation Modal */
-.confirmation-modal .modal-content {
-  max-width: 500px;
-}
-.confirmation-content .modal-body {
-  text-align: center;
-  padding: 32px 24px;
-}
-.confirmation-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
+.tab-text {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  margin: 0 auto 20px;
-}
-.confirmation-icon.success {
-  background: #d1fae5;
-  color: #065f46;
-}
-.confirmation-icon.danger {
-  background: #fee2e2;
-  color: #991b1b;
-}
-.confirmation-text {
-  font-size: 16px;
-  color: #2d3748;
-  margin-bottom: 12px;
-  line-height: 1.5;
-}
-.confirmation-subtext {
-  font-size: 14px;
-  color: #718096;
-  margin-bottom: 24px;
-}
-.input-group {
-  text-align: left;
-  margin-top: 20px;
-}
-.input-group label {
-  display: block;
-  font-size: 14px;
-  font-weight: 500;
-  color: #2d3748;
-  margin-bottom: 8px;
-}
-.form-input {
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-  font-family: inherit;
-  transition: all 0.2s;
-}
-.form-input:focus {
-  outline: none;
-  border-color: #48bb78;
-}
-.form-input.error {
-  border-color: #e53e3e;
-}
-.error-message {
-  color: #e53e3e;
-  font-size: 12px;
-  margin-top: 4px;
-}
-/* Profile Completion */
-.completion-card {
-  background: #f7fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 20px;
-}
-.completion-header {
-  display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.completion-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #2d3748;
-}
-.completion-percentage {
-  font-size: 18px;
-  font-weight: 600;
-  color: #48bb78;
-}
-.completion-bar {
-  height: 8px;
-  background: #e2e8f0;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 16px;
-}
-.completion-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #48bb78 0%, #38a169 100%);
-  transition: width 0.3s ease;
-}
-.completion-items {
-  display: flex;
-  flex-direction: column;
   gap: 8px;
 }
-.completion-item {
+.tab-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e2739;
+}
+.tab-count {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e2739;
+  font-variant-numeric: tabular-nums;
+}
+.tab-hint {
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+.tone-green { --c: #16a34a; --bg: #f0fdf4; }
+.tone-red { --c: #dc2626; --bg: #fef2f2; }
+.tone-gray { --c: #64748b; --bg: #f8fafc; }
+
+/* Panel & toolbar */
+.panel {
+  background: #fff;
+  border: 1px solid #e9edf3;
+  border-radius: 14px;
+  padding: 18px 20px;
+  min-width: 0;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.toolbar-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 240px;
+  max-width: 340px;
+}
+.search-ico {
+  position: absolute;
+  left: 11px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+.search-input,
+.select {
+  padding: 8px 11px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  font-size: 12.5px;
+  color: #1e2739;
+  background: #fff;
+}
+.search-input {
+  width: 100%;
+  padding-left: 32px;
+  background: #f8fafc;
+}
+.search-input:focus,
+.select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #7c6ff7;
+  box-shadow: 0 0 0 3px rgba(124, 111, 247, 0.12);
+}
+.date-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+/* Table */
+.table-scroll {
+  overflow-x: auto;
+  margin: 0 -6px;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 9px 10px;
+  background: #f8fafc;
+  white-space: nowrap;
+}
+.data-table th:first-child { border-radius: 8px 0 0 8px; }
+.data-table th:last-child { border-radius: 0 8px 8px 0; }
+.data-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  white-space: nowrap;
+  vertical-align: middle;
+  color: #1e2739;
+}
+.data-table tbody.dim {
+  opacity: 0.55;
+}
+.click-row {
+  cursor: pointer;
+}
+.click-row:hover td,
+.click-row:focus-visible td {
+  background: #fafaff;
+}
+.click-row.selected td {
+  background: #f5f3ff;
+}
+.click-row:focus-visible {
+  outline: 2px solid #7c6ff7;
+  outline-offset: -2px;
+}
+.empty-cell {
+  text-align: center;
+  color: #94a3b8 !important;
+  padding: 40px 10px !important;
+}
+.num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+.right {
+  text-align: right !important;
+}
+.strong {
+  font-weight: 600;
+  color: #1e2739;
+}
+.muted {
+  color: #64748b !important;
+}
+.mono {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace !important;
+  font-size: 12px;
+}
+.cell-main {
+  display: block;
+  font-weight: 500;
+  color: #1e2739;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+.sub {
+  display: block;
+  font-size: 11.5px;
+  color: #94a3b8;
+  font-weight: 400;
+}
+.vendor-cell {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 14px;
-  color: #4a5568;
 }
-.completion-icon {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
+.row-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+.chev {
+  color: #cbd5e1;
+}
+.rating {
+  color: #b45309;
+  font-weight: 600;
+  font-size: 12.5px;
+}
+.rating.small {
+  font-size: 11.5px;
+}
+.flags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.flag {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.flag.rose { background: #fff1f2; color: #be123c; }
+.flag.amber { background: #fffbeb; color: #b45309; }
+.flag.red { background: #fef2f2; color: #b91c1c; }
+
+/* Pills */
+.pill {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: #f1f5f9;
+  color: #64748b;
+}
+.ap-pending { background: #ede9fe; color: #6d28d9; }
+.ap-needs_resubmission { background: #fef3c7; color: #b45309; }
+.ap-pending_review { background: #dbeafe; color: #1d4ed8; }
+.ap-approved { background: #dcfce7; color: #15803d; }
+.ap-rejected { background: #fee2e2; color: #b91c1c; }
+.st-active { background: #dcfce7; color: #15803d; }
+.st-suspended { background: #fee2e2; color: #b91c1c; }
+.sub-active { background: #dcfce7; color: #15803d; }
+.sub-trialing { background: #e0f2fe; color: #0369a1; }
+.sub-expired,
+.sub-cancelled { background: #f1f5f9; color: #64748b; }
+.sub-past_due { background: #fee2e2; color: #b91c1c; }
+.st-pending { background: #fef3c7; color: #b45309; }
+.st-processing { background: #dbeafe; color: #1d4ed8; }
+.st-out_for_delivery { background: #e0f2fe; color: #0369a1; }
+.st-completed { background: #dcfce7; color: #15803d; }
+.st-cancelled,
+.st-failed { background: #f1f5f9; color: #64748b; }
+.st-returned,
+.st-refunded { background: #ede9fe; color: #6d28d9; }
+.pay-paid { background: #dcfce7; color: #15803d; }
+.pay-pending { background: #fef3c7; color: #b45309; }
+.pay-failed { background: #fee2e2; color: #b91c1c; }
+.pr-active { background: #dcfce7; color: #15803d; }
+.pr-draft { background: #fef3c7; color: #b45309; }
+
+/* Pager */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #f1f5f9;
+}
+.pager-info {
+  font-size: 12px;
+  color: #64748b;
+}
+.pager-btns {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Drawer */
+.drawer-backdrop,
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(2px);
+  z-index: 300;
+}
+.dialog-backdrop {
+  z-index: 400;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  background: #e2e8f0;
-  color: #a0aec0;
-  flex-shrink: 0;
+  padding: 16px;
 }
-.completion-icon.completed {
-  background: #d1fae5;
-  color: #065f46;
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(680px, 100vw);
+  background: #f8fafc;
+  z-index: 301;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -20px 0 50px rgba(15, 23, 42, 0.18);
+  outline: none;
 }
-/* Document Viewer */
-.document-viewer {
-  width: 100vw;
-  max-width: none;
-  height: 100vh;
-  max-height: none;
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e9edf3;
+}
+.drawer-title {
+  flex: 1;
+  min-width: 0;
+}
+.drawer-title h2 {
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #1e2739;
+}
+.drawer-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.drawer-meta .sub {
+  display: inline;
+}
+.drawer-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 14px;
+  background: #fff;
+  border-bottom: 1px solid #e9edf3;
+  overflow-x: auto;
+}
+.drawer-tab {
+  padding: 11px 10px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+.drawer-tab.active {
+  color: #5b4fc9;
+  border-bottom-color: #7c6ff7;
+}
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.drawer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 18px;
+  background: #fff;
+  border-top: 1px solid #e9edf3;
+  flex-wrap: wrap;
+}
+.foot-note {
+  margin-right: auto;
+}
+.suspended-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+  color: #991b1b;
+  font-size: 12.5px;
+}
+.suspended-banner > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.empty-msg {
+  font-size: 13px;
+  color: #94a3b8;
+  text-align: center;
+  padding: 28px 0;
+  margin: 0;
+}
+
+/* Drawer content */
+.card {
+  background: #fff;
+  border: 1px solid #e9edf3;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.card-label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #94a3b8;
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #fff;
+  border: 1px solid #e9edf3;
+  border-radius: 12px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+.stat-label {
+  font-size: 11.5px;
+  color: #64748b;
+}
+.stat-value {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1e2739;
+  font-variant-numeric: tabular-nums;
+}
+.rate-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 48px;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  font-size: 12.5px;
+}
+.rate-label {
+  color: #475569;
+}
+.rate-bar {
+  height: 7px;
+  border-radius: 7px;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+.rate-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 7px;
+}
+.rate-value {
+  text-align: right;
+  font-weight: 600;
+  color: #1e2739;
+}
+.callout {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+.callout.warn { background: #fffbeb; color: #92400e; }
+.callout.rose { background: #fff1f2; color: #9f1239; }
+.callout.red { background: #fef2f2; color: #991b1b; }
+.month-chart {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+.month {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.month-bar-wrap {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: linear-gradient(#f8fafc, #f8fafc) bottom / 100% 1px no-repeat;
+}
+.month-bar {
+  width: 60%;
+  max-width: 34px;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, #a79ffb, #6d5ff0);
+  min-height: 0;
+  transition: height 0.4s ease;
+}
+.month-orders {
+  position: absolute;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  margin-bottom: -4.5px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #f59e0b;
+  z-index: 1;
+}
+.month-label {
+  font-size: 11.5px;
+  color: #64748b;
+}
+.month-value {
+  font-size: 11px;
+  color: #94a3b8;
+}
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.product {
+  background: #fff;
+  border: 1px solid #e9edf3;
+  border-radius: 12px;
+  overflow: hidden;
+  min-width: 0;
+}
+.product-img {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+}
+.product-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.product-status {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+.product-body {
+  padding: 10px 12px;
+}
+.product-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12.5px;
+}
+.product-row.sub {
+  font-size: 11.5px;
+}
+.product-row .low {
+  color: #dc2626;
+  font-weight: 600;
+}
+.chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.count-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid #e9edf3;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1e2739;
+}
+.row-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  border: 1px solid #e9edf3;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.row-list.flat {
+  border: none;
   border-radius: 0;
 }
-.document-viewer .modal-body {
+.row-list li {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-bottom: 1px solid #f1f5f9;
 }
-.document-image {
-  width: 100%;
-  height: auto;
-  max-height: calc(100vh - 100px);
-  object-fit: contain;
+.row-list li:last-child {
+  border-bottom: none;
+}
+.row-list:not(.flat) li {
+  cursor: pointer;
+}
+.row-list:not(.flat) li:hover {
+  background: #fafaff;
+}
+.row-list.flat li {
+  padding: 9px 0;
+}
+.row-main {
+  flex: 1;
+  min-width: 0;
+}
+.row-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.plan-card {
+  background: radial-gradient(120% 140% at 100% 0%, #f5f3ff 0%, #fff 70%);
+  border: 1px solid #e9edf3;
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.plan-name {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e2739;
+  margin: 2px 0 6px;
+}
+.facts {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+.facts dt {
+  color: #94a3b8;
+}
+.facts dd {
+  margin: 0;
+  color: #1e2739;
+}
+.limits {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.limit {
+  font-size: 12px;
+  color: #475569;
+  background: #fff;
+  border: 1px solid #e9edf3;
   border-radius: 8px;
+  padding: 4px 10px;
 }
-.no-document {
-  text-align: center;
-  padding: 48px;
-  color: #718096;
+.limit b {
+  color: #1e2739;
 }
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 0 6px;
+}
+.timeline li {
+  --dot: #94a3b8;
+  position: relative;
+  display: flex;
+  gap: 14px;
+  padding-bottom: 18px;
+}
+.timeline li:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 14px;
+  bottom: 0;
+  width: 2px;
+  background: #e2e8f0;
+}
+.ev-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--dot);
+  margin-top: 3px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.ev-suspended { --dot: #dc2626; }
+.ev-reactivated { --dot: #16a34a; }
+.ev-joined { --dot: #7c6ff7; }
+.ev-reason {
+  display: block;
+  font-size: 12.5px;
+  color: #475569;
+  font-style: italic;
+}
+
+/* Dialogs */
+.dialog {
+  width: min(480px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+}
+.dialog h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e2739;
+}
+.dialog p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #475569;
+}
+.dialog textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #1e2739;
+  resize: vertical;
+}
+.dialog textarea.invalid {
+  border-color: #fca5a5;
+}
+.dialog-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.dialog-icon.ok { background: #dcfce7; color: #16a34a; }
+.dialog-icon.bad { background: #fee2e2; color: #dc2626; }
+.dialog-error {
+  color: #b91c1c !important;
+  font-size: 12.5px !important;
+  margin: 8px 0 0 !important;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.impact {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.field-row {
+  border: 1px solid #eef1f6;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #1e2739;
+  cursor: pointer;
+}
+.check input {
+  accent-color: #7c6ff7;
+}
+.field-row textarea {
+  margin-top: 8px;
+}
+
+/* Viewer */
+.viewer {
+  width: min(960px, 100%);
+  max-height: calc(100vh - 32px);
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.viewer header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e9edf3;
+}
+.viewer-actions {
+  display: flex;
+  gap: 8px;
+}
+.viewer img,
+.viewer iframe {
+  width: 100%;
+  max-height: calc(100vh - 110px);
+  object-fit: contain;
+  border: none;
+  background: #f8fafc;
+}
+.viewer iframe {
+  height: 75vh;
+}
+
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.25s ease;
+}
+.slide-enter-from,
+.slide-leave-to {
+  transform: translateX(100%);
+}
+
 /* Responsive */
-@media (max-width: 1200px) {
+@media (max-width: 1280px) {
   .main-content {
     margin-left: 200px;
   }
-  .detail-group {
-    grid-template-columns: 1fr;
+  .tab-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 968px) {
   .main-content {
     margin-left: 0;
   }
-  .table-header,
-  .table-row {
-    overflow-x: auto;
+  .mobile-toggle {
+    display: flex;
   }
 }
 @media (max-width: 640px) {
   .content-header {
-    flex-direction: row;
-    align-items: center;
-    gap: 12px;
+    padding: 16px;
   }
-  .header-actions {
-    width: 100%;
-    flex-wrap: wrap;
+  .page-body {
+    padding: 0 16px 32px;
   }
-  .search-box input {
-    width: 100%;
+  .tab-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .content-actions {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
+  .search-wrap {
+    max-width: none;
   }
-  .action-buttons {
-    width: 100%;
+  .stat-grid,
+  .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .btn-filter,
-  .btn-export {
-    flex: 1;
+  .rate-row {
+    grid-template-columns: 100px 1fr 44px;
+  }
+  .facts {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk {
+    animation: none;
+  }
+  .slide-enter-active,
+  .slide-leave-active,
+  .fade-enter-active,
+  .fade-leave-active {
+    transition: none;
   }
 }
 </style>

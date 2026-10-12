@@ -42,7 +42,7 @@ class CustomerProductController extends Controller
                 ], 422);
             }
 
-            $query = Product::where('status', 'active')
+            $query = Product::fromActiveVendors()->where('status', 'active')
                 ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->with([
                     'primaryImage',
@@ -143,22 +143,22 @@ class CustomerProductController extends Controller
     public function filters(Request $request)
     {
         try {
-            $categories = Product::where('status', 'active')
+            $categories = Product::fromActiveVendors()->where('status', 'active')
                 ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->distinct()->orderBy('category')->pluck('category')
                 ->filter()->values();
 
-            $flowerTypes = Product::where('status', 'active')
+            $flowerTypes = Product::fromActiveVendors()->where('status', 'active')
                 ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->distinct()->orderBy('flower_type')->pluck('flower_type')
                 ->filter()->values();
 
-            $colors = Product::where('status', 'active')
+            $colors = Product::fromActiveVendors()->where('status', 'active')
                 ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->distinct()->orderBy('color')->pluck('color')
                 ->filter()->values();
 
-            $occasions = Product::where('status', 'active')
+            $occasions = Product::fromActiveVendors()->where('status', 'active')
                 ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->whereNotNull('occasion_tags')
                 ->pluck('occasion_tags')
@@ -168,7 +168,7 @@ class CustomerProductController extends Controller
                 ->sort()
                 ->values();
 
-            $priceRow = Product::where('status', 'active')
+            $priceRow = Product::fromActiveVendors()->where('status', 'active')
                 ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->selectRaw('MIN(selling_price) as min_price, MAX(selling_price) as max_price')
                 ->first();
@@ -201,7 +201,7 @@ class CustomerProductController extends Controller
     public function show($id)
     {
         try {
-            $product = Product::where('status', 'active')
+            $product = Product::fromActiveVendors()->where('status', 'active')
                 ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->with(['primaryImage', 'images', 'models', 'owner'])
                 ->findOrFail($id);

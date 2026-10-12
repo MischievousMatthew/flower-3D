@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\LoginAuditLogController;
 use App\Http\Controllers\Admin\SubscriptionRevenueController;
 use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminVendorController;
 use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VendorController;
@@ -695,6 +696,15 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/', [AdminOrderController::class, 'index']);
             Route::get('/{id}', [AdminOrderController::class, 'show'])->whereNumber('id');
             Route::post('/{id}/notes', [AdminOrderController::class, 'addNote'])->whereNumber('id');
+        });
+
+        // Approved vendors: performance, products, orders, subscription, suspension
+        Route::middleware('role:admin')->prefix('vendors')->group(function () {
+            Route::get('/summary', [AdminVendorController::class, 'summary']);
+            Route::get('/', [AdminVendorController::class, 'index']);
+            Route::get('/{id}', [AdminVendorController::class, 'show'])->whereNumber('id');
+            Route::post('/{id}/suspend', [AdminVendorController::class, 'suspend'])->whereNumber('id');
+            Route::post('/{id}/reactivate', [AdminVendorController::class, 'reactivate'])->whereNumber('id');
         });
 
         // Read-only finance: payments, refunds, earnings and exports

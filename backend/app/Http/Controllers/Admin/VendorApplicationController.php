@@ -69,7 +69,7 @@ class VendorApplicationController extends Controller
             Log::info('Applications fetched successfully', ['count' => $applications->count()]);
             
             return response()->json([
-                'data' => $applications->items(),
+                'data' => collect($applications->items())->map->maskedForAdmin()->all(),
                 'meta' => [
                     'current_page' => $applications->currentPage(),
                     'last_page' => $applications->lastPage(),
@@ -179,7 +179,7 @@ class VendorApplicationController extends Controller
 
             return response()->json([
                 'message' => 'Application status updated successfully',
-                'application' => $application
+                'application' => $application->maskedForAdmin()
             ]);
             
         } catch (\Exception $e) {
@@ -345,7 +345,7 @@ class VendorApplicationController extends Controller
         try {
             $application = VendorApplication::findOrFail($id);
             
-            return response()->json($application);
+            return response()->json($application->maskedForAdmin());
             
         } catch (\Exception $e) {
             return response()->json([
@@ -365,7 +365,7 @@ class VendorApplicationController extends Controller
             if ($application->status === 'approved') {
                 return response()->json([
                     'message' => 'Application is already approved.',
-                    'application' => $application,
+                    'application' => $application->maskedForAdmin(),
                 ]);
             }
 
@@ -399,7 +399,7 @@ class VendorApplicationController extends Controller
 
             return response()->json([
                 'message'     => 'Vendor application approved successfully!',
-                'application' => $application->fresh(),
+                'application' => $application->fresh()->maskedForAdmin(),
             ]);
 
         } catch (QueryException $e) {
@@ -457,7 +457,7 @@ class VendorApplicationController extends Controller
 
             return response()->json([
                 'message'     => 'Vendor application rejected successfully!',
-                'application' => $application->fresh(),
+                'application' => $application->fresh()->maskedForAdmin(),
             ]);
 
         } catch (\Exception $e) {

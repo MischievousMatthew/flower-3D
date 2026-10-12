@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Employee;
 use App\Constants\ErpModule;
 use App\Services\LoginAuditService;
+use App\Services\VendorAccountService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -39,6 +40,14 @@ class EmployeeAuthController extends Controller
                     'success' => false,
                     'message' => 'Invalid credentials or account inactive',
                 ], 401);
+            }
+
+            if (VendorAccountService::isBlocked($employee)) {
+                return response()->json([
+                    'success' => false,
+                    'code' => 'account_suspended',
+                    'message' => VendorAccountService::BLOCKED_MESSAGE,
+                ], 403);
             }
 
             $token = Str::random(80);

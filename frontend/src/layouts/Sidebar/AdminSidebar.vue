@@ -71,7 +71,7 @@
           active-class="active"
         >
           <span class="nav-icon">🏪</span>
-          <span>Vendor Requests</span>
+          <span>Vendors</span>
           <span v-if="notificationCounts.vendorRequests > 0" class="nav-badge">
             {{
               notificationCounts.vendorRequests > 99
@@ -79,15 +79,6 @@
                 : notificationCounts.vendorRequests
             }}
           </span>
-        </router-link>
-
-        <router-link
-          to="/admin/vendor-requests"
-          class="nav-item"
-          active-class="active"
-        >
-          <span class="nav-icon">👥</span>
-          <span>Vendors</span>
         </router-link>
 
         <router-link

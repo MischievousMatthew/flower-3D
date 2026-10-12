@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\TwoFactorLoginChallenge;
 use App\Services\LoginAuditService;
+use App\Services\VendorAccountService;
 use App\Services\EmailOtpService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -142,6 +143,12 @@ class AuthController extends Controller
                 Log::warning('Unverified user attempted login: ' . $user->username);
                 throw ValidationException::withMessages([
                     'username' => 'Your account is not verified.',
+                ]);
+            }
+
+            if (VendorAccountService::isBlocked($user)) {
+                throw ValidationException::withMessages([
+                    'username' => VendorAccountService::BLOCKED_MESSAGE,
                 ]);
             }
 
@@ -612,6 +619,12 @@ class AuthController extends Controller
             if (!$user->is_verified) {
                 throw ValidationException::withMessages([
                     'username' => 'Vendor account not active.',
+                ]);
+            }
+
+            if (VendorAccountService::isBlocked($user)) {
+                throw ValidationException::withMessages([
+                    'username' => VendorAccountService::BLOCKED_MESSAGE,
                 ]);
             }
             

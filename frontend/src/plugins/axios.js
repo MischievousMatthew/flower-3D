@@ -94,6 +94,23 @@ api.interceptors.response.use(
       data: error.response?.data,
     });
 
+    // ================= SUSPENDED STORE =================
+    // The vendor (or the store they work for) was suspended: sign out and
+    // explain why on the login page.
+    const isLoginRequest = /login/.test(error.config?.url ?? "");
+    if (error.response?.status === 403 && error.response?.data?.code === "account_suspended" && !isLoginRequest) {
+      clearStoredAuth();
+      try {
+        sessionStorage.setItem("auth_notice", error.response.data.message);
+      } catch {
+        // storage unavailable; the login page simply won't show the notice
+      }
+      if (!window.location.pathname.includes("/guest/login")) {
+        window.location.replace("/guest/login");
+      }
+      return Promise.reject(error);
+    }
+
     // ================= HANDLE 401 =================
     if (shouldForceLogout(error)) {
       console.log("401 Unauthorized - clearing auth");

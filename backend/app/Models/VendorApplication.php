@@ -158,6 +158,21 @@ class VendorApplication extends Model
     //   Simple decryptString() call.  If it throws, log and return null rather
     //   than crashing the entire toArray() / serializeVendorApplication() call.
     // ─────────────────────────────────────────────────────────────────────────
+    /** Payout account as "•••• 4821", the only form admins see */
+    protected function maskedAccountNumber(): Attribute
+    {
+        return Attribute::make(get: function () {
+            $number = preg_replace('/\s+/', '', (string) $this->decrypted_account_number);
+            return $number === '' ? null : '•••• ' . substr($number, -4);
+        });
+    }
+
+    /** This application as admins may see it: payout account masked */
+    public function maskedForAdmin(): static
+    {
+        return $this->makeHidden('decrypted_account_number')->append('masked_account_number');
+    }
+
     protected function decryptedAccountNumber(): Attribute
     {
         return Attribute::make(
@@ -390,6 +405,15 @@ class VendorApplication extends Model
     public function scopePending($q)            { return $q->where('status', 'pending'); }
     public function scopeApproved($q)           { return $q->where('status', 'approved'); }
     public function scopeRejected($q)           { return $q->where('status', 'rejected'); }
+
+    /** Leave out stores whose vendor account is suspended */
+    public function scopeNotSuspended($q)
+    {
+        return $q->whereNotIn('email', User::query()
+            ->where('role', User::ROLE_VENDOR)
+            ->where('is_suspended', true)
+            ->select('email'));
+    }
     public function scopeUnderReview($q)        { return $q->where('status', 'under_review'); }
     public function scopeProfileComplete($q)    { return $q->where('profile_fully_completed', true); }
     public function scopeProfileIncomplete($q)  { return $q->where('profile_fully_completed', false); }

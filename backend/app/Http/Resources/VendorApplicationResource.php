@@ -35,7 +35,7 @@ class VendorApplicationResource extends JsonResource
             'bir_tin' => $this->bir_tin,
             'payout_method' => $this->payout_method,
             'account_holder_name' => $this->account_holder_name,
-            'decrypted_account_number' => $this->decrypted_account_number,
+            'masked_account_number' => $this->masked_account_number,
             'bank_name' => $this->bank_name,
             'billing_address' => $this->billing_address,
             'product_types' => $this->product_types,
