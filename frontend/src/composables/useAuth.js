@@ -12,6 +12,7 @@ import {
   getStoredUserToken,
 } from "../utils/authSession";
 import { clearSubscriptionAccess } from "./useSubscriptionAccess";
+import { useAdminAccess } from "./useAdminAccess";
 import { readPendingPlan } from "../constants/subscriptionPlans";
 
 const user = ref(null);
@@ -61,6 +62,8 @@ export function useAuth() {
   const clearAuthData = () => {
     clearStoredAuth();
     clearSubscriptionAccess();
+    // Forget the previous admin's permissions
+    useAdminAccess().reset();
 
     delete api.defaults.headers.common["Authorization"];
 

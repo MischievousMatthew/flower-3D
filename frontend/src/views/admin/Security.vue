@@ -1,0 +1,1554 @@
+<template>
+  <div class="admin-layout">
+    <AdminSidebar />
+
+    <main class="main-content">
+      <header class="content-header">
+        <div class="header-left">
+          <button class="mobile-toggle" @click="toggleMobile" aria-label="Toggle Menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+          </button>
+          <div>
+            <h1 class="page-title">Security &amp; system</h1>
+            <p class="page-subtitle">Administrators, permissions, audit trail, sign-ins, platform settings and system health</p>
+          </div>
+        </div>
+        <span v-if="!canManage" class="readonly-chip">View only · your role can't change these</span>
+      </header>
+
+      <div class="page-body">
+        <nav class="tabs" role="tablist">
+          <button v-for="t in TABS" :key="t.key" type="button" role="tab" class="tab" :class="{ active: tab === t.key }" :aria-selected="tab === t.key" @click="setTab(t.key)">
+            {{ t.label }}
+            <span v-if="t.key === 'health' && health && health.overall !== 'ok'" class="dot" :class="health.overall"></span>
+          </button>
+        </nav>
+
+        <!-- ═══ Administrators ═══ -->
+        <section v-if="tab === 'admins'" class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Administrators</h2>
+              <p class="panel-sub">Everyone who can sign in to this admin panel, and what their role allows.</p>
+            </div>
+            <button v-if="canManage" type="button" class="primary-btn" @click="openAdminDialog()">+ Add administrator</button>
+          </div>
+          <div v-if="loading.admins && !admins.length" class="sk-list"><span v-for="n in 3" :key="n" class="sk sk-row"></span></div>
+          <div v-else class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr><th>Administrator</th><th>Role</th><th>Status</th><th>Last sign-in</th><th class="num">Actions (30d)</th><th></th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="a in admins" :key="a.id" :class="{ off: !a.active }">
+                  <td>
+                    <div class="person">
+                      <span class="avatar">{{ initials(a.name) }}</span>
+                      <div>
+                        <span class="strong">{{ a.name }} <span v-if="a.id === access.id" class="you">You</span></span>
+                        <span class="sub">@{{ a.username }} · {{ a.email }}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <select v-if="canManage && a.id !== access.id" :value="a.role_id" class="input small" @change="changeRole(a, $event.target.value)">
+                      <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
+                    </select>
+                    <span v-else class="pill" :class="{ super: a.is_super_admin }">{{ a.role || "No role" }}</span>
+                  </td>
+                  <td><span class="pill" :class="a.active ? 'ok' : 'bad'">{{ a.active ? "Active" : "Turned off" }}</span></td>
+                  <td class="muted">{{ a.last_login_at ? timeAgo(a.last_login_at) : "Never" }}</td>
+                  <td class="num">{{ a.actions_30d }}</td>
+                  <td class="right">
+                    <div v-if="canManage" class="row-actions">
+                      <button type="button" class="mini-btn" @click="openPasswordDialog(a)">{{ a.id === access.id ? "Change my password" : "Set password" }}</button>
+                      <template v-if="a.id !== access.id">
+                        <button v-if="a.active" type="button" class="mini-btn danger" @click="setActive(a, false)">Turn off</button>
+                        <button v-else type="button" class="mini-btn ok" @click="setActive(a, true)">Turn on</button>
+                      </template>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ═══ Roles ═══ -->
+        <section v-else-if="tab === 'roles'">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Roles &amp; permissions</h2>
+              <p class="panel-sub">A role is a set of permissions. Every admin page and action checks them on the server.</p>
+            </div>
+            <button v-if="canManage" type="button" class="primary-btn" @click="openRoleDialog()">+ New role</button>
+          </div>
+          <div v-if="loading.roles && !roles.length" class="sk-list"><span v-for="n in 3" :key="n" class="sk sk-row tall"></span></div>
+          <div v-else class="role-grid">
+            <article v-for="r in roles" :key="r.id" class="panel role-card" :class="{ system: r.is_system }">
+              <div class="role-head">
+                <div>
+                  <h3>{{ r.name }} <span v-if="r.is_system" class="pill super">Built in</span></h3>
+                  <p class="sub">{{ r.description || "No description" }}</p>
+                </div>
+                <span class="count">{{ r.admins }} admin{{ r.admins === 1 ? "" : "s" }}</span>
+              </div>
+              <div class="perm-groups">
+                <div v-for="(perms, group) in catalog" :key="group" class="perm-group">
+                  <span class="group-label">{{ group }}</span>
+                  <span v-for="(label, key) in perms" :key="key" class="perm" :class="{ on: r.permissions.includes(key) }">
+                    {{ r.permissions.includes(key) ? "✓" : "–" }} {{ label }}
+                  </span>
+                </div>
+              </div>
+              <div v-if="canManage && !r.is_system" class="role-actions">
+                <button type="button" class="mini-btn" @click="openRoleDialog(r)">Edit</button>
+                <button type="button" class="mini-btn danger" :disabled="r.admins > 0" :title="r.admins ? 'Move its administrators first' : ''" @click="deleteRole(r)">Delete</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- ═══ Audit log ═══ -->
+        <section v-else-if="tab === 'audit'" class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Audit log</h2>
+              <p class="panel-sub">Every change an admin made, and every export, including ones that were refused.</p>
+            </div>
+          </div>
+          <div class="toolbar">
+            <input v-model="auditFilters.search" type="search" class="input grow" placeholder="Search path, admin or record #" />
+            <select v-model="auditFilters.admin_id" class="input"><option value="">All admins</option><option v-for="a in auditAdmins" :key="a.id" :value="a.id">{{ a.name }}</option></select>
+            <select v-model="auditFilters.area" class="input"><option value="">All areas</option><option v-for="(label, key) in AREAS" :key="key" :value="key">{{ label }}</option></select>
+            <select v-model="auditFilters.outcome" class="input"><option value="">Any outcome</option><option value="done">Done</option><option value="refused">Refused / failed</option></select>
+            <input v-model="auditFilters.from" type="date" class="input" aria-label="From" />
+            <input v-model="auditFilters.to" type="date" class="input" aria-label="To" />
+          </div>
+          <div v-if="loading.audit && !audit.length" class="sk-list"><span v-for="n in 6" :key="n" class="sk sk-row"></span></div>
+          <p v-else-if="!audit.length" class="empty">Nothing recorded for these filters yet.</p>
+          <div v-else class="table-scroll" :class="{ dim: loading.audit }">
+            <table class="data-table">
+              <thead><tr><th>When</th><th>Admin</th><th>What</th><th>Details</th><th>Result</th><th>From</th></tr></thead>
+              <tbody>
+                <tr v-for="l in audit" :key="l.id">
+                  <td class="muted">{{ formatDateTime(l.created_at) }}</td>
+                  <td class="strong">{{ l.admin_name || "—" }}</td>
+                  <td>
+                    <span class="strong">{{ actionLabel(l) }}</span>
+                    <span class="sub mono">{{ l.method }} {{ l.path }}</span>
+                  </td>
+                  <td>
+                    <div class="chips">
+                      <span v-for="(v, k) in l.details || {}" :key="k" class="chip">{{ k.replace(/_/g, " ") }}: {{ v }}</span>
+                    </div>
+                  </td>
+                  <td><span class="pill" :class="l.status_code < 400 ? 'ok' : 'bad'">{{ l.status_code < 400 ? "Done" : l.status_code === 403 ? "Not allowed" : `Failed (${l.status_code})` }}</span></td>
+                  <td class="muted">{{ l.ip_address || "—" }}<span class="sub">{{ l.device }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-if="auditMeta.total > auditMeta.per_page" class="pager">
+            <span class="sub">{{ auditMeta.total }} entries</span>
+            <div class="row-actions">
+              <button type="button" class="mini-btn" :disabled="auditMeta.current_page <= 1" @click="fetchAudit(auditMeta.current_page - 1)">Previous</button>
+              <span class="sub">{{ auditMeta.current_page }} / {{ auditMeta.last_page }}</span>
+              <button type="button" class="mini-btn" :disabled="auditMeta.current_page >= auditMeta.last_page" @click="fetchAudit(auditMeta.current_page + 1)">Next</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══ Sign-ins ═══ -->
+        <template v-else-if="tab === 'signins'">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Sign-in monitoring</h2>
+              <p class="panel-sub" v-if="signins">After {{ signins.lockout.max_attempts }} wrong passwords an account is locked for {{ signins.lockout.minutes }} minutes (change this in Platform settings).</p>
+            </div>
+            <select v-model.number="signinHours" class="input"><option :value="1">Last hour</option><option :value="24">Last 24 hours</option><option :value="168">Last 7 days</option><option :value="720">Last 30 days</option></select>
+          </div>
+          <div v-if="!signins" class="sk-list"><span v-for="n in 3" :key="n" class="sk sk-row tall"></span></div>
+          <template v-else>
+            <section class="stat-grid">
+              <div class="stat" :class="{ hot: signins.failed >= 20 }"><span class="stat-label">Failed sign-ins</span><span class="stat-value">{{ signins.failed }}</span></div>
+              <div class="stat"><span class="stat-label">Successful sign-ins</span><span class="stat-value">{{ signins.successful }}</span></div>
+              <div class="stat" :class="{ hot: signins.locked_now.length }"><span class="stat-label">Locked right now</span><span class="stat-value">{{ signins.locked_now.length }}</span></div>
+              <div class="stat"><span class="stat-label">Why they failed</span>
+                <span class="reasons"><span v-for="(n, reason) in signins.by_reason" :key="reason">{{ REASON[reason] ?? reason }} <b>{{ n }}</b></span><span v-if="!Object.keys(signins.by_reason).length" class="sub">No failures</span></span>
+              </div>
+            </section>
+            <section class="split">
+              <div class="panel">
+                <h3 class="panel-title">Where failures come from</h3>
+                <p v-if="!signins.top_ips.length" class="empty small">No failures.</p>
+                <ul v-else class="mini-list">
+                  <li v-for="ip in signins.top_ips" :key="ip.ip" :class="{ warn: ip.suspicious }">
+                    <span class="mono strong">{{ ip.ip }}</span>
+                    <span class="sub">{{ ip.failures }} failures · {{ ip.accounts }} account{{ ip.accounts === 1 ? "" : "s" }}</span>
+                    <span v-if="ip.suspicious" class="pill bad">Looks like guessing</span>
+                  </li>
+                </ul>
+                <h3 class="panel-title spaced">Most-targeted accounts</h3>
+                <p v-if="!signins.top_accounts.length" class="empty small">None.</p>
+                <ul v-else class="mini-list">
+                  <li v-for="acc in signins.top_accounts" :key="acc.identifier">
+                    <span class="mono strong">{{ acc.identifier }}</span>
+                    <span class="sub">{{ acc.failures }} failures</span>
+                    <span v-if="signins.locked_now.some((l) => l.identifier === acc.identifier)" class="pill bad">Locked</span>
+                  </li>
+                </ul>
+              </div>
+              <div class="panel">
+                <h3 class="panel-title">Recent admin sign-ins</h3>
+                <p v-if="!signins.admin_sign_ins.length" class="empty small">None recorded.</p>
+                <ul v-else class="mini-list">
+                  <li v-for="(s, i) in signins.admin_sign_ins" :key="i">
+                    <span class="strong">{{ s.name }}</span>
+                    <span class="sub">{{ s.device }}<template v-if="s.location"> · {{ s.location }}</template> · {{ s.ip }}</span>
+                    <span class="sub">{{ formatDateTime(s.at) }}</span>
+                  </li>
+                </ul>
+                <router-link to="/admin/login-logs" class="link-btn">All sign-ins →</router-link>
+              </div>
+            </section>
+            <section class="panel">
+              <h3 class="panel-title">Failed attempts</h3>
+              <p v-if="!signins.recent.length" class="empty small">No failed sign-ins in this period.</p>
+              <div v-else class="table-scroll">
+                <table class="data-table">
+                  <thead><tr><th>When</th><th>Account typed</th><th>Reason</th><th>Who</th><th>From</th></tr></thead>
+                  <tbody>
+                    <tr v-for="a in signins.recent" :key="a.id">
+                      <td class="muted">{{ formatDateTime(a.at) }}</td>
+                      <td class="mono">{{ a.identifier }}</td>
+                      <td><span class="pill" :class="a.reason === 'locked' ? 'bad' : 'warn'">{{ REASON[a.reason] ?? a.reason }}</span></td>
+                      <td class="muted">{{ a.actor_type === "employee" ? "Staff login" : "Account login" }}</td>
+                      <td class="muted">{{ a.ip }}<span class="sub">{{ a.device }}</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </template>
+        </template>
+
+        <!-- ═══ Platform settings ═══ -->
+        <form v-else-if="tab === 'settings'" class="panel settings" @submit.prevent="saveSettings">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Platform settings</h2>
+              <p class="panel-sub">These take effect straight away for everyone.</p>
+            </div>
+          </div>
+          <div v-if="!settings" class="sk-list"><span v-for="n in 4" :key="n" class="sk sk-row"></span></div>
+          <template v-else>
+            <fieldset :disabled="!canManage">
+              <h3 class="set-group">Sign-ups &amp; ordering</h3>
+              <label class="toggle-row">
+                <div><span class="strong">Customer sign-ups</span><span class="sub">When off, new customers can't create accounts. Existing customers still sign in.</span></div>
+                <input v-model="settings.registrations_open" type="checkbox" class="switch" />
+              </label>
+              <label class="toggle-row">
+                <div><span class="strong">Vendor applications</span><span class="sub">When off, the vendor registration form is refused.</span></div>
+                <input v-model="settings.vendor_applications_open" type="checkbox" class="switch" />
+              </label>
+              <label class="toggle-row" :class="{ alarm: settings.checkout_paused }">
+                <div><span class="strong">Pause all checkout</span><span class="sub">Stops every new order across all stores, e.g. during an incident. Payments already made aren't affected.</span></div>
+                <input v-model="settings.checkout_paused" type="checkbox" class="switch danger" />
+              </label>
+              <label class="field">
+                <span>Message customers see while checkout is paused</span>
+                <input v-model="settings.checkout_pause_message" class="input" maxlength="200" />
+              </label>
+
+              <h3 class="set-group">Sign-in protection</h3>
+              <div class="two">
+                <label class="field"><span>Wrong passwords before a lock</span><input v-model.number="settings.login_max_attempts" type="number" min="3" max="20" class="input" /></label>
+                <label class="field"><span>Lock lasts (minutes)</span><input v-model.number="settings.login_lockout_minutes" type="number" min="1" max="1440" class="input" /></label>
+              </div>
+
+              <h3 class="set-group">Monitoring</h3>
+              <label class="field narrow"><span>An order counts as stuck after this many days pending</span><input v-model.number="settings.stale_pending_days" type="number" min="1" max="30" class="input" /></label>
+            </fieldset>
+            <p v-if="settingsError" class="form-error">{{ settingsError }}</p>
+            <div v-if="canManage" class="form-actions">
+              <button type="submit" class="primary-btn" :disabled="busy">{{ busy ? "Saving…" : "Save settings" }}</button>
+            </div>
+          </template>
+        </form>
+
+        <!-- ═══ System health ═══ -->
+        <template v-else-if="tab === 'health'">
+          <div v-if="!health" class="sk-list"><span v-for="n in 4" :key="n" class="sk sk-row tall"></span></div>
+          <template v-else>
+            <div class="health-banner" :class="health.overall">
+              <strong>{{ { ok: "Everything looks healthy", warn: "Working, with some warnings", fail: "Something needs fixing" }[health.overall] }}</strong>
+              <span class="sub">Checked {{ formatDateTime(health.checked_at) }} · PHP {{ health.versions.php }} · Laravel {{ health.versions.laravel }} · {{ health.timezone }}</span>
+              <button type="button" class="mini-btn" @click="fetchHealth">Check again</button>
+            </div>
+            <section class="split">
+              <div v-for="(checks, group) in healthGroups" :key="group" class="panel">
+                <h3 class="panel-title">{{ group }}</h3>
+                <ul class="checks">
+                  <li v-for="c in checks" :key="c.name">
+                    <span class="check-dot" :class="c.status">{{ { ok: "✓", warn: "!", fail: "✕" }[c.status] }}</span>
+                    <span class="strong">{{ c.name }}</span>
+                    <span class="sub">{{ c.detail }}</span>
+                  </li>
+                </ul>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3 class="panel-title">API errors</h3>
+                  <p class="panel-sub">Requests that ended in a server error (5xx)</p>
+                </div>
+                <select v-model.number="errorHours" class="input"><option :value="1">Last hour</option><option :value="24">Last 24 hours</option><option :value="168">Last 7 days</option><option :value="720">Last 30 days</option></select>
+              </div>
+              <div v-if="!apiErrors" class="sk sk-row tall"></div>
+              <template v-else>
+                <p v-if="!apiErrors.total" class="calm">✓ No server errors in this period.</p>
+                <template v-else>
+                  <div class="bars" :aria-label="`${apiErrors.total} errors`">
+                    <div v-for="(count, label) in apiErrors.series" :key="label" class="bar-col" :title="`${label}: ${count}`">
+                      <span class="bar" :style="{ height: barHeight(count) }"></span>
+                    </div>
+                  </div>
+                  <div class="split tight">
+                    <div>
+                      <h4 class="mini-title">Most affected endpoints</h4>
+                      <ul class="mini-list">
+                        <li v-for="e in apiErrors.by_endpoint" :key="e.method + e.path">
+                          <span class="mono strong">{{ e.method }} {{ e.path }}</span>
+                          <span class="sub">{{ e.total }}× · last {{ timeAgo(e.last_at) }}</span>
+                        </li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 class="mini-title">Latest</h4>
+                      <ul class="mini-list">
+                        <li v-for="e in apiErrors.recent.slice(0, 12)" :key="e.id">
+                          <span class="mono strong">{{ e.status }} {{ e.method }} {{ e.path }}</span>
+                          <span class="sub">{{ e.exception ? e.exception + ": " : "" }}{{ e.message || "No message" }}</span>
+                          <span class="sub">{{ formatDateTime(e.at) }}<template v-if="e.duration_ms"> · {{ e.duration_ms }} ms</template></span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </template>
+              </template>
+            </section>
+          </template>
+        </template>
+      </div>
+    </main>
+
+    <!-- ═══ Dialogs ═══ -->
+    <Transition name="fade">
+      <div v-if="dialog.type" class="dialog-backdrop" @click.self="closeDialog">
+        <form class="dialog" :class="{ wide: dialog.type === 'role' }" @submit.prevent="submitDialog">
+          <template v-if="dialog.type === 'admin'">
+            <h3>Add an administrator</h3>
+            <p class="sub">They sign in at the normal login page with the username or email and password you set here.</p>
+            <div class="two">
+              <label class="field"><span>First name</span><input v-model="form.name" class="input" required /></label>
+              <label class="field"><span>Last name</span><input v-model="form.surname" class="input" required /></label>
+            </div>
+            <div class="two">
+              <label class="field"><span>Username</span><input v-model="form.username" class="input" required autocomplete="off" /></label>
+              <label class="field"><span>Email</span><input v-model="form.email" type="email" class="input" required autocomplete="off" /></label>
+            </div>
+            <label class="field"><span>Role</span>
+              <select v-model="form.admin_role_id" class="input" required><option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option></select>
+            </label>
+            <label class="field"><span>Temporary password</span>
+              <div class="pw-row">
+                <input v-model="form.password" :type="showPassword ? 'text' : 'password'" class="input mono" required autocomplete="new-password" />
+                <button type="button" class="mini-btn" @click="showPassword = !showPassword">{{ showPassword ? "Hide" : "Show" }}</button>
+                <button type="button" class="mini-btn" @click="generatePassword">Generate</button>
+              </div>
+              <small class="sub">At least 10 characters with upper- and lowercase letters and a number. Share it privately.</small>
+            </label>
+          </template>
+
+          <template v-else-if="dialog.type === 'password'">
+            <h3>{{ dialog.target.id === access.id ? "Change your password" : `Set a new password for ${dialog.target.name}` }}</h3>
+            <p class="sub">{{ dialog.target.id === access.id ? "You'll stay signed in." : "They'll be signed out and need the new password." }}</p>
+            <label class="field"><span>New password</span>
+              <div class="pw-row">
+                <input v-model="form.password" :type="showPassword ? 'text' : 'password'" class="input mono" required autocomplete="new-password" />
+                <button type="button" class="mini-btn" @click="showPassword = !showPassword">{{ showPassword ? "Hide" : "Show" }}</button>
+                <button type="button" class="mini-btn" @click="generatePassword">Generate</button>
+              </div>
+            </label>
+          </template>
+
+          <template v-else-if="dialog.type === 'role'">
+            <h3>{{ dialog.target ? `Edit “${dialog.target.name}”` : "New role" }}</h3>
+            <div class="two">
+              <label class="field"><span>Name</span><input v-model="form.name" class="input" maxlength="60" required /></label>
+              <label class="field"><span>Description</span><input v-model="form.description" class="input" maxlength="255" /></label>
+            </div>
+            <div class="perm-editor">
+              <div v-for="(perms, group) in catalog" :key="group" class="perm-group">
+                <span class="group-label">{{ group }}</span>
+                <label v-for="(label, key) in perms" :key="key" class="perm-check">
+                  <input v-model="form.permissions" type="checkbox" :value="key" />
+                  <span>{{ label }}</span>
+                </label>
+              </div>
+            </div>
+          </template>
+
+          <p v-if="dialog.error" class="form-error">{{ dialog.error }}</p>
+          <div class="dialog-actions">
+            <button type="button" class="ghost-btn" :disabled="busy" @click="closeDialog">Cancel</button>
+            <button type="submit" class="primary-btn" :disabled="busy">{{ busy ? "Saving…" : "Save" }}</button>
+          </div>
+        </form>
+      </div>
+    </Transition>
+  </div>
+</template>
+
+<script setup>
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { toast } from "vue3-toastify";
+import { useSidebarState } from "../../composables/useSidebarState";
+import { useAdminAccess } from "../../composables/useAdminAccess";
+import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
+import api from "../../plugins/axios";
+
+const { toggleMobile } = useSidebarState();
+const route = useRoute();
+const router = useRouter();
+const adminAccess = useAdminAccess();
+
+const TABS = [
+  { key: "admins", label: "Administrators" },
+  { key: "roles", label: "Roles & permissions" },
+  { key: "audit", label: "Audit log" },
+  { key: "signins", label: "Sign-ins" },
+  { key: "settings", label: "Platform settings" },
+  { key: "health", label: "System health" },
+];
+const REASON = { unknown_account: "Unknown account", wrong_password: "Wrong password", locked: "Blocked while locked", suspended: "Suspended account", unverified: "Unverified account" };
+const AREAS = {
+  AdminVendorController: "Vendors",
+  VendorApplication: "Vendor applications",
+  AdminCustomerController: "Customers",
+  AdminProductController: "Products & categories",
+  ProductReportController: "Product reports",
+  AdminOrderController: "Orders",
+  AdminContentController: "Website content",
+  AdminSupportController: "Support & announcements",
+  FinanceController: "Finance exports",
+  SubscriptionRevenueController: "Subscription exports",
+  SecurityController: "Security",
+};
+const ACTIONS = {
+  "AdminVendorController@suspend": "Suspended a vendor",
+  "AdminVendorController@reactivate": "Reactivated a vendor",
+  "VendorApplicationController@approve": "Approved a vendor application",
+  "VendorApplicationController@reject": "Rejected a vendor application",
+  "VendorApplicationController@updateStatus": "Changed an application's status",
+  "VendorApplicationController@export": "Exported vendor applications",
+  "VendorApplicationResubmissionController@requestResubmission": "Asked a vendor for corrections",
+  "VendorApplicationResubmissionController@approveItem": "Accepted a resubmitted item",
+  "VendorApplicationResubmissionController@requestAgain": "Asked again for a resubmitted item",
+  "AdminCustomerController@reveal": "Viewed a customer's personal details",
+  "AdminCustomerController@suspend": "Suspended a customer",
+  "AdminCustomerController@reactivate": "Reactivated a customer",
+  "AdminProductController@moderate": "Moderated a listing",
+  "AdminProductController@storeTaxonomy": "Added a category / type / occasion",
+  "AdminProductController@updateTaxonomy": "Edited a category / type / occasion",
+  "AdminProductController@destroyTaxonomy": "Deleted a category / type / occasion",
+  "AdminProductController@reorderTaxonomies": "Reordered a list",
+  "ProductReportController@review": "Reviewed a product report",
+  "AdminOrderController@addNote": "Added an order note",
+  "AdminContentController@saveBanner": "Saved a banner",
+  "AdminContentController@deleteBanner": "Deleted a banner",
+  "AdminContentController@addFeatured": "Featured a product",
+  "AdminContentController@removeFeatured": "Unfeatured a product",
+  "AdminContentController@saveArticle": "Saved an article",
+  "AdminContentController@publishArticle": "Published an article",
+  "AdminContentController@unpublishArticle": "Unpublished an article",
+  "AdminContentController@deleteArticle": "Deleted an article",
+  "AdminContentController@saveAnnouncement": "Saved an announcement / promotion",
+  "AdminContentController@deleteAnnouncement": "Deleted an announcement / promotion",
+  "AdminContentController@reorder": "Reordered website content",
+  "AdminContentController@saveSettings": "Changed website information",
+  "AdminSupportController@reply": "Replied to a support request",
+  "AdminSupportController@setStatus": "Updated a support request",
+  "AdminSupportController@sendBroadcast": "Sent an announcement",
+  "AdminSupportController@retractBroadcast": "Withdrew an announcement",
+  "FinanceController@exportTransactions": "Exported transactions",
+  "FinanceController@exportReport": "Exported a financial report",
+  "SubscriptionRevenueController@export": "Exported subscription payments",
+  "SecurityController@createAdmin": "Added an administrator",
+  "SecurityController@updateAdmin": "Edited an administrator",
+  "SecurityController@setAdminActive": "Turned an administrator on/off",
+  "SecurityController@resetAdminPassword": "Set an administrator's password",
+  "SecurityController@saveRole": "Saved a role",
+  "SecurityController@deleteRole": "Deleted a role",
+  "SecurityController@saveSettings": "Changed platform settings",
+};
+
+const access = adminAccess.access;
+const canManage = computed(() => adminAccess.can("security.manage"));
+const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : "admins");
+const loading = reactive({ admins: false, roles: false, audit: false });
+const busy = ref(false);
+
+// ── Admins & roles ───────────────────────────────────────────────
+const admins = ref([]);
+const roles = ref([]);
+const catalog = ref({});
+const fetchAdmins = async () => {
+  loading.admins = true;
+  try {
+    admins.value = (await api.get("/admin/security/admins")).data.data;
+  } catch {
+    toast.error("Administrators couldn't be loaded.");
+  } finally {
+    loading.admins = false;
+  }
+};
+const fetchRoles = async () => {
+  loading.roles = true;
+  try {
+    const { data } = await api.get("/admin/security/roles");
+    roles.value = data.data;
+    catalog.value = data.catalog;
+  } catch {
+    toast.error("Roles couldn't be loaded.");
+  } finally {
+    loading.roles = false;
+  }
+};
+const changeRole = async (admin, roleId) => {
+  try {
+    await api.put(`/admin/security/admins/${admin.id}`, { admin_role_id: Number(roleId) });
+    toast.success("Role changed.");
+  } catch (e) {
+    toast.error(e.response?.data?.message || "The role couldn't be changed.");
+  }
+  fetchAdmins();
+  fetchRoles();
+};
+const setActive = async (admin, active) => {
+  try {
+    const { data } = await api.post(`/admin/security/admins/${admin.id}/active`, { active });
+    toast.success(data.message);
+    fetchAdmins();
+  } catch (e) {
+    toast.error(e.response?.data?.message || "That change couldn't be saved.");
+  }
+};
+const deleteRole = async (role) => {
+  try {
+    const { data } = await api.delete(`/admin/security/roles/${role.id}`);
+    toast.success(data.message);
+    fetchRoles();
+  } catch (e) {
+    toast.error(e.response?.data?.message || "The role couldn't be deleted.");
+  }
+};
+
+// ── Audit ────────────────────────────────────────────────────────
+const audit = ref([]);
+const auditAdmins = ref([]);
+const auditMeta = ref({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
+const auditFilters = reactive({ search: "", admin_id: "", area: "", outcome: "", from: "", to: "" });
+const fetchAudit = async (page = 1) => {
+  loading.audit = true;
+  try {
+    const params = Object.fromEntries(Object.entries({ ...auditFilters, page }).filter(([, v]) => v !== ""));
+    const { data } = await api.get("/admin/security/audit", { params });
+    audit.value = data.data;
+    auditMeta.value = data.meta;
+    auditAdmins.value = data.admins;
+  } catch {
+    toast.error("The audit log couldn't be loaded.");
+  } finally {
+    loading.audit = false;
+  }
+};
+let auditTimer = null;
+watch(
+  () => ({ ...auditFilters }),
+  () => {
+    clearTimeout(auditTimer);
+    auditTimer = setTimeout(() => fetchAudit(1), 300);
+  },
+);
+const actionLabel = (l) => {
+  const base = ACTIONS[l.action] ?? l.action.replace(/Controller@/, " · ");
+  const target = l.target_id ? ` #${l.target_id}` : "";
+  return l.action === "AdminProductController@moderate" && l.details?.action ? `${base} (${l.details.action})${target}` : `${base}${target}`;
+};
+
+// ── Sign-ins ─────────────────────────────────────────────────────
+const signins = ref(null);
+const signinHours = ref(24);
+const fetchSignins = async () => {
+  try {
+    signins.value = (await api.get("/admin/security/sign-ins", { params: { hours: signinHours.value } })).data.data;
+  } catch {
+    toast.error("Sign-ins couldn't be loaded.");
+  }
+};
+watch(signinHours, fetchSignins);
+
+// ── Settings ─────────────────────────────────────────────────────
+const settings = ref(null);
+const settingsError = ref("");
+const fetchSettings = async () => {
+  try {
+    settings.value = (await api.get("/admin/security/settings")).data.data;
+  } catch {
+    toast.error("Settings couldn't be loaded.");
+  }
+};
+const saveSettings = async () => {
+  busy.value = true;
+  settingsError.value = "";
+  try {
+    const { data } = await api.put("/admin/security/settings", settings.value);
+    settings.value = data.data;
+    toast.success(data.message);
+  } catch (e) {
+    const errors = e.response?.data?.errors;
+    settingsError.value = errors ? Object.values(errors)[0]?.[0] : e.response?.data?.message || "Settings couldn't be saved.";
+  } finally {
+    busy.value = false;
+  }
+};
+
+// ── Health & errors ──────────────────────────────────────────────
+const health = ref(null);
+const apiErrors = ref(null);
+const errorHours = ref(24);
+const healthGroups = computed(() => {
+  const groups = {};
+  for (const c of health.value?.checks ?? []) (groups[c.group] ??= []).push(c);
+  return groups;
+});
+const fetchHealth = async () => {
+  try {
+    health.value = (await api.get("/admin/security/health")).data.data;
+  } catch {
+    toast.error("Health checks couldn't run.");
+  }
+};
+const fetchErrors = async () => {
+  try {
+    apiErrors.value = (await api.get("/admin/security/api-errors", { params: { hours: errorHours.value } })).data.data;
+  } catch {
+    toast.error("API errors couldn't be loaded.");
+  }
+};
+watch(errorHours, fetchErrors);
+const barHeight = (count) => {
+  const max = Math.max(1, ...Object.values(apiErrors.value?.series ?? {}));
+  return `${Math.max(6, Math.round((count / max) * 100))}%`;
+};
+
+// ── Dialogs ──────────────────────────────────────────────────────
+const dialog = reactive({ type: null, target: null, error: "" });
+const form = reactive({});
+const showPassword = ref(false);
+const openDialog = (type, target, values) => {
+  Object.keys(form).forEach((k) => delete form[k]);
+  Object.assign(form, values);
+  Object.assign(dialog, { type, target, error: "" });
+  showPassword.value = false;
+};
+const openAdminDialog = () =>
+  openDialog("admin", null, { name: "", surname: "", username: "", email: "", password: "", admin_role_id: roles.value.find((r) => !r.is_system)?.id ?? roles.value[0]?.id });
+const openPasswordDialog = (admin) => openDialog("password", admin, { password: "" });
+const openRoleDialog = (role = null) =>
+  openDialog("role", role, { name: role?.name ?? "", description: role?.description ?? "", permissions: [...(role?.permissions ?? ["dashboard.view"])] });
+const closeDialog = () => {
+  if (!busy.value) dialog.type = null;
+};
+const generatePassword = () => {
+  const sets = ["ABCDEFGHJKLMNPQRSTUVWXYZ", "abcdefghijkmnopqrstuvwxyz", "23456789", "!@#$%*?"];
+  const pick = (chars) => chars[crypto.getRandomValues(new Uint32Array(1))[0] % chars.length];
+  const chars = [...sets.map(pick), ...Array.from({ length: 10 }, () => pick(sets.join("")))];
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  form.password = chars.join("");
+  showPassword.value = true;
+};
+const submitDialog = async () => {
+  busy.value = true;
+  dialog.error = "";
+  try {
+    let message;
+    if (dialog.type === "admin") {
+      ({ data: { message } } = await api.post("/admin/security/admins", form));
+      fetchAdmins();
+      fetchRoles();
+    } else if (dialog.type === "password") {
+      ({ data: { message } } = await api.post(`/admin/security/admins/${dialog.target.id}/password`, { password: form.password }));
+    } else {
+      ({ data: { message } } = dialog.target ? await api.put(`/admin/security/roles/${dialog.target.id}`, form) : await api.post("/admin/security/roles", form));
+      fetchRoles();
+      adminAccess.load(true).catch(() => {});
+    }
+    toast.success(message);
+    busy.value = false;
+    dialog.type = null;
+  } catch (e) {
+    busy.value = false;
+    const errors = e.response?.data?.errors;
+    dialog.error = errors ? Object.values(errors)[0]?.[0] : e.response?.data?.message || "It couldn't be saved.";
+  }
+};
+
+// ── Tabs ─────────────────────────────────────────────────────────
+const loadTab = (key) => {
+  if (key === "admins") {
+    fetchAdmins();
+    if (!roles.value.length) fetchRoles();
+  }
+  if (key === "roles") fetchRoles();
+  if (key === "audit") fetchAudit(1);
+  if (key === "signins") fetchSignins();
+  if (key === "settings") fetchSettings();
+  if (key === "health") {
+    fetchHealth();
+    fetchErrors();
+  }
+};
+const setTab = (key) => {
+  tab.value = key;
+  router.replace({ query: { ...route.query, tab: key } });
+  loadTab(key);
+};
+
+// ── Formatting ───────────────────────────────────────────────────
+const initials = (name) => (name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+const formatDateTime = (v) =>
+  v ? new Date(v).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
+const timeAgo = (v) => {
+  const minutes = Math.floor((Date.now() - new Date(v)) / 60_000);
+  if (minutes < 60) return minutes < 1 ? "just now" : `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+};
+
+onMounted(async () => {
+  await adminAccess.load().catch(() => {});
+  loadTab(tab.value);
+});
+</script>
+
+<style scoped>
+* {
+  font-family: "Poppins", "Segoe UI", sans-serif;
+  box-sizing: border-box;
+}
+.admin-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f8fafc;
+}
+.main-content {
+  margin-left: 240px;
+  flex: 1;
+  min-width: 0;
+  min-height: 100vh;
+}
+.page-body {
+  padding: 18px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.content-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 20px 28px;
+  background: #fff;
+  border-bottom: 1px solid #e9edf3;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.mobile-toggle {
+  display: none;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px;
+}
+.page-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #1e2739;
+  margin: 0;
+  line-height: 1.2;
+}
+.page-subtitle {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 2px 0 0;
+}
+.readonly-chip {
+  font-size: 12px;
+  padding: 6px 11px;
+  border-radius: 20px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* Buttons */
+.ghost-btn,
+.primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ghost-btn {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+}
+.primary-btn {
+  border: none;
+  background: #7c6ff7;
+  color: #fff;
+}
+.primary-btn:hover:not(:disabled) {
+  background: #5b4fc9;
+}
+.primary-btn:disabled,
+.ghost-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.mini-btn {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 11px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mini-btn:hover:not(:disabled) {
+  border-color: #c7c2fb;
+  color: #5b4fc9;
+}
+.mini-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.mini-btn.danger { color: #b91c1c; }
+.mini-btn.ok { color: #15803d; }
+.link-btn {
+  display: inline-block;
+  margin-top: 10px;
+  color: #6d5ff0;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+/* Skeleton */
+.sk {
+  display: block;
+  border-radius: 10px;
+  background: linear-gradient(100deg, #eef1f6 30%, #f8fafc 50%, #eef1f6 70%);
+  background-size: 300% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+.sk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sk-row {
+  height: 52px;
+}
+.sk-row.tall {
+  height: 120px;
+}
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid #e9edf3;
+  background: #fff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tab.active {
+  background: #ede9fe;
+  border-color: #c7c2fb;
+  color: #4c3fd0;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.dot.warn { background: #f59e0b; }
+.dot.fail { background: #dc2626; }
+
+/* Panels */
+.panel {
+  background: #fff;
+  border: 1px solid #e9edf3;
+  border-radius: 14px;
+  padding: 18px 20px;
+  min-width: 0;
+}
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e2739;
+  margin: 0 0 4px;
+}
+.panel-title.spaced {
+  margin-top: 18px;
+}
+.panel-sub {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0;
+  max-width: 720px;
+}
+.split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.split.tight {
+  margin-top: 16px;
+}
+.empty {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+  padding: 24px 0;
+  margin: 0;
+}
+.empty.small {
+  padding: 10px 0;
+  text-align: left;
+}
+.calm {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 13px;
+  font-weight: 500;
+}
+.strong {
+  font-weight: 600;
+  color: #1e2739;
+  font-size: 13px;
+}
+.sub {
+  display: block;
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+.muted {
+  color: #64748b;
+}
+.mono {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+.pill {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: #f1f5f9;
+  color: #475569;
+}
+.pill.ok { background: #dcfce7; color: #15803d; }
+.pill.bad { background: #fee2e2; color: #b91c1c; }
+.pill.warn { background: #fef3c7; color: #b45309; }
+.pill.super { background: #ede9fe; color: #5b4fc9; }
+.you {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #e0f2fe;
+  color: #0369a1;
+  margin-left: 4px;
+}
+
+/* Tables */
+.table-scroll {
+  overflow-x: auto;
+  margin: 0 -6px;
+}
+.table-scroll.dim {
+  opacity: 0.55;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 9px 10px;
+  background: #f8fafc;
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+  color: #1e2739;
+}
+.data-table tr.off td {
+  opacity: 0.6;
+}
+.num {
+  text-align: right !important;
+}
+.right {
+  text-align: right;
+}
+.person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c6ff7, #5b4fc9);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.row-actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f5f3ff;
+  color: #5b4fc9;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.input {
+  padding: 8px 11px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  font-size: 12.5px;
+  color: #1e2739;
+  background: #fff;
+}
+.input.small {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.input:focus {
+  outline: none;
+  border-color: #7c6ff7;
+  box-shadow: 0 0 0 3px rgba(124, 111, 247, 0.12);
+}
+.toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.grow {
+  flex: 1 1 220px;
+}
+.pager {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* Roles */
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+.role-card.system {
+  border-color: #c7c2fb;
+  background: linear-gradient(160deg, #faf9ff, #fff 60%);
+}
+.role-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.role-head h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  color: #1e2739;
+}
+.count {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+}
+.perm-groups,
+.perm-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.perm-editor {
+  max-height: 52vh;
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+.perm-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.group-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+}
+.perm {
+  font-size: 12.5px;
+  color: #cbd5e1;
+}
+.perm.on {
+  color: #1e2739;
+}
+.perm-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: #334155;
+  cursor: pointer;
+}
+.perm-check input {
+  accent-color: #7c6ff7;
+}
+.role-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+/* Sign-ins */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #e9edf3;
+  background: #fff;
+}
+.stat.hot {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+.stat-label {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e2739;
+}
+.reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #475569;
+}
+.mini-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mini-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.mini-list li.warn .strong {
+  color: #b91c1c;
+}
+.mini-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin: 0;
+}
+
+/* Settings */
+.settings fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.set-group {
+  margin: 14px 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+}
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid #eef1f6;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.toggle-row.alarm {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+.toggle-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.switch {
+  appearance: none;
+  width: 40px;
+  height: 22px;
+  border-radius: 22px;
+  background: #cbd5e1;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+.switch:checked {
+  background: #16a34a;
+}
+.switch.danger:checked {
+  background: #dc2626;
+}
+.switch:checked::after {
+  transform: translateX(18px);
+}
+.switch:focus-visible {
+  outline: 2px solid #7c6ff7;
+  outline-offset: 2px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+}
+.field.narrow {
+  max-width: 420px;
+}
+.two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.form-error {
+  color: #b91c1c;
+  font-size: 12.5px;
+  margin: 10px 0 0;
+}
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* Health */
+.health-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border-radius: 14px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+.health-banner strong {
+  font-size: 15px;
+}
+.health-banner .sub {
+  flex: 1;
+  display: inline;
+}
+.health-banner.warn { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+.health-banner.fail { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+.checks {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.checks li {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  column-gap: 10px;
+  align-items: center;
+}
+.checks li .sub {
+  grid-column: 2;
+}
+.check-dot {
+  grid-row: span 2;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+.check-dot.ok { background: #16a34a; }
+.check-dot.warn { background: #f59e0b; }
+.check-dot.fail { background: #dc2626; }
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 90px;
+  padding: 6px 0;
+  border-bottom: 1px solid #eef1f6;
+}
+.bar-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+.bar {
+  display: block;
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: #f87171;
+}
+
+/* Dialog */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(2px);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.dialog {
+  width: min(520px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dialog.wide {
+  width: min(640px, 100%);
+}
+.dialog h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e2739;
+}
+.dialog .input {
+  width: 100%;
+}
+.pw-row {
+  display: flex;
+  gap: 6px;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+@media (max-width: 1280px) {
+  .main-content {
+    margin-left: 200px;
+  }
+}
+@media (max-width: 1100px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 968px) {
+  .main-content {
+    margin-left: 0;
+  }
+  .mobile-toggle {
+    display: flex;
+  }
+}
+@media (max-width: 640px) {
+  .content-header {
+    padding: 16px;
+  }
+  .page-body {
+    padding: 14px 16px 32px;
+  }
+  .two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk {
+    animation: none;
+  }
+}
+</style>

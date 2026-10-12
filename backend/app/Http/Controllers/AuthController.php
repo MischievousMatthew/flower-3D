@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Models\TwoFactorLoginChallenge;
 use App\Services\LoginAuditService;
 use App\Services\AccountSuspensionService;
+use App\Services\LoginGuard;
+use App\Support\PlatformSettings;
 use App\Services\EmailOtpService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -55,6 +57,10 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
+        if (!PlatformSettings::get('registrations_open')) {
+            return response()->json(['success' => false, 'message' => 'New customer sign-ups are paused right now. Please try again later.'], 403);
+        }
+
         $request->validate([
             'name'                  => 'required|string|max:255',
             'surname'               => 'required|string|max:255',
@@ -112,6 +118,13 @@ class AuthController extends Controller
                 'login_context' => 'nullable|array',
             ]);
 
+            $guard = app(LoginGuard::class);
+            $identifier = LoginGuard::identifier($request->username);
+            if ($minutes = $guard->lockedFor($identifier)) {
+                $guard->recordFailure($request, $identifier, 'locked');
+                throw ValidationException::withMessages(['username' => LoginGuard::lockedMessage($minutes)]);
+            }
+
             // Find user by username or email
             $user = User::where('username', $request->username)
                         ->orWhere('email', $request->username)
@@ -126,6 +139,7 @@ class AuthController extends Controller
 
             if (!$user) {
                 Log::warning('User not found: ' . $request->username);
+                $guard->recordFailure($request, $identifier, 'unknown_account');
                 throw ValidationException::withMessages([
                     'username' => 'The provided credentials are incorrect.',
                 ]);
@@ -134,6 +148,7 @@ class AuthController extends Controller
             // Check password
             if (!Hash::check($request->password, $user->password)) {
                 Log::warning('Password mismatch for user: ' . $user->username);
+                $guard->recordFailure($request, $identifier, 'wrong_password', $user->id);
                 throw ValidationException::withMessages([
                     'username' => 'The provided credentials are incorrect.',
                 ]);
@@ -141,12 +156,14 @@ class AuthController extends Controller
 
             if (!$user->is_verified) {
                 Log::warning('Unverified user attempted login: ' . $user->username);
+                $guard->recordFailure($request, $identifier, 'unverified', $user->id);
                 throw ValidationException::withMessages([
                     'username' => 'Your account is not verified.',
                 ]);
             }
 
             if (AccountSuspensionService::isBlocked($user)) {
+                $guard->recordFailure($request, $identifier, 'suspended', $user->id);
                 throw ValidationException::withMessages([
                     'username' => AccountSuspensionService::messageFor($user),
                 ]);
@@ -593,18 +610,26 @@ class AuthController extends Controller
     public function vendorLogin(Request $request)
     {
         try {
-            Log::info('=== VENDOR LOGIN REQUEST ===', $request->all());
+            Log::info('=== VENDOR LOGIN REQUEST ===', ['username' => $request->username]);
             
             $request->validate([
                 'username' => 'required|string',
                 'password' => 'required|string',
             ]);
 
+            $guard = app(LoginGuard::class);
+            $identifier = LoginGuard::identifier($request->username);
+            if ($minutes = $guard->lockedFor($identifier)) {
+                $guard->recordFailure($request, $identifier, 'locked');
+                throw ValidationException::withMessages(['username' => LoginGuard::lockedMessage($minutes)]);
+            }
+
             $user = User::where('username', $request->username)
                         ->orWhere('email', $request->username)
                         ->first();
 
             if (!$user || !Hash::check($request->password, $user->password)) {
+                $guard->recordFailure($request, $identifier, $user ? 'wrong_password' : 'unknown_account', $user?->id);
                 throw ValidationException::withMessages([
                     'username' => 'Invalid vendor credentials.',
                 ]);

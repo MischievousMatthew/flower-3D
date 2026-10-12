@@ -227,7 +227,7 @@ class AdminDashboardController extends Controller
             $insights[] = [
                 'tone' => $stale ? 'warn' : 'info',
                 'title' => "{$k['pending_orders']} orders waiting on vendors",
-                'detail' => $stale ? "{$stale} of them have been pending for more than 3 days." : 'None has been waiting more than 3 days.',
+                'detail' => $stale ? "{$stale} of them have been pending for more than " . \App\Support\PlatformSettings::get('stale_pending_days') . " days." : 'None of them looks stuck.',
             ];
         }
         if ($k['trialing_subscriptions'] > 0) {

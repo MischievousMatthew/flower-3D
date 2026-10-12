@@ -34,7 +34,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'subscription.module' => \App\Http\Middleware\EnsureSubscriptionModuleAccess::class,
             'resource.limit'    => \App\Http\Middleware\EnsureResourceLimit::class,
             'token.auth'        => \App\Http\Middleware\TokenAuth::class,
+            'admin.can'         => \App\Http\Middleware\EnsureAdminPermission::class,
+            'admin.audit'       => \App\Http\Middleware\AuditAdminAction::class,
         ]);
+
+        // Keep a record of server errors the API returns (Security → API errors)
+        $middleware->api(append: [\App\Http\Middleware\LogApiErrors::class]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

@@ -378,7 +378,7 @@ class AdminSupportController extends Controller
         $unanswered = SupportTicket::where('status', 'open')->where('last_activity_at', '<', now()->subDay())->count();
         $add('unanswered_tickets', 'warning', 'Requests waiting over a day', 'Open support requests with no reply in 24 hours.', $unanswered, ['path' => '/admin/support', 'query' => ['tab' => 'inbox']]);
 
-        $add('stale_orders', 'warning', 'Orders stuck in pending', 'Pending for more than 3 days.', (int) ($issues['stale_pending']['count'] ?? 0), ['path' => '/admin/orders', 'query' => ['tab' => 'issues']]);
+        $add('stale_orders', 'warning', 'Orders stuck in pending', 'Pending for more than ' . \App\Support\PlatformSettings::get('stale_pending_days') . ' days.', (int) ($issues['stale_pending']['count'] ?? 0), ['path' => '/admin/orders', 'query' => ['tab' => 'issues']]);
         $add('disputes', 'warning', 'Open return & refund requests', 'Waiting on the vendor to decide.', OrderRequest::where('status', 'pending')->count(), ['path' => '/admin/orders', 'query' => ['tab' => 'disputes']]);
         $add('reports', 'warning', 'Product reports to review', 'Customers flagged listings.', ProductReport::where('status', 'pending')->count(), ['path' => '/admin/reports']);
 

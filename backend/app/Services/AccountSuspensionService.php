@@ -80,7 +80,8 @@ class AccountSuspensionService
     public static function isBlocked($account): bool
     {
         if ($account instanceof User) {
-            return in_array($account->role, self::SUSPENDABLE, true) && (bool) $account->is_suspended;
+            // Admins turned off in Security → Administrators are blocked too
+            return in_array($account->role, [...self::SUSPENDABLE, User::ROLE_ADMIN], true) && (bool) $account->is_suspended;
         }
         if ($account instanceof Employee && $account->owner_id) {
             return (bool) User::query()->whereKey($account->owner_id)->value('is_suspended');
@@ -91,6 +92,10 @@ class AccountSuspensionService
 
     public static function messageFor($account): string
     {
+        if ($account instanceof User && $account->role === User::ROLE_ADMIN) {
+            return 'Your admin access has been turned off. Contact a super admin.';
+        }
+
         return $account instanceof User && $account->role === User::ROLE_CUSTOMER
             ? self::CUSTOMER_MESSAGE
             : self::VENDOR_MESSAGE;

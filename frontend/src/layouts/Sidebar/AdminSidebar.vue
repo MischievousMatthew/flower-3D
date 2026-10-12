@@ -30,6 +30,7 @@
       <p class="menu-label">MENU</p>
       <nav class="nav-menu">
         <router-link
+          v-if="canSee('/admin/dashboard')"
           to="/admin/dashboard"
           class="nav-item"
           active-class="active"
@@ -39,6 +40,7 @@
         </router-link>
 
         <router-link
+          v-if="canSee('/admin/subscription-revenue')"
           to="/admin/subscription-revenue"
           class="nav-item"
           active-class="active"
@@ -48,6 +50,7 @@
         </router-link>
 
         <router-link
+          v-if="canSee('/admin/orders')"
           to="/admin/orders"
           class="nav-item"
           active-class="active"
@@ -57,6 +60,7 @@
         </router-link>
 
         <router-link
+          v-if="canSee('/admin/finance')"
           to="/admin/finance"
           class="nav-item"
           active-class="active"
@@ -66,6 +70,7 @@
         </router-link>
 
         <router-link
+          v-if="canSee('/admin/vendor-requests')"
           to="/admin/vendor-requests"
           class="nav-item"
           active-class="active"
@@ -82,6 +87,7 @@
         </router-link>
 
         <router-link
+          v-if="canSee('/admin/customers')"
           to="/admin/customers"
           class="nav-item"
           active-class="active"
@@ -91,6 +97,7 @@
         </router-link>
 
         <router-link
+          v-if="canSee('/admin/product-approval')"
           to="/admin/product-approval"
           class="nav-item"
           active-class="active"
@@ -100,6 +107,7 @@
         </router-link>
 
         <router-link
+          v-if="canSee('/admin/reports')"
           to="/admin/reports"
           class="nav-item"
           active-class="active"
@@ -119,6 +127,7 @@
         </router-link>
 
         <router-link
+          v-if="canSee('/admin/support')"
           to="/admin/support"
           class="nav-item"
           active-class="active"
@@ -128,6 +137,7 @@
         </router-link>
 
         <router-link
+          v-if="canSee('/admin/website')"
           to="/admin/website"
           class="nav-item"
           active-class="active"
@@ -137,6 +147,17 @@
         </router-link>
 
         <router-link
+          v-if="canSee('/admin/security')"
+          to="/admin/security"
+          class="nav-item"
+          active-class="active"
+        >
+          <span class="nav-icon">🔐</span>
+          <span>Security</span>
+        </router-link>
+
+        <router-link
+          v-if="canSee('/admin/login-logs')"
           to="/admin/login-logs"
           class="nav-item"
           active-class="active"
@@ -162,10 +183,19 @@ import { ref, onMounted, onUnmounted, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import { useSidebarState } from "../../composables/useSidebarState";
+import { useAdminAccess } from "../../composables/useAdminAccess";
 import api from "../../plugins/axios";
 import LoadingOverlay from "../components/LoadingOverlay.vue";
 
 const { logout } = useAuth();
+const adminAccess = useAdminAccess();
+// Until permissions load, show nothing rather than links that would be refused
+const canSee = (path) => {
+  if (!adminAccess.access.loaded) return false;
+  const permission = adminAccess.permissionForPath(path);
+  return !permission || adminAccess.can(permission);
+};
+adminAccess.load().catch(() => {});
 const route = useRoute();
 const { isMobileOpen, closeMobile } = useSidebarState();
 const isLoading = ref(false);

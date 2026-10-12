@@ -25,6 +25,10 @@ class CheckoutController extends Controller
      */
     public function initializeCheckout(Request $request)
     {
+        if ($paused = $this->checkoutPaused()) {
+            return $paused;
+        }
+
         try {
             $user = $request->user();
 
@@ -250,8 +254,20 @@ class CheckoutController extends Controller
     /**
      * Create order with reservation date using vendor-specific reservation rules.
      */
+    /** Security → Platform settings can pause all new orders */
+    private function checkoutPaused(): ?\Illuminate\Http\JsonResponse
+    {
+        return \App\Support\PlatformSettings::get('checkout_paused')
+            ? response()->json(['success' => false, 'message' => \App\Support\PlatformSettings::get('checkout_pause_message')], 503)
+            : null;
+    }
+
     public function createOrder(Request $request)
     {
+        if ($paused = $this->checkoutPaused()) {
+            return $paused;
+        }
+
         try {
             $user = Auth::user();
 

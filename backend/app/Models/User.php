@@ -109,6 +109,17 @@ class User extends Authenticatable
         return $this->hasMany(SharedFile::class, 'uploaded_by');
     }
 
+    public function adminRole(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(AdminRole::class, 'admin_role_id');
+    }
+
+    /** Whether this admin may do something (see AdminRole::PERMISSIONS) */
+    public function adminCan(string $permission): bool
+    {
+        return $this->role === self::ROLE_ADMIN && (bool) $this->adminRole?->grants($permission);
+    }
+
     public function vendor(): HasOne
     {
         return $this->hasOne(VendorApplication::class, 'email', 'email');

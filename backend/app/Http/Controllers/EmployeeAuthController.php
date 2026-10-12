@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Constants\ErpModule;
 use App\Services\LoginAuditService;
 use App\Services\AccountSuspensionService;
+use App\Services\LoginGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -30,12 +31,20 @@ class EmployeeAuthController extends Controller
                 'login_context' => 'nullable|array',
             ]);
 
+            $guard = app(LoginGuard::class);
+            $identifier = LoginGuard::identifier($request->username);
+            if ($minutes = $guard->lockedFor($identifier)) {
+                $guard->recordFailure($request, $identifier, 'locked', null, 'employee');
+                return response()->json(['success' => false, 'message' => LoginGuard::lockedMessage($minutes)], 429);
+            }
+
             $employee = Employee::where('username', $request->username)
                 ->orWhere('email', $request->username)
                 ->where('status', 'Active')
                 ->first();
 
             if (!$employee || !Hash::check($request->password, $employee->password)) {
+                $guard->recordFailure($request, $identifier, $employee ? 'wrong_password' : 'unknown_account', null, 'employee');
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid credentials or account inactive',

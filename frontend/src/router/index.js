@@ -7,6 +7,9 @@ import {
   getPreferredUserType,
 } from "../utils/authSession";
 import { opaquePathFor, opaqueRouteTokens } from "./opaqueRoutes";
+import { useAdminAccess } from "../composables/useAdminAccess";
+
+const adminAccess = useAdminAccess();
 import { loadSubscriptionAccess, subscriptionAllowsModule } from "../composables/useSubscriptionAccess";
 import { SUBSCRIPTION_MODULES as MODULE } from "../constants/subscriptionModules";
 
@@ -649,6 +652,11 @@ const routes = [
         component: () => import("../views/admin/Support.vue"),
       },
       {
+        path: "security",
+        name: "AdminSecurity",
+        component: () => import("../views/admin/Security.vue"),
+      },
+      {
         path: "vendor-requests",
         name: "VendorRequest",
         component: () => import("../views/admin/VendorRequest.vue"),
@@ -974,6 +982,22 @@ router.beforeEach(async (to, from, next) => {
     }
     if (role === "customer") return next("/shop");
     return next("/guest/login");
+  }
+
+  // Admin pages also need a permission from the admin's role
+  if (to.meta.requiresAdmin && role === "admin") {
+    const required = adminAccess.permissionForPath(canonicalPath);
+    if (required) {
+      try {
+        await adminAccess.load();
+      } catch {
+        return next();
+      }
+      if (!adminAccess.can(required)) {
+        const fallback = adminAccess.firstAllowedPath();
+        return fallback && fallback !== canonicalPath ? next(fallback) : next("/guest/login");
+      }
+    }
   }
 
   if (to.meta.requiresVendor && role !== "vendor") {

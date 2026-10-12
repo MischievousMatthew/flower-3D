@@ -9,6 +9,7 @@ use App\Models\OrderRequest;
 use App\Models\User;
 use App\Models\VendorTransaction;
 use App\Support\PaymentMask;
+use App\Support\PlatformSettings;
 use App\Support\VendorDirectory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -34,7 +35,6 @@ class AdminOrderController extends Controller
         'refunded' => ['refunded', 'returned'],
     ];
 
-    private const STALE_PENDING_DAYS = 3;
     private const STALE_PROCESSING_DAYS = 7;
 
     /**
@@ -282,7 +282,8 @@ class AdminOrderController extends Controller
      */
     private function issueRules(): array
     {
-        $stalePending = now()->subDays(self::STALE_PENDING_DAYS);
+        $stalePendingDays = (int) PlatformSettings::get('stale_pending_days');
+        $stalePending = now()->subDays($stalePendingDays);
         $staleProcessing = now()->subDays(self::STALE_PROCESSING_DAYS);
 
         return [
@@ -311,7 +312,7 @@ class AdminOrderController extends Controller
                 'check' => fn (Order $o) => in_array($o->status, ['cancelled', 'failed'], true) && $o->stock_deducted_at && !$o->stock_restored_at,
             ],
             'stale_pending' => [
-                'label' => 'Pending for more than ' . self::STALE_PENDING_DAYS . ' days',
+                'label' => "Pending for more than {$stalePendingDays} days",
                 'severity' => 'low',
                 'query' => fn (Builder $q) => $q->where('status', 'pending')->where('created_at', '<', $stalePending),
                 'check' => fn (Order $o) => $o->status === 'pending' && $o->created_at?->lt($stalePending),

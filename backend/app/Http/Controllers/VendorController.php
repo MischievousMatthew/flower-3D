@@ -14,10 +14,15 @@ class VendorController extends Controller
 {
     public function register(Request $request)
     {
-        \Log::info('Vendor Registration - Request Data:', [
-            'all_data'       => $request->except(['government_id', 'selfie_with_id', 'proof_of_address', 'portfolio_photos']),
+        // Never log the application itself: it holds ID and bank account numbers
+        \Log::info('Vendor Registration received', [
+            'store_name'     => $request->input('store_name'),
             'files_received' => array_keys($request->allFiles()),
         ]);
+
+        if (!\App\Support\PlatformSettings::get('vendor_applications_open')) {
+            return response()->json(['success' => false, 'message' => 'Vendor applications are closed right now. Please check back soon.'], 403);
+        }
 
         $validator = Validator::make($request->all(), [
             'store_name'                => 'required|string|max:255',

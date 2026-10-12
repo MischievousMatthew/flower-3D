@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\AdminCustomerController;
 use App\Http\Controllers\Admin\AdminContentController;
 use App\Http\Controllers\SiteContentController;
 use App\Http\Controllers\Admin\AdminSupportController;
+use App\Http\Controllers\Admin\SecurityController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\ProductTaxonomyController;
@@ -711,48 +712,62 @@ Route::middleware('token.auth')->group(function () {
         Route::post('funding-requests/{id}/reject', [AccountingFundingRequestController::class, 'reject'])->middleware('employee.module:funding_requests,reject');
     });
 
-    Route::prefix('admin')->group(function () {
-        Route::get('/login-logs', [LoginAuditLogController::class, 'index']);
+    // ── Admin panel ───────────────────────────────────────────────────────
+    // Every route needs a permission from the admin's role (AdminRole::PERMISSIONS)
+    // and every change is written to the audit log.
+    Route::middleware(['role:admin', 'admin.audit'])->prefix('admin')->group(function () {
+        Route::get('/security/me', [SecurityController::class, 'me']);
 
-        Route::middleware('role:admin')->prefix('subscriptions')->group(function () {
+        Route::get('/login-logs', [LoginAuditLogController::class, 'index'])->middleware('admin.can:security.view');
+        Route::get('/dashboard', [AdminDashboardController::class, 'overview'])->middleware('admin.can:dashboard.view');
+
+        Route::middleware('admin.can:revenue.view')->prefix('subscriptions')->group(function () {
             Route::get('/revenue', [SubscriptionRevenueController::class, 'overview']);
             Route::get('/transactions', [SubscriptionRevenueController::class, 'transactions']);
-            Route::get('/transactions/export', [SubscriptionRevenueController::class, 'export']);
+            Route::get('/transactions/export', [SubscriptionRevenueController::class, 'export'])->middleware('admin.can:finance.export');
             Route::get('/subscribers', [SubscriptionRevenueController::class, 'subscribers']);
         });
 
-        Route::middleware('role:admin')->get('/dashboard', [AdminDashboardController::class, 'overview']);
-
         // Read-only oversight of vendor orders (plus private admin notes)
-        Route::middleware('role:admin')->prefix('orders')->group(function () {
-            Route::get('/summary', [AdminOrderController::class, 'summary']);
-            Route::get('/', [AdminOrderController::class, 'index']);
-            Route::get('/{id}', [AdminOrderController::class, 'show'])->whereNumber('id');
-            Route::post('/{id}/notes', [AdminOrderController::class, 'addNote'])->whereNumber('id');
+        Route::prefix('orders')->group(function () {
+            Route::middleware('admin.can:orders.view')->group(function () {
+                Route::get('/summary', [AdminOrderController::class, 'summary']);
+                Route::get('/', [AdminOrderController::class, 'index']);
+                Route::get('/{id}', [AdminOrderController::class, 'show'])->whereNumber('id');
+            });
+            Route::post('/{id}/notes', [AdminOrderController::class, 'addNote'])->whereNumber('id')->middleware('admin.can:orders.notes');
         });
 
         // Approved vendors: performance, products, orders, subscription, suspension
-        Route::middleware('role:admin')->prefix('vendors')->group(function () {
-            Route::get('/summary', [AdminVendorController::class, 'summary']);
-            Route::get('/', [AdminVendorController::class, 'index']);
-            Route::get('/{id}', [AdminVendorController::class, 'show'])->whereNumber('id');
-            Route::post('/{id}/suspend', [AdminVendorController::class, 'suspend'])->whereNumber('id');
-            Route::post('/{id}/reactivate', [AdminVendorController::class, 'reactivate'])->whereNumber('id');
+        Route::prefix('vendors')->group(function () {
+            Route::middleware('admin.can:vendors.view')->group(function () {
+                Route::get('/summary', [AdminVendorController::class, 'summary']);
+                Route::get('/', [AdminVendorController::class, 'index']);
+                Route::get('/{id}', [AdminVendorController::class, 'show'])->whereNumber('id');
+            });
+            Route::middleware('admin.can:vendors.manage')->group(function () {
+                Route::post('/{id}/suspend', [AdminVendorController::class, 'suspend'])->whereNumber('id');
+                Route::post('/{id}/reactivate', [AdminVendorController::class, 'reactivate'])->whereNumber('id');
+            });
         });
 
         // Customer accounts: personal details masked unless revealed (and logged)
-        Route::middleware('role:admin')->prefix('customers')->group(function () {
-            Route::get('/summary', [AdminCustomerController::class, 'summary']);
-            Route::get('/complaints', [AdminCustomerController::class, 'complaintFeed']);
-            Route::get('/', [AdminCustomerController::class, 'index']);
-            Route::get('/{id}', [AdminCustomerController::class, 'show'])->whereNumber('id');
-            Route::post('/{id}/reveal', [AdminCustomerController::class, 'reveal'])->whereNumber('id');
-            Route::post('/{id}/suspend', [AdminCustomerController::class, 'suspend'])->whereNumber('id');
-            Route::post('/{id}/reactivate', [AdminCustomerController::class, 'reactivate'])->whereNumber('id');
+        Route::prefix('customers')->group(function () {
+            Route::get('/complaints', [AdminCustomerController::class, 'complaintFeed'])->middleware('admin.can:customers.view|support.view');
+            Route::middleware('admin.can:customers.view')->group(function () {
+                Route::get('/summary', [AdminCustomerController::class, 'summary']);
+                Route::get('/', [AdminCustomerController::class, 'index']);
+                Route::get('/{id}', [AdminCustomerController::class, 'show'])->whereNumber('id');
+            });
+            Route::post('/{id}/reveal', [AdminCustomerController::class, 'reveal'])->whereNumber('id')->middleware('admin.can:customers.reveal');
+            Route::middleware('admin.can:customers.manage')->group(function () {
+                Route::post('/{id}/suspend', [AdminCustomerController::class, 'suspend'])->whereNumber('id');
+                Route::post('/{id}/reactivate', [AdminCustomerController::class, 'reactivate'])->whereNumber('id');
+            });
         });
 
         // Website content: banners, featured products, journal, announcements, site info
-        Route::middleware('role:admin')->prefix('content')->group(function () {
+        Route::middleware('admin.can:content.manage')->prefix('content')->group(function () {
             Route::get('/overview', [AdminContentController::class, 'overview']);
             Route::get('/link-options', [AdminContentController::class, 'linkOptions']);
 
@@ -786,27 +801,58 @@ Route::middleware('token.auth')->group(function () {
         });
 
         // Notifications & support: inbox, announcements, alerts, activity
-        Route::middleware('role:admin')->group(function () {
+        Route::middleware('admin.can:support.view')->group(function () {
             Route::get('/support/summary', [AdminSupportController::class, 'summary']);
             Route::get('/support/tickets', [AdminSupportController::class, 'tickets']);
             Route::get('/support/tickets/{id}', [AdminSupportController::class, 'ticket'])->whereNumber('id');
-            Route::post('/support/tickets/{id}/reply', [AdminSupportController::class, 'reply'])->whereNumber('id');
-            Route::post('/support/tickets/{id}/status', [AdminSupportController::class, 'setStatus'])->whereNumber('id');
             Route::get('/support/alerts', [AdminSupportController::class, 'alerts']);
             Route::get('/support/events', [AdminSupportController::class, 'events']);
             Route::get('/broadcasts', [AdminSupportController::class, 'broadcasts']);
+        });
+        Route::middleware('admin.can:support.reply')->group(function () {
+            Route::post('/support/tickets/{id}/reply', [AdminSupportController::class, 'reply'])->whereNumber('id');
+            Route::post('/support/tickets/{id}/status', [AdminSupportController::class, 'setStatus'])->whereNumber('id');
+        });
+        Route::middleware('admin.can:support.broadcast')->group(function () {
             Route::post('/broadcasts', [AdminSupportController::class, 'sendBroadcast']);
             Route::delete('/broadcasts/{id}', [AdminSupportController::class, 'retractBroadcast'])->whereNumber('id');
         });
 
         // Read-only finance: payments, refunds, earnings and exports
-        Route::middleware('role:admin')->prefix('finance')->group(function () {
-            Route::get('/overview', [AdminFinanceController::class, 'overview']);
-            Route::get('/transactions', [AdminFinanceController::class, 'transactions']);
-            Route::get('/transactions/export', [AdminFinanceController::class, 'exportTransactions']);
-            Route::get('/vendors', [AdminFinanceController::class, 'vendors']);
-            Route::get('/refunds', [AdminFinanceController::class, 'refunds']);
-            Route::get('/report/export', [AdminFinanceController::class, 'exportReport']);
+        Route::prefix('finance')->group(function () {
+            Route::middleware('admin.can:finance.view')->group(function () {
+                Route::get('/overview', [AdminFinanceController::class, 'overview']);
+                Route::get('/transactions', [AdminFinanceController::class, 'transactions']);
+                Route::get('/vendors', [AdminFinanceController::class, 'vendors']);
+                Route::get('/refunds', [AdminFinanceController::class, 'refunds']);
+            });
+            Route::middleware('admin.can:finance.export')->group(function () {
+                Route::get('/transactions/export', [AdminFinanceController::class, 'exportTransactions']);
+                Route::get('/report/export', [AdminFinanceController::class, 'exportReport']);
+            });
+        });
+
+        // Security & system settings
+        Route::prefix('security')->group(function () {
+            Route::middleware('admin.can:security.view')->group(function () {
+                Route::get('/admins', [SecurityController::class, 'admins']);
+                Route::get('/roles', [SecurityController::class, 'roles']);
+                Route::get('/audit', [SecurityController::class, 'audit']);
+                Route::get('/sign-ins', [SecurityController::class, 'signIns']);
+                Route::get('/settings', [SecurityController::class, 'settings']);
+                Route::get('/health', [SecurityController::class, 'health']);
+                Route::get('/api-errors', [SecurityController::class, 'apiErrors']);
+            });
+            Route::middleware('admin.can:security.manage')->group(function () {
+                Route::post('/admins', [SecurityController::class, 'createAdmin']);
+                Route::put('/admins/{id}', [SecurityController::class, 'updateAdmin'])->whereNumber('id');
+                Route::post('/admins/{id}/active', [SecurityController::class, 'setAdminActive'])->whereNumber('id');
+                Route::post('/admins/{id}/password', [SecurityController::class, 'resetAdminPassword'])->whereNumber('id');
+                Route::post('/roles', [SecurityController::class, 'saveRole']);
+                Route::put('/roles/{id}', [SecurityController::class, 'saveRole'])->whereNumber('id');
+                Route::delete('/roles/{id}', [SecurityController::class, 'deleteRole'])->whereNumber('id');
+                Route::put('/settings', [SecurityController::class, 'saveSettings']);
+            });
         });
     });
 
@@ -816,38 +862,48 @@ Route::middleware('token.auth')->group(function () {
 // 7. ADMIN — vendor applications, reports, products (admins only)
 // ============================================================
 
-Route::middleware(['token.auth', 'role:admin'])->prefix('admin')->group(function () {
+Route::middleware(['token.auth', 'role:admin', 'admin.audit'])->prefix('admin')->group(function () {
 
     // ── Vendor applications ───────────────────────────────────────────────
-    Route::get('/vendor-applications',             [VendorApplicationController::class, 'index']);
-    Route::get('/vendor-applications/statistics',  [VendorApplicationController::class, 'statistics']);
-    Route::put('/vendor-applications/{id}/status', [VendorApplicationController::class, 'updateStatus']);
-    Route::get('/vendor-applications/export',      [VendorApplicationController::class, 'export']);
-    Route::get('/vendor-applications/{id}',        [VendorApplicationController::class, 'show']);
-    Route::post('/vendor-applications/{id}/approve', [VendorApplicationController::class, 'approve']);
-    Route::post('/vendor-applications/{id}/reject',  [VendorApplicationController::class, 'reject']);
-    Route::get('/vendor-resubmission-fields', [VendorApplicationResubmissionController::class, 'availableFields']);
-    Route::get('/vendor-applications/{id}/resubmissions', [VendorApplicationResubmissionController::class, 'indexForApplication']);
-    Route::post('/vendor-applications/{id}/resubmission-requests', [VendorApplicationResubmissionController::class, 'requestResubmission']);
-    Route::post('/vendor-application-resubmissions/{id}/approve', [VendorApplicationResubmissionController::class, 'approveItem']);
-    Route::post('/vendor-application-resubmissions/{id}/request-again', [VendorApplicationResubmissionController::class, 'requestAgain']);
-    Route::get('/test',                            [VendorApplicationController::class, 'test']);
-    Route::get('/reports',                   [ProductReportController::class, 'index']);   // ← NEW
-    Route::post('/reports/{id}/review',      [ProductReportController::class, 'review']); // ← NEW
+    Route::middleware('admin.can:vendors.view')->group(function () {
+        Route::get('/vendor-applications',             [VendorApplicationController::class, 'index']);
+        Route::get('/vendor-applications/statistics',  [VendorApplicationController::class, 'statistics']);
+        Route::get('/vendor-applications/export',      [VendorApplicationController::class, 'export']);
+        Route::get('/vendor-applications/{id}',        [VendorApplicationController::class, 'show']);
+        Route::get('/vendor-resubmission-fields',      [VendorApplicationResubmissionController::class, 'availableFields']);
+        Route::get('/vendor-applications/{id}/resubmissions', [VendorApplicationResubmissionController::class, 'indexForApplication']);
+    });
+    Route::middleware('admin.can:vendors.manage')->group(function () {
+        Route::put('/vendor-applications/{id}/status',   [VendorApplicationController::class, 'updateStatus']);
+        Route::post('/vendor-applications/{id}/approve', [VendorApplicationController::class, 'approve']);
+        Route::post('/vendor-applications/{id}/reject',  [VendorApplicationController::class, 'reject']);
+        Route::post('/vendor-applications/{id}/resubmission-requests', [VendorApplicationResubmissionController::class, 'requestResubmission']);
+        Route::post('/vendor-application-resubmissions/{id}/approve', [VendorApplicationResubmissionController::class, 'approveItem']);
+        Route::post('/vendor-application-resubmissions/{id}/request-again', [VendorApplicationResubmissionController::class, 'requestAgain']);
+    });
+
+    // ── Product reports ───────────────────────────────────────────────────
+    Route::get('/reports',              [ProductReportController::class, 'index'])->middleware('admin.can:products.view');
+    Route::post('/reports/{id}/review', [ProductReportController::class, 'review'])->middleware('admin.can:products.moderate');
 
     // ── Listings: moderation only; vendors keep editing their own products ──
-    Route::get('/products/summary',            [AdminProductController::class, 'summary']);
-    Route::get('/products',                    [AdminProductController::class, 'index']);
-    Route::get('/products/{id}',               [AdminProductController::class, 'show'])->whereNumber('id');
-    Route::post('/products/{id}/{action}',     [AdminProductController::class, 'moderate'])
-        ->whereNumber('id')->whereIn('action', ['approve', 'hide', 'remove', 'restore']);
+    Route::middleware('admin.can:products.view')->group(function () {
+        Route::get('/products/summary',  [AdminProductController::class, 'summary']);
+        Route::get('/products',          [AdminProductController::class, 'index']);
+        Route::get('/products/{id}',     [AdminProductController::class, 'show'])->whereNumber('id');
+        Route::get('/taxonomies',        [AdminProductController::class, 'taxonomies']);
+    });
+    Route::post('/products/{id}/{action}', [AdminProductController::class, 'moderate'])
+        ->whereNumber('id')->whereIn('action', ['approve', 'hide', 'remove', 'restore'])
+        ->middleware('admin.can:products.moderate');
 
     // ── Categories, flower types, occasions ───────────────────────────────
-    Route::get('/taxonomies',                  [AdminProductController::class, 'taxonomies']);
-    Route::post('/taxonomies',                 [AdminProductController::class, 'storeTaxonomy']);
-    Route::post('/taxonomies/reorder',         [AdminProductController::class, 'reorderTaxonomies']);
-    Route::put('/taxonomies/{id}',             [AdminProductController::class, 'updateTaxonomy'])->whereNumber('id');
-    Route::delete('/taxonomies/{id}',          [AdminProductController::class, 'destroyTaxonomy'])->whereNumber('id');
+    Route::middleware('admin.can:products.taxonomy')->group(function () {
+        Route::post('/taxonomies',         [AdminProductController::class, 'storeTaxonomy']);
+        Route::post('/taxonomies/reorder', [AdminProductController::class, 'reorderTaxonomies']);
+        Route::put('/taxonomies/{id}',     [AdminProductController::class, 'updateTaxonomy'])->whereNumber('id');
+        Route::delete('/taxonomies/{id}',  [AdminProductController::class, 'destroyTaxonomy'])->whereNumber('id');
+    });
 
 }); // end admin prefix
 

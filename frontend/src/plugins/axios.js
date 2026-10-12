@@ -1,5 +1,6 @@
 // frontend/src/plugins/axios.js
 import axios from "axios";
+import { toast } from "vue3-toastify";
 import { clearStoredAuth, getPreferredAuthToken } from "../utils/authSession";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -109,6 +110,16 @@ api.interceptors.response.use(
         window.location.replace("/guest/login");
       }
       return Promise.reject(error);
+    }
+
+    // ================= ADMIN PERMISSION =================
+    // Page loads handle their own empty states; actions say why they failed.
+    if (
+      error.response?.status === 403 &&
+      error.response?.data?.code === "forbidden_permission" &&
+      (error.config?.method ?? "get").toLowerCase() !== "get"
+    ) {
+      toast.error(error.response.data.message);
     }
 
     // ================= HANDLE 401 =================
