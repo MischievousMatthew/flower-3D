@@ -305,7 +305,7 @@
               <p v-else-if="!renewals.length" class="empty-msg">Nothing due in the next 30 days</p>
               <ul v-else class="vendor-list">
                 <li v-for="row in renewals" :key="row.vendor.id + row.kind">
-                  <VendorAvatar :vendor="row.vendor" />
+                  <VendorAvatar :vendor="row.vendor" :size="34" />
                   <div class="vendor-info">
                     <span class="vendor-name">{{ row.vendor.store_name }}</span>
                     <span class="vendor-sub">
@@ -340,7 +340,7 @@
               <ul v-else class="vendor-list">
                 <li v-for="(row, index) in topVendors" :key="row.vendor_id">
                   <span class="rank">{{ index + 1 }}</span>
-                  <VendorAvatar :vendor="row.vendor" />
+                  <VendorAvatar :vendor="row.vendor" :size="34" />
                   <div class="vendor-info">
                     <span class="vendor-name">{{ row.vendor.store_name }}</span>
                     <span class="vendor-sub">{{ plural(row.payments, "payment") }} · last {{ formatDate(row.last_paid_at) }}</span>
@@ -422,7 +422,7 @@
                   <tr v-for="row in transactions" :key="row.id">
                     <td>
                       <div class="vendor-cell">
-                        <VendorAvatar :vendor="row.vendor" small />
+                        <VendorAvatar :vendor="row.vendor" />
                         <div class="vendor-info">
                           <span class="vendor-name">{{ row.vendor.store_name }}</span>
                           <span class="vendor-sub">{{ row.vendor.name }}</span>
@@ -466,7 +466,7 @@
                   <tr v-for="row in subscribers" :key="row.id">
                     <td>
                       <div class="vendor-cell">
-                        <VendorAvatar :vendor="row.vendor" small />
+                        <VendorAvatar :vendor="row.vendor" />
                         <div class="vendor-info">
                           <span class="vendor-name">{{ row.vendor.store_name }}</span>
                           <span class="vendor-sub">{{ row.vendor.email }}</span>
@@ -505,10 +505,11 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { toast } from "vue3-toastify";
 import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
+import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
 
 const { toggleMobile } = useSidebarState();
@@ -552,22 +553,6 @@ const CHECKOUT_LABELS = {
   failed: "Failed",
   cancelled: "Cancelled",
 };
-
-// ── Small vendor logo with initial fallback ─────────────────────
-const VendorAvatar = defineComponent({
-  props: { vendor: { type: Object, required: true }, small: Boolean },
-  setup(props) {
-    const broken = ref(false);
-    return () =>
-      h(
-        "span",
-        { class: ["v-avatar", { small: props.small }] },
-        props.vendor.logo_url && !broken.value
-          ? h("img", { src: props.vendor.logo_url, alt: "", onError: () => (broken.value = true) })
-          : (props.vendor.store_name || "?").charAt(0).toUpperCase(),
-      );
-  },
-});
 
 // ── Overview ─────────────────────────────────────────────────────
 const range = ref("30d");
@@ -1558,30 +1543,6 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-.v-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #7c6ff7, #5b4fc9);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 600;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-.v-avatar.small {
-  width: 30px;
-  height: 30px;
-  font-size: 12px;
-}
-.v-avatar :deep(img) {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 .vendor-info {
   display: flex;

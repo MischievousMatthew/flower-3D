@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\VendorApplicationController;
 use App\Http\Controllers\Admin\LoginAuditLogController;
 use App\Http\Controllers\Admin\SubscriptionRevenueController;
 use App\Http\Controllers\Admin\AdminOrderController;
+use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\VendorApplicationResubmissionController;
@@ -691,6 +692,16 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/', [AdminOrderController::class, 'index']);
             Route::get('/{id}', [AdminOrderController::class, 'show'])->whereNumber('id');
             Route::post('/{id}/notes', [AdminOrderController::class, 'addNote'])->whereNumber('id');
+        });
+
+        // Read-only finance: payments, refunds, earnings and exports
+        Route::middleware('role:admin')->prefix('finance')->group(function () {
+            Route::get('/overview', [AdminFinanceController::class, 'overview']);
+            Route::get('/transactions', [AdminFinanceController::class, 'transactions']);
+            Route::get('/transactions/export', [AdminFinanceController::class, 'exportTransactions']);
+            Route::get('/vendors', [AdminFinanceController::class, 'vendors']);
+            Route::get('/refunds', [AdminFinanceController::class, 'refunds']);
+            Route::get('/report/export', [AdminFinanceController::class, 'exportReport']);
         });
     });
 

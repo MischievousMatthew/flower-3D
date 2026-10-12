@@ -8,6 +8,7 @@ use App\Models\OrderAdminNote;
 use App\Models\OrderRequest;
 use App\Models\User;
 use App\Models\VendorTransaction;
+use App\Support\PaymentMask;
 use App\Support\VendorDirectory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -192,8 +193,8 @@ class AdminOrderController extends Controller
                 ],
                 'payment' => [
                     'paid_at' => $order->paid_at?->toIso8601String(),
-                    'paymongo_payment_intent_id' => $order->paymongo_payment_intent_id,
-                    'paymongo_source_id' => $order->paymongo_source_id,
+                    'paymongo_payment_intent_id' => PaymentMask::reference($order->paymongo_payment_intent_id),
+                    'paymongo_source_id' => PaymentMask::reference($order->paymongo_source_id),
                 ],
                 'customer' => $this->formatCustomer($order->user, $order) + [
                     'contact_number' => $order->user?->contact_number,

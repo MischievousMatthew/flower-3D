@@ -500,11 +500,12 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
+import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
 
 const { toggleMobile } = useSidebarState();
@@ -530,22 +531,6 @@ const ISSUE_SHORT = {
   stale_pending: "Stuck",
   stale_in_progress: "Stalled",
 };
-
-// ── Vendor logo with initial fallback ────────────────────────────
-const VendorAvatar = defineComponent({
-  props: { vendor: { type: Object, required: true } },
-  setup(props) {
-    const broken = ref(false);
-    return () =>
-      h(
-        "span",
-        { class: "v-avatar" },
-        props.vendor.logo_url && !broken.value
-          ? h("img", { src: props.vendor.logo_url, alt: "", onError: () => (broken.value = true) })
-          : (props.vendor.store_name || "?").charAt(0).toUpperCase(),
-      );
-  },
-});
 
 // ── Summary ──────────────────────────────────────────────────────
 const summary = ref(null);
@@ -1203,25 +1188,6 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 9px;
-}
-.v-avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #7c6ff7, #5b4fc9);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-.v-avatar :deep(img) {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 /* ── Pills & flags ──────────────────────────────────── */

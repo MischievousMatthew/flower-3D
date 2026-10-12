@@ -87,6 +87,7 @@ export const opaqueRouteTokens = Object.freeze({
   VendorCustomization: "9t5m2OwWYbCmDcdPs4usf2S8rhRD0zkU5UPnUms3iHE",
   AdminSubscriptionRevenue: "4qrAVSdgX6Rd2cga2cnUue4CwxUMSwm0vgdizsMnANo",
   AdminOrders: "dgvpQOjwKBWiOzhx4TjZXlD38NruAZX3assW60GD99s",
+  AdminFinance: "GuchExjqG2T-kOE3qqCjeB_NZG2OenlB3UjwoQ-Db3I",
 });
 
 export const opaquePathFor = (name, parameterPath = "") => {
