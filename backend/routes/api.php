@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\VendorApplicationController;
 use App\Http\Controllers\Admin\LoginAuditLogController;
 use App\Http\Controllers\Admin\SubscriptionRevenueController;
 use App\Http\Controllers\Admin\AdminOrderController;
+use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VendorController;
@@ -685,6 +686,8 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/transactions/export', [SubscriptionRevenueController::class, 'export']);
             Route::get('/subscribers', [SubscriptionRevenueController::class, 'subscribers']);
         });
+
+        Route::middleware('role:admin')->get('/dashboard', [AdminDashboardController::class, 'overview']);
 
         // Read-only oversight of vendor orders (plus private admin notes)
         Route::middleware('role:admin')->prefix('orders')->group(function () {

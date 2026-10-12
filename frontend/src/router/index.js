@@ -589,7 +589,7 @@ const routes = [
   {
     path: "/admin",
     meta: { requiresAuth: true, requiresAdmin: true },
-    redirect: "/admin/vendor-requests",
+    redirect: "/admin/dashboard",
     children: [
       {
         path: "dashboard",
@@ -912,7 +912,7 @@ router.beforeEach(async (to, from, next) => {
 
   // ── Non-employee routing (owner, admin, customer) ─────────────────────
   if (canonicalPath.startsWith("/erp")) {
-    if (role === "admin") return next("/admin/vendor-requests");
+    if (role === "admin") return next("/admin/dashboard");
     if (role === "vendor") return next();
     if (role === "customer") return next("/shop");
     return next("/guest/login");
@@ -940,7 +940,7 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (to.meta.requiresVendor && role !== "vendor") {
-    if (role === "admin") return next("/admin/vendor-requests");
+    if (role === "admin") return next("/admin/dashboard");
     if (role === "customer") return next("/shop");
     return next("/guest/login");
   }
@@ -950,7 +950,7 @@ router.beforeEach(async (to, from, next) => {
     userType !== "customer" &&
     !to.meta.public
   ) {
-    if (role === "admin") return next("/admin/vendor-requests");
+    if (role === "admin") return next("/admin/dashboard");
     if (role === "vendor") return next("/vendor/products");
     return next("/guest/login");
   }

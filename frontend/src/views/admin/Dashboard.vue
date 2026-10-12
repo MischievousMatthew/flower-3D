@@ -3,716 +3,614 @@
     <AdminSidebar />
 
     <main class="main-content">
-      <!-- Header -->
       <header class="content-header">
         <div class="header-left">
-          <button
-            class="mobile-toggle"
-            @click="toggleMobile"
-            aria-label="Toggle Menu"
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
+          <button class="mobile-toggle" @click="toggleMobile" aria-label="Toggle Menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="3" y1="12" x2="21" y2="12" />
               <line x1="3" y1="6" x2="21" y2="6" />
               <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
           </button>
-          <div class="header-title-block">
-            <h1 class="page-title">Dashboard</h1>
+          <div>
+            <h1 class="page-title">{{ greeting }}</h1>
             <p class="page-subtitle">
-              Welcome back — here's what's happening today
+              Here's how BloomCraft is doing
+              <template v-if="data">· updated {{ updatedLabel }}</template>
             </p>
           </div>
         </div>
         <div class="header-right">
-          <div class="search-wrap">
-            <svg
-              class="search-ico"
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
+          <div class="range-group" role="tablist" aria-label="Date range">
+            <button
+              v-for="option in RANGES"
+              :key="option.value"
+              type="button"
+              role="tab"
+              class="range-btn"
+              :class="{ active: range === option.value }"
+              :aria-selected="range === option.value"
+              @click="setRange(option.value)"
             >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input class="search-input" type="text" placeholder="Search..." />
+              {{ option.label }}
+            </button>
           </div>
-          <button class="icon-pill">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-            <span class="notif-dot"></span>
+          <button type="button" class="ghost-btn" :disabled="loading" @click="load">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
+            <span>{{ loading ? "Refreshing" : "Refresh" }}</span>
           </button>
-          <div class="avatar-pill">
-            <div class="avatar-circle">A</div>
-            <span class="avatar-name">Admin</span>
-          </div>
         </div>
       </header>
 
-      <div class="dashboard-body">
-        <!-- Loading state -->
-        <LoadingOverlay :visible="isLoading" message="Loading dashboard..." />
-
-        <!-- KPI Cards Row -->
-        <section class="kpi-row">
-          <div class="kpi-card kpi-vendors">
-            <div class="kpi-top">
-              <span class="kpi-label">Total Vendors</span>
-              <div class="kpi-icon-wrap kpi-icon-purple">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
-              </div>
-            </div>
-            <div class="kpi-value">{{ stats.total_vendors ?? "—" }}</div>
-            <div class="kpi-footer">
-              <span class="kpi-badge kpi-badge-up"
-                >+{{ stats.new_vendors_this_month ?? 0 }} this month</span
-              >
-            </div>
-          </div>
-
-          <div class="kpi-card kpi-pending">
-            <div class="kpi-top">
-              <span class="kpi-label">Pending Requests</span>
-              <div class="kpi-icon-wrap kpi-icon-amber">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-              </div>
-            </div>
-            <div class="kpi-value">{{ stats.pending_vendors ?? "—" }}</div>
-            <div class="kpi-footer">
-              <span class="kpi-badge kpi-badge-warn">Needs review</span>
-            </div>
-          </div>
-
-          <div class="kpi-card kpi-approved">
-            <div class="kpi-top">
-              <span class="kpi-label">Approved Vendors</span>
-              <div class="kpi-icon-wrap kpi-icon-green">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              </div>
-            </div>
-            <div class="kpi-value">{{ stats.approved_vendors ?? "—" }}</div>
-            <div class="kpi-footer">
-              <span class="kpi-badge kpi-badge-up">Active on platform</span>
-            </div>
-          </div>
-
-          <div class="kpi-card kpi-reports">
-            <div class="kpi-top">
-              <span class="kpi-label">Product Reports</span>
-              <div class="kpi-icon-wrap kpi-icon-red">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
-                  />
-                  <line x1="12" y1="9" x2="12" y2="13" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-              </div>
-            </div>
-            <div class="kpi-value">{{ stats.pending_reports ?? "—" }}</div>
-            <div class="kpi-footer">
-              <span class="kpi-badge kpi-badge-danger">Requires action</span>
-            </div>
-          </div>
+      <div class="page-body">
+        <section v-if="loadError && !data" class="panel error-panel">
+          <h2 class="panel-title">The dashboard couldn't be loaded</h2>
+          <p class="panel-sub">{{ loadError }}</p>
+          <button type="button" class="primary-btn" @click="load">Try again</button>
         </section>
 
-        <!-- Charts Row -->
-        <section class="charts-row">
-          <!-- Vendor Applications Chart -->
-          <div class="chart-card chart-wide">
-            <div class="chart-card-header">
-              <div>
-                <h2 class="chart-title">Vendor Applications</h2>
-                <p class="chart-sub">Monthly submission trend</p>
-              </div>
-              <div class="legend-row">
-                <span class="legend-dot" style="background: #7c6ff7"></span
-                ><span class="legend-text">Pending</span>
-                <span
-                  class="legend-dot"
-                  style="background: #4ade80; margin-left: 12px"
-                ></span
-                ><span class="legend-text">Approved</span>
-                <span
-                  class="legend-dot"
-                  style="background: #f87171; margin-left: 12px"
-                ></span
-                ><span class="legend-text">Rejected</span>
-              </div>
-            </div>
-            <div class="chart-canvas-wrap">
-              <canvas id="vendorChart"></canvas>
-            </div>
-          </div>
+        <template v-else>
+          <!-- Needs attention -->
+          <section v-if="data && attentionItems.length" class="attention">
+            <span class="attention-label">Needs your attention</span>
+            <router-link v-for="item in attentionItems" :key="item.key" :to="item.to" class="attention-chip" :class="item.tone">
+              <span class="attention-count">{{ item.count }}</span>
+              {{ item.label }}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="9 18 15 12 9 6" /></svg>
+            </router-link>
+          </section>
+          <section v-else-if="data" class="attention calm">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12" /></svg>
+            All caught up. No applications, reports, disputes or order issues waiting.
+          </section>
 
-          <!-- Status Donut -->
-          <div class="chart-card chart-narrow">
-            <div class="chart-card-header">
-              <div>
-                <h2 class="chart-title">Status Breakdown</h2>
-                <p class="chart-sub">All-time distribution</p>
+          <!-- Headline KPIs -->
+          <section class="kpi-row">
+            <template v-if="!data">
+              <div v-for="n in 4" :key="n" class="kpi-card">
+                <div class="sk sk-line" style="width: 45%"></div>
+                <div class="sk sk-value"></div>
+                <div class="sk sk-line" style="width: 65%"></div>
               </div>
-            </div>
-            <div class="chart-canvas-wrap" style="height: 200px">
-              <canvas id="donutChart"></canvas>
-            </div>
-            <div class="donut-legend">
-              <div class="donut-leg-row">
-                <span class="legend-dot" style="background: #7c6ff7"></span
-                ><span class="legend-text">Pending</span
-                ><span class="legend-num">{{
-                  stats.pending_vendors ?? 0
-                }}</span>
-              </div>
-              <div class="donut-leg-row">
-                <span class="legend-dot" style="background: #4ade80"></span
-                ><span class="legend-text">Approved</span
-                ><span class="legend-num">{{
-                  stats.approved_vendors ?? 0
-                }}</span>
-              </div>
-              <div class="donut-leg-row">
-                <span class="legend-dot" style="background: #f87171"></span
-                ><span class="legend-text">Rejected</span
-                ><span class="legend-num">{{
-                  stats.rejected_vendors ?? 0
-                }}</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Bottom Row -->
-        <section class="bottom-row">
-          <!-- Recent Applications Table -->
-          <div class="table-card">
-            <div class="table-card-header">
-              <div>
-                <h2 class="chart-title">Recent Applications</h2>
-                <p class="chart-sub">Latest vendor registration requests</p>
-              </div>
-              <router-link to="/admin/vendor-requests" class="view-all-link">
-                View all
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                >
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
-                </svg>
+            </template>
+            <template v-else>
+              <router-link to="/admin/finance" class="kpi-card kpi-feature">
+                <div class="kpi-top">
+                  <span class="kpi-label">Total sales · {{ rangeLabel }}</span>
+                  <span class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg></span>
+                </div>
+                <span class="kpi-value">{{ money(k.total_sales) }}</span>
+                <div class="kpi-footer">
+                  <span v-if="delta(k.total_sales, k.total_sales_previous)" class="badge on-dark">{{ delta(k.total_sales, k.total_sales_previous).text }}</span>
+                  <span class="kpi-note">{{ plural(k.paid_orders, "paid order") }} across all vendors</span>
+                </div>
               </router-link>
-            </div>
-            <div
-              v-if="recentApplications.length === 0 && !isLoading"
-              class="empty-msg"
-            >
-              No applications yet
-            </div>
-            <div v-else class="mini-table">
-              <div class="mini-table-head">
-                <span>Store</span>
-                <span>Owner</span>
-                <span>Type</span>
-                <span>Status</span>
-                <span>Date</span>
-              </div>
-              <div
-                v-for="app in recentApplications"
-                :key="app.id"
-                class="mini-table-row"
-              >
-                <span class="store-cell">
-                  <span class="store-ava">{{
-                    app.store_name?.charAt(0) ?? "?"
-                  }}</span>
-                  <span class="store-nm">{{ app.store_name }}</span>
-                </span>
-                <span class="text-secondary">{{ app.owner_name }}</span>
-                <span class="text-secondary">{{
-                  formatBizType(app.business_type)
-                }}</span>
-                <span>
-                  <span class="status-pill" :class="'pill-' + app.status">{{
-                    formatStatus(app.status)
-                  }}</span>
-                </span>
-                <span class="text-secondary">{{
-                  formatDate(app.submitted_at)
-                }}</span>
-              </div>
-            </div>
-          </div>
 
-          <!-- Product Reports Card -->
-          <div class="reports-card">
-            <div class="table-card-header">
-              <div>
-                <h2 class="chart-title">Product Reports</h2>
-                <p class="chart-sub">Flagged items needing review</p>
-              </div>
-              <router-link to="/admin/reports" class="view-all-link">
-                View all
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                >
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
-                </svg>
+              <router-link to="/admin/subscription-revenue" class="kpi-card">
+                <div class="kpi-top">
+                  <span class="kpi-label">Platform revenue</span>
+                  <span class="kpi-icon green"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg></span>
+                </div>
+                <span class="kpi-value">{{ money(k.platform_revenue) }}</span>
+                <div class="kpi-footer">
+                  <span v-if="delta(k.platform_revenue, k.platform_revenue_previous)" class="badge" :class="delta(k.platform_revenue, k.platform_revenue_previous).cls">
+                    {{ delta(k.platform_revenue, k.platform_revenue_previous).text }}
+                  </span>
+                  <span class="kpi-note">{{ money(k.mrr) }} monthly recurring</span>
+                </div>
               </router-link>
-            </div>
-            <div
-              v-if="recentReports.length === 0 && !isLoading"
-              class="empty-msg"
-            >
-              No reports at this time
-            </div>
-            <div v-for="rpt in recentReports" :key="rpt.id" class="report-row">
-              <div class="report-icon-wrap">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
-                  />
-                </svg>
+
+              <router-link to="/admin/orders" class="kpi-card">
+                <div class="kpi-top">
+                  <span class="kpi-label">Orders</span>
+                  <span class="kpi-icon blue"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" /></svg></span>
+                </div>
+                <span class="kpi-value">{{ k.orders }}</span>
+                <div class="kpi-footer">
+                  <span class="badge warn">{{ k.pending_orders }} pending</span>
+                  <span class="kpi-note">{{ k.in_progress_orders }} in progress</span>
+                </div>
+              </router-link>
+
+              <router-link to="/admin/subscription-revenue" class="kpi-card">
+                <div class="kpi-top">
+                  <span class="kpi-label">Active subscriptions</span>
+                  <span class="kpi-icon amber"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg></span>
+                </div>
+                <span class="kpi-value">{{ k.active_subscriptions }}</span>
+                <div class="kpi-footer">
+                  <span class="kpi-note">{{ k.paying_subscriptions }} paying · {{ k.trialing_subscriptions }} on free trial</span>
+                </div>
+              </router-link>
+            </template>
+          </section>
+
+          <!-- People & averages -->
+          <section class="metric-row">
+            <template v-if="!data">
+              <div v-for="n in 4" :key="n" class="metric-card">
+                <div class="sk sk-avatar"></div>
+                <div style="flex: 1"><div class="sk sk-line" style="width: 50%"></div><div class="sk sk-line" style="width: 30%"></div></div>
               </div>
-              <div class="report-info">
-                <span class="report-name">{{
-                  rpt.product?.name ?? "Unnamed Product"
-                }}</span>
-                <span class="report-reason">{{ rpt.reason }}</span>
+            </template>
+            <template v-else>
+              <div class="metric-card">
+                <span class="metric-icon violet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg></span>
+                <div>
+                  <span class="metric-label">Registered customers</span>
+                  <span class="metric-value">{{ k.customers }}</span>
+                  <span class="metric-note">+{{ k.new_customers }} {{ rangeShort }}</span>
+                </div>
               </div>
-              <span class="status-pill" :class="'pill-' + rpt.status">{{
-                formatStatus(rpt.status)
-              }}</span>
+              <router-link to="/admin/vendor-requests" class="metric-card link">
+                <span class="metric-icon pink"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg></span>
+                <div>
+                  <span class="metric-label">Vendors</span>
+                  <span class="metric-value">{{ k.vendors }}</span>
+                  <span class="metric-note">+{{ k.new_vendors }} {{ rangeShort }}</span>
+                </div>
+              </router-link>
+              <div class="metric-card">
+                <span class="metric-icon sky"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></span>
+                <div>
+                  <span class="metric-label">Average order value</span>
+                  <span class="metric-value">{{ money(k.average_order_value) }}</span>
+                  <span class="metric-note">Paid orders · {{ rangeShort }}</span>
+                </div>
+              </div>
+              <div class="metric-card">
+                <span class="metric-icon lime"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg></span>
+                <div>
+                  <span class="metric-label">Lifetime sales</span>
+                  <span class="metric-value">{{ money(k.lifetime_sales) }}</span>
+                  <span class="metric-note">Since the first order</span>
+                </div>
+              </div>
+            </template>
+          </section>
+
+          <!-- Chart + insights -->
+          <section class="split-row">
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title">Performance</h2>
+                  <p class="panel-sub">{{ seriesSubtitle }}</p>
+                </div>
+                <div class="seg" role="tablist" aria-label="Chart metric">
+                  <button v-for="m in CHART_METRICS" :key="m.value" type="button" class="seg-btn" :class="{ active: chartMetric === m.value }" @click="chartMetric = m.value">
+                    {{ m.label }}
+                  </button>
+                </div>
+              </div>
+              <div class="chart-wrap">
+                <div v-if="!data" class="sk sk-block"></div>
+                <canvas v-show="data" ref="chartCanvas"></canvas>
+              </div>
             </div>
 
-            <!-- Quick links -->
-            <div class="quick-links">
-              <h3 class="ql-title">Quick Actions</h3>
-              <router-link to="/admin/vendor-requests" class="ql-item">
-                <span class="ql-ico ql-ico-purple">
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  </svg>
-                </span>
-                <span>Review vendor requests</span>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  class="ql-arrow"
-                >
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
-                </svg>
-              </router-link>
-              <router-link to="/admin/product-approval" class="ql-item">
-                <span class="ql-ico ql-ico-green">
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                </span>
-                <span>Approve products</span>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  class="ql-arrow"
-                >
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 19 12" />
-                </svg>
-              </router-link>
-              <router-link to="/admin/reports" class="ql-item">
-                <span class="ql-ico ql-ico-red">
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
-                    />
-                  </svg>
-                </span>
-                <span>Review reported products</span>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  class="ql-arrow"
-                >
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 19 12" />
-                </svg>
-              </router-link>
+            <div class="panel insights">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title">Insights</h2>
+                  <p class="panel-sub">What stands out · {{ rangeLabel }}</p>
+                </div>
+              </div>
+              <template v-if="!data">
+                <div v-for="n in 4" :key="n" class="insight"><div class="sk sk-line" style="width: 60%"></div><div class="sk sk-line"></div></div>
+              </template>
+              <p v-else-if="!data.insights.length" class="empty-msg">Not enough activity yet to say much.</p>
+              <ul v-else class="insight-list">
+                <li v-for="(insight, i) in data.insights" :key="i" class="insight" :class="insight.tone">
+                  <span class="insight-icon">
+                    <svg v-if="insight.tone === 'good'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /></svg>
+                    <svg v-else-if="insight.tone === 'warn'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /><circle cx="12" cy="12" r="10" /></svg>
+                    <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18h6" /><path d="M10 22h4" /><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z" /></svg>
+                  </span>
+                  <div>
+                    <span class="insight-title">{{ insight.title }}</span>
+                    <span class="insight-detail">{{ insight.detail }}</span>
+                  </div>
+                </li>
+              </ul>
             </div>
-          </div>
-        </section>
+          </section>
+
+          <!-- Leaders + status mix -->
+          <section class="three-row">
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title">Top products</h2>
+                  <p class="panel-sub">By quantity sold · {{ rangeShort }}</p>
+                </div>
+              </div>
+              <template v-if="!data"><div v-for="n in 4" :key="n" class="sk sk-line" style="margin-bottom: 14px"></div></template>
+              <p v-else-if="!data.top_products.length" class="empty-msg">No products sold in this period</p>
+              <ol v-else class="rank-list">
+                <li v-for="(p, i) in data.top_products" :key="p.product_id ?? i">
+                  <span class="rank">{{ i + 1 }}</span>
+                  <div class="rank-main">
+                    <span class="rank-name">{{ p.name }}</span>
+                    <div class="rank-bar"><span :style="{ width: barWidth(p.quantity, data.top_products[0].quantity) }"></span></div>
+                  </div>
+                  <div class="rank-right">
+                    <span class="strong">{{ p.quantity }} sold</span>
+                    <span class="sub">{{ money(p.revenue) }}</span>
+                  </div>
+                </li>
+              </ol>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title">Top vendors</h2>
+                  <p class="panel-sub">By paid sales · {{ rangeShort }}</p>
+                </div>
+              </div>
+              <template v-if="!data"><div v-for="n in 4" :key="n" class="sk sk-line" style="margin-bottom: 14px"></div></template>
+              <p v-else-if="!data.top_vendors.length" class="empty-msg">No vendor sales in this period</p>
+              <ol v-else class="rank-list">
+                <li v-for="(v, i) in data.top_vendors" :key="v.vendor_id">
+                  <VendorAvatar :vendor="v.vendor" :size="30" />
+                  <div class="rank-main">
+                    <span class="rank-name">{{ v.vendor.store_name }}</span>
+                    <div class="rank-bar"><span :style="{ width: barWidth(v.sales, data.top_vendors[0].sales) }"></span></div>
+                  </div>
+                  <div class="rank-right">
+                    <span class="strong">{{ money(v.sales) }}</span>
+                    <span class="sub">{{ plural(v.orders, "order") }}</span>
+                  </div>
+                </li>
+              </ol>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title">Order status</h2>
+                  <p class="panel-sub">Orders placed · {{ rangeShort }}</p>
+                </div>
+              </div>
+              <template v-if="!data"><div class="sk sk-donut"></div></template>
+              <p v-else-if="!data.status_mix.length" class="empty-msg">No orders in this period</p>
+              <template v-else>
+                <div class="donut-wrap">
+                  <canvas ref="statusCanvas"></canvas>
+                  <div class="donut-center">
+                    <span class="donut-value">{{ k.orders }}</span>
+                    <span class="donut-caption">ORDERS</span>
+                  </div>
+                </div>
+                <ul class="legend-list">
+                  <li v-for="row in data.status_mix" :key="row.status">
+                    <i :style="{ background: STATUS_COLORS[row.status] ?? '#94a3b8' }"></i>
+                    <span class="legend-name">{{ STATUS_LABELS[row.status] ?? row.status }}</span>
+                    <span class="legend-num">{{ row.count }}</span>
+                  </li>
+                </ul>
+              </template>
+            </div>
+          </section>
+
+          <!-- Recent activity -->
+          <section class="split-row even">
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title">Recent orders</h2>
+                  <p class="panel-sub">Latest across all vendors</p>
+                </div>
+                <router-link to="/admin/orders" class="view-all">View all →</router-link>
+              </div>
+              <template v-if="!data">
+                <div v-for="n in 5" :key="n" class="row-skeleton"><div class="sk sk-avatar"></div><div style="flex: 1"><div class="sk sk-line" style="width: 50%"></div><div class="sk sk-line" style="width: 30%"></div></div></div>
+              </template>
+              <p v-else-if="!data.recent_orders.length" class="empty-msg">No orders yet</p>
+              <ul v-else class="activity-list">
+                <li v-for="o in data.recent_orders" :key="o.id" tabindex="0" @click="openOrder(o.id)" @keydown.enter="openOrder(o.id)">
+                  <VendorAvatar :vendor="o.vendor" :size="34" />
+                  <div class="activity-main">
+                    <span class="activity-title mono">{{ o.order_number }}</span>
+                    <span class="sub">{{ o.customer || "Customer" }} → {{ o.vendor.store_name }} · {{ timeAgo(o.created_at) }}</span>
+                  </div>
+                  <div class="activity-right">
+                    <span class="strong">{{ money(o.total_amount) }}</span>
+                    <span class="pill" :class="`st-${o.status}`">{{ STATUS_LABELS[o.status] ?? o.status }}</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2 class="panel-title">Recent transactions</h2>
+                  <p class="panel-sub">Order and subscription payments</p>
+                </div>
+                <router-link to="/admin/finance" class="view-all">View all →</router-link>
+              </div>
+              <template v-if="!data">
+                <div v-for="n in 5" :key="n" class="row-skeleton"><div class="sk sk-avatar"></div><div style="flex: 1"><div class="sk sk-line" style="width: 50%"></div><div class="sk sk-line" style="width: 30%"></div></div></div>
+              </template>
+              <p v-else-if="!data.recent_transactions.length" class="empty-msg">No payments yet</p>
+              <ul v-else class="activity-list">
+                <li v-for="t in data.recent_transactions" :key="t.key" tabindex="0" @click="openTransaction(t)" @keydown.enter="openTransaction(t)">
+                  <span class="tx-icon" :class="t.source">
+                    <svg v-if="t.source === 'subscription'" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+                    <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+                  </span>
+                  <div class="activity-main">
+                    <span class="activity-title">{{ t.source === "subscription" ? `${t.vendor.store_name} subscription` : `${t.customer?.name || "Customer"} paid ${t.vendor.store_name}` }}</span>
+                    <span class="sub">{{ t.method_label }} · {{ timeAgo(t.occurred_at) }}<template v-if="t.gateway_ref"> · {{ t.gateway_ref }}</template></span>
+                  </div>
+                  <div class="activity-right">
+                    <span class="strong" :class="{ struck: t.state === 'voided' || t.state === 'failed' }">{{ money(t.amount) }}</span>
+                    <span class="pill" :class="`ps-${t.state}`">{{ STATE_LABELS[t.state] }}</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </section>
+        </template>
       </div>
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import { toast } from "vue3-toastify";
 import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
-import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
+import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
 
 const { toggleMobile } = useSidebarState();
+const router = useRouter();
 
-const isLoading = ref(true);
+const RANGES = [
+  { value: "7d", label: "7D", long: "last 7 days", short: "in 7 days" },
+  { value: "30d", label: "30D", long: "last 30 days", short: "in 30 days" },
+  { value: "90d", label: "90D", long: "last 90 days", short: "in 90 days" },
+  { value: "12m", label: "12M", long: "last 12 months", short: "in 12 months" },
+  { value: "ytd", label: "YTD", long: "this year", short: "this year" },
+  { value: "all", label: "All", long: "all time", short: "all time" },
+];
+const CHART_METRICS = [
+  { value: "revenue", label: "Revenue" },
+  { value: "orders", label: "Orders" },
+  { value: "new_customers", label: "Customers" },
+];
+const STATUS_LABELS = {
+  pending: "Pending",
+  processing: "Processing",
+  out_for_delivery: "Out for delivery",
+  completed: "Completed",
+  cancelled: "Cancelled",
+  failed: "Failed",
+  returned: "Returned",
+  refunded: "Refunded",
+};
+const STATUS_COLORS = {
+  pending: "#f59e0b",
+  processing: "#3b82f6",
+  out_for_delivery: "#38bdf8",
+  completed: "#22c55e",
+  cancelled: "#cbd5e1",
+  failed: "#f87171",
+  returned: "#a78bfa",
+  refunded: "#8b5cf6",
+};
+const STATE_LABELS = { successful: "Paid", pending: "Pending", failed: "Failed", refunded: "Refunded", voided: "Cancelled" };
 
-const stats = ref({
-  total_vendors: 0,
-  pending_vendors: 0,
-  approved_vendors: 0,
-  rejected_vendors: 0,
-  new_vendors_this_month: 0,
-  pending_reports: 0,
+const range = ref("30d");
+const data = ref(null);
+const loading = ref(false);
+const loadError = ref("");
+const chartMetric = ref("revenue");
+const now = ref(Date.now());
+
+const k = computed(() => data.value?.kpis ?? {});
+const rangeLabel = computed(() => RANGES.find((r) => r.value === range.value)?.long ?? "");
+const rangeShort = computed(() => RANGES.find((r) => r.value === range.value)?.short ?? "");
+const greeting = computed(() => {
+  const hour = new Date(now.value).getHours();
+  return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+});
+const updatedLabel = computed(() => {
+  const seconds = Math.max(0, Math.round((now.value - new Date(data.value.generated_at)) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.round(seconds / 60);
+  return minutes < 60 ? `${minutes} min ago` : `${Math.round(minutes / 60)} h ago`;
+});
+const seriesSubtitle = computed(() => {
+  const unit = data.value?.series?.unit;
+  return `${unit === "day" ? "Daily" : unit === "week" ? "Weekly" : "Monthly"} · ${rangeLabel.value}`;
 });
 
-const recentApplications = ref([]);
-const recentReports = ref([]);
+const attentionItems = computed(() => {
+  const a = data.value?.attention;
+  if (!a) return [];
+  return [
+    { key: "apps", count: a.vendor_applications, label: "vendor applications", to: "/admin/vendor-requests", tone: "violet" },
+    { key: "reports", count: a.product_reports, label: "product reports", to: "/admin/reports", tone: "red" },
+    { key: "disputes", count: a.open_disputes, label: "open disputes", to: "/admin/orders?tab=disputes", tone: "rose" },
+    { key: "issues", count: a.order_issues, label: "orders need a look", to: "/admin/orders?tab=issues", tone: "amber" },
+  ].filter((item) => item.count > 0);
+});
 
-// ─── Charts ────────────────────────────────────────────────
-let vendorChartInst = null;
-let donutChartInst = null;
+let requestId = 0;
+const load = async () => {
+  const id = ++requestId;
+  loading.value = true;
+  loadError.value = "";
+  try {
+    const { data: response } = await api.get("/admin/dashboard", { params: { range: range.value } });
+    if (id !== requestId) return;
+    data.value = response.data;
+    now.value = Date.now();
+    await nextTick();
+    await renderCharts();
+  } catch (error) {
+    if (id !== requestId) return;
+    loadError.value = error.response?.data?.message || "Check your connection and try again.";
+    if (data.value) toast.error("The dashboard couldn't be refreshed.");
+  } finally {
+    if (id === requestId) loading.value = false;
+  }
+};
+
+const setRange = (value) => {
+  if (range.value === value) return;
+  range.value = value;
+  load();
+};
+
+const openOrder = (id) => router.push({ path: "/admin/orders", query: { order: id } });
+const openTransaction = (t) => (t.source === "order" ? openOrder(t.source_id) : router.push("/admin/subscription-revenue"));
+
+// ── Charts ───────────────────────────────────────────────────────
+const chartCanvas = ref(null);
+const statusCanvas = ref(null);
+let mainChart = null;
+let statusChart = null;
 
 const loadChartJs = () =>
-  new Promise((resolve) => {
+  new Promise((resolve, reject) => {
     if (window.Chart) return resolve();
-    const s = document.createElement("script");
-    s.src =
-      "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
-    s.onload = resolve;
-    document.head.appendChild(s);
+    const existing = document.querySelector("script[data-chartjs]");
+    const script = existing || document.createElement("script");
+    script.addEventListener("load", resolve);
+    script.addEventListener("error", reject);
+    if (!existing) {
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
+      script.dataset.chartjs = "true";
+      document.head.appendChild(script);
+    }
   });
 
-const renderVendorChart = (monthlyData) => {
-  const ctx = document.getElementById("vendorChart");
-  if (!ctx) return;
-  if (vendorChartInst) vendorChartInst.destroy();
+const renderCharts = async () => {
+  try {
+    await loadChartJs();
+  } catch {
+    return; // the numbers still show without charts
+  }
+  renderMain();
+  renderStatus();
+};
 
-  const labels = monthlyData.map((d) => d.month);
-  const pending = monthlyData.map((d) => d.pending);
-  const approved = monthlyData.map((d) => d.approved);
-  const rejected = monthlyData.map((d) => d.rejected);
+const renderMain = () => {
+  if (!chartCanvas.value || !data.value || !window.Chart) return;
+  const points = data.value.series.points;
+  const metric = chartMetric.value;
+  const isMoney = metric === "revenue";
+  mainChart?.destroy();
 
-  vendorChartInst = new window.Chart(ctx, {
+  const datasets = isMoney
+    ? [
+        { label: "Vendor sales", data: points.map((p) => p.sales), backgroundColor: "#7c6ff7", borderRadius: 5, maxBarThickness: 34, stack: "money" },
+        { label: "Platform revenue", data: points.map((p) => p.platform_revenue), backgroundColor: "#22c55e", borderRadius: 5, maxBarThickness: 34, stack: "money" },
+      ]
+    : [
+        {
+          type: "line",
+          label: metric === "orders" ? "Orders" : "New customers",
+          data: points.map((p) => p[metric]),
+          borderColor: "#7c6ff7",
+          backgroundColor: "rgba(124, 111, 247, 0.12)",
+          fill: true,
+          tension: 0.35,
+          pointRadius: 3,
+          pointBackgroundColor: "#fff",
+          pointBorderWidth: 2,
+          borderWidth: 2,
+        },
+      ];
+
+  mainChart = new window.Chart(chartCanvas.value, {
     type: "bar",
-    data: {
-      labels,
-      datasets: [
-        {
-          label: "Pending",
-          data: pending,
-          backgroundColor: "#7c6ff7",
-          borderRadius: 4,
-          barPercentage: 0.7,
-        },
-        {
-          label: "Approved",
-          data: approved,
-          backgroundColor: "#4ade80",
-          borderRadius: 4,
-          barPercentage: 0.7,
-        },
-        {
-          label: "Rejected",
-          data: rejected,
-          backgroundColor: "#f87171",
-          borderRadius: 4,
-          barPercentage: 0.7,
-        },
-      ],
-    },
+    data: { labels: points.map((p) => p.label), datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { mode: "index" } },
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: isMoney, position: "bottom", labels: { boxWidth: 10, boxHeight: 10, color: "#64748b", font: { size: 11 } } },
+        tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${isMoney ? money(c.raw) : c.raw}` } },
+      },
       scales: {
-        x: {
-          grid: { display: false },
-          ticks: { color: "#94a3b8", font: { size: 11 } },
-        },
+        x: { stacked: isMoney, grid: { display: false }, ticks: { color: "#94a3b8", font: { size: 11 }, maxRotation: 0, autoSkipPadding: 12 } },
         y: {
+          stacked: isMoney,
+          beginAtZero: true,
           grid: { color: "#f1f5f9" },
-          ticks: { color: "#94a3b8", font: { size: 11 }, precision: 0 },
+          ticks: { color: "#94a3b8", font: { size: 11 }, precision: 0, callback: (v) => (isMoney ? moneyShort(v) : v) },
         },
       },
     },
   });
 };
 
-const renderDonutChart = (pending, approved, rejected) => {
-  const ctx = document.getElementById("donutChart");
-  if (!ctx) return;
-  if (donutChartInst) donutChartInst.destroy();
-
-  donutChartInst = new window.Chart(ctx, {
+const renderStatus = () => {
+  statusChart?.destroy();
+  statusChart = null;
+  if (!statusCanvas.value || !data.value?.status_mix.length || !window.Chart) return;
+  const mix = data.value.status_mix;
+  statusChart = new window.Chart(statusCanvas.value, {
     type: "doughnut",
     data: {
-      labels: ["Pending", "Approved", "Rejected"],
-      datasets: [
-        {
-          data: [pending, approved, rejected],
-          backgroundColor: ["#7c6ff7", "#4ade80", "#f87171"],
-          borderWidth: 0,
-          hoverOffset: 6,
-        },
-      ],
+      labels: mix.map((r) => STATUS_LABELS[r.status] ?? r.status),
+      datasets: [{ data: mix.map((r) => r.count), backgroundColor: mix.map((r) => STATUS_COLORS[r.status] ?? "#94a3b8"), borderWidth: 0, hoverOffset: 5 }],
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: "72%",
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: (c) => ` ${c.label}: ${c.raw}` } },
-      },
-    },
+    options: { responsive: true, maintainAspectRatio: false, cutout: "72%", plugins: { legend: { display: false } } },
   });
 };
 
-// ─── Build monthly data from raw applications ───────────────
-const buildMonthlyData = (applications) => {
-  const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  const now = new Date();
-  const last6 = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    last6.push({
-      month: months[d.getMonth()],
-      year: d.getFullYear(),
-      pending: 0,
-      approved: 0,
-      rejected: 0,
-    });
-  }
+watch(chartMetric, renderMain);
 
-  applications.forEach((app) => {
-    const d = new Date(app.submitted_at);
-    const bucket = last6.find(
-      (b) => b.month === months[d.getMonth()] && b.year === d.getFullYear(),
-    );
-    if (bucket) {
-      const st = app.status?.toLowerCase();
-      if (st === "pending") bucket.pending++;
-      else if (st === "approved") bucket.approved++;
-      else if (st === "rejected") bucket.rejected++;
-    }
-  });
-
-  return last6;
+// ── Formatting ───────────────────────────────────────────────────
+const peso = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
+const money = (v) => (v === null || v === undefined ? "—" : peso.format(Number(v)));
+const moneyShort = (value) => {
+  const n = Number(value) || 0;
+  if (Math.abs(n) >= 1_000_000) return `₱${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (Math.abs(n) >= 1_000) return `₱${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return `₱${n.toFixed(0)}`;
+};
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const barWidth = (value, max) => `${max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 0}%`;
+const delta = (current, previous) => {
+  if (previous === null || previous === undefined) return null;
+  if (previous === 0) return current > 0 ? { text: "New", cls: "up" } : null;
+  const pct = ((current - previous) / previous) * 100;
+  if (Math.abs(pct) < 0.05) return { text: "0%", cls: "flat" };
+  return { text: `${pct > 0 ? "▲" : "▼"} ${Math.abs(pct).toFixed(1)}%`, cls: pct > 0 ? "up" : "down" };
+};
+const timeAgo = (value) => {
+  if (!value) return "";
+  const minutes = Math.floor((Date.now() - new Date(value)) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 31) return `${days} day${days === 1 ? "" : "s"} ago`;
+  return new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 };
 
-// ─── Fetch all data ─────────────────────────────────────────
-const fetchDashboard = async () => {
-  isLoading.value = true;
-  try {
-    // Statistics
-    const { data: statsData } = await api.get(
-      "/admin/vendor-applications/statistics",
-    );
-    stats.value = {
-      total_vendors:
-        (statsData.approved ?? 0) +
-        (statsData.pending ?? 0) +
-        (statsData.rejected ?? 0),
-      pending_vendors: statsData.pending ?? 0,
-      approved_vendors: statsData.approved ?? 0,
-      rejected_vendors: statsData.rejected ?? 0,
-      new_vendors_this_month: statsData.this_month ?? 0,
-      pending_reports: 0,
-    };
-
-    // Recent applications (all statuses, last 6)
-    const { data: appData } = await api.get("/admin/vendor-applications", {
-      params: { per_page: 5, page: 1 },
-    });
-    const allApps = appData.data ?? [];
-    recentApplications.value = allApps.slice(0, 5);
-
-    // All applications for chart (get a bigger set)
-    const { data: chartData } = await api.get("/admin/vendor-applications", {
-      params: { per_page: 100, page: 1 },
-    });
-    const chartApps = chartData.data ?? [];
-    const monthly = buildMonthlyData(chartApps);
-
-    // Product Reports
-    try {
-      const { data: rptData } = await api.get("/admin/reports", {
-        params: { per_page: 5, status: "pending" },
-      });
-      const reports = rptData.data ?? rptData ?? [];
-      recentReports.value = Array.isArray(reports) ? reports.slice(0, 4) : [];
-      stats.value.pending_reports =
-        rptData.meta?.total ?? recentReports.value.length;
-    } catch (_) {
-      recentReports.value = [];
-    }
-
-    // Render charts after DOM updates
-    await nextTick();
-    await loadChartJs();
-    renderVendorChart(monthly);
-    renderDonutChart(
-      stats.value.pending_vendors,
-      stats.value.approved_vendors,
-      stats.value.rejected_vendors,
-    );
-  } catch (err) {
-    console.error("Dashboard fetch error:", err);
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-onMounted(fetchDashboard);
-
-// ─── Formatters ─────────────────────────────────────────────
-const formatBizType = (t) =>
-  ({
-    individual: "Sole Prop",
-    partnership: "Partnership",
-    corporation: "Corporation",
-  })[t] ??
-  t ??
-  "—";
-const formatStatus = (s) =>
-  ({
-    pending: "Pending",
-    approved: "Approved",
-    rejected: "Rejected",
-    under_review: "Under Review",
-  })[s] ??
-  s ??
-  "—";
-const formatDate = (d) => {
-  if (!d) return "—";
-  try {
-    return new Date(d).toLocaleDateString("en-PH", {
-      month: "short",
-      day: "numeric",
-      year: "2-digit",
-    });
-  } catch {
-    return d;
-  }
-};
+let clock = null;
+onMounted(() => {
+  load();
+  clock = setInterval(() => (now.value = Date.now()), 30_000);
+});
+onBeforeUnmount(() => {
+  clearInterval(clock);
+  mainChart?.destroy();
+  statusChart?.destroy();
+});
 </script>
 
 <style scoped>
@@ -721,44 +619,47 @@ const formatDate = (d) => {
   box-sizing: border-box;
 }
 
-/* ── Layout ───────────────────────────────────────────────── */
+/* ── Layout ─────────────────────────────────────────── */
 .admin-layout {
   display: flex;
   min-height: 100vh;
   background: #f8fafc;
 }
-
 .main-content {
   margin-left: 240px;
   flex: 1;
-  padding: 0;
+  min-width: 0;
   min-height: 100vh;
   transition: margin-left 0.3s;
 }
-
-.dashboard-body {
+.page-body {
   padding: 0 28px 40px;
 }
+.page-body > section {
+  margin-top: 18px;
+}
 
-/* ── Header ───────────────────────────────────────────────── */
+/* ── Header ─────────────────────────────────────────── */
 .content-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 28px 20px;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 20px 28px;
   background: #fff;
   border-bottom: 1px solid #e9edf3;
   position: sticky;
   top: 0;
   z-index: 100;
 }
-
-.header-left {
+.header-left,
+.header-right {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
-
 .mobile-toggle {
   display: none;
   background: transparent;
@@ -766,15 +667,7 @@ const formatDate = (d) => {
   color: #64748b;
   cursor: pointer;
   padding: 4px;
-  border-radius: 6px;
 }
-
-@media (max-width: 968px) {
-  .mobile-toggle {
-    display: flex;
-  }
-}
-
 .page-title {
   font-size: 22px;
   font-weight: 600;
@@ -785,558 +678,705 @@ const formatDate = (d) => {
 .page-subtitle {
   font-size: 12px;
   color: #94a3b8;
-  margin: 0;
+  margin: 2px 0 0;
 }
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.range-group,
+.seg {
+  display: inline-flex;
+  padding: 3px;
+  background: #f1f5f9;
+  border-radius: 9px;
+  gap: 2px;
 }
-
-.search-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.search-ico {
-  position: absolute;
-  left: 11px;
-  color: #94a3b8;
-  pointer-events: none;
-}
-.search-input {
-  padding: 8px 14px 8px 34px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 13px;
-  width: 220px;
-  color: #1e2739;
-  transition: border 0.2s;
-  background: #f8fafc;
-}
-.search-input:focus {
-  outline: none;
-  border-color: #7c6ff7;
-  background: #fff;
-}
-
-.icon-pill {
-  position: relative;
-  width: 36px;
-  height: 36px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #fff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.range-btn,
+.seg-btn {
+  border: none;
+  background: transparent;
+  padding: 6px 11px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
   color: #64748b;
+  cursor: pointer;
 }
-.notif-dot {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #f87171;
-  border: 1.5px solid #fff;
+.range-btn.active,
+.seg-btn.active {
+  background: #fff;
+  color: #5b4fc9;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+.ghost-btn,
+.primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ghost-btn {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+}
+.ghost-btn:hover:not(:disabled) {
+  border-color: #c7c2fb;
+  color: #5b4fc9;
+}
+.ghost-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.primary-btn {
+  border: none;
+  background: #7c6ff7;
+  color: #fff;
 }
 
-.avatar-pill {
+/* ── Skeleton ───────────────────────────────────────── */
+.sk {
+  border-radius: 6px;
+  background: linear-gradient(100deg, #eef1f6 30%, #f8fafc 50%, #eef1f6 70%);
+  background-size: 300% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+.sk-line {
+  height: 12px;
+  margin: 6px 0;
+}
+.sk-value {
+  height: 30px;
+  width: 70%;
+  margin: 14px 0 12px;
+}
+.sk-block {
+  height: 100%;
+  border-radius: 10px;
+}
+.sk-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sk-donut {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  margin: 10px auto;
+}
+.row-skeleton {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
+/* ── Attention ──────────────────────────────────────── */
+.attention {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 12px 4px 4px;
-  border: 1px solid #e2e8f0;
-  border-radius: 24px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
   background: #fff;
-  cursor: pointer;
+  border: 1px solid #e9edf3;
+  border-radius: 12px;
 }
-.avatar-circle {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #7c6ff7, #5b4fc9);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.attention.calm {
+  color: #15803d;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: #f0fdf4;
+  border-color: #dcfce7;
+}
+.attention-label {
   font-size: 12px;
   font-weight: 600;
+  color: #475569;
+  margin-right: 4px;
 }
-.avatar-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: #2d3748;
+.attention-chip {
+  --c: #7c6ff7;
+  --bg: #f5f3ff;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px 5px 5px;
+  border-radius: 20px;
+  background: var(--bg);
+  color: #1e2739;
+  font-size: 12.5px;
+  text-decoration: none;
+  transition: transform 0.15s;
 }
+.attention-chip:hover {
+  transform: translateY(-1px);
+}
+.attention-chip svg {
+  color: var(--c);
+}
+.attention-count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--c);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.attention-chip.red { --c: #dc2626; --bg: #fef2f2; }
+.attention-chip.rose { --c: #e11d48; --bg: #fff1f2; }
+.attention-chip.amber { --c: #d97706; --bg: #fffbeb; }
 
-/* ── Dashboard body spacing ───────────────────────────────── */
-.dashboard-body > section {
-  margin-top: 24px;
-}
-
-/* ── KPI Cards ────────────────────────────────────────────── */
+/* ── KPI cards ──────────────────────────────────────── */
 .kpi-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
-
 .kpi-card {
+  display: flex;
+  flex-direction: column;
   background: #fff;
-  border-radius: 12px;
-  padding: 20px;
   border: 1px solid #e9edf3;
-  transition: box-shadow 0.2s;
+  border-radius: 14px;
+  padding: 18px 20px;
+  text-decoration: none;
+  min-width: 0;
+  transition: box-shadow 0.2s, transform 0.2s;
 }
-.kpi-card:hover {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.07);
+a.kpi-card:hover {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07);
+  transform: translateY(-2px);
 }
-
+.kpi-feature {
+  background: radial-gradient(120% 140% at 100% 0%, #8f84ff 0%, #6d5ff0 45%, #4c3fd0 100%);
+  border-color: transparent;
+}
+.kpi-feature .kpi-label,
+.kpi-feature .kpi-note {
+  color: rgba(255, 255, 255, 0.82);
+}
+.kpi-feature .kpi-value {
+  color: #fff;
+}
+.kpi-feature .kpi-icon {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
 .kpi-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  gap: 8px;
 }
 .kpi-label {
   font-size: 13px;
   font-weight: 500;
   color: #64748b;
 }
-
-.kpi-icon-wrap {
+.kpi-icon {
   width: 34px;
   height: 34px;
-  border-radius: 8px;
-  display: flex;
+  border-radius: 9px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-.kpi-icon-purple {
-  background: #ede9ff;
+  background: #ede9fe;
   color: #7c6ff7;
+  flex-shrink: 0;
 }
-.kpi-icon-amber {
-  background: #fef3c7;
-  color: #d97706;
-}
-.kpi-icon-green {
-  background: #dcfce7;
-  color: #16a34a;
-}
-.kpi-icon-red {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
+.kpi-icon.green { background: #dcfce7; color: #16a34a; }
+.kpi-icon.blue { background: #dbeafe; color: #2563eb; }
+.kpi-icon.amber { background: #fef3c7; color: #d97706; }
 .kpi-value {
-  font-size: 32px;
+  font-size: 27px;
   font-weight: 700;
   color: #1e2739;
-  margin-bottom: 10px;
-  line-height: 1;
+  margin: 12px 0 10px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
-
-.kpi-badge {
+.kpi-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.kpi-note {
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+.badge {
   font-size: 11px;
-  font-weight: 500;
-  padding: 3px 9px;
+  font-weight: 600;
+  padding: 3px 8px;
   border-radius: 20px;
 }
-.kpi-badge-up {
-  background: #dcfce7;
-  color: #16a34a;
-}
-.kpi-badge-warn {
-  background: #fef3c7;
-  color: #b45309;
-}
-.kpi-badge-danger {
-  background: #fee2e2;
-  color: #dc2626;
-}
+.badge.up { background: #dcfce7; color: #15803d; }
+.badge.down { background: #fee2e2; color: #b91c1c; }
+.badge.flat { background: #f1f5f9; color: #64748b; }
+.badge.warn { background: #fef3c7; color: #b45309; }
+.badge.on-dark { background: rgba(255, 255, 255, 0.2); color: #fff; }
 
-/* ── Charts Row ───────────────────────────────────────────── */
-.charts-row {
+/* ── Metric cards ───────────────────────────────────── */
+.metric-row {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
-
-.chart-card {
+.metric-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   background: #fff;
-  border-radius: 12px;
   border: 1px solid #e9edf3;
-  padding: 20px;
+  border-radius: 14px;
+  padding: 14px 16px;
+  text-decoration: none;
+  min-width: 0;
+}
+.metric-card.link:hover {
+  border-color: #c7c2fb;
+}
+.metric-card > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.metric-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.metric-icon.violet { background: #ede9fe; color: #7c3aed; }
+.metric-icon.pink { background: #fce7f3; color: #db2777; }
+.metric-icon.sky { background: #e0f2fe; color: #0284c7; }
+.metric-icon.lime { background: #ecfccb; color: #4d7c0f; }
+.metric-label {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+.metric-value {
+  font-size: 19px;
+  font-weight: 700;
+  color: #1e2739;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+.metric-note {
+  font-size: 11.5px;
+  color: #94a3b8;
 }
 
-.chart-card-header {
+/* ── Panels ─────────────────────────────────────────── */
+.split-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+}
+.split-row.even {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.three-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.panel {
+  background: #fff;
+  border: 1px solid #e9edf3;
+  border-radius: 14px;
+  padding: 20px;
+  min-width: 0;
+}
+.panel-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 20px;
   gap: 12px;
   flex-wrap: wrap;
+  margin-bottom: 16px;
 }
-
-.chart-title {
+.panel-title {
   font-size: 15px;
   font-weight: 600;
   color: #1e2739;
   margin: 0;
 }
-.chart-sub {
+.panel-sub {
   font-size: 12px;
   color: #94a3b8;
   margin: 2px 0 0;
 }
-
-.legend-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  display: inline-block;
-}
-.legend-text {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.chart-canvas-wrap {
-  position: relative;
-  height: 220px;
-}
-
-/* Donut card */
-.donut-legend {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.donut-leg-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.donut-leg-row .legend-text {
-  flex: 1;
-  font-size: 13px;
-  color: #475569;
-}
-.legend-num {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1e2739;
-}
-
-/* ── Bottom Row ───────────────────────────────────────────── */
-.bottom-row {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 16px;
-}
-
-.table-card,
-.reports-card {
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid #e9edf3;
-  padding: 20px;
-}
-
-.table-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.view-all-link {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.view-all {
   font-size: 12px;
   font-weight: 500;
-  color: #7c6ff7;
+  color: #6d5ff0;
   text-decoration: none;
   white-space: nowrap;
-  padding-top: 2px;
-  transition: opacity 0.2s;
 }
-.view-all-link:hover {
-  opacity: 0.75;
+.view-all:hover {
+  text-decoration: underline;
 }
-
+.error-panel {
+  text-align: center;
+  padding: 48px 20px;
+  margin-top: 18px;
+}
+.error-panel .primary-btn {
+  margin-top: 16px;
+}
 .empty-msg {
   font-size: 13px;
   color: #94a3b8;
   text-align: center;
-  padding: 32px 0;
+  padding: 28px 0;
+  margin: 0;
+}
+.chart-wrap {
+  position: relative;
+  height: 300px;
 }
 
-/* Mini Table */
-.mini-table {
-  width: 100%;
-}
-.mini-table-head {
-  display: grid;
-  grid-template-columns: 2fr 1.3fr 1fr 1fr 1fr;
-  padding: 8px 10px;
-  background: #f8fafc;
-  border-radius: 6px;
-  margin-bottom: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.mini-table-row {
-  display: grid;
-  grid-template-columns: 2fr 1.3fr 1fr 1fr 1fr;
-  align-items: center;
-  padding: 10px 10px;
-  border-bottom: 1px solid #f1f5f9;
-  font-size: 13px;
-  transition: background 0.15s;
-}
-.mini-table-row:hover {
-  background: #f8fafc;
-  border-radius: 6px;
-}
-.mini-table-row:last-child {
-  border-bottom: none;
-}
-
-.store-cell {
+/* ── Insights ───────────────────────────────────────── */
+.insight-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
-  align-items: center;
-  gap: 9px;
+  flex-direction: column;
+  gap: 10px;
 }
-.store-ava {
+.insight {
+  --c: #6d5ff0;
+  --bg: #f5f3ff;
+  display: flex;
+  gap: 11px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: #fbfbfe;
+  border: 1px solid #f1f1f9;
+}
+.insight.good { --c: #16a34a; --bg: #dcfce7; }
+.insight.warn { --c: #d97706; --bg: #fef3c7; }
+.insight-icon {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #7c6ff7, #5b4fc9);
-  color: #fff;
-  display: flex;
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--c);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  font-weight: 600;
   flex-shrink: 0;
 }
-.store-nm {
+.insight > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.insight-title {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: #1e2739;
 }
-.text-secondary {
+.insight-detail {
+  font-size: 12px;
   color: #64748b;
+  margin-top: 1px;
 }
 
-/* Status pills */
-.status-pill {
-  display: inline-block;
-  padding: 3px 9px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 500;
+/* ── Rankings ───────────────────────────────────────── */
+.rank-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
-.pill-pending {
-  background: #fef3c7;
-  color: #b45309;
-}
-.pill-approved {
-  background: #dcfce7;
-  color: #16a34a;
-}
-.pill-rejected {
-  background: #fee2e2;
-  color: #dc2626;
-}
-.pill-under_review {
-  background: #e0e7ff;
-  color: #4338ca;
-}
-
-/* Reports card rows */
-.report-row {
+.rank-list li {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid #f1f5f9;
+  gap: 11px;
 }
-.report-row:last-of-type {
-  border-bottom: none;
-}
-
-.report-icon-wrap {
-  width: 30px;
-  height: 30px;
+.rank {
+  width: 26px;
+  height: 26px;
   border-radius: 8px;
-  background: #fee2e2;
-  color: #dc2626;
-  display: flex;
+  background: #f5f3ff;
+  color: #6d5ff0;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-.report-info {
+.rank-main {
   flex: 1;
   min-width: 0;
 }
-.report-name {
+.rank-name {
   display: block;
   font-size: 13px;
   font-weight: 500;
   color: #1e2739;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.report-reason {
+.rank-bar {
+  height: 5px;
+  margin-top: 6px;
+  border-radius: 5px;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+.rank-bar span {
   display: block;
-  font-size: 11px;
-  color: #94a3b8;
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #a79ffb, #6d5ff0);
+}
+.rank-right,
+.activity-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  font-size: 13px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  gap: 2px;
 }
-
-/* Quick Links */
-.quick-links {
-  margin-top: 20px;
-  border-top: 1px solid #f1f5f9;
-  padding-top: 16px;
-}
-.ql-title {
-  font-size: 12px;
+.strong {
   font-weight: 600;
+  color: #1e2739;
+  font-variant-numeric: tabular-nums;
+}
+.struck {
   color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin: 0 0 10px;
+  text-decoration: line-through;
+}
+.sub {
+  display: block;
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+.mono {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace !important;
+  font-size: 12.5px;
 }
 
-.ql-item {
+/* Donut */
+.donut-wrap {
+  position: relative;
+  height: 160px;
+}
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.donut-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e2739;
+}
+.donut-caption {
+  font-size: 10px;
+  color: #94a3b8;
+  letter-spacing: 0.1em;
+}
+.legend-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+}
+.legend-list li {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-size: 13px;
-  color: #475569;
-  font-weight: 500;
-  transition: background 0.15s;
-  margin-bottom: 4px;
+  gap: 7px;
+  font-size: 12.5px;
 }
-.ql-item:hover {
-  background: #f8fafc;
+.legend-list i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.legend-name {
+  flex: 1;
+  color: #475569;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.legend-num {
+  font-weight: 600;
   color: #1e2739;
 }
 
-.ql-ico {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
+/* ── Activity ───────────────────────────────────────── */
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.activity-list li {
   display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px;
+  margin: 0 -8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.activity-list li + li {
+  border-top: 1px solid #f4f6f9;
+}
+.activity-list li:hover,
+.activity-list li:focus-visible {
+  background: #fafaff;
+  outline: none;
+}
+.activity-main {
+  flex: 1;
+  min-width: 0;
+}
+.activity-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e2739;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.activity-main .sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tx-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background: #ede9fe;
+  color: #6d5ff0;
 }
-.ql-ico-purple {
-  background: #ede9ff;
-  color: #7c6ff7;
-}
-.ql-ico-green {
+.tx-icon.subscription {
   background: #dcfce7;
   color: #16a34a;
 }
-.ql-ico-red {
-  background: #fee2e2;
-  color: #dc2626;
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10.5px;
+  font-weight: 600;
 }
+.st-pending { background: #fef3c7; color: #b45309; }
+.st-processing { background: #dbeafe; color: #1d4ed8; }
+.st-out_for_delivery { background: #e0f2fe; color: #0369a1; }
+.st-completed { background: #dcfce7; color: #15803d; }
+.st-cancelled,
+.st-failed { background: #f1f5f9; color: #64748b; }
+.st-returned,
+.st-refunded { background: #ede9fe; color: #6d28d9; }
+.ps-successful { background: #dcfce7; color: #15803d; }
+.ps-pending { background: #fef3c7; color: #b45309; }
+.ps-failed { background: #fee2e2; color: #b91c1c; }
+.ps-refunded { background: #ede9fe; color: #6d28d9; }
+.ps-voided { background: #f1f5f9; color: #64748b; }
 
-.ql-arrow {
-  margin-left: auto;
-  color: #cbd5e0;
+/* ── Responsive ─────────────────────────────────────── */
+@media (max-width: 1360px) {
+  .three-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
-.ql-item:hover .ql-arrow {
-  color: #7c6ff7;
-}
-
-/* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 1280px) {
   .main-content {
     margin-left: 200px;
   }
-  .kpi-row {
-    grid-template-columns: repeat(2, 1fr);
+  .kpi-row,
+  .metric-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-
 @media (max-width: 1100px) {
-  .charts-row {
-    grid-template-columns: 1fr;
-  }
-  .bottom-row {
-    grid-template-columns: 1fr;
+  .split-row,
+  .split-row.even,
+  .three-row {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
-
 @media (max-width: 968px) {
   .main-content {
     margin-left: 0;
   }
-  .kpi-row {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .search-input {
-    width: 160px;
+  .mobile-toggle {
+    display: flex;
   }
 }
-
 @media (max-width: 640px) {
-  .kpi-row {
-    grid-template-columns: 1fr;
-  }
   .content-header {
-    flex-wrap: wrap;
-    gap: 12px;
+    padding: 16px;
   }
-  .header-right {
+  .page-body {
+    padding: 0 16px 32px;
+  }
+  .kpi-row,
+  .metric-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .range-group {
     width: 100%;
+    overflow-x: auto;
   }
-  .search-input {
-    flex: 1;
-    width: auto;
+  .chart-wrap {
+    height: 240px;
   }
-  .dashboard-body {
-    padding: 0 14px 40px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk {
+    animation: none;
   }
-  .mini-table-head,
-  .mini-table-row {
-    grid-template-columns: 2fr 1fr 1fr;
-  }
-  .mini-table-head span:nth-child(2),
-  .mini-table-row span:nth-child(2),
-  .mini-table-head span:nth-child(3),
-  .mini-table-row span:nth-child(3) {
-    display: none;
+  a.kpi-card:hover,
+  .attention-chip:hover {
+    transform: none;
   }
 }
 </style>

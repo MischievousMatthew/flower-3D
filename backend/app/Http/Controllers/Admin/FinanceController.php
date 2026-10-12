@@ -9,7 +9,7 @@ use App\Models\User;
 use App\Models\VendorBalance;
 use App\Models\VendorSubscriptionCheckout;
 use App\Models\VendorTransaction;
-use App\Support\PaymentMask;
+use App\Support\PaymentLedger;
 use App\Support\ReportPeriod;
 use App\Support\VendorDirectory;
 use Carbon\CarbonImmutable;
@@ -33,7 +33,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class FinanceController extends Controller
 {
-    private const STATES = ['successful', 'pending', 'failed', 'refunded', 'voided'];
 
     /**
      * GET /api/admin/finance/overview?range=30d
@@ -74,7 +73,7 @@ class FinanceController extends Controller
         $refundTotal = round((float) $refunded->sum('amount'), 2);
 
         // Payment attempts created in the period, by outcome
-        $states = $this->ledgerQuery()
+        $states = PaymentLedger::query()
             ->whereBetween('created_at', [$period->start, $period->end])
             ->selectRaw('state, count(*) as total, coalesce(sum(amount), 0) as amount')
             ->groupBy('state')
@@ -84,7 +83,7 @@ class FinanceController extends Controller
         $failed = (int) ($states['failed']->total ?? 0);
 
         // Money still to come in, whatever the period
-        $pendingNow = $this->ledgerQuery()->where('state', 'pending')
+        $pendingNow = PaymentLedger::query()->where('state', 'pending')
             ->selectRaw("channel, count(*) as total, coalesce(sum(amount), 0) as amount")
             ->groupBy('channel')->get()->keyBy('channel');
 
@@ -112,7 +111,7 @@ class FinanceController extends Controller
                     'open_disputes' => OrderRequest::query()->where('status', 'pending')->count(),
                     'vendor_balances' => round((float) VendorBalance::query()->sum('balance'), 2),
                 ],
-                'states' => collect(self::STATES)->map(fn ($state) => [
+                'states' => collect(PaymentLedger::STATES)->map(fn ($state) => [
                     'state' => $state,
                     'count' => (int) ($states[$state]->total ?? 0),
                     'amount' => round((float) ($states[$state]->amount ?? 0), 2),
@@ -149,7 +148,7 @@ class FinanceController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $this->formatLedger($rows),
+            'data' => PaymentLedger::format($rows),
             'meta' => [
                 'current_page' => $page->currentPage(),
                 'last_page' => $page->lastPage(),
@@ -164,7 +163,7 @@ class FinanceController extends Controller
      */
     public function exportTransactions(Request $request): StreamedResponse
     {
-        $rows = $this->formatLedger($this->filteredLedger($request)->limit(10000)->get());
+        $rows = PaymentLedger::format($this->filteredLedger($request)->limit(10000)->get());
 
         return $this->csv('bloomcraft-transactions-' . now()->format('Y-m-d') . '.csv', function ($out) use ($rows) {
             fputcsv($out, ['Date', 'Type', 'Reference', 'Vendor', 'Customer', 'Channel', 'Method', 'Status', 'Amount (PHP)', 'Gateway ref. (masked)']);
@@ -221,11 +220,11 @@ class FinanceController extends Controller
                     'order_number' => $r->order_number,
                     'amount' => $r->amount,
                     'method' => $r->method,
-                    'method_label' => $this->methodLabel($r->method),
+                    'method_label' => PaymentLedger::methodLabel($r->method),
                     'refunded_at' => $r->at->toIso8601String(),
                     'vendor_debited' => $r->vendor_debited,
                     'vendor' => $vendors[$r->vendor_id] ?? VendorDirectory::unknown($r->vendor_id),
-                    'customer' => $this->personName($customers[$r->customer_id] ?? null),
+                    'customer' => PaymentLedger::personName($customers[$r->customer_id] ?? null),
                 ])->all(),
                 'disputes' => $disputes->map(fn (OrderRequest $d) => [
                     'id' => $d->id,
@@ -237,9 +236,9 @@ class FinanceController extends Controller
                     'order_number' => $d->order?->order_number,
                     'amount' => (float) ($d->order?->total_amount ?? 0),
                     'payment_status' => $d->order?->payment_status,
-                    'method_label' => $this->methodLabel($d->order?->payment_method),
+                    'method_label' => PaymentLedger::methodLabel($d->order?->payment_method),
                     'vendor' => $vendors[$d->order?->vendor_id] ?? VendorDirectory::unknown($d->order?->vendor_id),
-                    'customer' => $this->personName($d->user),
+                    'customer' => PaymentLedger::personName($d->user),
                     'created_at' => $d->created_at?->toIso8601String(),
                     'updated_at' => $d->updated_at?->toIso8601String(),
                 ])->all(),
@@ -301,71 +300,16 @@ class FinanceController extends Controller
 
             fputcsv($out, ['REFUNDS', 'Order', 'Amount (PHP)', 'Method', 'Vendor debited']);
             foreach ($refunds as $r) {
-                fputcsv($out, [$r->at->format('Y-m-d H:i'), $r->order_number, $money($r->amount), $this->methodLabel($r->method), $r->vendor_debited ? 'Yes' : 'No']);
+                fputcsv($out, [$r->at->format('Y-m-d H:i'), $r->order_number, $money($r->amount), PaymentLedger::methodLabel($r->method), $r->vendor_debited ? 'Yes' : 'No']);
             }
         });
     }
 
     // ── Ledger ───────────────────────────────────────────────────────────
 
-    /**
-     * Order payments and subscription payments as one list. The state is the
-     * payment's outcome, not the order's fulfilment status.
-     */
-    private function ledgerQuery(): Builder
-    {
-
-        $orders = DB::table('orders')->selectRaw("
-            'order' as source,
-            id as source_id,
-            order_number as reference,
-            vendor_id,
-            user_id as customer_id,
-            payment_method as method,
-            case when payment_method = 'cod' then 'cod' else 'paymongo' end as channel,
-            case
-                when payment_status = 'paid' then 'successful'
-                when payment_status = 'refunded' then 'refunded'
-                when payment_status = 'failed' or status = 'failed' then 'failed'
-                when status in ('cancelled', 'returned', 'refunded') then 'voided'
-                else 'pending'
-            end as state,
-            total_amount as amount,
-            coalesce(paid_at, created_at) as occurred_at,
-            created_at,
-            coalesce(paymongo_payment_intent_id, paymongo_source_id) as gateway_ref,
-            status as order_status
-        ");
-
-        $subscriptions = DB::table('vendor_subscription_checkouts')->selectRaw("
-            'subscription' as source,
-            id as source_id,
-            reference_number as reference,
-            vendor_id,
-            cast(null as bigint) as customer_id,
-            'subscription' as method,
-            'paymongo' as channel,
-            case
-                when status = 'paid' then 'successful'
-                when status = 'failed' then 'failed'
-                when status = 'cancelled' then 'voided'
-                when created_at < ? then 'voided'
-                else 'pending'
-            end as state,
-            amount,
-            coalesce(paid_at, created_at) as occurred_at,
-            created_at,
-            coalesce(paymongo_payment_id, paymongo_checkout_session_id) as gateway_ref,
-            cast(null as varchar) as order_status
-        ", [now()->subDay()]); // a subscription checkout left unpaid for a day was abandoned
-
-
-        return DB::query()->fromSub($orders->unionAll($subscriptions), 'ledger');
-    }
-
     private function filteredLedger(Request $request): Builder
     {
-        $query = $this->ledgerQuery();
+        $query = PaymentLedger::query();
 
         if (in_array($request->input('source'), ['order', 'subscription'], true)) {
             $query->where('source', $request->input('source'));
@@ -373,7 +317,7 @@ class FinanceController extends Controller
         if (in_array($request->input('channel'), ['cod', 'paymongo'], true)) {
             $query->where('channel', $request->input('channel'));
         }
-        if (in_array($request->input('state'), self::STATES, true)) {
+        if (in_array($request->input('state'), PaymentLedger::STATES, true)) {
             $query->where('state', $request->input('state'));
         }
         if ($request->filled('from')) {
@@ -405,33 +349,6 @@ class FinanceController extends Controller
         };
 
         return $query->orderBy(...$sort)->orderByDesc('source_id');
-    }
-
-    private function formatLedger(Collection $rows): array
-    {
-        $vendors = VendorDirectory::details($rows->pluck('vendor_id'));
-        $customers = User::query()->whereIn('id', $rows->pluck('customer_id')->filter()->unique())
-            ->get(['id', 'name', 'surname', 'email'])->keyBy('id');
-
-        return $rows->map(fn ($row) => [
-            'key' => $row->source . '-' . $row->source_id,
-            'source' => $row->source,
-            'source_id' => (int) $row->source_id,
-            'reference' => $row->reference,
-            'channel' => $row->channel,
-            'method' => $row->method,
-            'method_label' => $this->methodLabel($row->method),
-            'state' => $row->state,
-            'amount' => round((float) $row->amount, 2),
-            'occurred_at' => $row->occurred_at ? CarbonImmutable::parse($row->occurred_at)->toIso8601String() : null,
-            'gateway_ref' => PaymentMask::reference($row->gateway_ref),
-            'order_status' => $row->order_status,
-            'vendor' => $vendors[$row->vendor_id] ?? VendorDirectory::unknown($row->vendor_id),
-            'customer' => $row->customer_id ? [
-                'name' => $this->personName($customers[$row->customer_id] ?? null),
-                'email' => $customers[$row->customer_id]->email ?? null,
-            ] : null,
-        ])->values()->all();
     }
 
     // ── Vendors & refunds ────────────────────────────────────────────────
@@ -531,26 +448,6 @@ class FinanceController extends Controller
         $first = collect([Order::query()->min('created_at'), VendorSubscriptionCheckout::query()->min('created_at')])->filter()->min();
 
         return ReportPeriod::make($request->input('range'), $first ? CarbonImmutable::parse($first) : null);
-    }
-
-    private function methodLabel(?string $method): string
-    {
-        return match ($method) {
-            'cod' => 'Cash on delivery',
-            'ewallet' => 'E-wallet',
-            'bank_transfer' => 'Bank transfer',
-            'gcash' => 'GCash',
-            'maya' => 'Maya',
-            'card' => 'Card',
-            'subscription' => 'GCash / Maya',
-            null, '' => '—',
-            default => ucfirst(str_replace('_', ' ', $method)),
-        };
-    }
-
-    private function personName(?User $user): ?string
-    {
-        return $user ? (trim($user->name . ' ' . ($user->surname ?? '')) ?: null) : null;
     }
 
     private function csv(string $filename, callable $write): StreamedResponse

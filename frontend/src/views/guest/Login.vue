@@ -234,7 +234,7 @@ onMounted(() => {
 
       // Redirect based on role
       if (userData.role === "admin") {
-        router.push("/admin/vendor-requests");
+        router.push("/admin/dashboard");
       } else if (userData.role === "vendor") {
         router.push("/vendor/products");
       } else {
