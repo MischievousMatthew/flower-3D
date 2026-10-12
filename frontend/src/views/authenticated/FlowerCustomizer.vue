@@ -238,6 +238,39 @@
             </button>
           </div>
 
+          <div v-if="sceneReady" class="fc-toolbar fc-toolbar-center" role="toolbar" aria-label="Move, rotate and size">
+            <button
+              type="button"
+              class="fc-tool"
+              :class="{ on: bouquetSelected }"
+              :data-tip="bouquetSelected ? 'Deselect bouquet (Esc)' : 'Select whole bouquet'"
+              :aria-pressed="bouquetSelected"
+              aria-label="Select whole bouquet"
+              @click="toggleBouquetSelection"
+            >
+              <BcIcon name="bouquet" />
+            </button>
+            <span class="fc-toolbar-rule" aria-hidden="true"></span>
+            <button
+              v-for="mode in TRANSFORM_MODES"
+              :key="mode.value"
+              type="button"
+              class="fc-tool"
+              :class="{ on: hasTransformTarget && transformMode === mode.value }"
+              :data-tip="`${mode.label} (${mode.key})`"
+              :aria-label="mode.label"
+              :aria-pressed="transformMode === mode.value"
+              :disabled="!hasTransformTarget || (mode.value === 'scale' && bouquetSelected)"
+              @click="transformMode = mode.value"
+            >
+              <BcIcon :name="mode.icon" />
+            </button>
+            <span class="fc-toolbar-rule" aria-hidden="true"></span>
+            <button type="button" class="fc-tool" data-tip="Focus view (F)" aria-label="Focus the view on the selection" :disabled="!hasTransformTarget" @click="focusSelection">
+              <BcIcon name="target" />
+            </button>
+          </div>
+
           <div v-if="bouquetLoadError" class="fc-stage-center">
             <div class="fc-stage-message">
               <BcIcon name="info" />
@@ -317,101 +350,136 @@
             <section class="fc-section">
               <div class="fc-panel-head">
                 <h2>Adjust</h2>
-                <span v-if="selectedFlower" class="fc-truncate">{{ selectedFlower.product_name }}</span>
+                <span v-if="bouquetSelected" class="fc-truncate">Whole bouquet</span>
+                <span v-else-if="selectedFlower" class="fc-truncate">{{ selectedFlower.product_name }}</span>
               </div>
-              <p v-if="!selectedFlower" class="fc-note">Select something on the bouquet to resize, turn or move it.</p>
+              <p v-if="!hasTransformTarget" class="fc-note">
+                Click a flower to adjust it, or click the wrap (or the bouquet button above the stage) to move the whole bouquet.
+              </p>
 
               <div v-else class="fc-adjust">
-                <button
-                  type="button"
-                  class="fc-switch"
-                  role="switch"
-                  :aria-checked="selectedFlower.locked"
-                  @click="toggleSelectedLock"
-                >
-                  <span class="fc-switch-copy">
-                    <strong><BcIcon :name="selectedFlower.locked ? 'lock' : 'unlock'" /> Hold position</strong>
-                    <small>{{ selectedFlower.locked ? "Dragging and arrows are off." : "Drag it on the wrap or use the arrows." }}</small>
-                  </span>
-                  <span class="fc-switch-track"><span class="fc-switch-knob"></span></span>
-                </button>
-
-                <div class="fc-control">
-                  <div class="fc-control-head">
-                    <label for="fc-size">Size</label>
-                    <output>{{ Number(selectedFlower.scale ?? 1).toFixed(2) }}&times;</output>
+                <!-- Whole bouquet -->
+                <template v-if="bouquetSelected">
+                  <p class="fc-note">Moves the whole arrangement in the view. Your flowers stay where you placed them on the wrap.</p>
+                  <div class="fc-control">
+                    <div class="fc-control-head">
+                      <label for="fc-bouquet-turn">Turn</label>
+                      <output>{{ Math.round(bouquetTurn) }}&deg;</output>
+                    </div>
+                    <div class="fc-control-row">
+                      <button type="button" class="fc-step" aria-label="Turn left 15 degrees" @click="setBouquetTurn(bouquetTurn - 15)"><BcIcon name="minus" /></button>
+                      <input
+                        id="fc-bouquet-turn"
+                        class="fc-range"
+                        type="range"
+                        min="-180"
+                        max="180"
+                        :value="bouquetTurn"
+                        :style="rangeFill(bouquetTurn, -180, 180)"
+                        @input="setBouquetTurn(Number($event.target.value))"
+                      />
+                      <button type="button" class="fc-step" aria-label="Turn right 15 degrees" @click="setBouquetTurn(bouquetTurn + 15)"><BcIcon name="plus" /></button>
+                    </div>
                   </div>
-                  <input
-                    id="fc-size"
-                    class="fc-range"
-                    type="range"
-                    min="0.25"
-                    max="2"
-                    step="0.01"
-                    :value="selectedFlower.scale ?? 1"
-                    :style="rangeFill(selectedFlower.scale ?? 1, 0.25, 2)"
-                    @input="updateSelectedScale(Number($event.target.value))"
-                  />
-                </div>
+                </template>
 
-                <div class="fc-control">
-                  <div class="fc-control-head">
-                    <label for="fc-tilt">Tilt</label>
-                    <output>{{ Math.round(selectedFlower.rotation.xDeg) }}&deg;</output>
-                  </div>
-                  <div class="fc-control-row">
-                    <button type="button" class="fc-step" aria-label="Tilt back 15 degrees" @click="nudgeSelectedRotation('x', -15)"><BcIcon name="minus" /></button>
+                <!-- A flower, filler or card -->
+                <template v-else>
+                  <button
+                    type="button"
+                    class="fc-switch"
+                    role="switch"
+                    :aria-checked="selectedFlower.locked"
+                    @click="toggleSelectedLock"
+                  >
+                    <span class="fc-switch-copy">
+                      <strong><BcIcon :name="selectedFlower.locked ? 'lock' : 'unlock'" /> Hold position</strong>
+                      <small>{{ selectedFlower.locked ? "Moving, turning and sizing are off." : "Drag it on the wrap, use the handles or the buttons below." }}</small>
+                    </span>
+                    <span class="fc-switch-track"><span class="fc-switch-knob"></span></span>
+                  </button>
+
+                  <div class="fc-control">
+                    <div class="fc-control-head">
+                      <label for="fc-size">Size</label>
+                      <output>{{ Number(selectedFlower.scale ?? 1).toFixed(2) }}&times;</output>
+                    </div>
                     <input
-                      id="fc-tilt"
+                      id="fc-size"
                       class="fc-range"
                       type="range"
-                      min="-180"
-                      max="180"
-                      :value="selectedFlower.rotation.xDeg"
-                      :style="rangeFill(selectedFlower.rotation.xDeg, -180, 180)"
-                      @input="updateSelectedRotation('x', Number($event.target.value))"
+                      min="0.25"
+                      max="2"
+                      step="0.01"
+                      :disabled="selectedFlower.locked"
+                      :value="selectedFlower.scale ?? 1"
+                      :style="rangeFill(selectedFlower.scale ?? 1, 0.25, 2)"
+                      @input="updateSelectedScale(Number($event.target.value))"
                     />
-                    <button type="button" class="fc-step" aria-label="Tilt forward 15 degrees" @click="nudgeSelectedRotation('x', 15)"><BcIcon name="plus" /></button>
                   </div>
-                </div>
 
-                <div class="fc-control">
-                  <div class="fc-control-head">
-                    <label for="fc-turn">Turn</label>
-                    <output>{{ Math.round(selectedFlower.rotation.yDeg) }}&deg;</output>
+                  <div v-for="axis in ROTATION_AXES" :key="axis.key" class="fc-control">
+                    <div class="fc-control-head">
+                      <label :for="`fc-rot-${axis.key}`">{{ axis.label }}</label>
+                      <output>{{ Math.round(selectedFlower.rotation[`${axis.key}Deg`] || 0) }}&deg;</output>
+                    </div>
+                    <div class="fc-control-row">
+                      <button type="button" class="fc-step" :aria-label="`${axis.minus} 15 degrees`" :disabled="selectedFlower.locked" @click="nudgeSelectedRotation(axis.key, -15)"><BcIcon name="minus" /></button>
+                      <input
+                        :id="`fc-rot-${axis.key}`"
+                        class="fc-range"
+                        type="range"
+                        min="-180"
+                        max="180"
+                        :disabled="selectedFlower.locked"
+                        :value="selectedFlower.rotation[`${axis.key}Deg`] || 0"
+                        :style="rangeFill(selectedFlower.rotation[`${axis.key}Deg`] || 0, -180, 180)"
+                        @input="updateSelectedRotation(axis.key, Number($event.target.value))"
+                      />
+                      <button type="button" class="fc-step" :aria-label="`${axis.plus} 15 degrees`" :disabled="selectedFlower.locked" @click="nudgeSelectedRotation(axis.key, 15)"><BcIcon name="plus" /></button>
+                    </div>
                   </div>
-                  <div class="fc-control-row">
-                    <button type="button" class="fc-step" aria-label="Turn left 15 degrees" @click="nudgeSelectedRotation('y', -15)"><BcIcon name="minus" /></button>
-                    <input
-                      id="fc-turn"
-                      class="fc-range"
-                      type="range"
-                      min="-180"
-                      max="180"
-                      :value="selectedFlower.rotation.yDeg"
-                      :style="rangeFill(selectedFlower.rotation.yDeg, -180, 180)"
-                      @input="updateSelectedRotation('y', Number($event.target.value))"
-                    />
-                    <button type="button" class="fc-step" aria-label="Turn right 15 degrees" @click="nudgeSelectedRotation('y', 15)"><BcIcon name="plus" /></button>
-                  </div>
-                </div>
+                </template>
 
+                <!-- Six-way movement, relative to the current view -->
                 <div class="fc-move">
                   <div class="fc-move-copy">
-                    <span>Position</span>
-                    <small>Moves in small steps</small>
+                    <span>Move</span>
+                    <small>Follows the way you're looking. Hold Shift for small steps.</small>
                   </div>
-                  <div class="fc-pad" :class="{ locked: selectedFlower.locked }">
-                    <button type="button" class="fc-pad-up" aria-label="Move up" :disabled="selectedFlower.locked" @click="nudgeSelectedPosition('up')"><BcIcon name="arrowUp" /></button>
-                    <button type="button" class="fc-pad-left" aria-label="Move left" :disabled="selectedFlower.locked" @click="nudgeSelectedPosition('left')"><BcIcon name="arrowLeft" /></button>
-                    <button type="button" class="fc-pad-right" aria-label="Move right" :disabled="selectedFlower.locked" @click="nudgeSelectedPosition('right')"><BcIcon name="arrowRight" /></button>
-                    <button type="button" class="fc-pad-down" aria-label="Move down" :disabled="selectedFlower.locked" @click="nudgeSelectedPosition('down')"><BcIcon name="arrowDown" /></button>
+                  <div class="fc-move-controls" :class="{ locked: moveLocked }">
+                    <div class="fc-pad">
+                      <button type="button" class="fc-pad-up" aria-label="Move forward" title="Forward (↑)" :disabled="moveLocked" @click="nudgeSelectedPosition('forward', $event)"><BcIcon name="arrowUp" /></button>
+                      <button type="button" class="fc-pad-left" aria-label="Move left" title="Left (←)" :disabled="moveLocked" @click="nudgeSelectedPosition('left', $event)"><BcIcon name="arrowLeft" /></button>
+                      <button type="button" class="fc-pad-right" aria-label="Move right" title="Right (→)" :disabled="moveLocked" @click="nudgeSelectedPosition('right', $event)"><BcIcon name="arrowRight" /></button>
+                      <button type="button" class="fc-pad-down" aria-label="Move backward" title="Backward (↓)" :disabled="moveLocked" @click="nudgeSelectedPosition('backward', $event)"><BcIcon name="arrowDown" /></button>
+                    </div>
+                    <div class="fc-lift">
+                      <button type="button" aria-label="Move up" title="Up (Page Up or E)" :disabled="moveLocked" @click="nudgeSelectedPosition('up', $event)"><BcIcon name="arrowUp" /><span>Up</span></button>
+                      <button type="button" aria-label="Move down" title="Down (Page Down or Q)" :disabled="moveLocked" @click="nudgeSelectedPosition('down', $event)"><BcIcon name="arrowDown" /><span>Down</span></button>
+                    </div>
                   </div>
                 </div>
 
-                <button type="button" class="fc-text-btn" @click="resetSelectedTransform">
+                <button v-if="bouquetSelected" type="button" class="fc-text-btn" @click="resetBouquetPlacement">
+                  <BcIcon name="reset" /> Put the bouquet back in the centre
+                </button>
+                <button v-else type="button" class="fc-text-btn" :disabled="selectedFlower.locked" @click="resetSelectedTransform">
                   <BcIcon name="reset" /> Reset size and angle
                 </button>
+
+                <details class="fc-keys">
+                  <summary>Keyboard shortcuts</summary>
+                  <dl>
+                    <div><dt>G / R / S</dt><dd>Move, rotate or size with the handles</dd></div>
+                    <div><dt>Arrow keys</dt><dd>Forward, back, left, right</dd></div>
+                    <div><dt>Page Up / Down, E / Q</dt><dd>Up and down</dd></div>
+                    <div><dt>Shift</dt><dd>Smaller steps</dd></div>
+                    <div><dt>F</dt><dd>Focus the view on the selection</dd></div>
+                    <div><dt>Delete</dt><dd>Remove the selected item</dd></div>
+                    <div><dt>Esc</dt><dd>Deselect</dd></div>
+                  </dl>
+                </details>
               </div>
             </section>
 
@@ -685,11 +753,12 @@
 </template>
 
 <script setup>
-import { computed, h, nextTick, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, h, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import api from "../../plugins/axios.js";
 import { dressBouquet } from "../../utils/bouquetDressing.js";
@@ -733,6 +802,13 @@ const ICONS = {
   info: [["circle", { cx: 12, cy: 12, r: 9 }], ["path", { d: "M12 11v5M12 8h.01" }]],
   bag: [["path", { d: "M5 8h14l-1 12H6z" }], ["path", { d: "M9 8V6.5a3 3 0 0 1 6 0V8" }]],
   move: [["path", { d: "M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" }]],
+  scale: [["path", { d: "M4 20h7v-7H4zM14 4h6v6M20 4l-8 8" }]],
+  bouquet: [
+    ["path", { d: "M7 10l5 11 5-11" }],
+    ["circle", { cx: 9, cy: 7, r: 2.5 }],
+    ["circle", { cx: 15, cy: 7, r: 2.5 }],
+    ["circle", { cx: 12, cy: 4.5, r: 2.5 }],
+  ],
   target: [["circle", { cx: 12, cy: 12, r: 7 }], ["circle", { cx: 12, cy: 12, r: 2 }], ["path", { d: "M12 2v3M12 19v3M2 12h3M19 12h3" }]],
   leaf: [["path", { d: "M5 19c0-8 5-14 14-14 0 9-6 14-14 14z" }], ["path", { d: "M5 19l7.5-7.5" }]],
   card: [["rect", { x: 3, y: 6, width: 18, height: 13, rx: 2 }], ["path", { d: "m3.5 7.5 8.5 6 8.5-6" }]],
@@ -750,6 +826,18 @@ const BcIcon = (props) =>
   );
 BcIcon.props = ["name"];
 
+const TRANSFORM_MODES = [
+  { value: "translate", label: "Move", key: "G", icon: "move" },
+  { value: "rotate", label: "Rotate", key: "R", icon: "rotate" },
+  { value: "scale", label: "Size", key: "S", icon: "scale" },
+];
+const ROTATION_AXES = [
+  { key: "x", label: "Tilt", minus: "Tilt back", plus: "Tilt forward" },
+  { key: "y", label: "Turn", minus: "Turn left", plus: "Turn right" },
+  { key: "z", label: "Lean", minus: "Lean left", plus: "Lean right" },
+];
+const MOVE_STEP = 0.08;
+const FINE_MOVE_STEP = 0.02;
 const MAX_FLOWERS = 3;
 const MAX_FILLERS = 5;
 // Used only when the vendor has not added their own wrappers or ribbons.
@@ -786,6 +874,10 @@ const selectedFlowers = ref([]);
 const selectedSceneId = ref(null);
 const isDragOver = ref(false);
 const isTransformDragging = ref(false);
+// The whole bouquet (wrap + everything on it) can be selected instead of one item
+const bouquetSelected = ref(false);
+const transformMode = ref("translate");
+const bouquetTurn = ref(0);
 const isLeftSidebarCollapsed = ref(false);
 const isRightSidebarCollapsed = ref(false);
 const isFullscreen = ref(false);
@@ -846,21 +938,30 @@ const fillersSubtotal = computed(() => placedFillers.value.reduce((sum, filler) 
 const stemSlots = computed(() => Array.from({ length: MAX_FLOWERS }, (_, index) => placedFlowers.value[index] || null));
 const flowerImage = (flowerId) => flowers.value.find((flower) => flower.id === flowerId)?.image || null;
 const rangeFill = (value, min, max) => ({ "--fill": `${((Number(value) - min) / (max - min)) * 100}%` });
+const hasTransformTarget = computed(() => bouquetSelected.value || !!selectedFlower.value);
+const moveLocked = computed(() => !bouquetSelected.value && !!selectedFlower.value?.locked);
 const stageHint = computed(() => {
   if (pendingFlower.value) return { title: `Click the wrap to place ${pendingFlower.value.product_name}`, detail: "A marker shows where it will land." };
+  if (bouquetSelected.value) {
+    return { title: "Whole bouquet selected", detail: "Drag the handles to move it, R to rotate. Esc to deselect." };
+  }
   if (selectedFlower.value?.kind === "card") {
     return { title: "Double-click the card to write your message", detail: "Drag it to move it, or open it in the Card panel." };
   }
   if (selectedFlower.value) {
     return selectedFlower.value.locked
       ? { title: `${selectedFlower.value.product_name} is locked`, detail: "Unlock it in Adjust to move it again." }
-      : { title: `Drag ${selectedFlower.value.product_name} to move it`, detail: "Drag the background to rotate the view." };
+      : { title: `Drag ${selectedFlower.value.product_name} over the wrap, or use the handles`, detail: "G move · R rotate · S size · arrow keys nudge · Esc deselect" };
   }
-  if (placedFlowers.value.length >= MAX_FLOWERS) return { title: "All stems placed", detail: "Adjust them or choose a wrapper and ribbon." };
-  return { title: "Pick a flower, then click the wrap", detail: "Drag to rotate the view, scroll to zoom." };
+  if (placedFlowers.value.length >= MAX_FLOWERS) return { title: "All stems placed", detail: "Click one to adjust it, or click the wrap to move the whole bouquet." };
+  return { title: "Pick a flower, then click the wrap", detail: "Drag empty space to look around, scroll to zoom." };
 });
 
 let scene, camera, renderer, controls, bouquetRoot, flowerLayer, hoverMarker, animationFrameId = 0, pointerDown = null, transformDrag = null, toastTimer;
+// arrangement holds the wrap and every placed item, so moving the bouquet moves them together
+let arrangement, gizmo, gizmoStartScale = 1;
+// Pointer moves are applied at most once per frame
+let queuedPointer = null, pointerFrame = 0;
 const loader = new GLTFLoader();
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -887,11 +988,13 @@ onMounted(async () => {
   await Promise.all([loadBouquetModel(), fetchFlowers(), fetchCustomizationOptions()]);
   if (editingCustomization.value) await restoreBouquet(editingCustomization.value);
   window.addEventListener("resize", handleResize);
+  window.addEventListener("keydown", onKeydown);
   document.addEventListener("fullscreenchange", syncFullscreenState);
 });
 
 onUnmounted(() => {
   window.removeEventListener("resize", handleResize);
+  window.removeEventListener("keydown", onKeydown);
   document.removeEventListener("fullscreenchange", syncFullscreenState);
   cleanupScene();
   clearTimeout(toastTimer);
@@ -929,7 +1032,10 @@ function initScene() {
   hoverMarker = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), new THREE.MeshStandardMaterial({ color: 0xb86558, emissive: 0xb86558, emissiveIntensity: 0.35 }));
   hoverMarker.visible = false;
   flowerLayer = new THREE.Group();
-  scene.add(ambient, key, fill, ground, flowerLayer, hoverMarker);
+  arrangement = new THREE.Group();
+  arrangement.add(flowerLayer);
+  scene.add(ambient, key, fill, ground, arrangement, hoverMarker);
+  setupGizmo();
   setupCanvasInteractions();
   animateScene();
 }
@@ -958,7 +1064,7 @@ async function loadBouquetModel() {
     const scaledBox = new THREE.Box3().setFromObject(bouquetRoot);
     bouquetRoot.position.y -= scaledBox.min.y;
     bouquetRoot.scale.multiplyScalar(wrapperScale.value);
-    scene.add(bouquetRoot);
+    arrangement.add(bouquetRoot);
     // Only the two paper layers are tinted; the ribbon is generated.
     dressing = dressBouquet(bouquetRoot);
     dressing.outer.apply(wrap.outer.color);
@@ -1140,7 +1246,7 @@ function onCanvasDragOver(event) {
   isDragOver.value = true;
   if (!draggedFlower.value) return;
   dragFeedback.value = `Release to place ${draggedFlower.value.product_name}`;
-  updateHoverMarker(event.clientX, event.clientY);
+  queuePointer(event.clientX, event.clientY);
 }
 
 function onCanvasDragLeave() {
@@ -1164,72 +1270,150 @@ async function onCanvasDrop(event) {
   hideHoverMarker();
 }
 
+// Blender-style handles: arrows to move, rings to rotate, boxes to size
+function setupGizmo() {
+  gizmo = new TransformControls(camera, renderer.domElement);
+  gizmo.setSize(0.8);
+  gizmo.setSpace("world");
+  gizmo.addEventListener("dragging-changed", (event) => {
+    controls.enabled = !event.value;
+    isTransformDragging.value = event.value;
+    if (event.value) {
+      gizmoStartScale = gizmo.object?.scale.x ?? 1;
+      return;
+    }
+    commitGizmoChange();
+  });
+  gizmo.addEventListener("objectChange", () => {
+    const object = gizmo.object;
+    if (!object || object === arrangement || gizmo.mode !== "scale") return;
+    // Items only scale evenly: follow whichever handle moved the most
+    const { x, y, z } = object.scale;
+    const pick = [x, y, z].reduce((best, value) => (Math.abs(value - gizmoStartScale) > Math.abs(best - gizmoStartScale) ? value : best), x);
+    object.scale.setScalar(THREE.MathUtils.clamp(pick, 0.25, 2));
+  });
+  scene.add(gizmo.getHelper());
+}
+
+function updateGizmo() {
+  if (!gizmo) return;
+  const item = selectedFlower.value;
+  const target = pendingFlower.value || draggedFlower.value
+    ? null
+    : bouquetSelected.value
+      ? arrangement
+      : item && !item.locked
+        ? placedObjects.get(item.sceneId)
+        : null;
+  if (!target) {
+    gizmo.detach();
+    return;
+  }
+  if (bouquetSelected.value && transformMode.value === "scale") {
+    transformMode.value = "translate"; // the bouquet's size comes from the wrapper; this watcher runs again
+    return;
+  }
+  gizmo.setMode(transformMode.value);
+  // The bouquet only spins upright
+  const uprightSpin = bouquetSelected.value && transformMode.value === "rotate";
+  gizmo.showX = !uprightSpin;
+  gizmo.showZ = !uprightSpin;
+  gizmo.showY = true;
+  if (gizmo.object !== target) gizmo.attach(target);
+}
+watch([selectedSceneId, bouquetSelected, transformMode, () => selectedFlower.value?.locked, pendingFlower, draggedFlower, sceneReady], updateGizmo, { flush: "post" });
+
+function commitGizmoChange() {
+  const object = gizmo?.object;
+  if (!object) return;
+  if (object === arrangement) {
+    bouquetTurn.value = Math.round(THREE.MathUtils.radToDeg(arrangement.rotation.y));
+    return;
+  }
+  commitObjectState(object.userData.sceneId);
+}
+
+// Copies an object's position, angle and size into the saved design
+function commitObjectState(sceneId) {
+  const object = sceneId ? placedObjects.get(sceneId) : null;
+  if (!object) return;
+  const deg = (radians) => Math.round(THREE.MathUtils.radToDeg(radians) * 10) / 10;
+  updateFlowerState(sceneId, {
+    position: { x: object.position.x, y: object.position.y, z: object.position.z },
+    rotation: { xDeg: deg(object.rotation.x), yDeg: deg(object.rotation.y), zDeg: deg(object.rotation.z) },
+    scale: Math.round(object.scale.x * 100) / 100,
+  });
+}
+
+function queuePointer(clientX, clientY) {
+  queuedPointer = { x: clientX, y: clientY };
+  if (pointerFrame) return;
+  pointerFrame = window.requestAnimationFrame(flushPointer);
+}
+
+function flushPointer() {
+  pointerFrame = 0;
+  const next = queuedPointer;
+  queuedPointer = null;
+  if (!next) return;
+  if (transformDrag?.sceneId) moveSelectedFlower(next.x, next.y, transformDrag.sceneId);
+  else if (pendingFlower.value || draggedFlower.value) updateHoverMarker(next.x, next.y);
+}
+
 function setupCanvasInteractions() {
   const canvas = renderer.domElement;
   canvas.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0) return;
+    // The handles get first say
+    if (event.button !== 0 || gizmo?.dragging || gizmo?.axis) return;
     pointerDown = { x: event.clientX, y: event.clientY };
-    const placedHit = getPlacedFlowerHit(event.clientX, event.clientY);
-    if (placedHit?.sceneId) {
-      event.preventDefault();
-      selectPlacedFlower(placedHit.sceneId);
-      transformDrag = { sceneId: placedHit.sceneId, pointerId: event.pointerId };
-      isTransformDragging.value = true;
-      if (canvas.setPointerCapture) {
-        canvas.setPointerCapture(event.pointerId);
-      }
-      controls.enabled = false;
-      return;
-    }
+    if (pendingFlower.value || draggedFlower.value) return;
 
-    if (
-      selectedSceneId.value &&
-      !pendingFlower.value &&
-      !draggedFlower.value &&
-      getPlacement(event.clientX, event.clientY)
-    ) {
-      event.preventDefault();
-      transformDrag = { sceneId: selectedSceneId.value, pointerId: event.pointerId };
-      isTransformDragging.value = true;
-      if (canvas.setPointerCapture) {
-        canvas.setPointerCapture(event.pointerId);
-      }
-      controls.enabled = false;
-    }
+    // Pressing on an item selects it and lets you slide it over the wrap.
+    // Pressing the wrap or empty space only turns the view.
+    const placedHit = getPlacedFlowerHit(event.clientX, event.clientY);
+    if (!placedHit?.sceneId) return;
+    event.preventDefault();
+    selectPlacedFlower(placedHit.sceneId);
+    if (selectedFlowers.value.find((entry) => entry.sceneId === placedHit.sceneId)?.locked) return;
+    transformDrag = { sceneId: placedHit.sceneId, pointerId: event.pointerId };
+    isTransformDragging.value = true;
+    canvas.setPointerCapture?.(event.pointerId);
+    controls.enabled = false;
   });
   canvas.addEventListener("pointermove", (event) => {
     if (transformDrag?.sceneId) {
       event.preventDefault();
-      moveSelectedFlower(event.clientX, event.clientY, transformDrag.sceneId);
+      queuePointer(event.clientX, event.clientY);
       return;
     }
-    if (pendingFlower.value || draggedFlower.value) updateHoverMarker(event.clientX, event.clientY);
+    if (pendingFlower.value || draggedFlower.value) queuePointer(event.clientX, event.clientY);
   });
   canvas.addEventListener("pointerleave", () => {
-    endTransformDrag();
-    hideHoverMarker();
+    if (!transformDrag) hideHoverMarker();
   });
   canvas.addEventListener("pointerup", async (event) => {
-    if (!pointerDown || event.button !== 0) return;
-    const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y) > 6;
+    if (event.button !== 0) return;
     if (transformDrag?.sceneId) {
       endTransformDrag(event.pointerId);
       pointerDown = null;
       return;
     }
-    const placedHit = getPlacedFlowerHit(event.clientX, event.clientY);
-    if (!moved && placedHit?.sceneId) {
-      selectPlacedFlower(placedHit.sceneId);
-      pointerDown = null;
+    if (!pointerDown) return;
+    const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y) > 6;
+    pointerDown = null;
+    if (moved) return; // that was a view drag
+
+    if (pendingFlower.value) {
+      const placement = getPlacement(event.clientX, event.clientY);
+      if (!placement) return showToast("Click directly on the bouquet to place the flower.", "error");
+      await placeFlowerOnBouquet(pendingFlower.value, placement);
+      pendingFlower.value = null;
+      hideHoverMarker();
       return;
     }
-    pointerDown = null;
-    if (moved || !pendingFlower.value) return;
-    const placement = getPlacement(event.clientX, event.clientY);
-    if (!placement) return showToast("Click directly on the bouquet to place the flower.", "error");
-    await placeFlowerOnBouquet(pendingFlower.value, placement);
-    pendingFlower.value = null;
-    hideHoverMarker();
+    if (getPlacedFlowerHit(event.clientX, event.clientY)) return; // selected on press
+    if (getPlacement(event.clientX, event.clientY)) selectBouquet();
+    else clearSelection();
   });
   canvas.addEventListener("pointercancel", (event) => {
     endTransformDrag(event.pointerId);
@@ -1256,7 +1440,10 @@ function getPlacement(clientX, clientY) {
   if (!intersections.length) return null;
   const hit = intersections[0];
   const normal = hit.face?.normal ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() : new THREE.Vector3(0, 1, 0);
-  return { point: hit.point.clone().add(normal.clone().multiplyScalar(0.05)), normal };
+  const point = hit.point.clone().add(normal.clone().multiplyScalar(0.05));
+  flowerLayer.updateMatrixWorld();
+  // Items live inside the arrangement, so they keep their place when it moves
+  return { point, normal, local: flowerLayer.worldToLocal(point.clone()) };
 }
 
 function getPlacedFlowerHit(clientX, clientY) {
@@ -1288,9 +1475,16 @@ function endTransformDrag(pointerId = null) {
   if (canvas && pointerId !== null && canvas.hasPointerCapture?.(pointerId)) {
     canvas.releasePointerCapture(pointerId);
   }
+  // Apply the last queued move, then save once
+  if (pointerFrame) {
+    window.cancelAnimationFrame(pointerFrame);
+    flushPointer();
+  }
+  const sceneId = transformDrag?.sceneId;
   transformDrag = null;
   isTransformDragging.value = false;
   if (controls) controls.enabled = true;
+  if (sceneId) commitObjectState(sceneId);
 }
 
 async function placeFlowerOnBouquet(flower, placement) {
@@ -1323,7 +1517,8 @@ async function placeFlowerOnBouquet(flower, placement) {
     };
     fitFlowerModel(instance);
     wrapper.add(instance);
-    wrapper.position.copy(placement.point);
+    const at = placement.local ?? placement.point;
+    wrapper.position.copy(at);
     wrapper.rotation.set(
       THREE.MathUtils.degToRad(initialRotation.xDeg),
       THREE.MathUtils.degToRad(initialRotation.yDeg),
@@ -1340,7 +1535,7 @@ async function placeFlowerOnBouquet(flower, placement) {
       product_name: flower.product_name || flower.name,
       price: Number(flower.price || 0),
       model_3d_url: flower.model,
-      position: { x: placement.point.x, y: placement.point.y, z: placement.point.z },
+      position: { x: at.x, y: at.y, z: at.z },
       rotation: initialRotation,
       scale: 1,
       locked: false,
@@ -1399,7 +1594,8 @@ function placeCardOnBouquet(card, placement, saved = null) {
   const sceneId = saved?.scene_id || `card-${card.id}-${Date.now()}`;
 
   const object = createCard({ size: size.label, message, open });
-  object.position.copy(placement.point);
+  const at = placement.local ?? placement.point;
+  object.position.copy(at);
   object.rotation.set(
     THREE.MathUtils.degToRad(rotation.xDeg),
     THREE.MathUtils.degToRad(rotation.yDeg),
@@ -1423,7 +1619,7 @@ function placeCardOnBouquet(card, placement, saved = null) {
     limit: card.limit,
     message,
     open,
-    position: { x: placement.point.x, y: placement.point.y, z: placement.point.z },
+    position: { x: at.x, y: at.y, z: at.z },
     rotation,
     scale,
     locked: Boolean(saved?.locked),
@@ -1514,6 +1710,7 @@ function removeFlower(sceneId) {
     selectedSceneId.value = selectedFlowers.value[0]?.sceneId ?? null;
   }
   const object = placedObjects.get(sceneId);
+  if (object && gizmo?.object === object) gizmo.detach();
   if (object) {
     flowerLayer.remove(object);
     if (object.userData.isCard) disposeCard(object);
@@ -1523,6 +1720,7 @@ function removeFlower(sceneId) {
 }
 
 function resetDesign() {
+  gizmo?.detach();
   selectedFlowers.value.forEach((flower) => {
     const object = placedObjects.get(flower.sceneId);
     if (!object) return;
@@ -1539,18 +1737,32 @@ function resetDesign() {
 }
 
 function selectPlacedFlower(sceneId) {
+  bouquetSelected.value = false;
   selectedSceneId.value = sceneId;
 }
 
+function selectBouquet() {
+  selectedSceneId.value = null;
+  bouquetSelected.value = true;
+}
+
+function clearSelection() {
+  selectedSceneId.value = null;
+  bouquetSelected.value = false;
+}
+
+function toggleBouquetSelection() {
+  if (bouquetSelected.value) clearSelection();
+  else selectBouquet();
+}
+
+// Slides an item over the wrap while it's dragged; saved when the drag ends
 function moveSelectedFlower(clientX, clientY, sceneId = selectedSceneId.value) {
   const placement = getPlacement(clientX, clientY);
   const object = sceneId ? placedObjects.get(sceneId) : null;
   const flower = selectedFlowers.value.find((entry) => entry.sceneId === sceneId);
   if (!placement || !object || flower?.locked) return;
-  object.position.copy(placement.point);
-  updateFlowerState(sceneId, {
-    position: { x: placement.point.x, y: placement.point.y, z: placement.point.z },
-  });
+  object.position.copy(placement.local);
 }
 
 function updateSelectedRotation(axis, degrees) {
@@ -1558,16 +1770,18 @@ function updateSelectedRotation(axis, degrees) {
   const object = sceneId ? placedObjects.get(sceneId) : null;
   const flower = selectedFlower.value;
   if (!sceneId || !object || !flower) return;
-  const nextRotation = { ...flower.rotation, [`${axis}Deg`]: degrees };
-  if (axis === "x") object.rotation.x = THREE.MathUtils.degToRad(degrees);
-  if (axis === "y") object.rotation.y = THREE.MathUtils.degToRad(degrees);
+  if (flower.locked) return;
+  // Keep the angle between -180 and 180
+  const wrapped = ((((degrees + 180) % 360) + 360) % 360) - 180;
+  const nextRotation = { ...flower.rotation, [`${axis}Deg`]: wrapped };
+  object.rotation[axis] = THREE.MathUtils.degToRad(wrapped);
   updateFlowerState(sceneId, { rotation: nextRotation });
 }
 
 function updateSelectedScale(scale) {
   const flower = selectedFlower.value;
   const object = flower ? placedObjects.get(flower.sceneId) : null;
-  if (!flower || !object) return;
+  if (!flower || !object || flower.locked) return;
 
   const nextScale = THREE.MathUtils.clamp(scale, 0.25, 2);
   object.scale.setScalar(nextScale);
@@ -1577,7 +1791,7 @@ function updateSelectedScale(scale) {
 function nudgeSelectedRotation(axis, delta) {
   const flower = selectedFlower.value;
   if (!flower) return;
-  updateSelectedRotation(axis, flower.rotation[`${axis}Deg`] + delta);
+  updateSelectedRotation(axis, (flower.rotation[`${axis}Deg`] || 0) + delta);
 }
 
 function resetSelectedTransform() {
@@ -1606,25 +1820,98 @@ function toggleFlowerLock(sceneId) {
   updateFlowerState(sceneId, { locked: !flower.locked });
 }
 
-function nudgeSelectedPosition(direction) {
+// A world direction for each button, relative to where the camera looks:
+// forward is "into the screen" along the floor, up is always straight up.
+function directionVector(direction) {
+  if (direction === "up") return new THREE.Vector3(0, 1, 0);
+  if (direction === "down") return new THREE.Vector3(0, -1, 0);
+  const forward = new THREE.Vector3();
+  camera.getWorldDirection(forward);
+  forward.y = 0;
+  if (forward.lengthSq() < 1e-6) forward.set(0, 0, -1);
+  forward.normalize();
+  const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+  return {
+    forward,
+    backward: forward.clone().negate(),
+    right,
+    left: right.clone().negate(),
+  }[direction] ?? new THREE.Vector3();
+}
+
+function nudgeSelectedPosition(direction, event = null) {
+  const step = event?.shiftKey ? FINE_MOVE_STEP : MOVE_STEP;
+  const delta = directionVector(direction).multiplyScalar(step);
+
+  if (bouquetSelected.value) {
+    arrangement.position.add(delta);
+    return;
+  }
+
   const flower = selectedFlower.value;
   const object = flower ? placedObjects.get(flower.sceneId) : null;
   if (!flower || !object || flower.locked) return;
+  // Items sit inside the arrangement, which may be turned
+  object.position.add(delta.applyQuaternion(arrangement.quaternion.clone().invert()));
+  commitObjectState(flower.sceneId);
+}
 
-  const step = 0.08;
-  const nextPosition = {
-    x: flower.position.x,
-    y: flower.position.y,
-    z: flower.position.z,
-  };
+function setBouquetTurn(degrees) {
+  const wrapped = ((((degrees + 180) % 360) + 360) % 360) - 180;
+  bouquetTurn.value = wrapped;
+  if (arrangement) arrangement.rotation.y = THREE.MathUtils.degToRad(wrapped);
+}
 
-  if (direction === "left") nextPosition.x -= step;
-  if (direction === "right") nextPosition.x += step;
-  if (direction === "up") nextPosition.y += step;
-  if (direction === "down") nextPosition.y -= step;
+function resetBouquetPlacement() {
+  if (!arrangement) return;
+  arrangement.position.set(0, 0, 0);
+  setBouquetTurn(0);
+}
 
-  object.position.set(nextPosition.x, nextPosition.y, nextPosition.z);
-  updateFlowerState(flower.sceneId, { position: nextPosition });
+// Points the camera at the selection, keeping the current angle and distance
+function focusSelection() {
+  const target = bouquetSelected.value ? arrangement : selectedFlower.value ? placedObjects.get(selectedFlower.value.sceneId) : null;
+  if (!target || !controls) return;
+  const box = new THREE.Box3().setFromObject(target);
+  if (box.isEmpty()) return;
+  const center = box.getCenter(new THREE.Vector3());
+  const shift = center.sub(controls.target);
+  controls.target.add(shift);
+  camera.position.add(shift);
+  controls.update();
+}
+
+const MOVE_KEYS = {
+  arrowup: "forward",
+  arrowdown: "backward",
+  arrowleft: "left",
+  arrowright: "right",
+  pageup: "up",
+  e: "up",
+  pagedown: "down",
+  q: "down",
+};
+
+function onKeydown(event) {
+  if (!sceneReady.value || cardEditor.open || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.target?.closest?.("input, textarea, select, [contenteditable='true']")) return;
+  const key = event.key.toLowerCase();
+  let handled = true;
+
+  if (key === "escape") {
+    if (pendingFlower.value) pendingFlower.value = null;
+    else clearSelection();
+  } else if (!hasTransformTarget.value) {
+    handled = false;
+  } else if (key === "g") transformMode.value = "translate";
+  else if (key === "r") transformMode.value = "rotate";
+  else if (key === "s" && !bouquetSelected.value) transformMode.value = "scale";
+  else if (key === "f") focusSelection();
+  else if ((key === "delete" || key === "backspace") && selectedFlower.value) removeFlower(selectedFlower.value.sceneId);
+  else if (MOVE_KEYS[key]) nudgeSelectedPosition(MOVE_KEYS[key], event);
+  else handled = false;
+
+  if (handled) event.preventDefault();
 }
 
 function updateFlowerState(sceneId, patch) {
@@ -1934,6 +2221,9 @@ function handleResize() {
 
 function cleanupScene() {
   window.cancelAnimationFrame(animationFrameId);
+  window.cancelAnimationFrame(pointerFrame);
+  gizmo?.detach();
+  gizmo?.dispose();
   controls?.dispose();
   renderer?.dispose();
   if (renderer?.domElement && viewerContainer.value?.contains(renderer.domElement)) {
@@ -2763,6 +3053,11 @@ function showToast(message, type = "success") {
   right: 16px;
 }
 
+.fc-toolbar-center {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .fc-toolbar-rule {
   width: 1px;
   height: 18px;
@@ -3341,6 +3636,79 @@ function showToast(message, type = "success") {
 .fc-pad-left { grid-area: left; }
 .fc-pad-right { grid-area: right; }
 .fc-pad-down { grid-area: down; }
+
+.fc-move-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fc-lift {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fc-lift button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.25s;
+}
+
+.fc-lift button:hover:not(:disabled) {
+  background: var(--ivory-deep);
+}
+
+.fc-lift button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.fc-lift .fc-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.fc-keys {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.fc-keys summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.fc-keys dl {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+}
+
+.fc-keys dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fc-keys dt {
+  font-weight: 600;
+  color: var(--ink, inherit);
+  white-space: nowrap;
+}
+
+.fc-keys dd {
+  margin: 0;
+  text-align: right;
+}
 
 .fc-text-btn {
   display: inline-flex;
