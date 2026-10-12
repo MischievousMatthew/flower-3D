@@ -602,6 +602,11 @@ const routes = [
         component: () => import("../views/admin/SubscriptionRevenue.vue"),
       },
       {
+        path: "orders",
+        name: "AdminOrders",
+        component: () => import("../views/admin/Orders.vue"),
+      },
+      {
         path: "vendor-requests",
         name: "VendorRequest",
         component: () => import("../views/admin/VendorRequest.vue"),

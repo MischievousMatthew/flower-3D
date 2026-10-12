@@ -110,6 +110,11 @@ class Order extends Model
         return $this->hasMany(\App\Models\OrderRequest::class);
     }
 
+    public function adminNotes(): HasMany
+    {
+        return $this->hasMany(OrderAdminNote::class)->latest();
+    }
+
     // ─── Scopes ────────────────────────────────────────────────────────────────
 
     public function scopePending($query)    { return $query->where('status', 'pending'); }

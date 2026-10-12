@@ -6,6 +6,7 @@ use App\Http\Controllers\Customer\CustomerProductController;
 use App\Http\Controllers\Admin\VendorApplicationController;
 use App\Http\Controllers\Admin\LoginAuditLogController;
 use App\Http\Controllers\Admin\SubscriptionRevenueController;
+use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\VendorApplicationResubmissionController;
@@ -682,6 +683,14 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/transactions', [SubscriptionRevenueController::class, 'transactions']);
             Route::get('/transactions/export', [SubscriptionRevenueController::class, 'export']);
             Route::get('/subscribers', [SubscriptionRevenueController::class, 'subscribers']);
+        });
+
+        // Read-only oversight of vendor orders (plus private admin notes)
+        Route::middleware('role:admin')->prefix('orders')->group(function () {
+            Route::get('/summary', [AdminOrderController::class, 'summary']);
+            Route::get('/', [AdminOrderController::class, 'index']);
+            Route::get('/{id}', [AdminOrderController::class, 'show'])->whereNumber('id');
+            Route::post('/{id}/notes', [AdminOrderController::class, 'addNote'])->whereNumber('id');
         });
     });
 

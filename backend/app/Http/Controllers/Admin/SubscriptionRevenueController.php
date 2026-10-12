@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\SubscriptionStatus;
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Models\VendorApplication;
 use App\Models\VendorSubscription;
 use App\Models\VendorSubscriptionCheckout;
 use App\Models\VendorSubscriptionTrial;
 use App\Subscriptions\SubscriptionPlans;
+use App\Support\VendorDirectory;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
@@ -463,12 +463,11 @@ class SubscriptionRevenueController extends Controller
         }
         if ($search = trim((string) $request->input('search'))) {
             $like = '%' . mb_strtolower($search) . '%';
-            $emails = VendorApplication::query()->whereRaw('lower(store_name) like ?', [$like])->pluck('email');
             $vendorIds = User::query()
                 ->whereRaw('lower(name) like ?', [$like])
                 ->orWhereRaw('lower(email) like ?', [$like])
-                ->orWhereIn('email', $emails)
-                ->pluck('id');
+                ->pluck('id')
+                ->merge(VendorDirectory::idsMatching($search));
 
             $query->where(fn ($q) => $q
                 ->whereRaw('lower(reference_number) like ?', [$like])
@@ -500,28 +499,13 @@ class SubscriptionRevenueController extends Controller
 
     // ── Vendors ──────────────────────────────────────────────────────────
 
-    /** Store name and logo for each vendor user id */
     private function vendorDetails(Collection $vendorIds): array
     {
-        $users = User::query()->whereIn('id', $vendorIds->filter()->unique()->values())->get(['id', 'name', 'email']);
-        $stores = VendorApplication::query()
-            ->whereIn('email', $users->pluck('email'))
-            ->orderByDesc('id')
-            ->get()
-            ->unique('email')
-            ->keyBy('email');
-
-        return $users->mapWithKeys(fn ($user) => [$user->id => [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'store_name' => $stores[$user->email]->store_name ?? $user->name,
-            'logo_url' => $stores[$user->email]->store_logo_url ?? null,
-        ]])->all();
+        return VendorDirectory::details($vendorIds);
     }
 
     private function unknownVendor($id): array
     {
-        return ['id' => $id, 'name' => 'Deleted vendor', 'email' => null, 'store_name' => 'Deleted vendor', 'logo_url' => null];
+        return VendorDirectory::unknown($id);
     }
 }
