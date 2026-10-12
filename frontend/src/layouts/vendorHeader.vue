@@ -51,6 +51,9 @@
       <!-- Parent-injected icon buttons -->
       <slot name="actions" />
 
+      <!-- Announcements and support replies (store owners only) -->
+      <NotificationBell v-if="user?.role === 'vendor'" support-path="/vendor/support" />
+
       <router-link
         :to="chatRoute"
         class="chat-pill"
@@ -272,6 +275,7 @@ import api from "../plugins/axios";
 import { toast } from "vue3-toastify";
 import { useSubscriptionAccess } from "../composables/useSubscriptionAccess";
 import LoadingOverlay from "../layouts/components/LoadingOverlay.vue";
+import NotificationBell from "../components/support/NotificationBell.vue";
 
 const props = defineProps({
   title: { type: String, default: "" },

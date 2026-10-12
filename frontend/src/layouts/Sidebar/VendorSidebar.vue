@@ -145,6 +145,14 @@
         </router-link>
       </div>
 
+      <div class="nav-section">
+        <div class="section-label">HELP</div>
+        <router-link to="/vendor/support" class="nav-item" active-class="active">
+          <span class="nav-icon">🛟</span>
+          <span>Help &amp; support</span>
+        </router-link>
+      </div>
+
       <!-- <router-link to="/report" class="nav-item">
         <span class="nav-icon">📋</span>
         <span>Report</span>

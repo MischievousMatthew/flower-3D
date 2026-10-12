@@ -124,6 +124,11 @@ const routes = [
         name: "OrderTracking",
         component: () => import("../views/authenticated/OrderTracking.vue"),
       },
+      {
+        path: "support",
+        name: "CustomerSupport",
+        component: () => import("../views/authenticated/CustomerSupport.vue"),
+      },
     ],
   },
 
@@ -168,6 +173,12 @@ const routes = [
         name: "VendorChat",
         meta: { subscriptionModule: MODULE.CRM },
         component: () => import("../views/vendor/VendorChat.vue"),
+      },
+      {
+        // Always available, whatever the plan
+        path: "support",
+        name: "VendorSupport",
+        component: () => import("../views/vendor/VendorSupport.vue"),
       },
       {
         path: "finance-dashboard",
@@ -631,6 +642,11 @@ const routes = [
         path: "website",
         name: "AdminContent",
         component: () => import("../views/admin/Content.vue"),
+      },
+      {
+        path: "support",
+        name: "AdminSupport",
+        component: () => import("../views/admin/Support.vue"),
       },
       {
         path: "vendor-requests",

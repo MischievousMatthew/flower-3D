@@ -13,6 +13,9 @@ use App\Http\Controllers\Admin\AdminProductController;
 use App\Http\Controllers\Admin\AdminCustomerController;
 use App\Http\Controllers\Admin\AdminContentController;
 use App\Http\Controllers\SiteContentController;
+use App\Http\Controllers\Admin\AdminSupportController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\SupportController;
 use App\Http\Controllers\ProductTaxonomyController;
 use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\AuthController;
@@ -167,6 +170,20 @@ Route::middleware('token.auth')->group(function () {
         ->middleware('vendor');
     Route::get('/vendor/subscription/checkout/{checkout}', [VendorSubscriptionController::class, 'checkoutStatus'])
         ->middleware('vendor');
+
+    // Notifications inbox and support requests (vendors and customers)
+    Route::middleware('token.auth:user')->group(function () {
+        Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+        Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+        Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->whereNumber('id');
+
+        Route::get('/support/tickets', [SupportController::class, 'index']);
+        Route::post('/support/tickets', [SupportController::class, 'store']);
+        Route::get('/support/tickets/{id}', [SupportController::class, 'show'])->whereNumber('id');
+        Route::post('/support/tickets/{id}/messages', [SupportController::class, 'reply'])->whereNumber('id');
+        Route::post('/support/tickets/{id}/resolve', [SupportController::class, 'resolve'])->whereNumber('id');
+    });
 
     // ----------------------------------------------------------
     // 6a. Auth — session management
@@ -766,6 +783,20 @@ Route::middleware('token.auth')->group(function () {
 
             Route::get('/settings', [AdminContentController::class, 'settings']);
             Route::put('/settings', [AdminContentController::class, 'saveSettings']);
+        });
+
+        // Notifications & support: inbox, announcements, alerts, activity
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/support/summary', [AdminSupportController::class, 'summary']);
+            Route::get('/support/tickets', [AdminSupportController::class, 'tickets']);
+            Route::get('/support/tickets/{id}', [AdminSupportController::class, 'ticket'])->whereNumber('id');
+            Route::post('/support/tickets/{id}/reply', [AdminSupportController::class, 'reply'])->whereNumber('id');
+            Route::post('/support/tickets/{id}/status', [AdminSupportController::class, 'setStatus'])->whereNumber('id');
+            Route::get('/support/alerts', [AdminSupportController::class, 'alerts']);
+            Route::get('/support/events', [AdminSupportController::class, 'events']);
+            Route::get('/broadcasts', [AdminSupportController::class, 'broadcasts']);
+            Route::post('/broadcasts', [AdminSupportController::class, 'sendBroadcast']);
+            Route::delete('/broadcasts/{id}', [AdminSupportController::class, 'retractBroadcast'])->whereNumber('id');
         });
 
         // Read-only finance: payments, refunds, earnings and exports

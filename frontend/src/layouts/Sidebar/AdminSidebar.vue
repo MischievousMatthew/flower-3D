@@ -119,6 +119,15 @@
         </router-link>
 
         <router-link
+          to="/admin/support"
+          class="nav-item"
+          active-class="active"
+        >
+          <span class="nav-icon">🛎️</span>
+          <span>Notifications &amp; Support</span>
+        </router-link>
+
+        <router-link
           to="/admin/website"
           class="nav-item"
           active-class="active"

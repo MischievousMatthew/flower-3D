@@ -72,12 +72,34 @@
               <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" />
               <path d="M10 20a2 2 0 0 0 4 0" />
             </svg>
-            <span v-if="notificationCount > 0" class="nav-badge">
-              {{ notificationCount > 9 ? "9+" : notificationCount }}
+            <span v-if="notificationCount + noticeUnread > 0" class="nav-badge">
+              {{ notificationCount + noticeUnread > 9 ? "9+" : notificationCount + noticeUnread }}
             </span>
           </button>
 
           <div v-if="showNotificationDropdown" class="nav-menu notification-menu">
+            <template v-if="notices.length">
+              <div class="nav-menu-head">
+                <span class="bc-label">From BloomCraft</span>
+                <button v-if="noticeUnread" type="button" class="nav-menu-action" @click="readAllNotices">Mark read</button>
+              </div>
+              <div class="notification-list">
+                <button
+                  v-for="notice in notices"
+                  :key="`notice-${notice.id}`"
+                  type="button"
+                  class="notification-entry"
+                  @click="openNotice(notice)"
+                >
+                  <span class="notification-status-dot" :class="notice.read ? '' : 'info'"></span>
+                  <span class="notification-entry-content">
+                    <span class="notification-entry-title">{{ notice.title }}</span>
+                    <span v-if="notice.body" class="notification-entry-message">{{ notice.body }}</span>
+                    <span class="notification-entry-time">{{ formatNoticeTime(notice.created_at) }}</span>
+                  </span>
+                </button>
+              </div>
+            </template>
             <div class="nav-menu-head">
               <span class="bc-label">Order updates</span>
               <button
@@ -204,6 +226,18 @@
                 <path d="M4 8l8 4 8-4M12 12v8" />
               </svg>
               <span>Orders</span>
+            </router-link>
+
+            <router-link
+              v-if="user?.role === 'customer'"
+              to="/customer/support"
+              class="dropdown-item"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" />
+              </svg>
+              <span>Help &amp; support</span>
             </router-link>
 
             <router-link
@@ -400,12 +434,56 @@ const toggleUserDropdown = () => {
   }
 };
 
+// ── Notices from BloomCraft (announcements, support replies) ──────────────
+const notices = ref([]);
+const noticeUnread = ref(0);
+const loadNotices = async (withItems = false) => {
+  if (!isAuthenticated.value || user.value?.role !== "customer") return;
+  try {
+    if (withItems) {
+      const { data } = await api.get("/notifications", { params: { limit: 6 } });
+      notices.value = data.data ?? [];
+      noticeUnread.value = data.unread ?? 0;
+    } else {
+      noticeUnread.value = (await api.get("/notifications/unread-count")).data.unread ?? 0;
+    }
+  } catch {
+    // notices are optional
+  }
+};
+const openNotice = async (notice) => {
+  if (!notice.read) {
+    notice.read = true;
+    try {
+      noticeUnread.value = (await api.post(`/notifications/${notice.id}/read`)).data.unread ?? 0;
+    } catch {
+      // stays unread on the server; harmless
+    }
+  }
+  if (notice.link_url) {
+    showNotificationDropdown.value = false;
+    if (/^https?:\/\//i.test(notice.link_url)) window.open(notice.link_url, "_blank", "noopener");
+    else router.push(notice.link_url);
+  }
+};
+const readAllNotices = async () => {
+  notices.value.forEach((n) => (n.read = true));
+  noticeUnread.value = 0;
+  try {
+    await api.post("/notifications/read-all");
+  } catch {
+    loadNotices();
+  }
+};
+const formatNoticeTime = (value) =>
+  value ? new Date(value).toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+
 const toggleNotificationDropdown = async () => {
   showNotificationDropdown.value = !showNotificationDropdown.value;
   showUserDropdown.value = false;
 
   if (showNotificationDropdown.value) {
-    await loadOrderNotifications();
+    await Promise.all([loadOrderNotifications(), loadNotices(true)]);
     markOrderNotificationsAsSeen(orderNotifications.value);
   }
 };
@@ -686,7 +764,11 @@ onMounted(() => {
     loadOrderNotifications();
 
     if (user.value?.role === "customer") {
-      notificationInterval = window.setInterval(loadOrderNotifications, 60000);
+      loadNotices();
+      notificationInterval = window.setInterval(() => {
+        loadOrderNotifications();
+        loadNotices();
+      }, 60000);
     }
   }
 });
