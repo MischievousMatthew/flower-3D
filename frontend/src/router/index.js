@@ -622,6 +622,11 @@ const routes = [
         component: () => import("../views/admin/Dashboard.vue"),
       },
       {
+        path: "analytics",
+        name: "AdminAnalytics",
+        component: () => import("../views/admin/Analytics.vue"),
+      },
+      {
         path: "subscription-revenue",
         name: "AdminSubscriptionRevenue",
         component: () => import("../views/admin/SubscriptionRevenue.vue"),

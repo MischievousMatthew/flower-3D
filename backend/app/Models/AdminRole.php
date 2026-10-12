@@ -16,6 +16,8 @@ class AdminRole extends Model
         'Overview' => [
             'dashboard.view' => 'See the dashboard',
             'revenue.view' => 'See subscription revenue',
+            'reports.view' => 'See reports & analytics',
+            'reports.export' => 'Download reports (CSV / PDF)',
         ],
         'Orders & money' => [
             'orders.view' => 'See orders',

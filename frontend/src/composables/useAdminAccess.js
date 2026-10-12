@@ -11,6 +11,7 @@ let request = null;
 /** Admin pages in sidebar order, with the permission each one needs */
 export const ADMIN_PAGES = [
   { path: "/admin/dashboard", permission: "dashboard.view" },
+  { path: "/admin/analytics", permission: "reports.view" },
   { path: "/admin/subscription-revenue", permission: "revenue.view" },
   { path: "/admin/orders", permission: "orders.view" },
   { path: "/admin/finance", permission: "finance.view" },

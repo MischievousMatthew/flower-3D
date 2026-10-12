@@ -40,6 +40,16 @@
         </router-link>
 
         <router-link
+          v-if="canSee('/admin/analytics')"
+          to="/admin/analytics"
+          class="nav-item"
+          active-class="active"
+        >
+          <span class="nav-icon">📈</span>
+          <span>Reports &amp; Analytics</span>
+        </router-link>
+
+        <router-link
           v-if="canSee('/admin/subscription-revenue')"
           to="/admin/subscription-revenue"
           class="nav-item"

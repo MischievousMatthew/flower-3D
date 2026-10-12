@@ -448,6 +448,7 @@ const AREAS = {
   AdminSupportController: "Support & announcements",
   FinanceController: "Finance exports",
   SubscriptionRevenueController: "Subscription exports",
+  AdminReportsController: "Report downloads",
   SecurityController: "Security",
 };
 const ACTIONS = {
@@ -489,6 +490,7 @@ const ACTIONS = {
   "FinanceController@exportTransactions": "Exported transactions",
   "FinanceController@exportReport": "Exported a financial report",
   "SubscriptionRevenueController@export": "Exported subscription payments",
+  "AdminReportsController@export": "Downloaded an analytics report",
   "SecurityController@createAdmin": "Added an administrator",
   "SecurityController@updateAdmin": "Edited an administrator",
   "SecurityController@setAdminActive": "Turned an administrator on/off",

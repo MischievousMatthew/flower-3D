@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\AdminContentController;
 use App\Http\Controllers\SiteContentController;
 use App\Http\Controllers\Admin\AdminSupportController;
 use App\Http\Controllers\Admin\SecurityController;
+use App\Http\Controllers\Admin\AdminReportsController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\ProductTaxonomyController;
@@ -720,6 +721,10 @@ Route::middleware('token.auth')->group(function () {
 
         Route::get('/login-logs', [LoginAuditLogController::class, 'index'])->middleware('admin.can:security.view');
         Route::get('/dashboard', [AdminDashboardController::class, 'overview'])->middleware('admin.can:dashboard.view');
+
+        // Reports & analytics (CSV / PDF downloads are audited as exports)
+        Route::get('/analytics', [AdminReportsController::class, 'index'])->middleware('admin.can:reports.view');
+        Route::get('/analytics/export', [AdminReportsController::class, 'export'])->middleware('admin.can:reports.export');
 
         Route::middleware('admin.can:revenue.view')->prefix('subscriptions')->group(function () {
             Route::get('/revenue', [SubscriptionRevenueController::class, 'overview']);
