@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminVendorController;
 use App\Http\Controllers\Admin\AdminProductController;
+use App\Http\Controllers\Admin\AdminCustomerController;
 use App\Http\Controllers\ProductTaxonomyController;
 use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\AuthController;
@@ -710,6 +711,17 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/{id}', [AdminVendorController::class, 'show'])->whereNumber('id');
             Route::post('/{id}/suspend', [AdminVendorController::class, 'suspend'])->whereNumber('id');
             Route::post('/{id}/reactivate', [AdminVendorController::class, 'reactivate'])->whereNumber('id');
+        });
+
+        // Customer accounts: personal details masked unless revealed (and logged)
+        Route::middleware('role:admin')->prefix('customers')->group(function () {
+            Route::get('/summary', [AdminCustomerController::class, 'summary']);
+            Route::get('/complaints', [AdminCustomerController::class, 'complaintFeed']);
+            Route::get('/', [AdminCustomerController::class, 'index']);
+            Route::get('/{id}', [AdminCustomerController::class, 'show'])->whereNumber('id');
+            Route::post('/{id}/reveal', [AdminCustomerController::class, 'reveal'])->whereNumber('id');
+            Route::post('/{id}/suspend', [AdminCustomerController::class, 'suspend'])->whereNumber('id');
+            Route::post('/{id}/reactivate', [AdminCustomerController::class, 'reactivate'])->whereNumber('id');
         });
 
         // Read-only finance: payments, refunds, earnings and exports

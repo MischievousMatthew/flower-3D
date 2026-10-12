@@ -8,11 +8,11 @@ use App\Models\Order;
 use App\Models\OrderRequest;
 use App\Models\Product;
 use App\Models\User;
-use App\Models\VendorAccountEvent;
+use App\Models\AccountEvent;
 use App\Models\VendorApplication;
 use App\Models\VendorSubscription;
 use App\Models\VendorSubscriptionCheckout;
-use App\Services\VendorAccountService;
+use App\Services\AccountSuspensionService;
 use App\Subscriptions\SubscriptionPlans;
 use App\Support\PaymentLedger;
 use Carbon\CarbonImmutable;
@@ -31,7 +31,7 @@ class AdminVendorController extends Controller
 {
     private const FINISHED = ['completed', 'cancelled', 'failed', 'returned', 'refunded'];
 
-    public function __construct(private readonly VendorAccountService $accounts)
+    public function __construct(private readonly AccountSuspensionService $accounts)
     {
     }
 
@@ -111,8 +111,8 @@ class AdminVendorController extends Controller
                 'products' => $this->products($vendor),
                 'orders' => $this->orders($vendor),
                 'subscription' => $this->subscription($vendor),
-                'history' => VendorAccountEvent::query()->with('admin:id,name,surname')
-                    ->where('vendor_id', $vendor->id)->latest()->get()
+                'history' => AccountEvent::query()->with('admin:id,name,surname')
+                    ->where('user_id', $vendor->id)->latest()->orderByDesc('id')->get()
                     ->map(fn ($e) => [
                         'id' => $e->id,
                         'action' => $e->action,

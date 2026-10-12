@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\TwoFactorLoginChallenge;
 use App\Services\LoginAuditService;
-use App\Services\VendorAccountService;
+use App\Services\AccountSuspensionService;
 use App\Services\EmailOtpService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -146,9 +146,9 @@ class AuthController extends Controller
                 ]);
             }
 
-            if (VendorAccountService::isBlocked($user)) {
+            if (AccountSuspensionService::isBlocked($user)) {
                 throw ValidationException::withMessages([
-                    'username' => VendorAccountService::BLOCKED_MESSAGE,
+                    'username' => AccountSuspensionService::messageFor($user),
                 ]);
             }
 
@@ -622,9 +622,9 @@ class AuthController extends Controller
                 ]);
             }
 
-            if (VendorAccountService::isBlocked($user)) {
+            if (AccountSuspensionService::isBlocked($user)) {
                 throw ValidationException::withMessages([
-                    'username' => VendorAccountService::BLOCKED_MESSAGE,
+                    'username' => AccountSuspensionService::messageFor($user),
                 ]);
             }
             

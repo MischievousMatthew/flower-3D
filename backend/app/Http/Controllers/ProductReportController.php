@@ -234,7 +234,7 @@ class ProductReportController extends Controller
                     $vendorBanCount = $owner->ban_count;
 
                     if ($owner->ban_count >= 3 && !$owner->is_suspended) {
-                        app(\App\Services\VendorAccountService::class)->suspend(
+                        app(\App\Services\AccountSuspensionService::class)->suspend(
                             $owner,
                             $request->user(),
                             "Automatically suspended after {$owner->ban_count} banned products."

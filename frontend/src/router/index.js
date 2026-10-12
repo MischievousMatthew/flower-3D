@@ -612,6 +612,11 @@ const routes = [
         component: () => import("../views/admin/Finance.vue"),
       },
       {
+        path: "customers",
+        name: "AdminCustomers",
+        component: () => import("../views/admin/Customers.vue"),
+      },
+      {
         path: "vendor-requests",
         name: "VendorRequest",
         component: () => import("../views/admin/VendorRequest.vue"),

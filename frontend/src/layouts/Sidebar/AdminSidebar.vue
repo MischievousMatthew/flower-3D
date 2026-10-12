@@ -82,6 +82,15 @@
         </router-link>
 
         <router-link
+          to="/admin/customers"
+          class="nav-item"
+          active-class="active"
+        >
+          <span class="nav-icon">🧑‍🤝‍🧑</span>
+          <span>Customers</span>
+        </router-link>
+
+        <router-link
           to="/admin/product-approval"
           class="nav-item"
           active-class="active"

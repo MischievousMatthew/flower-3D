@@ -4,7 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Employee;
 use App\Models\User;
-use App\Services\VendorAccountService;
+use App\Services\AccountSuspensionService;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -42,11 +42,11 @@ class TokenAuth
             ], 401);
         }
 
-        if (VendorAccountService::isBlocked($authenticatable)) {
+        if (AccountSuspensionService::isBlocked($authenticatable)) {
             return response()->json([
                 'success' => false,
                 'code' => 'account_suspended',
-                'message' => VendorAccountService::BLOCKED_MESSAGE,
+                'message' => AccountSuspensionService::messageFor($authenticatable),
             ], 403);
         }
 
