@@ -29,6 +29,17 @@ const routes = [
         meta: { public: true, preservePublicPath: true },
       },
       {
+        // The Journal keeps readable URLs so articles can be shared
+        path: "journal",
+        component: () => import("../views/guest/Journal.vue"),
+        meta: { public: true, preservePublicPath: true },
+      },
+      {
+        path: "journal/:slug",
+        component: () => import("../views/guest/JournalArticle.vue"),
+        meta: { public: true, preservePublicPath: true },
+      },
+      {
         path: "shop",
         name: "Shop",
         component: () => import("../views/authenticated/Shop.vue"),
@@ -615,6 +626,11 @@ const routes = [
         path: "customers",
         name: "AdminCustomers",
         component: () => import("../views/admin/Customers.vue"),
+      },
+      {
+        path: "website",
+        name: "AdminContent",
+        component: () => import("../views/admin/Content.vue"),
       },
       {
         path: "vendor-requests",

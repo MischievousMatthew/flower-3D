@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
+use App\Models\FeaturedProduct;
 use App\Models\Product;
+use App\Models\ProductTaxonomy;
 use App\Models\VendorApplication;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -138,6 +140,49 @@ class CustomerProductController extends Controller
     }
 
     /**
+     * GET /api/customer/products/featured
+     * The products admins picked for the shop, in their order. Only ones
+     * customers can currently buy are returned.
+     */
+    public function featured()
+    {
+        try {
+            $ids = FeaturedProduct::query()->orderBy('sort_order')->pluck('product_id')->all();
+            if (!$ids) {
+                return response()->json(['success' => true, 'data' => []]);
+            }
+
+            $products = Product::listedForCustomers()->where('status', 'active')
+                ->whereIn('selling_type', ['per_piece', 'bouquet'])
+                ->whereIn('id', $ids)
+                ->with([
+                    'primaryImage',
+                    'images'  => fn ($q) => $q->orderBy('display_order')->orderBy('id'),
+                    'models',
+                    'owner',
+                ])
+                ->get()
+                ->sortBy(fn ($p) => array_search($p->id, $ids, true))
+                ->values();
+
+            $statsMap  = $this->loadProductStats($products->pluck('id')->all());
+            $vendorMap = $this->loadVendorNames($products->pluck('owner.email')->filter()->unique()->all());
+
+            return response()->json([
+                'success' => true,
+                'data'    => $products->map(fn ($p) => $this->formatProduct(
+                    $p,
+                    $statsMap[$p->id] ?? null,
+                    $vendorMap[$p->owner->email ?? ''] ?? null
+                ))->values(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('CustomerProductController@featured: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Featured products could not be loaded.'], 500);
+        }
+    }
+
+    /**
      * GET /api/customer/products/filters
      */
     public function filters(Request $request)
@@ -173,9 +218,24 @@ class CustomerProductController extends Controller
                 ->selectRaw('MIN(selling_price) as min_price, MAX(selling_price) as max_price')
                 ->first();
 
+            // Follow the admin-managed lists: their order first, then anything unlisted
+            $lists = ProductTaxonomy::query()->orderBy('sort_order')->orderBy('label')->get(['type', 'value', 'label'])->groupBy('type');
+            $ordered = function ($values, string $type) use ($lists) {
+                $order = ($lists[$type] ?? collect())->pluck('value')->flip();
+                return collect($values)->sortBy(fn ($v) => [$order[$v] ?? PHP_INT_MAX, $v])->values();
+            };
+            $categories = $ordered($categories, 'category');
+            $flowerTypes = $ordered($flowerTypes, 'flower_type');
+            $occasions = $ordered($occasions, 'occasion');
+
             return response()->json([
                 'success' => true,
                 'data'    => [
+                    'labels'       => [
+                        'categories'   => ($lists['category'] ?? collect())->pluck('label', 'value'),
+                        'flower_types' => ($lists['flower_type'] ?? collect())->pluck('label', 'value'),
+                        'occasions'    => ($lists['occasion'] ?? collect())->pluck('label', 'value'),
+                    ],
                     'categories'   => $categories,
                     'flower_types' => $flowerTypes,
                     'colors'       => $colors,

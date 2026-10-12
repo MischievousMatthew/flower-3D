@@ -119,6 +119,15 @@
         </router-link>
 
         <router-link
+          to="/admin/website"
+          class="nav-item"
+          active-class="active"
+        >
+          <span class="nav-icon">🌐</span>
+          <span>Website</span>
+        </router-link>
+
+        <router-link
           to="/admin/login-logs"
           class="nav-item"
           active-class="active"

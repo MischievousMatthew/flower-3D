@@ -378,7 +378,7 @@
           </div>
           <ul class="journal-list">
             <li v-for="(post, i) in blogPosts" :key="post.id">
-              <a href="#" class="journal-row" @click.prevent="readBlog(post.id)">
+              <a :href="post.slug ? `/journal/${post.slug}` : '/journal'" class="journal-row" @click.prevent="readBlog(post)">
                 <span class="journal-index">{{
                   String(i + 1).padStart(2, "0")
                 }}</span>
@@ -484,8 +484,7 @@
               <span>BloomCraft</span>
             </div>
             <p>
-              Your marketplace for custom flower arrangements. Connect with
-              local vendors and design the perfect bouquet.
+              {{ footerAbout }}
             </p>
             <ul class="social-links">
               <li v-for="social in socialLinks" :key="social.name">
@@ -559,6 +558,7 @@ import {
   RIBBON_PRESETS,
 } from "../../composables/useLandingBouquet";
 import "../../styles/bloomcraft.css";
+import { useSiteContent } from "../../composables/useSiteContent";
 import LandingLoader from "../../components/landing/LandingLoader.vue";
 import PlanAccountModal from "../../components/landing/PlanAccountModal.vue";
 import PricingPlanCard from "../../components/pricing/PricingPlanCard.vue";
@@ -742,31 +742,41 @@ const processSteps = [
   },
 ];
 
-const blogPosts = ref([
+// Website content from Admin → Website (falls back to the original copy)
+const { site } = useSiteContent();
+const PLACEHOLDER_POSTS = [
   { id: 1, title: "Seasonal Flower Guide for Spring", category: "Seasonal guide" },
   { id: 2, title: "How to Care for Your Custom Bouquet", category: "Flower care" },
   { id: 3, title: "Meet Our Featured Vendor: Petal & Co", category: "Vendor stories" },
-]);
+];
+const blogPosts = computed(() =>
+  site.articles.length
+    ? site.articles.map((a) => ({ id: a.id, slug: a.slug, title: a.title, category: a.category_label }))
+    : PLACEHOLDER_POSTS,
+);
+const footerAbout = computed(
+  () =>
+    site.settings.about ||
+    "Your marketplace for custom flower arrangements. Connect with local vendors and design the perfect bouquet.",
+);
 
-const socialLinks = ref([
-  { name: "Facebook", icon: "f", url: "#" },
-  { name: "X", icon: "x", url: "#" },
-  { name: "LinkedIn", icon: "in", url: "#" },
-  { name: "Instagram", icon: "ig", url: "#" },
-]);
+const SOCIAL_NAMES = { facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok", x: "X" };
+const socialLinks = computed(() =>
+  Object.entries(site.settings.socials ?? {})
+    .filter(([, url]) => url)
+    .map(([key, url]) => ({ name: SOCIAL_NAMES[key] ?? key, url })),
+);
 
-const companyLinks = ref([
+const companyLinks = computed(() => [
   { name: "About Us", url: "#about" },
-  { name: "Contact", url: "#contact" },
-  { name: "Careers", url: "#careers" },
-  { name: "Press", url: "#press" },
+  { name: "Journal", url: "/journal" },
+  ...(site.settings.contact_email ? [{ name: "Contact", url: `mailto:${site.settings.contact_email}` }] : []),
 ]);
 
-const supportLinks = ref([
-  { name: "Help Center", url: "#help" },
-  { name: "Terms of Service", url: "#terms" },
-  { name: "Privacy Policy", url: "#privacy" },
-  { name: "Shipping Info", url: "#shipping" },
+const supportLinks = computed(() => [
+  { name: "Shop", url: "/shop" },
+  ...(site.settings.contact_email ? [{ name: site.settings.contact_email, url: `mailto:${site.settings.contact_email}` }] : []),
+  ...(site.settings.contact_phone ? [{ name: site.settings.contact_phone, url: `tel:${site.settings.contact_phone.replace(/s+/g, "")}` }] : []),
 ]);
 
 // Computed
@@ -861,16 +871,18 @@ const handleLearnMore = (type) => {
   router.push("/guest/register");
 };
 
-const readBlog = (postId) => {
-  console.log("Reading blog post:", postId);
-};
+const readBlog = (post) => router.push(post.slug ? `/journal/${post.slug}` : "/journal");
 
 const handleFooterLink = (url) => {
   if (url === "#about") {
     scrollToSection("about");
     return;
   }
-  console.log("Footer link clicked:", url);
+  if (/^(mailto|tel):/.test(url)) {
+    window.location.href = url;
+    return;
+  }
+  if (url.startsWith("/")) router.push(url);
 };
 
 // ==========================================================

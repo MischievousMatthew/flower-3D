@@ -50,8 +50,14 @@
     </div>
 
     <!-- Hero -->
-    <section class="shop-hero">
-      <div class="bc-container shop-hero-grid">
+    <section class="shop-hero" :class="{ 'shop-hero--banners': site.banners.length }">
+      <div class="bc-container">
+        <AnnouncementBar />
+      </div>
+      <div v-if="site.banners.length" class="bc-container">
+        <BannerCarousel :banners="site.banners" />
+      </div>
+      <div v-else class="bc-container shop-hero-grid">
         <div class="shop-hero-copy">
           <p class="bc-label">Fresh flowers</p>
           <h1>The ultimate <em>flower</em> shopping destination</h1>
@@ -86,6 +92,32 @@
             alt="Hand-tied bouquet of soft pink and peach roses"
           />
         </figure>
+      </div>
+    </section>
+
+    <!-- Promotions (Admin → Website) -->
+    <PromotionCards :promotions="site.promotions" />
+
+    <!-- Featured picks (Admin → Website) -->
+    <section v-if="featuredProducts.length" class="shop-featured" id="featured" aria-labelledby="featured-title">
+      <div class="bc-container">
+        <div class="bc-section-head shop-head">
+          <p class="bc-label">Featured picks</p>
+          <h2 id="featured-title">Chosen by <em>BloomCraft</em></h2>
+        </div>
+        <div class="products-grid">
+          <ProductCard
+            v-for="product in featuredProducts"
+            :key="`featured-${product.id}`"
+            :product="product"
+            :selected-vendor="selectedVendor"
+            :adding-to-cart="addingToCartProductId === product.id"
+            @open-modal="openProductModal"
+            @add-to-cart="addToCartDirect"
+            @buy-now="buyNowDirect"
+            @select-vendor="selectVendorById"
+          />
+        </div>
       </div>
     </section>
 
@@ -284,6 +316,29 @@
       </div>
     </section>
 
+    <!-- Shop by category (Admin → Products → Categories & tags) -->
+    <section v-if="shopCategories.length" class="shop-categories" id="categories" aria-labelledby="categories-title">
+      <div class="bc-container">
+        <div class="bc-section-head shop-head">
+          <p class="bc-label">Shop by category</p>
+          <h2 id="categories-title">Find your <em>flower</em></h2>
+        </div>
+        <ul class="category-chips">
+          <li v-for="c in shopCategories" :key="c.value">
+            <button
+              type="button"
+              class="category-chip"
+              :class="{ 'category-chip--active': selectedFilters.category.length === 1 && selectedFilters.category[0] === c.value }"
+              :aria-pressed="selectedFilters.category.length === 1 && selectedFilters.category[0] === c.value"
+              @click="shopByCategory(c.value)"
+            >
+              {{ c.label }} <span>{{ c.products }}</span>
+            </button>
+          </li>
+        </ul>
+      </div>
+    </section>
+
     <!-- Shop by occasion (from the real occasion filter values) -->
     <section class="shop-occasions" id="occasions">
       <div class="bc-container">
@@ -406,7 +461,7 @@
                   :value="category"
                   v-model="selectedFilters.category"
                   @change="fetchProducts"
-                /><span>{{ category }}</span>
+                /><span>{{ filterOptions.labels?.categories?.[category] ?? category }}</span>
               </label>
             </div>
           </div>
@@ -698,6 +753,11 @@
       </div>
     </section>
 
+    <!-- Journal (Admin → Website → Journal) -->
+    <JournalTeaser :articles="site.articles" />
+
+    <SiteFooter />
+
     <!-- Product details -->
     <div v-if="showProductModal" class="modal-overlay" @click="closeModal">
       <div
@@ -917,7 +977,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import api from "../../plugins/axios.js";
 import NavHeader from "../../layouts/NavHeader.vue";
@@ -929,9 +989,30 @@ import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import ProductReviews from "../../layouts/components/ProductReviews.vue";
 import ProductCard from "../../layouts/components/ProductCard.vue";
+import AnnouncementBar from "../../components/site/AnnouncementBar.vue";
+import BannerCarousel from "../../components/site/BannerCarousel.vue";
+import PromotionCards from "../../components/site/PromotionCards.vue";
+import JournalTeaser from "../../components/site/JournalTeaser.vue";
+import SiteFooter from "../../components/site/SiteFooter.vue";
+import { useSiteContent } from "../../composables/useSiteContent";
 import "../../styles/bloomcraft.css";
 
 const router = useRouter();
+const route = useRoute();
+const { site } = useSiteContent();
+
+// ── Website content (Admin → Website) ─────────────────────────────────────
+const featuredProducts = ref([]);
+const fetchFeatured = async () => {
+  try {
+    const { data } = await api.get("customer/products/featured");
+    if (data.success) featuredProducts.value = data.data || [];
+  } catch {
+    featuredProducts.value = [];
+  }
+};
+// Categories that currently have something to buy, in the admin's order
+const shopCategories = computed(() => site.categories.filter((c) => c.products > 0));
 const { isAuthenticated, user } = useAuth();
 const cartStore = useCart();
 const { flyToCart } = useFlyToCart();
@@ -1606,6 +1687,33 @@ const scrollToSection = (id) => {
   if (el) el.scrollIntoView({ behavior: "smooth" });
 };
 
+// Shop by category: filter the grid to one category and jump to it.
+const shopByCategory = (category) => {
+  selectedFilters.value.category = [category];
+  pagination.value.current_page = 1;
+  fetchProducts();
+  scrollToSection("products");
+};
+
+// Links from banners, announcements and promotions arrive as
+// ?category=…, ?occasion=… or ?section=products
+const applyContentLink = (query) => {
+  const category = typeof query.category === "string" ? query.category : null;
+  const occasion = typeof query.occasion === "string" ? query.occasion : null;
+  if (category) selectedFilters.value.category = [category];
+  if (occasion) selectedFilters.value.occasion = [occasion];
+  return Boolean(category || occasion || query.section === "products");
+};
+watch(
+  () => route.query,
+  (query) => {
+    if (!applyContentLink(query)) return;
+    pagination.value.current_page = 1;
+    fetchProducts();
+    setTimeout(() => scrollToSection("products"), 50);
+  },
+);
+
 // Shop by occasion: filter the grid to one occasion and jump to it.
 const shopByOccasion = (occasion) => {
   selectedFilters.value.occasion = [occasion];
@@ -1711,7 +1819,9 @@ const buyNowDirect = async (product) => {
 };
 
 onMounted(async () => {
-  await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors()]);
+  const fromContentLink = applyContentLink(route.query);
+  await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors(), fetchFeatured()]);
+  if (fromContentLink) setTimeout(() => scrollToSection("products"), 50);
   if (isAuthenticated.value) {
     await Promise.all([loadCart(), fetchNearbyStores()]);
   } else {
@@ -1800,6 +1910,52 @@ onUnmounted(() => {
 ============================================================= */
 .shop-hero {
   padding: 150px 0 clamp(80px, 9vw, 130px);
+}
+
+.shop-hero--banners {
+  padding-bottom: clamp(40px, 5vw, 70px);
+}
+
+.shop-featured,
+.shop-categories {
+  padding: clamp(40px, 6vw, 80px) 0;
+}
+
+.category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.25s, border-color 0.25s, color 0.25s;
+}
+
+.category-chip span {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.category-chip:hover,
+.category-chip--active {
+  background: var(--espresso);
+  border-color: var(--espresso);
+  color: var(--paper);
+}
+
+.category-chip:hover span,
+.category-chip--active span {
+  color: var(--gold);
 }
 
 .shop-hero-grid {

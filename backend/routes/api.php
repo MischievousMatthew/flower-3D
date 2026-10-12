@@ -11,6 +11,8 @@ use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminVendorController;
 use App\Http\Controllers\Admin\AdminProductController;
 use App\Http\Controllers\Admin\AdminCustomerController;
+use App\Http\Controllers\Admin\AdminContentController;
+use App\Http\Controllers\SiteContentController;
 use App\Http\Controllers\ProductTaxonomyController;
 use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\AuthController;
@@ -114,6 +116,14 @@ Route::prefix('vendors')->group(function () {
 
 Route::get('/stores/{storeId}/customizable-flowers', [VendorStoreFrontController::class, 'getCustomizableFlowers']);
 Route::get('/stores/{storeId}/customization-options', [VendorStoreFrontController::class, 'getCustomizationOptions']);
+
+// Website content for the shop and landing page (managed by admins)
+Route::prefix('site')->group(function () {
+    Route::get('/home',            [SiteContentController::class, 'home']);
+    Route::get('/settings',        [SiteContentController::class, 'settings']);
+    Route::get('/articles',        [SiteContentController::class, 'articles']);
+    Route::get('/articles/{slug}', [SiteContentController::class, 'article']);
+});
 
 // Choices for the vendor product form (managed by admins)
 Route::get('/product-taxonomies', [ProductTaxonomyController::class, 'index']);
@@ -722,6 +732,40 @@ Route::middleware('token.auth')->group(function () {
             Route::post('/{id}/reveal', [AdminCustomerController::class, 'reveal'])->whereNumber('id');
             Route::post('/{id}/suspend', [AdminCustomerController::class, 'suspend'])->whereNumber('id');
             Route::post('/{id}/reactivate', [AdminCustomerController::class, 'reactivate'])->whereNumber('id');
+        });
+
+        // Website content: banners, featured products, journal, announcements, site info
+        Route::middleware('role:admin')->prefix('content')->group(function () {
+            Route::get('/overview', [AdminContentController::class, 'overview']);
+            Route::get('/link-options', [AdminContentController::class, 'linkOptions']);
+
+            Route::get('/banners', [AdminContentController::class, 'banners']);
+            Route::post('/banners', [AdminContentController::class, 'saveBanner']);
+            Route::post('/banners/{id}', [AdminContentController::class, 'saveBanner'])->whereNumber('id');
+            Route::delete('/banners/{id}', [AdminContentController::class, 'deleteBanner'])->whereNumber('id');
+
+            Route::get('/featured', [AdminContentController::class, 'featured']);
+            Route::get('/featured/search', [AdminContentController::class, 'searchProducts']);
+            Route::post('/featured', [AdminContentController::class, 'addFeatured']);
+            Route::delete('/featured/{id}', [AdminContentController::class, 'removeFeatured'])->whereNumber('id');
+
+            Route::get('/articles', [AdminContentController::class, 'articles']);
+            Route::post('/articles', [AdminContentController::class, 'saveArticle']);
+            Route::get('/articles/{id}', [AdminContentController::class, 'article'])->whereNumber('id');
+            Route::post('/articles/{id}', [AdminContentController::class, 'saveArticle'])->whereNumber('id');
+            Route::post('/articles/{id}/publish', [AdminContentController::class, 'publishArticle'])->whereNumber('id');
+            Route::post('/articles/{id}/unpublish', [AdminContentController::class, 'unpublishArticle'])->whereNumber('id');
+            Route::delete('/articles/{id}', [AdminContentController::class, 'deleteArticle'])->whereNumber('id');
+
+            Route::get('/announcements', [AdminContentController::class, 'announcements']);
+            Route::post('/announcements', [AdminContentController::class, 'saveAnnouncement']);
+            Route::post('/announcements/{id}', [AdminContentController::class, 'saveAnnouncement'])->whereNumber('id');
+            Route::delete('/announcements/{id}', [AdminContentController::class, 'deleteAnnouncement'])->whereNumber('id');
+
+            Route::post('/{type}/reorder', [AdminContentController::class, 'reorder'])->whereIn('type', ['banners', 'announcements', 'featured']);
+
+            Route::get('/settings', [AdminContentController::class, 'settings']);
+            Route::put('/settings', [AdminContentController::class, 'saveSettings']);
         });
 
         // Read-only finance: payments, refunds, earnings and exports
