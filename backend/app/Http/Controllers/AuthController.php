@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -103,6 +104,21 @@ class AuthController extends Controller
         ], 201);
     }
 
+    /**
+     * Refuses a sign-in for a reason about the account itself (suspended,
+     * locked, unverified). The code lets the login page show this message
+     * instead of a generic "wrong username or password".
+     */
+    private function refuseLogin(string $code, string $message): never
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'code' => $code,
+            'message' => $message,
+            'errors' => ['username' => [$message]],
+        ], 422));
+    }
+
     public function login(Request $request)
     {
         DB::enableQueryLog();
@@ -122,7 +138,7 @@ class AuthController extends Controller
             $identifier = LoginGuard::identifier($request->username);
             if ($minutes = $guard->lockedFor($identifier)) {
                 $guard->recordFailure($request, $identifier, 'locked');
-                throw ValidationException::withMessages(['username' => LoginGuard::lockedMessage($minutes)]);
+                $this->refuseLogin('account_locked', LoginGuard::lockedMessage($minutes));
             }
 
             // Find user by username or email
@@ -154,19 +170,17 @@ class AuthController extends Controller
                 ]);
             }
 
+            // Suspension is checked before verification so a suspended account
+            // always hears that it's suspended
+            if (AccountSuspensionService::isBlocked($user)) {
+                $guard->recordFailure($request, $identifier, 'suspended', $user->id);
+                $this->refuseLogin('account_suspended', AccountSuspensionService::messageFor($user));
+            }
+
             if (!$user->is_verified) {
                 Log::warning('Unverified user attempted login: ' . $user->username);
                 $guard->recordFailure($request, $identifier, 'unverified', $user->id);
-                throw ValidationException::withMessages([
-                    'username' => 'Your account is not verified.',
-                ]);
-            }
-
-            if (AccountSuspensionService::isBlocked($user)) {
-                $guard->recordFailure($request, $identifier, 'suspended', $user->id);
-                throw ValidationException::withMessages([
-                    'username' => AccountSuspensionService::messageFor($user),
-                ]);
+                $this->refuseLogin('account_unverified', "Your account isn't verified yet. Open the verification link we emailed you, then sign in again.");
             }
 
             if ($user->role === User::ROLE_CUSTOMER && $user->two_factor_enabled) {
@@ -187,6 +201,8 @@ class AuthController extends Controller
             return $this->completeUserLogin($user, $request);
         } catch (ValidationException $e) {
             Log::warning('Login validation failed', $e->errors());
+            throw $e;
+        } catch (HttpResponseException $e) {
             throw $e;
         } catch (Exception $e) {
             Log::error('Login Error: ' . $e->getMessage(), [

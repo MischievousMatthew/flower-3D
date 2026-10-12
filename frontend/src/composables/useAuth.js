@@ -137,7 +137,7 @@ export function useAuth() {
       }
 
       error.value = errorMessage;
-      return { success: false, error: errorMessage, isEmployeeError: true };
+      return { success: false, error: errorMessage, isEmployeeError: true, status: err?.response?.status, code: err?.response?.data?.code ?? null };
     } finally {
       loading.value = false;
     }
@@ -200,7 +200,7 @@ export function useAuth() {
       }
 
       error.value = errorMessage;
-      return { success: false, error: errorMessage, isEmployeeError: false };
+      return { success: false, error: errorMessage, isEmployeeError: false, status: err?.response?.status, code: err?.response?.data?.code ?? null };
     } finally {
       loading.value = false;
     }
@@ -215,6 +215,10 @@ export function useAuth() {
       loginContext,
     });
     if (employeeResult.success) return employeeResult;
+    // A staff account that exists but can't sign in (store suspended, too many tries)
+    if (employeeResult.code || employeeResult.status === 403) {
+      return { success: false, error: employeeResult.error, code: employeeResult.code };
+    }
 
     const userResult = await login({
       ...credentials,
@@ -222,6 +226,13 @@ export function useAuth() {
     });
     if (userResult.success) return userResult;
     if (userResult.requiresTwoFactor) return userResult;
+    // Suspended, locked or unverified: say so instead of "wrong password"
+    if (userResult.code) {
+      return { success: false, error: userResult.error, code: userResult.code };
+    }
+    if (!userResult.status || userResult.status >= 500) {
+      return { success: false, error: "We couldn't reach BloomCraft. Check your connection and try again." };
+    }
 
     return {
       success: false,

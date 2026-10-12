@@ -35,7 +35,7 @@ class EmployeeAuthController extends Controller
             $identifier = LoginGuard::identifier($request->username);
             if ($minutes = $guard->lockedFor($identifier)) {
                 $guard->recordFailure($request, $identifier, 'locked', null, 'employee');
-                return response()->json(['success' => false, 'message' => LoginGuard::lockedMessage($minutes)], 429);
+                return response()->json(['success' => false, 'code' => 'account_locked', 'message' => LoginGuard::lockedMessage($minutes)], 429);
             }
 
             $employee = Employee::where('username', $request->username)

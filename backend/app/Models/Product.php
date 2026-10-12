@@ -42,6 +42,11 @@ class Product extends Model
         return !in_array($this->moderation_status ?? self::MODERATION_APPROVED, self::MODERATION_LIVE, true);
     }
 
+    /** Every new listing is live straight away and waits in the admin's "Needs review" queue */
+    protected $attributes = [
+        'moderation_status' => self::MODERATION_PENDING,
+    ];
+
     protected $fillable = [
         // Identity
         'product_name',
