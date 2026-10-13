@@ -183,6 +183,7 @@ class ProductController extends Controller
                 'max_stock_level'        => 'nullable|integer|min:0',
                 'selling_type'           => 'required|in:per_piece,per_piece_customizable,bouquet',
                 'season'                 => 'nullable|in:all-year,spring,summer,autumn,winter',
+                'preparation_days'       => 'nullable|integer|min:0|max:60',
                 'supplier_name'          => 'nullable|string|max:255',
                 'supplier_contact'       => 'nullable|string|max:100',
                 'supplier_sku'           => 'nullable|string|max:255',

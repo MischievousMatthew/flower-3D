@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Payroll;
 use App\Models\Product;
 use App\Models\VendorTransaction;
 use App\Services\SubscriptionAccessService;
@@ -220,22 +221,79 @@ class VendorDashboardController extends Controller
         ];
     }
 
+    /**
+     * The latest money in and out, each saying where it came from or went:
+     * ledger entries (customer payments, refunds, stock purchases…) and paid
+     * payroll, which the finance dashboard also counts as an expense.
+     */
     private function recentTransactions(int $vendorId): array
     {
-        return VendorTransaction::forVendor($vendorId)
-            ->with('order:id,order_number')
+        $ledger = VendorTransaction::forVendor($vendorId)
+            ->with(['order:id,order_number,user_id,delivery_contact_name', 'order.user:id,name,surname'])
             ->latest()
-            ->limit(6)
+            ->limit(8)
             ->get()
-            ->map(fn (VendorTransaction $t) => [
-                'key' => md5('txn' . $t->id),
-                'type' => $t->type,
-                'category' => $t->category,
-                'description' => $t->description,
-                'order_number' => $t->order?->order_number,
-                'amount' => round((float) $t->amount, 2),
-                'created_at' => $t->created_at?->toIso8601String(),
-            ])->all();
+            ->map(function (VendorTransaction $t) {
+                $meta = (array) ($t->metadata ?? []);
+                $order = $t->order;
+                $customer = $order?->delivery_contact_name
+                    ?: trim(($order?->user?->name ?? '') . ' ' . ($order?->user?->surname ?? '')) ?: 'a customer';
+
+                [$title, $party] = match ($t->category) {
+                    'order_revenue' => ['Customer payment', "From {$customer}"],
+                    'refund' => [! empty($meta['partial']) ? 'Partial refund' : 'Refund', "To {$customer}"],
+                    'procurement' => ['Supplier purchase', 'To ' . ($meta['supplier_name'] ?? 'a supplier')],
+                    'withdrawal' => ['Withdrawal', 'To your payout account'],
+                    'adjustment' => isset($meta['funding_request_id'])
+                        ? ['Stock purchase', 'For ' . ($meta['product_name'] ?? 'inventory')
+                            . (isset($meta['approved_quantity']) ? " ({$meta['approved_quantity']})" : '')]
+                        : ['Balance adjustment', $t->description ?: 'Manual adjustment'],
+                    default => [ucfirst(str_replace('_', ' ', $t->category)), $t->description ?: ''],
+                };
+
+                return [
+                    'key' => md5('txn' . $t->id),
+                    'type' => $t->type,
+                    'category' => $t->category,
+                    'title' => $title,
+                    'party' => $party,
+                    'order_number' => $order?->order_number ?? ($meta['order_number'] ?? null),
+                    'amount' => round((float) $t->amount, 2),
+                    'at' => $t->created_at,
+                ];
+            });
+
+        $payroll = Payroll::with('employee')
+            ->where('owner_id', $vendorId)
+            ->whereIn('status', ['approved', 'paid'])
+            ->latest('updated_at')
+            ->limit(8)
+            ->get()
+            ->map(function (Payroll $p) {
+                $name = $p->employee?->full_name ?? $p->employee?->name ?? 'an employee';
+                $period = $p->period_start && $p->period_end
+                    ? $p->period_start->format('M j') . '–' . $p->period_end->format('M j')
+                    : null;
+
+                return [
+                    'key' => md5('pay' . $p->id),
+                    'type' => 'debit',
+                    'category' => 'payroll',
+                    'title' => 'Salary',
+                    'party' => "To {$name}" . ($period ? " · {$period}" : ''),
+                    'order_number' => null,
+                    'amount' => round((float) $p->net_salary, 2),
+                    'at' => ($p->status === 'paid' && $p->paid_at) ? $p->paid_at : $p->updated_at,
+                ];
+            })
+            ->filter(fn ($t) => $t['amount'] > 0);
+
+        return $ledger->concat($payroll)
+            ->sortByDesc(fn ($t) => $t['at']?->getTimestamp() ?? 0)
+            ->take(8)
+            ->map(fn ($t) => ['created_at' => $t['at']?->toIso8601String()] + collect($t)->except('at')->all())
+            ->values()
+            ->all();
     }
 
     private function subscription(array $summary): array

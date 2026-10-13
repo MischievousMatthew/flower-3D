@@ -157,6 +157,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
+import { useRoute } from "vue-router";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
@@ -172,6 +173,7 @@ const PALETTE = [
   { bg: "#fff6e5", fg: "#b45309" }, { bg: "#f3f0ff", fg: "#6b46c1" }, { bg: "#e6fffa", fg: "#2c7a7b" },
 ];
 
+const route = useRoute();
 const kind = ref("category");
 const activeValue = ref(null);
 const busy = ref(false);
@@ -252,7 +254,14 @@ async function addPicked() {
   if (ok) picking.value = false;
 }
 
-onMounted(load);
+onMounted(async () => {
+  // Linked from Products ("Tag them"): open the products with no occasion
+  if (route.query.kind === "occasion") {
+    kind.value = "occasion";
+    activeValue.value = UNSET.value;
+  }
+  await load();
+});
 </script>
 
 <style scoped>

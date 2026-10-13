@@ -131,7 +131,9 @@
               <span>{{ points[hover].label }} · {{ points[hover].orders }} {{ points[hover].orders === 1 ? "order" : "orders" }}</span>
             </div>
             <div class="chart-axis">
-              <span v-for="(p, i) in points" :key="p.key" :class="{ hide: !showLabel(i) }">{{ p.label }}</span>
+              <template v-for="(p, i) in points" :key="p.key">
+                <span v-if="showLabel(i)" :style="axisStyle(i)" :class="{ minor: minorLabel(i) }">{{ p.label }}</span>
+              </template>
             </div>
             <p v-if="!data.sales.count" class="chart-empty">No sales in this period yet.</p>
           </div>
@@ -231,7 +233,13 @@
 
         <!-- Recent transactions -->
         <section class="vd-card span-2" aria-label="Recent transactions">
-          <div class="card-head"><div><h2>Recent transactions</h2><p>Money in and out of your balance</p></div></div>
+          <div class="card-head">
+            <div><h2>Recent transactions</h2><p>Where your money came from and where it went</p></div>
+            <div v-if="data?.transactions?.length" class="txn-totals">
+              <span class="in">In {{ money(txnTotals.in) }}</span>
+              <span class="out">Out {{ money(txnTotals.out) }}</span>
+            </div>
+          </div>
           <ul v-if="!data" class="vd-list"><li v-for="n in 4" :key="n"><div class="bc-skeleton sk-thumb round"></div><div class="sk-grow"><div class="bc-skeleton sk-line w60"></div><div class="bc-skeleton sk-line w40"></div></div></li></ul>
           <LockedNote v-else-if="!data.transactions" module="finance" block />
           <p v-else-if="!data.transactions.length" class="vd-empty">No transactions yet. They appear here once customers pay.</p>
@@ -239,8 +247,14 @@
             <li v-for="t in data.transactions" :key="t.key">
               <span class="txn-icon" :class="t.type" v-html="t.type === 'credit' ? ICONS.down : ICONS.up"></span>
               <div class="li-main">
-                <strong>{{ TXN_LABEL[t.category] ?? titleCase(t.category) }}<template v-if="t.order_number"> · {{ t.order_number }}</template></strong>
-                <span>{{ formatDate(t.created_at, true) }}</span>
+                <strong>
+                  {{ t.title }}
+                  <span class="txn-kind" :class="t.type">{{ t.type === "credit" ? "Income" : "Expense" }}</span>
+                </strong>
+                <span class="txn-party">{{ t.party }}</span>
+                <span>
+                  <template v-if="t.order_number">{{ t.order_number }} · </template>{{ formatDate(t.created_at, true) }}
+                </span>
               </div>
               <span class="txn-amt" :class="t.type">{{ t.type === "credit" ? "+" : "−" }}{{ money(t.amount) }}</span>
             </li>
@@ -294,7 +308,6 @@ const RANGES = [
 const MODULE_NAME = { orders: "Orders", products: "Products", finance: "Finance" };
 const PLAN_STATUS = { active: "Active", trial: "Free trial", inactive: "Inactive", none: "No plan" };
 const LIMIT_LABEL = { branches: "Branches", warehouses: "Warehouses", staff_employees: "Staff" };
-const TXN_LABEL = { order_revenue: "Order payment", refund: "Refund", procurement: "Procurement", withdrawal: "Withdrawal", adjustment: "Adjustment" };
 
 const icon = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const ICONS = {
@@ -378,6 +391,12 @@ const planState = computed(() => {
 const limits = computed(() =>
   Object.entries(sub.value.limits ?? {}).map(([key, l]) => ({ key, ...l, label: LIMIT_LABEL[key] ?? l.label }))
 );
+const txnTotals = computed(() =>
+  (data.value?.transactions ?? []).reduce(
+    (acc, t) => (t.type === "credit" ? { ...acc, in: acc.in + t.amount } : { ...acc, out: acc.out + t.amount }),
+    { in: 0, out: 0 },
+  ),
+);
 const stockAlerts = computed(() => (data.value?.products ? data.value.products.low_stock + data.value.products.out_of_stock : 0));
 const topQty = computed(() => Math.max(1, ...(data.value?.top_flowers ?? []).map((f) => f.quantity)));
 const isLocked = (module) => !!module && !!data.value && (data.value.locked.includes(module) || (modules.value && !modules.value.includes(module)));
@@ -424,10 +443,27 @@ const chart = computed(() => {
   const area = `${line} L${xs[xs.length - 1]},${H - PAD} L${xs[0]},${H - PAD} Z`;
   return { xs, ys, line, area };
 });
-const showLabel = (i) => {
+// Evenly spaced dates (never two crowded together), first and last always shown
+const axisIndexes = computed(() => {
   const n = points.value.length;
-  const every = n > 20 ? Math.ceil(n / 8) : n > 10 ? 2 : 1;
-  return i % every === 0 || i === n - 1;
+  const count = Math.min(n, 7);
+  if (count <= 1) return new Set(n ? [0] : []);
+  return new Set(Array.from({ length: count }, (_, k) => Math.round((k * (n - 1)) / (count - 1))));
+});
+const showLabel = (i) => axisIndexes.value.has(i);
+// Every other middle date, dropped on narrow screens
+const minorLabel = (i) => {
+  const list = [...axisIndexes.value];
+  const k = list.indexOf(i);
+  return k > 0 && k < list.length - 1 && k % 2 === 1;
+};
+// Place each date under its point; the ends hug the card edges so nothing spills out
+const axisStyle = (i) => {
+  const n = points.value.length;
+  if (n <= 1) return { left: "50%", transform: "translateX(-50%)" };
+  if (i === 0) return { left: "0" };
+  if (i === n - 1) return { right: "0" };
+  return { left: `${(i / (n - 1)) * 100}%`, transform: "translateX(-50%)" };
 };
 
 // Formatting
@@ -763,21 +799,22 @@ onMounted(async () => {
   color: #cbd5e0;
 }
 .chart-axis {
-  display: flex;
-  justify-content: space-between;
+  position: relative;
+  height: 16px;
   margin-top: 8px;
   font-size: 11px;
   color: #a0aec0;
+  overflow: hidden;
 }
 .chart-axis span {
-  flex: 1;
-  text-align: center;
+  position: absolute;
+  top: 0;
   white-space: nowrap;
 }
-.chart-axis span:first-child { text-align: left; }
-.chart-axis span:last-child { text-align: right; }
-.chart-axis .hide {
-  visibility: hidden;
+@media (max-width: 560px) {
+  .chart-axis .minor {
+    display: none;
+  }
 }
 .chart-empty {
   position: absolute;
@@ -1005,6 +1042,35 @@ onMounted(async () => {
 }
 .txn-icon.credit { background: #e8f8ef; color: #2f855a; }
 .txn-icon.debit { background: #fff5f5; color: #c53030; }
+.txn-kind {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+.txn-kind.credit { background: #e8f8ef; color: #2f855a; }
+.txn-kind.debit { background: #fff5f5; color: #c53030; }
+.li-main .txn-party {
+  color: #2d3748;
+  font-weight: 500;
+}
+.txn-totals {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  font-size: 12px;
+  font-weight: 600;
+}
+.txn-totals span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.txn-totals .in { background: #e8f8ef; color: #2f855a; }
+.txn-totals .out { background: #fff5f5; color: #c53030; }
 .txn-amt {
   font-size: 13.5px;
   font-weight: 600;

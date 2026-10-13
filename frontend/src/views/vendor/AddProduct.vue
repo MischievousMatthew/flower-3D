@@ -1,678 +1,408 @@
 <template>
-  <vendorHeader />
-  <div class="product-layout">
-    <VendorSidebar />
+  <ShopLayout title="Add product" subtitle="Fill in the steps on the left; the preview shows how customers will see it.">
+    <template #actions>
+      <button type="button" class="sp-btn sp-btn-ghost" :disabled="submitting" @click="submit('draft')">
+        {{ submitting === "draft" ? "Saving…" : "Save as draft" }}
+      </button>
+      <button type="button" class="sp-btn sp-btn-primary" :disabled="submitting" @click="submit('active')">
+        <span v-html="ICONS.check"></span>{{ submitting === "active" ? "Publishing…" : "Publish" }}
+      </button>
+    </template>
 
-    <main class="main-content">
-      <!-- Header -->
-      <header class="content-header">
-        <div class="header-left">
-          <button @click="goBack" class="btn-back"><span>←</span></button>
-          <h1 class="page-title">Add New Product</h1>
-        </div>
-        <div class="header-actions">
-          <button
-            @click="saveDraft"
-            class="btn-secondary"
-            :disabled="isSubmitting"
+    <div class="ap-layout">
+      <form class="ap-form" novalidate @submit.prevent="submit('active')">
+        <!-- 1. Photos -->
+        <section id="ap-photos" class="sp-card ap-step" :class="{ done: steps.photos }">
+          <header class="ap-step-head">
+            <span class="ap-num">{{ steps.photos ? "✓" : 1 }}</span>
+            <div><h2>Photos</h2><p>Up to 5. The first one is the cover; drag to reorder.</p></div>
+          </header>
+          <div
+            class="ap-photos"
+            :class="{ dragging: dropping }"
+            @dragover.prevent="dropping = true"
+            @dragleave.prevent="dropping = false"
+            @drop.prevent="onDrop"
           >
-            <span>📝</span><span>Save as Draft</span>
-          </button>
-          <button
-            @click="publishProduct"
-            class="btn-primary"
-            :disabled="isSubmitting"
-          >
-            <span>✅</span
-            ><span>{{
-              isSubmitting ? "Publishing..." : "Publish Product"
-            }}</span>
-          </button>
-        </div>
-      </header>
-
-      <!-- Form -->
-      <div class="form-container">
-        <form @submit.prevent="publishProduct">
-          <!-- Basic Information -->
-          <div class="form-section">
-            <h2 class="section-title">Basic Information</h2>
-            <div class="form-grid">
-              <div class="form-group full-width">
-                <label class="form-label">Product Name *</label>
-                <input
-                  v-model="formData.product_name"
-                  type="text"
-                  placeholder="e.g., Red Rose Bouquet"
-                  class="form-input"
-                  :class="{ 'is-invalid': errors.product_name }"
-                  @input="clearError('product_name')"
-                  required
-                />
-                <span v-if="errors.product_name" class="error-text">{{
-                  errors.product_name
-                }}</span>
-              </div>
-              <div class="form-group full-width">
-                <label class="form-label">Product Description *</label>
-                <textarea
-                  v-model="formData.description"
-                  placeholder="Describe your product in detail..."
-                  rows="4"
-                  class="form-textarea"
-                  :class="{ 'is-invalid': errors.description }"
-                  @input="clearError('description')"
-                  required
-                ></textarea>
-                <span v-if="errors.description" class="error-text">{{
-                  errors.description
-                }}</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">SKU (Stock Keeping Unit) *</label>
-                <input
-                  v-model="formData.sku"
-                  type="text"
-                  placeholder="e.g., ROSE-RED-001"
-                  class="form-input"
-                  :class="{ 'is-invalid': errors.sku }"
-                  @input="clearError('sku')"
-                  required
-                />
-                <span v-if="errors.sku" class="error-text">{{
-                  errors.sku
-                }}</span>
-                <span class="hint-text"
-                  >Unique identifier for this product</span
-                >
-              </div>
-              <div class="form-group">
-                <label class="form-label">Category / Type *</label>
-                <select
-                  v-model="formData.category"
-                  class="form-select"
-                  :class="{ 'is-invalid': errors.category }"
-                  @change="clearError('category')"
-                  required
-                >
-                  <option value="">Select category</option>
-                  <option v-for="c in withCurrent(taxonomies.categories, formData.category)" :key="c.value" :value="c.value">{{ c.label }}</option>
-                </select>
-                <span v-if="errors.category" class="error-text">{{
-                  errors.category
-                }}</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Flower Type *</label>
-                <select
-                  v-model="formData.flower_type"
-                  class="form-select"
-                  :class="{ 'is-invalid': errors.flower_type }"
-                  @change="clearError('flower_type')"
-                  required
-                >
-                  <option value="">Select flower type</option>
-                  <option v-for="t in withCurrent(taxonomies.flower_types, formData.flower_type)" :key="t.value" :value="t.value">{{ t.label }}{{ t.description ? ` (${t.description})` : "" }}</option>
-                </select>
-                <span v-if="errors.flower_type" class="error-text">{{
-                  errors.flower_type
-                }}</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Color *</label>
-                <select
-                  v-model="formData.color"
-                  class="form-select"
-                  :class="{ 'is-invalid': errors.color }"
-                  @change="handleColorChange"
-                  required
-                >
-                  <option value="">Select color</option>
-                  <option value="white">White</option>
-                  <option value="yellow">Yellow</option>
-                  <option value="red">Red</option>
-                  <option value="pink">Pink</option>
-                  <option value="purple">Purple</option>
-                  <option value="orange">Orange</option>
-                  <option value="blue">Blue</option>
-                  <option value="green">Green</option>
-                  <option value="cream">Cream</option>
-                  <option value="other">Other</option>
-                </select>
-                <span v-if="errors.color" class="error-text">{{
-                  errors.color
-                }}</span>
-              </div>
-              <div class="form-group" v-if="formData.color === 'other'">
-                <label class="form-label">Specify Color *</label>
-                <input
-                  v-model="formData.color_other"
-                  type="text"
-                  placeholder="e.g., Burgundy, Lavender"
-                  class="form-input"
-                  :class="{ 'is-invalid': errors.color_other }"
-                  @input="clearError('color_other')"
-                  required
-                />
-                <span v-if="errors.color_other" class="error-text">{{
-                  errors.color_other
-                }}</span>
-              </div>
-            </div>
+            <figure
+              v-for="(img, i) in images"
+              :key="img.url"
+              class="ap-photo"
+              draggable="true"
+              @dragstart="dragFrom = i"
+              @dragover.prevent
+              @drop.stop.prevent="moveImage(i)"
+            >
+              <img :src="img.url" :alt="`Photo ${i + 1}`" />
+              <span v-if="i === 0" class="ap-cover">Cover</span>
+              <button v-else type="button" class="ap-make-cover" @click="makeCover(i)">Make cover</button>
+              <button type="button" class="ap-x" aria-label="Remove photo" @click="removeImage(i)"><span v-html="ICONS.close"></span></button>
+            </figure>
+            <label v-if="images.length < 5" class="ap-photo ap-add" :class="{ big: !images.length }">
+              <input type="file" accept="image/*" multiple @change="onPick" />
+              <span v-html="ICONS.upload"></span>
+              <strong>{{ images.length ? "Add more" : "Add photos" }}</strong>
+              <small v-if="!images.length">Click or drop images here · up to 10 MB each</small>
+            </label>
           </div>
+          <p v-if="errors.images" class="sp-error">{{ errors.images }}</p>
+        </section>
 
-          <!-- Pricing Information -->
-          <div class="form-section">
-            <h2 class="section-title">Pricing Information</h2>
-            <div class="form-grid">
-              <div class="form-group">
-                <label class="form-label">Purchase Price / Cost *</label>
-                <div class="input-with-prefix">
-                  <span class="prefix">₱</span>
-                  <input
-                    v-model.number="formData.purchase_price"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    class="form-input"
-                    :class="{ 'is-invalid': errors.purchase_price }"
-                    @input="
-                      clearError('purchase_price');
-                      calculateProfit();
-                    "
-                    required
-                  />
-                </div>
-                <span v-if="errors.purchase_price" class="error-text">{{
-                  errors.purchase_price
-                }}</span>
-                <span class="hint-text">Your cost to acquire this product</span>
+        <!-- 2. Basics -->
+        <section id="ap-basics" class="sp-card ap-step" :class="{ done: steps.basics }">
+          <header class="ap-step-head">
+            <span class="ap-num">{{ steps.basics ? "✓" : 2 }}</span>
+            <div><h2>Basics</h2><p>What it is and what makes it special.</p></div>
+          </header>
+          <div class="sp-grid-2">
+            <label class="sp-field sp-span-all">
+              <span>Product name</span>
+              <input v-model="form.product_name" class="sp-input" :class="{ invalid: errors.product_name }" maxlength="255" placeholder="e.g. Sunny Day Tulip Bouquet" @input="clear('product_name')" />
+              <small v-if="errors.product_name" class="sp-error">{{ errors.product_name }}</small>
+            </label>
+            <label class="sp-field sp-span-all">
+              <span>Description</span>
+              <textarea v-model="form.description" class="sp-textarea" :class="{ invalid: errors.description }" rows="4" maxlength="3000" placeholder="Flowers used, size, the feeling it gives…" @input="clear('description')"></textarea>
+              <small v-if="errors.description" class="sp-error">{{ errors.description }}</small>
+              <small v-else>{{ form.description.length }}/3000</small>
+            </label>
+            <div class="sp-field">
+              <span class="sp-label">Colour</span>
+              <div class="ap-colors" role="radiogroup" aria-label="Colour">
+                <button
+                  v-for="c in COLORS"
+                  :key="c.value"
+                  type="button"
+                  role="radio"
+                  class="ap-swatch"
+                  :class="{ on: form.color === c.value }"
+                  :aria-checked="form.color === c.value"
+                  :title="c.label"
+                  :style="{ '--sw': c.hex }"
+                  @click="setColor(c.value)"
+                ><span class="sr-only">{{ c.label }}</span></button>
               </div>
-              <div class="form-group">
-                <label class="form-label">Selling Price / Retail Price *</label>
-                <div class="input-with-prefix">
-                  <span class="prefix">₱</span>
-                  <input
-                    v-model.number="formData.selling_price"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    class="form-input"
-                    :class="{ 'is-invalid': errors.selling_price }"
-                    @input="
-                      clearError('selling_price');
-                      calculateProfit();
-                    "
-                    required
-                  />
-                </div>
-                <span v-if="errors.selling_price" class="error-text">{{
-                  errors.selling_price
-                }}</span>
-                <span class="hint-text">Price customers will pay</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Profit Margin</label>
-                <div class="profit-display">
-                  <div class="profit-amount">
-                    ₱{{ profitAmount.toFixed(2) }}
-                  </div>
-                  <div class="profit-percentage">
-                    {{ profitPercentage.toFixed(1) }}% margin
-                  </div>
-                </div>
-              </div>
-
-              <!-- ── Discount Toggle (matches Edit modal style) ── -->
-              <div class="form-group full-width">
-                <div
-                  class="discount-toggle-row"
-                  :class="{ active: formData.has_discount }"
-                >
-                  <label class="toggle-switch">
-                    <input
-                      type="checkbox"
-                      v-model="formData.has_discount"
-                      @change="handleDiscountToggle"
-                    />
-                    <span class="toggle-slider"></span>
-                  </label>
-                  <div class="toggle-label-group">
-                    <span class="toggle-label-main">Enable Discount Price</span>
-                    <span class="toggle-label-sub"
-                      >Show a crossed-out original price and a lower sale
-                      price</span
-                    >
-                  </div>
-                  <span
-                    v-if="formData.has_discount"
-                    class="discount-active-pill"
-                    >🏷️ Sale Active</span
-                  >
-                </div>
-              </div>
-
-              <transition name="slide-down">
-                <div v-if="formData.has_discount">
-                  <div class="form-group">
-                    <label class="form-label">Discount Price *</label>
-                    <div class="input-with-prefix">
-                      <span class="prefix">₱</span>
-                      <input
-                        v-model.number="formData.discount_price"
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        class="form-input"
-                        :class="{ 'is-invalid': errors.discount_price }"
-                        @input="clearError('discount_price')"
-                        :required="formData.has_discount"
-                      />
-                    </div>
-                    <span v-if="errors.discount_price" class="error-text">{{
-                      errors.discount_price
-                    }}</span>
-                    <span class="hint-text"
-                      >Must be less than selling price</span
-                    >
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Discount Percentage</label>
-                    <div class="discount-display">
-                      <div class="discount-amount">
-                        {{ discountPercentage.toFixed(1) }}%
-                      </div>
-                      <div class="discount-text">off selling price</div>
-                    </div>
-                  </div>
-                </div>
-              </transition>
+              <small v-if="errors.color" class="sp-error">{{ errors.color }}</small>
+              <small v-else>{{ colorLabel || "Pick the main colour" }}</small>
             </div>
+            <label v-if="form.color === 'other'" class="sp-field">
+              <span>Which colour?</span>
+              <input v-model="form.color_other" class="sp-input" :class="{ invalid: errors.color_other }" maxlength="100" placeholder="e.g. Burgundy, Lavender" @input="clear('color_other')" />
+              <small v-if="errors.color_other" class="sp-error">{{ errors.color_other }}</small>
+            </label>
+            <label class="sp-field">
+              <span>SKU</span>
+              <div class="ap-inline">
+                <input v-model="form.sku" class="sp-input" :class="{ invalid: errors.sku }" maxlength="255" placeholder="e.g. TULIP-YEL-001" @input="clear('sku')" />
+                <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="generateSku">Generate</button>
+              </div>
+              <small v-if="errors.sku" class="sp-error">{{ errors.sku }}</small>
+              <small v-else>Your own code to tell products apart</small>
+            </label>
           </div>
+        </section>
 
-          <!-- Stock Management -->
-          <div class="form-section">
-            <h2 class="section-title">Stock Management</h2>
-            <div class="form-grid">
-              <div class="form-group">
-                <label class="form-label">Quantity in Stock *</label>
-                <input
-                  v-model.number="formData.quantity_in_stock"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  class="form-input"
-                  :class="{ 'is-invalid': errors.quantity_in_stock }"
-                  @input="clearError('quantity_in_stock')"
-                  required
-                />
-                <span v-if="errors.quantity_in_stock" class="error-text">{{
-                  errors.quantity_in_stock
-                }}</span>
-                <span class="hint-text">Current available units</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Minimum Stock Level *</label>
-                <input
-                  v-model.number="formData.min_stock_level"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  class="form-input"
-                  :class="{ 'is-invalid': errors.min_stock_level }"
-                  @input="clearError('min_stock_level')"
-                  required
-                />
-                <span v-if="errors.min_stock_level" class="error-text">{{
-                  errors.min_stock_level
-                }}</span>
-                <span class="hint-text"
-                  >Alert when stock reaches this level</span
-                >
-              </div>
-              <div class="form-group">
-                <label class="form-label">Maximum Stock Level</label>
-                <input
-                  v-model.number="formData.max_stock_level"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  class="form-input"
-                />
-                <span class="hint-text">Avoid overstocking</span>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Season Availability</label>
-                <select v-model="formData.season" class="form-select">
-                  <option value="all-year">All Year Round</option>
-                  <option value="spring">Spring</option>
-                  <option value="summer">Summer</option>
-                  <option value="autumn">Autumn</option>
-                  <option value="winter">Winter</option>
-                </select>
-              </div>
-            </div>
-            <div class="info-banner">
-              <span class="info-icon">🏭</span>
-              <div>
-                <strong>Storage & Freshness managed by Warehouse</strong>
-                <p>
-                  Storage location, harvest dates, expiration dates, and batch
-                  tracking are handled in the Warehouse module when flowers
-                  physically arrive.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Selling Type -->
-          <div class="form-section">
-            <h2 class="section-title">Selling Type</h2>
-            <div class="form-grid">
-              <div class="form-group full-width">
-                <label class="form-label">How is this product sold? *</label>
-                <select
-                  v-model="formData.selling_type"
-                  class="form-select"
-                  :class="{ 'is-invalid': errors.selling_type }"
-                  @change="clearError('selling_type')"
-                  required
-                >
-                  <option value="per_piece">Per Piece</option>
-                  <option value="per_piece_customizable">
-                    Per Piece (Customizable)
-                  </option>
-                  <option value="bouquet">Bouquet</option>
-                </select>
-                <span v-if="errors.selling_type" class="error-text">{{
-                  errors.selling_type
-                }}</span>
-                <span class="hint-text">
-                  <template v-if="formData.selling_type === 'per_piece'"
-                    >Single stem or piece sold as-is</template
-                  >
-                  <template
-                    v-else-if="
-                      formData.selling_type === 'per_piece_customizable'
-                    "
-                    >Customer can customize quantity, color, or
-                    arrangement</template
-                  >
-                  <template v-else-if="formData.selling_type === 'bouquet'"
-                    >Pre-arranged bouquet ready for sale</template
-                  >
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Supplier Information -->
-          <div class="form-section">
-            <h2 class="section-title">Supplier Information</h2>
-            <div class="form-grid">
-              <div class="form-group">
-                <label class="form-label">Supplier Name</label>
-                <input
-                  v-model="formData.supplier_name"
-                  type="text"
-                  placeholder="e.g., Garden Wholesale Inc."
-                  class="form-input"
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Supplier Contact</label>
-                <input
-                  v-model="formData.supplier_contact"
-                  type="text"
-                  placeholder="Phone or email"
-                  class="form-input"
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Supplier SKU / Code</label>
-                <input
-                  v-model="formData.supplier_sku"
-                  type="text"
-                  placeholder="Supplier's product code"
-                  class="form-input"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- 3D Model -->
-          <div class="form-section">
-            <h2 class="section-title">
-              3D Model <span class="optional-label">(Optional)</span>
-            </h2>
-            <div class="model-upload-section">
-              <div v-if="product3DModel" class="model-preview-container">
-                <div class="model-preview">
-                  <div class="model-info">
-                    <span class="model-icon">🎨</span>
-                    <div class="model-details">
-                      <p class="model-name">{{ product3DModel.file.name }}</p>
-                      <p class="model-size">
-                        {{ formatFileSize(product3DModel.file.size) }}
-                      </p>
-                      <p class="model-type">
-                        {{
-                          product3DModel.file.name
-                            .split(".")
-                            .pop()
-                            .toUpperCase()
-                        }}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    @click="remove3DModel"
-                    class="remove-model-btn"
-                  >
-                    ✕ Remove
-                  </button>
-                </div>
-              </div>
-              <div
-                v-else
-                class="model-upload-placeholder"
-                @click="trigger3DFileInput"
-                @dragover.prevent
-                @drop.prevent="handle3DFileDrop"
-              >
-                <span class="upload-icon">🎨</span>
-                <span class="upload-text">Upload 3D Model</span>
-                <span class="upload-hint">GLB, GLTF, OBJ, or FBX format</span>
-                <span class="upload-size-hint">Max 50MB</span>
-              </div>
-              <input
-                ref="modelFileInput"
-                type="file"
-                accept=".glb,.gltf,.obj,.fbx"
-                @change="handle3DFileSelect"
-                style="display: none"
-              />
-              <p class="hint-text">
-                Upload a 3D model to give customers an interactive view.
-                Supported: GLB (recommended), GLTF, OBJ, FBX
-              </p>
-            </div>
-          </div>
-
-          <!-- Product Images -->
-          <div class="form-section">
-            <h2 class="section-title">Product Images</h2>
-            <div class="image-upload-section">
-              <div class="image-grid">
-                <div
-                  v-for="(image, index) in productImages"
-                  :key="index"
-                  class="image-preview"
-                >
-                  <img :src="image.url" alt="Product" />
-                  <button
-                    type="button"
-                    @click="removeImage(index)"
-                    class="remove-image-btn"
-                  >
-                    ✕
-                  </button>
-                  <div v-if="index === 0" class="primary-badge">Primary</div>
-                </div>
-                <div
-                  v-if="productImages.length < 5"
-                  class="image-upload-placeholder"
-                  @click="triggerFileInput"
-                  @dragover.prevent
-                  @drop.prevent="handleDrop"
-                >
-                  <span class="upload-icon">📷</span>
-                  <span class="upload-text">Add Photo</span>
-                  <span class="upload-hint">Click or drag image here</span>
-                </div>
-              </div>
-              <input
-                ref="fileInput"
-                type="file"
-                accept="image/*"
-                multiple
-                @change="handleFileSelect"
-                style="display: none"
-              />
-              <p class="hint-text">
-                Upload up to 5 photos. First image will be the primary product
-                image.
-              </p>
-            </div>
-          </div>
-
-          <!-- Additional Information -->
-          <div class="form-section">
-            <h2 class="section-title">Additional Information</h2>
-            <div class="form-grid">
-              <div class="form-group full-width">
-                <label class="form-label">Care Instructions</label>
-                <textarea
-                  v-model="formData.care_instructions"
-                  placeholder="How to care for these flowers..."
-                  rows="3"
-                  class="form-textarea"
-                ></textarea>
-              </div>
-              <div class="form-group full-width">
-                <label class="form-label"
-                  >Occasion Tags
-                  <span class="optional-label">(Select up to 2)</span></label
-                >
-                <div class="tag-selector">
-                  <label
-                    v-for="tag in occasionTags"
-                    :key="tag"
-                    class="tag-option"
-                    :class="{ disabled: isTagDisabled(tag) }"
-                  >
-                    <input
-                      type="checkbox"
-                      :value="tag"
-                      v-model="formData.occasion_tags"
-                      :disabled="isTagDisabled(tag)"
-                      @change="handleTagChange"
-                    />
-                    <span>{{ tag }}</span>
-                  </label>
-                </div>
-                <span v-if="errors.occasion_tags" class="error-text">{{
-                  errors.occasion_tags
-                }}</span>
-                <span class="hint-text" v-if="formData.occasion_tags.length > 0"
-                  >Selected: {{ formData.occasion_tags.join(", ") }}</span
-                >
-              </div>
-              <div class="form-group full-width">
-                <label class="form-label">Additional Notes</label>
-                <textarea
-                  v-model="formData.notes"
-                  placeholder="Any extra information (e.g., fragile, limited edition, special handling)..."
-                  rows="3"
-                  class="form-textarea"
-                ></textarea>
-              </div>
-              <div class="form-group full-width">
-                <label class="checkbox-label">
-                  <input type="checkbox" v-model="formData.is_fragile" />
-                  <span>⚠️ Fragile — Handle with Care</span>
-                </label>
-              </div>
-              <div class="form-group full-width">
-                <label class="checkbox-label">
-                  <input
-                    type="checkbox"
-                    v-model="formData.requires_refrigeration"
-                  />
-                  <span>❄️ Requires Refrigeration</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <!-- Form Actions -->
-          <div class="form-actions">
-            <button type="button" @click="goBack" class="btn-cancel">
-              Cancel
-            </button>
-            <div class="action-group">
+        <!-- 3. Category & occasions -->
+        <section id="ap-organize" class="sp-card ap-step" :class="{ done: steps.organize }">
+          <header class="ap-step-head">
+            <span class="ap-num">{{ steps.organize ? "✓" : 3 }}</span>
+            <div><h2>Category &amp; occasions</h2><p>How customers find it when they browse or shop for an event.</p></div>
+          </header>
+          <div class="sp-field">
+            <span class="sp-label">Category</span>
+            <div class="ap-chips">
               <button
+                v-for="c in withCurrent(taxonomies.categories, form.category)"
+                :key="c.value"
                 type="button"
-                @click="saveDraft"
-                class="btn-secondary"
-                :disabled="isSubmitting"
-              >
-                <span v-if="isSubmitting && isDraft">Saving...</span>
-                <span v-else>📝 Save as Draft</span>
-              </button>
+                class="sp-pick"
+                :class="{ on: form.category === c.value }"
+                :aria-pressed="form.category === c.value"
+                @click="form.category = c.value; clear('category')"
+              >{{ c.label }}</button>
+            </div>
+            <small v-if="errors.category" class="sp-error">{{ errors.category }}</small>
+          </div>
+          <div class="sp-field ap-gap">
+            <span class="sp-label">Flower type</span>
+            <div class="ap-type-grid">
               <button
-                type="submit"
-                class="btn-primary"
-                :disabled="isSubmitting"
+                v-for="t in withCurrent(taxonomies.flower_types, form.flower_type)"
+                :key="t.value"
+                type="button"
+                class="ap-type"
+                :class="{ on: form.flower_type === t.value }"
+                :aria-pressed="form.flower_type === t.value"
+                @click="form.flower_type = t.value; clear('flower_type')"
               >
-                <span v-if="isSubmitting && !isDraft">Publishing...</span>
-                <span v-else>✅ Publish Product</span>
+                <strong>{{ t.label }}</strong>
+                <span v-if="t.description">{{ t.description }}</span>
               </button>
             </div>
+            <small v-if="errors.flower_type" class="sp-error">{{ errors.flower_type }}</small>
           </div>
-        </form>
-      </div>
-    </main>
-  </div>
+          <div class="sp-field ap-gap">
+            <span class="sp-label">
+              Occasions <em class="ap-count" :class="{ full: form.occasion_tags.length === 2 }">{{ form.occasion_tags.length }}/2</em>
+            </span>
+            <div class="ap-chips">
+              <button
+                v-for="o in taxonomies.occasions"
+                :key="o.value"
+                type="button"
+                class="sp-pick ap-occasion"
+                :class="{ on: form.occasion_tags.includes(o.value) }"
+                :aria-pressed="form.occasion_tags.includes(o.value)"
+                :disabled="!form.occasion_tags.includes(o.value) && form.occasion_tags.length >= 2"
+                @click="toggleOccasion(o.value)"
+              >
+                <span v-if="form.occasion_tags.includes(o.value)" v-html="ICONS.check"></span>{{ o.label }}
+              </button>
+            </div>
+            <small v-if="errors.occasion_tags" class="sp-error">{{ errors.occasion_tags }}</small>
+            <small v-else>Pick 1 or 2. Customers use “Shop by occasion”, and products without one don't show up there.</small>
+          </div>
+        </section>
+
+        <!-- 4. Price -->
+        <section id="ap-price" class="sp-card ap-step" :class="{ done: steps.price }">
+          <header class="ap-step-head">
+            <span class="ap-num">{{ steps.price ? "✓" : 4 }}</span>
+            <div><h2>Price</h2><p>What it costs you and what customers pay.</p></div>
+          </header>
+          <div class="sp-grid-2">
+            <label class="sp-field">
+              <span>Selling price</span>
+              <div class="ap-money"><i>₱</i><input v-model.number="form.selling_price" type="number" min="0" step="0.01" class="sp-input" :class="{ invalid: errors.selling_price }" placeholder="0.00" @input="clear('selling_price')" /></div>
+              <small v-if="errors.selling_price" class="sp-error">{{ errors.selling_price }}</small>
+            </label>
+            <label class="sp-field">
+              <span>Your cost</span>
+              <div class="ap-money"><i>₱</i><input v-model.number="form.purchase_price" type="number" min="0" step="0.01" class="sp-input" :class="{ invalid: errors.purchase_price }" placeholder="0.00" @input="clear('purchase_price')" /></div>
+              <small v-if="errors.purchase_price" class="sp-error">{{ errors.purchase_price }}</small>
+              <small v-else>Only you see this</small>
+            </label>
+          </div>
+          <div v-if="form.selling_price > 0" class="ap-profit" :class="{ bad: profit <= 0 }">
+            <span>{{ profit > 0 ? "You earn" : "You lose" }} <strong>{{ money(Math.abs(profit)) }}</strong> per sale</span>
+            <span v-if="form.purchase_price > 0">{{ Math.round((profit / form.selling_price) * 100) }}% margin</span>
+          </div>
+
+          <label class="ap-switch-row">
+            <span class="sp-switch"><input v-model="form.has_discount" type="checkbox" @change="!form.has_discount && (form.discount_price = null)" /><span></span></span>
+            <span><strong>Put it on sale</strong><small>Shows the regular price crossed out. You can schedule dates later from Products or Promotions.</small></span>
+          </label>
+          <div v-if="form.has_discount" class="sp-grid-2 ap-gap">
+            <label class="sp-field">
+              <span>Sale price</span>
+              <div class="ap-money"><i>₱</i><input v-model.number="form.discount_price" type="number" min="0" step="0.01" class="sp-input" :class="{ invalid: errors.discount_price }" placeholder="0.00" @input="clear('discount_price')" /></div>
+              <small v-if="errors.discount_price" class="sp-error">{{ errors.discount_price }}</small>
+            </label>
+            <div class="sp-field">
+              <span class="sp-label">Customers save</span>
+              <div class="ap-save">{{ salePercent ? `${salePercent}% off` : "—" }}</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. Stock & selling -->
+        <section id="ap-stock" class="sp-card ap-step" :class="{ done: steps.stock }">
+          <header class="ap-step-head">
+            <span class="ap-num">{{ steps.stock ? "✓" : 5 }}</span>
+            <div><h2>Stock &amp; how it's sold</h2><p>How many you have and how customers buy it.</p></div>
+          </header>
+          <div class="ap-sell-grid" role="radiogroup" aria-label="How it's sold">
+            <button
+              v-for="s in SELLING"
+              :key="s.value"
+              type="button"
+              role="radio"
+              class="ap-sell"
+              :class="{ on: form.selling_type === s.value }"
+              :aria-checked="form.selling_type === s.value"
+              @click="form.selling_type = s.value"
+            >
+              <span class="ap-sell-icon" v-html="ICONS[s.icon]"></span>
+              <strong>{{ s.label }}</strong>
+              <span>{{ s.hint }}</span>
+            </button>
+          </div>
+          <div class="sp-grid-3 ap-gap">
+            <label class="sp-field">
+              <span>In stock</span>
+              <input v-model.number="form.quantity_in_stock" type="number" min="0" step="1" class="sp-input" :class="{ invalid: errors.quantity_in_stock }" @input="clear('quantity_in_stock')" />
+              <small v-if="errors.quantity_in_stock" class="sp-error">{{ errors.quantity_in_stock }}</small>
+            </label>
+            <label class="sp-field">
+              <span>Warn me at</span>
+              <input v-model.number="form.min_stock_level" type="number" min="0" step="1" class="sp-input" :class="{ invalid: errors.min_stock_level }" @input="clear('min_stock_level')" />
+              <small>Low-stock alert</small>
+            </label>
+            <label class="sp-field">
+              <span>Maximum <small>(optional)</small></span>
+              <input v-model.number="form.max_stock_level" type="number" :min="form.min_stock_level || 0" step="1" class="sp-input" />
+            </label>
+            <label class="sp-field">
+              <span>Season</span>
+              <select v-model="form.season" class="sp-select">
+                <option v-for="s in SEASONS" :key="s.value" :value="s.value">{{ s.label }}</option>
+              </select>
+            </label>
+            <label class="sp-field">
+              <span>Preparation time</span>
+              <select v-model.number="form.preparation_days" class="sp-select">
+                <option :value="0">Ready the same day</option>
+                <option v-for="d in [1, 2, 3, 5, 7]" :key="d" :value="d">{{ d }} {{ d === 1 ? "day" : "days" }}</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <!-- 6. Care & extras -->
+        <section id="ap-extra" class="sp-card ap-step done-optional">
+          <header class="ap-step-head">
+            <span class="ap-num">6</span>
+            <div><h2>Care &amp; extras <em class="ap-optional">optional</em></h2><p>Handling, a 3D model, and where you source it.</p></div>
+          </header>
+          <div class="ap-toggles">
+            <label class="ap-switch-row">
+              <span class="sp-switch"><input v-model="form.is_fragile" type="checkbox" /><span></span></span>
+              <span><strong>Fragile</strong><small>Couriers are told to handle with care</small></span>
+            </label>
+            <label class="ap-switch-row">
+              <span class="sp-switch"><input v-model="form.requires_refrigeration" type="checkbox" /><span></span></span>
+              <span><strong>Keep cool</strong><small>Needs refrigeration until delivery</small></span>
+            </label>
+          </div>
+          <div class="sp-grid-2 ap-gap">
+            <label class="sp-field sp-span-all">
+              <span>Care instructions</span>
+              <textarea v-model="form.care_instructions" class="sp-textarea" rows="2" placeholder="Trim stems at an angle, change water every two days…"></textarea>
+            </label>
+          </div>
+
+          <div class="ap-model" :class="{ has: modelFile }" @dragover.prevent @drop.prevent="onModelDrop">
+            <span class="ap-model-icon" v-html="ICONS.cube"></span>
+            <div class="ap-model-text">
+              <strong>{{ modelFile ? modelFile.name : "3D model" }}</strong>
+              <span>{{ modelFile ? fileSize(modelFile.size) : form.selling_type === "per_piece_customizable" ? "Needed for the flower to appear in the 3D customizer" : "GLB (best), GLTF, OBJ or FBX · up to 50 MB" }}</span>
+            </div>
+            <button v-if="modelFile" type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="modelFile = null">Remove</button>
+            <label v-else class="sp-btn sp-btn-ghost sp-btn-sm ap-file">
+              <input type="file" accept=".glb,.gltf,.obj,.fbx" @change="onModelPick" />Upload
+            </label>
+          </div>
+          <p v-if="errors.model_file" class="sp-error">{{ errors.model_file }}</p>
+
+          <details class="ap-more">
+            <summary>Supplier &amp; notes</summary>
+            <div class="sp-grid-3 ap-gap">
+              <label class="sp-field"><span>Supplier</span><input v-model="form.supplier_name" class="sp-input" maxlength="255" placeholder="e.g. Dangwa Wholesale" /></label>
+              <label class="sp-field"><span>Supplier contact</span><input v-model="form.supplier_contact" class="sp-input" maxlength="100" placeholder="Phone or email" /></label>
+              <label class="sp-field"><span>Supplier's code</span><input v-model="form.supplier_sku" class="sp-input" maxlength="255" /></label>
+              <label class="sp-field sp-span-all"><span>Private notes</span><textarea v-model="form.notes" class="sp-textarea" rows="2" placeholder="Only you and your staff see this"></textarea></label>
+            </div>
+          </details>
+        </section>
+      </form>
+
+      <!-- Preview + checklist -->
+      <aside class="ap-side">
+        <div class="sp-card ap-preview">
+          <p class="ap-side-label">Customer preview</p>
+          <div class="ap-card">
+            <div class="ap-card-media">
+              <img v-if="images[0]" :src="images[0].url" alt="" />
+              <span v-else class="ap-card-blank" v-html="ICONS.image"></span>
+              <span v-if="salePercent" class="sp-chip pink ap-card-badge">−{{ salePercent }}%</span>
+            </div>
+            <div class="ap-card-body">
+              <span class="ap-card-cat">{{ categoryLabel || "Category" }}</span>
+              <strong>{{ form.product_name || "Product name" }}</strong>
+              <div class="ap-card-price">
+                <b>{{ money(form.has_discount && salePercent ? form.discount_price : form.selling_price) }}</b>
+                <s v-if="form.has_discount && salePercent">{{ money(form.selling_price) }}</s>
+              </div>
+              <div v-if="form.occasion_tags.length" class="ap-card-tags">
+                <span v-for="t in form.occasion_tags" :key="t">{{ t }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sp-card ap-checklist">
+          <p class="ap-side-label">Ready to publish?</p>
+          <ul>
+            <li v-for="s in CHECKLIST" :key="s.key" :class="{ done: steps[s.key] }">
+              <a :href="`#${s.anchor}`" @click.prevent="jump(s.anchor)">
+                <span class="ap-tick" v-html="steps[s.key] ? ICONS.check : ''"></span>{{ s.label }}
+              </a>
+            </li>
+          </ul>
+          <div class="ap-progress"><span :style="{ width: `${progress}%` }"></span></div>
+          <button type="button" class="sp-btn sp-btn-primary ap-publish" :disabled="submitting" @click="submit('active')">
+            {{ submitting === "active" ? "Publishing…" : "Publish product" }}
+          </button>
+          <button type="button" class="sp-btn sp-btn-ghost ap-publish" :disabled="submitting" @click="submit('draft')">
+            {{ submitting === "draft" ? "Saving…" : "Save as draft" }}
+          </button>
+          <p class="sp-hint">Drafts stay hidden from customers until you publish them from Products.</p>
+        </div>
+      </aside>
+    </div>
+  </ShopLayout>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import vendorHeader from "../../layouts/vendorHeader.vue";
-import { useAuth } from "../../composables/useAuth";
-import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
-
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import api from "../../plugins/axios";
+import ShopLayout from "../../components/vendor/shop/ShopLayout.vue";
+import { SHOP_ICONS as ICONS } from "../../components/vendor/shop/shopIcons";
+import { apiMessage, money, useVendorCatalog } from "../../components/vendor/shop/useVendorCatalog";
 import { useProductTaxonomies } from "../../composables/useProductTaxonomies";
+import "../../components/vendor/shop/shop.css";
 
-const { taxonomies, withCurrent } = useProductTaxonomies();
-
-const router = useRouter();
 const route = useRoute();
-const { user } = useAuth();
-const fileInput = ref(null);
-const modelFileInput = ref(null);
-const isSubmitting = ref(false);
-const isDraft = ref(false);
-const product3DModel = ref(null);
-const errors = reactive({});
+const router = useRouter();
+const { taxonomies, withCurrent } = useProductTaxonomies();
+const { load: reloadCatalog } = useVendorCatalog();
 
-const formData = reactive({
-  owner_id: null,
+const COLORS = [
+  { value: "white", label: "White", hex: "#ffffff" },
+  { value: "cream", label: "Cream", hex: "#f5ecd7" },
+  { value: "yellow", label: "Yellow", hex: "#f6d743" },
+  { value: "orange", label: "Orange", hex: "#f6943b" },
+  { value: "red", label: "Red", hex: "#d63031" },
+  { value: "pink", label: "Pink", hex: "#f78fb3" },
+  { value: "purple", label: "Purple", hex: "#8e5bd6" },
+  { value: "blue", label: "Blue", hex: "#4a90e2" },
+  { value: "green", label: "Green", hex: "#4caf50" },
+  { value: "other", label: "Other", hex: "conic-gradient(#f78fb3, #f6d743, #4a90e2, #8e5bd6, #f78fb3)" },
+];
+const SEASONS = [
+  { value: "all-year", label: "All year round" },
+  { value: "spring", label: "Spring" },
+  { value: "summer", label: "Summer" },
+  { value: "autumn", label: "Autumn" },
+  { value: "winter", label: "Winter" },
+];
+const SELLING = [
+  { value: "bouquet", label: "Bouquet", hint: "Arranged and ready to give", icon: "flower" },
+  { value: "per_piece", label: "Per piece", hint: "Single stems or items", icon: "tag" },
+  { value: "per_piece_customizable", label: "3D customizable", hint: "Customers add it to bouquets they design", icon: "cube" },
+];
+const CHECKLIST = [
+  { key: "photos", label: "At least one photo", anchor: "ap-photos" },
+  { key: "basics", label: "Name, description, colour & SKU", anchor: "ap-basics" },
+  { key: "organize", label: "Category, flower type & an occasion", anchor: "ap-organize" },
+  { key: "price", label: "Selling price above your cost", anchor: "ap-price" },
+  { key: "stock", label: "Stock count", anchor: "ap-stock" },
+];
+
+const blank = () => ({
   product_name: "",
   description: "",
   sku: "",
@@ -680,15 +410,16 @@ const formData = reactive({
   flower_type: "",
   color: "",
   color_other: "",
-  purchase_price: 0,
-  selling_price: 0,
+  purchase_price: null,
+  selling_price: null,
   has_discount: false,
   discount_price: null,
   quantity_in_stock: 0,
-  min_stock_level: 0,
+  min_stock_level: 5,
   max_stock_level: null,
-  selling_type: "per_piece",
+  selling_type: "bouquet",
   season: "all-year",
+  preparation_days: 0,
   supplier_name: "",
   supplier_contact: "",
   supplier_sku: "",
@@ -697,1074 +428,827 @@ const formData = reactive({
   notes: "",
   is_fragile: false,
   requires_refrigeration: false,
-  status: "active",
 });
 
-const productImages = ref([]);
+const form = reactive(blank());
+const images = ref([]);
+const modelFile = ref(null);
+const errors = reactive({});
+const submitting = ref(null);
+const dropping = ref(false);
+const dragFrom = ref(null);
+let saved = false;
 
-const occasionTags = computed(() => taxonomies.occasions.map((o) => o.value));
-
-// ── Computed ───────────────────────────────────────────────────────────────
-
-const profitAmount = computed(() => {
-  const selling = parseFloat(formData.selling_price) || 0;
-  const purchase = parseFloat(formData.purchase_price) || 0;
-  return selling - purchase;
+// ── Derived ───────────────────────────────────────────────────────────────
+const profit = computed(() => (Number(form.selling_price) || 0) - (Number(form.purchase_price) || 0));
+const salePercent = computed(() => {
+  const price = Number(form.selling_price) || 0;
+  const sale = Number(form.discount_price) || 0;
+  return form.has_discount && price > 0 && sale > 0 && sale < price ? Math.round((1 - sale / price) * 100) : 0;
 });
-const profitPercentage = computed(() => {
-  const purchase = parseFloat(formData.purchase_price) || 0;
-  if (purchase === 0) return 0;
-  return (profitAmount.value / purchase) * 100;
-});
-const discountPercentage = computed(() => {
-  if (!formData.has_discount || !formData.discount_price) return 0;
-  const selling = parseFloat(formData.selling_price) || 0;
-  const discount = parseFloat(formData.discount_price) || 0;
-  if (selling === 0) return 0;
-  return ((selling - discount) / selling) * 100;
-});
+const colorLabel = computed(() =>
+  form.color === "other" ? form.color_other || "Other" : COLORS.find((c) => c.value === form.color)?.label,
+);
+// 3D-customizable flowers are used inside custom bouquets, not listed by occasion
+const needsOccasion = computed(() => form.selling_type !== "per_piece_customizable");
+const categoryLabel = computed(() => taxonomies.categories.find((c) => c.value === form.category)?.label);
+const steps = computed(() => ({
+  photos: images.value.length > 0,
+  basics: !!(form.product_name.trim() && form.description.trim() && form.sku.trim() && form.color && (form.color !== "other" || form.color_other.trim())),
+  organize: !!(form.category && form.flower_type && (form.occasion_tags.length || !needsOccasion.value)),
+  price: Number(form.selling_price) > 0 && Number(form.purchase_price) >= 0 && form.purchase_price !== null && profit.value > 0 && (!form.has_discount || salePercent.value > 0),
+  stock: Number.isInteger(Number(form.quantity_in_stock)) && Number(form.quantity_in_stock) >= 0,
+}));
+const progress = computed(() => (Object.values(steps.value).filter(Boolean).length / CHECKLIST.length) * 100);
+const touched = computed(() => images.value.length > 0 || JSON.stringify(form) !== JSON.stringify({ ...blank(), selling_type: form.selling_type }));
 
-// ── Methods ────────────────────────────────────────────────────────────────
+// ── Inputs ────────────────────────────────────────────────────────────────
+const clear = (key) => delete errors[key];
+function setColor(value) {
+  form.color = value;
+  if (value !== "other") form.color_other = "";
+  clear("color");
+}
+function toggleOccasion(value) {
+  const i = form.occasion_tags.indexOf(value);
+  if (i >= 0) form.occasion_tags.splice(i, 1);
+  else if (form.occasion_tags.length < 2) form.occasion_tags.push(value);
+  clear("occasion_tags");
+}
+function generateSku() {
+  const part = (s, n) => (s || "").normalize("NFD").replace(/[^A-Za-z0-9]/g, "").slice(0, n).toUpperCase();
+  const head = part(form.product_name.split(/\s+/)[0] || form.category, 5) || "ITEM";
+  const color = part(form.color === "other" ? form.color_other : form.color, 3);
+  const tail = Math.random().toString(36).slice(2, 6).toUpperCase();
+  form.sku = [head, color, tail].filter(Boolean).join("-");
+  clear("sku");
+}
 
-const calculateProfit = () => {}; // triggered by @input — computed handles the rest
-
-const handleColorChange = () => {
-  clearError("color");
-  if (formData.color !== "other") {
-    formData.color_other = "";
-    clearError("color_other");
+function addFiles(files) {
+  clear("images");
+  for (const file of files) {
+    if (images.value.length >= 5) {
+      toast.info("You can add up to 5 photos.");
+      break;
+    }
+    if (!file.type.startsWith("image/")) continue;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error(`${file.name} is over 10 MB.`);
+      continue;
+    }
+    images.value.push({ file, url: URL.createObjectURL(file) });
   }
-};
+}
+function onPick(e) {
+  addFiles([...(e.target.files ?? [])]);
+  e.target.value = "";
+}
+function onDrop(e) {
+  dropping.value = false;
+  if (dragFrom.value !== null) return;
+  addFiles([...(e.dataTransfer?.files ?? [])]);
+}
+function moveImage(to) {
+  const from = dragFrom.value;
+  dragFrom.value = null;
+  dropping.value = false;
+  if (from === null || from === to) return;
+  const [img] = images.value.splice(from, 1);
+  images.value.splice(to, 0, img);
+}
+function makeCover(i) {
+  const [img] = images.value.splice(i, 1);
+  images.value.unshift(img);
+}
+function removeImage(i) {
+  URL.revokeObjectURL(images.value[i].url);
+  images.value.splice(i, 1);
+}
 
-const handleDiscountToggle = () => {
-  if (!formData.has_discount) {
-    formData.discount_price = null;
-    clearError("discount_price");
-  }
-};
-
-const handleTagChange = () => {
-  if (formData.occasion_tags.length > 2) {
-    formData.occasion_tags = formData.occasion_tags.slice(0, 2);
-    toast.warning("You can only select up to 2 occasion tags");
-  }
-  clearError("occasion_tags");
-};
-const isTagDisabled = (tag) =>
-  formData.occasion_tags.length >= 2 && !formData.occasion_tags.includes(tag);
-
-// 3D model
-const trigger3DFileInput = () => modelFileInput.value?.click();
-const handle3DFileSelect = (e) => {
-  const file = e.target.files[0];
-  if (file) validate3DModel(file);
-};
-const handle3DFileDrop = (e) => {
-  e.preventDefault();
-  const file = e.dataTransfer.files[0];
-  if (file) validate3DModel(file);
-};
-const validate3DModel = (file) => {
-  const allowed = [".glb", ".gltf", ".obj", ".fbx"];
-  const name = file.name.toLowerCase();
-  if (!allowed.some((ext) => name.endsWith(ext))) {
-    toast.error(
-      "Invalid file format. Please upload GLB, GLTF, OBJ, or FBX file.",
-    );
+function setModel(file) {
+  clear("model_file");
+  if (!file) return;
+  if (!/\.(glb|gltf|obj|fbx)$/i.test(file.name)) {
+    errors.model_file = "Use a GLB, GLTF, OBJ or FBX file.";
     return;
   }
   if (file.size > 50 * 1024 * 1024) {
-    toast.error("File size too large. Maximum size is 50MB.");
+    errors.model_file = "The 3D model must be 50 MB or smaller.";
     return;
   }
-  product3DModel.value = { file, type: name.split(".").pop(), size: file.size };
-  toast.success("3D model uploaded successfully!");
+  modelFile.value = file;
+}
+const onModelPick = (e) => {
+  setModel(e.target.files?.[0]);
+  e.target.value = "";
 };
-const remove3DModel = () => {
-  product3DModel.value = null;
-  if (modelFileInput.value) modelFileInput.value.value = "";
-};
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024,
-    sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-};
+const onModelDrop = (e) => setModel(e.dataTransfer?.files?.[0]);
+const fileSize = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.ceil(b / 1024)} KB`);
 
-// Images
-const triggerFileInput = () => fileInput.value?.click();
-const handleFileSelect = (e) => addImages(Array.from(e.target.files));
-const handleDrop = (e) => {
-  e.preventDefault();
-  addImages(Array.from(e.dataTransfer.files));
-};
-const addImages = (files) => {
-  const imageFiles = files.filter((f) => f.type.startsWith("image/"));
-  const remaining = 5 - productImages.value.length;
-  if (imageFiles.length > remaining) {
-    toast.info(`You can only upload ${remaining} more image(s).`);
-    imageFiles.splice(remaining);
-  }
-  imageFiles.forEach((file) => {
-    const reader = new FileReader();
-    reader.onload = (e) =>
-      productImages.value.push({ file, url: e.target.result });
-    reader.readAsDataURL(file);
-  });
-  if (fileInput.value) fileInput.value.value = "";
-};
-const removeImage = (index) => productImages.value.splice(index, 1);
-const clearError = (field) => {
-  if (errors[field]) delete errors[field];
-};
+function jump(anchor) {
+  document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
-const validateForm = () => {
+// ── Validation & submit ───────────────────────────────────────────────────
+function validate(status) {
   Object.keys(errors).forEach((k) => delete errors[k]);
-  let isValid = true;
-  let firstError = null;
+  const e = errors;
+  if (!form.product_name.trim()) e.product_name = "Give your product a name.";
+  if (!images.value.length) e.images = "Add at least one photo.";
 
-  const required = [
-    {
-      field: "product_name",
-      label: "Product Name",
-      value: formData.product_name,
-    },
-    {
-      field: "description",
-      label: "Product Description",
-      value: formData.description,
-    },
-    { field: "sku", label: "SKU", value: formData.sku },
-    { field: "category", label: "Category", value: formData.category },
-    { field: "flower_type", label: "Flower Type", value: formData.flower_type },
-    { field: "color", label: "Color", value: formData.color },
-    {
-      field: "purchase_price",
-      label: "Purchase Price",
-      value: formData.purchase_price,
-      type: "number",
-    },
-    {
-      field: "selling_price",
-      label: "Selling Price",
-      value: formData.selling_price,
-      type: "number",
-    },
-    {
-      field: "quantity_in_stock",
-      label: "Quantity in Stock",
-      value: formData.quantity_in_stock,
-      type: "number",
-    },
-    {
-      field: "min_stock_level",
-      label: "Min Stock Level",
-      value: formData.min_stock_level,
-      type: "number",
-    },
-    {
-      field: "selling_type",
-      label: "Selling Type",
-      value: formData.selling_type,
-    },
-  ];
+  // The server needs these for drafts too, so check them either way
+  if (!form.description.trim()) e.description = "Add a short description.";
+  if (!form.sku.trim()) e.sku = "Add a SKU, or press Generate.";
+  if (!form.color) e.color = "Pick a colour.";
+  else if (form.color === "other" && !form.color_other.trim()) e.color_other = "Name the colour.";
+  if (!form.category) e.category = "Pick a category.";
+  if (!form.flower_type) e.flower_type = "Pick a flower type.";
+  if (!(Number(form.selling_price) > 0)) e.selling_price = "Set a selling price.";
+  if (form.purchase_price === null || form.purchase_price === "" || Number(form.purchase_price) < 0) e.purchase_price = "Enter your cost (0 if none).";
+  else if (Number(form.selling_price) > 0 && profit.value <= 0) e.selling_price = "The selling price must be higher than your cost.";
+  if (form.has_discount && !salePercent.value) e.discount_price = "The sale price must be above ₱0 and below the selling price.";
+  if (!Number.isInteger(Number(form.quantity_in_stock)) || Number(form.quantity_in_stock) < 0) e.quantity_in_stock = "Enter how many you have.";
+  if (status === "active" && needsOccasion.value && !form.occasion_tags.length) e.occasion_tags = "Pick at least one occasion so customers can find it.";
 
-  for (const f of required) {
-    if (f.type === "number") {
-      if (isNaN(parseFloat(f.value)) || parseFloat(f.value) < 0) {
-        errors[f.field] = `${f.label} is required and must be 0 or greater`;
-        isValid = false;
-        if (!firstError) firstError = f.field;
-      }
-    } else {
-      if (!f.value || f.value.trim() === "") {
-        errors[f.field] = `${f.label} is required`;
-        isValid = false;
-        if (!firstError) firstError = f.field;
-      }
-    }
+  const first = Object.keys(e)[0];
+  if (first) {
+    toast.error(e[first]);
+    const anchor = {
+      images: "ap-photos", product_name: "ap-basics", description: "ap-basics", sku: "ap-basics", color: "ap-basics", color_other: "ap-basics",
+      category: "ap-organize", flower_type: "ap-organize", occasion_tags: "ap-organize",
+      selling_price: "ap-price", purchase_price: "ap-price", discount_price: "ap-price", quantity_in_stock: "ap-stock",
+    }[first];
+    if (anchor) jump(anchor);
   }
+  return !first;
+}
 
-  if (
-    formData.color === "other" &&
-    (!formData.color_other || !formData.color_other.trim())
-  ) {
-    errors.color_other = "Please specify the color";
-    isValid = false;
-    if (!firstError) firstError = "color_other";
-  }
-
-  const selling = parseFloat(formData.selling_price) || 0;
-  const purchase = parseFloat(formData.purchase_price) || 0;
-  if (selling <= purchase) {
-    errors.selling_price = "Selling price must be greater than purchase price";
-    isValid = false;
-    if (!firstError) firstError = "selling_price";
-  }
-
-  if (formData.has_discount) {
-    const disc = parseFloat(formData.discount_price) || 0;
-    if (!formData.discount_price || disc <= 0) {
-      errors.discount_price =
-        "Discount price is required when discount is enabled";
-      isValid = false;
-      if (!firstError) firstError = "discount_price";
-    } else if (disc >= selling) {
-      errors.discount_price = "Discount price must be less than selling price";
-      isValid = false;
-      if (!firstError) firstError = "discount_price";
-    }
-  }
-
-  if (formData.occasion_tags.length > 2) {
-    errors.occasion_tags = "You can only select up to 2 occasion tags";
-    isValid = false;
-  }
-
-  if (productImages.value.length === 0) {
-    errors.images = "At least one product image is required";
-    isValid = false;
-    if (!firstError) firstError = "images";
-  }
-
-  if (!isValid && firstError) {
-    setTimeout(() => {
-      const el = document.querySelector(
-        ".form-input.is-invalid, .form-select.is-invalid, .form-textarea.is-invalid",
-      );
-      if (el) {
-        el.closest(".form-section")?.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-        el.focus();
-      }
-    }, 100);
-    toast.error(errors[firstError]);
-  }
-  return isValid;
-};
-
-const saveDraft = async () => {
-  isDraft.value = true;
-  formData.status = "draft";
-  await submitProduct();
-};
-const publishProduct = async () => {
-  isDraft.value = false;
-  formData.status = "active";
-  await submitProduct();
-};
-
-const submitProduct = async () => {
-  if (isSubmitting.value) return;
-  if (!validateForm()) return;
-  if (!user.value?.id) {
-    toast.error("Please login to continue");
-    router.push("/guest/login");
-    return;
-  }
-
-  isSubmitting.value = true;
-  formData.owner_id = user.value.id;
-
+async function submit(status) {
+  if (submitting.value || !validate(status)) return;
+  submitting.value = status;
   try {
-    const submitData = new FormData();
-
-    // Booleans
-    submitData.append("is_fragile", formData.is_fragile ? "1" : "0");
-    submitData.append(
-      "requires_refrigeration",
-      formData.requires_refrigeration ? "1" : "0",
-    );
-    submitData.append("has_discount", formData.has_discount ? "1" : "0");
-
-    // All scalar fields
-    const scalarFields = [
-      "product_name",
-      "description",
-      "sku",
-      "category",
-      "flower_type",
-      "color",
-      "color_other",
-      "purchase_price",
-      "selling_price",
-      "discount_price",
-      "quantity_in_stock",
-      "min_stock_level",
-      "max_stock_level",
-      "selling_type",
-      "season",
-      "supplier_name",
-      "supplier_contact",
-      "supplier_sku",
-      "care_instructions",
-      "notes",
-      "status",
-    ];
-
-    scalarFields.forEach((key) => {
-      const value = formData[key];
-      if (value !== null && value !== undefined && value !== "") {
-        submitData.append(key, value.toString());
-      }
-    });
-
-    // owner_id
-    submitData.append("owner_id", user.value.id.toString());
-
-    // Occasion tags
-    if (
-      Array.isArray(formData.occasion_tags) &&
-      formData.occasion_tags.length > 0
-    ) {
-      formData.occasion_tags.forEach((tag) => {
-        submitData.append("occasion_tags[]", tag);
-      });
+    const fd = new FormData();
+    const fields = {
+      ...form,
+      status,
+      color_other: form.color === "other" ? form.color_other : "",
+      discount_price: form.has_discount ? form.discount_price : "",
+    };
+    for (const [key, value] of Object.entries(fields)) {
+      if (key === "occasion_tags") continue;
+      if (typeof value === "boolean") fd.append(key, value ? "1" : "0");
+      else if (value !== null && value !== undefined && value !== "") fd.append(key, String(value).trim());
     }
+    form.occasion_tags.forEach((t) => fd.append("occasion_tags[]", t));
+    images.value.forEach((img) => fd.append("images[]", img.file, img.file.name));
+    if (modelFile.value) fd.append("model_file", modelFile.value, modelFile.value.name);
 
-    // ✅ Images — log each one so we can confirm they're attached
-    if (productImages.value.length > 0) {
-      productImages.value.forEach((img, index) => {
-        if (img.file instanceof File) {
-          submitData.append("images[]", img.file, img.file.name);
-          console.log(
-            `Appending image[${index}]:`,
-            img.file.name,
-            img.file.size,
-            img.file.type,
-          );
-        }
-      });
+    const { data } = await api.post("vendor/products", fd);
+    saved = true;
+    toast.success(status === "draft" ? "Saved as a draft." : `${form.product_name} is live in your shop.`);
+    reloadCatalog();
+    router.push({ name: "VendorProducts" });
+    return data;
+  } catch (err) {
+    const serverErrors = err?.response?.data?.errors;
+    if (serverErrors) {
+      for (const [key, list] of Object.entries(serverErrors)) errors[key.split(".")[0]] = [].concat(list)[0];
     }
-
-    // ✅ 3D model
-    if (product3DModel.value?.file instanceof File) {
-      submitData.append(
-        "model_file",
-        product3DModel.value.file,
-        product3DModel.value.file.name,
-      );
-      console.log(
-        "Appending model:",
-        product3DModel.value.file.name,
-        product3DModel.value.file.size,
-      );
-    }
-
-    // ✅ Log FormData entries for debugging
-    console.log("=== FormData entries ===");
-    for (let [key, value] of submitData.entries()) {
-      if (value instanceof File) {
-        console.log(
-          key,
-          "→ File:",
-          value.name,
-          value.size + "bytes",
-          value.type,
-        );
-      } else {
-        console.log(key, "→", value);
-      }
-    }
-
-    const response = await api.post("vendor/products", submitData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
-
-    if (response.data.success) {
-      toast.success(response.data.message || "Product added successfully!");
-      router.push("/vendor/products");
-    }
-  } catch (error) {
-    console.error("Submit error:", error.response?.data);
-    if (error.response?.data?.errors) {
-      Object.keys(errors).forEach((k) => delete errors[k]);
-      Object.entries(error.response.data.errors).forEach(([k, v]) => {
-        errors[k] = Array.isArray(v) ? v[0] : v;
-      });
-      const first = Object.keys(error.response.data.errors)[0];
-      if (first) toast.error(error.response.data.errors[first][0]);
-    } else {
-      toast.error(
-        error.response?.data?.message ||
-          "Failed to add product. Please try again.",
-      );
-    }
+    toast.error(apiMessage(err, "Couldn't save the product. Please try again."));
   } finally {
-    isSubmitting.value = false;
-    isDraft.value = false;
+    submitting.value = null;
   }
-};
+}
 
-const goBack = () => {
-  if (confirm("Are you sure you want to leave? Unsaved changes will be lost."))
-    router.back();
+onBeforeRouteLeave(() => {
+  if (saved || !touched.value) return true;
+  return window.confirm("Leave without saving this product?");
+});
+const beforeUnload = (e) => {
+  if (!saved && touched.value) {
+    e.preventDefault();
+    e.returnValue = "";
+  }
 };
 
 onMounted(() => {
-  if (user.value) formData.owner_id = user.value.id;
-  // "Add flower" on the 3D Customization page opens this form preset for the customizer.
-  if (route.query.selling_type === "per_piece_customizable") {
-    formData.selling_type = "per_piece_customizable";
+  // "Add flower" on the 3D Bouquets page opens this form preset for the customizer
+  if (["per_piece_customizable", "per_piece", "bouquet"].includes(route.query.selling_type)) {
+    form.selling_type = route.query.selling_type;
   }
+  window.addEventListener("beforeunload", beforeUnload);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("beforeunload", beforeUnload);
+  images.value.forEach((img) => URL.revokeObjectURL(img.url));
 });
 </script>
 
 <style scoped>
-* {
-  font-family: "Poppins", sans-serif;
-  box-sizing: border-box;
+.ap-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+  align-items: start;
 }
-
-.product-layout {
-  display: flex;
-  min-height: 100vh;
-  background: #f8f9fa;
-}
-
-.main-content {
-  margin-left: 260px;
-  flex: 1;
-  padding: 24px;
-}
-
-/* Header */
-.content-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-.header-left {
-  display: flex;
-  align-items: center;
+.ap-form {
+  display: grid;
   gap: 16px;
 }
-.btn-back {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  background: white;
-  cursor: pointer;
-  font-size: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
+.ap-step {
+  scroll-margin-top: 16px;
 }
-.btn-back:hover {
-  border-color: #48bb78;
-  color: #48bb78;
-}
-.page-title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0;
-}
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
-
-/* Form */
-.form-container {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-.form-section {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 20px;
-  border: 1px solid #e2e8f0;
-}
-.section-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0 0 20px 0;
-}
-.optional-label {
-  font-size: 13px;
-  font-weight: 400;
-  color: #9ca3af;
-  margin-left: 6px;
-}
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-}
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.form-group.full-width {
-  grid-column: 1 / -1;
-}
-.form-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #2d3748;
-}
-.form-input,
-.form-select,
-.form-textarea {
-  padding: 10px 14px;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #2d3748;
-  transition: all 0.2s;
-  background: white;
-  font-family: inherit;
-}
-.form-input:focus,
-.form-select:focus,
-.form-textarea:focus {
-  outline: none;
-  border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
-}
-.form-textarea {
-  resize: vertical;
-  min-height: 80px;
-}
-.error-text {
-  color: #e53e3e;
-  font-size: 12px;
-}
-.form-input.is-invalid,
-.form-select.is-invalid,
-.form-textarea.is-invalid {
-  border-color: #e53e3e;
-}
-.hint-text {
-  font-size: 12px;
-  color: #9ca3af;
-}
-
-/* Info banner */
-.info-banner {
+.ap-step-head {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  margin-top: 20px;
-  padding: 14px 18px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 10px;
-  border-left: 4px solid #3b82f6;
-}
-.info-icon {
-  font-size: 20px;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-.info-banner strong {
-  display: block;
-  font-size: 14px;
-  color: #1e40af;
-  margin-bottom: 4px;
-}
-.info-banner p {
-  font-size: 13px;
-  color: #3b82f6;
-  margin: 0;
-}
-
-/* Input prefix */
-.input-with-prefix {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.prefix {
-  position: absolute;
-  left: 14px;
-  color: #9ca3af;
-  font-weight: 500;
-  z-index: 1;
-  pointer-events: none;
-}
-.input-with-prefix .form-input {
-  padding-left: 32px;
-}
-
-/* Profit display */
-.profit-display {
-  padding: 16px;
-  background: #d1fae5;
-  border-radius: 8px;
-  border: 1px solid #a7f3d0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 64px;
-}
-.profit-amount {
-  font-size: 24px;
-  font-weight: 700;
-  color: #065f46;
-  margin-bottom: 4px;
-}
-.profit-percentage {
-  font-size: 13px;
-  color: #047857;
-}
-
-/* Discount display */
-.discount-display {
-  padding: 16px;
-  background: #fef3c7;
-  border-radius: 8px;
-  border: 1px solid #fde68a;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 64px;
-}
-.discount-amount {
-  font-size: 24px;
-  font-weight: 700;
-  color: #92400e;
-  margin-bottom: 4px;
-}
-.discount-text {
-  font-size: 13px;
-  color: #b45309;
-}
-
-/* ─── Toggle Switch (matches edit modal) ──────────────── */
-.discount-toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  background: #f7fafc;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  transition: all 0.2s;
-}
-.discount-toggle-row.active {
-  border-color: #48bb78;
-  background: #f0fff4;
-}
-.toggle-switch {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-  flex-shrink: 0;
-}
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-.toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  inset: 0;
-  background: #cbd5e0;
-  border-radius: 24px;
-  transition: 0.3s;
-}
-.toggle-slider::before {
-  content: "";
-  position: absolute;
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background: white;
-  border-radius: 50%;
-  transition: 0.3s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-.toggle-switch input:checked + .toggle-slider {
-  background: #48bb78;
-}
-.toggle-switch input:checked + .toggle-slider::before {
-  transform: translateX(20px);
-}
-.toggle-label-group {
-  flex: 1;
-}
-.toggle-label-main {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: #2d3748;
-}
-.toggle-label-sub {
-  display: block;
-  font-size: 12px;
-  color: #9ca3af;
-  margin-top: 2px;
-}
-.discount-active-pill {
-  padding: 5px 12px;
-  background: #e53e3e;
-  color: white;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-/* Slide transition */
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.25s ease;
-  overflow: hidden;
-}
-.slide-down-enter-from,
-.slide-down-leave-to {
-  opacity: 0;
-  max-height: 0;
-  transform: translateY(-8px);
-}
-.slide-down-enter-to,
-.slide-down-leave-from {
-  opacity: 1;
-  max-height: 200px;
-  transform: translateY(0);
-}
-
-/* 3D model */
-.model-upload-section {
-  width: 100%;
-}
-.model-preview-container {
   margin-bottom: 16px;
 }
-.model-preview {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  background: #f7fafc;
-  border-radius: 12px;
-  border: 2px solid #e2e8f0;
-}
-.model-info {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.model-icon {
-  font-size: 32px;
-}
-.model-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.model-name {
-  font-size: 14px;
+.ap-step-head h2 {
+  margin: 0;
+  font-size: 15.5px;
   font-weight: 600;
-  color: #2d3748;
-  margin: 0;
+  color: #1a202c;
 }
-.model-size,
-.model-type {
-  font-size: 12px;
+.ap-step-head p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
   color: #718096;
-  margin: 0;
 }
-.remove-model-btn {
-  padding: 8px 16px;
-  background: #fee2e2;
-  color: #991b1b;
-  border: none;
-  border-radius: 6px;
+.ap-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: #edf2f7;
+  color: #4a5568;
   font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s, color 0.2s;
+}
+.ap-step.done .ap-num {
+  background: #48bb78;
+  color: #fff;
+}
+.ap-optional {
+  margin-left: 6px;
+  font-size: 11px;
+  font-style: normal;
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
+  color: #a0aec0;
 }
-.remove-model-btn:hover {
-  background: #fecaca;
-}
-.model-upload-placeholder {
-  padding: 48px;
-  border: 2px dashed #cbd5e0;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: #f7fafc;
-}
-.model-upload-placeholder:hover {
-  border-color: #48bb78;
-  background: #d1fae5;
-}
-.upload-icon {
-  font-size: 40px;
-  margin-bottom: 10px;
-}
-.upload-text {
-  font-size: 15px;
-  font-weight: 600;
-  color: #2d3748;
-  margin-bottom: 6px;
-}
-.upload-hint {
-  font-size: 13px;
-  color: #718096;
-  margin-bottom: 4px;
-}
-.upload-size-hint {
-  font-size: 12px;
-  color: #9ca3af;
+.ap-gap {
+  margin-top: 16px;
 }
 
-/* Images */
-.image-upload-section {
-  width: 100%;
-}
-.image-grid {
+/* Photos */
+.ap-photos {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 16px;
-  margin-bottom: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 10px;
+  padding: 4px;
+  border-radius: 16px;
+  transition: background 0.15s;
 }
-.image-preview {
+.ap-photos.dragging {
+  background: #f0fff4;
+}
+.ap-photo {
   position: relative;
+  margin: 0;
   aspect-ratio: 1;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
-  border: 2px solid #e2e8f0;
-  transition: all 0.2s;
+  background: #f7faf8;
+  border: 1px solid #edf2f7;
+  cursor: grab;
 }
-.image-preview:hover {
-  border-color: #48bb78;
-}
-.image-preview img {
+.ap-photo img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.remove-image-btn {
+.ap-cover {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(239, 68, 68, 0.9);
-  color: white;
-  cursor: pointer;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: all 0.2s;
+  left: 8px;
+  bottom: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #48bb78;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
 }
-.image-preview:hover .remove-image-btn {
+.ap-make-cover {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(26, 32, 44, 0.75);
+  color: #fff;
+  font-family: "Poppins", sans-serif;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ap-photo:hover .ap-make-cover,
+.ap-make-cover:focus-visible {
   opacity: 1;
 }
-.primary-badge {
+.ap-x {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
-  padding: 3px 8px;
-  background: #48bb78;
-  color: white;
-  font-size: 10px;
-  font-weight: 700;
-  border-radius: 4px;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  color: #c53030;
+  cursor: pointer;
 }
-.image-upload-placeholder {
-  aspect-ratio: 1;
-  border: 2px dashed #cbd5e0;
-  border-radius: 12px;
+.ap-x :deep(svg) {
+  width: 13px;
+  height: 13px;
+}
+.ap-add {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 4px;
+  padding: 10px;
+  border: 1.5px dashed #9ae6b4;
+  background: #f7fdf9;
+  color: #2f855a;
+  text-align: center;
   cursor: pointer;
-  transition: all 0.2s;
-  background: #f7fafc;
 }
-.image-upload-placeholder:hover {
-  border-color: #48bb78;
-  background: #d1fae5;
+.ap-add.big {
+  grid-column: 1 / -1;
+  aspect-ratio: auto;
+  min-height: 170px;
+}
+.ap-add strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.ap-add small {
+  font-size: 11.5px;
+  color: #68a882;
+}
+.ap-add :deep(svg) {
+  width: 24px;
+  height: 24px;
+}
+.ap-add input,
+.ap-file input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.ap-add:focus-within {
+  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.25);
 }
 
-/* Tags */
-.tag-selector {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+/* Basics */
+.ap-colors {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  padding: 4px;
 }
-.tag-option {
+.ap-swatch {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--sw);
+  box-shadow: 0 0 0 1px #e2e8f0;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.ap-swatch:hover {
+  transform: scale(1.08);
+}
+.ap-swatch.on {
+  box-shadow: 0 0 0 2px #48bb78;
+  transform: scale(1.1);
+}
+.ap-inline {
+  display: flex;
+  gap: 8px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+/* Organize */
+.ap-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ap-occasion :deep(svg) {
+  width: 13px;
+  height: 13px;
+}
+.ap-count {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #edf2f7;
+  color: #4a5568;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+}
+.ap-count.full {
+  background: #e6f9ee;
+  color: #22753f;
+}
+.ap-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.ap-type {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 13px;
+  background: #fff;
+  font-family: "Poppins", sans-serif;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ap-type strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a202c;
+}
+.ap-type span {
+  font-size: 11.5px;
+  color: #718096;
+}
+.ap-type.on {
+  border-color: #48bb78;
+  background: #f0fff4;
+}
+
+/* Price */
+.ap-money {
+  position: relative;
+}
+.ap-money i {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-style: normal;
+  color: #a0aec0;
+  font-size: 13.5px;
+}
+.ap-money .sp-input {
+  padding-left: 28px;
+}
+.ap-profit {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: #f0fff4;
+  color: #22753f;
+  font-size: 13px;
+}
+.ap-profit.bad {
+  background: #fff5f5;
+  color: #c53030;
+}
+.ap-switch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 16px;
+  cursor: pointer;
+}
+.ap-switch-row strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1a202c;
+}
+.ap-switch-row small {
+  display: block;
+  font-size: 12px;
+  color: #718096;
+}
+.ap-switch-row .sp-switch {
+  margin-top: 2px;
+}
+.ap-save {
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: #fff0f6;
+  color: #b83280;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Stock & selling */
+.ap-sell-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.ap-sell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  font-family: "Poppins", sans-serif;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ap-sell strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1a202c;
+}
+.ap-sell span:last-child {
+  font-size: 11.5px;
+  color: #718096;
+}
+.ap-sell.on {
+  border-color: #48bb78;
+  background: #f0fff4;
+}
+.ap-sell-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-bottom: 4px;
+  border-radius: 10px;
+  background: #e6f9ee;
+  color: #22753f;
+}
+.ap-sell-icon :deep(svg) {
+  width: 17px;
+  height: 17px;
+}
+
+/* Extras */
+.ap-toggles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 16px;
+}
+.ap-toggles .ap-switch-row {
+  margin-top: 0;
+}
+.ap-model {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px;
+  border: 1.5px dashed #cbd5e0;
+  border-radius: 14px;
+  background: #fbfdfc;
+}
+.ap-model.has {
+  border-style: solid;
+  border-color: #9ae6b4;
+}
+.ap-model-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #e6fffa;
+  color: #2c7a7b;
+}
+.ap-model-icon :deep(svg) {
+  width: 20px;
+  height: 20px;
+}
+.ap-model-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ap-model-text strong {
   font-size: 13px;
-  background: white;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.tag-option:hover:not(.disabled) {
-  border-color: #48bb78;
-  background: #f0fdf4;
+.ap-model-text span {
+  font-size: 11.5px;
+  color: #a0aec0;
 }
-.tag-option.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.ap-file {
+  position: relative;
 }
-.tag-option input[type="checkbox"] {
+.ap-more {
+  margin-top: 16px;
+  border-top: 1px solid #f1f5f3;
+  padding-top: 12px;
+}
+.ap-more summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2f855a;
   cursor: pointer;
-  accent-color: #48bb78;
 }
 
-.checkbox-label {
+/* Side */
+.ap-side {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 14px;
+}
+.ap-side-label {
+  margin: 0 0 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #a0aec0;
+}
+.ap-card {
+  border: 1px solid #edf2f7;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.ap-card-media {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: #f0fff4;
+}
+.ap-card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ap-card-blank {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: #9ae6b4;
+}
+.ap-card-blank :deep(svg) {
+  width: 36px;
+  height: 36px;
+}
+.ap-card-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+.ap-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px 14px;
+}
+.ap-card-cat {
+  font-size: 11.5px;
+  color: #a0aec0;
+}
+.ap-card-body strong {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #1a202c;
+  overflow-wrap: anywhere;
+}
+.ap-card-price b {
+  font-size: 15px;
+  color: #1a202c;
+}
+.ap-card-price s {
+  margin-left: 6px;
+  font-size: 12px;
+  color: #a0aec0;
+}
+.ap-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.ap-card-tags span {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #fff0f6;
+  color: #b83280;
+  font-size: 11px;
+  font-weight: 500;
+}
+.ap-checklist ul {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.ap-checklist a {
   display: flex;
   align-items: center;
   gap: 10px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #2d3748;
-  padding: 8px;
-  border-radius: 6px;
-  transition: background-color 0.2s;
+  padding: 6px 4px;
+  border-radius: 9px;
+  font-size: 13px;
+  color: #4a5568;
+  text-decoration: none;
 }
-.checkbox-label:hover {
-  background: #f7fafc;
+.ap-checklist a:hover {
+  background: #f8fcf9;
 }
-.checkbox-label input[type="checkbox"] {
-  cursor: pointer;
-  width: 18px;
-  height: 18px;
-  accent-color: #48bb78;
+.ap-checklist li.done a {
+  color: #22753f;
 }
-
-/* Actions */
-.form-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px;
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  margin-top: 20px;
+.ap-tick {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid #cbd5e0;
+  border-radius: 50%;
+  color: #fff;
 }
-.action-group {
-  display: flex;
-  gap: 12px;
+.ap-tick :deep(svg) {
+  width: 12px;
+  height: 12px;
 }
-.btn-primary,
-.btn-secondary,
-.btn-cancel {
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.2s;
-  border: none;
-  font-family: inherit;
-}
-.btn-primary {
-  background: #48bb78;
-  color: white;
-}
-.btn-primary:hover:not(:disabled) {
-  background: #38a169;
-  transform: translateY(-1px);
-}
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-.btn-secondary {
-  background: white;
-  color: #2d3748;
-  border: 1px solid #e2e8f0;
-}
-.btn-secondary:hover:not(:disabled) {
+.ap-checklist li.done .ap-tick {
   border-color: #48bb78;
-  color: #48bb78;
-  background: #f0fdf4;
+  background: #48bb78;
 }
-.btn-secondary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.ap-progress {
+  height: 6px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: #edf2f7;
+  overflow: hidden;
 }
-.btn-cancel {
-  background: white;
-  color: #6b7280;
-  border: 1px solid #e2e8f0;
+.ap-progress span {
+  display: block;
+  height: 100%;
+  background: #48bb78;
+  transition: width 0.3s;
 }
-.btn-cancel:hover {
-  border-color: #ef4444;
-  color: #ef4444;
-  background: #fff5f5;
+.ap-publish {
+  width: 100%;
+  margin-bottom: 8px;
 }
-
-@media (max-width: 1024px) {
-  .main-content {
-    margin-left: 0;
+@media (max-width: 1100px) {
+  .ap-layout {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  .tag-selector {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .form-actions {
-    flex-direction: column;
-    gap: 16px;
-  }
-  .action-group {
-    width: 100%;
-    justify-content: space-between;
+  .ap-side {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-@media (max-width: 768px) {
-  .main-content {
-    padding: 16px;
+@media (max-width: 720px) {
+  .ap-side {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .form-section {
-    padding: 16px;
-  }
-}
-@media (max-width: 640px) {
-  .page-title {
-    font-size: 22px;
-  }
-  .action-group {
-    flex-direction: column;
-    gap: 8px;
-  }
-  .tag-selector {
-    grid-template-columns: 1fr;
+  .ap-sell-grid,
+  .ap-toggles {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

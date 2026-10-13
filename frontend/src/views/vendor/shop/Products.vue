@@ -11,6 +11,12 @@
       <button type="button" @click="load">Try again</button>
     </div>
 
+    <div v-if="untagged" class="sp-banner warn">
+      <span v-html="ICONS.alert"></span>
+      {{ untagged }} {{ untagged === 1 ? "product has" : "products have" }} no occasion, so {{ untagged === 1 ? "it doesn't" : "they don't" }} appear under “Shop by occasion”.
+      <router-link :to="{ name: 'VendorCategories', query: { kind: 'occasion' } }" class="banner-link">Tag {{ untagged === 1 ? "it" : "them" }}</router-link>
+    </div>
+
     <!-- Summary -->
     <section class="sp-stats" aria-label="Product summary">
       <template v-if="!products">
@@ -283,6 +289,7 @@ const inStatus = (p, key) =>
 const counts = computed(() =>
   Object.fromEntries(STATUS_FILTERS.map((f) => [f.key, (products.value ?? []).filter((p) => inStatus(p, f.key)).length])),
 );
+const untagged = computed(() => (products.value ?? []).filter((p) => p.status !== "inactive" && p.selling_type !== "per_piece_customizable" && !p.occasion_tags.length).length);
 const usedCategories = computed(() => [...new Set((products.value ?? []).map((p) => p.category).filter(Boolean))]);
 
 const visible = computed(() => {
@@ -413,6 +420,12 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
 <style scoped>
 .grow {
   flex: 1;
+}
+.banner-link {
+  margin-left: auto;
+  color: inherit;
+  font-weight: 600;
+  white-space: nowrap;
 }
 .narrow {
   width: auto;

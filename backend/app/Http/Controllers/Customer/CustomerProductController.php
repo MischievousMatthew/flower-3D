@@ -203,15 +203,18 @@ class CustomerProductController extends Controller
                 ->distinct()->orderBy('color')->pluck('color')
                 ->filter()->values();
 
-            $occasions = Product::listedForCustomers()->where('status', 'active')
+            // Every occasion on the admin's list (so "Shop by occasion" is never
+            // empty), plus any older value a product still uses, with how many
+            // products each one has.
+            $occasionCounts = Product::listedForCustomers()->where('status', 'active')
                 ->whereIn('selling_type', ['per_piece', 'bouquet'])
                 ->whereNotNull('occasion_tags')
                 ->pluck('occasion_tags')
                 ->flatten()
-                ->unique()
                 ->filter()
-                ->sort()
-                ->values();
+                ->countBy();
+            $occasions = ProductTaxonomy::activeValues(ProductTaxonomy::OCCASION);
+            $occasions = collect([...$occasions, ...$occasionCounts->keys()])->unique()->values();
 
             $priceRow = Product::listedForCustomers()->where('status', 'active')
                 ->whereIn('selling_type', ['per_piece', 'bouquet'])
@@ -240,6 +243,7 @@ class CustomerProductController extends Controller
                     'flower_types' => $flowerTypes,
                     'colors'       => $colors,
                     'occasions'    => $occasions,
+                    'occasion_counts' => $occasionCounts,
                     'seasons'      => ['all-year', 'spring', 'summer', 'autumn', 'winter'],
                     'price_range'  => [
                         'min' => (float) ($priceRow->min_price ?? 0),

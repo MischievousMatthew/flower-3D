@@ -363,6 +363,7 @@
               type="button"
               class="occasion-item"
               :class="{
+                'occasion-item--empty': !occasionCount(occasion),
                 'occasion-item--active':
                   selectedFilters.occasion.length === 1 &&
                   selectedFilters.occasion[0] === occasion,
@@ -377,6 +378,7 @@
                 String(i + 1).padStart(2, "0")
               }}</span>
               <span class="occasion-name">{{ occasion }}</span>
+              <span class="occasion-count">{{ occasionCountText(occasion) }}</span>
               <span class="occasion-arrow" aria-hidden="true">→</span>
             </button>
           </li>
@@ -590,6 +592,7 @@
                   v-model="selectedFilters.occasion"
                   @change="fetchProducts"
                 /><span>{{ occasion }}</span>
+                <small v-if="occasionCount(occasion)" class="filter-count">{{ occasionCount(occasion) }}</small>
               </label>
             </div>
           </div>
@@ -1094,6 +1097,13 @@ const customerCityCoordinates = {
   "Alfonso, Cavite": [14.1406, 120.8532],
   "Magallanes, Cavite": [14.1874, 120.7587],
   "General Emilio Aguinaldo, Cavite": [14.1842, 120.7947],
+};
+
+// How many live products are tagged with an occasion (0 shows as "Coming soon")
+const occasionCount = (occasion) => filterOptions.value.occasion_counts?.[occasion] ?? 0;
+const occasionCountText = (occasion) => {
+  const n = occasionCount(occasion);
+  return n ? `${n} ${n === 1 ? "design" : "designs"}` : "Coming soon";
 };
 
 const filterOptions = ref({
@@ -2345,7 +2355,8 @@ onUnmounted(() => {
 
 .occasion-item {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 24px;
+  grid-template-columns: 52px minmax(0, 1fr) auto 24px;
+  column-gap: 12px;
   align-items: center;
   width: 100%;
   padding: 26px 0;
@@ -2355,6 +2366,22 @@ onUnmounted(() => {
   color: var(--ink);
   text-align: left;
   cursor: pointer;
+}
+
+.occasion-count {
+  font-size: 13px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.occasion-item--empty .occasion-name {
+  color: var(--ink-soft);
+}
+
+.filter-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-soft);
 }
 
 .occasion-index {
