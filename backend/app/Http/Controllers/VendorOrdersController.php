@@ -141,6 +141,7 @@ class VendorOrdersController extends Controller
                     'created_at' => $order->created_at->format('Y-m-d H:i:s'),
                     'return_request' => $this->formatLatestOrderRequest($order, 'return'),
                     'refund_request' => $this->formatLatestOrderRequest($order, 'refund'),
+                    'return_case' => $this->latestReturnCase($order),
                     'user' => [
                         'id' => $order->user->id,
                         'name' => $order->user->name,
@@ -418,6 +419,7 @@ class VendorOrdersController extends Controller
                     'created_at' => $order->created_at->format('Y-m-d H:i:s'),
                     'return_request' => $this->formatLatestOrderRequest($order, 'return'),
                     'refund_request' => $this->formatLatestOrderRequest($order, 'refund'),
+                    'return_case' => $this->latestReturnCase($order),
                     'user' => [
                         'name' => $order->user->name,
                         'email' => $order->user->email,
@@ -548,6 +550,7 @@ class VendorOrdersController extends Controller
                 'created_at' => $order->created_at->format('Y-m-d H:i:s'),
                 'return_request' => $this->formatLatestOrderRequest($order, 'return'),
                 'refund_request' => $this->formatLatestOrderRequest($order, 'refund'),
+                'return_case' => $this->latestReturnCase($order),
                 'customer' => [
                     'id' => $order->user->id,
                     'name' => $order->user->name,
@@ -923,6 +926,14 @@ class VendorOrdersController extends Controller
             'delivered' => 'to_received',
             default => $order->status,
         };
+    }
+
+    /** The order's latest return/refund case, in the shared case format */
+    private function latestReturnCase(Order $order): ?array
+    {
+        $case = $order->orderRequests?->sortByDesc('id')->first();
+
+        return $case ? app(\App\Services\ReturnCaseService::class)->summary($case) : null;
     }
 
     private function formatLatestOrderRequest(Order $order, string $type): ?array

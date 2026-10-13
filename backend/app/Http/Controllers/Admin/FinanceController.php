@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\VendorBalance;
 use App\Models\VendorSubscriptionCheckout;
 use App\Models\VendorTransaction;
+use App\Services\ReturnCaseService;
 use App\Support\PaymentLedger;
 use App\Support\ReportPeriod;
 use App\Support\VendorDirectory;
@@ -33,6 +34,15 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class FinanceController extends Controller
 {
+    /** Refund Management filters → case statuses */
+    private const CASE_FILTERS = [
+        'pending' => ['pending'],
+        'approved' => ['approved'],
+        'completed' => ['completed'],
+        'rejected' => ['rejected', 'withdrawn'],
+        'open' => ['pending', 'approved'],
+    ];
+
 
     /**
      * GET /api/admin/finance/overview?range=30d
@@ -202,11 +212,14 @@ class FinanceController extends Controller
 
         $disputes = OrderRequest::query()
             ->with(['order:id,order_number,vendor_id,user_id,total_amount,payment_method,payment_status,status', 'user:id,name,surname'])
-            ->when(in_array($request->input('dispute_status'), ['pending', 'approved', 'rejected'], true),
-                fn ($q) => $q->where('status', $request->input('dispute_status')))
-            ->latest()
+            ->when(isset(self::CASE_FILTERS[$request->input('dispute_status')]),
+                fn ($q) => $q->whereIn('status', self::CASE_FILTERS[$request->input('dispute_status')]))
+            ->orderByRaw("case when status in ('pending','approved') then 0 else 1 end")
+            ->orderByDesc('last_activity_at')
+            ->orderByDesc('id')
             ->limit(100)
             ->get();
+        $caseService = app(ReturnCaseService::class);
 
         $vendors = VendorDirectory::details($refunds->pluck('vendor_id')->merge($disputes->pluck('order.vendor_id')));
         $customers = User::query()->whereIn('id', $refunds->pluck('customer_id')->filter()->unique())
@@ -215,8 +228,10 @@ class FinanceController extends Controller
         $allRefunds = $this->refundEvents();
         $since = now()->subDays(30);
         $requestCounts = OrderRequest::query()->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
-        $oldestOpen = OrderRequest::query()->where('status', 'pending')->min('created_at');
-        $decided = OrderRequest::query()->whereIn('status', ['approved', 'rejected'])->where('updated_at', '>=', now()->subDays(90))->get(['created_at', 'updated_at']);
+        $oldestOpen = OrderRequest::query()->whereIn('status', OrderRequest::OPEN_STATUSES)->min('created_at');
+        // How long customers and shops take to agree (or the shop to decline)
+        $decided = OrderRequest::query()->whereNotNull('settled_at')->where('settled_at', '>=', now()->subDays(90))->get(['created_at', 'settled_at'])
+            ->map(fn ($d) => $d->created_at->diffInMinutes($d->settled_at) / 60);
 
         return response()->json([
             'success' => true,
@@ -228,14 +243,17 @@ class FinanceController extends Controller
                     'refund_count_30d' => $allRefunds->filter(fn ($r) => $r->at->gte($since))->count(),
                     'not_debited' => $allRefunds->where('vendor_debited', false)->count(),
                     'requests' => [
-                        'pending' => (int) ($requestCounts['pending'] ?? 0),
-                        'approved' => (int) ($requestCounts['approved'] ?? 0),
-                        'rejected' => (int) ($requestCounts['rejected'] ?? 0),
+                        'negotiating' => (int) ($requestCounts['pending'] ?? 0),
+                        'agreed' => (int) ($requestCounts['approved'] ?? 0),
+                        'completed' => (int) ($requestCounts['completed'] ?? 0),
+                        'closed' => (int) (($requestCounts['rejected'] ?? 0) + ($requestCounts['withdrawn'] ?? 0)),
+                        // Kept for older screens
+                        'pending' => (int) (($requestCounts['pending'] ?? 0) + ($requestCounts['approved'] ?? 0)),
+                        'approved' => (int) ($requestCounts['completed'] ?? 0),
+                        'rejected' => (int) (($requestCounts['rejected'] ?? 0) + ($requestCounts['withdrawn'] ?? 0)),
                     ],
                     'oldest_open_at' => $oldestOpen ? \Carbon\Carbon::parse($oldestOpen)->toIso8601String() : null,
-                    'avg_decision_hours_90d' => $decided->count()
-                        ? round($decided->avg(fn ($d) => $d->created_at->diffInMinutes($d->updated_at) / 60), 1)
-                        : null,
+                    'avg_decision_hours_90d' => $decided->count() ? round($decided->avg(), 1) : null,
                 ],
                 'refunds' => $refunds->map(fn ($r) => [
                     'order_id' => $r->order_id,
@@ -248,12 +266,8 @@ class FinanceController extends Controller
                     'vendor' => $vendors[$r->vendor_id] ?? VendorDirectory::unknown($r->vendor_id),
                     'customer' => PaymentLedger::personName($customers[$r->customer_id] ?? null),
                 ])->all(),
-                'disputes' => $disputes->map(fn (OrderRequest $d) => [
-                    'id' => $d->id,
-                    'type' => $d->type,
-                    'status' => $d->status,
-                    'reason' => $d->reason,
-                    'vendor_response' => $d->admin_notes,
+                'disputes' => $disputes->map(fn (OrderRequest $d) => $caseService->summary($d) + [
+                    'vendor_response' => $d->closed_reason ?? $d->admin_notes,
                     'order_id' => $d->order_id,
                     'order_number' => $d->order?->order_number,
                     'amount' => (float) ($d->order?->total_amount ?? 0),
@@ -261,11 +275,31 @@ class FinanceController extends Controller
                     'method_label' => PaymentLedger::methodLabel($d->order?->payment_method),
                     'vendor' => $vendors[$d->order?->vendor_id] ?? VendorDirectory::unknown($d->order?->vendor_id),
                     'customer' => PaymentLedger::personName($d->user),
-                    'created_at' => $d->created_at?->toIso8601String(),
-                    'updated_at' => $d->updated_at?->toIso8601String(),
+                    'updated_at' => ($d->last_activity_at ?? $d->updated_at)?->toIso8601String(),
                 ])->all(),
             ],
         ]);
+    }
+
+    /**
+     * GET /api/admin/finance/refunds/{id}
+     * One return/refund case with its full conversation. View only: the
+     * customer and the shop settle it between them.
+     */
+    public function refundCase(int $id): JsonResponse
+    {
+        $case = OrderRequest::query()->with(['user:id,name,surname', 'order:id,order_number,vendor_id,total_amount,payment_method,payment_status,status'])->find($id);
+        if (!$case) {
+            return response()->json(['success' => false, 'message' => 'Case not found'], 404);
+        }
+        $vendor = VendorDirectory::details([$case->order?->vendor_id])[$case->order?->vendor_id] ?? VendorDirectory::unknown($case->order?->vendor_id);
+
+        return response()->json(['success' => true, 'data' => app(ReturnCaseService::class)->detail($case) + [
+            'customer' => PaymentLedger::personName($case->user),
+            'vendor' => $vendor,
+            // The vendor's book entry, once the customer confirmed the refund
+            'ledger_amount' => VendorTransaction::query()->where('order_id', $case->order_id)->where('category', 'refund')->value('amount'),
+        ]]);
     }
 
     /**

@@ -52,7 +52,7 @@ class AdminOrderController extends Controller
             'data' => [
                 'total' => (int) $byStatus->sum(),
                 'buckets' => $buckets,
-                'open_disputes' => OrderRequest::query()->where('status', 'pending')->count(),
+                'open_disputes' => OrderRequest::query()->whereIn('status', OrderRequest::OPEN_STATUSES)->count(),
                 'issues' => $this->withIssues(Order::query())->count(),
                 'issue_breakdown' => collect($this->issueRules())->map(fn ($rule, $key) => [
                     'key' => $key,
@@ -75,7 +75,7 @@ class AdminOrderController extends Controller
         $query = Order::query()
             ->withCount([
                 'items',
-                'orderRequests as open_requests_count' => fn ($q) => $q->where('status', 'pending'),
+                'orderRequests as open_requests_count' => fn ($q) => $q->whereIn('status', OrderRequest::OPEN_STATUSES),
                 'orderRequests as requests_count',
             ]);
 
@@ -222,14 +222,8 @@ class AdminOrderController extends Controller
                     'notes' => $item->notes,
                     'custom' => $this->customSummary($item->customizations),
                 ])->values(),
-                'requests' => $order->orderRequests->map(fn (OrderRequest $r) => [
-                    'id' => $r->id,
-                    'type' => $r->type,
-                    'status' => $r->status,
-                    'reason' => $r->reason,
-                    'media_url' => $r->media_url,
-                    'media_type' => $r->media_type,
-                    'vendor_response' => $r->admin_notes,
+                'requests' => $order->orderRequests->map(fn (OrderRequest $r) => app(\App\Services\ReturnCaseService::class)->summary($r) + [
+                    'vendor_response' => $r->closed_reason ?? $r->admin_notes,
                     'customer' => trim(($r->user?->name ?? '') . ' ' . ($r->user?->surname ?? '')) ?: null,
                     'created_at' => $r->created_at?->toIso8601String(),
                     'updated_at' => $r->updated_at?->toIso8601String(),
@@ -302,8 +296,8 @@ class AdminOrderController extends Controller
             'open_dispute' => [
                 'label' => 'Return or refund request waiting on the vendor',
                 'severity' => 'medium',
-                'query' => fn (Builder $q) => $q->whereHas('orderRequests', fn ($r) => $r->where('status', 'pending')),
-                'check' => fn (Order $o) => ($o->open_requests_count ?? $o->orderRequests->where('status', 'pending')->count()) > 0,
+                'query' => fn (Builder $q) => $q->whereHas('orderRequests', fn ($r) => $r->whereIn('status', OrderRequest::OPEN_STATUSES)),
+                'check' => fn (Order $o) => ($o->open_requests_count ?? $o->orderRequests->whereIn('status', OrderRequest::OPEN_STATUSES)->count()) > 0,
             ],
             'stock_not_restored' => [
                 'label' => 'Cancelled, but the stock taken for it was never put back',
@@ -455,8 +449,15 @@ class AdminOrderController extends Controller
 
         foreach ($order->orderRequests as $r) {
             $events->push(['at' => $r->created_at, 'kind' => 'dispute', 'title' => ucfirst($r->type) . ' requested', 'detail' => $r->reason]);
-            if ($r->status !== 'pending') {
-                $events->push(['at' => $r->updated_at, 'kind' => $r->status === 'approved' ? 'resolved' : 'rejected', 'title' => ucfirst($r->type) . ' ' . $r->status . ' by the vendor', 'detail' => $r->admin_notes]);
+            $describe = fn ($resolution, $amount) => app(\App\Services\ReturnCaseService::class)->describe($resolution, $amount);
+            if ($r->settled_at) {
+                $events->push(['at' => $r->settled_at, 'kind' => 'resolved', 'title' => 'Customer and shop agreed on ' . $describe($r->settled_resolution, $r->settled_amount), 'detail' => null]);
+            }
+            if ($r->completed_at) {
+                $events->push(['at' => $r->completed_at, 'kind' => 'resolved', 'title' => OrderRequest::isRefund($r->settled_resolution) ? 'Customer confirmed the refund' : 'Customer confirmed the replacement', 'detail' => $r->refund_reference ? 'Reference ' . $r->refund_reference : null]);
+            }
+            if (in_array($r->status, ['rejected', 'withdrawn'], true)) {
+                $events->push(['at' => $r->last_activity_at ?? $r->updated_at, 'kind' => 'rejected', 'title' => $r->status === 'rejected' ? 'Declined by the shop' : 'Withdrawn by the customer', 'detail' => $r->closed_reason ?? $r->admin_notes]);
             }
         }
 

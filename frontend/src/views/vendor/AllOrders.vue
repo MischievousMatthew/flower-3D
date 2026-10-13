@@ -386,30 +386,16 @@
 	                </button>
 	              </div>
 	              <div
-	                v-if="getPendingRefundRequest(order)"
+	                v-if="caseNeedsShop(order)"
 	                class="request-action-panel"
 	              >
 	                <div class="request-copy">
-	                  <span class="request-chip">Refund Request</span>
-	                  <p>
-	                    {{
-	                      getPendingRefundRequest(order).reason ||
-	                      "Customer requested a refund."
-	                    }}
-	                  </p>
+	                  <span class="request-chip">Return / refund</span>
+	                  <p>{{ CASE_STAGE_TEXT[order.return_case.stage] || "The customer is waiting for your reply." }}</p>
 	                </div>
 	                <div class="request-buttons">
-	                  <button
-	                    class="btn-action btn-reject"
-	                    @click="rejectRefundRequest(order)"
-	                  >
-	                    Reject Refund
-	                  </button>
-	                  <button
-	                    class="btn-action btn-approve"
-	                    @click="approveRefundRequest(order)"
-	                  >
-	                    Accept Refund
+	                  <button class="btn-action btn-approve" @click="viewOrderDetails(order.id)">
+	                    Open request
 	                  </button>
 	                </div>
 	              </div>
@@ -714,30 +700,16 @@
 	                </button>
 	              </div>
 	              <div
-	                v-if="getPendingRefundRequest(order)"
+	                v-if="caseNeedsShop(order)"
 	                class="request-action-panel"
 	              >
 	                <div class="request-copy">
-	                  <span class="request-chip">Refund Request</span>
-	                  <p>
-	                    {{
-	                      getPendingRefundRequest(order).reason ||
-	                      "Customer requested a refund."
-	                    }}
-	                  </p>
+	                  <span class="request-chip">Return / refund</span>
+	                  <p>{{ CASE_STAGE_TEXT[order.return_case.stage] || "The customer is waiting for your reply." }}</p>
 	                </div>
 	                <div class="request-buttons">
-	                  <button
-	                    class="btn-action btn-reject"
-	                    @click="rejectRefundRequest(order)"
-	                  >
-	                    Reject Refund
-	                  </button>
-	                  <button
-	                    class="btn-action btn-approve"
-	                    @click="approveRefundRequest(order)"
-	                  >
-	                    Accept Refund
+	                  <button class="btn-action btn-approve" @click="viewOrderDetails(order.id)">
+	                    Open request
 	                  </button>
 	                </div>
 	              </div>
@@ -1026,35 +998,16 @@
 	            </div>
 
 	            <div
-	              v-if="selectedOrderDetails.refund_request"
+	              v-if="selectedOrderDetails.return_case"
 	              class="details-section"
 	            >
-	              <h4 class="section-title">Refund Request</h4>
-	              <div class="request-detail-box">
-	                <div class="request-detail-head">
-	                  <span
-	                    class="request-chip"
-	                    :class="`request-${selectedOrderDetails.refund_request.status}`"
-	                  >
-	                    {{ selectedOrderDetails.refund_request.status }}
-	                  </span>
-	                  <span class="request-date">
-	                    {{
-	                      formatDate(selectedOrderDetails.refund_request.created_at)
-	                    }}
-	                  </span>
-	                </div>
-	                <p>{{ selectedOrderDetails.refund_request.reason }}</p>
-	                <a
-	                  v-if="selectedOrderDetails.refund_request.media_url"
-	                  :href="selectedOrderDetails.refund_request.media_url"
-	                  class="request-link"
-	                  target="_blank"
-	                  rel="noopener noreferrer"
-	                >
-	                  View proof
-	                </a>
-	              </div>
+	              <h4 class="section-title">Return / refund</h4>
+	              <ReturnCasePanel
+	                :case-id="selectedOrderDetails.return_case.id"
+	                role="vendor"
+	                api-base="/sc/order-requests"
+	                @changed="onReturnCaseChanged"
+	              />
 	            </div>
 
 	            <!-- Pricing Summary -->
@@ -1125,20 +1078,6 @@
 	            </svg>
 	            Update Status
 	          </button>
-	          <template v-if="getPendingRefundRequest(selectedOrderDetails)">
-	            <button
-	              class="btn-secondary btn-reject-modal"
-	              @click="rejectRefundRequest(selectedOrderDetails)"
-	            >
-	              Reject Refund
-	            </button>
-	            <button
-	              class="btn-primary btn-approve-modal"
-	              @click="approveRefundRequest(selectedOrderDetails)"
-	            >
-	              Accept Refund
-	            </button>
-	          </template>
 	        </div>
       </div>
     </div>
@@ -1208,6 +1147,7 @@ import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import ThreeDModelViewer from "../../layouts/3D/3DModelViewer.vue";
 import api from "../../plugins/axios.js";
+import ReturnCasePanel from "../../components/returns/ReturnCasePanel.vue";
 import { toast } from "vue3-toastify";
 
 const router = useRouter();
@@ -1442,13 +1382,28 @@ function getDisplayStatus(order) {
   return order.status || order.order_status || "";
 }
 
-function getPendingRefundRequest(order) {
-  if (!order?.refund_request) return null;
-  return order.refund_request.status === "pending" ? order.refund_request : null;
+// A return/refund case waiting on the shop
+const CASE_STAGE_TEXT = {
+  awaiting_vendor: "The customer asked for a return or refund. Accept, offer something else or decline.",
+  awaiting_return: "Agreed. Confirm once the returned item reaches you.",
+  awaiting_refund: "Agreed. Send the refund and record it.",
+  awaiting_replacement: "Agreed. Send the replacement and mark it as sent.",
+};
+function caseNeedsShop(order) {
+  return order?.return_case?.next_actor === "vendor";
+}
+
+async function onReturnCaseChanged(detail) {
+  if (selectedOrderDetails.value?.return_case) {
+    selectedOrderDetails.value.return_case = { ...selectedOrderDetails.value.return_case, ...detail };
+  }
+  const row = orders.value.find((o) => o.id === selectedOrderDetails.value?.id);
+  if (row?.return_case) row.return_case = { ...row.return_case, ...detail };
 }
 
 function canUpdateOrderStatus(order) {
-  return !!order && !getPendingRefundRequest(order);
+  // An open return/refund case settles the order; status changes wait until it closes
+  return !!order && !["pending", "approved"].includes(order.return_case?.status);
 }
 
 function formatCalendarDate(dateString) {
@@ -1980,76 +1935,6 @@ function updateOrderStatus(orderId, currentStatus) {
       isLoading.value = false;
       loadingMessage.value = "";
     });
-}
-
-async function approveRefundRequest(order) {
-  const request = getPendingRefundRequest(order);
-
-  if (!request) {
-    toast.info("No pending refund request for this order");
-    return;
-  }
-
-  if (!window.confirm("Accept this refund request?")) {
-    return;
-  }
-
-  try {
-    isLoading.value = true;
-    loadingMessage.value = "Accepting refund request...";
-
-    await api.post(`/sc/order-requests/${request.id}/approve`);
-    await loadOrders(pagination.value.current_page);
-
-    if (selectedOrderDetails.value?.id === order.id) {
-      await fetchOrderDetails(order.id);
-    }
-
-    toast.success("Refund request accepted");
-  } catch (error) {
-    console.error("Error approving refund request:", error);
-    toast.error(
-      error.response?.data?.message || "Failed to accept refund request",
-    );
-  } finally {
-    isLoading.value = false;
-    loadingMessage.value = "";
-  }
-}
-
-async function rejectRefundRequest(order) {
-  const request = getPendingRefundRequest(order);
-
-  if (!request) {
-    toast.info("No pending refund request for this order");
-    return;
-  }
-
-  if (!window.confirm("Reject this refund request?")) {
-    return;
-  }
-
-  try {
-    isLoading.value = true;
-    loadingMessage.value = "Rejecting refund request...";
-
-    await api.post(`/sc/order-requests/${request.id}/reject`);
-    await loadOrders(pagination.value.current_page);
-
-    if (selectedOrderDetails.value?.id === order.id) {
-      await fetchOrderDetails(order.id);
-    }
-
-    toast.success("Refund request rejected");
-  } catch (error) {
-    console.error("Error rejecting refund request:", error);
-    toast.error(
-      error.response?.data?.message || "Failed to reject refund request",
-    );
-  } finally {
-    isLoading.value = false;
-    loadingMessage.value = "";
-  }
 }
 
 onMounted(async () => {

@@ -326,8 +326,8 @@ class AdminReportsController extends Controller
             'requests' => [
                 'returns' => $requests->where('type', 'return')->count(),
                 'refunds' => $requests->where('type', 'refund')->count(),
-                'approved' => $requests->where('status', 'approved')->count(),
-                'rejected' => $requests->where('status', 'rejected')->count(),
+                'approved' => $requests->whereIn('status', ['approved', 'completed'])->count(),
+                'rejected' => $requests->whereIn('status', ['rejected', 'withdrawn'])->count(),
                 'open' => $requests->where('status', 'pending')->count(),
             ],
         ];

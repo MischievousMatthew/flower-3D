@@ -215,11 +215,15 @@ class VendorFinanceService
 
     /**
      * Called when an order is refunded.
-     * Debits the vendor's balance and records a refund transaction.
+     * Debits the vendor's balance and records a refund transaction, which the
+     * vendor dashboard counts as an expense (it comes off net profit).
+     *
+     * $amount defaults to the order total; a settled return/refund case passes
+     * the agreed amount. One refund entry per order, so repeats are ignored.
      */
-    public function handleOrderRefund(Order $order): void
+    public function handleOrderRefund(Order $order, ?float $amount = null, array $metadata = []): void
     {
-        $processed = DB::transaction(function () use ($order): bool {
+        $processed = DB::transaction(function () use ($order, $amount, $metadata): bool {
             $lockedOrder = Order::query()
                 ->whereKey($order->id)
                 ->lockForUpdate()
@@ -253,7 +257,7 @@ class VendorFinanceService
                 ->firstOrFail();
 
             $balanceBefore = (float) $vendorBalance->balance;
-            $amount        = (float) $lockedOrder->total_amount;
+            $amount        = round(min((float) ($amount ?? $lockedOrder->total_amount), (float) $lockedOrder->total_amount), 2);
             $balanceAfter  = max(0, $balanceBefore - $amount); // don't go negative
 
             // Debit vendor
@@ -271,11 +275,12 @@ class VendorFinanceService
                 'amount'         => $amount,
                 'balance_before' => $balanceBefore,
                 'balance_after'  => $balanceAfter,
-                'description'    => "Refund for Order #{$lockedOrder->order_number}",
+                'description'    => ($amount < (float) $lockedOrder->total_amount ? 'Partial refund' : 'Refund') . " for Order #{$lockedOrder->order_number}",
                 'status'         => 'completed',
                 'metadata'       => [
                     'order_number' => $lockedOrder->order_number,
                     'refunded_at'  => now()->toIso8601String(),
+                    ...$metadata,
                 ],
             ]);
 
@@ -289,7 +294,7 @@ class VendorFinanceService
         Log::info('VendorFinanceService: refund processed', [
             'order_id'  => $order->id,
             'vendor_id' => $order->vendor_id,
-            'amount'    => $order->total_amount,
+            'amount'    => $amount ?? $order->total_amount,
         ]);
     }
 

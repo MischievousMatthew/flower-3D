@@ -56,6 +56,7 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\CustomerOrderTrackingController;
 use App\Http\Controllers\OrderRequestController;
+use App\Http\Controllers\CustomerReturnCaseController;
 use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\VendorFinanceDashboardController;
 use App\Http\Controllers\ProductReportController; // ← NEW
@@ -253,6 +254,13 @@ Route::middleware('token.auth')->group(function () {
         Route::post('/orders/{id}/cancel',           [CustomerOrderTrackingController::class, 'cancel'])->whereNumber('id');
         Route::post('/orders/{id}/request-return',   [CustomerOrderTrackingController::class, 'requestReturn'])->whereNumber('id');
         Route::post('/orders/{id}/request-refund',   [CustomerOrderTrackingController::class, 'requestRefund'])->whereNumber('id');
+
+        // ── Return/refund cases the customer and the shop settle together ──
+        Route::post('/orders/{id}/return-case', [CustomerOrderTrackingController::class, 'openReturnCase'])->whereNumber('id');
+        Route::get('/return-cases/{id}', [CustomerReturnCaseController::class, 'show'])->whereNumber('id');
+        Route::post('/return-cases/{id}/{action}', [CustomerReturnCaseController::class, 'act'])
+            ->whereNumber('id')
+            ->whereIn('action', ['accept', 'offer', 'withdraw', 'message', 'confirm-refund', 'refund-missing', 'confirm-replacement', 'replacement-missing']);
         Route::get('/{orderId}/delivery',            [DeliveryController::class, 'customerOrder']);
 
         // ── Reviews ───────────────────────────────────────────────────────────
@@ -420,6 +428,11 @@ Route::middleware('token.auth')->group(function () {
         Route::get('/order-requests', [OrderRequestController::class, 'index'])->middleware('employee.module:deliveries,view');
         Route::post('/order-requests/{id}/approve', [OrderRequestController::class, 'approve'])->middleware('employee.module:deliveries,approve');
         Route::post('/order-requests/{id}/reject', [OrderRequestController::class, 'reject'])->middleware('employee.module:deliveries,reject');
+        Route::get('/order-requests/{id}', [OrderRequestController::class, 'show'])->whereNumber('id')->middleware('employee.module:deliveries,view');
+        Route::post('/order-requests/{id}/{action}', [OrderRequestController::class, 'act'])
+            ->whereNumber('id')
+            ->whereIn('action', ['accept', 'offer', 'message', 'item-received', 'refund-sent', 'replacement-sent'])
+            ->middleware('employee.module:deliveries,approve');
     });
 
     // ----------------------------------------------------------
@@ -831,6 +844,7 @@ Route::middleware('token.auth')->group(function () {
                 Route::get('/transactions', [AdminFinanceController::class, 'transactions']);
                 Route::get('/vendors', [AdminFinanceController::class, 'vendors']);
                 Route::get('/refunds', [AdminFinanceController::class, 'refunds']);
+                Route::get('/refunds/{id}', [AdminFinanceController::class, 'refundCase'])->whereNumber('id');
             });
             Route::middleware('admin.can:finance.export')->group(function () {
                 Route::get('/transactions/export', [AdminFinanceController::class, 'exportTransactions']);

@@ -115,6 +115,13 @@
                   <span class="ot-chip" :class="dlvChipClass(order)">{{
                     dlvLabel(order)
                   }}</span>
+                  <span
+                    v-if="caseIsOpen(order)"
+                    class="ot-chip"
+                    :class="order.return_case.next_actor === 'customer' ? 'chip--orange' : 'chip--blue'"
+                  >
+                    {{ order.return_case.next_actor === "customer" ? "Return/refund · your reply needed" : "Return/refund in progress" }}
+                  </span>
                 </div>
                 <div class="ot-card__row ot-card__row--sm">
                   <svg viewBox="0 0 16 16" fill="none" class="ot-ico-store">
@@ -303,119 +310,29 @@
                     }}
                   </button>
 
-                  <!-- Request Return -->
-                  <template v-if="canReturn(order)">
-                    <div
-                      v-if="order.return_request"
-                      class="ot-request-status ot-request-status--return"
-                    >
-                      <svg viewBox="0 0 20 20" fill="none" class="ot-btn__ico">
-                        <path
-                          d="M3 10a7 7 0 1 0 7-7"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                        />
-                        <path
-                          d="M3 4v6h6"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        />
-                      </svg>
-                      Return
-                      {{
-                        order.return_request.status === "pending"
-                          ? "Pending Review"
-                          : order.return_request.status
-                      }}
-                    </div>
-                    <button
-                      v-else
-                      class="ot-btn ot-btn--orange"
-                      :disabled="actionLoading === order.id + '_ret'"
-                      @click.stop="openRequestModal(order, 'return')"
-                    >
-                      <svg viewBox="0 0 20 20" fill="none" class="ot-btn__ico">
-                        <path
-                          d="M3 10a7 7 0 1 0 7-7"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                        />
-                        <path
-                          d="M3 4v6h6"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        />
-                      </svg>
-                      Request Return
-                    </button>
-                  </template>
-
-                  <!-- Request Refund -->
-                  <template v-if="canRefund(order)">
-                    <div
-                      v-if="order.refund_request"
-                      class="ot-request-status ot-request-status--refund"
-                    >
-                      <svg viewBox="0 0 20 20" fill="none" class="ot-btn__ico">
-                        <circle
-                          cx="10"
-                          cy="10"
-                          r="7"
-                          stroke="currentColor"
-                          stroke-width="1.8"
-                        />
-                        <path
-                          d="M10 7v6M7.5 9c0-1 1-1.5 2.5-1.5s2.5.5 2.5 1.5-1 1.5-2.5 1.5-2.5.5-2.5 1.5 1 1.5 2.5 1.5 2.5-.5 2.5-1.5"
-                          stroke="currentColor"
-                          stroke-width="1.4"
-                          stroke-linecap="round"
-                        />
-                      </svg>
-                      Refund
-                      {{
-                        order.refund_request.status === "pending"
-                          ? "Pending Review"
-                          : order.refund_request.status
-                      }}
-                    </div>
-                    <button
-                      v-else
-                      class="ot-btn ot-btn--outline"
-                      :disabled="actionLoading === order.id + '_ref'"
-                      @click.stop="openRequestModal(order, 'refund')"
-                    >
-                      <svg viewBox="0 0 20 20" fill="none" class="ot-btn__ico">
-                        <circle
-                          cx="10"
-                          cy="10"
-                          r="7"
-                          stroke="currentColor"
-                          stroke-width="1.8"
-                        />
-                        <path
-                          d="M10 7v6M7.5 9c0-1 1-1.5 2.5-1.5s2.5.5 2.5 1.5-1 1.5-2.5 1.5-2.5.5-2.5 1.5 1 1.5 2.5 1.5 2.5-.5 2.5-1.5"
-                          stroke="currentColor"
-                          stroke-width="1.4"
-                          stroke-linecap="round"
-                        />
-                      </svg>
-                      Request Refund
-                    </button>
-                  </template>
+                  <!-- Return or refund -->
+                  <button
+                    v-if="order.can_open_return_case"
+                    class="ot-btn ot-btn--orange"
+                    @click.stop="openRequestModal(order)"
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" class="ot-btn__ico">
+                      <path d="M3 10a7 7 0 1 0 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                      <path d="M3 4v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    Return or refund
+                  </button>
+                  <button
+                    v-else-if="order.return_case"
+                    class="ot-btn ot-btn--outline"
+                    @click.stop="scrollToCase(order)"
+                  >
+                    View return/refund
+                  </button>
 
                   <!-- ① Rate Products button (only for completed orders) -->
                   <button
-                    v-if="
-                      canReview(order) &&
-                      !order.return_request &&
-                      !order.refund_request
-                    "
+                    v-if="canReview(order) && !caseIsOpen(order)"
                     class="ot-btn ot-btn--star"
                     @click.stop="openReviewModal(order)"
                     :title="
@@ -470,80 +387,15 @@
                   </div>
                 </div>
 
-                <!-- Return / refund request summary if already submitted -->
-                <div
-                  class="ot-sec"
-                  v-if="order.return_request || order.refund_request"
-                >
-                  <h4 class="ot-sec__title">Submitted Requests</h4>
-                  <div class="ot-request-cards">
-                    <div
-                      v-if="order.return_request"
-                      class="ot-req-card ot-req-card--return"
-                    >
-                      <div class="ot-req-card__head">
-                        <span class="ot-req-card__type">Return Request</span>
-                        <span
-                          class="ot-req-badge"
-                          :class="reqBadge(order.return_request.status)"
-                          >{{ order.return_request.status }}</span
-                        >
-                      </div>
-                      <p class="ot-req-card__reason">
-                        {{ order.return_request.reason }}
-                      </p>
-                      <div
-                        v-if="order.return_request.media_url"
-                        class="ot-req-card__media"
-                      >
-                        <video
-                          v-if="order.return_request.media_type === 'video'"
-                          :src="order.return_request.media_url"
-                          controls
-                          class="ot-media-preview"
-                        ></video>
-                        <img
-                          v-else
-                          :src="order.return_request.media_url"
-                          alt="Return proof"
-                          class="ot-media-preview"
-                        />
-                      </div>
-                    </div>
-                    <div
-                      v-if="order.refund_request"
-                      class="ot-req-card ot-req-card--refund"
-                    >
-                      <div class="ot-req-card__head">
-                        <span class="ot-req-card__type">Refund Request</span>
-                        <span
-                          class="ot-req-badge"
-                          :class="reqBadge(order.refund_request.status)"
-                          >{{ order.refund_request.status }}</span
-                        >
-                      </div>
-                      <p class="ot-req-card__reason">
-                        {{ order.refund_request.reason }}
-                      </p>
-                      <div
-                        v-if="order.refund_request.media_url"
-                        class="ot-req-card__media"
-                      >
-                        <video
-                          v-if="order.refund_request.media_type === 'video'"
-                          :src="order.refund_request.media_url"
-                          controls
-                          class="ot-media-preview"
-                        ></video>
-                        <img
-                          v-else
-                          :src="order.refund_request.media_url"
-                          alt="Refund proof"
-                          class="ot-media-preview"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                <!-- Return / refund case, settled with the shop -->
+                <div v-if="order.return_case" :id="`case-${order.id}`" class="ot-sec">
+                  <h4 class="ot-sec__title">Return / refund</h4>
+                  <ReturnCasePanel
+                    :case-id="order.return_case.id"
+                    role="customer"
+                    api-base="/customer/return-cases"
+                    @changed="(detail) => onCaseChanged(order, detail)"
+                  />
                 </div>
 
                 <!-- Timeline -->
@@ -707,13 +559,7 @@
               </svg>
             </div>
             <div>
-              <h3 class="ot-modal__title">
-                {{
-                  reqModal.type === "return"
-                    ? "Request Return"
-                    : "Request Refund"
-                }}
-              </h3>
+              <h3 class="ot-modal__title">Return or refund</h3>
               <p class="ot-modal__sub">{{ reqModal.orderNumber }}</p>
             </div>
             <button class="ot-modal__close" @click="closeReqModal">
@@ -730,10 +576,56 @@
 
           <!-- Body -->
           <div class="ot-modal__body">
+            <!-- Keep the item, or send it back -->
+            <div class="ot-field">
+              <span class="ot-field__lbl">What happens to the item?</span>
+              <div class="ot-choice">
+                <label class="ot-choice__opt" :class="{ on: reqModal.type === 'refund' }">
+                  <input v-model="reqModal.type" type="radio" value="refund" />
+                  <span><strong>Keep it</strong><small>The flowers can't be sent back (e.g. wilted)</small></span>
+                </label>
+                <label class="ot-choice__opt" :class="{ on: reqModal.type === 'return' }">
+                  <input v-model="reqModal.type" type="radio" value="return" />
+                  <span><strong>Send it back</strong><small>You return the item to the shop</small></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- What would make it right -->
+            <div class="ot-field">
+              <span class="ot-field__lbl">What would you like?</span>
+              <div class="ot-choice ot-choice--3">
+                <label
+                  v-for="o in RESOLUTION_OPTIONS"
+                  :key="o.value"
+                  class="ot-choice__opt"
+                  :class="{ on: reqModal.resolution === o.value, off: o.value !== 'replacement' && !reqModal.paid }"
+                >
+                  <input v-model="reqModal.resolution" type="radio" :value="o.value" :disabled="o.value !== 'replacement' && !reqModal.paid" />
+                  <span><strong>{{ o.label }}</strong><small>{{ o.hint }}</small></span>
+                </label>
+              </div>
+              <span v-if="!reqModal.paid" class="ot-field__hint">Refunds are available once the order is paid.</span>
+              <div v-if="reqModal.resolution === 'partial_refund'" class="ot-amount">
+                <label class="ot-field__lbl" for="ot-amount">Amount (order total ₱{{ fmt(reqModal.total) }})</label>
+                <input id="ot-amount" v-model.number="reqModal.amount" type="number" min="1" step="0.01" :max="reqModal.total" class="ot-textarea" />
+                <span v-if="reqModal.errors.amount" class="ot-field__err">{{ reqModal.errors.amount }}</span>
+              </div>
+              <span class="ot-field__hint">The shop can accept or suggest something else. You can message each other until you agree.</span>
+            </div>
+
+            <!-- What went wrong -->
+            <div class="ot-field">
+              <label class="ot-field__lbl" for="ot-reason-cat">What went wrong?</label>
+              <select id="ot-reason-cat" v-model="reqModal.reasonCategory" class="ot-textarea">
+                <option v-for="(label, key) in REASONS" :key="key" :value="key">{{ label }}</option>
+              </select>
+            </div>
+
             <!-- Reason -->
             <div class="ot-field">
               <label class="ot-field__lbl">
-                Reason <span class="ot-field__req">*</span>
+                Tell the shop what happened <span class="ot-field__req">*</span>
               </label>
               <textarea
                 v-model="reqModal.reason"
@@ -884,13 +776,7 @@
               :disabled="reqModal.submitting"
               @click="submitRequest"
             >
-              {{
-                reqModal.submitting
-                  ? "Submitting…"
-                  : reqModal.type === "return"
-                    ? "Submit Return"
-                    : "Submit Refund"
-              }}
+              {{ reqModal.submitting ? "Sending…" : "Send request" }}
             </button>
           </div>
         </div>
@@ -951,12 +837,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import api from "../../plugins/axios";
 import { useAuth } from "../../composables/useAuth";
 import NavHeader from "../../layouts/NavHeader.vue";
 import ReviewModal from "../../layouts/components/ReviewModal.vue";
+import ReturnCasePanel from "../../components/returns/ReturnCasePanel.vue";
 import "../../styles/bloomcraft.css";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
@@ -987,7 +874,12 @@ const meta = reactive({
 // Return / refund modal
 const reqModal = reactive({
   show: false,
-  type: "return",
+  type: "refund",
+  resolution: "full_refund",
+  amount: null,
+  reasonCategory: "damaged",
+  paid: false,
+  total: 0,
   orderId: null,
   orderNumber: "",
   reason: "",
@@ -995,8 +887,22 @@ const reqModal = reactive({
   mediaPreviewUrl: null,
   mediaPreviewType: null,
   submitting: false,
-  errors: { reason: "", media: "" },
+  errors: { reason: "", media: "", amount: "" },
 });
+const RESOLUTION_OPTIONS = [
+  { value: "full_refund", label: "Full refund", hint: "All your money back" },
+  { value: "partial_refund", label: "Partial refund", hint: "Part of it back" },
+  { value: "replacement", label: "Replacement", hint: "Send it again" },
+];
+const REASONS = {
+  damaged: "Arrived damaged or wilted",
+  wrong_item: "Wrong item or arrangement",
+  missing_item: "Missing items",
+  not_as_described: "Not as described or pictured",
+  late: "Arrived late",
+  quality: "Poor quality",
+  other: "Something else",
+};
 
 // Simple confirm modal
 const confirmModal = reactive({
@@ -1030,6 +936,7 @@ const statusTabs = [
   { label: "Out for Delivery", value: "out_for_delivery" },
   { label: "Completed", value: "completed" },
   { label: "Returned", value: "returned" },
+  { label: "Returns & refunds", value: "returns" },
 ];
 
 const trackingSteps = [
@@ -1080,9 +987,8 @@ async function fetchOrders(page = 1) {
 
 // ── Action guards ─────────────────────────────────────────────────────────────
 const canComplete = (o) => o.delivery?.status === "to_received";
-const canReturn = (o) => o.delivery?.status === "completed";
-const canRefund = (o) =>
-  o.delivery?.status === "completed" && o.payment_status === "paid";
+// A return/refund case still being settled
+const caseIsOpen = (o) => ["pending", "approved"].includes(o.return_case?.status);
 const isPaidEWallet = (o) =>
   ["ewallet", "gcash", "maya", "paymaya"].includes(
     String(o.payment_method || "").toLowerCase(),
@@ -1092,7 +998,7 @@ const canCancel = (o) =>
   (!o.delivery || o.delivery.status === "pending") &&
   !isPaidEWallet(o);
 const showActions = (o) =>
-  canCancel(o) || canComplete(o) || canReturn(o) || canRefund(o) || canReview(o);
+  canCancel(o) || canComplete(o) || o.can_open_return_case || o.return_case || canReview(o);
 
 // ① canReview computed helper — true if order is completed
 const canReview = (order) =>
@@ -1123,7 +1029,7 @@ function doComplete(order) {
       confirmModal.show = false;
       await fetchOrders(meta.current_page);
     } catch (e) {
-      alert(e.response?.data?.message ?? "Action failed.");
+      toast.error(e.response?.data?.message ?? "That didn't go through. Please try again.");
     } finally {
       confirmModal.loading = false;
       actionLoading.value = null;
@@ -1168,10 +1074,16 @@ function doCancel(order) {
 }
 
 // ── Return / Refund modal ─────────────────────────────────────────────────────
-function openRequestModal(order, type) {
+function openRequestModal(order) {
+  const paid = order.payment_status === "paid";
   Object.assign(reqModal, {
     show: true,
-    type,
+    type: "refund",
+    resolution: paid ? "full_refund" : "replacement",
+    amount: null,
+    reasonCategory: "damaged",
+    paid,
+    total: Number(order.total_amount || 0),
     orderId: order.id,
     orderNumber: order.order_number,
     reason: "",
@@ -1179,8 +1091,26 @@ function openRequestModal(order, type) {
     mediaPreviewUrl: null,
     mediaPreviewType: null,
     submitting: false,
-    errors: { reason: "", media: "" },
+    errors: { reason: "", media: "", amount: "" },
   });
+}
+
+// Keeps the order card in step with the case as it moves along
+async function onCaseChanged(order, detail) {
+  order.return_case = { ...order.return_case, ...detail };
+  if (["completed", "rejected", "withdrawn"].includes(detail.status) || detail.item_received_at) {
+    try {
+      const { data } = await api.get(`${API_BASE}/${order.id}`, { headers: authHeaders() });
+      Object.assign(order, data.data ?? {});
+    } catch {
+      // the next page load picks it up
+    }
+  }
+}
+
+function scrollToCase(order) {
+  expandedId.value = order.id;
+  nextTick(() => document.getElementById(`case-${order.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
 }
 
 function closeReqModal() {
@@ -1232,6 +1162,15 @@ function validateReqModal() {
   let ok = true;
   reqModal.errors.reason = "";
   reqModal.errors.media = "";
+  reqModal.errors.amount = "";
+
+  if (reqModal.resolution === "partial_refund") {
+    const amount = Number(reqModal.amount);
+    if (!amount || amount <= 0 || amount >= reqModal.total) {
+      reqModal.errors.amount = `Enter an amount above ₱0 and below ₱${fmt(reqModal.total)}.`;
+      ok = false;
+    }
+  }
 
   if (!reqModal.reason.trim() || reqModal.reason.trim().length < 10) {
     reqModal.errors.reason = "Please provide at least 10 characters.";
@@ -1248,26 +1187,29 @@ async function submitRequest() {
   if (!validateReqModal()) return;
 
   reqModal.submitting = true;
-  actionLoading.value =
-    reqModal.orderId + (reqModal.type === "return" ? "_ret" : "_ref");
+  const orderId = reqModal.orderId;
 
   try {
     const fd = new FormData();
+    fd.append("type", reqModal.type);
+    fd.append("resolution", reqModal.resolution);
+    if (reqModal.resolution === "partial_refund") fd.append("amount", String(reqModal.amount));
+    fd.append("reason_category", reqModal.reasonCategory);
     fd.append("reason", reqModal.reason);
     if (reqModal.mediaFile) fd.append("media", reqModal.mediaFile);
 
-    const endpoint =
-      reqModal.type === "return" ? "request-return" : "request-refund";
-
-    await api.post(`${API_BASE}/${reqModal.orderId}/${endpoint}`, fd, {
+    const { data } = await api.post(`${API_BASE}/${orderId}/return-case`, fd, {
       headers: {
         ...authHeaders(),
         "Content-Type": "multipart/form-data",
       },
     });
 
+    reqModal.submitting = false;
     closeReqModal();
+    toast.success(data.message || "Request sent to the shop.");
     await fetchOrders(meta.current_page);
+    scrollToCase({ id: orderId });
   } catch (e) {
     const msg =
       e.response?.data?.message ?? "Submission failed. Please try again.";
@@ -1275,8 +1217,9 @@ async function submitRequest() {
       const errs = e.response.data.errors;
       reqModal.errors.reason = errs.reason?.[0] ?? "";
       reqModal.errors.media = errs.media?.[0] ?? "";
+      reqModal.errors.amount = errs.amount?.[0] ?? "";
     } else {
-      alert(msg);
+      toast.error(msg);
     }
   } finally {
     reqModal.submitting = false;
@@ -1434,6 +1377,59 @@ onMounted(async () => {
 @layer bc-reset {
   .ot-page :is(p, h1, h2, h3, h4) {
     margin: 0;
+  }
+}
+
+.ot-choice {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.ot-choice--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.ot-choice__opt {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px;
+  border: 1px solid var(--line, #e2ddd5);
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.ot-choice__opt span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ot-choice__opt small {
+  color: var(--ink-soft, #6b6560);
+  font-size: 11.5px;
+}
+.ot-choice__opt.on {
+  border-color: var(--return-accent, #3f6f5a);
+  box-shadow: 0 0 0 2px var(--return-accent-soft, #e8f1ec);
+}
+.ot-choice__opt.off {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ot-choice__opt input {
+  margin-top: 2px;
+  accent-color: var(--return-accent, #3f6f5a);
+}
+.ot-amount {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+@media (max-width: 560px) {
+  .ot-choice,
+  .ot-choice--3 {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

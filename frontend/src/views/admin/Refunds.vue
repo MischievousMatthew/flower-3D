@@ -22,8 +22,8 @@
       <div class="page-body">
         <p class="info-note">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
-          View only. Each vendor approves or rejects their own return and refund requests, so refunds always go through their order and balance checks.
-          Open an order to read its history or leave an admin note.
+          View only. Customers and shops settle each request between them: they agree on a full refund, a partial refund or a replacement,
+          the shop sends it, and the customer confirms. A confirmed refund is then recorded on the vendor's books for the agreed amount.
         </p>
 
         <section v-if="error && !data" class="panel center">
@@ -48,13 +48,13 @@
                 <span class="kpi-value">{{ money(sum.refunded_30d) }}</span>
                 <span class="kpi-note">{{ plural(sum.refund_count_30d, "refund") }}</span>
               </div>
-              <button type="button" class="kpi clickable" :class="{ warn: sum.requests.pending }" @click="status = 'pending'">
+              <button type="button" class="kpi clickable" :class="{ warn: sum.requests.pending }" @click="status = 'open'">
                 <span class="kpi-label">Open requests</span>
                 <span class="kpi-value">{{ sum.requests.pending }}</span>
                 <span class="kpi-note">{{ sum.oldest_open_at ? `Oldest waiting ${timeAgo(sum.oldest_open_at)}` : "Nothing waiting" }}</span>
               </button>
               <div class="kpi">
-                <span class="kpi-label">Vendor decision time</span>
+                <span class="kpi-label">Time to agree</span>
                 <span class="kpi-value">{{ sum.avg_decision_hours_90d === null ? "—" : hours(sum.avg_decision_hours_90d) }}</span>
                 <span class="kpi-note">Average, last 90 days</span>
               </div>
@@ -71,11 +71,11 @@
             <div class="panel-head">
               <div>
                 <h2 class="panel-title">Return &amp; refund requests</h2>
-                <p class="panel-sub">Customers ask; the vendor decides. Requests open for over {{ OVERDUE_DAYS }} days are flagged.</p>
+                <p class="panel-sub">Click one to read the whole conversation. Open requests with no activity for {{ OVERDUE_DAYS }} days are flagged.</p>
               </div>
               <div class="seg">
                 <button v-for="f in STATUS" :key="f.value" type="button" class="seg-btn" :class="{ active: status === f.value }" @click="status = f.value">
-                  {{ f.label }}<span v-if="data && f.value" class="seg-count">{{ sum.requests[f.value] }}</span>
+                  {{ f.label }}<span v-if="data && f.count" class="seg-count">{{ sum.requests[f.count] ?? 0 }}</span>
                 </button>
               </div>
             </div>
@@ -90,7 +90,7 @@
             <div v-if="!data || (loading && requestsLoading)" class="sk-list"><span v-for="n in 4" :key="n" class="sk sk-row"></span></div>
             <p v-else-if="!filteredRequests.length" class="empty">{{ data.disputes.length ? "No request matches your search." : "No requests here." }}</p>
             <ul v-else class="row-list">
-              <li v-for="d in filteredRequests" :key="d.id" tabindex="0" @click="openOrder(d.order_id, 'disputes')" @keydown.enter="openOrder(d.order_id, 'disputes')">
+              <li v-for="d in filteredRequests" :key="d.id" tabindex="0" :class="{ selected: caseId === d.id }" @click="caseId = d.id" @keydown.enter="caseId = d.id">
                 <VendorAvatar :vendor="d.vendor" :size="34" />
                 <div class="row-main">
                   <span class="strong">
@@ -99,16 +99,19 @@
                     <span class="muted"> · {{ d.vendor.store_name }}</span>
                   </span>
                   <span class="sub ellipsis">“{{ d.reason || "No reason given" }}” — {{ d.customer || "customer" }}</span>
-                  <span v-if="d.vendor_response" class="sub ellipsis">Vendor: {{ d.vendor_response }}</span>
+                  <span v-if="d.settled" class="sub ellipsis">Agreed: {{ describe(d.settled.resolution, d.settled.amount) }}</span>
+                  <span v-else-if="d.offer" class="sub ellipsis">{{ d.offer.by === "vendor" ? "Shop offered" : "Customer asked for" }} {{ describe(d.offer.resolution, d.offer.amount) }}</span>
+                  <span v-if="d.vendor_response && ['rejected', 'withdrawn'].includes(d.status)" class="sub ellipsis">“{{ d.vendor_response }}”</span>
                 </div>
                 <div class="row-pills">
-                  <span class="pill" :class="`rq-${d.status}`">{{ REQUEST_LABEL[d.status] ?? d.status }}</span>
+                  <span class="pill" :class="`rq-${d.status}`">{{ STAGE_LABEL[d.stage] ?? d.status }}</span>
+                  <span v-if="d.next_actor" class="sub">{{ d.next_actor === "vendor" ? "Shop to act" : "Customer to act" }}</span>
                   <span v-if="isOverdue(d)" class="pill overdue">Overdue</span>
                 </div>
                 <div class="row-right">
                   <span class="strong">{{ money(d.amount) }}</span>
                   <span class="sub">{{ d.method_label }} · {{ PAYMENT_LABEL[d.payment_status] ?? d.payment_status }}</span>
-                  <span class="sub">{{ d.status === "pending" ? `waiting ${timeAgo(d.created_at)}` : `decided ${formatDate(d.updated_at)}` }}</span>
+                  <span class="sub">{{ d.next_actor ? `last activity ${timeAgo(d.last_activity_at)} ago` : formatDate(d.last_activity_at) }}</span>
                 </div>
               </li>
             </ul>
@@ -145,6 +148,25 @@
         </template>
       </div>
     </main>
+
+    <Transition name="fade"><div v-if="caseId" class="drawer-backdrop" @click="caseId = null"></div></Transition>
+    <Transition name="slide">
+      <aside v-if="caseId" class="drawer" role="dialog" aria-modal="true" aria-label="Return or refund request">
+        <header class="drawer-head">
+          <div>
+            <h2>{{ activeCase?.order_number || "Return / refund" }}</h2>
+            <p v-if="activeCase" class="sub">{{ activeCase.vendor?.store_name }} · {{ activeCase.customer || "customer" }}</p>
+          </div>
+          <div class="drawer-actions">
+            <button v-if="activeCase" type="button" class="ghost-btn" @click="openOrder(activeCase.order_id, 'disputes')">Open order</button>
+            <button type="button" class="ghost-btn" aria-label="Close" @click="caseId = null">✕</button>
+          </div>
+        </header>
+        <div class="drawer-body">
+          <ReturnCasePanel :case-id="caseId" role="admin" api-base="/admin/finance/refunds" />
+        </div>
+      </aside>
+    </Transition>
   </div>
 </template>
 
@@ -155,6 +177,7 @@ import { toast } from "vue3-toastify";
 import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
+import ReturnCasePanel from "../../components/returns/ReturnCasePanel.vue";
 import api from "../../plugins/axios";
 
 const { toggleMobile } = useSidebarState();
@@ -163,11 +186,23 @@ const router = useRouter();
 const OVERDUE_DAYS = 2;
 const STATUS = [
   { value: "", label: "All" },
-  { value: "pending", label: "Open" },
-  { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
+  { value: "pending", label: "Agreeing", count: "negotiating" },
+  { value: "approved", label: "Agreed", count: "agreed" },
+  { value: "completed", label: "Settled", count: "completed" },
+  { value: "rejected", label: "Declined", count: "closed" },
 ];
-const REQUEST_LABEL = { pending: "Open", approved: "Approved", rejected: "Rejected" };
+const STAGE_LABEL = {
+  awaiting_vendor: "Shop to reply",
+  awaiting_customer: "Offer to customer",
+  awaiting_return: "Item coming back",
+  awaiting_refund: "Refund to send",
+  confirm_refund: "Refund sent",
+  awaiting_replacement: "Replacement to send",
+  confirm_replacement: "Replacement sent",
+  completed: "Settled",
+  rejected: "Declined",
+  withdrawn: "Withdrawn",
+};
 const PAYMENT_LABEL = { paid: "paid", refunded: "refunded", pending: "unpaid", unpaid: "unpaid", failed: "payment failed" };
 
 const data = ref(null);
@@ -178,6 +213,8 @@ const status = ref("");
 const requestSearch = ref("");
 const requestType = ref("");
 const refundSearch = ref("");
+const caseId = ref(null);
+const activeCase = computed(() => data.value?.disputes?.find((d) => d.id === caseId.value) ?? null);
 const sum = computed(() => data.value?.summary);
 
 const load = async () => {
@@ -210,7 +247,9 @@ const filteredRefunds = computed(() => {
   const term = refundSearch.value.trim().toLowerCase();
   return (data.value?.refunds ?? []).filter((r) => matches(term, r.order_number, r.customer, r.vendor?.store_name));
 });
-const isOverdue = (d) => d.status === "pending" && Date.now() - new Date(d.created_at) > OVERDUE_DAYS * 86_400_000;
+const isOverdue = (d) => !!d.next_actor && Date.now() - new Date(d.last_activity_at) > OVERDUE_DAYS * 86_400_000;
+const describe = (resolution, amount) =>
+  resolution === "replacement" ? "a replacement" : `a ${resolution === "full_refund" ? "full" : "partial"} refund of ${money(amount)}`;
 const openOrder = (id, tab) => router.push({ path: "/admin/orders", query: { order: id, ...(tab ? { tab } : {}) } });
 
 // ── Formatting ───────────────────────────────────────────────────
@@ -221,7 +260,7 @@ const hours = (h) => (h < 48 ? `${Math.round(h)} h` : `${(h / 24).toFixed(1)} da
 const formatDate = (v) => (v ? new Date(v).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—");
 const timeAgo = (v) => {
   const minutes = Math.floor((Date.now() - new Date(v)) / 60_000);
-  if (minutes < 60) return minutes < 1 ? "just now" : `${minutes} min`;
+  if (minutes < 60) return minutes < 1 ? "under a minute" : `${minutes} min`;
   const h = Math.floor(minutes / 60);
   if (h < 24) return `${h} h`;
   const days = Math.floor(h / 24);
@@ -645,5 +684,70 @@ onMounted(load);
   .sk {
     animation: none;
   }
+}
+
+.row-list li.selected {
+  background: #f5f3ff;
+}
+.rq-completed { background: #dcfce7; color: #15803d; }
+.rq-withdrawn { background: #f1f5f9; color: #64748b; }
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.32);
+  z-index: 300;
+}
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(620px, 100vw);
+  z-index: 301;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  box-shadow: -12px 0 40px rgba(15, 23, 42, 0.18);
+  --return-accent: #6d5ff0;
+  --return-accent-soft: #f1efff;
+}
+.drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #eef1f6;
+}
+.drawer-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e2739;
+}
+.drawer-actions {
+  display: flex;
+  gap: 6px;
+}
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px 28px;
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.25s ease;
+}
+.slide-enter-from,
+.slide-leave-to {
+  transform: translateX(100%);
 }
 </style>

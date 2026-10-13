@@ -71,8 +71,8 @@
               />
             </svg>
             Requests
-            <span v-if="reqCounts.pending > 0" class="view-btn-badge">{{
-              reqCounts.pending
+            <span v-if="reqCounts.needs_shop > 0" class="view-btn-badge">{{
+              reqCounts.needs_shop
             }}</span>
           </button>
         </div>
@@ -182,7 +182,7 @@
               d="M10 2a8 8 0 100 16A8 8 0 0010 2zm1 9H9V5h2v6zm0 2H9v2h2v-2z"
             />
             <path
-              v-else-if="rTab.value === 'approved'"
+              v-else-if="rTab.value === 'approved' || rTab.value === 'completed'"
               d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z"
             />
             <path
@@ -203,7 +203,7 @@
         </div>
         <div class="kpi-text">
           <span class="kpi-label">{{ rTab.label }}</span>
-          <span class="kpi-num">{{ reqCounts[rTab.value] ?? 0 }}</span>
+          <span class="kpi-num">{{ reqCountFor(rTab.value) }}</span>
         </div>
       </div>
     </div>
@@ -568,7 +568,7 @@
       <div class="req-card-header">
         <div>
           <h2 class="req-card-title">Return & Refund Requests</h2>
-          <p class="req-card-sub">Customer requests awaiting review</p>
+          <p class="req-card-sub">Settle each one with the customer: agree, send the refund or replacement, and they confirm.</p>
         </div>
       </div>
 
@@ -714,75 +714,27 @@
               </td>
               <!-- Status -->
               <td>
-                <span
-                  class="req-status-badge"
-                  :class="'req-status--' + (req.status ?? 'pending')"
-                >
-                  {{
-                    req.status
-                      ? req.status.charAt(0).toUpperCase() + req.status.slice(1)
-                      : "Pending"
-                  }}
+                <span class="req-status-badge" :class="'req-status--' + (req.status ?? 'pending')">
+                  {{ CASE_STAGE_LABEL[req.stage] ?? req.status }}
                 </span>
-                <div
-                  v-if="req.admin_notes"
-                  class="req-admin-note"
-                  :title="req.admin_notes"
-                >
-                  {{
-                    req.admin_notes.length > 40
-                      ? req.admin_notes.slice(0, 40) + "…"
-                      : req.admin_notes
-                  }}
+                <div v-if="req.next_actor === 'vendor'" class="req-turn">Your turn</div>
+                <div v-else-if="req.next_actor === 'customer'" class="req-turn req-turn--wait">Waiting for customer</div>
+                <div v-if="req.settled" class="req-admin-note">Agreed: {{ describeResolution(req.settled.resolution, req.settled.amount) }}</div>
+                <div v-else-if="req.offer" class="req-admin-note">
+                  {{ req.offer.by === "vendor" ? "You offered" : "Asked for" }} {{ describeResolution(req.offer.resolution, req.offer.amount) }}
                 </div>
               </td>
               <!-- Date -->
               <td class="muted-cell">{{ formatTime(req.created_at) }}</td>
               <!-- Actions -->
               <td>
-                <div v-if="req.status === 'pending'" class="req-action-cell">
-                  <button
-                    class="req-action-btn req-approve-btn"
-                    :disabled="reqActionLoading === req.id + '_a'"
-                    title="Approve"
-                    @click="openApproveModal(req)"
-                  >
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      width="13"
-                    >
-                      <path
-                        d="M4 10l4 4L16 6"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                    </svg>
-                    Approve
-                  </button>
-                  <button
-                    class="req-action-btn req-reject-btn"
-                    :disabled="reqActionLoading === req.id + '_r'"
-                    title="Reject"
-                    @click="openRejectModal(req)"
-                  >
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      width="13"
-                    >
-                      <path d="M5 5l10 10M15 5l-10 10" stroke-linecap="round" />
-                    </svg>
-                    Reject
-                  </button>
-                </div>
-                <span v-else class="req-resolved-note">
-                  {{ req.status === "approved" ? "✓ Approved" : "✕ Rejected" }}
-                </span>
+                <button
+                  class="req-action-btn"
+                  :class="req.next_actor === 'vendor' ? 'req-approve-btn' : ''"
+                  @click="openCase(req)"
+                >
+                  {{ req.next_actor === "vendor" ? "Respond" : "Open" }}
+                </button>
               </td>
             </tr>
           </tbody>
@@ -1202,104 +1154,23 @@
       </div>
     </teleport>
 
-    <!-- ── NEW: Approve / Reject Confirmation Modal ────────────────────── -->
+    <!-- ── Return / refund case ───────────────────────────────────────── -->
     <teleport to="body">
-      <div
-        v-if="reqConfirmModal.open"
-        class="modal-backdrop"
-        @click.self="reqConfirmModal.open = false"
-      >
-        <div class="req-confirm-modal">
-          <div class="modal-header">
-            <h2>
-              {{
-                reqConfirmModal.action === "approve"
-                  ? "✅ Approve Request"
-                  : "❌ Reject Request"
-              }}
-            </h2>
-            <button class="modal-close" @click="reqConfirmModal.open = false">
-              ✕
-            </button>
-          </div>
-          <div class="req-confirm-body">
-            <p class="req-confirm-info">
-              <span
-                class="req-type-badge"
-                :class="'req-type--' + reqConfirmModal.request?.type"
-              >
-                {{
-                  reqConfirmModal.request?.type === "return"
-                    ? "↩ Return"
-                    : "💰 Refund"
-                }}
-              </span>
-              <strong>{{
-                reqConfirmModal.request?.order?.order_number
-              }}</strong>
-              · {{ reqConfirmModal.request?.customer?.name }}
-            </p>
-            <p class="req-confirm-reason">
-              {{ reqConfirmModal.request?.reason }}
-            </p>
-            <div class="req-notes-field">
-              <label class="req-notes-lbl"
-                >Admin Notes
-                <span style="color: #9ca3af; font-weight: 400"
-                  >(optional)</span
-                ></label
-              >
-              <textarea
-                v-model="reqConfirmModal.notes"
-                class="req-notes-textarea"
-                rows="3"
-                placeholder="Add any notes for the customer…"
-              ></textarea>
+      <div v-if="caseModal.id" class="modal-backdrop" @click.self="closeCase">
+        <div class="req-case-modal" role="dialog" aria-modal="true">
+          <div class="req-case-head">
+            <div>
+              <h3>Return / refund · {{ caseModal.orderNumber }}</h3>
+              <p v-if="caseModal.customer">{{ caseModal.customer }}</p>
             </div>
+            <button class="modal-close" aria-label="Close" @click="closeCase">✕</button>
           </div>
-          <div class="req-confirm-footer">
-            <button
-              class="action-btn-ghost"
-              @click="reqConfirmModal.open = false"
-              :disabled="reqConfirmModal.loading"
-            >
-              Cancel
-            </button>
-            <button
-              class="req-confirm-btn"
-              :class="
-                reqConfirmModal.action === 'approve'
-                  ? 'req-confirm-btn--approve'
-                  : 'req-confirm-btn--reject'
-              "
-              :disabled="reqConfirmModal.loading"
-              @click="doRequestAction"
-            >
-              <svg
-                v-if="reqConfirmModal.loading"
-                class="spin-ico"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-dasharray="32"
-                  stroke-linecap="round"
-                />
-              </svg>
-              {{
-                reqConfirmModal.loading
-                  ? "Processing…"
-                  : reqConfirmModal.action === "approve"
-                    ? "Confirm Approve"
-                    : "Confirm Reject"
-              }}
-            </button>
-          </div>
+          <ReturnCasePanel
+            :case-id="caseModal.id"
+            role="vendor"
+            api-base="/sc/order-requests"
+            @changed="fetchRequests(reqMeta.current_page, true)"
+          />
         </div>
       </div>
     </teleport>
@@ -1311,6 +1182,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import { deliveryService } from "../../../../../services/deliveryService";
+import ReturnCasePanel from "../../../../../components/returns/ReturnCasePanel.vue";
 import LoadingOverlay from "../../../../../layouts/components/LoadingOverlay.vue";
 import BarcodeModal from "../../../../../layouts/components/BarcodeModal.vue";
 
@@ -1341,12 +1213,30 @@ const statusTabs = [
 // NEW: request filter tabs
 const reqTabs = [
   { value: "all", label: "All", color: "kpi-gray" },
-  { value: "pending", label: "Pending", color: "kpi-amber" },
-  { value: "approved", label: "Approved", color: "kpi-green" },
-  { value: "rejected", label: "Rejected", color: "kpi-red" },
+  { value: "pending", label: "Agreeing", color: "kpi-amber" },
+  { value: "approved", label: "Agreed · in progress", color: "kpi-blue" },
+  { value: "completed", label: "Settled", color: "kpi-green" },
+  { value: "rejected", label: "Declined / withdrawn", color: "kpi-red" },
   { value: "return", label: "Returns", color: "kpi-indigo" },
-  { value: "refund", label: "Refunds", color: "kpi-blue" },
+  { value: "refund", label: "Refunds only", color: "kpi-blue" },
 ];
+const CASE_STAGE_LABEL = {
+  awaiting_vendor: "New request",
+  awaiting_customer: "Offer sent",
+  awaiting_return: "Item coming back",
+  awaiting_refund: "Send refund",
+  confirm_refund: "Refund sent",
+  awaiting_replacement: "Send replacement",
+  confirm_replacement: "Replacement sent",
+  completed: "Settled",
+  rejected: "Declined",
+  withdrawn: "Withdrawn",
+};
+const reqCountFor = (value) =>
+  ({ return: reqCounts.value.returns, refund: reqCounts.value.refunds })[value] ?? reqCounts.value[value] ?? 0;
+const peso = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
+const describeResolution = (resolution, amount) =>
+  resolution === "replacement" ? "a replacement" : `${resolution === "full_refund" ? "full" : "partial"} refund ${peso.format(Number(amount || 0))}`;
 
 // ─── View ─────────────────────────────────────────────────────────────────────
 const currentView = ref("table");
@@ -1381,11 +1271,12 @@ const reqCounts = ref({
   all: 0,
   pending: 0,
   approved: 0,
+  completed: 0,
   rejected: 0,
-  return: 0,
-  refund: 0,
+  needs_shop: 0,
+  returns: 0,
+  refunds: 0,
 });
-const reqActionLoading = ref(null);
 
 // Media preview modal (NEW)
 const mediaModal = ref({
@@ -1396,14 +1287,14 @@ const mediaModal = ref({
   orderNumber: "",
 });
 
-// Approve / Reject confirmation modal (NEW)
-const reqConfirmModal = ref({
-  open: false,
-  action: "approve",
-  request: null,
-  notes: "",
-  loading: false,
-});
+// Return / refund case being viewed
+const caseModal = ref({ id: null, orderNumber: "", customer: "" });
+function openCase(req) {
+  caseModal.value = { id: req.id, orderNumber: req.order?.order_number ?? "—", customer: req.customer?.name ?? "" };
+}
+function closeCase() {
+  caseModal.value = { id: null, orderNumber: "", customer: "" };
+}
 
 // ─── Existing modals ──────────────────────────────────────────────────────────
 const logsModal = ref({
@@ -1610,61 +1501,6 @@ function openMediaModal(req) {
     type: req.type,
     orderNumber: req.order?.order_number ?? "—",
   };
-}
-
-// ─── Approve / Reject modals (NEW) ────────────────────────────────────────────
-function openApproveModal(req) {
-  Object.assign(reqConfirmModal.value, {
-    open: true,
-    action: "approve",
-    request: req,
-    notes: "",
-    loading: false,
-  });
-}
-function openRejectModal(req) {
-  Object.assign(reqConfirmModal.value, {
-    open: true,
-    action: "reject",
-    request: req,
-    notes: "",
-    loading: false,
-  });
-}
-
-async function doRequestAction() {
-  const { action, request, notes } = reqConfirmModal.value;
-  reqConfirmModal.value.loading = true;
-  reqActionLoading.value = request.id + (action === "approve" ? "_a" : "_r");
-  try {
-    if (action === "approve") {
-      await deliveryService.approveOrderRequest(request.id, {
-        admin_notes: notes,
-      });
-      toast.success("Request approved.", {
-        position: toast.POSITION.TOP_RIGHT,
-        autoClose: 3000,
-      });
-    } else {
-      await deliveryService.rejectOrderRequest(request.id, {
-        admin_notes: notes,
-      });
-      toast.success("Request rejected.", {
-        position: toast.POSITION.TOP_RIGHT,
-        autoClose: 3000,
-      });
-    }
-    reqConfirmModal.value.open = false;
-    await fetchRequests(reqMeta.value.current_page, true);
-  } catch (e) {
-    toast.error(e?.response?.data?.message ?? "Action failed.", {
-      position: toast.POSITION.TOP_RIGHT,
-      autoClose: 4000,
-    });
-  } finally {
-    reqConfirmModal.value.loading = false;
-    reqActionLoading.value = null;
-  }
 }
 
 // ─── Calendar ─────────────────────────────────────────────────────────────────
@@ -3542,5 +3378,52 @@ onUnmounted(() => clearInterval(pollTimer));
   height: 15px;
   animation: spin 0.8s linear infinite;
   flex-shrink: 0;
+}
+
+/* Return / refund case */
+.req-case-modal {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 22px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+  --return-accent: #4f46e5;
+  --return-accent-soft: #eef2ff;
+}
+.req-case-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.req-case-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.req-case-head p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: #6b7280;
+}
+.req-turn {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+}
+.req-turn--wait {
+  color: #6b7280;
+  font-weight: 500;
+}
+.req-status--completed {
+  background: #dcfce7;
+  color: #15803d;
+}
+.req-status--withdrawn {
+  background: #f1f5f9;
+  color: #64748b;
 }
 </style>

@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use App\Services\VendorFinanceService;
+use App\Services\ReturnCaseService;
 
 class CustomerOrderTrackingController extends Controller
 {
@@ -40,7 +41,10 @@ class CustomerOrderTrackingController extends Controller
         $query = Order::where('user_id', Auth::id())
             ->with(['delivery.logs', 'vendor:id,name,email', 'items', 'orderRequests']);
 
-        if ($request->filled('delivery_status')) {
+        if ($request->input('delivery_status') === 'returns') {
+            // Every order with a return/refund case, open or closed
+            $query->whereHas('orderRequests');
+        } elseif ($request->filled('delivery_status')) {
             $statuses = self::TAB_DELIVERY_STATUSES[$request->delivery_status]
                 ?? [$request->delivery_status];
 
@@ -157,115 +161,59 @@ class CustomerOrderTrackingController extends Controller
     }
 
     /**
-     * POST /api/customer/orders/{id}/request-return
+     * POST /api/customer/orders/{id}/return-case
+     * Opens a return/refund case the customer and the shop settle together.
      */
-    public function requestReturn(Request $request, int $id): JsonResponse
+    public function openReturnCase(Request $request, int $id): JsonResponse
     {
         $order = $this->ownedOrder($id);
         if (! $order) {
             return response()->json(['success' => false, 'message' => 'Order not found'], 404);
         }
 
-        if (! $order->delivery || $order->delivery->status !== 'completed') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Return can only be requested for delivered orders.',
-            ], 422);
-        }
-
-        if ($this->hasPendingRequest($order->id, 'return')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You already have a pending return request for this order.',
-            ], 422);
-        }
-
-        $request->validate([
+        $data = $request->validate([
+            'type' => ['required', 'in:refund,return'],
+            'resolution' => ['required', 'in:full_refund,partial_refund,replacement'],
+            'amount' => ['nullable', 'numeric', 'min:0.01'],
+            'reason_category' => ['required', 'in:' . implode(',', array_keys(ReturnCaseService::REASONS))],
             'reason' => ['required', 'string', 'min:10', 'max:1000'],
-            'media' => ['nullable', 'file', 'mimes:jpg,jpeg,png,mp4,mov', 'max:20480'],
+            'media' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,mp4,mov', 'max:20480'],
         ]);
+        $data['amount'] = isset($data['amount']) ? (float) $data['amount'] : null;
 
-        [$mediaPath, $mediaType] = $this->storeMedia($request);
-
-        OrderRequest::create([
-            'owner_id' => $order->vendor_id,
-            'order_id' => $order->id,
-            'user_id' => Auth::id(),
-            'type' => 'return',
-            'reason' => $request->reason,
-            'media_path' => $mediaPath,
-            'media_type' => $mediaType,
-            'status' => 'pending',
-        ]);
-
-        $order->delivery->update(['status' => 'returned', 'last_scanned_at' => now()]);
-        $order->delivery->logs()->create([
-            'owner_id' => $order->delivery->owner_id ?? $order->vendor_id,
-            'status' => 'returned',
-            'scanned_at' => now(),
-            'notes' => 'Return requested by customer.',
-        ]);
-        $order->update(['status' => 'returned']);
+        try {
+            $service = app(ReturnCaseService::class);
+            $case = $service->open($order, Auth::user(), $data, $request->file('media'));
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'Return request submitted. Our team will contact you with next steps.',
+            'message' => 'Request sent. The shop will reply here, and you can message them any time.',
+            'data' => $service->detail($case),
         ]);
     }
 
-    /**
-     * POST /api/customer/orders/{id}/request-refund
-     */
-    public function requestRefund(Request $request, int $id): JsonResponse
+    /** POST /api/customer/orders/{id}/request-return (older app versions) */
+    public function requestReturn(Request $request, int $id): JsonResponse
     {
         $order = $this->ownedOrder($id);
-        if (! $order) {
-            return response()->json(['success' => false, 'message' => 'Order not found'], 404);
-        }
-
-        if ($order->payment_status !== 'paid') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Refund can only be requested for paid orders.',
-            ], 422);
-        }
-
-        if (! $order->delivery || ! in_array($order->delivery->status, ['completed', 'returned'], true)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Refund can only be requested for delivered or returned orders.',
-            ], 422);
-        }
-
-        if ($this->hasPendingRequest($order->id, 'refund')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You already have a pending refund request for this order.',
-            ], 422);
-        }
-
-        $request->validate([
-            'reason' => ['required', 'string', 'min:10', 'max:1000'],
-            'media' => ['nullable', 'file', 'mimes:jpg,jpeg,png,mp4,mov', 'max:20480'],
+        $request->merge([
+            'type' => 'return',
+            'resolution' => $order?->payment_status === 'paid' ? 'full_refund' : 'replacement',
+            'reason_category' => 'other',
         ]);
 
-        [$mediaPath, $mediaType] = $this->storeMedia($request);
+        return $this->openReturnCase($request, $id);
+    }
 
-        OrderRequest::create([
-            'owner_id' => $order->vendor_id,
-            'order_id' => $order->id,
-            'user_id' => Auth::id(),
-            'type' => 'refund',
-            'reason' => $request->reason,
-            'media_path' => $mediaPath,
-            'media_type' => $mediaType,
-            'status' => 'pending',
-        ]);
+    /** POST /api/customer/orders/{id}/request-refund (older app versions) */
+    public function requestRefund(Request $request, int $id): JsonResponse
+    {
+        $request->merge(['type' => 'refund', 'resolution' => 'full_refund', 'reason_category' => 'other']);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Refund request submitted and is waiting for vendor approval.',
-        ]);
+        return $this->openReturnCase($request, $id);
     }
 
     private function ownedOrder(int $id): ?Order
@@ -274,32 +222,6 @@ class CustomerOrderTrackingController extends Controller
             ->where('user_id', Auth::id())
             ->with(['delivery', 'orderRequests'])
             ->first();
-    }
-
-    private function hasPendingRequest(int $orderId, string $type): bool
-    {
-        return OrderRequest::where('order_id', $orderId)
-            ->where('type', $type)
-            ->where('status', 'pending')
-            ->exists();
-    }
-
-    private function storeMedia(Request $request): array
-    {
-        if (! $request->hasFile('media') || ! $request->file('media')->isValid()) {
-            return [null, null];
-        }
-
-        $file = $request->file('media');
-        $mime = $file->getMimeType();
-        $mediaType = str_starts_with($mime, 'video/') ? 'video' : 'image';
-
-        $result = CloudinaryHelper::upload($file->getRealPath(), [
-            'folder' => 'returns',
-            'resource_type' => $mediaType,
-        ]);
-
-        return [$result['public_id'], $mediaType];
     }
 
     private function formatOrder(Order $order): array
@@ -314,6 +236,10 @@ class CustomerOrderTrackingController extends Controller
         $requests = ($order->orderRequests ?? collect())
             ->sortByDesc('created_at')
             ->keyBy('type');
+        $latestCase = ($order->orderRequests ?? collect())->sortByDesc('id')->first();
+        $delivered = $order->status === 'completed' || $delivery?->status === 'completed';
+        $settledBefore = ($order->orderRequests ?? collect())->contains(fn ($r) => $r->status === 'completed');
+        $openCase = ($order->orderRequests ?? collect())->contains(fn ($r) => in_array($r->status, OrderRequest::OPEN_STATUSES, true));
 
         return [
             'id' => $order->id,
@@ -345,6 +271,9 @@ class CustomerOrderTrackingController extends Controller
                 'size' => $i->size,
                 'notes' => $i->notes,
             ])->values(),
+            // The latest return/refund case, and whether a new one can be opened
+            'return_case' => $latestCase ? app(ReturnCaseService::class)->summary($latestCase) : null,
+            'can_open_return_case' => $delivered && ! $openCase && ! $settledBefore,
             'return_request' => isset($requests['return']) ? [
                 'id' => $requests['return']->id,
                 'status' => $requests['return']->status,
