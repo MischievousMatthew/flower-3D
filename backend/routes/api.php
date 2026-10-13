@@ -58,6 +58,7 @@ use App\Http\Controllers\CustomerOrderTrackingController;
 use App\Http\Controllers\OrderRequestController;
 use App\Http\Controllers\CustomerReturnCaseController;
 use App\Http\Controllers\ProductReviewController;
+use App\Http\Controllers\VendorBooksController;
 use App\Http\Controllers\VendorCatalogController;
 use App\Http\Controllers\VendorDashboardController;
 use App\Http\Controllers\VendorFulfillmentController;
@@ -444,6 +445,19 @@ Route::middleware('token.auth')->group(function () {
 
         Route::post('/orders/{orderId}/scan-delivery', [DeliveryController::class, 'scan'])->middleware('subscription.module:scanning');
         Route::get('/deliveries', [DeliveryController::class, 'vendorOrders'])->middleware('subscription.module:deliveries');
+
+        // Finance & business management pages
+        Route::prefix('books')->middleware('subscription.module:finance')->group(function () {
+            Route::get('/transactions',          [VendorBooksController::class, 'transactions']);
+            Route::get('/expenses',              [VendorBooksController::class, 'expenses']);
+            Route::post('/expenses',             [VendorBooksController::class, 'storeExpense']);
+            Route::post('/expenses/{id}',        [VendorBooksController::class, 'updateExpense'])->whereNumber('id');
+            Route::delete('/expenses/{id}',      [VendorBooksController::class, 'destroyExpense'])->whereNumber('id');
+            Route::get('/profit-loss',           [VendorBooksController::class, 'profitLoss']);
+            Route::get('/reports',               [VendorBooksController::class, 'reports']);
+            Route::get('/reports/export',        [VendorBooksController::class, 'exportReport']);
+            Route::get('/refunds',               [VendorBooksController::class, 'refunds']);
+        });
 
         Route::prefix('finance')->middleware('subscription.module:finance')->group(function () {
             Route::get('/overview',     [VendorFinanceDashboardController::class, 'overview']);

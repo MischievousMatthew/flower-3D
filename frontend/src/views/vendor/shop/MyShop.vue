@@ -202,6 +202,21 @@ const weekFrom = (schedules) =>
   });
 
 // Group days with identical hours back into the stored schedule shape
+// Best guess from the old free-text hours: which days, and the first time range in it
+function weekFromText(text) {
+  const t = String(text || "");
+  const toH24 = (h, m, ap) => {
+    let hour = Number(h) % 12;
+    if (/p/i.test(ap)) hour += 12;
+    return `${String(hour).padStart(2, "0")}:${m}`;
+  };
+  const times = [...t.matchAll(/(\d{1,2}):(\d{2})\s*([AaPp])\.?[Mm]/g)];
+  const opening = times[0] ? toH24(times[0][1], times[0][2], times[0][3]) : "08:00";
+  const closing = times[1] ? toH24(times[1][1], times[1][2], times[1][3]) : "17:00";
+  const everyDay = /every\s*day|daily|mon\s*-\s*sun/i.test(t);
+  return DAYS.map((day, i) => ({ day, open: everyDay || i < 6, opening_time: opening, closing_time: closing }));
+}
+
 const schedulesFrom = (days) => {
   const groups = [];
   for (const d of days.filter((x) => x.open)) {
@@ -218,8 +233,8 @@ function apply(data) {
   shop.value = data;
   form.value = Object.fromEntries(FIELDS.map((k) => [k, data[k] ?? (k.startsWith("store_l") ? null : "")]));
   week.value = weekFrom(data.operating_schedules);
-  // Older shops only have the text version of their hours: start them with weekdays 8–5
-  if (!data.operating_schedules?.length) week.value.forEach((d, i) => (d.open = i < 6));
+  // Older shops only have the text version of their hours (e.g. "Everyday: 8:00 AM – 5:00 PM")
+  if (!data.operating_schedules?.length) week.value = weekFromText(data.operating_hours);
   snapshot = state();
 }
 
@@ -361,7 +376,21 @@ const to12 = (t) => {
 const hoursText = computed(() => {
   const groups = schedulesFrom(week.value);
   if (!groups.length) return "";
-  const short = (days) => (days.length === 7 ? "Every day" : days.length === 5 && days.every((d) => DAYS.slice(0, 5).includes(d)) ? "Mon–Fri" : days.map((d) => d.slice(0, 3)).join(", "));
+  // "Mon–Sat", "Mon–Wed, Fri": runs of 3+ days are shortened
+  const short = (days) => {
+    if (days.length === 7) return "Every day";
+    const idx = days.map((d) => DAYS.indexOf(d)).sort((a, b) => a - b);
+    const parts = [];
+    for (let i = 0; i < idx.length; ) {
+      let j = i;
+      while (j + 1 < idx.length && idx[j + 1] === idx[j] + 1) j++;
+      const name = (k) => DAYS[idx[k]].slice(0, 3);
+      if (j - i >= 2) parts.push(`${name(i)}–${name(j)}`);
+      else for (let k = i; k <= j; k++) parts.push(name(k));
+      i = j + 1;
+    }
+    return parts.join(", ");
+  };
   return groups.map((g) => `${short(g.days)} ${to12(g.opening_time)}–${to12(g.closing_time)}`).join(" · ");
 });
 const openNow = computed(() => {

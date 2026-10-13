@@ -177,13 +177,16 @@ watch(search, () => {
   }, 300);
 });
 
-const describe = (res, amount) =>
-  res === "replacement" ? "a replacement" : `${res === "full_refund" ? "a full refund" : "a partial refund"} of ${money(amount)}`;
+// A full refund is the whole order (older requests didn't store the amount)
+const describe = (c, res, amount) =>
+  res === "replacement"
+    ? "a replacement"
+    : `${res === "full_refund" ? "a full refund" : "a partial refund"} of ${money(res === "full_refund" ? amount || c.order?.total_amount : amount)}`;
 function terms(c) {
-  if (c.settled) return `Agreed: ${describe(c.settled.resolution, c.settled.amount)}`;
-  if (c.offer) return `${c.offer.by === "vendor" ? "You offered" : "Customer asks for"} ${describe(c.offer.resolution, c.offer.amount)}`;
+  if (c.settled) return `Agreed: ${describe(c, c.settled.resolution, c.settled.amount)}`;
+  if (c.offer) return `${c.offer.by === "vendor" ? "You offered" : "Customer asks for"} ${describe(c, c.offer.resolution, c.offer.amount)}`;
   if (c.closed_reason) return c.closed_reason;
-  return `Asked for ${describe(c.requested.resolution, c.requested.amount)}`;
+  return `Asked for ${describe(c, c.requested.resolution, c.requested.amount)}`;
 }
 function stageTone(c) {
   if (c.next_actor === "vendor") return "amber";

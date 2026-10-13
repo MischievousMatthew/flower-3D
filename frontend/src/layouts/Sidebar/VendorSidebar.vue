@@ -209,6 +209,70 @@
       </div>
 
       <div class="nav-section">
+        <div class="section-label">FINANCE</div>
+        <router-link
+          :to="{ name: 'VendorBooksSales' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('finance') }"
+          :title="lockTooltip('finance')"
+          @click="handleModuleNavigation($event, 'finance')"
+        >
+          <span class="nav-icon">🧾</span>
+          <span>Sales &amp; Transactions</span>
+          <span v-if="isLocked('finance')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorBooksExpenses' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('finance') }"
+          :title="lockTooltip('finance')"
+          @click="handleModuleNavigation($event, 'finance')"
+        >
+          <span class="nav-icon">💸</span>
+          <span>Expenses</span>
+          <span v-if="isLocked('finance')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorBooksProfit' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('finance') }"
+          :title="lockTooltip('finance')"
+          @click="handleModuleNavigation($event, 'finance')"
+        >
+          <span class="nav-icon">📈</span>
+          <span>Profit &amp; Loss</span>
+          <span v-if="isLocked('finance')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorBooksReports' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('finance') }"
+          :title="lockTooltip('finance')"
+          @click="handleModuleNavigation($event, 'finance')"
+        >
+          <span class="nav-icon">📑</span>
+          <span>Financial Reports</span>
+          <span v-if="isLocked('finance')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorBooksRefunds' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('finance') }"
+          :title="lockTooltip('finance')"
+          @click="handleModuleNavigation($event, 'finance')"
+        >
+          <span class="nav-icon">↩️</span>
+          <span>Refund Tracking</span>
+          <span v-if="isLocked('finance')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+      </div>
+
+      <div class="nav-section">
         <div class="section-label">HELP</div>
         <router-link to="/vendor/support" class="nav-item" active-class="active">
           <span class="nav-icon">🛟</span>
@@ -459,9 +523,11 @@ watch(
 }
 
 .logo-section {
+  /* Same size whatever box-sizing the page uses; grows for long shop names */
+  box-sizing: content-box;
   padding: 20px 24px;
   border-bottom: 1px solid #e2e8f0;
-  height: 43px;
+  min-height: 43px;
 }
 
 .logo {

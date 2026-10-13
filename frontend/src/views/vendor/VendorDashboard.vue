@@ -1,7 +1,7 @@
 <template>
-  <vendorHeader title="Dashboard" />
   <div class="vd-page">
     <VendorSidebar />
+    <vendorHeader title="Dashboard" />
     <main class="vd-main">
       <!-- Heading -->
       <header class="vd-head">
@@ -295,6 +295,7 @@ import api from "../../plugins/axios";
 import vendorHeader from "../../layouts/vendorHeader.vue";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import { useVendorProfile } from "../../composables/useVendorProfile";
+import "../../components/vendor/shop/shop.css";
 
 const router = useRouter();
 const { vendorProfile } = useVendorProfile({ autoFetch: true, showToast: false });
@@ -329,8 +330,8 @@ const ICONS = {
 const ACTIONS = [
   { label: "Add product", icon: "plus", tone: "green", to: { name: "VendorAddProduct" }, module: "products" },
   { label: "Manage orders", icon: "orders", tone: "blue", to: { name: "VendorReservation" }, module: "orders" },
-  { label: "Calendar", icon: "calendar", tone: "violet", to: { name: "VendorCalendar" }, module: "calendar" },
-  { label: "3D customization", icon: "cube", tone: "teal", to: { name: "VendorCustomization" }, module: "products" },
+  { label: "Reservations", icon: "calendar", tone: "violet", to: { name: "VendorCalendar" }, module: "calendar" },
+  { label: "3D bouquets", icon: "cube", tone: "teal", to: { name: "VendorCustomization" }, module: "products" },
   { label: "Customer chat", icon: "chat", tone: "amber", to: { name: "VendorChat" }, module: "crm" },
   { label: "Staff list", icon: "team", tone: "rose", to: { name: "VendorStaffList" } },
   { label: "Help & support", icon: "help", tone: "slate", to: { name: "VendorSupport" } },

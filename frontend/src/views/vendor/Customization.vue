@@ -1,7 +1,7 @@
 <template>
-  <vendorHeader />
   <div class="cz-page">
     <VendorSidebar />
+    <vendorHeader title="3D Bouquets" />
 
     <main class="cz-main">
       <ShopLayout embedded />
@@ -876,9 +876,10 @@ const formatSize = (bytes) =>
   transition: margin-left 0.3s ease;
 }
 
-.cz-page *,
-.cz-page *::before,
-.cz-page *::after {
+/* Only this page's own content: the shared sidebar and header keep their sizing */
+.cz-main *,
+.cz-main *::before,
+.cz-main *::after {
   box-sizing: border-box;
 }
 

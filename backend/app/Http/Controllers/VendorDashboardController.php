@@ -8,6 +8,7 @@ use App\Models\Payroll;
 use App\Models\Product;
 use App\Models\VendorTransaction;
 use App\Services\SubscriptionAccessService;
+use App\Subscriptions\SubscriptionPlans;
 use App\Traits\ResolvesOwner;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -35,7 +36,10 @@ class VendorDashboardController extends Controller
         $user = $request->user();
 
         [$from, $to, $prevFrom, $prevTo] = $this->bounds($range);
-        $can = fn (string $module) => $access->canAccess($user, $module);
+        // One subscription lookup for the whole page
+        $summary = $access->accessSummary($user);
+        $modules = $summary['modules'] ?? [];
+        $can = fn (string $module) => in_array(SubscriptionPlans::canonicalModule($module), $modules, true);
         $locked = array_values(array_filter(['orders', 'products', 'finance'], fn ($m) => ! $can($m)));
 
         $result = [
@@ -43,7 +47,7 @@ class VendorDashboardController extends Controller
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
             'locked' => $locked,
-            'subscription' => $this->subscription($access->accessSummary($user)),
+            'subscription' => $this->subscription($summary),
         ];
 
         if ($can('orders')) {

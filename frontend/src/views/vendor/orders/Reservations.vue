@@ -408,6 +408,7 @@ onMounted(() => {
   white-space: nowrap;
 }
 .rv-count small {
+  margin-left: 3px;
   font-size: 10.5px;
   font-weight: 500;
   color: #718096;

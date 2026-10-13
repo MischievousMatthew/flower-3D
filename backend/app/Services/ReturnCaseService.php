@@ -349,6 +349,11 @@ class ReturnCaseService
 
     public function summary(OrderRequest $case): array
     {
+        // A full refund is the whole order; older requests didn't store the amount
+        $amount = fn ($resolution, $value) => $value === null && $resolution === OrderRequest::FULL_REFUND
+            ? (float) ($case->order?->total_amount ?? 0)
+            : $value;
+
         return [
             'id' => $case->id,
             'type' => $case->type,
@@ -358,12 +363,12 @@ class ReturnCaseService
             'reason' => $case->reason,
             'reason_category' => $case->reason_category,
             'reason_label' => self::REASONS[$case->reason_category] ?? 'Something else',
-            'requested' => ['resolution' => $case->resolution_requested, 'amount' => $case->amount_requested],
+            'requested' => ['resolution' => $case->resolution_requested, 'amount' => $amount($case->resolution_requested, $case->amount_requested)],
             'offer' => $case->status === 'pending' && $case->offer_resolution
-                ? ['resolution' => $case->offer_resolution, 'amount' => $case->offer_amount, 'by' => $case->offer_by, 'at' => $case->offered_at?->toIso8601String()]
+                ? ['resolution' => $case->offer_resolution, 'amount' => $amount($case->offer_resolution, $case->offer_amount), 'by' => $case->offer_by, 'at' => $case->offered_at?->toIso8601String()]
                 : null,
             'settled' => $case->settled_resolution
-                ? ['resolution' => $case->settled_resolution, 'amount' => $case->settled_amount, 'at' => $case->settled_at?->toIso8601String()]
+                ? ['resolution' => $case->settled_resolution, 'amount' => $amount($case->settled_resolution, $case->settled_amount), 'at' => $case->settled_at?->toIso8601String()]
                 : null,
             'item_received_at' => $case->item_received_at?->toIso8601String(),
             'refund' => $case->refund_method

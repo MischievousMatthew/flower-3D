@@ -1,9 +1,10 @@
 <template>
-  <vendorHeader v-if="!embedded" :title="title" />
-  <div :class="embedded ? 'sl-embedded' : 'sl-page'">
+  <div ref="root" :class="embedded ? 'sl-embedded' : 'sl-page'">
     <VendorSidebar v-if="!embedded" />
+    <!-- The header sits inside the content column so the fixed sidebar never covers it -->
+    <vendorHeader v-if="!embedded" :title="title" />
     <main :class="{ 'sl-main': !embedded }">
-      <nav class="sl-tabs" :aria-label="section === 'orders' ? 'Orders and fulfillment' : 'Shop and product management'">
+      <nav class="sl-tabs" :aria-label="NAV_LABEL[section] ?? 'Shop and product management'">
         <router-link
           v-for="t in tabs"
           :key="t.name"
@@ -32,7 +33,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import vendorHeader from "../../../layouts/vendorHeader.vue";
 import VendorSidebar from "../../../layouts/Sidebar/VendorSidebar.vue";
@@ -66,15 +67,36 @@ const ORDER_TABS = [
   { name: "VendorCalendar", label: "Reservations", icon: "calendar", module: "calendar" },
   { name: "VendorReturns", label: "Returns & Refunds", icon: "restore", module: "orders" },
 ];
-const tabs = computed(() => (props.section === "orders" ? ORDER_TABS : TABS));
+const FINANCE_TABS = [
+  { name: "VendorBooksSales", label: "Sales & Transactions", icon: "receipt", module: "finance" },
+  { name: "VendorBooksExpenses", label: "Expenses", icon: "card", module: "finance" },
+  { name: "VendorBooksProfit", label: "Profit & Loss", icon: "percent", module: "finance" },
+  { name: "VendorBooksReports", label: "Reports", icon: "note", module: "finance" },
+  { name: "VendorBooksRefunds", label: "Refunds", icon: "restore", module: "finance" },
+];
+const NAV_LABEL = { shop: "Shop and product management", orders: "Orders and fulfillment", finance: "Finance and business" };
+const tabs = computed(() => ({ orders: ORDER_TABS, finance: FINANCE_TABS })[props.section] ?? TABS);
 const isOn = (t) => route.name === t.name || (t.also ?? []).includes(route.name);
 
 const locked = (module) =>
   !!module && !!subscriptionAccess.value && !subscriptionAllowsModule(subscriptionAccess.value, module);
 
+// A photo that fails to load becomes a plain placeholder instead of showing its alt text
+const root = ref(null);
+const onImageError = (e) => {
+  const img = e.target;
+  if (img?.tagName !== "IMG" || img.dataset.broken) return;
+  img.dataset.broken = "1";
+  img.alt = "";
+  // A transparent pixel: keeps the tile without the browser's broken-image outline
+  img.src = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+};
+
 onMounted(() => {
   if (!subscriptionAccess.value) loadSubscriptionAccess().catch(() => {});
+  root.value?.addEventListener("error", onImageError, true);
 });
+onBeforeUnmount(() => root.value?.removeEventListener("error", onImageError, true));
 </script>
 
 <style scoped>

@@ -61,19 +61,19 @@
         <template v-if="canAct">
           <div v-if="!composer.open" class="rc-actions">
             <template v-if="data.offer.by !== role">
-              <button type="button" class="rc-btn rc-btn--main" :disabled="busy" @click="act('accept')">
+              <button type="button" class="rc-btn rc-btn--main" :disabled="!!busy" @click="act('accept')">
                 {{ busy === "accept" ? "Saving…" : role === "vendor" ? "Accept request" : "Accept offer" }}
               </button>
-              <button type="button" class="rc-btn" :disabled="busy" @click="openOffer">
+              <button type="button" class="rc-btn" :disabled="!!busy" @click="openOffer">
                 {{ role === "vendor" ? "Offer something else" : "Counter-offer" }}
               </button>
             </template>
             <template v-else>
               <span class="rc-wait">Waiting for the {{ role === "vendor" ? "customer" : "shop" }} to reply.</span>
-              <button type="button" class="rc-btn" :disabled="busy" @click="openOffer">Change my offer</button>
+              <button type="button" class="rc-btn" :disabled="!!busy" @click="openOffer">Change my offer</button>
             </template>
-            <button v-if="role === 'vendor'" type="button" class="rc-btn rc-btn--danger" :disabled="busy" @click="closing.open = true">Decline request</button>
-            <button v-if="role === 'customer'" type="button" class="rc-btn rc-btn--quiet" :disabled="busy" @click="closing.open = true">Withdraw request</button>
+            <button v-if="role === 'vendor'" type="button" class="rc-btn rc-btn--danger" :disabled="!!busy" @click="closing.open = true">Decline request</button>
+            <button v-if="role === 'customer'" type="button" class="rc-btn rc-btn--quiet" :disabled="!!busy" @click="closing.open = true">Withdraw request</button>
           </div>
 
           <!-- Offer form -->
@@ -84,6 +84,7 @@
                 <span><strong>{{ o.label }}</strong><small>{{ o.hint }}</small></span>
               </label>
             </div>
+            <p v-if="!refundable" class="rc-note">This order isn't marked as paid, so only a replacement can be offered.</p>
             <label v-if="composer.resolution === 'partial_refund'" class="rc-field">
               <span>Amount (less than {{ money(data.order?.total_amount) }})</span>
               <input v-model.number="composer.amount" type="number" min="1" step="0.01" :max="data.order?.total_amount" class="rc-input" required />
@@ -93,8 +94,8 @@
               <textarea v-model="composer.note" class="rc-input" rows="2" maxlength="1000" placeholder="Explain your offer"></textarea>
             </label>
             <div class="rc-actions">
-              <button type="button" class="rc-btn rc-btn--quiet" :disabled="busy" @click="composer.open = false">Cancel</button>
-              <button type="submit" class="rc-btn rc-btn--main" :disabled="busy">{{ busy === "offer" ? "Sending…" : "Send offer" }}</button>
+              <button type="button" class="rc-btn rc-btn--quiet" :disabled="!!busy" @click="composer.open = false">Cancel</button>
+              <button type="submit" class="rc-btn rc-btn--main" :disabled="!!busy">{{ busy === "offer" ? "Sending…" : "Send offer" }}</button>
             </div>
           </form>
 
@@ -105,8 +106,8 @@
               <textarea v-model="closing.reason" class="rc-input" rows="2" maxlength="500" :required="role === 'vendor'"></textarea>
             </label>
             <div class="rc-actions">
-              <button type="button" class="rc-btn rc-btn--quiet" :disabled="busy" @click="closing.open = false">Keep it open</button>
-              <button type="submit" class="rc-btn rc-btn--danger" :disabled="busy">
+              <button type="button" class="rc-btn rc-btn--quiet" :disabled="!!busy" @click="closing.open = false">Keep it open</button>
+              <button type="submit" class="rc-btn rc-btn--danger" :disabled="!!busy">
                 {{ busy ? "Saving…" : role === "vendor" ? "Decline request" : "Withdraw request" }}
               </button>
             </div>
@@ -122,7 +123,7 @@
           <p v-else-if="role === 'vendor'">Arrange the pickup with the customer below, then confirm once the item reaches you.</p>
           <p v-else>Waiting for the item to reach the shop.</p>
           <div v-if="role === 'vendor' && canAct" class="rc-actions">
-            <button type="button" class="rc-btn rc-btn--main" :disabled="busy" @click="act('item-received')">
+            <button type="button" class="rc-btn rc-btn--main" :disabled="!!busy" @click="act('item-received')">
               {{ busy === "item-received" ? "Saving…" : "I've received the item" }}
             </button>
           </div>
@@ -150,7 +151,7 @@
                 <input v-model="refund.note" class="rc-input" maxlength="500" />
               </label>
               <div class="rc-actions">
-                <button type="submit" class="rc-btn rc-btn--main" :disabled="busy">{{ busy === "refund-sent" ? "Saving…" : "Mark refund as sent" }}</button>
+                <button type="submit" class="rc-btn rc-btn--main" :disabled="!!busy">{{ busy === "refund-sent" ? "Saving…" : "Mark refund as sent" }}</button>
               </div>
             </form>
           </template>
@@ -163,8 +164,8 @@
             <template v-if="data.refund?.reference"> (ref <strong>{{ data.refund.reference }}</strong>)</template>.
           </p>
           <div v-if="role === 'customer'" class="rc-actions">
-            <button type="button" class="rc-btn rc-btn--main" :disabled="busy" @click="act('confirm-refund')">{{ busy === "confirm-refund" ? "Saving…" : "Yes, I received it" }}</button>
-            <button type="button" class="rc-btn" :disabled="busy" @click="act('refund-missing')">Not yet</button>
+            <button type="button" class="rc-btn rc-btn--main" :disabled="!!busy" @click="act('confirm-refund')">{{ busy === "confirm-refund" ? "Saving…" : "Yes, I received it" }}</button>
+            <button type="button" class="rc-btn" :disabled="!!busy" @click="act('refund-missing')">Not yet</button>
           </div>
           <p v-else class="rc-wait">Waiting for the customer to confirm they received it.</p>
         </template>
@@ -179,7 +180,7 @@
                 <input v-model="replacementNote" class="rc-input" maxlength="255" placeholder="e.g. Courier and expected time" />
               </label>
               <div class="rc-actions">
-                <button type="submit" class="rc-btn rc-btn--main" :disabled="busy">{{ busy === "replacement-sent" ? "Saving…" : "Mark replacement as sent" }}</button>
+                <button type="submit" class="rc-btn rc-btn--main" :disabled="!!busy">{{ busy === "replacement-sent" ? "Saving…" : "Mark replacement as sent" }}</button>
               </div>
             </form>
           </template>
@@ -189,8 +190,8 @@
         <template v-else-if="data.stage === 'confirm_replacement'">
           <p>The shop sent the replacement.</p>
           <div v-if="role === 'customer'" class="rc-actions">
-            <button type="button" class="rc-btn rc-btn--main" :disabled="busy" @click="act('confirm-replacement')">{{ busy === "confirm-replacement" ? "Saving…" : "Yes, I received it" }}</button>
-            <button type="button" class="rc-btn" :disabled="busy" @click="act('replacement-missing')">Not yet</button>
+            <button type="button" class="rc-btn rc-btn--main" :disabled="!!busy" @click="act('confirm-replacement')">{{ busy === "confirm-replacement" ? "Saving…" : "Yes, I received it" }}</button>
+            <button type="button" class="rc-btn" :disabled="!!busy" @click="act('replacement-missing')">Not yet</button>
           </div>
           <p v-else class="rc-wait">Waiting for the customer to confirm it arrived.</p>
         </template>
@@ -230,7 +231,7 @@
 
         <form v-if="role !== 'admin' && isOpen" class="rc-compose" @submit.prevent="sendMessage">
           <textarea v-model="message" class="rc-input" rows="2" maxlength="2000" :placeholder="role === 'vendor' ? 'Message the customer' : 'Message the shop'" @keydown.enter.exact.prevent="sendMessage"></textarea>
-          <button type="submit" class="rc-btn rc-btn--main" :disabled="busy || !message.trim()">{{ busy === "message" ? "Sending…" : "Send" }}</button>
+          <button type="submit" class="rc-btn rc-btn--main" :disabled="!!busy || !message.trim()">{{ busy === "message" ? "Sending…" : "Send" }}</button>
         </form>
       </div>
     </template>
@@ -643,6 +644,11 @@ const fmtDateTime = (v) =>
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 8px;
+}
+.rc-note {
+  margin: 0;
+  font-size: 12px;
+  color: #718096;
 }
 .rc-option {
   display: flex;

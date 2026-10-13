@@ -29,6 +29,8 @@
 
 /* Buttons */
 .sp-btn {
+  box-sizing: border-box;
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -90,6 +92,8 @@
   font-size: 12px;
 }
 .sp-icon-btn {
+  box-sizing: border-box;
+  flex: none;
   display: inline-grid;
   place-items: center;
   width: 34px;
@@ -649,4 +653,27 @@ button.sp-stat.on {
   .sp-modal {
     padding: 18px;
   }
+}
+
+/* Loading placeholders. Defined here too so vendor pages don't depend on the
+   customer stylesheet having been loaded first. */
+.bc-skeleton {
+  display: block;
+  border-radius: 10px;
+  background: linear-gradient(100deg, #edf2f0 30%, #f7faf8 50%, #edf2f0 70%);
+  background-size: 300% 100%;
+  animation: spShimmer 1.6s ease-in-out infinite;
+}
+@keyframes spShimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bc-skeleton { animation: none; }
+}
+
+/* A photo that failed to load (see ShopLayout) keeps its size as a soft tile */
+img[data-broken] {
+  background: #f0fff4;
+  color: transparent;
 }

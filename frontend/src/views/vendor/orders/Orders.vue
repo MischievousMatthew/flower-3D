@@ -100,7 +100,7 @@
               </span>
               <span class="orow-items">{{ o.item_names || "—" }}<template v-if="o.has_custom_bouquet"> · <em>custom 3D bouquet</em></template></span>
               <span class="orow-meta">
-                <span class="meta-date" :class="{ late: isLate(o), soon: !isLate(o) && daysFromToday(o.delivery_date) <= 1 }">
+                <span class="meta-date" :class="{ late: isLate(o), soon: isSoon(o) }">
                   <span v-html="ICONS.truck"></span>{{ dayLabel(o.delivery_date) }}
                 </span>
                 <span v-if="isLate(o)" class="sp-chip red">Late</span>
@@ -255,6 +255,11 @@ watch(search, () => {
   searchTimer = setTimeout(reload, 300);
 });
 
+// Due today or tomorrow and still to be delivered
+const isSoon = (o) => {
+  const n = daysFromToday(o.delivery_date);
+  return n !== null && n >= 0 && n <= 1 && !["completed", "cancelled", "returned", "refunded"].includes(o.status);
+};
 const open = (o) => router.push({ name: "VendorOrderDetails", query: { order: o.id } });
 const openReturns = (o) => router.push({ name: "VendorReturns", query: { order: o.id } });
 const act = (order, action) => (acting.value = { order, action });
@@ -532,7 +537,7 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  min-width: 96px;
+  width: 120px;
 }
 .orow-money strong {
   font-size: 14px;
@@ -545,14 +550,15 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
   white-space: nowrap;
 }
 .orow-side > .sp-chip {
-  min-width: 96px;
+  width: 124px;
   justify-content: center;
 }
+/* Fixed width so money and status line up on every row */
 .orow-actions {
   display: flex;
   gap: 6px;
   justify-content: flex-end;
-  min-width: 230px;
+  width: 290px;
 }
 .pager {
   display: flex;
@@ -585,13 +591,13 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
   }
   .orow-money {
     align-items: flex-start;
-    min-width: 0;
+    width: auto;
   }
   .orow-side > .sp-chip {
-    min-width: 0;
+    width: auto;
   }
   .orow-actions {
-    min-width: 0;
+    width: auto;
     margin-left: auto;
   }
 }

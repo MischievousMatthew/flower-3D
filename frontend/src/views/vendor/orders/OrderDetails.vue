@@ -209,7 +209,7 @@ const custom = (item) => parseCustomizations(item.customizations) ?? {};
 const extraCustom = (item) =>
   Object.fromEntries(
     Object.entries(custom(item))
-      .filter(([k, v]) => !HIDDEN_CUSTOM.includes(k) && v !== null && v !== "" && typeof v !== "object")
+      .filter(([k, v]) => !HIDDEN_CUSTOM.includes(k) && !/scale|_id$|url|path|position|rotation/i.test(k) && v !== null && v !== "" && typeof v !== "object")
       .map(([k, v]) => [k.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase()), v]),
   );
 const hasDetails = (item) =>
@@ -577,7 +577,7 @@ onMounted(() => {
 }
 .facts > div {
   display: grid;
-  grid-template-columns: 104px minmax(0, 1fr);
+  grid-template-columns: 92px minmax(0, 1fr);
   gap: 8px;
 }
 .facts dt {
@@ -596,6 +596,10 @@ onMounted(() => {
   font-size: 13px;
   color: #1a202c;
   overflow-wrap: anywhere;
+}
+.facts dd.break {
+  font-size: 12.5px;
+  word-break: break-all;
 }
 .facts a {
   color: #2f855a;

@@ -523,6 +523,8 @@ class CheckoutController extends Controller
                                                 ($item->product->images[0]->image_url ?? ''),
                         'quantity'            => $item->quantity,
                         'unit_price'          => $price,
+                        // What one costs the shop, kept for profit & loss
+                        'unit_cost'           => $item->product?->getRawOriginal('purchase_price'),
                         'subtotal'            => $itemSubtotal,
                         'color' => $item->color ?? '',
                         'size' => $item->size ?? '',
@@ -574,6 +576,7 @@ class CheckoutController extends Controller
                         'product_image' => $itemData['product_image'] ?? null,
                         'quantity' => $itemData['quantity'],
                         'unit_price' => $itemData['unit_price'],
+                        'unit_cost' => $itemData['unit_cost'] ?? null,
                         'subtotal' => $itemData['subtotal'],
                         'color' => $itemData['color'] ?? null,
                         'size' => $itemData['size'] ?? null,

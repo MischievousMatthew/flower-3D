@@ -227,6 +227,36 @@ const routes = [
         component: () => import("../views/vendor/VendorSupport.vue"),
       },
       {
+        path: "finance/transactions",
+        name: "VendorBooksSales",
+        meta: { subscriptionModule: MODULE.FINANCE },
+        component: () => import("../views/vendor/finance/Transactions.vue"),
+      },
+      {
+        path: "finance/expenses",
+        name: "VendorBooksExpenses",
+        meta: { subscriptionModule: MODULE.FINANCE },
+        component: () => import("../views/vendor/finance/Expenses.vue"),
+      },
+      {
+        path: "finance/profit-loss",
+        name: "VendorBooksProfit",
+        meta: { subscriptionModule: MODULE.FINANCE },
+        component: () => import("../views/vendor/finance/ProfitLoss.vue"),
+      },
+      {
+        path: "finance/reports",
+        name: "VendorBooksReports",
+        meta: { subscriptionModule: MODULE.FINANCE },
+        component: () => import("../views/vendor/finance/Reports.vue"),
+      },
+      {
+        path: "finance/refunds",
+        name: "VendorBooksRefunds",
+        meta: { subscriptionModule: MODULE.FINANCE },
+        component: () => import("../views/vendor/finance/Refunds.vue"),
+      },
+      {
         // The vendor's home overview. Open to every plan; each card follows the
         // plan's modules. ERP Finance still uses ERP/Finance/Dashboard.vue.
         path: "finance-dashboard",
