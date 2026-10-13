@@ -35,10 +35,17 @@
     </div>
 
     <nav class="nav-menu">
-      <!-- <router-link to="/vendor/products" class="nav-item" active-class="active">
-        <span class="nav-icon">📊</span>
-        <span>Dashboard</span>
-      </router-link> -->
+      <div class="nav-section">
+        <div class="section-label">OVERVIEW</div>
+        <router-link
+          to="/vendor/finance-dashboard"
+          class="nav-item"
+          active-class="active"
+        >
+          <span class="nav-icon">📊</span>
+          <span>Dashboard</span>
+        </router-link>
+      </div>
 
       <div class="nav-section">
         <div class="section-label">SHOP</div>
@@ -86,22 +93,6 @@
         >
           <span class="nav-icon">👨‍💼</span>
           <span>Staff List</span>
-        </router-link>
-      </div>
-
-      <div class="nav-section">
-        <div class="section-label">FINANCE</div>
-        <router-link
-          to="/vendor/finance-dashboard"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('finance') }"
-          :title="lockTooltip('finance')"
-          @click="handleModuleNavigation($event, 'finance')"
-        >
-          <span class="nav-icon">📈</span>
-          <span>Finance Overview</span>
-          <span v-if="isLocked('finance')" class="lock-icon" aria-hidden="true">🔒</span>
         </router-link>
       </div>
 

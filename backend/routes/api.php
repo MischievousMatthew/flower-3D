@@ -58,6 +58,7 @@ use App\Http\Controllers\CustomerOrderTrackingController;
 use App\Http\Controllers\OrderRequestController;
 use App\Http\Controllers\CustomerReturnCaseController;
 use App\Http\Controllers\ProductReviewController;
+use App\Http\Controllers\VendorDashboardController;
 use App\Http\Controllers\VendorFinanceDashboardController;
 use App\Http\Controllers\ProductReportController; // ← NEW
 use App\Http\Controllers\VendorSubscriptionController;
@@ -325,6 +326,8 @@ Route::middleware('token.auth')->group(function () {
     Route::prefix('vendor')->middleware('vendor')->group(function () {
 
         Route::get('/dashboard', fn () => response()->json(['message' => 'Vendor dashboard']));
+        // Home page overview; open to every plan, sections follow the plan's modules
+        Route::get('/dashboard/overview', [VendorDashboardController::class, 'overview']);
 
         Route::prefix('employees')->group(function () {
             Route::get('/',              [EmployeeController::class, 'index']);

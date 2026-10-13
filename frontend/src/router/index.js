@@ -185,10 +185,11 @@ const routes = [
         component: () => import("../views/vendor/VendorSupport.vue"),
       },
       {
+        // The vendor's home overview. Open to every plan; each card follows the
+        // plan's modules. ERP Finance still uses ERP/Finance/Dashboard.vue.
         path: "finance-dashboard",
         name: "VendorFinanceDashboard",
-        meta: { subscriptionModule: MODULE.FINANCE },
-        component: () => import("../views/ERP/Finance/Dashboard.vue"),
+        component: () => import("../views/vendor/VendorDashboard.vue"),
       },
       {
         path: "profile",
