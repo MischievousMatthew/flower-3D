@@ -3,14 +3,14 @@
   <div :class="embedded ? 'sl-embedded' : 'sl-page'">
     <VendorSidebar v-if="!embedded" />
     <main :class="{ 'sl-main': !embedded }">
-      <nav class="sl-tabs" aria-label="Shop and product management">
+      <nav class="sl-tabs" :aria-label="section === 'orders' ? 'Orders and fulfillment' : 'Shop and product management'">
         <router-link
-          v-for="t in TABS"
+          v-for="t in tabs"
           :key="t.name"
           :to="{ name: t.name }"
           class="sl-tab"
-          :class="{ on: route.name === t.name, locked: locked(t.module) }"
-          :aria-current="route.name === t.name ? 'page' : undefined"
+          :class="{ on: isOn(t), locked: locked(t.module) }"
+          :aria-current="isOn(t) ? 'page' : undefined"
         >
           <span class="sl-tab-icon" v-html="ICONS[t.icon]"></span>
           <span>{{ t.label }}</span>
@@ -32,14 +32,16 @@
 </template>
 
 <script setup>
-import { onMounted } from "vue";
+import { computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import vendorHeader from "../../../layouts/vendorHeader.vue";
 import VendorSidebar from "../../../layouts/Sidebar/VendorSidebar.vue";
 import { useSubscriptionAccess } from "../../../composables/useSubscriptionAccess";
 import { SHOP_ICONS as ICONS } from "./shopIcons";
 
-defineProps({
+const props = defineProps({
+  // Which group of tabs to show: shop (Shop & products) or orders (Orders & fulfillment)
+  section: { type: String, default: "shop" },
   title: { type: String, default: "" },
   subtitle: { type: String, default: "" },
   // Only the tab strip, for pages that keep their own layout (3D Bouquets)
@@ -57,6 +59,15 @@ const TABS = [
   { name: "VendorCustomization", label: "3D Bouquets", icon: "cube", module: "products" },
   { name: "VendorPromotions", label: "Promotions", icon: "percent", module: "products" },
 ];
+
+const ORDER_TABS = [
+  { name: "VendorReservation", label: "Orders", icon: "receipt", module: "orders", also: ["VendorOrderDetails"] },
+  { name: "VendorDeliveries", label: "Deliveries", icon: "truck", module: "orders" },
+  { name: "VendorCalendar", label: "Reservations", icon: "calendar", module: "calendar" },
+  { name: "VendorReturns", label: "Returns & Refunds", icon: "restore", module: "orders" },
+];
+const tabs = computed(() => (props.section === "orders" ? ORDER_TABS : TABS));
+const isOn = (t) => route.name === t.name || (t.also ?? []).includes(route.name);
 
 const locked = (module) =>
   !!module && !!subscriptionAccess.value && !subscriptionAllowsModule(subscriptionAccess.value, module);

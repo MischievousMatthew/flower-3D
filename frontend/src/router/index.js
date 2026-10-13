@@ -175,13 +175,32 @@ const routes = [
         path: "reservation",
         name: "VendorReservation",
         meta: { subscriptionModule: MODULE.ORDERS },
-        component: () => import("../views/vendor/AllOrders.vue"),
+        component: () => import("../views/vendor/orders/Orders.vue"),
+      },
+      {
+        // The order to show travels in history state (hidden IDs), not the URL
+        path: "order",
+        name: "VendorOrderDetails",
+        meta: { subscriptionModule: MODULE.ORDERS },
+        component: () => import("../views/vendor/orders/OrderDetails.vue"),
+      },
+      {
+        path: "deliveries",
+        name: "VendorDeliveries",
+        meta: { subscriptionModule: MODULE.ORDERS },
+        component: () => import("../views/vendor/orders/Deliveries.vue"),
+      },
+      {
+        path: "returns",
+        name: "VendorReturns",
+        meta: { subscriptionModule: MODULE.ORDERS },
+        component: () => import("../views/vendor/orders/Returns.vue"),
       },
       {
         path: "calendar",
         name: "VendorCalendar",
         meta: { subscriptionModule: MODULE.CALENDAR },
-        component: () => import("../views/vendor/Reservation.vue"),
+        component: () => import("../views/vendor/orders/Reservations.vue"),
       },
       {
         path: "add-product",

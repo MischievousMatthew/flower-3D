@@ -60,6 +60,7 @@ use App\Http\Controllers\CustomerReturnCaseController;
 use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\VendorCatalogController;
 use App\Http\Controllers\VendorDashboardController;
+use App\Http\Controllers\VendorFulfillmentController;
 use App\Http\Controllers\VendorPromotionController;
 use App\Http\Controllers\VendorFinanceDashboardController;
 use App\Http\Controllers\ProductReportController; // ← NEW
@@ -418,6 +419,14 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/orders/{orderId}',        [VendorOrdersController::class, 'getOrderDetails']);
             Route::put('/orders/{orderId}/status', [VendorOrdersController::class, 'updateOrderStatus']);
         });
+
+        // Orders & Fulfillment pages
+        Route::prefix('fulfillment')->middleware('subscription.module:orders')->group(function () {
+            Route::get('/orders',      [VendorFulfillmentController::class, 'orders']);
+            Route::get('/orders/{id}', [VendorFulfillmentController::class, 'show'])->whereNumber('id');
+            Route::get('/schedule',    [VendorFulfillmentController::class, 'schedule']);
+        });
+        Route::get('/fulfillment/calendar', [VendorFulfillmentController::class, 'calendar'])->middleware('subscription.module:calendar');
 
         Route::middleware('subscription.module:calendar')->group(function () {
             Route::get('/orders/calendar-data', [VendorOrdersController::class, 'getCalendarData']);

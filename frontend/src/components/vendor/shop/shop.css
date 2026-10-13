@@ -265,6 +265,7 @@
 .sp-chip.violet { background: #f3f0ff; color: #6b46c1; }
 .sp-chip.slate { background: #f1f5f9; color: #64748b; }
 .sp-chip.pink { background: #fff0f6; color: #b83280; }
+.sp-chip.teal { background: #e6fffa; color: #2c7a7b; }
 .sp-pick {
   display: inline-flex;
   align-items: center;
