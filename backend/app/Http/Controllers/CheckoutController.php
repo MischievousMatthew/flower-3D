@@ -209,7 +209,7 @@ class CheckoutController extends Controller
                 'vendor' => [
                     'id' => $vendorId,
                     'store_name' => $vendorApplication->store_name,
-                    'store_address' => $vendorApplication->store_address ?? '',
+                    'store_address' => $vendorApplication->full_store_address ?? '',
                     'contact_number' => $vendorApplication->contact_number ?? '',
                     'email' => $vendorApplication->email ?? '',
                     'max_orders_per_day' => $vendorApplication?->max_orders_per_day ?? 10,
@@ -550,7 +550,7 @@ class CheckoutController extends Controller
                     'delivery_notes' => $request->delivery_notes ?? '',
                     'customer_notes' => $request->customer_notes ?? '',
                     'store_name' => $vendor->store_name,
-                    'store_address' => $vendor->store_address ?? '',
+                    'store_address' => $vendor?->full_store_address ?? '',
                     'status' => 'pending',
                     'reservation_date' => $reservationDate->toDateString(), // Store as Y-m-d
                 ]);

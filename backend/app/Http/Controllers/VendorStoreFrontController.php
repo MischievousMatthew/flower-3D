@@ -570,7 +570,7 @@ class VendorStorefrontController extends Controller
             'store_logo_path'     => $this->storageUrl($v->store_logo_path),
             'store_cover_url'     => $this->storageUrl($v->store_cover_path),
             'business_type'       => $v->business_type ?? '',
-            'store_address'       => $v->store_address ?? '',
+            'store_address'       => $v->full_store_address,
             'store_latitude'      => $v->store_latitude,
             'store_longitude'     => $v->store_longitude,
             'verification_level'  => $v->verification_level ?? '',

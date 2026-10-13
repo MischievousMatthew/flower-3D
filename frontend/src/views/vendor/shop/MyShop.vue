@@ -74,8 +74,14 @@
             </div>
             <div class="sp-grid-2">
               <label class="sp-field sp-span-all">
-                <span>Shop address</span>
-                <input v-model.trim="form.store_address" class="sp-input" :class="{ invalid: errors.store_address }" maxlength="500" required />
+                <span>Street / Blk &amp; Lot</span>
+                <input v-model.trim="form.store_street" class="sp-input" :class="{ invalid: errors.store_street }" maxlength="255" placeholder="e.g. Blk 5 Lot 12, Mabini St., Brgy. San Agustin" autocomplete="address-line1" />
+                <small v-if="errors.store_street" class="sp-error">{{ errors.store_street }}</small>
+                <small v-else>So customers and riders can find your door</small>
+              </label>
+              <label class="sp-field sp-span-all">
+                <span>City / Province</span>
+                <input v-model.trim="form.store_address" class="sp-input" :class="{ invalid: errors.store_address }" maxlength="500" placeholder="e.g. Trece Martires, Cavite" autocomplete="address-level2" required />
                 <small v-if="errors.store_address" class="sp-error">{{ errors.store_address }}</small>
               </label>
               <label class="sp-field sp-span-all">
@@ -83,12 +89,11 @@
                 <input v-model.trim="form.service_areas" class="sp-input" maxlength="500" placeholder="e.g. Imus, Bacoor, Dasmariñas" />
               </label>
               <div class="sp-field sp-span-all">
-                <span class="sp-label">Map pin</span>
                 <div class="pin-row">
                   <span class="pin-icon" v-html="ICONS.pin"></span>
-                  <span v-if="hasPin" class="pin-text">{{ form.store_latitude.toFixed(5) }}, {{ form.store_longitude.toFixed(5) }}</span>
-                  <span v-else class="pin-text muted">No pin yet. Use your location while you're at the shop.</span>
-                  <a v-if="hasPin" :href="mapUrl" target="_blank" rel="noopener" class="sp-btn sp-btn-ghost sp-btn-sm">View on map</a>
+                  <span v-if="hasPin" class="pin-text">Your shop is pinned on the map, used to work out delivery fees.</span>
+                  <span v-else class="pin-text muted">Not pinned yet. Press “Use my location” while you're at the shop.</span>
+                  <a v-if="hasPin" :href="mapUrl" target="_blank" rel="noopener" class="sp-btn sp-btn-ghost sp-btn-sm">Check pin</a>
                 </div>
                 <small v-if="locateError" class="sp-error">{{ locateError }}</small>
               </div>
@@ -149,7 +154,7 @@
             </p>
             <p v-if="form?.store_description" class="preview-about">{{ form.store_description }}</p>
             <ul class="preview-facts">
-              <li v-if="form?.store_address"><span v-html="ICONS.pin"></span>{{ form.store_address }}</li>
+              <li v-if="form?.store_address || form?.store_street"><span v-html="ICONS.pin"></span>{{ [form.store_street, form.store_address].filter(Boolean).join(", ") }}</li>
               <li v-if="hoursText"><span v-html="ICONS.clock"></span>{{ hoursText }}</li>
               <li v-if="form?.contact_number"><span v-html="ICONS.phone"></span>{{ form.contact_number }}</li>
               <li v-if="form?.facebook_page || form?.instagram_page"><span v-html="ICONS.globe"></span>{{ [form.facebook_page && "Facebook", form.instagram_page && "Instagram"].filter(Boolean).join(" · ") }}</li>
@@ -175,7 +180,7 @@ import { useVendorProfile } from "../../../composables/useVendorProfile";
 import "../../../components/vendor/shop/shop.css";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const FIELDS = ["store_name", "store_description", "store_address", "service_areas", "contact_number", "email", "facebook_page", "instagram_page", "store_latitude", "store_longitude"];
+const FIELDS = ["store_name", "store_description", "store_street", "store_address", "service_areas", "contact_number", "email", "facebook_page", "instagram_page", "store_latitude", "store_longitude"];
 
 const { fetchProfile } = useVendorProfile({ autoFetch: false, showToast: false });
 

@@ -212,7 +212,7 @@ class AdminVendorController extends Controller
                 'email' => $user->email,
                 'contact_number' => $app->contact_number ?? $user->contact_number,
                 'business_type' => $app?->business_type,
-                'address' => $app?->store_address,
+                'address' => $app?->full_store_address,
                 'joined_at' => ($app?->reviewed_at ?? $user->created_at)?->toIso8601String(),
                 'status' => $user->is_suspended ? 'suspended' : 'active',
                 'strikes' => (int) $user->ban_count,

@@ -22,7 +22,7 @@ class VendorApplication extends Model
 
     protected $fillable = [
         'application_id', 'status_token', 'store_name', 'store_description',
-        'business_type', 'store_address', 'store_latitude', 'store_longitude', 'service_areas', 'operating_hours', 'operating_schedules',
+        'business_type', 'store_address', 'store_street', 'store_latitude', 'store_longitude', 'service_areas', 'operating_hours', 'operating_schedules',
         'owner_name', 'position', 'contact_number', 'email',
         'government_id_number', 'government_id_path', 'selfie_with_id_path',
         'proof_of_address_path', 'dti_number', 'sec_number',
@@ -294,6 +294,15 @@ class VendorApplication extends Model
     }
 
     // ── Document / logo URL accessors ─────────────────────────────────────
+
+    /** "Blk 5 Lot 2, Mabini St., Trece Martires, Cavite": street first, then the city / province. */
+    protected function fullStoreAddress(): Attribute
+    {
+        return Attribute::make(get: fn () => collect([$this->store_street, $this->store_address])
+            ->map(fn ($part) => trim((string) $part))
+            ->filter()
+            ->implode(', '));
+    }
 
     protected function resolvePathUrl(?string $path): ?string
     {
