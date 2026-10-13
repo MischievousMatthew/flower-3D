@@ -1,6 +1,6 @@
 // src/constants/erpModules.js
 // Single source of truth for every ERP module exposed through the RBAC system.
-// Used by: StaffList RBAC table, DynamicSidebar nav filtering, router guards.
+// Used by: vendor Roles & permissions (Staff & operations), DynamicSidebar nav filtering, router guards.
 
 export const ERP_MODULES = [
   {

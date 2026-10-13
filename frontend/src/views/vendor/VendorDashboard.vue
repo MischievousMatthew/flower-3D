@@ -333,7 +333,7 @@ const ACTIONS = [
   { label: "Reservations", icon: "calendar", tone: "violet", to: { name: "VendorCalendar" }, module: "calendar" },
   { label: "3D bouquets", icon: "cube", tone: "teal", to: { name: "VendorCustomization" }, module: "products" },
   { label: "Customer chat", icon: "chat", tone: "amber", to: { name: "VendorChat" }, module: "crm" },
-  { label: "Staff list", icon: "team", tone: "rose", to: { name: "VendorStaffList" } },
+  { label: "Employees", icon: "team", tone: "rose", to: { name: "VendorStaffList" } },
   { label: "Help & support", icon: "help", tone: "slate", to: { name: "VendorSupport" } },
 ];
 

@@ -77,6 +77,13 @@ class Employee extends Authenticatable
 
     // ── Module-Based RBAC ─────────────────────────────────────────────────
 
+    /** The role the shop owner gave them (Staff & operations → Roles). Its permissions are copied into modulePermissions. */
+    public function staffRole(): BelongsTo
+    {
+        return $this->belongsTo(StaffRole::class, 'staff_role_id');
+    }
+
+
     public function modulePermissions(): HasMany
     {
         return $this->hasMany(EmployeeModulePermission::class);

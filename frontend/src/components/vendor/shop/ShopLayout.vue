@@ -41,7 +41,7 @@ import { useSubscriptionAccess } from "../../../composables/useSubscriptionAcces
 import { SHOP_ICONS as ICONS } from "./shopIcons";
 
 const props = defineProps({
-  // Which group of tabs to show: shop (Shop & products) or orders (Orders & fulfillment)
+  // Which group of tabs to show: shop, orders, finance or staff
   section: { type: String, default: "shop" },
   title: { type: String, default: "" },
   subtitle: { type: String, default: "" },
@@ -74,8 +74,16 @@ const FINANCE_TABS = [
   { name: "VendorBooksReports", label: "Reports", icon: "note", module: "finance" },
   { name: "VendorBooksRefunds", label: "Refunds", icon: "restore", module: "finance" },
 ];
-const NAV_LABEL = { shop: "Shop and product management", orders: "Orders and fulfillment", finance: "Finance and business" };
-const tabs = computed(() => ({ orders: ORDER_TABS, finance: FINANCE_TABS })[props.section] ?? TABS);
+const STAFF_TABS = [
+  { name: "VendorStaffList", label: "Employees", icon: "users", module: "staff" },
+  { name: "VendorStaffRoles", label: "Roles & Permissions", icon: "shield", module: "staff" },
+  { name: "VendorStaffAttendance", label: "Attendance", icon: "clock", module: "attendance" },
+  { name: "VendorStaffSchedules", label: "Schedules", icon: "calendar", module: "staff" },
+  { name: "VendorStaffPayroll", label: "Payroll", icon: "card", module: "payroll" },
+  { name: "VendorStaffActivity", label: "Activity Logs", icon: "activity", module: "staff" },
+];
+const NAV_LABEL = { shop: "Shop and product management", orders: "Orders and fulfillment", finance: "Finance and business", staff: "Staff and operations" };
+const tabs = computed(() => ({ orders: ORDER_TABS, finance: FINANCE_TABS, staff: STAFF_TABS })[props.section] ?? TABS);
 const isOn = (t) => route.name === t.name || (t.also ?? []).includes(route.name);
 
 const locked = (module) =>

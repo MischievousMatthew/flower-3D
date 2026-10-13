@@ -45,6 +45,18 @@
           <span class="nav-icon">📊</span>
           <span>Dashboard</span>
         </router-link>
+        <router-link
+          to="/vendor/chat"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('crm') }"
+          :title="lockTooltip('crm')"
+          @click="handleModuleNavigation($event, 'crm')"
+        >
+          <span class="nav-icon">💬</span>
+          <span>Chat</span>
+          <span v-if="isLocked('crm')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
       </div>
 
       <div class="nav-section">
@@ -101,38 +113,6 @@
           <span class="nav-icon">↩️</span>
           <span>Returns &amp; Refunds</span>
           <span v-if="isLocked('orders')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-      </div>
-
-      <div class="nav-section">
-        <div class="section-label">TEAM</div>
-        <!-- <router-link to="/customers" class="nav-item">
-          <span class="nav-icon">👥</span>
-          <span>Customers</span>
-        </router-link>
-        <router-link to="/arrangements" class="nav-item">
-          <span class="nav-icon">💐</span>
-          <span>Arrangements</span>
-        </router-link> -->
-        <router-link
-          to="/vendor/staff-list"
-          class="nav-item"
-          active-class="active"
-        >
-          <span class="nav-icon">👨‍💼</span>
-          <span>Staff List</span>
-        </router-link>
-        <router-link
-          to="/vendor/chat"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('crm') }"
-          :title="lockTooltip('crm')"
-          @click="handleModuleNavigation($event, 'crm')"
-        >
-          <span class="nav-icon">💬</span>
-          <span>Chat</span>
-          <span v-if="isLocked('crm')" class="lock-icon" aria-hidden="true">🔒</span>
         </router-link>
       </div>
 
@@ -269,6 +249,82 @@
           <span class="nav-icon">↩️</span>
           <span>Refund Tracking</span>
           <span v-if="isLocked('finance')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+      </div>
+
+      <div class="nav-section">
+        <div class="section-label">STAFF &amp; OPERATIONS</div>
+        <router-link
+          :to="{ name: 'VendorStaffList' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('staff') }"
+          :title="lockTooltip('staff')"
+          @click="handleModuleNavigation($event, 'staff')"
+        >
+          <span class="nav-icon">👥</span>
+          <span>Employees</span>
+          <span v-if="isLocked('staff')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorStaffRoles' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('staff') }"
+          :title="lockTooltip('staff')"
+          @click="handleModuleNavigation($event, 'staff')"
+        >
+          <span class="nav-icon">🛡️</span>
+          <span>Roles &amp; Permissions</span>
+          <span v-if="isLocked('staff')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorStaffAttendance' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('attendance') }"
+          :title="lockTooltip('attendance')"
+          @click="handleModuleNavigation($event, 'attendance')"
+        >
+          <span class="nav-icon">⏱️</span>
+          <span>Attendance</span>
+          <span v-if="isLocked('attendance')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorStaffSchedules' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('staff') }"
+          :title="lockTooltip('staff')"
+          @click="handleModuleNavigation($event, 'staff')"
+        >
+          <span class="nav-icon">🗓️</span>
+          <span>Schedules</span>
+          <span v-if="isLocked('staff')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorStaffPayroll' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('payroll') }"
+          :title="lockTooltip('payroll')"
+          @click="handleModuleNavigation($event, 'payroll')"
+        >
+          <span class="nav-icon">💵</span>
+          <span>Payroll</span>
+          <span v-if="isLocked('payroll')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorStaffActivity' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('staff') }"
+          :title="lockTooltip('staff')"
+          @click="handleModuleNavigation($event, 'staff')"
+        >
+          <span class="nav-icon">📜</span>
+          <span>Activity Logs</span>
+          <span v-if="isLocked('staff')" class="lock-icon" aria-hidden="true">🔒</span>
         </router-link>
       </div>
 

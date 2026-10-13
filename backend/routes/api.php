@@ -59,6 +59,7 @@ use App\Http\Controllers\OrderRequestController;
 use App\Http\Controllers\CustomerReturnCaseController;
 use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\VendorBooksController;
+use App\Http\Controllers\StaffController;
 use App\Http\Controllers\VendorCatalogController;
 use App\Http\Controllers\VendorDashboardController;
 use App\Http\Controllers\VendorFulfillmentController;
@@ -457,6 +458,35 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/reports',               [VendorBooksController::class, 'reports']);
             Route::get('/reports/export',        [VendorBooksController::class, 'exportReport']);
             Route::get('/refunds',               [VendorBooksController::class, 'refunds']);
+        });
+
+        // Staff & operations pages (shop owners; employees use the ERP)
+        Route::prefix('staff')->group(function () {
+            Route::middleware('subscription.module:staff')->group(function () {
+                Route::get('/roles',               [StaffController::class, 'roles']);
+                Route::post('/roles',              [StaffController::class, 'storeRole']);
+                Route::put('/roles/{id}',          [StaffController::class, 'updateRole'])->whereNumber('id');
+                Route::delete('/roles/{id}',       [StaffController::class, 'destroyRole'])->whereNumber('id');
+                Route::get('/employees',           [StaffController::class, 'employees']);
+                Route::post('/employees',          [StaffController::class, 'storeEmployee'])->middleware('resource.limit:staff_employees');
+                Route::put('/employees/{id}',      [StaffController::class, 'updateEmployee'])->whereNumber('id');
+                Route::get('/schedules',           [StaffController::class, 'schedules']);
+                Route::post('/shifts',             [StaffController::class, 'saveShift']);
+                Route::post('/shifts/copy-week',   [StaffController::class, 'copyWeek']);
+                Route::delete('/shifts/{id}',      [StaffController::class, 'destroyShift'])->whereNumber('id');
+                Route::get('/activity',            [StaffController::class, 'activity']);
+            });
+            Route::middleware('subscription.module:attendance')->group(function () {
+                Route::get('/attendance',          [StaffController::class, 'attendance']);
+                Route::post('/attendance',         [StaffController::class, 'storeAttendance']);
+                Route::put('/attendance/{id}',     [StaffController::class, 'updateAttendance'])->whereNumber('id');
+            });
+            Route::middleware('subscription.module:payroll')->group(function () {
+                Route::get('/payroll',             [StaffController::class, 'payroll']);
+                Route::post('/payroll/preview',    [StaffController::class, 'previewPayroll']);
+                Route::post('/payroll',            [StaffController::class, 'createPayroll']);
+                Route::post('/payroll/{action}',   [StaffController::class, 'payrollAction'])->whereIn('action', ['approve', 'reject', 'paid']);
+            });
         });
 
         Route::prefix('finance')->middleware('subscription.module:finance')->group(function () {

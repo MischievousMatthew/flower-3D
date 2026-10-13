@@ -268,10 +268,42 @@ const routes = [
         name: "VendorProfile",
         component: () => import("../views/vendor/VendorProfile.vue"),
       },
+      // Staff & operations (VendorStaffList is the Employees page; it replaced the old staff list)
       {
         path: "staff-list",
         name: "VendorStaffList",
-        component: () => import("../views/vendor/StaffList.vue"),
+        meta: { subscriptionModule: MODULE.STAFF },
+        component: () => import("../views/vendor/staff/Employees.vue"),
+      },
+      {
+        path: "staff/roles",
+        name: "VendorStaffRoles",
+        meta: { subscriptionModule: MODULE.STAFF },
+        component: () => import("../views/vendor/staff/Roles.vue"),
+      },
+      {
+        path: "staff/attendance",
+        name: "VendorStaffAttendance",
+        meta: { subscriptionModule: MODULE.ATTENDANCE },
+        component: () => import("../views/vendor/staff/Attendance.vue"),
+      },
+      {
+        path: "staff/schedules",
+        name: "VendorStaffSchedules",
+        meta: { subscriptionModule: MODULE.STAFF },
+        component: () => import("../views/vendor/staff/Schedules.vue"),
+      },
+      {
+        path: "staff/payroll",
+        name: "VendorStaffPayroll",
+        meta: { subscriptionModule: MODULE.PAYROLL },
+        component: () => import("../views/vendor/staff/Payroll.vue"),
+      },
+      {
+        path: "staff/activity",
+        name: "VendorStaffActivity",
+        meta: { subscriptionModule: MODULE.STAFF },
+        component: () => import("../views/vendor/staff/Activity.vue"),
       },
       {
         path: "force-change-password",

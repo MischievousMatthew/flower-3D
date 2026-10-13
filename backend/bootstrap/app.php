@@ -40,6 +40,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Keep a record of server errors the API returns (Security → API errors)
         $middleware->api(append: [\App\Http\Middleware\LogApiErrors::class]);
+
+        // Staff & operations → Activity logs: what employees change
+        $middleware->api(append: [\App\Http\Middleware\LogStaffActivity::class]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
