@@ -186,7 +186,7 @@ const routes = [
       },
       {
         path: "deliveries",
-        name: "VendorDeliveries",
+        name: "VendorDeliverySchedule",
         meta: { subscriptionModule: MODULE.ORDERS },
         component: () => import("../views/vendor/orders/Deliveries.vue"),
       },

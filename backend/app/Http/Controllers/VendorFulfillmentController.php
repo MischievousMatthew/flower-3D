@@ -291,12 +291,18 @@ class VendorFulfillmentController extends Controller
 
     // ─────────────────────────────────────────────────────────────────────
 
-    /** Orders the shop may see: cash on delivery straight away, online payments once paid. */
+    /**
+     * Orders the shop may see. Only e-wallet checkouts are held back until
+     * PayMongo confirms payment (an abandoned checkout isn't a real order);
+     * once paid they stay visible, even after a refund.
+     */
     private function visibleOrders(int $vendorId)
     {
         return Order::query()
             ->where('vendor_id', $vendorId)
-            ->where(fn ($q) => $q->where('payment_method', 'cod')->orWhere('payment_status', 'paid'));
+            ->where(fn ($q) => $q->where('payment_method', '!=', 'ewallet')->orWhereNull('payment_method')
+                ->orWhereIn('payment_status', ['paid', 'refunded'])
+                ->orWhereNotNull('paid_at'));
     }
 
     private function displayStatus(Order $order): string
@@ -325,7 +331,7 @@ class VendorFulfillmentController extends Controller
         $deliveryDate = $order->reservation_date?->toDateString();
         $prepDays = (int) $order->items->max(fn ($i) => (int) ($i->product?->preparation_days ?? 0));
         $prepareBy = $deliveryDate ? Carbon::parse($deliveryDate)->subDays($prepDays)->toDateString() : null;
-        $onlineUnpaid = $order->payment_method !== 'cod' && $order->payment_status !== 'paid';
+        $onlineUnpaid = $order->payment_method === 'ewallet' && $order->payment_status !== 'paid';
         $first = $order->items->first();
         $customer = $order->delivery_contact_name
             ?: trim(($order->user?->name ?? '') . ' ' . ($order->user?->surname ?? '')) ?: 'Customer';

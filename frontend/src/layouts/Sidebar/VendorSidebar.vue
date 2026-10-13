@@ -67,7 +67,7 @@
           </span>
         </router-link>
         <router-link
-          :to="{ name: 'VendorDeliveries' }"
+          :to="{ name: 'VendorDeliverySchedule' }"
           class="nav-item"
           active-class="active"
           :class="{ 'is-locked': isLocked('orders') }"

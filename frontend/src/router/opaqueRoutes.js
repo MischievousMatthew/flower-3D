@@ -85,7 +85,7 @@ export const opaqueRouteTokens = Object.freeze({
   VendorCustomization: "9t5m2OwWYbCmDcdPs4usf2S8rhRD0zkU5UPnUms3iHE",
   VendorShop: "8s0cxuBEHgP1F7zweSCViytw037JkeQBYQXoZqtM4Sa",
   VendorOrderDetails: "tadPPmpUb4r12yEc44mvvnuhBEDonvrUge2auVEaNHT",
-  VendorDeliveries: "KAFiEyN2IPFA3pIzqsv2W2GniTp7OP4pEPFFXqGIMjM",
+  VendorDeliverySchedule: "KAFiEyN2IPFA3pIzqsv2W2GniTp7OP4pEPFFXqGIMjM",
   VendorReturns: "ofNRI2tAWfJsweloNkYp37X8h5DxJja1Wr5mGuVk46R",
   VendorInventory: "afsQQkjWeahpXoB86wXTayu6FgUSAHT4mcfW8XBa3BB",
   VendorCategories: "FcGfi0owA7dBU8z9UkyFPuNeS1ZSwdPe0TrsfGpmXqI",

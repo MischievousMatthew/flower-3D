@@ -62,7 +62,7 @@ const TABS = [
 
 const ORDER_TABS = [
   { name: "VendorReservation", label: "Orders", icon: "receipt", module: "orders", also: ["VendorOrderDetails"] },
-  { name: "VendorDeliveries", label: "Deliveries", icon: "truck", module: "orders" },
+  { name: "VendorDeliverySchedule", label: "Deliveries", icon: "truck", module: "orders" },
   { name: "VendorCalendar", label: "Reservations", icon: "calendar", module: "calendar" },
   { name: "VendorReturns", label: "Returns & Refunds", icon: "restore", module: "orders" },
 ];
