@@ -443,6 +443,11 @@
                 @updated="fetchProductStats(selectedProduct.id)"
               />
             </div>
+
+            <div v-if="selectedProduct" class="modal-reviews-embed">
+              <p class="bc-label">Questions &amp; answers</p>
+              <ProductQuestions :product-id="selectedProduct.id" />
+            </div>
           </div>
         </div>
       </div>
@@ -484,6 +489,7 @@ import NavHeader from "../../layouts/NavHeader.vue";
 import ModelViewer3D from "../../layouts/3D/3DModelViewer.vue";
 import ProductCard from "../../layouts/components/ProductCard.vue";
 import ProductReviews from "../../layouts/components/ProductReviews.vue";
+import ProductQuestions from "../../layouts/components/ProductQuestions.vue";
 import { useCart } from "../../composables/useCart";
 import { useFlyToCart } from "../../composables/useFlyToCart";
 import { toast } from "vue3-toastify";

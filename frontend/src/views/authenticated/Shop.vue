@@ -971,6 +971,11 @@
                 @updated="refreshProductStats"
               />
             </div>
+
+            <div v-if="selectedProduct" class="modal-reviews-embed">
+              <p class="bc-label">Questions &amp; answers</p>
+              <ProductQuestions :product-id="selectedProduct.id" />
+            </div>
           </div>
         </div>
       </div>
@@ -991,6 +996,7 @@ import { useFlyToCart } from "../../composables/useFlyToCart";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import ProductReviews from "../../layouts/components/ProductReviews.vue";
+import ProductQuestions from "../../layouts/components/ProductQuestions.vue";
 import ProductCard from "../../layouts/components/ProductCard.vue";
 import AnnouncementBar from "../../components/site/AnnouncementBar.vue";
 import BannerCarousel from "../../components/site/BannerCarousel.vue";

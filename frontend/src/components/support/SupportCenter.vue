@@ -52,8 +52,9 @@
             <span>Order number (optional)</span>
             <select v-model="draft.order_id">
               <option value="">Not about a specific order</option>
-              <option v-for="o in orders" :key="o.id" :value="o.id">{{ o.order_number }}</option>
+              <option v-for="o in orders" :key="o.id" :value="o.id">{{ orderLabel(o) }}</option>
             </select>
+            <small v-if="ordersLoaded && !orders.length" class="muted small">You have no orders yet.</small>
           </label>
           <label class="field">
             <span>Tell us what happened</span>
@@ -127,6 +128,7 @@ const STATUS = { open: "Waiting for us", waiting: "Waiting for you", resolved: "
 const tickets = ref([]);
 const categories = ref({});
 const orders = ref([]);
+const ordersLoaded = ref(false);
 const active = ref(null);
 const mode = ref("none");
 const loading = ref(false);
@@ -152,11 +154,25 @@ const loadOrders = async () => {
   if (!props.ordersEndpoint) return;
   try {
     const { data } = await api.get(props.ordersEndpoint, { params: { per_page: 30 } });
-    const list = data?.data?.data ?? data?.data ?? [];
-    orders.value = (Array.isArray(list) ? list : []).filter((o) => o?.id && o?.order_number).slice(0, 30);
+    // Customer orders come as data[]; vendor orders as data.orders[] (paginated)
+    const raw = data?.data;
+    const list = Array.isArray(raw) ? raw : raw?.orders ?? raw?.data ?? [];
+    orders.value = (Array.isArray(list) ? list : [])
+      .filter((o) => o?.id && o?.order_number)
+      .sort((a, b) => new Date(b.created_at ?? 0) - new Date(a.created_at ?? 0))
+      .slice(0, 30);
   } catch {
     orders.value = [];
+  } finally {
+    ordersLoaded.value = true;
   }
+};
+
+/** "#BC-1024 · Oct 3 · ₱1,250.00" so the right order is easy to spot */
+const orderLabel = (o) => {
+  const when = o.created_at ? new Date(o.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "";
+  const total = o.total_amount != null ? `₱${Number(o.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "";
+  return [o.order_number, when, total].filter(Boolean).join(" · ");
 };
 
 const open = async (id) => {

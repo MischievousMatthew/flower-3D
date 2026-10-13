@@ -218,7 +218,25 @@ const routes = [
         path: "chat",
         name: "VendorChat",
         meta: { subscriptionModule: MODULE.CRM },
-        component: () => import("../views/vendor/VendorChat.vue"),
+        component: () => import("../views/vendor/crm/CustomerChat.vue"),
+      },
+      {
+        path: "inquiries",
+        name: "VendorInquiries",
+        meta: { subscriptionModule: MODULE.CRM },
+        component: () => import("../views/vendor/crm/Inquiries.vue"),
+      },
+      {
+        path: "reviews",
+        name: "VendorReviews",
+        meta: { subscriptionModule: MODULE.PRODUCTS },
+        component: () => import("../views/vendor/crm/Reviews.vue"),
+      },
+      {
+        // Always available, whatever the plan
+        path: "notifications",
+        name: "VendorNotifications",
+        component: () => import("../views/vendor/crm/Notifications.vue"),
       },
       {
         // Always available, whatever the plan

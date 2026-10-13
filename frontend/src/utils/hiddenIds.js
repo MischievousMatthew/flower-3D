@@ -3,7 +3,7 @@
  * customer, vendor or ticket to open). They travel in the browser's history
  * state instead of the address bar, so IDs never show in the URL.
  */
-export const HIDDEN_ID_KEYS = ["order", "product", "customer", "vendor", "ticket"];
+export const HIDDEN_ID_KEYS = ["order", "product", "customer", "vendor", "ticket", "conversation", "inquiry", "review"];
 
 /** Moves any hidden-ID keys from `location.query` into `location.state` */
 export const hideIdsInLocation = (location) => {

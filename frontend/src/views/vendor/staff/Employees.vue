@@ -141,7 +141,7 @@
               </span>
               <div>
                 <strong>{{ p.name }}</strong>
-                <small>{{ [p.position, p.department].filter(Boolean).join(" · ") || "No position set" }}</small>
+                <small>{{ [...new Set([p.position, p.department].filter(Boolean))].join(" · ") || "No position set" }}</small>
               </div>
             </div>
             <div class="em-tags">
@@ -274,7 +274,7 @@
               </span>
               <div>
                 <h3 id="pf-title">{{ profile.name }}</h3>
-                <p>{{ [profile.position, profile.department].filter(Boolean).join(" · ") || "No position set" }}</p>
+                <p>{{ [...new Set([profile.position, profile.department].filter(Boolean))].join(" · ") || "No position set" }}</p>
               </div>
             </div>
             <button type="button" class="sp-icon-btn" aria-label="Close" @click="profile = null"><span v-html="ICONS.close"></span></button>

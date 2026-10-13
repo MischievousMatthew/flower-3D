@@ -17,7 +17,7 @@
       <ul v-else class="menu-body list">
         <li v-for="n in items" :key="n.id">
           <button type="button" class="item" :class="{ unread: !n.read, important: n.important }" @click="openItem(n)">
-            <span class="item-icon">{{ n.type === "announcement" ? "📣" : "💬" }}</span>
+            <span class="item-icon">{{ ICON[n.type] ?? "💬" }}</span>
             <span class="item-text">
               <span class="item-title">{{ n.title }}</span>
               <span v-if="n.body" class="item-body">{{ n.body }}</span>
@@ -26,7 +26,8 @@
           </button>
         </li>
       </ul>
-      <router-link v-if="supportPath" :to="supportPath" class="menu-foot" @click="openMenu = false">Help &amp; support →</router-link>
+      <router-link v-if="allPath" :to="allPath" class="menu-foot" @click="openMenu = false">See all notifications →</router-link>
+      <router-link v-else-if="supportPath" :to="supportPath" class="menu-foot" @click="openMenu = false">Help &amp; support →</router-link>
     </div>
   </div>
 </template>
@@ -37,7 +38,20 @@ import { useRouter } from "vue-router";
 import api from "../../plugins/axios";
 
 /** Inbox for announcements from BloomCraft and support replies */
-const props = defineProps({ supportPath: { type: String, default: "/vendor/support" } });
+const props = defineProps({
+  supportPath: { type: String, default: "/vendor/support" },
+  // Where "See all" goes (vendors: Customer relationships → Notifications)
+  allPath: { type: [String, Object], default: null },
+});
+
+const ICON = { announcement: "📣", order: "🧾", payment: "💳", stock: "📦", message: "💬", inquiry: "❓", review: "⭐", return: "↩️", inquiry_answer: "💡", review_reply: "💬" };
+
+/** "route:VendorOrderDetails?order=12" → a named route; the order ID travels hidden */
+const target = (link) => {
+  if (!link.startsWith("route:")) return link;
+  const [name, qs] = link.slice(6).split("?");
+  return { name, query: Object.fromEntries(new URLSearchParams(qs ?? "")) };
+};
 const router = useRouter();
 
 const root = ref(null);
@@ -83,7 +97,7 @@ const openItem = async (n) => {
   if (n.link_url) {
     openMenu.value = false;
     if (/^https?:\/\//i.test(n.link_url)) window.open(n.link_url, "_blank", "noopener");
-    else router.push(n.link_url);
+    else router.push(target(n.link_url));
   }
 };
 

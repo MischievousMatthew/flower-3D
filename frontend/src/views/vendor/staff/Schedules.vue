@@ -430,6 +430,7 @@ onMounted(load);
   color: #2d3748;
   font-variant-numeric: tabular-nums;
 }
+.sc-grid thead .sc-person-col,
 .sc-grid thead .sc-total {
   font-size: 11.5px;
   font-weight: 500;

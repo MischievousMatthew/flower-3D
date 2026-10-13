@@ -51,9 +51,11 @@ export function groupCatalog(catalog) {
       })),
     });
   }
+  // Areas in the plan first; locked ones last so they don't crowd what you can use
+  const rank = (g) => (groups[g].some((a) => a.available) ? 0 : 100) + ((GROUP_ORDER.indexOf(g) + 99) % 99);
   return Object.keys(groups)
-    .sort((a, b) => (GROUP_ORDER.indexOf(a) + 99) % 99 - (GROUP_ORDER.indexOf(b) + 99) % 99)
-    .map((g) => ({ group: g, label: GROUP_LABEL[g] ?? g, areas: groups[g] }));
+    .sort((a, b) => rank(a) - rank(b))
+    .map((g) => ({ group: g, label: GROUP_LABEL[g] ?? g, areas: [...groups[g]].sort((x, y) => Number(y.available) - Number(x.available)) }));
 }
 
 const AREA_LABEL = {

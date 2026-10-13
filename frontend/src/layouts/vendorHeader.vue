@@ -52,7 +52,7 @@
       <slot name="actions" />
 
       <!-- Announcements and support replies (store owners only) -->
-      <NotificationBell v-if="user?.role === 'vendor'" support-path="/vendor/support" />
+      <NotificationBell v-if="user?.role === 'vendor'" support-path="/vendor/support" :all-path="{ name: 'VendorNotifications' }" />
 
       <router-link
         :to="chatRoute"

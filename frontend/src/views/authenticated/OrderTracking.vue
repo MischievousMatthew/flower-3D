@@ -398,6 +398,12 @@
                   />
                 </div>
 
+                <!-- Questions to the shop about this order -->
+                <div class="ot-sec">
+                  <h4 class="ot-sec__title">Questions for the shop</h4>
+                  <ProductQuestions :order-id="order.id" />
+                </div>
+
                 <!-- Timeline -->
                 <div class="ot-sec" v-if="order.delivery?.timeline?.length">
                   <h4 class="ot-sec__title">Delivery Updates</h4>
@@ -844,6 +850,7 @@ import { useAuth } from "../../composables/useAuth";
 import NavHeader from "../../layouts/NavHeader.vue";
 import ReviewModal from "../../layouts/components/ReviewModal.vue";
 import ReturnCasePanel from "../../components/returns/ReturnCasePanel.vue";
+import ProductQuestions from "../../layouts/components/ProductQuestions.vue";
 import "../../styles/bloomcraft.css";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";

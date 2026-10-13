@@ -60,6 +60,8 @@ use App\Http\Controllers\CustomerReturnCaseController;
 use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\VendorBooksController;
 use App\Http\Controllers\StaffController;
+use App\Http\Controllers\VendorCrmController;
+use App\Http\Controllers\CustomerInquiryController;
 use App\Http\Controllers\VendorCatalogController;
 use App\Http\Controllers\VendorDashboardController;
 use App\Http\Controllers\VendorFulfillmentController;
@@ -143,6 +145,9 @@ Route::get('/product-taxonomies', [ProductTaxonomyController::class, 'index']);
 
 // ── PUBLIC — Product reviews (no auth required) ───────────────────────────
 Route::get('/products/{productId}/reviews', [ProductReviewController::class, 'index'])
+    ->whereNumber('productId');
+// Answered questions about a product (Customer relationships → Inquiries)
+Route::get('/products/{productId}/questions', [CustomerInquiryController::class, 'productQuestions'])
     ->whereNumber('productId');
 
 // ============================================================
@@ -250,6 +255,10 @@ Route::middleware('token.auth')->group(function () {
     // ----------------------------------------------------------
 
     Route::prefix('customer')->group(function () {
+
+        // ── Questions to a shop about a product or an order ───────────────────
+        Route::get('/inquiries',  [CustomerInquiryController::class, 'mine']);
+        Route::post('/inquiries', [CustomerInquiryController::class, 'store'])->middleware('throttle:10,60');
 
         // ── Order tracking ────────────────────────────────────────────────────
         Route::get('/orders',      [CustomerOrderTrackingController::class, 'index']);
@@ -458,6 +467,22 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/reports',               [VendorBooksController::class, 'reports']);
             Route::get('/reports/export',        [VendorBooksController::class, 'exportReport']);
             Route::get('/refunds',               [VendorBooksController::class, 'refunds']);
+        });
+
+        // Customer relationships pages (chat itself uses the /chat routes)
+        Route::prefix('crm')->group(function () {
+            Route::middleware('subscription.module:crm')->group(function () {
+                Route::get('/inquiries',                [VendorCrmController::class, 'inquiries']);
+                Route::post('/inquiries/{id}/answer',   [VendorCrmController::class, 'answer'])->whereNumber('id');
+                Route::post('/inquiries/{id}/status',   [VendorCrmController::class, 'inquiryStatus'])->whereNumber('id');
+                Route::get('/customers/{id}',           [VendorCrmController::class, 'customer'])->whereNumber('id');
+            });
+            Route::middleware('subscription.module:products')->group(function () {
+                Route::get('/reviews',                  [VendorCrmController::class, 'reviews']);
+                Route::post('/reviews/{id}/reply',      [VendorCrmController::class, 'reply'])->whereNumber('id');
+            });
+            Route::get('/notifications',                [VendorCrmController::class, 'notifications']);
+            Route::put('/notifications/preferences',    [VendorCrmController::class, 'savePreferences']);
         });
 
         // Staff & operations pages (shop owners; employees use the ERP)

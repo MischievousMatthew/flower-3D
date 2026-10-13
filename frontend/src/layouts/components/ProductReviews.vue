@@ -181,6 +181,12 @@
             />
             <div class="pr-item__img-overlay"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg></div>
           </div>
+
+          <!-- The shop's reply -->
+          <div v-if="review.shop_reply" class="pr-item__reply">
+            <span class="pr-item__reply-label">Response from the shop</span>
+            <p>{{ review.shop_reply }}</p>
+          </div>
         </div>
       </div>
 
@@ -790,6 +796,28 @@ watch(
   color: var(--gold, #d4b27a);
 }
 
+.pr-item__reply {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-left: 3px solid #48bb78;
+  border-radius: 0 10px 10px 0;
+  background: #f7fafc;
+}
+.pr-item__reply-label {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2f855a;
+}
+.pr-item__reply p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #2d3748;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .pr-item__comment {
   font-size: 0.875rem;
   color: var(--ink, #1e1b18);

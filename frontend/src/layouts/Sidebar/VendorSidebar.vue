@@ -45,18 +45,6 @@
           <span class="nav-icon">📊</span>
           <span>Dashboard</span>
         </router-link>
-        <router-link
-          to="/vendor/chat"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('crm') }"
-          :title="lockTooltip('crm')"
-          @click="handleModuleNavigation($event, 'crm')"
-        >
-          <span class="nav-icon">💬</span>
-          <span>Chat</span>
-          <span v-if="isLocked('crm')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
       </div>
 
       <div class="nav-section">
@@ -113,6 +101,50 @@
           <span class="nav-icon">↩️</span>
           <span>Returns &amp; Refunds</span>
           <span v-if="isLocked('orders')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+      </div>
+
+      <div class="nav-section">
+        <div class="section-label">CUSTOMERS</div>
+        <router-link
+          :to="{ name: 'VendorChat' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('crm') }"
+          :title="lockTooltip('crm')"
+          @click="handleModuleNavigation($event, 'crm')"
+        >
+          <span class="nav-icon">💬</span>
+          <span>Customer Chat</span>
+          <span v-if="isLocked('crm')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorInquiries' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('crm') }"
+          :title="lockTooltip('crm')"
+          @click="handleModuleNavigation($event, 'crm')"
+        >
+          <span class="nav-icon">❓</span>
+          <span>Inquiries</span>
+          <span v-if="isLocked('crm')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorReviews' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('products') }"
+          :title="lockTooltip('products')"
+          @click="handleModuleNavigation($event, 'products')"
+        >
+          <span class="nav-icon">⭐</span>
+          <span>Reviews &amp; Ratings</span>
+          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link :to="{ name: 'VendorNotifications' }" class="nav-item" active-class="active">
+          <span class="nav-icon">🔔</span>
+          <span>Notifications</span>
         </router-link>
       </div>
 

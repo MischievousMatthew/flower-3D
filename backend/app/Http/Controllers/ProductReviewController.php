@@ -494,6 +494,9 @@ class ProductReviewController extends Controller
             // Only the vendor's own review list includes hidden reviews
             'is_hidden'     => $r->hidden_at !== null,
             'hidden_reason' => $r->hidden_at ? $r->hidden_reason : null,
+            // The shop's public answer to this review (Customer relationships → Reviews)
+            'shop_reply'    => $r->vendor_reply ?? null,
+            'shop_replied_at' => $r->vendor_replied_at?->toIso8601String(),
         ];
     }
     /**

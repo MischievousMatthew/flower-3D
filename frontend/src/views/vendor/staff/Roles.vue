@@ -344,17 +344,18 @@ onMounted(load);
 </script>
 
 <style scoped>
+/* Masonry-style columns, so short role cards don't leave gaps */
 .ro-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-  align-items: start;
+  columns: 320px;
+  column-gap: 16px;
 }
 .ro-card {
   display: flex;
   flex-direction: column;
   gap: 14px;
   min-width: 0;
+  margin-bottom: 16px;
+  break-inside: avoid;
 }
 .ro-head {
   display: flex;
@@ -604,7 +605,7 @@ li.full .ro-acts {
 }
 @media (max-width: 640px) {
   .ro-grid {
-    grid-template-columns: minmax(0, 1fr);
+    columns: 1;
   }
   .ro-group li {
     grid-template-columns: 16px minmax(0, 1fr);

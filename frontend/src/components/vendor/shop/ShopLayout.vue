@@ -5,18 +5,18 @@
     <vendorHeader v-if="!embedded" :title="title" />
     <main :class="{ 'sl-main': !embedded }">
       <nav class="sl-tabs" :aria-label="NAV_LABEL[section] ?? 'Shop and product management'">
-        <router-link
-          v-for="t in tabs"
-          :key="t.name"
-          :to="{ name: t.name }"
-          class="sl-tab"
-          :class="{ on: isOn(t), locked: locked(t.module) }"
-          :aria-current="isOn(t) ? 'page' : undefined"
-        >
-          <span class="sl-tab-icon" v-html="ICONS[t.icon]"></span>
-          <span>{{ t.label }}</span>
-          <span v-if="locked(t.module)" aria-label="Not in your plan">🔒</span>
-        </router-link>
+        <template v-for="t in tabs" :key="t.name">
+          <!-- A tab outside the plan says which plan it needs instead of navigating -->
+          <button v-if="locked(t.module)" type="button" class="sl-tab locked" :title="upgradeText(t.module)" @click="toast.info(upgradeText(t.module))">
+            <span class="sl-tab-icon" v-html="ICONS[t.icon]"></span>
+            <span>{{ t.label }}</span>
+            <span aria-label="Not in your plan">🔒</span>
+          </button>
+          <router-link v-else :to="{ name: t.name }" class="sl-tab" :class="{ on: isOn(t) }" :aria-current="isOn(t) ? 'page' : undefined">
+            <span class="sl-tab-icon" v-html="ICONS[t.icon]"></span>
+            <span>{{ t.label }}</span>
+          </router-link>
+        </template>
       </nav>
 
       <header v-if="!embedded" class="sl-head">
@@ -37,11 +37,12 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import vendorHeader from "../../../layouts/vendorHeader.vue";
 import VendorSidebar from "../../../layouts/Sidebar/VendorSidebar.vue";
-import { useSubscriptionAccess } from "../../../composables/useSubscriptionAccess";
+import { toast } from "vue3-toastify";
+import { subscriptionUpgradeMessage, useSubscriptionAccess } from "../../../composables/useSubscriptionAccess";
 import { SHOP_ICONS as ICONS } from "./shopIcons";
 
 const props = defineProps({
-  // Which group of tabs to show: shop, orders, finance or staff
+  // Which group of tabs to show: shop, orders, finance, staff or crm
   section: { type: String, default: "shop" },
   title: { type: String, default: "" },
   subtitle: { type: String, default: "" },
@@ -82,12 +83,20 @@ const STAFF_TABS = [
   { name: "VendorStaffPayroll", label: "Payroll", icon: "card", module: "payroll" },
   { name: "VendorStaffActivity", label: "Activity Logs", icon: "activity", module: "staff" },
 ];
-const NAV_LABEL = { shop: "Shop and product management", orders: "Orders and fulfillment", finance: "Finance and business", staff: "Staff and operations" };
-const tabs = computed(() => ({ orders: ORDER_TABS, finance: FINANCE_TABS, staff: STAFF_TABS })[props.section] ?? TABS);
+const CRM_TABS = [
+  { name: "VendorChat", label: "Customer Chat", icon: "chat", module: "crm" },
+  { name: "VendorInquiries", label: "Inquiries", icon: "help", module: "crm" },
+  { name: "VendorReviews", label: "Reviews & Ratings", icon: "star", module: "products" },
+  { name: "VendorNotifications", label: "Notifications", icon: "bell" },
+];
+const NAV_LABEL = { shop: "Shop and product management", orders: "Orders and fulfillment", finance: "Finance and business", staff: "Staff and operations", crm: "Customer relationships" };
+const tabs = computed(() => ({ orders: ORDER_TABS, finance: FINANCE_TABS, staff: STAFF_TABS, crm: CRM_TABS })[props.section] ?? TABS);
 const isOn = (t) => route.name === t.name || (t.also ?? []).includes(route.name);
 
 const locked = (module) =>
   !!module && !!subscriptionAccess.value && !subscriptionAllowsModule(subscriptionAccess.value, module);
+
+const upgradeText = (module) => subscriptionUpgradeMessage(subscriptionAccess.value, module);
 
 // A photo that fails to load becomes a plain placeholder instead of showing its alt text
 const root = ref(null);
@@ -152,6 +161,11 @@ onBeforeUnmount(() => root.value?.removeEventListener("error", onImageError, tru
   text-decoration: none;
   white-space: nowrap;
   transition: background 0.15s, color 0.15s;
+}
+button.sl-tab {
+  border: 0;
+  background: none;
+  cursor: pointer;
 }
 .sl-tab:hover {
   background: #f3f8f5;

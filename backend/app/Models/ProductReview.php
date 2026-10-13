@@ -25,6 +25,7 @@ class ProductReview extends Model
         'rating'       => 'integer',
         'is_anonymous' => 'boolean',
         'hidden_at'    => 'datetime',
+        'vendor_replied_at' => 'datetime',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────
