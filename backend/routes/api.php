@@ -58,7 +58,9 @@ use App\Http\Controllers\CustomerOrderTrackingController;
 use App\Http\Controllers\OrderRequestController;
 use App\Http\Controllers\CustomerReturnCaseController;
 use App\Http\Controllers\ProductReviewController;
+use App\Http\Controllers\VendorCatalogController;
 use App\Http\Controllers\VendorDashboardController;
+use App\Http\Controllers\VendorPromotionController;
 use App\Http\Controllers\VendorFinanceDashboardController;
 use App\Http\Controllers\ProductReportController; // ← NEW
 use App\Http\Controllers\VendorSubscriptionController;
@@ -387,7 +389,28 @@ Route::middleware('token.auth')->group(function () {
             Route::post('/customization-options/{id}',         [VendorCustomizationOptionController::class, 'update'])->whereNumber('id');
             Route::patch('/customization-options/{id}/active', [VendorCustomizationOptionController::class, 'setActive'])->whereNumber('id');
             Route::delete('/customization-options/{id}',       [VendorCustomizationOptionController::class, 'destroy'])->whereNumber('id');
+
+            // Shop & product management: products, inventory, categories, own sale prices
+            Route::prefix('catalog')->group(function () {
+                Route::get('/products',                    [VendorCatalogController::class, 'products']);
+                Route::post('/products/bulk',              [VendorCatalogController::class, 'bulk']);
+                Route::post('/products/{id}/stock',        [VendorCatalogController::class, 'adjustStock'])->whereNumber('id');
+                Route::patch('/products/{id}/stock-levels', [VendorCatalogController::class, 'stockLevels'])->whereNumber('id');
+                Route::patch('/products/{id}/discount',    [VendorCatalogController::class, 'discount'])->whereNumber('id');
+                Route::get('/stock-history',               [VendorCatalogController::class, 'stockHistory']);
+            });
+
+            // Seasonal offers
+            Route::get('/promotions',               [VendorPromotionController::class, 'index']);
+            Route::post('/promotions',              [VendorPromotionController::class, 'store']);
+            Route::put('/promotions/{id}',          [VendorPromotionController::class, 'update'])->whereNumber('id');
+            Route::post('/promotions/{id}/toggle',  [VendorPromotionController::class, 'toggle'])->whereNumber('id');
+            Route::delete('/promotions/{id}',       [VendorPromotionController::class, 'destroy'])->whereNumber('id');
         });
+
+        // My Shop: profile, location and business hours (every plan)
+        Route::get('/shop', [VendorProfileController::class, 'getShop']);
+        Route::put('/shop', [VendorProfileController::class, 'updateShop']);
 
         Route::middleware('subscription.module:orders')->group(function () {
             Route::get('/orders',                  [VendorOrdersController::class, 'getAllOrders']);

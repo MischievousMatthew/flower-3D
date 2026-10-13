@@ -146,7 +146,30 @@ const routes = [
         path: "products",
         name: "VendorProducts",
         meta: { subscriptionModule: MODULE.PRODUCTS },
-        component: () => import("../views/vendor/ViewProduct.vue"),
+        component: () => import("../views/vendor/shop/Products.vue"),
+      },
+      {
+        path: "shop",
+        name: "VendorShop",
+        component: () => import("../views/vendor/shop/MyShop.vue"),
+      },
+      {
+        path: "inventory",
+        name: "VendorInventory",
+        meta: { subscriptionModule: MODULE.PRODUCTS },
+        component: () => import("../views/vendor/shop/Inventory.vue"),
+      },
+      {
+        path: "categories",
+        name: "VendorCategories",
+        meta: { subscriptionModule: MODULE.PRODUCTS },
+        component: () => import("../views/vendor/shop/Categories.vue"),
+      },
+      {
+        path: "promotions",
+        name: "VendorPromotions",
+        meta: { subscriptionModule: MODULE.PRODUCTS },
+        component: () => import("../views/vendor/shop/Promotions.vue"),
       },
       {
         path: "reservation",

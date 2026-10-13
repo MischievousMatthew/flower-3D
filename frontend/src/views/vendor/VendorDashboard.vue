@@ -196,7 +196,7 @@
         <section class="vd-card" aria-label="Stock alerts">
           <div class="card-head">
             <div><h2>Stock alerts</h2><p>Low or out of stock</p></div>
-            <router-link v-if="data?.products" :to="{ name: 'VendorProducts' }" class="head-link">Stocks →</router-link>
+            <router-link v-if="data?.products" :to="{ name: 'VendorInventory' }" class="head-link">Inventory →</router-link>
           </div>
           <ul v-if="!data" class="vd-list"><li v-for="n in 3" :key="n"><div class="bc-skeleton sk-thumb"></div><div class="sk-grow"><div class="bc-skeleton sk-line w60"></div><div class="bc-skeleton sk-line w40"></div></div></li></ul>
           <LockedNote v-else-if="!data.products" module="products" block />

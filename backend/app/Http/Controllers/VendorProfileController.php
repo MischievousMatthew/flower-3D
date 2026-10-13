@@ -51,6 +51,149 @@ class VendorProfileController extends Controller
         }
     }
 
+    /** GET /vendor/shop — what customers see about the shop, for the My Shop page. */
+    public function getShop(Request $request)
+    {
+        $vendorApplication = $this->findApprovedVendorApplication();
+        if (!$vendorApplication) {
+            return response()->json(['success' => false, 'message' => 'Shop not found'], 404);
+        }
+
+        return response()->json(['success' => true, 'data' => $this->serializeShop($vendorApplication)]);
+    }
+
+    /** PUT /vendor/shop — shop profile, location and weekly business hours. */
+    public function updateShop(Request $request)
+    {
+        $vendorApplication = $this->findApprovedVendorApplication();
+        if (!$vendorApplication) {
+            return response()->json(['success' => false, 'message' => 'Shop not found'], 404);
+        }
+
+        $data = $request->validate([
+            'store_name'          => 'required|string|max:255',
+            'store_description'   => 'nullable|string|max:1000',
+            'store_address'       => 'required|string|max:500',
+            'store_latitude'      => 'nullable|numeric|between:-90,90',
+            'store_longitude'     => 'nullable|numeric|between:-180,180',
+            'service_areas'       => 'nullable|string|max:500',
+            'contact_number'      => 'required|string|max:20',
+            'facebook_page'       => 'nullable|url|max:255',
+            'instagram_page'      => 'nullable|url|max:255',
+            'operating_schedules' => 'required|array|min:1|max:7',
+            'operating_schedules.*.days'         => 'required|array|min:1',
+            'operating_schedules.*.days.*'       => ['string', Rule::in(self::WEEK_DAYS)],
+            'operating_schedules.*.opening_time' => ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
+            'operating_schedules.*.closing_time' => ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
+        ], [
+            'operating_schedules.required' => 'Open the shop on at least one day.',
+            'operating_schedules.*.opening_time.regex' => 'Use a valid opening time.',
+            'operating_schedules.*.closing_time.regex' => 'Use a valid closing time.',
+        ]);
+
+        $schedules = [];
+        $seen = [];
+        foreach ($data['operating_schedules'] as $schedule) {
+            if ($schedule['opening_time'] >= $schedule['closing_time']) {
+                return response()->json(['success' => false, 'message' => 'Closing time must be after opening time.', 'errors' => ['operating_schedules' => ['Closing time must be after opening time.']]], 422);
+            }
+            $days = array_values(array_filter(self::WEEK_DAYS, fn ($d) => in_array($d, $schedule['days'], true)));
+            if (array_intersect($days, $seen)) {
+                return response()->json(['success' => false, 'message' => 'Each day can only have one set of hours.', 'errors' => ['operating_schedules' => ['Each day can only have one set of hours.']]], 422);
+            }
+            $seen = [...$seen, ...$days];
+            $schedules[] = ['days' => $days, 'opening_time' => $schedule['opening_time'], 'closing_time' => $schedule['closing_time']];
+        }
+
+        $vendorApplication->fill([
+            'store_name'          => trim($data['store_name']),
+            'store_description'   => isset($data['store_description']) ? trim($data['store_description']) : null,
+            'store_address'       => trim($data['store_address']),
+            'store_latitude'      => $data['store_latitude'] ?? $vendorApplication->store_latitude,
+            'store_longitude'     => $data['store_longitude'] ?? $vendorApplication->store_longitude,
+            'service_areas'       => isset($data['service_areas']) ? trim($data['service_areas']) : null,
+            'contact_number'      => trim($data['contact_number']),
+            'facebook_page'       => $data['facebook_page'] ?? null,
+            'instagram_page'      => $data['instagram_page'] ?? null,
+            'operating_schedules' => $schedules,
+            'operating_hours'     => $this->describeSchedules($schedules),
+        ])->save();
+
+        // The sidebar and storefront read the name from the user record too
+        $user = $this->authenticatedVendorUser();
+        if ($user) {
+            $vendorData = is_array($user->vendor_data) ? $user->vendor_data : (json_decode((string) $user->vendor_data, true) ?: []);
+            if (($vendorData['store_name'] ?? null) !== $vendorApplication->store_name) {
+                $vendorData['store_name'] = $vendorApplication->store_name;
+                $user->forceFill(['vendor_data' => $vendorData])->save();
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Shop details saved.',
+            'data'    => $this->serializeShop($vendorApplication->fresh()),
+        ]);
+    }
+
+    private const WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    /** "Mon-Fri: 8:00 AM – 5:00 PM; Sat, Sun: 8:00 AM – 3:00 PM", as the registration form writes it. */
+    private function describeSchedules(array $schedules): string
+    {
+        $time = fn (string $t) => \Carbon\Carbon::createFromFormat('H:i', $t)->format('g:i A');
+        $days = function (array $days) {
+            if (count($days) === 7) {
+                return 'Everyday';
+            }
+            $idx = array_map(fn ($d) => array_search($d, self::WEEK_DAYS, true), $days);
+            $parts = [];
+            $start = 0;
+            for ($i = 1; $i <= count($idx); $i++) {
+                if ($i === count($idx) || $idx[$i] !== $idx[$i - 1] + 1) {
+                    $run = array_slice($idx, $start, $i - $start);
+                    if (count($run) >= 3) {
+                        $parts[] = substr(self::WEEK_DAYS[$run[0]], 0, 3) . '-' . substr(self::WEEK_DAYS[end($run)], 0, 3);
+                    } else {
+                        foreach ($run as $r) {
+                            $parts[] = substr(self::WEEK_DAYS[$r], 0, 3);
+                        }
+                    }
+                    $start = $i;
+                }
+            }
+
+            return implode(', ', $parts);
+        };
+
+        return implode('; ', array_map(
+            fn ($s) => $days($s['days']) . ': ' . $time($s['opening_time']) . ' – ' . $time($s['closing_time']),
+            $schedules
+        ));
+    }
+
+    private function serializeShop(VendorApplication $app): array
+    {
+        return [
+            'store_name'          => $app->store_name ?? '',
+            'store_description'   => $app->store_description ?? '',
+            'store_address'       => $app->store_address ?? '',
+            'store_latitude'      => $app->store_latitude !== null ? (float) $app->store_latitude : null,
+            'store_longitude'     => $app->store_longitude !== null ? (float) $app->store_longitude : null,
+            'service_areas'       => $app->service_areas ?? '',
+            'contact_number'      => $app->contact_number ?? '',
+            'email'               => $app->email ?? '',
+            'facebook_page'       => $app->facebook_page ?? '',
+            'instagram_page'      => $app->instagram_page ?? '',
+            'operating_hours'     => $app->operating_hours ?? '',
+            'operating_schedules' => $this->safeVendorArray($app, 'operating_schedules'),
+            'store_logo_url'      => $this->safeVendorValue($app, 'store_logo_url'),
+            'store_cover_url'     => $this->safeVendorValue($app, 'store_cover_url'),
+            'business_type'       => $this->safeVendorValue($app, 'formatted_business_type'),
+            'member_since'        => ($since = $app->reviewed_at ?? $app->created_at) ? \Carbon\Carbon::parse($since)->toIso8601String() : null,
+        ];
+    }
+
     public function updatePaymentDetails(Request $request)
     {
         try {

@@ -65,6 +65,8 @@ class Product extends Model
         'selling_price',
         'has_discount',
         'discount_price',
+        'discount_starts_at',
+        'discount_ends_at',
         'selling_type',
 
         // Stock
@@ -105,6 +107,8 @@ class Product extends Model
         'purchase_price'         => 'decimal:2',
         'selling_price'          => 'decimal:2',
         'discount_price'         => 'decimal:2',
+        'discount_starts_at'     => 'datetime',
+        'discount_ends_at'       => 'datetime',
         'occasion_tags'          => 'array',
         'preparation_days'       => 'integer',
         'supplier_lead_time'     => 'integer',
@@ -150,6 +154,72 @@ class Product extends Model
     public function getSellingPriceAttribute($value): float
     {
         return (float) ($value ?? 0);
+    }
+
+    /**
+     * When true, discount_price reads the stored value as-is. The vendor's own
+     * product screens set this so their edit forms never pick up (and save) a
+     * promotion price as the product's own discount.
+     */
+    public static bool $rawPricing = false;
+
+    /**
+     * The sale price customers pay right now, or null when there is none:
+     * the product's own discount while its dates allow it, or a running
+     * promotion from the shop, whichever is lower.
+     */
+    public function getDiscountPriceAttribute($value): ?string
+    {
+        if (static::$rawPricing) {
+            return $value === null ? null : number_format((float) $value, 2, '.', '');
+        }
+
+        $best = $this->ownDiscountNow($value);
+        $promotion = $this->runningPromotion();
+        if ($promotion && ($best === null || $promotion['price'] < $best)) {
+            $best = $promotion['price'];
+        }
+
+        return $best === null ? null : number_format($best, 2, '.', '');
+    }
+
+    /** The product's own discount if it is set, lower than the price and inside its dates. */
+    public function ownDiscountNow($value = null): ?float
+    {
+        $value ??= $this->attributes['discount_price'] ?? null;
+        $price = (float) ($this->attributes['selling_price'] ?? 0);
+        if ($value === null || (float) $value <= 0 || (float) $value >= $price) {
+            return null;
+        }
+
+        $now = now();
+        $starts = $this->discount_starts_at;
+        $ends = $this->discount_ends_at;
+        if (($starts && $starts->gt($now)) || ($ends && $ends->lt($now))) {
+            return null;
+        }
+
+        return (float) $value;
+    }
+
+    /** The best running shop promotion for this product: ['promotion' => VendorPromotion, 'price' => float]. */
+    public function runningPromotion(): ?array
+    {
+        $ownerId = (int) ($this->attributes['owner_id'] ?? 0);
+        $price = (float) ($this->attributes['selling_price'] ?? 0);
+        if (! $ownerId || $price <= 0) {
+            return null;
+        }
+
+        $best = null;
+        foreach (VendorPromotion::runningFor($ownerId) as $promotion) {
+            $after = $promotion->covers($this) ? $promotion->priceFor($price) : null;
+            if ($after !== null && ($best === null || $after < $best['price'])) {
+                $best = ['promotion' => $promotion, 'price' => $after];
+            }
+        }
+
+        return $best;
     }
 
     // ── Stock helpers ──────────────────────────────────────────────────────

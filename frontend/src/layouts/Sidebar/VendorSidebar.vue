@@ -94,34 +94,6 @@
           <span class="nav-icon">👨‍💼</span>
           <span>Staff List</span>
         </router-link>
-      </div>
-
-      <div class="nav-section">
-        <div class="section-label">PHYSICAL ASSET</div>
-        <router-link
-          to="/vendor/products"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('products') }"
-          :title="lockTooltip('products')"
-          @click="handleModuleNavigation($event, 'products')"
-        >
-          <span class="nav-icon">📦</span>
-          <span>Stocks</span>
-          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorCustomization' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('products') }"
-          :title="lockTooltip('products')"
-          @click="handleModuleNavigation($event, 'products')"
-        >
-          <span class="nav-icon">💐</span>
-          <span>3D Customization</span>
-          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
         <router-link
           to="/vendor/chat"
           class="nav-item"
@@ -133,6 +105,78 @@
           <span class="nav-icon">💬</span>
           <span>Chat</span>
           <span v-if="isLocked('crm')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+      </div>
+
+      <div class="nav-section">
+        <div class="section-label">SHOP &amp; PRODUCTS</div>
+        <router-link
+          :to="{ name: 'VendorShop' }"
+          class="nav-item"
+          active-class="active"
+        >
+          <span class="nav-icon">🏪</span>
+          <span>My Shop</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorProducts' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('products') }"
+          :title="lockTooltip('products')"
+          @click="handleModuleNavigation($event, 'products')"
+        >
+          <span class="nav-icon">🌷</span>
+          <span>Products</span>
+          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorInventory' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('products') }"
+          :title="lockTooltip('products')"
+          @click="handleModuleNavigation($event, 'products')"
+        >
+          <span class="nav-icon">📦</span>
+          <span>Inventory</span>
+          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorCategories' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('products') }"
+          :title="lockTooltip('products')"
+          @click="handleModuleNavigation($event, 'products')"
+        >
+          <span class="nav-icon">🏷️</span>
+          <span>Categories &amp; Occasions</span>
+          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorCustomization' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('products') }"
+          :title="lockTooltip('products')"
+          @click="handleModuleNavigation($event, 'products')"
+        >
+          <span class="nav-icon">💐</span>
+          <span>3D Bouquets</span>
+          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
+        </router-link>
+        <router-link
+          :to="{ name: 'VendorPromotions' }"
+          class="nav-item"
+          active-class="active"
+          :class="{ 'is-locked': isLocked('products') }"
+          :title="lockTooltip('products')"
+          @click="handleModuleNavigation($event, 'products')"
+        >
+          <span class="nav-icon">🎉</span>
+          <span>Promotions</span>
+          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
         </router-link>
       </div>
 

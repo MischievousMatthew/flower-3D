@@ -4,10 +4,11 @@
     <VendorSidebar />
 
     <main class="cz-main">
+      <ShopLayout embedded />
       <header class="cz-intro">
         <div>
           <p class="cz-kicker">Flower customizer</p>
-          <h1>3D Customization</h1>
+          <h1>3D Bouquets</h1>
           <p class="cz-lede">
             Choose what customers can use when they build a bouquet in 3D: wrappers, flowers,
             fillers and ribbons.
@@ -33,7 +34,7 @@
         </button>
       </nav>
 
-      <!-- Flowers: customizable products live in Stocks, so this tab lists them. -->
+      <!-- Flowers: customizable products live in Products, so this tab lists them. -->
       <section
         v-if="activeTab === 'flowers'"
         id="cz-panel-flowers"
@@ -46,7 +47,7 @@
             <h2>Flowers</h2>
             <p>
               Products sold as <strong>Per Piece (Customizable)</strong> with a 3D model appear in the
-              customizer. Stock, price and description are managed in Stocks.
+              customizer. Stock, price and description are managed in Products and Inventory.
             </p>
           </div>
           <router-link
@@ -91,7 +92,7 @@
                 <span v-else class="cz-chip warn">No 3D model, hidden from the customizer</span>
               </div>
               <div class="cz-actions">
-                <router-link to="/vendor/products" class="cz-link">Edit in Stocks</router-link>
+                <router-link :to="{ name: 'VendorProducts' }" class="cz-link">Edit in Products</router-link>
               </div>
             </div>
           </article>
@@ -426,6 +427,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 import api from "../../plugins/axios";
 import vendorHeader from "../../layouts/vendorHeader.vue";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
+import ShopLayout from "../../components/vendor/shop/ShopLayout.vue";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import "../../styles/bloomcraft.css";

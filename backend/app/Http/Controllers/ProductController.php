@@ -23,6 +23,13 @@ class ProductController extends Controller
 
     private const INVENTORY_PRODUCTS_MODULE = 'inventory_products';
 
+    public function __construct()
+    {
+        // These are the vendor's and ERP's own product screens: show the stored
+        // discount, not a running promotion, so edit forms save what was set.
+        Product::$rawPricing = true;
+    }
+
     private function requireInventoryProductAccess(Request $request, string $permission = 'view')
     {
         $user = $request->user();
@@ -375,11 +382,14 @@ class ProductController extends Controller
             $product->update($data);
             app(ProductModerationService::class)->markEdited($product);
 
-            DB::table('products')->where('id', $product->id)->update([
-                'has_discount'   => $hasDiscount ? 1 : 0,
-                'discount_price' => $hasDiscount ? $discountPrice : null,
-                'updated_at'     => now(),
-            ]);
+            // A form that doesn't send the discount fields leaves the sale price alone
+            if ($request->has('has_discount')) {
+                DB::table('products')->where('id', $product->id)->update([
+                    'has_discount'   => $hasDiscount ? 1 : 0,
+                    'discount_price' => $hasDiscount ? $discountPrice : null,
+                    'updated_at'     => now(),
+                ]);
+            }
 
             // ── Delete removed images ─────────────────────────────────────
             if ($request->has('removed_image_ids') && is_array($request->removed_image_ids)) {
