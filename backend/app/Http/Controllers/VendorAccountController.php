@@ -264,7 +264,7 @@ class VendorAccountController extends Controller
             'same_day_delivery'   => 'required|boolean',
             'lead_time_days'      => 'required|integer|min:0|max:30',
             'max_orders_per_day'  => 'required|integer|min:1|max:500',
-            'service_areas'       => 'nullable|string|max:500',
+            'service_areas'       => ['nullable', 'string', 'max:500', VendorApplication::serviceAreaRule()],
             'cancellation_policy' => 'required|string|max:1000',
             ...VendorProfileController::scheduleRules(),
             'preferences'                  => 'required|array',

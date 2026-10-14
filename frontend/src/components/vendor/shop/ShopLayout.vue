@@ -54,7 +54,7 @@ const route = useRoute();
 const { subscriptionAccess, loadSubscriptionAccess, subscriptionAllowsModule } = useSubscriptionAccess();
 
 const TABS = [
-  { name: "VendorShop", label: "My Shop", icon: "store" },
+  { name: "VendorShop", label: "Shop Profile", icon: "store" },
   { name: "VendorProducts", label: "Products", icon: "flower", module: "products" },
   { name: "VendorInventory", label: "Inventory", icon: "box", module: "products" },
   { name: "VendorCategories", label: "Categories & Occasions", icon: "tag", module: "products" },

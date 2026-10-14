@@ -517,6 +517,38 @@ class VendorApplication extends Model
         ];
     }
 
+    /**
+     * Places a vendor can deliver to, picked from a list so every shop names
+     * them the same way. A province means all of it. Keep in sync with
+     * frontend/src/constants/serviceAreas.js.
+     */
+    public const SERVICE_AREAS = [
+        'Cavite' => [
+            'Alfonso', 'Amadeo', 'Bacoor', 'Carmona', 'Cavite City', 'Dasmariñas', 'General Emilio Aguinaldo',
+            'General Mariano Alvarez', 'General Trias', 'Imus', 'Indang', 'Kawit', 'Magallanes', 'Maragondon',
+            'Mendez', 'Naic', 'Noveleta', 'Rosario', 'Silang', 'Tagaytay', 'Tanza', 'Ternate', 'Trece Martires',
+        ],
+        'Metro Manila' => [
+            'Caloocan', 'Las Piñas', 'Makati', 'Malabon', 'Mandaluyong', 'Manila', 'Marikina', 'Muntinlupa',
+            'Navotas', 'Parañaque', 'Pasay', 'Pasig', 'Quezon City', 'San Juan', 'Taguig', 'Valenzuela',
+        ],
+    ];
+
+    /** Validation for the comma-separated service_areas string: only places on the list. */
+    public static function serviceAreaRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) {
+            $known = [];
+            foreach (self::SERVICE_AREAS as $province => $places) {
+                $known = [...$known, $province, ...$places];
+            }
+            $unknown = array_diff(array_filter(array_map('trim', explode(',', (string) $value))), $known);
+            if ($unknown) {
+                $fail('Pick delivery areas from the list (' . implode(', ', $unknown) . ' isn\'t on it).');
+            }
+        };
+    }
+
     public const SHOP_PREFERENCE_DEFAULTS = [
         'accepting_orders' => true,
         'away_message'     => null,

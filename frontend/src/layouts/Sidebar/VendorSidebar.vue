@@ -1,516 +1,138 @@
 <template>
-  <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
-
   <!-- Backdrop for mobile -->
   <div v-if="isMobileOpen" class="sidebar-backdrop" @click="closeMobile"></div>
 
-  <aside class="sidebar" :class="{ 'mobile-open': isMobileOpen }">
-    <div class="logo-section">
-      <div class="logo">
-        <span class="logo-icon">
-          <img
-            v-if="sidebarLogoUrl"
-            :src="sidebarLogoUrl"
-            :alt="`${businessName} logo`"
-            class="logo-image"
-            @error="handleLogoError"
-          />
-          <img
-            v-else
-            src="../../../public/bloomcraft-blankBg.png"
-            alt="Bloomcraft Logo"
-            class="logo-image"
-          />
-        </span>
-        <span class="logo-text">{{ businessName }}</span>
-      </div>
-    </div>
+  <aside class="sidebar" :class="{ 'mobile-open': isMobileOpen }" :style="accentVars" aria-label="Vendor navigation">
+    <!-- Shop identity -->
+    <router-link :to="{ name: 'VendorShop' }" class="brand">
+      <span class="brand-logo">
+        <img v-if="sidebarLogoUrl" :src="sidebarLogoUrl" :alt="`${businessName} logo`" @error="logoLoadFailed = true" />
+        <span v-else>{{ businessInitial }}</span>
+      </span>
+      <span class="brand-text">
+        <b>{{ businessName }}</b>
+        <small>{{ businessAddress }}</small>
+      </span>
+    </router-link>
 
-    <div class="business-info">
-      <div class="business-avatar">{{ businessInitial }}</div>
-      <div class="business-details">
-        <div class="business-name">{{ businessName }}</div>
-        <div class="business-address">{{ businessAddress }}</div>
-      </div>
-    </div>
-
-    <nav class="nav-menu">
-      <div class="nav-section">
-        <div class="section-label">OVERVIEW</div>
+    <nav class="nav">
+      <section v-for="section in VENDOR_NAV" :key="section.label" class="nav-section">
+        <h2 class="nav-label">{{ section.label }}</h2>
         <router-link
-          to="/vendor/finance-dashboard"
+          v-for="item in section.items"
+          :key="item.name"
+          :to="{ name: item.name }"
           class="nav-item"
-          active-class="active"
+          active-class=""
+          exact-active-class=""
+          :class="{ active: activeItem === item, locked: isLocked(item.module) }"
+          :aria-current="activeItem === item ? 'page' : undefined"
+          :title="lockTooltip(item.module)"
+          @click="handleNavigation($event, item.module)"
         >
-          <span class="nav-icon">📊</span>
-          <span>Dashboard</span>
+          <span class="nav-icon" v-html="ICONS[item.icon]"></span>
+          <span class="nav-text">{{ item.label }}</span>
+          <span v-if="isLocked(item.module)" class="nav-lock" aria-label="Not in your plan" v-html="ICONS.lock"></span>
+          <span v-else-if="item.badge === 'orders' && orderCount > 0" class="nav-badge">{{ orderCount > 99 ? "99+" : orderCount }}</span>
+          <span v-else-if="item.badge === 'plan' && planAlert" class="nav-badge warn" :title="planAlert">!</span>
         </router-link>
-      </div>
-
-      <div class="nav-section">
-        <div class="section-label">ORDERS &amp; FULFILLMENT</div>
-        <router-link
-          :to="{ name: 'VendorReservation' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ active: route.name === 'VendorOrderDetails', 'is-locked': isLocked('orders') }"
-          :title="lockTooltip('orders')"
-          @click="handleModuleNavigation($event, 'orders')"
-        >
-          <span class="nav-icon">🧾</span>
-          <span>Orders</span>
-          <span v-if="isLocked('orders')" class="lock-icon" aria-hidden="true">🔒</span>
-          <span v-if="notificationCounts.orders > 0" class="nav-badge">
-            {{
-              notificationCounts.orders > 99 ? "99+" : notificationCounts.orders
-            }}
-          </span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorDeliverySchedule' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('orders') }"
-          :title="lockTooltip('orders')"
-          @click="handleModuleNavigation($event, 'orders')"
-        >
-          <span class="nav-icon">🚚</span>
-          <span>Deliveries</span>
-          <span v-if="isLocked('orders')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorCalendar' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('calendar') }"
-          :title="lockTooltip('calendar')"
-          @click="handleModuleNavigation($event, 'calendar')"
-        >
-          <span class="nav-icon">📅</span>
-          <span>Reservations</span>
-          <span v-if="isLocked('calendar')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorReturns' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('orders') }"
-          :title="lockTooltip('orders')"
-          @click="handleModuleNavigation($event, 'orders')"
-        >
-          <span class="nav-icon">↩️</span>
-          <span>Returns &amp; Refunds</span>
-          <span v-if="isLocked('orders')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-      </div>
-
-      <div class="nav-section">
-        <div class="section-label">CUSTOMERS</div>
-        <router-link
-          :to="{ name: 'VendorChat' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('crm') }"
-          :title="lockTooltip('crm')"
-          @click="handleModuleNavigation($event, 'crm')"
-        >
-          <span class="nav-icon">💬</span>
-          <span>Customer Chat</span>
-          <span v-if="isLocked('crm')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorInquiries' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('crm') }"
-          :title="lockTooltip('crm')"
-          @click="handleModuleNavigation($event, 'crm')"
-        >
-          <span class="nav-icon">❓</span>
-          <span>Inquiries</span>
-          <span v-if="isLocked('crm')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorReviews' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('products') }"
-          :title="lockTooltip('products')"
-          @click="handleModuleNavigation($event, 'products')"
-        >
-          <span class="nav-icon">⭐</span>
-          <span>Reviews &amp; Ratings</span>
-          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link :to="{ name: 'VendorNotifications' }" class="nav-item" active-class="active">
-          <span class="nav-icon">🔔</span>
-          <span>Notifications</span>
-        </router-link>
-      </div>
-
-      <div class="nav-section">
-        <div class="section-label">SHOP &amp; PRODUCTS</div>
-        <router-link
-          :to="{ name: 'VendorShop' }"
-          class="nav-item"
-          active-class="active"
-        >
-          <span class="nav-icon">🏪</span>
-          <span>My Shop</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorProducts' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('products') }"
-          :title="lockTooltip('products')"
-          @click="handleModuleNavigation($event, 'products')"
-        >
-          <span class="nav-icon">🌷</span>
-          <span>Products</span>
-          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorInventory' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('products') }"
-          :title="lockTooltip('products')"
-          @click="handleModuleNavigation($event, 'products')"
-        >
-          <span class="nav-icon">📦</span>
-          <span>Inventory</span>
-          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorCategories' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('products') }"
-          :title="lockTooltip('products')"
-          @click="handleModuleNavigation($event, 'products')"
-        >
-          <span class="nav-icon">🏷️</span>
-          <span>Categories &amp; Occasions</span>
-          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorCustomization' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('products') }"
-          :title="lockTooltip('products')"
-          @click="handleModuleNavigation($event, 'products')"
-        >
-          <span class="nav-icon">💐</span>
-          <span>3D Bouquets</span>
-          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorPromotions' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('products') }"
-          :title="lockTooltip('products')"
-          @click="handleModuleNavigation($event, 'products')"
-        >
-          <span class="nav-icon">🎉</span>
-          <span>Promotions</span>
-          <span v-if="isLocked('products')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-      </div>
-
-      <div class="nav-section">
-        <div class="section-label">FINANCE</div>
-        <router-link
-          :to="{ name: 'VendorBooksSales' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('finance') }"
-          :title="lockTooltip('finance')"
-          @click="handleModuleNavigation($event, 'finance')"
-        >
-          <span class="nav-icon">🧾</span>
-          <span>Sales &amp; Transactions</span>
-          <span v-if="isLocked('finance')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorBooksExpenses' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('finance') }"
-          :title="lockTooltip('finance')"
-          @click="handleModuleNavigation($event, 'finance')"
-        >
-          <span class="nav-icon">💸</span>
-          <span>Expenses</span>
-          <span v-if="isLocked('finance')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorBooksProfit' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('finance') }"
-          :title="lockTooltip('finance')"
-          @click="handleModuleNavigation($event, 'finance')"
-        >
-          <span class="nav-icon">📈</span>
-          <span>Profit &amp; Loss</span>
-          <span v-if="isLocked('finance')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorBooksReports' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('finance') }"
-          :title="lockTooltip('finance')"
-          @click="handleModuleNavigation($event, 'finance')"
-        >
-          <span class="nav-icon">📑</span>
-          <span>Financial Reports</span>
-          <span v-if="isLocked('finance')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorBooksRefunds' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('finance') }"
-          :title="lockTooltip('finance')"
-          @click="handleModuleNavigation($event, 'finance')"
-        >
-          <span class="nav-icon">↩️</span>
-          <span>Refund Tracking</span>
-          <span v-if="isLocked('finance')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-      </div>
-
-      <div class="nav-section">
-        <div class="section-label">STAFF &amp; OPERATIONS</div>
-        <router-link
-          :to="{ name: 'VendorStaffList' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('staff') }"
-          :title="lockTooltip('staff')"
-          @click="handleModuleNavigation($event, 'staff')"
-        >
-          <span class="nav-icon">👥</span>
-          <span>Employees</span>
-          <span v-if="isLocked('staff')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorStaffRoles' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('staff') }"
-          :title="lockTooltip('staff')"
-          @click="handleModuleNavigation($event, 'staff')"
-        >
-          <span class="nav-icon">🛡️</span>
-          <span>Roles &amp; Permissions</span>
-          <span v-if="isLocked('staff')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorStaffAttendance' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('attendance') }"
-          :title="lockTooltip('attendance')"
-          @click="handleModuleNavigation($event, 'attendance')"
-        >
-          <span class="nav-icon">⏱️</span>
-          <span>Attendance</span>
-          <span v-if="isLocked('attendance')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorStaffSchedules' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('staff') }"
-          :title="lockTooltip('staff')"
-          @click="handleModuleNavigation($event, 'staff')"
-        >
-          <span class="nav-icon">🗓️</span>
-          <span>Schedules</span>
-          <span v-if="isLocked('staff')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorStaffPayroll' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('payroll') }"
-          :title="lockTooltip('payroll')"
-          @click="handleModuleNavigation($event, 'payroll')"
-        >
-          <span class="nav-icon">💵</span>
-          <span>Payroll</span>
-          <span v-if="isLocked('payroll')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-        <router-link
-          :to="{ name: 'VendorStaffActivity' }"
-          class="nav-item"
-          active-class="active"
-          :class="{ 'is-locked': isLocked('staff') }"
-          :title="lockTooltip('staff')"
-          @click="handleModuleNavigation($event, 'staff')"
-        >
-          <span class="nav-icon">📜</span>
-          <span>Activity Logs</span>
-          <span v-if="isLocked('staff')" class="lock-icon" aria-hidden="true">🔒</span>
-        </router-link>
-      </div>
-
-      <!-- Open on every plan, so a vendor can always see their plan and renew -->
-      <div class="nav-section">
-        <div class="section-label">SUBSCRIPTION &amp; ACCOUNT</div>
-        <router-link :to="{ name: 'VendorSubscription' }" class="nav-item" active-class="active">
-          <span class="nav-icon">💎</span>
-          <span>Subscription Plan</span>
-          <span v-if="planAlert" class="nav-badge" :title="planAlert">!</span>
-        </router-link>
-        <router-link :to="{ name: 'VendorBilling' }" class="nav-item" active-class="active">
-          <span class="nav-icon">🧾</span>
-          <span>Billing History</span>
-        </router-link>
-        <router-link :to="{ name: 'VendorUsage' }" class="nav-item" active-class="active">
-          <span class="nav-icon">📊</span>
-          <span>Usage &amp; Limits</span>
-        </router-link>
-        <router-link :to="{ name: 'VendorShopSettings' }" class="nav-item" active-class="active">
-          <span class="nav-icon">⚙️</span>
-          <span>Shop Settings</span>
-        </router-link>
-        <router-link :to="{ name: 'VendorSecurity' }" class="nav-item" active-class="active">
-          <span class="nav-icon">🔐</span>
-          <span>Security Settings</span>
-        </router-link>
-      </div>
-
-      <div class="nav-section">
-        <div class="section-label">HELP</div>
-        <router-link to="/vendor/support" class="nav-item" active-class="active">
-          <span class="nav-icon">🛟</span>
-          <span>Help &amp; support</span>
-        </router-link>
-      </div>
-
-      <!-- <router-link to="/report" class="nav-item">
-        <span class="nav-icon">📋</span>
-        <span>Report</span>
-      </router-link>
-      <router-link to="/support" class="nav-item">
-        <span class="nav-icon">💬</span>
-        <span>Customer Support</span>
-      </router-link> -->
+      </section>
     </nav>
 
     <div v-if="lockedModule" class="upgrade-hint" role="status">
       <span>{{ lockTooltip(lockedModule) }}</span>
-      <button type="button" @click="viewPlans">View Plans</button>
+      <div class="upgrade-actions">
+        <button type="button" class="upgrade-go" @click="viewPlans">View plans</button>
+        <button type="button" class="upgrade-dismiss" @click="lockedModule = null">Dismiss</button>
+      </div>
     </div>
 
-    <!-- <div class="sidebar-footer">
-      <button @click="handleLogout" class="logout-btn" :disabled="isLoading">
-        <span class="logout-icon">🚪</span>
-        <span>Logout</span>
-        <span v-if="isLoading" class="logout-spinner"></span>
+    <!-- Tab color -->
+    <div ref="colorRef" class="sidebar-foot">
+      <button type="button" class="color-toggle" :aria-expanded="showColors" aria-controls="sidebar-colors" @click="showColors = !showColors">
+        <span class="nav-icon" v-html="ICONS.palette"></span>
+        <span class="nav-text">Sidebar color</span>
+        <span class="color-dot" :style="{ background: accent }"></span>
       </button>
-    </div> -->
+      <Transition name="pop">
+        <div v-if="showColors" id="sidebar-colors" class="color-pop" role="dialog" aria-label="Sidebar color">
+          <p class="color-title">Tab color</p>
+          <div class="swatches">
+            <button
+              v-for="c in ACCENT_PRESETS"
+              :key="c.value"
+              type="button"
+              class="swatch"
+              :class="{ on: accent === c.value }"
+              :style="{ background: c.value }"
+              :aria-label="c.name"
+              :aria-pressed="accent === c.value"
+              :title="c.name"
+              @click="setAccent(c.value)"
+            ></button>
+          </div>
+          <label class="custom-color">
+            <input type="color" :value="accent" aria-label="Any color" @input="setAccent($event.target.value)" />
+            <span>Any color</span>
+            <code>{{ accent.toUpperCase() }}</code>
+          </label>
+          <button v-if="accent !== DEFAULT_ACCENT" type="button" class="color-reset" @click="resetAccent">Back to default</button>
+        </div>
+      </Transition>
+    </div>
   </aside>
 </template>
 
 <script setup>
 import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { useAuth } from "../../composables/useAuth";
 import { useSidebarState } from "../../composables/useSidebarState";
 import { useVendorProfile } from "../../composables/useVendorProfile";
 import { useSubscriptionAccess } from "../../composables/useSubscriptionAccess";
+import { ACCENT_PRESETS, DEFAULT_ACCENT, useSidebarTheme } from "../../composables/useSidebarTheme";
+import { SHOP_ICONS as ICONS } from "../../components/vendor/shop/shopIcons";
+import { VENDOR_NAV, navPlaceFor } from "./vendorNav";
 import api from "../../plugins/axios";
-import LoadingOverlay from "../components/LoadingOverlay.vue";
 
-const { logout } = useAuth();
 const router = useRouter();
 const route = useRoute();
 const { isMobileOpen, closeMobile } = useSidebarState();
-const {
-  subscriptionAccess,
-  loadSubscriptionAccess,
-  subscriptionAllowsModule,
-  subscriptionUpgradeMessage,
-} = useSubscriptionAccess();
-const { vendorProfile, fetchProfile } = useVendorProfile({
-  autoFetch: false,
-  showToast: false,
-});
+const { accent, accentVars, setAccent, resetAccent } = useSidebarTheme();
+const { subscriptionAccess, loadSubscriptionAccess, subscriptionAllowsModule, subscriptionUpgradeMessage } = useSubscriptionAccess();
+const { vendorProfile, fetchProfile } = useVendorProfile({ autoFetch: false, showToast: false });
 
-const isLoading = ref(null);
-const isLoadingMessage = ref("");
 const logoLoadFailed = ref(false);
-const notificationCounts = ref({
-  orders: 0,
-});
+const orderCount = ref(0);
 const lockedModule = ref(null);
+const showColors = ref(false);
+const colorRef = ref(null);
 let notificationInterval = null;
 let subscriptionInterval = null;
 
-const businessName = computed(() => {
-  return (
-    vendorProfile.value?.store_name?.trim() ||
-    vendorProfile.value?.owner_name?.trim() ||
-    "Vendor Store"
-  );
-});
-
-const businessAddress = computed(() => {
-  return (
-    vendorProfile.value?.store_address?.trim() ||
-    vendorProfile.value?.service_areas?.trim() ||
-    "No store address set"
-  );
-});
-
+const businessName = computed(() => vendorProfile.value?.store_name?.trim() || vendorProfile.value?.owner_name?.trim() || "Vendor Store");
+const businessAddress = computed(() => vendorProfile.value?.store_address?.trim() || vendorProfile.value?.service_areas?.trim() || "No store address set");
 const businessInitial = computed(() => {
-  const source = businessName.value.trim();
-  if (!source) return "V";
-
-  const words = source.split(/\s+/).filter(Boolean);
-  if (words.length >= 2) {
-    return `${words[0][0]}${words[1][0]}`.toUpperCase();
-  }
-
-  return source.slice(0, 1).toUpperCase();
+  const words = businessName.value.split(/\s+/).filter(Boolean);
+  return (words.length >= 2 ? `${words[0][0]}${words[1][0]}` : businessName.value.slice(0, 1)).toUpperCase() || "V";
 });
+const sidebarLogoUrl = computed(() => (logoLoadFailed.value ? "" : vendorProfile.value?.store_logo_url?.trim() || ""));
 
-const sidebarLogoUrl = computed(() => {
-  if (logoLoadFailed.value) return "";
-  return vendorProfile.value?.store_logo_url?.trim() || "";
-});
+const activeItem = computed(() => navPlaceFor(route.name)?.item ?? null);
 
-isLoading.value = false;
+const isLocked = (module) => !!module && subscriptionAccess.value !== null && !subscriptionAllowsModule(subscriptionAccess.value, module);
+const lockTooltip = (module) => (isLocked(module) ? subscriptionUpgradeMessage(subscriptionAccess.value, module) : undefined);
 
-const handleLogoError = () => {
-  logoLoadFailed.value = true;
-};
-
-const isLocked = (module) =>
-  subscriptionAccess.value !== null &&
-  !subscriptionAllowsModule(subscriptionAccess.value, module);
-
-const lockTooltip = (module) =>
-  isLocked(module)
-    ? subscriptionUpgradeMessage(subscriptionAccess.value, module)
-    : undefined;
-
-const handleModuleNavigation = (event, module) => {
+const handleNavigation = (event, module) => {
   if (!isLocked(module)) return;
   event.preventDefault();
   lockedModule.value = module;
 };
+const viewPlans = () => {
+  lockedModule.value = null;
+  router.push({ name: "VendorSubscription" });
+};
 
-const viewPlans = () => router.push({ name: "VendorSubscription" });
-
-// A "!" on Subscription Plan when there's no active plan or it ends within a week
+// A "!" on Subscription & Billing when there's no active plan or it ends within a week
 const planAlert = computed(() => {
   const access = subscriptionAccess.value;
   if (!access) return "";
@@ -521,413 +143,396 @@ const planAlert = computed(() => {
   return days <= 7 ? `Your plan ends in ${Math.max(0, days)} day${days === 1 ? "" : "s"}` : "";
 });
 
-const handleLogout = async () => {
-  if (isLoading.value) return;
-
-  isLoading.value = true;
-  isLoadingMessage.value = "Logging out...";
-
-  try {
-    await logout();
-  } catch (error) {
-    console.error("Logout error:", error);
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-const checkLogoutState = () => {
-  const logoutInitiated = sessionStorage.getItem("logout_initiated_vendor");
-  if (logoutInitiated) {
-    const logoutTime = parseInt(logoutInitiated);
-    const currentTime = Date.now();
-
-    if (currentTime - logoutTime < 5000) {
-      isLoading.value = true;
-
-      setTimeout(() => {
-        isLoading.value = false;
-        sessionStorage.removeItem("logout_initiated_vendor");
-      }, 1000);
-    } else {
-      sessionStorage.removeItem("logout_initiated_vendor");
-    }
-  }
-};
-
-const checkAuthState = () => {
-  const token =
-    localStorage.getItem("auth_token") || localStorage.getItem("vendor_token");
-  if (!token && isLoading.value) {
-    setTimeout(() => {
-      isLoading.value = false;
-    }, 1000);
-  }
-};
-
-const handleBeforeUnload = () => {
-  if (isLoading.value) {
-    sessionStorage.setItem("vendor_logout_was_showing", "true");
-  }
-};
-
-const handlePageLoad = () => {
-  const logoutWasShowing = sessionStorage.getItem("vendor_logout_was_showing");
-  if (logoutWasShowing === "true") {
-    isLoading.value = false;
-    sessionStorage.removeItem("vendor_logout_was_showing");
-  }
-};
-
-const loadSidebarNotifications = async () => {
+const loadOrderCount = async () => {
   try {
     const response = await api.get("/vendor/orders/statistics");
-    const statusBreakdown = response.data?.data?.status_breakdown ?? {};
-
-    notificationCounts.value.orders =
-      Number(statusBreakdown.pending ?? 0) +
-      Number(statusBreakdown.processing ?? 0);
-  } catch (error) {
-    console.error("Error loading vendor sidebar notifications:", error);
+    const status = response.data?.data?.status_breakdown ?? {};
+    orderCount.value = Number(status.pending ?? 0) + Number(status.processing ?? 0);
+  } catch (_) {
+    // The badge just stays as it was
   }
+};
+
+const onOutsideClick = (e) => {
+  if (showColors.value && colorRef.value && !colorRef.value.contains(e.target)) showColors.value = false;
 };
 
 onMounted(() => {
-  checkLogoutState();
-  checkAuthState();
-  handlePageLoad();
   fetchProfile().catch(() => {});
   loadSubscriptionAccess().catch(() => {});
-  loadSidebarNotifications();
-  notificationInterval = window.setInterval(loadSidebarNotifications, 60000);
+  loadOrderCount();
+  notificationInterval = window.setInterval(loadOrderCount, 60000);
   subscriptionInterval = window.setInterval(() => loadSubscriptionAccess().catch(() => {}), 60000);
-
-  window.addEventListener("beforeunload", handleBeforeUnload);
+  document.addEventListener("click", onOutsideClick);
 });
 
 onUnmounted(() => {
-  window.removeEventListener("beforeunload", handleBeforeUnload);
-  if (notificationInterval) {
-    window.clearInterval(notificationInterval);
-  }
-  if (subscriptionInterval) {
-    window.clearInterval(subscriptionInterval);
-  }
+  window.clearInterval(notificationInterval);
+  window.clearInterval(subscriptionInterval);
+  document.removeEventListener("click", onOutsideClick);
 });
 
-// Close sidebar on route change (mobile)
 watch(
   () => route.path,
   () => {
+    lockedModule.value = null;
     loadSubscriptionAccess().catch(() => {});
     if (isMobileOpen.value) closeMobile();
   },
 );
-
-watch(
-  () => vendorProfile.value?.store_logo_url,
-  () => {
-    logoLoadFailed.value = false;
-  },
-);
+watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = false));
 </script>
 
 <style scoped>
 .sidebar {
   position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
   width: 260px;
   height: 100vh;
   background: #ffffff;
-  border-right: 1px solid #e2e8f0;
-  display: flex;
-  flex-direction: column;
-  left: 0;
-  top: 0;
-  overflow-y: auto;
-  z-index: 300;
+  border-right: 1px solid #edf0f3;
+  font-family: "Poppins", sans-serif;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.logo-section {
-  /* Same size whatever box-sizing the page uses; grows for long shop names */
-  box-sizing: content-box;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e2e8f0;
-  min-height: 43px;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.logo-icon {
-  font-size: 24px;
-}
-
-.logo-image {
-  width: 50px;
-  height: 50px;
-  object-fit: cover;
-  border-radius: 14px;
-  display: block;
-}
-
-.logo-text {
-  font-size: 18px;
-  font-weight: 600;
-  color: #2d3748;
-}
-
-.business-info {
-  padding: 16px 24px;
+/* Identity */
+.brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid #e2e8f0;
+  margin: 14px 14px 6px;
+  padding: 10px;
+  border-radius: 16px;
+  background: #f7f9fa;
+  text-decoration: none;
+  transition: background 0.15s;
 }
-
-.business-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+.brand:hover {
+  background: #f0f3f5;
+}
+.brand-logo {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border-radius: 12px;
   background: #d1fae5;
   color: #065f46;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 15px;
   font-weight: 600;
+}
+.brand-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.brand-text {
+  min-width: 0;
+}
+.brand-text b,
+.brand-text small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.brand-text b {
   font-size: 14px;
-}
-
-.business-details {
-  flex: 1;
-}
-
-.business-name {
-  font-size: 13px;
   font-weight: 600;
-  color: #2d3748;
-  margin-bottom: 2px;
+  color: #1a202c;
+}
+.brand-text small {
+  font-size: 11.5px;
+  color: #8a94a6;
 }
 
-.business-address {
-  font-size: 11px;
-  color: #718096;
-}
-
-.nav-menu {
+/* Navigation */
+.nav {
   flex: 1;
-  padding: 8px 16px;
+  overflow-y: auto;
+  padding: 4px 14px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #e2e8f0 transparent;
 }
-
-.nav-section {
-  margin-bottom: 20px;
+.nav-section + .nav-section {
+  margin-top: 6px;
 }
-
-.section-label {
-  font-size: 11px;
+.nav-label {
+  margin: 0;
+  padding: 14px 12px 6px;
+  font-size: 10.5px;
   font-weight: 600;
-  color: #9ca3af;
-  letter-spacing: 0.5px;
-  padding: 12px 12px 8px;
-  margin-bottom: 4px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a0aab8;
 }
-
 .nav-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
+  gap: 11px;
   margin-bottom: 2px;
-  border-radius: 8px;
-  color: #718096;
+  padding: 9px 12px;
+  border-radius: 12px;
+  color: #5b6474;
+  font-size: 13.5px;
+  font-weight: 500;
   text-decoration: none;
-  font-size: 14px;
-  transition: all 0.2s;
-  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
 }
-
+.nav-item:hover {
+  background: var(--sb-accent-soft);
+  color: #1a202c;
+}
+.nav-item:hover .nav-icon {
+  color: var(--sb-accent);
+}
+.nav-item.active {
+  background: var(--sb-accent);
+  color: var(--sb-accent-ink);
+  box-shadow: 0 6px 16px -6px var(--sb-accent-glow);
+}
+.nav-item.active .nav-icon {
+  color: inherit;
+}
+.nav-item:focus-visible {
+  outline: 2px solid var(--sb-accent);
+  outline-offset: 2px;
+}
+.nav-item.locked {
+  opacity: 0.5;
+}
+.nav-item.locked:hover {
+  background: #f7f9fa;
+  color: #5b6474;
+}
+.nav-item.locked:hover .nav-icon {
+  color: inherit;
+}
+.nav-icon {
+  flex: none;
+  display: inline-flex;
+  color: #8a94a6;
+  transition: color 0.15s;
+}
+.nav-icon :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+.nav-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.nav-lock {
+  display: inline-flex;
+}
+.nav-lock :deep(svg) {
+  width: 14px;
+  height: 14px;
+}
 .nav-badge {
-  margin-left: auto;
-  min-width: 22px;
-  height: 22px;
+  flex: none;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
   border-radius: 999px;
-  background: #dc2626;
+  background: #e53e3e;
   color: #fff;
   font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 7px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+}
+.nav-badge.warn {
+  background: #f59e0b;
+}
+.nav-item.active .nav-badge {
+  background: #fff;
+  color: #c53030;
 }
 
-.nav-item:hover {
-  background: #f7fafc;
-  color: #2d3748;
-}
-
-.nav-item.active {
-  background: #48bb78;
-  color: white;
-}
-
-.nav-item.is-locked {
-  opacity: 0.52;
-  cursor: not-allowed;
-}
-
-.nav-item.is-locked:hover,
-.nav-item.is-locked.active {
-  background: transparent;
-  color: #718096;
-}
-
-.lock-icon {
-  margin-left: auto;
-  font-size: 13px;
-  filter: grayscale(1);
-}
-
+/* Locked-module hint */
 .upgrade-hint {
-  margin: 0 16px 14px;
-  padding: 10px;
+  display: grid;
+  gap: 8px;
+  margin: 0 14px 10px;
+  padding: 12px;
   border: 1px solid #fde68a;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #fffbeb;
   color: #92400e;
   font-size: 12px;
-  display: grid;
+  line-height: 1.45;
+}
+.upgrade-actions {
+  display: flex;
   gap: 8px;
 }
-
 .upgrade-hint button {
-  width: fit-content;
   border: 0;
-  border-radius: 6px;
-  padding: 6px 9px;
-  background: #d97706;
-  color: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
 }
-
-.nav-icon {
-  font-size: 18px;
-  width: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.upgrade-go {
+  background: #d97706;
+  color: #fff;
+}
+.upgrade-dismiss {
+  background: none;
+  color: #92400e;
 }
 
-.sidebar-footer {
-  margin-top: auto;
-  padding: 16px 24px 24px;
-  border-top: 1px solid #e2e8f0;
-}
-
-.logout-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  padding: 12px 16px;
-  background: transparent;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  color: #e53e3e;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
+/* Tab color */
+.sidebar-foot {
   position: relative;
+  padding: 10px 14px 14px;
+  border-top: 1px solid #edf0f3;
 }
-
-.logout-btn:hover:not(:disabled) {
-  background: #fff5f5;
-  border-color: #e53e3e;
-  transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(229, 62, 62, 0.15);
+.color-toggle {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: #5b6474;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
 }
-
-.logout-btn:active:not(:disabled) {
-  transform: translateY(0);
+.color-toggle:hover {
+  background: var(--sb-accent-soft);
 }
-
-.logout-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.logout-icon {
-  font-size: 18px;
-}
-
-.logout-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(229, 62, 62, 0.3);
-  border-top: 2px solid #e53e3e;
+.color-dot {
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-left: 8px;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px #e2e8f0;
+}
+.color-pop {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: calc(100% - 4px);
+  padding: 14px;
+  border: 1px solid #edf0f3;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+}
+.color-title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a5568;
+}
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.swatch:hover {
+  transform: scale(1.1);
+}
+.swatch.on {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1a202c;
+}
+.custom-color {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border: 1px solid #edf0f3;
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: #4a5568;
+  cursor: pointer;
+}
+.custom-color input {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.custom-color input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.custom-color input::-webkit-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
+.custom-color span {
+  flex: 1;
+}
+.custom-color code {
+  font-size: 11.5px;
+  color: #8a94a6;
+}
+.color-reset {
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #718096;
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.pop-enter-active,
+.pop-leave-active {
+  transition: opacity 0.15s, transform 0.15s;
+}
+.pop-enter-from,
+.pop-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
 }
 
-@media (max-width: 1200px) {
-  .sidebar {
-    width: 200px;
-  }
-}
-
+/* Mobile */
 @media (max-width: 968px) {
   .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
     width: 280px;
+    transform: translateX(-100%);
   }
-
   .sidebar.mobile-open {
-    transform: translateX(0) !important;
     z-index: 1000;
-    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
   }
 }
-
 .sidebar-backdrop {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(2px);
+  inset: 0;
   z-index: 999;
-}
-
-/* Animation for mobile menu */
-.sidebar {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Scrollbar styling */
-.sidebar::-webkit-scrollbar {
-  width: 4px;
-}
-
-.sidebar::-webkit-scrollbar-track {
-  background: #f7fafc;
-}
-
-.sidebar::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
-  border-radius: 2px;
-}
-
-.sidebar::-webkit-scrollbar-thumb:hover {
-  background: #a0aec0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(2px);
 }
 </style>

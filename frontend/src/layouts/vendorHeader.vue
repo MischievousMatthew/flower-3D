@@ -1,265 +1,77 @@
 <template>
-  <!-- Full-screen overlay while logging out -->
-  <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
+  <header class="vh">
+    <button type="button" class="vh-icon-btn vh-menu" aria-label="Open menu" @click="toggleMobile" v-html="ICONS.menu"></button>
 
-  <header class="vendor-header">
-    <!-- Mobile Menu Toggle -->
-    <button class="mobile-toggle" @click="toggleMobile" aria-label="Toggle Menu">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="3" y1="12" x2="21" y2="12"></line>
-        <line x1="3" y1="6" x2="21" y2="6"></line>
-        <line x1="3" y1="18" x2="21" y2="18"></line>
-      </svg>
-    </button>
+    <!-- Where you are -->
+    <div class="vh-where">
+      <span v-if="place" class="vh-crumb">{{ place.section.label }}</span>
+      <h1 class="vh-title">{{ title || place?.item.label || "Vendor" }}</h1>
+    </div>
 
-    <!-- Left: page title -->
-    <h1 class="page-title">{{ title }}</h1>
-
-    <!-- Right: actions + user pill -->
-    <div class="header-actions">
-      <!-- Optional search -->
-      <div v-if="showSearch" class="search-box">
-        <svg
-          class="search-icon"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-        >
-          <circle
-            cx="11"
-            cy="11"
-            r="8"
-            stroke="currentColor"
-            stroke-width="1.8"
-          />
-          <path
-            d="m21 21-4.35-4.35"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-          />
-        </svg>
+    <div class="vh-actions">
+      <label v-if="showSearch" class="vh-search">
+        <span v-html="ICONS.search"></span>
         <input
-          type="text"
+          type="search"
           :placeholder="searchPlaceholder"
           :value="modelValue"
+          :aria-label="searchPlaceholder"
           @input="$emit('update:modelValue', $event.target.value)"
         />
-      </div>
+      </label>
 
-      <!-- Parent-injected icon buttons -->
+      <!-- Parent-injected buttons -->
       <slot name="actions" />
+
+      <router-link :to="{ name: 'VendorSupport' }" class="vh-icon-btn" title="Help & support" aria-label="Help & support" v-html="ICONS.help"></router-link>
 
       <!-- Announcements and support replies (store owners only) -->
       <NotificationBell v-if="user?.role === 'vendor'" support-path="/vendor/support" :all-path="{ name: 'VendorNotifications' }" />
 
-      <router-link
-        :to="chatRoute"
-        class="chat-pill"
-        :class="{ active: isChatRoute }"
-      >
-        <span>Chat</span>
-        <span v-if="unreadChatCount > 0" class="chat-pill-badge">
-          {{ unreadChatCount > 9 ? "9+" : unreadChatCount }}
-        </span>
+      <router-link :to="chatRoute" class="vh-icon-btn" :class="{ on: isChatRoute }" title="Customer chat" aria-label="Customer chat">
+        <span v-html="ICONS.chat"></span>
+        <span v-if="unreadChatCount > 0" class="vh-dot-badge">{{ unreadChatCount > 9 ? "9+" : unreadChatCount }}</span>
       </router-link>
 
-      <!-- Slim divider -->
-      <div class="header-divider" />
+      <span class="vh-divider" aria-hidden="true"></span>
 
-      <!-- ── User pill ──────────────────────────────── -->
-      <div class="user-pill-wrap" ref="dropdownRef">
-        <button
-          class="user-pill"
-          :class="{ active: showDropdown }"
-          @click="toggleDropdown"
-        >
-          <!-- Avatar -->
-          <div class="pill-avatar-wrap">
-            <img
-              v-if="resolvedAvatar"
-              :src="resolvedAvatar"
-              :alt="displayName"
-              class="pill-avatar-img"
-              @error="avatarFailed = true"
-            />
-            <div v-else class="pill-avatar-fallback">{{ initials }}</div>
-            <span class="pill-online-dot" />
-          </div>
-
-          <!-- Name + role -->
-          <div class="pill-info">
-            <span class="pill-name">{{ shortName }}</span>
-            <span class="pill-role">VENDOR</span>
-          </div>
-
-          <!-- Chevron -->
-          <svg
-            class="pill-chevron"
-            :class="{ open: showDropdown }"
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-          >
-            <path
-              d="M2.5 5L7 9.5L11.5 5"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+      <!-- Account menu -->
+      <div ref="dropdownRef" class="vh-user-wrap">
+        <button type="button" class="vh-user" :class="{ open: showDropdown }" :aria-expanded="showDropdown" aria-haspopup="menu" @click="toggleDropdown">
+          <span class="vh-avatar">
+            <img v-if="resolvedAvatar" :src="resolvedAvatar" :alt="displayName" @error="avatarFailed = true" />
+            <span v-else>{{ initials }}</span>
+          </span>
+          <span class="vh-user-text">
+            <b>{{ shortName }}</b>
+            <small>{{ planLabel }}</small>
+          </span>
+          <span class="vh-chevron" v-html="ICONS.chevronDown"></span>
         </button>
 
-        <!-- ── Dropdown ───────────────────────────────── -->
-        <transition name="drop">
-          <div v-if="showDropdown" class="drop-card">
-            <!-- Identity header -->
-            <div class="drop-identity">
-              <div class="drop-avatar-ring">
-                <img
-                  v-if="resolvedAvatar"
-                  :src="resolvedAvatar"
-                  :alt="displayName"
-                  class="drop-avatar-img"
-                  @error="avatarFailed = true"
-                />
-                <div v-else class="drop-avatar-fallback">{{ initials }}</div>
-              </div>
-              <div class="drop-meta">
-                <p class="drop-name">{{ displayName }}</p>
-                <p class="drop-email">{{ userEmail }}</p>
-                <div class="drop-badges">
-                  <span class="badge-role">Vendor</span>
-                  <span class="badge-plan" :class="planClass">{{
-                    planLabel
-                  }}</span>
-                  <span v-if="subscriptionStatus" class="badge-plan badge-status" :class="statusClass">{{ subscriptionStatus }}</span>
-                </div>
+        <Transition name="drop">
+          <div v-if="showDropdown" class="vh-menu-card" role="menu">
+            <div class="vh-menu-id">
+              <span class="vh-avatar lg">
+                <img v-if="resolvedAvatar" :src="resolvedAvatar" :alt="displayName" @error="avatarFailed = true" />
+                <span v-else>{{ initials }}</span>
+              </span>
+              <div>
+                <b>{{ displayName }}</b>
+                <small>{{ userEmail }}</small>
+                <span class="vh-plan" :class="statusClass">{{ planLabel }}<template v-if="subscriptionStatus"> · {{ subscriptionStatus }}</template></span>
               </div>
             </div>
-
-            <!-- Profile link -->
-            <div class="drop-body">
-              <router-link
-                :to="chatRoute"
-                class="drop-item"
-                @click="showDropdown = false"
-              >
-                <span class="drop-item-icon">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                </span>
-                <span>Chat</span>
-                <span v-if="unreadChatCount > 0" class="drop-chat-badge">
-                  {{ unreadChatCount > 9 ? "9+" : unreadChatCount }}
-                </span>
-                <svg
-                  class="item-arrow"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 12 12"
-                  fill="none"
-                >
-                  <path
-                    d="M4.5 2.5L8 6L4.5 9.5"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
+            <nav class="vh-menu-links">
+              <router-link v-for="l in MENU" :key="l.name" :to="{ name: l.name }" class="vh-menu-item" role="menuitem" @click="showDropdown = false">
+                <span v-html="ICONS[l.icon]"></span>{{ l.label }}
               </router-link>
-
-              <router-link
-                to="/vendor/profile"
-                class="drop-item"
-                @click="showDropdown = false"
-              >
-                <span class="drop-item-icon">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                    <circle
-                      cx="12"
-                      cy="7"
-                      r="4"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                </span>
-                <span>Profile</span>
-                <svg
-                  class="item-arrow"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 12 12"
-                  fill="none"
-                >
-                  <path
-                    d="M4.5 2.5L8 6L4.5 9.5"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </router-link>
-            </div>
-
-            <!-- Logout -->
-            <div class="drop-footer">
-              <button class="drop-logout-btn" @click="handleLogout">
-                <span class="drop-item-icon">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                    <polyline
-                      points="16 17 21 12 16 7"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                    <line
-                      x1="21"
-                      y1="12"
-                      x2="9"
-                      y2="12"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                </span>
-                <span>Logout</span>
-              </button>
-            </div>
+            </nav>
+            <button type="button" class="vh-menu-item vh-logout" role="menuitem" :disabled="isLoggingOut" @click="handleLogout">
+              <span v-html="ICONS.logout"></span>{{ isLoggingOut ? "Signing out…" : "Sign out" }}
+            </button>
           </div>
-        </transition>
+        </Transition>
       </div>
     </div>
   </header>
@@ -267,17 +79,17 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "../composables/useAuth";
 import { useChatNotifications } from "../composables/useChatNotifications";
 import { useSidebarState } from "../composables/useSidebarState";
-import api from "../plugins/axios";
-import { toast } from "vue3-toastify";
 import { useSubscriptionAccess } from "../composables/useSubscriptionAccess";
-import LoadingOverlay from "../layouts/components/LoadingOverlay.vue";
+import { SHOP_ICONS as ICONS } from "../components/vendor/shop/shopIcons";
+import { navPlaceFor } from "./Sidebar/vendorNav";
 import NotificationBell from "../components/support/NotificationBell.vue";
+import api from "../plugins/axios";
 
-const props = defineProps({
+defineProps({
   title: { type: String, default: "" },
   showSearch: { type: Boolean, default: false },
   searchPlaceholder: { type: String, default: "Search name or SKU..." },
@@ -285,6 +97,15 @@ const props = defineProps({
 });
 defineEmits(["update:modelValue"]);
 
+const MENU = [
+  { name: "VendorProfile", label: "Profile", icon: "user" },
+  { name: "VendorSubscription", label: "Subscription & Billing", icon: "sparkle" },
+  { name: "VendorShopSettings", label: "Shop settings", icon: "gear" },
+  { name: "VendorSecurity", label: "Security", icon: "shield" },
+  { name: "VendorSupport", label: "Help & support", icon: "help" },
+];
+
+const route = useRoute();
 const router = useRouter();
 const { user, logout } = useAuth();
 const { unreadChatCount, chatRoute } = useChatNotifications();
@@ -293,22 +114,21 @@ const { subscriptionAccess, loadSubscriptionAccess } = useSubscriptionAccess();
 
 const showDropdown = ref(false);
 const dropdownRef = ref(null);
-const isLoading = ref(false);
-const isLoadingMessage = ref("");
+const isLoggingOut = ref(false);
 const avatarFailed = ref(false);
 const vendorProfile = ref(null);
 
-// ── Load enriched vendor profile ─────────────────────────────────────────
+const place = computed(() => navPlaceFor(route.name));
+
 const loadVendorProfile = async () => {
   try {
     const res = await api.get("/vendor/profile");
-    if (res.data?.success || res.data?.data) {
-      vendorProfile.value = res.data.data ?? res.data;
-    }
-  } catch {}
+    if (res.data?.success || res.data?.data) vendorProfile.value = res.data.data ?? res.data;
+  } catch (_) {
+    // Falls back to the signed-in user's details
+  }
 };
 
-// ── Computed ──────────────────────────────────────────────────────────────
 const displayName = computed(() => {
   const vp = vendorProfile.value;
   if (vp?.owner_name) return vp.owner_name;
@@ -317,26 +137,11 @@ const displayName = computed(() => {
   if (u?.name && u?.surname) return `${u.name} ${u.surname}`;
   return u?.name || u?.email?.split("@")[0] || "Vendor";
 });
-
-const shortName = computed(() => {
-  const n = displayName.value;
-  return n.length > 17 ? n.slice(0, 16) + "…" : n;
-});
-
+const shortName = computed(() => (displayName.value.length > 18 ? `${displayName.value.slice(0, 17)}…` : displayName.value));
 const initials = computed(
-  () =>
-    displayName.value
-      .split(" ")
-      .map((w) => w[0] ?? "")
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() || "V",
+  () => displayName.value.split(" ").map((w) => w[0] ?? "").slice(0, 2).join("").toUpperCase() || "V",
 );
-
-const userEmail = computed(
-  () => vendorProfile.value?.email || user.value?.email || "",
-);
-
+const userEmail = computed(() => vendorProfile.value?.email || user.value?.email || "");
 const resolvedAvatar = computed(() => {
   if (avatarFailed.value) return "";
   const vp = vendorProfile.value;
@@ -347,585 +152,389 @@ const resolvedAvatar = computed(() => {
   return "";
 });
 
-const planLabel = computed(
-  () =>
-    subscriptionAccess.value?.plan_name ? `${subscriptionAccess.value.plan_name} Plan` :
-    vendorProfile.value?.plan ||
-    user.value?.plan ||
-    user.value?.subscription_plan ||
-    "Free Plan",
-);
-
+const planLabel = computed(() => {
+  const a = subscriptionAccess.value;
+  if (a?.plan_name) return `${a.plan_name} plan`;
+  return a ? "No plan" : "Vendor";
+});
 const subscriptionStatus = computed(() => {
-  const status = subscriptionAccess.value?.status;
-  if (!status) return "";
-  return status === "trialing" ? "Trial" : status.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const a = subscriptionAccess.value;
+  if (!a?.status) return "";
+  if (a.status === "trialing") return "Trial";
+  return a.status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+});
+const statusClass = computed(() => {
+  const a = subscriptionAccess.value;
+  if (!a) return "";
+  if (!a.subscription_active) return "off";
+  return a.status === "trialing" ? "trial" : "on";
 });
 
-const statusClass = computed(() => subscriptionAccess.value?.status === "trialing" ? "status-trial" : "status-active");
+const isChatRoute = computed(() => router.currentRoute.value.path.startsWith(chatRoute.value));
 
-const planClass = computed(() => {
-  const p = planLabel.value.toLowerCase();
-  if (p.includes("pro")) return "plan-pro";
-  if (p.includes("biz") || p.includes("business")) return "plan-biz";
-  return "plan-free";
-});
-
-const isChatRoute = computed(() =>
-  router.currentRoute.value.path.startsWith(chatRoute.value),
-);
-
-// ── Dropdown ──────────────────────────────────────────────────────────────
 const toggleDropdown = () => {
   showDropdown.value = !showDropdown.value;
-  if (showDropdown.value) {
-    loadVendorProfile();
-    loadSubscriptionAccess().catch(() => {});
-  }
+  if (showDropdown.value) loadSubscriptionAccess().catch(() => {});
+};
+const onOutsideClick = (e) => {
+  if (dropdownRef.value && !dropdownRef.value.contains(e.target)) showDropdown.value = false;
+};
+const onKey = (e) => {
+  if (e.key === "Escape") showDropdown.value = false;
 };
 
-const onOutsideClick = (e) => {
-  if (dropdownRef.value && !dropdownRef.value.contains(e.target))
-    showDropdown.value = false;
-};
 onMounted(() => {
   document.addEventListener("click", onOutsideClick);
-  loadVendorProfile();
+  document.addEventListener("keydown", onKey);
   loadSubscriptionAccess().catch(() => {});
 });
-onUnmounted(() => document.removeEventListener("click", onOutsideClick));
-watch(
-  user,
-  (u) => {
-    if (u) loadVendorProfile();
-  },
-  { immediate: true },
-);
+onUnmounted(() => {
+  document.removeEventListener("click", onOutsideClick);
+  document.removeEventListener("keydown", onKey);
+});
+watch(user, (u) => u && loadVendorProfile(), { immediate: true });
 
-// ── Logout — LoadingOverlay handles all visual feedback ───────────────────
 const handleLogout = async () => {
-  if (isLoading.value) return;
-
-  isLoading.value = true;
-  isLoadingMessage.value = "Logging out...";
-  showDropdown.value = false;
-
+  if (isLoggingOut.value) return;
+  isLoggingOut.value = true;
   try {
     await logout();
   } catch (error) {
     console.error("Logout error:", error);
   } finally {
-    isLoading.value = false;
+    isLoggingOut.value = false;
+    showDropdown.value = false;
   }
 };
 </script>
 
 <style scoped>
-* {
-  font-family:
-    "Poppins",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-  box-sizing: border-box;
-}
-
-/* ── Sticky header ───────────────────────────────────── */
-.vendor-header {
+.vh {
   position: sticky;
   top: 0;
   z-index: 200;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 14px 28px;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.04),
-    0 4px 16px rgba(0, 0, 0, 0.06),
-    0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  gap: 14px;
+  min-height: 68px;
+  padding: 10px 28px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid #edf0f3;
+  font-family: "Poppins", sans-serif;
+  box-sizing: border-box;
 }
-
-.mobile-toggle {
-  display: none;
-  background: transparent;
-  border: none;
-  color: #4a5568;
-  cursor: pointer;
-  padding: 8px;
-  margin-right: 12px;
-  border-radius: 8px;
-  transition: background-color 0.2s;
+.vh *,
+.vh *::before,
+.vh *::after {
+  box-sizing: border-box;
 }
-
-.mobile-toggle:hover {
-  background-color: #f7fafc;
+.vh-where {
+  flex: 1;
+  min-width: 0;
 }
-
-.page-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #1a202c;
+.vh-crumb {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a0aab8;
+}
+.vh-title {
   margin: 0;
-  letter-spacing: -0.3px;
+  overflow: hidden;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #1a202c;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vh-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-/* ── Right section ───────────────────────────────────── */
-.header-actions {
+/* Round icon buttons */
+.vh-icon-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #edf0f3;
+  border-radius: 12px;
+  background: #fff;
+  color: #5b6474;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.vh-icon-btn:hover,
+.vh-icon-btn.on {
+  background: #f5f7f9;
+  border-color: #e2e8f0;
+  color: #1a202c;
+}
+.vh-icon-btn :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+.vh-dot-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #e53e3e;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
+.vh-menu {
+  display: none;
+}
+
+/* Search */
+.vh-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #edf0f3;
+  border-radius: 12px;
+  background: #f7f9fa;
+  color: #a0aab8;
+}
+.vh-search:focus-within {
+  border-color: #cbd5e0;
+  background: #fff;
+}
+.vh-search :deep(svg) {
+  width: 16px;
+  height: 16px;
+}
+.vh-search input {
+  width: 220px;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: #1a202c;
+  font: inherit;
+  font-size: 13px;
+}
+
+.vh-divider {
+  width: 1px;
+  height: 28px;
+  margin: 0 4px;
+  background: #edf0f3;
+}
+
+/* Account */
+.vh-user-wrap {
+  position: relative;
+}
+.vh-user {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.header-divider {
-  width: 1px;
-  height: 28px;
-  background: #e2e8f0;
-  border-radius: 1px;
-  margin: 0 2px;
-}
-
-.chat-pill {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 78px;
-  height: 40px;
-  padding: 0 16px;
-  border-radius: 999px;
-  border: 1.5px solid #d9efe0;
-  background: #f5fdf8;
-  color: #166534;
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 700;
-  transition: all 0.2s ease;
-}
-
-.chat-pill:hover,
-.chat-pill.active {
-  background: #dcfce7;
-  border-color: #86efac;
-}
-
-.chat-pill-badge,
-.drop-chat-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: #dc2626;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.chat-pill-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-}
-
-/* ── Search ──────────────────────────────────────────── */
-.search-box {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.search-icon {
-  position: absolute;
-  left: 12px;
-  color: #94a3b8;
-  pointer-events: none;
-}
-.search-box input {
-  width: 260px;
-  padding: 9px 14px 9px 36px;
-  border: 1.5px solid #e8edf5;
-  border-radius: 9px;
-  font-size: 13.5px;
-  background: #f8fafd;
-  color: #1a202c;
-  font-family: inherit;
-  transition: all 0.2s;
-}
-.search-box input:focus {
-  outline: none;
-  border-color: #48bb78;
-  background: white;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.12);
-}
-.search-box input::placeholder {
-  color: #b0bec5;
-}
-
-/* ── User pill ───────────────────────────────────────── */
-.user-pill-wrap {
-  position: relative;
-}
-
-.user-pill {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 6px 12px 6px 5px;
-  background: white;
-  border: 1.5px solid #e8edf5;
-  border-radius: 40px;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: none;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  transition: all 0.2s;
-  font-family: inherit;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: background 0.15s, border-color 0.15s;
 }
-.user-pill:hover,
-.user-pill.active {
-  border-color: #48bb78;
-  background: #f5fdf8;
-  box-shadow: 0 2px 10px rgba(72, 187, 120, 0.15);
+.vh-user:hover,
+.vh-user.open {
+  background: #f7f9fa;
+  border-color: #edf0f3;
 }
-
-/* Avatar */
-.pill-avatar-wrap {
-  position: relative;
-  flex-shrink: 0;
-}
-.pill-avatar-img {
-  width: 33px;
-  height: 33px;
-  border-radius: 50%;
-  object-fit: cover;
-  display: block;
-  border: 2px solid #e8f5e9;
-}
-.pill-avatar-fallback {
-  width: 33px;
-  height: 33px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #48bb78, #38a169);
-  color: white;
+.vh-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 11px;
+  background: #2d3748;
+  color: #fff;
   font-size: 13px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #e8f5e9;
+  font-weight: 600;
 }
-.pill-online-dot {
-  position: absolute;
-  bottom: 1px;
-  right: 0;
-  width: 9px;
-  height: 9px;
-  background: #48bb78;
-  border-radius: 50%;
-  border: 2px solid white;
-  box-shadow: 0 0 0 1px rgba(72, 187, 120, 0.3);
+.vh-avatar.lg {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  font-size: 16px;
 }
-
-/* Name + role */
-.pill-info {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+.vh-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-.pill-name {
+.vh-user-text b,
+.vh-user-text small {
+  display: block;
+  white-space: nowrap;
+}
+.vh-user-text b {
   font-size: 13px;
   font-weight: 600;
   color: #1a202c;
-  line-height: 1.25;
-  max-width: 120px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.pill-role {
-  font-size: 9.5px;
-  font-weight: 600;
-  color: #48bb78;
-  letter-spacing: 0.6px;
+.vh-user-text small {
+  font-size: 11.5px;
+  color: #8a94a6;
 }
-
-/* Chevron */
-.pill-chevron {
-  color: #94a3b8;
-  transition: transform 0.25s;
-  flex-shrink: 0;
+.vh-chevron {
+  display: inline-flex;
+  color: #a0aab8;
+  transition: transform 0.2s;
 }
-.pill-chevron.open {
+.vh-chevron :deep(svg) {
+  width: 16px;
+  height: 16px;
+}
+.vh-user.open .vh-chevron {
   transform: rotate(180deg);
-  color: #48bb78;
 }
 
-/* ── Dropdown card ─────────────────────────────────────── */
-.drop-card {
+.vh-menu-card {
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 8px);
   right: 0;
-  width: 296px;
-  background: white;
-  border-radius: 16px;
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.05),
-    0 4px 8px rgba(0, 0, 0, 0.04),
-    0 16px 40px rgba(0, 0, 0, 0.12);
-  overflow: hidden;
-  z-index: 9999;
+  width: 290px;
+  padding: 8px;
+  border: 1px solid #edf0f3;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.16);
 }
-
-/* Identity */
-.drop-identity {
+.vh-menu-id {
   display: flex;
-  align-items: center;
-  gap: 13px;
-  padding: 20px 18px 18px;
-  background: linear-gradient(140deg, #f0fff5 0%, #f9fef9 60%, #fff 100%);
-  border-bottom: 1px solid #edf5ed;
+  gap: 12px;
+  padding: 10px 10px 14px;
+  border-bottom: 1px solid #f1f4f6;
 }
-
-.drop-avatar-ring {
-  flex-shrink: 0;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  overflow: hidden;
-  box-shadow:
-    0 0 0 2px white,
-    0 0 0 4px #a7f3d0;
-}
-.drop-avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.drop-avatar-fallback {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #48bb78, #38a169);
-  color: white;
-  font-size: 18px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.drop-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+.vh-menu-id > div {
   min-width: 0;
 }
-.drop-name {
-  font-size: 15px;
-  font-weight: 700;
+.vh-menu-id b,
+.vh-menu-id small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vh-menu-id b {
+  font-size: 14px;
+  font-weight: 600;
   color: #1a202c;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.drop-email {
-  font-size: 11.5px;
-  color: #94a3b8;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.vh-menu-id small {
+  font-size: 12px;
+  color: #8a94a6;
 }
-.drop-badges {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-  margin-top: 4px;
-}
-
-.badge-role {
+.vh-plan {
   display: inline-block;
-  padding: 2px 9px;
-  background: white;
+  background: #f1f5f9;
   color: #64748b;
+  margin-top: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
-  border-radius: 20px;
-  border: 1px solid #e2e8f0;
 }
-.badge-plan {
-  display: inline-block;
-  padding: 2px 9px;
-  font-size: 11px;
-  font-weight: 700;
-  border-radius: 20px;
+.vh-plan.on { background: #e6f9ee; color: #22753f; }
+.vh-plan.trial { background: #f3f0ff; color: #6b46c1; }
+.vh-plan.off { background: #fff1f1; color: #c53030; }
+.vh-menu-links {
+  display: grid;
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f4f6;
 }
-.plan-free {
-  background: #f0fff4;
-  color: #38a169;
-  border: 1.5px solid #c6f6d5;
-}
-.plan-pro {
-  background: #fffbeb;
-  color: #d97706;
-  border: 1.5px solid #fde68a;
-}
-.plan-biz {
-  background: #eff6ff;
-  color: #2563eb;
-  border: 1.5px solid #bfdbfe;
-}
-.badge-status { border: 1.5px solid transparent; }
-.status-trial { color: #2563eb; background: #eff6ff; border-color: #bfdbfe; }
-.status-active { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
-
-/* Profile link */
-.drop-body {
-  padding: 6px 8px;
-}
-
-.drop-item {
+.vh-menu-item {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 10px 12px;
-  color: #374151;
-  text-decoration: none;
-  font-size: 13.5px;
-  font-weight: 500;
-  border-radius: 10px;
-  transition:
-    background 0.15s,
-    color 0.15s;
-  cursor: pointer;
-}
-.drop-item:hover {
-  background: #f0faf4;
-  color: #1a2e1a;
-}
-.drop-item:hover .item-arrow {
-  opacity: 1;
-  transform: translateX(2px);
-}
-
-.drop-item-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: #f3f4f6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: #4b5563;
-  transition: background 0.15s;
-}
-.drop-item:hover .drop-item-icon {
-  background: #d1fae5;
-  color: #16a34a;
-}
-
-.item-arrow {
-  margin-left: auto;
-  color: #cbd5e0;
-  opacity: 0;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.drop-chat-badge {
-  margin-left: auto;
-  margin-right: 8px;
-}
-
-/* Logout */
-.drop-footer {
-  border-top: 1px solid #f1f5f1;
-  padding: 6px 8px 8px;
-}
-
-.drop-logout-btn {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 10px 12px;
+  gap: 10px;
   width: 100%;
-  color: #e53e3e;
-  font-size: 13.5px;
-  font-weight: 500;
+  padding: 9px 10px;
+  border: 0;
   border-radius: 10px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: background 0.15s;
-  font-family: inherit;
+  background: none;
+  color: #4a5568;
+  font: inherit;
+  font-size: 13px;
   text-align: left;
+  text-decoration: none;
+  cursor: pointer;
 }
-.drop-logout-btn:hover {
+.vh-menu-item:hover {
+  background: #f7f9fa;
+  color: #1a202c;
+}
+.vh-menu-item :deep(svg) {
+  width: 16px;
+  height: 16px;
+  color: #8a94a6;
+}
+.vh-logout {
+  margin-top: 6px;
+  color: #c53030;
+}
+.vh-logout :deep(svg) {
+  color: currentColor;
+}
+.vh-logout:hover {
   background: #fff5f5;
+  color: #c53030;
 }
-.drop-logout-btn .drop-item-icon {
-  color: #e53e3e;
-  background: #fee2e2;
-}
-.drop-logout-btn:hover .drop-item-icon {
-  background: #fecaca;
-}
-
-/* ── Dropdown transition ─────────────────────────────── */
-.drop-enter-active {
-  transition:
-    opacity 0.18s ease,
-    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
+.drop-enter-active,
 .drop-leave-active {
-  transition:
-    opacity 0.12s ease,
-    transform 0.12s ease;
+  transition: opacity 0.15s, transform 0.15s;
 }
 .drop-enter-from,
 .drop-leave-to {
   opacity: 0;
-  transform: translateY(-8px) scale(0.97);
+  transform: translateY(-6px);
 }
 
-/* ── Responsive ──────────────────────────────────────── */
-@media (max-width: 768px) {
-  .vendor-header {
-    padding: 12px 16px;
+@media (max-width: 968px) {
+  .vh {
+    padding: 10px 16px;
   }
-  .mobile-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .vh-menu {
+    display: grid;
   }
-  .pill-info {
+  .vh-user-text,
+  .vh-chevron,
+  .vh-divider {
     display: none;
   }
-  .user-pill {
-    padding: 5px;
-    border-radius: 50%;
-    gap: 0;
+  .vh-user {
+    padding: 2px;
   }
-  .pill-chevron {
+}
+@media (max-width: 640px) {
+  .vh-search {
     display: none;
   }
-  .header-divider {
+  .vh-crumb {
     display: none;
-  }
-  .chat-pill {
-    min-width: 64px;
-    height: 36px;
-    padding: 0 12px;
-  }
-  .drop-card {
-    width: 272px;
-    right: -4px;
   }
 }
 </style>

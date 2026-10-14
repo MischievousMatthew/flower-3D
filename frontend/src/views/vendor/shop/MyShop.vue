@@ -1,5 +1,5 @@
 <template>
-  <ShopLayout title="My Shop" subtitle="Your shop's profile, photos and location, exactly as customers see them. Hours, delivery and order settings are in Shop settings.">
+  <ShopLayout title="Shop Profile" subtitle="Your shop's profile, photos and location, exactly as customers see them. Hours, delivery and order settings are in Shop settings.">
     <template #actions>
       <button type="button" class="sp-btn sp-btn-ghost" :disabled="!dirty || saving" @click="reset">Discard</button>
       <button type="submit" form="shop-form" class="sp-btn sp-btn-primary" :disabled="!form || !dirty || saving">
@@ -84,10 +84,12 @@
                 <input v-model.trim="form.store_address" class="sp-input" :class="{ invalid: errors.store_address }" maxlength="500" placeholder="e.g. Trece Martires, Cavite" autocomplete="address-level2" required />
                 <small v-if="errors.store_address" class="sp-error">{{ errors.store_address }}</small>
               </label>
-              <label class="sp-field sp-span-all">
+              <div class="sp-field sp-span-all">
                 <span>Areas you deliver to</span>
-                <input v-model.trim="form.service_areas" class="sp-input" maxlength="500" placeholder="e.g. Imus, Bacoor, Dasmariñas" />
-              </label>
+                <ServiceAreaPicker v-model="form.service_areas" />
+                <small v-if="errors.service_areas" class="sp-error">{{ errors.service_areas }}</small>
+                <small v-else>Pick a whole province or just the cities you cover.</small>
+              </div>
               <div class="sp-field sp-span-all">
                 <div class="pin-row">
                   <span class="pin-icon" v-html="ICONS.pin"></span>
@@ -159,6 +161,8 @@ import { onBeforeRouteLeave } from "vue-router";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
+import ServiceAreaPicker from "../../../components/vendor/shop/ServiceAreaPicker.vue";
+import { joinServiceAreas, parseServiceAreas } from "../../../constants/serviceAreas";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { useVendorProfile } from "../../../composables/useVendorProfile";
@@ -230,6 +234,8 @@ async function save() {
       ...rest,
       facebook_page: rest.facebook_page || null,
       instagram_page: rest.instagram_page || null,
+      // Only places on the list are kept
+      service_areas: joinServiceAreas(parseServiceAreas(rest.service_areas)) || null,
     });
     apply(data.data);
     toast.success(data.message);

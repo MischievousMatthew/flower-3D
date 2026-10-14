@@ -69,10 +69,12 @@
                 <small v-if="errors.max_orders_per_day" class="sp-error">{{ errors.max_orders_per_day }}</small>
                 <small v-else>A day is shown as fully booked after this many.</small>
               </label>
-              <label class="sp-field sp-span-all">
+              <div class="sp-field sp-span-all">
                 <span>Areas you deliver to</span>
-                <input v-model.trim="form.service_areas" class="sp-input" maxlength="500" placeholder="e.g. Imus, Bacoor, Dasmariñas" />
-              </label>
+                <ServiceAreaPicker v-model="form.service_areas" />
+                <small v-if="errors.service_areas" class="sp-error">{{ errors.service_areas }}</small>
+                <small v-else>Pick a whole province or just the cities you cover.</small>
+              </div>
               <label class="sp-field sp-span-all">
                 <span>Cancellation &amp; refund policy</span>
                 <textarea v-model="form.cancellation_policy" class="sp-textarea" rows="4" maxlength="1000" :class="{ invalid: errors.cancellation_policy }" placeholder="e.g. Free cancellation up to 24 hours before delivery. Custom bouquets can't be refunded once prepared."></textarea>
@@ -156,6 +158,8 @@ import { onBeforeRouteLeave } from "vue-router";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
+import ServiceAreaPicker from "../../../components/vendor/shop/ServiceAreaPicker.vue";
+import { joinServiceAreas, parseServiceAreas } from "../../../constants/serviceAreas";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { hoursText, schedulesFrom, to12, weekFrom, weekFromText } from "../../../components/vendor/shop/businessHours";
@@ -252,7 +256,8 @@ async function save() {
     const p = form.value.preferences;
     const { data } = await api.put("vendor/account/shop-settings", {
       ...form.value,
-      service_areas: form.value.service_areas || null,
+      // Only places on the list are kept
+      service_areas: joinServiceAreas(parseServiceAreas(form.value.service_areas)) || null,
       operating_schedules: schedulesFrom(week.value),
       preferences: { ...p, away_message: p.away_message || null, back_on: p.back_on || null },
     });

@@ -77,7 +77,7 @@ class VendorProfileController extends Controller
             'store_street'        => 'nullable|string|max:255',
             'store_latitude'      => 'nullable|numeric|between:-90,90',
             'store_longitude'     => 'nullable|numeric|between:-180,180',
-            'service_areas'       => 'nullable|string|max:500',
+            'service_areas'       => ['nullable', 'string', 'max:500', VendorApplication::serviceAreaRule()],
             'contact_number'      => 'required|string|max:20',
             'facebook_page'       => 'nullable|url|max:255',
             'instagram_page'      => 'nullable|url|max:255',
