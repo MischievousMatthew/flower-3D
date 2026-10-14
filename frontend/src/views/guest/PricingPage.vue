@@ -109,7 +109,7 @@ async function selectPlan(plan) {
     if (plan.key === "business" && subscriptionAccess.value?.business_trial_eligible && !subscriptionAccess.value?.subscription_active) {
       await api.post("/vendor/subscription/business-trial");
       await loadSubscriptionAccess();
-      await router.push({ path: "/vendor/profile", query: { subscription_success: "business_trial" } });
+      await router.push({ name: "VendorSubscription", query: { subscription_success: "business_trial" } });
       return;
     }
     const { data } = await api.post("/vendor/subscription/checkout", { plan_key: plan.key });
@@ -143,7 +143,7 @@ onMounted(async () => {
       } else if (paymentState === "paid") {
         await loadSubscriptionAccess();
         const planKey = subscriptionAccess.value?.plan_key;
-        await router.replace({ path: "/vendor/profile", query: { subscription_success: planKey } });
+        await router.replace({ name: "VendorSubscription", query: { subscription_success: planKey } });
       } else if (route.query.plan) {
         // Plan picked on the landing page: start that plan's existing
         // checkout flow. Payment-return states above always take precedence.
@@ -170,7 +170,7 @@ async function waitForConfirmedCheckout(checkoutId) {
       const { data } = await api.get(`/vendor/subscription/checkout/${checkoutId}`);
       if (data?.data?.status === "paid") {
         await loadSubscriptionAccess();
-        await router.replace({ path: "/vendor/profile", query: { subscription_success: data.data.plan_key } });
+        await router.replace({ name: "VendorSubscription", query: { subscription_success: data.data.plan_key } });
         return;
       }
       if (["failed", "cancelled"].includes(data?.data?.status)) {

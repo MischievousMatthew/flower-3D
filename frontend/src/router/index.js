@@ -323,6 +323,32 @@ const routes = [
         meta: { subscriptionModule: MODULE.STAFF },
         component: () => import("../views/vendor/staff/Activity.vue"),
       },
+      // Subscription & account: open on every plan, even an expired one
+      {
+        path: "account/subscription",
+        name: "VendorSubscription",
+        component: () => import("../views/vendor/account/Subscription.vue"),
+      },
+      {
+        path: "account/billing",
+        name: "VendorBilling",
+        component: () => import("../views/vendor/account/Billing.vue"),
+      },
+      {
+        path: "account/usage",
+        name: "VendorUsage",
+        component: () => import("../views/vendor/account/Usage.vue"),
+      },
+      {
+        path: "account/shop-settings",
+        name: "VendorShopSettings",
+        component: () => import("../views/vendor/account/ShopSettings.vue"),
+      },
+      {
+        path: "account/security",
+        name: "VendorSecurity",
+        component: () => import("../views/vendor/account/Security.vue"),
+      },
       {
         path: "force-change-password",
         name: "VendorForceChangePassword",

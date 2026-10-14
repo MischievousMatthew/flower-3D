@@ -69,6 +69,7 @@ use App\Http\Controllers\VendorPromotionController;
 use App\Http\Controllers\VendorFinanceDashboardController;
 use App\Http\Controllers\ProductReportController; // ← NEW
 use App\Http\Controllers\VendorSubscriptionController;
+use App\Http\Controllers\VendorAccountController;
 use App\Http\Controllers\VendorCustomizationOptionController;
 
 /*
@@ -381,7 +382,7 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/draft-products',      [ProductController::class, 'draftProducts']);
             Route::get('/products/inactive',   [ProductController::class, 'inactiveProducts']);
             Route::get('/inactive-products',   [ProductController::class, 'inactiveProducts']);
-            Route::post('/products',           [ProductController::class, 'store']);
+            Route::post('/products',           [ProductController::class, 'store'])->middleware('resource.limit:products');
             Route::get('/products/{id}',       [ProductController::class, 'show']);
             Route::put('/products/{id}',       [ProductController::class, 'update']);
             Route::patch('/products/{id}',     [ProductController::class, 'update']);
@@ -418,6 +419,18 @@ Route::middleware('token.auth')->group(function () {
             Route::put('/promotions/{id}',          [VendorPromotionController::class, 'update'])->whereNumber('id');
             Route::post('/promotions/{id}/toggle',  [VendorPromotionController::class, 'toggle'])->whereNumber('id');
             Route::delete('/promotions/{id}',       [VendorPromotionController::class, 'destroy'])->whereNumber('id');
+        });
+
+        // Subscription & account (every plan, even an expired one, so the vendor can renew)
+        Route::prefix('account')->group(function () {
+            Route::get('/subscription',            [VendorAccountController::class, 'subscription']);
+            Route::get('/billing',                 [VendorAccountController::class, 'billing']);
+            Route::get('/billing/{id}/invoice',    [VendorAccountController::class, 'invoice'])->whereNumber('id');
+            Route::get('/usage',                   [VendorAccountController::class, 'usage']);
+            Route::get('/shop-settings',           [VendorAccountController::class, 'shopSettings']);
+            Route::put('/shop-settings',           [VendorAccountController::class, 'updateShopSettings']);
+            Route::get('/security',                [VendorAccountController::class, 'security']);
+            Route::post('/security/sign-out-others', [VendorAccountController::class, 'signOutOtherDevices']);
         });
 
         // My Shop: profile, location and business hours (every plan)
@@ -648,7 +661,7 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/products/{id}',     [ProductController::class, 'show']);
         });
 
-        Route::post('/products', [ProductController::class, 'store'])->middleware('employee.module:inventory_products,create');
+        Route::post('/products', [ProductController::class, 'store'])->middleware(['employee.module:inventory_products,create', 'resource.limit:products']);
         Route::middleware('employee.module:inventory_products,edit')->group(function () {
             Route::put('/products/{id}',     [ProductController::class, 'update']);
             Route::patch('/products/{id}',   [ProductController::class, 'update']);

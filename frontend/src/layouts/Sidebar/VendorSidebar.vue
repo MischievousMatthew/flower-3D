@@ -360,6 +360,32 @@
         </router-link>
       </div>
 
+      <!-- Open on every plan, so a vendor can always see their plan and renew -->
+      <div class="nav-section">
+        <div class="section-label">SUBSCRIPTION &amp; ACCOUNT</div>
+        <router-link :to="{ name: 'VendorSubscription' }" class="nav-item" active-class="active">
+          <span class="nav-icon">💎</span>
+          <span>Subscription Plan</span>
+          <span v-if="planAlert" class="nav-badge" :title="planAlert">!</span>
+        </router-link>
+        <router-link :to="{ name: 'VendorBilling' }" class="nav-item" active-class="active">
+          <span class="nav-icon">🧾</span>
+          <span>Billing History</span>
+        </router-link>
+        <router-link :to="{ name: 'VendorUsage' }" class="nav-item" active-class="active">
+          <span class="nav-icon">📊</span>
+          <span>Usage &amp; Limits</span>
+        </router-link>
+        <router-link :to="{ name: 'VendorShopSettings' }" class="nav-item" active-class="active">
+          <span class="nav-icon">⚙️</span>
+          <span>Shop Settings</span>
+        </router-link>
+        <router-link :to="{ name: 'VendorSecurity' }" class="nav-item" active-class="active">
+          <span class="nav-icon">🔐</span>
+          <span>Security Settings</span>
+        </router-link>
+      </div>
+
       <div class="nav-section">
         <div class="section-label">HELP</div>
         <router-link to="/vendor/support" class="nav-item" active-class="active">
@@ -482,7 +508,18 @@ const handleModuleNavigation = (event, module) => {
   lockedModule.value = module;
 };
 
-const viewPlans = () => router.push("/pricing");
+const viewPlans = () => router.push({ name: "VendorSubscription" });
+
+// A "!" on Subscription Plan when there's no active plan or it ends within a week
+const planAlert = computed(() => {
+  const access = subscriptionAccess.value;
+  if (!access) return "";
+  if (!access.subscription_active) return access.plan_key ? "Your plan has ended" : "Choose a plan";
+  const ends = access.status === "trialing" ? access.trial_ends_at : access.subscription_ends_at;
+  if (!ends) return "";
+  const days = Math.ceil((new Date(ends) - Date.now()) / 86400000);
+  return days <= 7 ? `Your plan ends in ${Math.max(0, days)} day${days === 1 ? "" : "s"}` : "";
+});
 
 const handleLogout = async () => {
   if (isLoading.value) return;

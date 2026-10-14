@@ -57,5 +57,7 @@ export const apiMessage = (e, fallback) => {
     const first = Object.values(errors).flat()[0];
     if (first) return first;
   }
+  // Plan limits explain which plan raises them
+  if (e?.response?.data?.code === "resource_limit_reached" && e.response.data.detail) return e.response.data.detail;
   return e?.response?.data?.message || fallback;
 };

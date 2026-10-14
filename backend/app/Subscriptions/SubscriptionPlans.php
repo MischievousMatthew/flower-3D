@@ -17,6 +17,7 @@ final class SubscriptionPlans
     public const RESOURCE_BRANCHES = 'branches';
     public const RESOURCE_WAREHOUSES = 'warehouses';
     public const RESOURCE_STAFF_EMPLOYEES = 'staff_employees';
+    public const RESOURCE_PRODUCTS = 'products';
 
     public const MODULES = [
         'products', 'reservations', 'calendar', 'finance', 'staff',
@@ -51,7 +52,7 @@ final class SubscriptionPlans
             'currency' => 'PHP',
             'custom_pricing' => false,
             'included_modules' => ['products', 'reservations', 'calendar', 'orders', 'deliveries', 'scanning'],
-            'resource_limits' => ['branches' => 1, 'warehouses' => 0, 'staff_employees' => 5],
+            'resource_limits' => ['branches' => 1, 'warehouses' => 0, 'staff_employees' => 5, 'products' => 50],
             'free_trial_available' => false,
             'trial_duration_months' => 0,
         ],
@@ -62,7 +63,7 @@ final class SubscriptionPlans
             'currency' => 'PHP',
             'custom_pricing' => false,
             'included_modules' => ['products', 'reservations', 'calendar', 'finance', 'staff', 'procurement', 'suppliers', 'warehouse', 'supply_chain', 'orders', 'logistics', 'deliveries', 'scanning', 'crm'],
-            'resource_limits' => ['branches' => 2, 'warehouses' => 1, 'staff_employees' => 15],
+            'resource_limits' => ['branches' => 2, 'warehouses' => 1, 'staff_employees' => 15, 'products' => 300],
             'free_trial_available' => true,
             'trial_duration_months' => 1,
         ],
@@ -73,7 +74,7 @@ final class SubscriptionPlans
             'currency' => 'PHP',
             'custom_pricing' => false,
             'included_modules' => self::MODULES,
-            'resource_limits' => ['branches' => 3, 'warehouses' => 1, 'staff_employees' => 30],
+            'resource_limits' => ['branches' => 3, 'warehouses' => 1, 'staff_employees' => 30, 'products' => 1000],
             'free_trial_available' => false,
             'trial_duration_months' => 0,
         ],
@@ -85,7 +86,7 @@ final class SubscriptionPlans
             'currency' => 'PHP',
             'custom_pricing' => true,
             'included_modules' => self::MODULES,
-            'resource_limits' => ['branches' => null, 'warehouses' => null, 'staff_employees' => null],
+            'resource_limits' => ['branches' => null, 'warehouses' => null, 'staff_employees' => null, 'products' => null],
             'free_trial_available' => false,
             'trial_duration_months' => 0,
         ],

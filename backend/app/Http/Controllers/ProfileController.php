@@ -178,9 +178,9 @@ class ProfileController extends Controller
     public function startTwoFactorManagement(Request $request)
     {
         $user = Auth::user();
-        if ($user->role !== \App\Models\User::ROLE_CUSTOMER) {
+        if (!in_array($user->role, [\App\Models\User::ROLE_CUSTOMER, \App\Models\User::ROLE_VENDOR], true)) {
             throw ValidationException::withMessages([
-                'two_factor' => ['Two-factor authentication is currently available for customer accounts only.'],
+                'two_factor' => ['Two-factor authentication is available for customer and vendor accounts only.'],
             ]);
         }
         $request->validate(['action' => ['required', 'in:enable,disable']]);

@@ -148,6 +148,14 @@ class CheckoutController extends Controller
                 ->where('status', 'approved')
                 ->first();
 
+            // Shop settings → "Taking orders" switched off
+            if ($vendorApplication && !$vendorApplication->isTakingOrders()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $vendorApplication->pausedOrdersMessage(),
+                ], 422);
+            }
+
             // Calculate totals
             $subtotal = 0;
             $items = [];
@@ -425,6 +433,17 @@ class CheckoutController extends Controller
                         ? 'Vendor is not ready to accept online payments'
                         : 'Vendor is not ready to accept orders'
                 ], 400);
+            }
+
+            if (!$vendor->isTakingOrders()) {
+                return response()->json(['success' => false, 'message' => $vendor->pausedOrdersMessage()], 422);
+            }
+
+            if ($paymentMethod === 'cod' && !$vendor->shopPreferences()['accept_cod']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "{$vendor->store_name} doesn't accept cash on delivery. Please pay with an e-wallet.",
+                ], 422);
             }
 
             $settings = VendorApplication::buildReservationSettings($vendorUser, $vendor);
@@ -769,13 +788,16 @@ class CheckoutController extends Controller
             'enabled' => true,
         ];
 
-        $methods[] = [
-            'type' => 'cod',
-            'name' => 'Cash on Delivery',
-            'description' => 'Pay when you receive your order',
-            'icon' => '💵',
-            'enabled' => true,
-        ];
+        // Shop settings → preferences can turn cash on delivery off
+        if ($vendorApplication->shopPreferences()['accept_cod']) {
+            $methods[] = [
+                'type' => 'cod',
+                'name' => 'Cash on Delivery',
+                'description' => 'Pay when you receive your order',
+                'icon' => '💵',
+                'enabled' => true,
+            ];
+        }
 
         return $methods;
     }

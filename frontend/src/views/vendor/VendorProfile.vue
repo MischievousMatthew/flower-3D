@@ -73,7 +73,7 @@
             <button
               v-if="!profileData.delivery_details_completed"
               class="completion-action"
-              @click="activeTab = 'delivery'"
+              @click="router.push({ name: 'VendorShopSettings' })"
             >
               Complete →
             </button>
@@ -98,6 +98,7 @@
         <span class="subscription-card__status" :class="`status-${profileData.subscription.status}`">
           {{ profileData.subscription.status === 'trialing' ? 'Trial' : formatSubscriptionStatus(profileData.subscription.status) }}
         </span>
+        <router-link :to="{ name: 'VendorSubscription' }" class="subscription-card__manage">Manage plan →</router-link>
       </section>
 
       <!-- Tabs -->
@@ -129,10 +130,10 @@
             >!</span
           >
         </button>
+        <!-- Delivery and password moved to Subscription & account -->
         <button
           class="tab-button"
-          :class="{ active: activeTab === 'delivery' }"
-          @click="activeTab = 'delivery'"
+          @click="router.push({ name: 'VendorShopSettings' })"
         >
           <span class="tab-icon">🚚</span><span>Delivery Details</span>
           <span v-if="!profileData.delivery_details_completed" class="tab-badge"
@@ -141,10 +142,9 @@
         </button>
         <button
           class="tab-button"
-          :class="{ active: activeTab === 'password' }"
-          @click="activeTab = 'password'"
+          @click="router.push({ name: 'VendorSecurity' })"
         >
-          <span class="tab-icon">🔒</span><span>Password</span>
+          <span class="tab-icon">🔒</span><span>Password &amp; Security</span>
         </button>
       </div>
 
@@ -717,287 +717,6 @@
           </form>
         </div>
 
-        <!-- ══════════ Delivery Details ══════════ -->
-        <div v-if="activeTab === 'delivery'" class="tab-panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Delivery Details</h2>
-            <p class="panel-description">
-              Configure your delivery and logistics settings
-            </p>
-          </div>
-
-          <transition name="alert-slide">
-            <div v-if="deliveryForm.successMsg" class="alert-banner success">
-              <span class="alert-icon">✅</span>
-              <span>{{ deliveryForm.successMsg }}</span>
-              <button
-                class="alert-dismiss"
-                @click="deliveryForm.successMsg = ''"
-              >
-                ✕
-              </button>
-            </div>
-          </transition>
-          <transition name="alert-slide">
-            <div v-if="deliveryForm.errorMsg" class="alert-banner error">
-              <span class="alert-icon">❌</span>
-              <span>{{ deliveryForm.errorMsg }}</span>
-              <button class="alert-dismiss" @click="deliveryForm.errorMsg = ''">
-                ✕
-              </button>
-            </div>
-          </transition>
-
-          <form @submit.prevent="updateDeliveryDetails" class="profile-form">
-            <div class="form-grid">
-              <div class="form-group full-width">
-                <label class="form-label">Delivery Method</label>
-                <div class="info-box" style="margin-top: 8px">
-                  <span class="info-icon">✓</span>
-                  <p>
-                    All deliveries are handled by you (Self Delivery). Delivery
-                    fees will be determined per order during checkout.
-                  </p>
-                </div>
-                <input
-                  type="hidden"
-                  v-model="formData.delivery.delivery_handled_by"
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Max Orders Per Day *</label>
-                <input
-                  type="number"
-                  v-model.number="formData.delivery.max_orders_per_day"
-                  class="form-input"
-                  :class="{
-                    'is-invalid': deliveryForm.errors.max_orders_per_day,
-                  }"
-                  placeholder="e.g., 20"
-                  min="1"
-                  required
-                  @input="deliveryForm.clearError('max_orders_per_day')"
-                />
-                <span
-                  v-if="deliveryForm.errors.max_orders_per_day"
-                  class="field-error"
-                  >{{ deliveryForm.errors.max_orders_per_day }}</span
-                >
-              </div>
-              <div class="form-group">
-                <label class="form-label">Lead Time Required *</label>
-                <input
-                  type="text"
-                  v-model="formData.delivery.lead_time"
-                  class="form-input"
-                  :class="{ 'is-invalid': deliveryForm.errors.lead_time }"
-                  placeholder="e.g., 24 hours, 2 days"
-                  required
-                  @input="deliveryForm.clearError('lead_time')"
-                />
-                <span
-                  v-if="deliveryForm.errors.lead_time"
-                  class="field-error"
-                  >{{ deliveryForm.errors.lead_time }}</span
-                >
-              </div>
-              <div class="form-group full-width">
-                <label class="form-label">Cancellation & Refund Policy *</label>
-                <textarea
-                  v-model="formData.delivery.cancellation_policy"
-                  class="form-input"
-                  rows="4"
-                  placeholder="Describe your cancellation and refund policy..."
-                  required
-                ></textarea>
-                <span
-                  v-if="deliveryForm.errors.cancellation_policy"
-                  class="field-error"
-                  >{{ deliveryForm.errors.cancellation_policy }}</span
-                >
-              </div>
-            </div>
-            <div class="form-actions">
-              <button
-                type="submit"
-                class="btn-primary"
-                :disabled="deliveryForm.isSubmitting"
-              >
-                <span v-if="deliveryForm.isSubmitting" class="btn-spinner-wrap"
-                  ><span class="btn-spinner"></span> Saving...</span
-                >
-                <span v-else>Save Delivery Details</span>
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <!-- ══════════ Change Password ══════════ -->
-        <div v-if="activeTab === 'password'" class="tab-panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Change Password</h2>
-            <p class="panel-description">
-              Keep your account secure with a strong password
-            </p>
-          </div>
-
-          <transition name="alert-slide">
-            <div v-if="passwordForm.successMsg" class="alert-banner success">
-              <span class="alert-icon">✅</span>
-              <span>{{ passwordForm.successMsg }}</span>
-              <button
-                class="alert-dismiss"
-                @click="passwordForm.successMsg = ''"
-              >
-                ✕
-              </button>
-            </div>
-          </transition>
-          <transition name="alert-slide">
-            <div v-if="passwordForm.errorMsg" class="alert-banner error">
-              <span class="alert-icon">❌</span>
-              <span>{{ passwordForm.errorMsg }}</span>
-              <button class="alert-dismiss" @click="passwordForm.errorMsg = ''">
-                ✕
-              </button>
-            </div>
-          </transition>
-
-          <div class="password-security-note">
-            <span class="security-icon">🔒</span>
-            <div>
-              <strong>Keep your account secure</strong>
-              <p>
-                Use at least 8 characters including uppercase letters, numbers,
-                and symbols.
-              </p>
-            </div>
-          </div>
-
-          <form @submit.prevent="changePassword" class="profile-form">
-            <div class="form-grid password-grid">
-              <div class="form-group full-width">
-                <label class="form-label">Current Password *</label>
-                <div class="input-password-wrap">
-                  <input
-                    v-model="passwordData.current_password"
-                    :type="showPasswords.current ? 'text' : 'password'"
-                    class="form-input"
-                    :class="{
-                      'is-invalid': passwordForm.errors.current_password,
-                    }"
-                    placeholder="Enter your current password"
-                    @input="passwordForm.clearError('current_password')"
-                  />
-                  <button
-                    type="button"
-                    class="eye-btn"
-                    @click="showPasswords.current = !showPasswords.current"
-                  >
-                    {{ showPasswords.current ? "🙈" : "👁️" }}
-                  </button>
-                </div>
-                <span
-                  v-if="passwordForm.errors.current_password"
-                  class="field-error"
-                  >{{ passwordForm.errors.current_password }}</span
-                >
-              </div>
-              <div class="form-group">
-                <label class="form-label">New Password *</label>
-                <div class="input-password-wrap">
-                  <input
-                    v-model="passwordData.password"
-                    :type="showPasswords.new ? 'text' : 'password'"
-                    class="form-input"
-                    :class="{ 'is-invalid': passwordForm.errors.password }"
-                    placeholder="Minimum 8 characters"
-                    @input="onNewPasswordInput"
-                  />
-                  <button
-                    type="button"
-                    class="eye-btn"
-                    @click="showPasswords.new = !showPasswords.new"
-                  >
-                    {{ showPasswords.new ? "🙈" : "👁️" }}
-                  </button>
-                </div>
-                <span v-if="passwordForm.errors.password" class="field-error">{{
-                  passwordForm.errors.password
-                }}</span>
-                <div v-if="passwordData.password" class="strength-bar-wrap">
-                  <div class="strength-bar">
-                    <div
-                      class="strength-fill"
-                      :class="passwordStrength.level"
-                      :style="{ width: passwordStrength.pct + '%' }"
-                    ></div>
-                  </div>
-                  <span
-                    class="strength-label"
-                    :class="passwordStrength.level"
-                    >{{ passwordStrength.label }}</span
-                  >
-                </div>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Confirm New Password *</label>
-                <div class="input-password-wrap">
-                  <input
-                    v-model="passwordData.password_confirmation"
-                    :type="showPasswords.confirm ? 'text' : 'password'"
-                    class="form-input"
-                    :class="{
-                      'is-invalid': passwordForm.errors.password_confirmation,
-                      'is-match':
-                        passwordsMatch && passwordData.password_confirmation,
-                    }"
-                    placeholder="Repeat new password"
-                    @input="passwordForm.clearError('password_confirmation')"
-                  />
-                  <button
-                    type="button"
-                    class="eye-btn"
-                    @click="showPasswords.confirm = !showPasswords.confirm"
-                  >
-                    {{ showPasswords.confirm ? "🙈" : "👁️" }}
-                  </button>
-                </div>
-                <span
-                  v-if="passwordForm.errors.password_confirmation"
-                  class="field-error"
-                  >{{ passwordForm.errors.password_confirmation }}</span
-                >
-                <span
-                  v-else-if="
-                    passwordData.password_confirmation && passwordsMatch
-                  "
-                  class="match-hint"
-                  >✅ Passwords match</span
-                >
-                <span
-                  v-else-if="
-                    passwordData.password_confirmation && !passwordsMatch
-                  "
-                  class="mismatch-hint"
-                  >❌ Passwords do not match</span
-                >
-              </div>
-            </div>
-            <div class="form-actions">
-              <button
-                type="submit"
-                class="btn-primary"
-                :disabled="passwordForm.isSubmitting || !passwordsMatch"
-              >
-                <span v-if="passwordForm.isSubmitting" class="btn-spinner-wrap"
-                  ><span class="btn-spinner"></span> Updating...</span
-                >
-                <span v-else>🔑 Update Password</span>
-              </button>
-            </div>
-          </form>
-        </div>
       </div>
       <!-- end tab-content -->
     </main>
@@ -1593,7 +1312,9 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 .subscription-card__eyebrow { margin: 0 0 5px; color: #64748b; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .subscription-card h2 { margin: 0 0 4px; color: #1e293b; font-size: 20px; }
 .subscription-card p:not(.subscription-card__eyebrow) { margin: 0; color: #64748b; font-size: 14px; }
-.subscription-card__status { padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.subscription-card__status { margin-left: auto; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.subscription-card__manage { color: #2f855a; font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.subscription-card__manage:hover { text-decoration: underline; }
 .status-trialing { color: #1d4ed8; background: #dbeafe; }.status-active { color: #047857; background: #d1fae5; }.status-pending, .status-past_due { color: #92400e; background: #fef3c7; }
 
 /* Completion card */

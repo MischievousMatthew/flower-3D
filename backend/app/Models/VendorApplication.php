@@ -34,7 +34,7 @@ class VendorApplication extends Model
         'delivery_handled_by', 'max_orders_per_day', 'lead_time',
         'cancellation_policy', 'store_logo_path', 'store_cover_path', 'portfolio_photos_paths',
         'facebook_page', 'instagram_page', 'status', 'verification_level',
-        'resubmission_status',
+        'resubmission_status', 'shop_preferences',
         'admin_notes', 'rejection_reason', 'submitted_at', 'reviewed_at',
         'reviewed_by', 'payment_details_completed', 'product_details_completed',
         'delivery_details_completed', 'profile_fully_completed',
@@ -45,7 +45,8 @@ class VendorApplication extends Model
         'cutoff_times'                => 'array',
         'operating_schedules'         => 'array',
         'portfolio_photos_paths'      => 'array',
-        'same_day_delivery'           => 'boolean',
+        'shop_preferences'            => 'array',
+        'same_day_delivery'          => 'boolean',
         'max_orders_per_day'          => 'integer',
         'store_latitude'              => 'float',
         'store_longitude'             => 'float',
@@ -514,6 +515,44 @@ class VendorApplication extends Model
             'same_day_available_today'  => $sameDayDelivery && !$sameDayCutoffReached,
             'operating_schedules'       => $application?->operating_schedules ?? [],
         ];
+    }
+
+    public const SHOP_PREFERENCE_DEFAULTS = [
+        'accepting_orders' => true,
+        'away_message'     => null,
+        'back_on'          => null,
+        'accept_cod'       => true,
+    ];
+
+    /** Shop settings → preferences, with defaults for shops that never saved any. */
+    public function shopPreferences(): array
+    {
+        return array_merge(self::SHOP_PREFERENCE_DEFAULTS, array_intersect_key(
+            (array) ($this->shop_preferences ?? []),
+            self::SHOP_PREFERENCE_DEFAULTS,
+        ));
+    }
+
+    /** False while the vendor has paused new orders; reaching the "back on" date resumes them. */
+    public function isTakingOrders(?CarbonInterface $at = null): bool
+    {
+        $prefs = $this->shopPreferences();
+        if ($prefs['accepting_orders']) {
+            return true;
+        }
+
+        $today = ($at ? Carbon::instance($at) : Carbon::now(self::RESERVATION_TIMEZONE))->toDateString();
+
+        return $prefs['back_on'] !== null && $prefs['back_on'] <= $today;
+    }
+
+    public function pausedOrdersMessage(): string
+    {
+        $prefs = $this->shopPreferences();
+        $message = trim((string) ($prefs['away_message'] ?? ''));
+        $back = $prefs['back_on'] ? " Back on " . Carbon::parse($prefs['back_on'])->format('F j') . '.' : '';
+
+        return ($message !== '' ? $message : "{$this->store_name} isn't taking new orders right now.") . $back;
     }
 
     public function reservationLeadTimeDays(): int

@@ -183,7 +183,7 @@ class AuthController extends Controller
                 $this->refuseLogin('account_unverified', "Your account isn't verified yet. Open the verification link we emailed you, then sign in again.");
             }
 
-            if ($user->role === User::ROLE_CUSTOMER && $user->two_factor_enabled) {
+            if (in_array($user->role, [User::ROLE_CUSTOMER, User::ROLE_VENDOR], true) && $user->two_factor_enabled) {
                 $challengeToken = Str::random(80);
                 TwoFactorLoginChallenge::where('user_id', $user->id)->delete();
                 TwoFactorLoginChallenge::create([

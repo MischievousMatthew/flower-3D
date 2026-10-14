@@ -92,6 +92,10 @@
             </div>
           </div>
 
+          <p v-if="vendor.taking_orders === false" class="sf-paused" role="status">
+            {{ vendor.paused_message }}
+          </p>
+
           <p v-if="vendor.store_description" class="sf-desc">
             {{ vendor.store_description }}
           </p>
@@ -1117,6 +1121,18 @@ onMounted(async () => {
   flex-wrap: wrap;
   gap: 10px;
   padding-bottom: 10px;
+}
+
+.sf-paused {
+  max-width: 62ch;
+  margin-top: 24px !important;
+  padding: 12px 16px;
+  border: 1px solid #f6d58e;
+  border-radius: 12px;
+  background: #fffaf0;
+  color: #8a4b0f;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .sf-desc {

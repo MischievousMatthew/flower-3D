@@ -582,6 +582,9 @@ class VendorStorefrontController extends Controller
             'service_areas'       => $this->normalizeServiceAreas($v->service_areas),
             'cutoff_times'        => $v->cutoff_times ?? '',
             'operating_hours'     => $v->operating_hours ?? '',
+            // Shop settings → "Taking orders" switched off
+            'taking_orders'       => $v->isTakingOrders(),
+            'paused_message'      => $v->isTakingOrders() ? null : $v->pausedOrdersMessage(),
         ];
 
         if (!$full) {

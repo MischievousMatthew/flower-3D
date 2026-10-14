@@ -81,29 +81,16 @@ class VendorProfileController extends Controller
             'contact_number'      => 'required|string|max:20',
             'facebook_page'       => 'nullable|url|max:255',
             'instagram_page'      => 'nullable|url|max:255',
-            'operating_schedules' => 'required|array|min:1|max:7',
-            'operating_schedules.*.days'         => 'required|array|min:1',
-            'operating_schedules.*.days.*'       => ['string', Rule::in(self::WEEK_DAYS)],
-            'operating_schedules.*.opening_time' => ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
-            'operating_schedules.*.closing_time' => ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
-        ], [
-            'operating_schedules.required' => 'Open the shop on at least one day.',
-            'operating_schedules.*.opening_time.regex' => 'Use a valid opening time.',
-            'operating_schedules.*.closing_time.regex' => 'Use a valid closing time.',
-        ]);
+            // Business hours now live in Shop settings; still accepted here when sent
+            ...self::scheduleRules('sometimes'),
+        ], self::SCHEDULE_MESSAGES);
 
-        $schedules = [];
-        $seen = [];
-        foreach ($data['operating_schedules'] as $schedule) {
-            if ($schedule['opening_time'] >= $schedule['closing_time']) {
-                return response()->json(['success' => false, 'message' => 'Closing time must be after opening time.', 'errors' => ['operating_schedules' => ['Closing time must be after opening time.']]], 422);
-            }
-            $days = array_values(array_filter(self::WEEK_DAYS, fn ($d) => in_array($d, $schedule['days'], true)));
-            if (array_intersect($days, $seen)) {
-                return response()->json(['success' => false, 'message' => 'Each day can only have one set of hours.', 'errors' => ['operating_schedules' => ['Each day can only have one set of hours.']]], 422);
-            }
-            $seen = [...$seen, ...$days];
-            $schedules[] = ['days' => $days, 'opening_time' => $schedule['opening_time'], 'closing_time' => $schedule['closing_time']];
+        if (array_key_exists('operating_schedules', $data)) {
+            $schedules = self::normalizeSchedules($data['operating_schedules']);
+            $vendorApplication->fill([
+                'operating_schedules' => $schedules,
+                'operating_hours'     => self::describeSchedules($schedules),
+            ]);
         }
 
         $vendorApplication->fill([
@@ -117,8 +104,6 @@ class VendorProfileController extends Controller
             'contact_number'      => trim($data['contact_number']),
             'facebook_page'       => $data['facebook_page'] ?? null,
             'instagram_page'      => $data['instagram_page'] ?? null,
-            'operating_schedules' => $schedules,
-            'operating_hours'     => $this->describeSchedules($schedules),
         ])->save();
 
         // The sidebar and storefront read the name from the user record too
@@ -138,10 +123,48 @@ class VendorProfileController extends Controller
         ]);
     }
 
-    private const WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    public const WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    public const SCHEDULE_MESSAGES = [
+        'operating_schedules.required' => 'Open the shop on at least one day.',
+        'operating_schedules.*.opening_time.regex' => 'Use a valid opening time.',
+        'operating_schedules.*.closing_time.regex' => 'Use a valid closing time.',
+    ];
+
+    /** Validation for the weekly business hours ([{days, opening_time, closing_time}]). */
+    public static function scheduleRules(string $presence = 'required'): array
+    {
+        return [
+            'operating_schedules' => "{$presence}|array|min:1|max:7",
+            'operating_schedules.*.days'         => 'required|array|min:1',
+            'operating_schedules.*.days.*'       => ['string', Rule::in(self::WEEK_DAYS)],
+            'operating_schedules.*.opening_time' => ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
+            'operating_schedules.*.closing_time' => ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
+        ];
+    }
+
+    /** Orders days Monday-first; one set of hours per day, closing after opening. */
+    public static function normalizeSchedules(array $input): array
+    {
+        $schedules = [];
+        $seen = [];
+        foreach ($input as $schedule) {
+            if ($schedule['opening_time'] >= $schedule['closing_time']) {
+                throw ValidationException::withMessages(['operating_schedules' => ['Closing time must be after opening time.']]);
+            }
+            $days = array_values(array_filter(self::WEEK_DAYS, fn ($d) => in_array($d, $schedule['days'], true)));
+            if (array_intersect($days, $seen)) {
+                throw ValidationException::withMessages(['operating_schedules' => ['Each day can only have one set of hours.']]);
+            }
+            $seen = [...$seen, ...$days];
+            $schedules[] = ['days' => $days, 'opening_time' => $schedule['opening_time'], 'closing_time' => $schedule['closing_time']];
+        }
+
+        return $schedules;
+    }
 
     /** "Mon-Fri: 8:00 AM – 5:00 PM; Sat, Sun: 8:00 AM – 3:00 PM", as the registration form writes it. */
-    private function describeSchedules(array $schedules): string
+    public static function describeSchedules(array $schedules): string
     {
         $time = fn (string $t) => \Carbon\Carbon::createFromFormat('H:i', $t)->format('g:i A');
         $days = function (array $days) {
@@ -717,6 +740,7 @@ class VendorProfileController extends Controller
             }
 
             $user->password = Hash::make($request->password);
+            $user->password_changed_at = now();
 
             if ($user->role === 'vendor' && isset($user->vendor_data['needs_password_change'])) {
                 $vendorData                          = $user->vendor_data;

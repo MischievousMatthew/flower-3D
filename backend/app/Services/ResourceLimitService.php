@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Employee;
+use App\Models\Product;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Subscriptions\SubscriptionPlans;
@@ -19,6 +20,7 @@ class ResourceLimitService
         SubscriptionPlans::RESOURCE_BRANCHES => ['label' => 'Branch', 'plural' => 'branches', 'model' => null],
         SubscriptionPlans::RESOURCE_WAREHOUSES => ['label' => 'Warehouse', 'plural' => 'warehouses', 'model' => Warehouse::class],
         SubscriptionPlans::RESOURCE_STAFF_EMPLOYEES => ['label' => 'Staff member', 'plural' => 'staff members', 'model' => Employee::class],
+        SubscriptionPlans::RESOURCE_PRODUCTS => ['label' => 'Product', 'plural' => 'products', 'model' => Product::class],
     ];
 
     public function getResourceLimit(User $vendor, string $resource): ?int

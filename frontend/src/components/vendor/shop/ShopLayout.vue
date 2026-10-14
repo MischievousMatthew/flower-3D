@@ -42,7 +42,7 @@ import { subscriptionUpgradeMessage, useSubscriptionAccess } from "../../../comp
 import { SHOP_ICONS as ICONS } from "./shopIcons";
 
 const props = defineProps({
-  // Which group of tabs to show: shop, orders, finance, staff or crm
+  // Which group of tabs to show: shop, orders, finance, staff, crm or account
   section: { type: String, default: "shop" },
   title: { type: String, default: "" },
   subtitle: { type: String, default: "" },
@@ -89,8 +89,16 @@ const CRM_TABS = [
   { name: "VendorReviews", label: "Reviews & Ratings", icon: "star", module: "products" },
   { name: "VendorNotifications", label: "Notifications", icon: "bell" },
 ];
-const NAV_LABEL = { shop: "Shop and product management", orders: "Orders and fulfillment", finance: "Finance and business", staff: "Staff and operations", crm: "Customer relationships" };
-const tabs = computed(() => ({ orders: ORDER_TABS, finance: FINANCE_TABS, staff: STAFF_TABS, crm: CRM_TABS })[props.section] ?? TABS);
+// Open on every plan, even an expired one, so the vendor can always renew
+const ACCOUNT_TABS = [
+  { name: "VendorSubscription", label: "Subscription Plan", icon: "sparkle" },
+  { name: "VendorBilling", label: "Billing History", icon: "receipt" },
+  { name: "VendorUsage", label: "Usage & Limits", icon: "activity" },
+  { name: "VendorShopSettings", label: "Shop Settings", icon: "store" },
+  { name: "VendorSecurity", label: "Security", icon: "lock" },
+];
+const NAV_LABEL = { account: "Subscription and account", shop: "Shop and product management", orders: "Orders and fulfillment", finance: "Finance and business", staff: "Staff and operations", crm: "Customer relationships" };
+const tabs = computed(() => ({ orders: ORDER_TABS, finance: FINANCE_TABS, staff: STAFF_TABS, crm: CRM_TABS, account: ACCOUNT_TABS })[props.section] ?? TABS);
 const isOn = (t) => route.name === t.name || (t.also ?? []).includes(route.name);
 
 const locked = (module) =>

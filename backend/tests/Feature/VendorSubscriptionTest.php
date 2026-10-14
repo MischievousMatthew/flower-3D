@@ -114,6 +114,14 @@ class VendorSubscriptionTest extends TestCase
             $table->string('access')->nullable();
             $table->timestamps();
         });
+        // Counted for the plan's product limit
+        Schema::create('products', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('owner_id');
+            $table->string('product_name')->nullable();
+            $table->timestamps();
+            $table->softDeletes();
+        });
     }
 
     protected function tearDown(): void
@@ -124,6 +132,7 @@ class VendorSubscriptionTest extends TestCase
         Schema::dropIfExists('warehouses');
         Schema::dropIfExists('employees');
         Schema::dropIfExists('employee_module_permissions');
+        Schema::dropIfExists('products');
         Schema::dropIfExists('users');
 
         parent::tearDown();

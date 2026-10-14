@@ -1,5 +1,5 @@
 <template>
-  <ShopLayout title="My Shop" subtitle="Your shop's profile, photos, location and business hours, exactly as customers see them.">
+  <ShopLayout title="My Shop" subtitle="Your shop's profile, photos and location, exactly as customers see them. Hours, delivery and order settings are in Shop settings.">
     <template #actions>
       <button type="button" class="sp-btn sp-btn-ghost" :disabled="!dirty || saving" @click="reset">Discard</button>
       <button type="submit" form="shop-form" class="sp-btn sp-btn-primary" :disabled="!form || !dirty || saving">
@@ -100,27 +100,12 @@
             </div>
           </section>
 
-          <!-- Hours -->
+          <!-- Hours: edited in Shop settings -->
           <section class="sp-card">
             <div class="sp-card-head">
-              <div><h2>Business hours</h2><p>Same-day orders close at your closing time.</p></div>
-              <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="copyFirst">Copy first open day to all</button>
+              <div><h2>Business hours</h2><p>{{ hoursText || "Not set yet" }}</p></div>
+              <router-link :to="{ name: 'VendorShopSettings' }" class="sp-btn sp-btn-ghost sp-btn-sm"><span v-html="ICONS.clock"></span>Edit in Shop settings</router-link>
             </div>
-            <ul class="hours">
-              <li v-for="d in week" :key="d.day" :class="{ closed: !d.open }">
-                <label class="hours-day">
-                  <span class="sp-switch"><input v-model="d.open" type="checkbox" :aria-label="`Open on ${d.day}`" /><span></span></span>
-                  <strong>{{ d.day }}</strong>
-                </label>
-                <template v-if="d.open">
-                  <input v-model="d.opening_time" type="time" class="sp-input time" :aria-label="`${d.day} opening time`" required />
-                  <span class="to">to</span>
-                  <input v-model="d.closing_time" type="time" class="sp-input time" :class="{ invalid: d.opening_time >= d.closing_time }" :aria-label="`${d.day} closing time`" required />
-                </template>
-                <span v-else class="closed-text">Closed</span>
-              </li>
-            </ul>
-            <p v-if="errors.operating_schedules" class="sp-error">{{ errors.operating_schedules }}</p>
           </section>
         </template>
       </form>
@@ -177,9 +162,9 @@ import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { useVendorProfile } from "../../../composables/useVendorProfile";
+import { hoursText as describeHours, openNow as isOpenNow, weekFrom, weekFromText } from "../../../components/vendor/shop/businessHours";
 import "../../../components/vendor/shop/shop.css";
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const FIELDS = ["store_name", "store_description", "store_street", "store_address", "service_areas", "contact_number", "email", "facebook_page", "instagram_page", "store_latitude", "store_longitude"];
 
 const { fetchProfile } = useVendorProfile({ autoFetch: false, showToast: false });
@@ -195,37 +180,6 @@ const locateError = ref("");
 const errors = reactive({});
 let snapshot = "";
 
-const weekFrom = (schedules) =>
-  DAYS.map((day) => {
-    const s = (schedules ?? []).find((x) => (x.days ?? []).includes(day));
-    return { day, open: !!s, opening_time: s?.opening_time ?? "08:00", closing_time: s?.closing_time ?? "17:00" };
-  });
-
-// Group days with identical hours back into the stored schedule shape
-// Best guess from the old free-text hours: which days, and the first time range in it
-function weekFromText(text) {
-  const t = String(text || "");
-  const toH24 = (h, m, ap) => {
-    let hour = Number(h) % 12;
-    if (/p/i.test(ap)) hour += 12;
-    return `${String(hour).padStart(2, "0")}:${m}`;
-  };
-  const times = [...t.matchAll(/(\d{1,2}):(\d{2})\s*([AaPp])\.?[Mm]/g)];
-  const opening = times[0] ? toH24(times[0][1], times[0][2], times[0][3]) : "08:00";
-  const closing = times[1] ? toH24(times[1][1], times[1][2], times[1][3]) : "17:00";
-  const everyDay = /every\s*day|daily|mon\s*-\s*sun/i.test(t);
-  return DAYS.map((day, i) => ({ day, open: everyDay || i < 6, opening_time: opening, closing_time: closing }));
-}
-
-const schedulesFrom = (days) => {
-  const groups = [];
-  for (const d of days.filter((x) => x.open)) {
-    const g = groups.find((x) => x.opening_time === d.opening_time && x.closing_time === d.closing_time);
-    if (g) g.days.push(d.day);
-    else groups.push({ days: [d.day], opening_time: d.opening_time, closing_time: d.closing_time });
-  }
-  return groups;
-};
 const state = () => JSON.stringify([form.value, week.value]);
 const dirty = computed(() => !!form.value && state() !== snapshot);
 
@@ -261,8 +215,6 @@ function validate() {
   for (const key of ["facebook_page", "instagram_page"]) {
     if (f[key] && !/^https?:\/\/\S+\.\S+/.test(f[key])) errors[key] = "Use a full link starting with https://";
   }
-  if (!week.value.some((d) => d.open)) errors.operating_schedules = "Open on at least one day.";
-  else if (week.value.some((d) => d.open && d.opening_time >= d.closing_time)) errors.operating_schedules = "Closing time must be after opening time.";
   return !Object.keys(errors).length;
 }
 
@@ -278,7 +230,6 @@ async function save() {
       ...rest,
       facebook_page: rest.facebook_page || null,
       instagram_page: rest.instagram_page || null,
-      operating_schedules: schedulesFrom(week.value),
     });
     apply(data.data);
     toast.success(data.message);
@@ -290,16 +241,6 @@ async function save() {
   } finally {
     saving.value = false;
   }
-}
-
-function copyFirst() {
-  const first = week.value.find((d) => d.open);
-  if (!first) return;
-  week.value.forEach((d) => {
-    d.open = true;
-    d.opening_time = first.opening_time;
-    d.closing_time = first.closing_time;
-  });
 }
 
 const hasPin = computed(() => Number.isFinite(form.value?.store_latitude) && Number.isFinite(form.value?.store_longitude));
@@ -369,37 +310,8 @@ const coverStyle = computed(() =>
 const initials = computed(() =>
   (form.value?.store_name || "S").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase(),
 );
-const to12 = (t) => {
-  const [h, m] = t.split(":").map(Number);
-  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
-};
-const hoursText = computed(() => {
-  const groups = schedulesFrom(week.value);
-  if (!groups.length) return "";
-  // "Mon–Sat", "Mon–Wed, Fri": runs of 3+ days are shortened
-  const short = (days) => {
-    if (days.length === 7) return "Every day";
-    const idx = days.map((d) => DAYS.indexOf(d)).sort((a, b) => a - b);
-    const parts = [];
-    for (let i = 0; i < idx.length; ) {
-      let j = i;
-      while (j + 1 < idx.length && idx[j + 1] === idx[j] + 1) j++;
-      const name = (k) => DAYS[idx[k]].slice(0, 3);
-      if (j - i >= 2) parts.push(`${name(i)}–${name(j)}`);
-      else for (let k = i; k <= j; k++) parts.push(name(k));
-      i = j + 1;
-    }
-    return parts.join(", ");
-  };
-  return groups.map((g) => `${short(g.days)} ${to12(g.opening_time)}–${to12(g.closing_time)}`).join(" · ");
-});
-const openNow = computed(() => {
-  if (!week.value.length) return null;
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }));
-  const today = week.value[(now.getDay() + 6) % 7];
-  const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  return today.open && hhmm >= today.opening_time && hhmm < today.closing_time;
-});
+const hoursText = computed(() => describeHours(week.value));
+const openNow = computed(() => isOpenNow(week.value));
 
 onBeforeRouteLeave(() => {
   if (dirty.value && !saving.value) {
@@ -448,49 +360,6 @@ onMounted(fetch);
 .pin-text.muted {
   color: #a0aec0;
 }
-.hours {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-}
-.hours li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: #fbfdfc;
-}
-.hours li.closed {
-  background: #f8f9fa;
-}
-.hours-day {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 150px;
-  cursor: pointer;
-}
-.hours-day strong {
-  font-size: 13px;
-  font-weight: 500;
-  color: #1a202c;
-}
-.time {
-  width: 130px;
-  padding: 7px 10px;
-}
-.to {
-  font-size: 12px;
-  color: #a0aec0;
-}
-.closed-text {
-  font-size: 12.5px;
-  color: #a0aec0;
-}
-
 /* Preview */
 .shop-preview {
   position: sticky;
@@ -639,18 +508,6 @@ onMounted(fetch);
   .shop-preview {
     position: static;
     order: -1;
-  }
-}
-@media (max-width: 560px) {
-  .hours li {
-    flex-wrap: wrap;
-  }
-  .hours-day {
-    width: 100%;
-  }
-  .time {
-    flex: 1;
-    width: auto;
   }
 }
 </style>
