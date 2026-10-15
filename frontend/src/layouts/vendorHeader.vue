@@ -67,6 +67,10 @@
                 <span v-html="ICONS[l.icon]"></span>{{ l.label }}
               </router-link>
             </nav>
+            <label class="vh-menu-item vh-dark" role="menuitemcheckbox" :aria-checked="isDark">
+              <span v-html="ICONS.moon"></span>Dark mode
+              <span class="sp-switch"><input type="checkbox" :checked="isDark" aria-label="Dark mode" @change="setDark($event.target.checked)" /><span></span></span>
+            </label>
             <button type="button" class="vh-menu-item vh-logout" role="menuitem" :disabled="isLoggingOut" @click="handleLogout">
               <span v-html="ICONS.logout"></span>{{ isLoggingOut ? "Signing out…" : "Sign out" }}
             </button>
@@ -85,6 +89,8 @@ import { useChatNotifications } from "../composables/useChatNotifications";
 import { useSidebarState } from "../composables/useSidebarState";
 import { useSubscriptionAccess } from "../composables/useSubscriptionAccess";
 import { useVendorProfile } from "../composables/useVendorProfile";
+import { useVendorTheme } from "../composables/useVendorTheme";
+import "../components/vendor/shop/shop.css";
 import { SHOP_ICONS as ICONS } from "../components/vendor/shop/shopIcons";
 import { navPlaceFor } from "./Sidebar/vendorNav";
 import NotificationBell from "../components/support/NotificationBell.vue";
@@ -110,6 +116,7 @@ const router = useRouter();
 const { user, logout } = useAuth();
 const { unreadChatCount, chatRoute } = useChatNotifications();
 const { toggleMobile } = useSidebarState();
+const { isDark, setDark } = useVendorTheme();
 const { ACCESS_REUSE_MS, subscriptionAccess, loadSubscriptionAccess } = useSubscriptionAccess();
 
 const showDropdown = ref(false);
@@ -214,10 +221,10 @@ const handleLogout = async () => {
   gap: 14px;
   min-height: 68px;
   padding: 10px 28px;
-  background: rgba(255, 255, 255, 0.86);
+  background: var(--v-glass);
   backdrop-filter: saturate(180%) blur(14px);
   -webkit-backdrop-filter: saturate(180%) blur(14px);
-  border-bottom: 1px solid #edf0f3;
+  border-bottom: 1px solid var(--v-border);
   font-family: "Poppins", sans-serif;
   box-sizing: border-box;
 }
@@ -236,7 +243,7 @@ const handleLogout = async () => {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #a0aab8;
+  color: var(--v-faint);
 }
 .vh-title {
   margin: 0;
@@ -244,7 +251,7 @@ const handleLogout = async () => {
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: #1a202c;
+  color: var(--v-text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -261,19 +268,19 @@ const handleLogout = async () => {
   place-items: center;
   width: 40px;
   height: 40px;
-  border: 1px solid #edf0f3;
+  border: 1px solid var(--v-border);
   border-radius: 12px;
-  background: #fff;
-  color: #5b6474;
+  background: var(--v-surface);
+  color: var(--v-text-2);
   text-decoration: none;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .vh-icon-btn:hover,
 .vh-icon-btn.on {
-  background: #f5f7f9;
-  border-color: #e2e8f0;
-  color: #1a202c;
+  background: var(--v-subtle);
+  border-color: var(--v-border-strong);
+  color: var(--v-text);
 }
 .vh-icon-btn :deep(svg) {
   width: 18px;
@@ -286,7 +293,7 @@ const handleLogout = async () => {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  border: 2px solid #fff;
+  border: 2px solid var(--v-surface);
   border-radius: 999px;
   background: #e53e3e;
   color: #fff;
@@ -306,14 +313,14 @@ const handleLogout = async () => {
   gap: 8px;
   height: 40px;
   padding: 0 12px;
-  border: 1px solid #edf0f3;
+  border: 1px solid var(--v-border);
   border-radius: 12px;
-  background: #f7f9fa;
-  color: #a0aab8;
+  background: var(--v-subtle);
+  color: var(--v-faint);
 }
 .vh-search:focus-within {
-  border-color: #cbd5e0;
-  background: #fff;
+  border-color: var(--v-border-strong);
+  background: var(--v-input);
 }
 .vh-search :deep(svg) {
   width: 16px;
@@ -324,7 +331,7 @@ const handleLogout = async () => {
   border: 0;
   outline: 0;
   background: none;
-  color: #1a202c;
+  color: var(--v-text);
   font: inherit;
   font-size: 13px;
 }
@@ -333,7 +340,7 @@ const handleLogout = async () => {
   width: 1px;
   height: 28px;
   margin: 0 4px;
-  background: #edf0f3;
+  background: var(--v-subtle-2);
 }
 
 /* Account */
@@ -355,8 +362,8 @@ const handleLogout = async () => {
 }
 .vh-user:hover,
 .vh-user.open {
-  background: #f7f9fa;
-  border-color: #edf0f3;
+  background: var(--v-subtle);
+  border-color: var(--v-border);
 }
 .vh-avatar {
   flex: none;
@@ -390,15 +397,15 @@ const handleLogout = async () => {
 .vh-user-text b {
   font-size: 13px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .vh-user-text small {
   font-size: 11.5px;
-  color: #8a94a6;
+  color: var(--v-faint);
 }
 .vh-chevron {
   display: inline-flex;
-  color: #a0aab8;
+  color: var(--v-faint);
   transition: transform 0.2s;
 }
 .vh-chevron :deep(svg) {
@@ -415,16 +422,16 @@ const handleLogout = async () => {
   right: 0;
   width: 290px;
   padding: 8px;
-  border: 1px solid #edf0f3;
+  border: 1px solid var(--v-border);
   border-radius: 18px;
-  background: #fff;
+  background: var(--v-raised);
   box-shadow: 0 20px 48px rgba(15, 23, 42, 0.16);
 }
 .vh-menu-id {
   display: flex;
   gap: 12px;
   padding: 10px 10px 14px;
-  border-bottom: 1px solid #f1f4f6;
+  border-bottom: 1px solid var(--v-border);
 }
 .vh-menu-id > div {
   min-width: 0;
@@ -439,29 +446,29 @@ const handleLogout = async () => {
 .vh-menu-id b {
   font-size: 14px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .vh-menu-id small {
   font-size: 12px;
-  color: #8a94a6;
+  color: var(--v-faint);
 }
 .vh-plan {
   display: inline-block;
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--v-subtle);
+  color: var(--v-muted);
   margin-top: 6px;
   padding: 2px 9px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
 }
-.vh-plan.on { background: #e6f9ee; color: #22753f; }
-.vh-plan.trial { background: #f3f0ff; color: #6b46c1; }
-.vh-plan.off { background: #fff1f1; color: #c53030; }
+.vh-plan.on { background: var(--v-green-soft); color: var(--v-green-text); }
+.vh-plan.trial { background: var(--v-purple-soft); color: var(--v-purple-text); }
+.vh-plan.off { background: var(--v-red-soft); color: var(--v-red-text); }
 .vh-menu-links {
   display: grid;
   padding: 6px 0;
-  border-bottom: 1px solid #f1f4f6;
+  border-bottom: 1px solid var(--v-border);
 }
 .vh-menu-item {
   display: flex;
@@ -472,7 +479,7 @@ const handleLogout = async () => {
   border: 0;
   border-radius: 10px;
   background: none;
-  color: #4a5568;
+  color: var(--v-text-2);
   font: inherit;
   font-size: 13px;
   text-align: left;
@@ -480,24 +487,27 @@ const handleLogout = async () => {
   cursor: pointer;
 }
 .vh-menu-item:hover {
-  background: #f7f9fa;
-  color: #1a202c;
+  background: var(--v-subtle);
+  color: var(--v-text);
 }
 .vh-menu-item :deep(svg) {
   width: 16px;
   height: 16px;
-  color: #8a94a6;
+  color: var(--v-faint);
+}
+.vh-dark .sp-switch {
+  margin-left: auto;
 }
 .vh-logout {
   margin-top: 6px;
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .vh-logout :deep(svg) {
   color: currentColor;
 }
 .vh-logout:hover {
-  background: #fff5f5;
-  color: #c53030;
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
 }
 .drop-enter-active,
 .drop-leave-active {

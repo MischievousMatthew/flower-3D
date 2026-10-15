@@ -66,9 +66,9 @@ function countText(g) {
 }
 .sa-group {
   padding: 12px;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
   border-radius: 14px;
-  background: #fbfdfc;
+  background: var(--v-subtle);
 }
 .sa-head {
   display: flex;
@@ -79,11 +79,11 @@ function countText(g) {
 .sa-head b {
   font-size: 13px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .sa-count {
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .sa-whole {
   display: inline-flex;
@@ -91,7 +91,7 @@ function countText(g) {
   gap: 8px;
   margin-left: auto;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
   cursor: pointer;
 }
 .sa-places {

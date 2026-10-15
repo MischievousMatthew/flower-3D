@@ -870,8 +870,8 @@ const formatSize = (bytes) =>
   --paper: #f8f9fa;
   margin-left: 260px;
   min-height: 100vh;
-  background: #f8f9fa;
-  color: #2d3748;
+  background: var(--v-bg);
+  color: var(--v-text);
   font-family: "Poppins", sans-serif;
   transition: margin-left 0.3s ease;
 }
@@ -907,7 +907,7 @@ const formatSize = (bytes) =>
 .cz-lede {
   max-width: 640px;
   margin: 0;
-  color: #718096;
+  color: var(--v-muted);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -917,7 +917,7 @@ const formatSize = (bytes) =>
   display: flex;
   gap: 4px;
   margin: 24px 0 20px;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid var(--v-border-strong);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -931,7 +931,7 @@ const formatSize = (bytes) =>
   border: none;
   border-bottom: 3px solid transparent;
   background: transparent;
-  color: #9ca3af;
+  color: var(--v-faint);
   font: inherit;
   font-size: 14px;
   font-weight: 500;
@@ -941,20 +941,20 @@ const formatSize = (bytes) =>
 }
 
 .cz-tab:hover {
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 
 .cz-tab.active {
   border-bottom-color: var(--bc-accent);
-  color: #2d3748;
+  color: var(--v-text);
 }
 
 .cz-count {
   min-width: 22px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: #edf2f7;
-  color: #4a5568;
+  background: var(--v-subtle-2);
+  color: var(--v-text-2);
   font-size: 12px;
   text-align: center;
 }
@@ -976,9 +976,9 @@ const formatSize = (bytes) =>
 .cz-list,
 .cz-item,
 .cz-empty {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--v-border-strong);
   border-radius: 12px;
-  background: #fff;
+  background: var(--v-surface);
 }
 
 .cz-form {
@@ -1001,7 +1001,7 @@ const formatSize = (bytes) =>
 .cz-form-head p,
 .cz-panel-head p {
   margin: 4px 0 0;
-  color: #718096;
+  color: var(--v-muted);
   font-size: 13px;
   line-height: 1.55;
 }
@@ -1013,23 +1013,23 @@ const formatSize = (bytes) =>
 }
 
 .cz-label {
-  color: #4a5568;
+  color: var(--v-text-2);
   font-size: 13px;
   font-weight: 500;
 }
 
 .cz-label small {
-  color: #a0aec0;
+  color: var(--v-faint);
   font-weight: 400;
 }
 
 .cz-input {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--v-border-strong);
   border-radius: 8px;
-  background: #fff;
-  color: #2d3748;
+  background: var(--v-input);
+  color: var(--v-text);
   font: inherit;
   font-size: 14px;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -1054,7 +1054,7 @@ const formatSize = (bytes) =>
 
 .cz-counter {
   align-self: flex-end;
-  color: #a0aec0;
+  color: var(--v-faint);
   font-size: 12px;
 }
 
@@ -1104,7 +1104,7 @@ const formatSize = (bytes) =>
   position: absolute;
   top: 50%;
   left: 12px;
-  color: #a0aec0;
+  color: var(--v-faint);
   font-size: 14px;
   transform: translateY(-50%);
   pointer-events: none;
@@ -1132,7 +1132,7 @@ const formatSize = (bytes) =>
   margin-top: 6px;
   padding: 12px;
   border-radius: 10px;
-  background: #f7fafc;
+  background: var(--v-subtle);
 }
 
 .cz-slider {
@@ -1144,12 +1144,12 @@ const formatSize = (bytes) =>
 .cz-slider-head {
   display: flex;
   justify-content: space-between;
-  color: #718096;
+  color: var(--v-muted);
   font-size: 12px;
 }
 
 .cz-slider-head strong {
-  color: #2d3748;
+  color: var(--v-text);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -1168,7 +1168,7 @@ const formatSize = (bytes) =>
 .cz-slider input[type="range"]::-webkit-slider-thumb {
   width: 18px;
   height: 18px;
-  border: 3px solid #fff;
+  border: 3px solid var(--v-surface);
   border-radius: 50%;
   background: transparent;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.2);
@@ -1178,7 +1178,7 @@ const formatSize = (bytes) =>
 .cz-slider input[type="range"]::-moz-range-thumb {
   width: 14px;
   height: 14px;
-  border: 3px solid #fff;
+  border: 3px solid var(--v-surface);
   border-radius: 50%;
   background: transparent;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.2);
@@ -1195,9 +1195,9 @@ const formatSize = (bytes) =>
   align-items: center;
   gap: 12px;
   padding: 14px;
-  border: 1.5px dashed #cbd5e0;
+  border: 1.5px dashed var(--v-border-strong);
   border-radius: 10px;
-  background: #f7fafc;
+  background: var(--v-subtle);
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
 }
@@ -1219,7 +1219,7 @@ const formatSize = (bytes) =>
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: #fff;
+  background: var(--v-surface);
   color: var(--bc-accent);
   font-size: 16px;
 }
@@ -1239,7 +1239,7 @@ const formatSize = (bytes) =>
 }
 
 .cz-upload-text small {
-  color: #a0aec0;
+  color: var(--v-faint);
   font-size: 12px;
 }
 
@@ -1282,13 +1282,13 @@ const formatSize = (bytes) =>
 }
 
 .cz-btn-ghost {
-  border-color: #e2e8f0;
-  background: #fff;
-  color: #4a5568;
+  border-color: var(--v-border-strong);
+  background: var(--v-surface);
+  color: var(--v-text-2);
 }
 
 .cz-btn-ghost:hover:not(:disabled) {
-  border-color: #cbd5e0;
+  border-color: var(--v-border-strong);
 }
 
 .cz-btn:focus-visible,
@@ -1315,7 +1315,7 @@ const formatSize = (bytes) =>
 }
 
 .cz-link.danger {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 
 .cz-link:disabled {
@@ -1338,7 +1338,7 @@ const formatSize = (bytes) =>
 }
 
 .cz-list-note {
-  color: #718096;
+  color: var(--v-muted);
   font-size: 13px;
 }
 
@@ -1355,7 +1355,7 @@ const formatSize = (bytes) =>
   display: flex;
   gap: 14px;
   padding: 14px;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
   border-radius: 10px;
   transition: border-color 0.2s, background 0.2s, opacity 0.2s;
 }
@@ -1381,8 +1381,8 @@ const formatSize = (bytes) =>
 }
 
 .cz-dot--model {
-  background: #ebf8ff;
-  color: #2b6cb0;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1403,7 +1403,7 @@ const formatSize = (bytes) =>
   height: 72px;
   border-radius: 8px;
   object-fit: cover;
-  background: #fff;
+  background: var(--v-surface);
 }
 
 .cz-allowance {
@@ -1417,7 +1417,7 @@ const formatSize = (bytes) =>
   display: inline-flex;
   padding: 3px;
   border-radius: 10px;
-  background: #edf2f7;
+  background: var(--v-subtle-2);
 }
 
 .cz-segment button {
@@ -1425,7 +1425,7 @@ const formatSize = (bytes) =>
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: #4a5568;
+  color: var(--v-text-2);
   font: inherit;
   font-size: 13px;
   font-weight: 500;
@@ -1433,8 +1433,8 @@ const formatSize = (bytes) =>
 }
 
 .cz-segment button.active {
-  background: #fff;
-  color: #2d3748;
+  background: var(--v-surface);
+  color: var(--v-text);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -1448,7 +1448,7 @@ const formatSize = (bytes) =>
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #4a5568;
+  color: var(--v-text-2);
   font-size: 13px;
 }
 
@@ -1457,7 +1457,7 @@ const formatSize = (bytes) =>
 }
 
 .cz-hint {
-  color: #718096;
+  color: var(--v-muted);
   font-size: 12px;
 }
 
@@ -1479,10 +1479,10 @@ const formatSize = (bytes) =>
   place-items: center;
   width: 36px;
   height: 36px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--v-border-strong);
   border-radius: 8px;
-  background: #fff;
-  color: #718096;
+  background: var(--v-surface);
+  color: var(--v-muted);
   cursor: pointer;
 }
 
@@ -1534,21 +1534,21 @@ const formatSize = (bytes) =>
 
 .cz-hexline {
   margin: 0;
-  color: #a0aec0;
+  color: var(--v-faint);
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
   font-size: 12px;
 }
 
 .cz-desc {
   margin: 2px 0 0;
-  color: #4a5568;
+  color: var(--v-text-2);
   font-size: 13px;
   line-height: 1.55;
   word-break: break-word;
 }
 
 .cz-desc.muted {
-  color: #a0aec0;
+  color: var(--v-faint);
   font-style: italic;
 }
 
@@ -1570,7 +1570,7 @@ const formatSize = (bytes) =>
 }
 
 .cz-confirm-text {
-  color: #c53030;
+  color: var(--v-red-text);
   font-size: 13px;
 }
 
@@ -1596,7 +1596,7 @@ const formatSize = (bytes) =>
   width: 40px;
   height: 22px;
   border-radius: 999px;
-  background: #cbd5e0;
+  background: var(--v-border-strong);
   transition: background 0.25s;
 }
 
@@ -1631,7 +1631,7 @@ const formatSize = (bytes) =>
 }
 
 .cz-switch-text {
-  color: #4a5568;
+  color: var(--v-text-2);
   font-size: 13px;
 }
 
@@ -1666,7 +1666,7 @@ const formatSize = (bytes) =>
   height: 84px;
   border-radius: 10px;
   object-fit: cover;
-  background: #f7fafc;
+  background: var(--v-subtle);
 }
 
 .cz-thumb--empty {
@@ -1685,19 +1685,19 @@ const formatSize = (bytes) =>
 .cz-chip {
   padding: 3px 9px;
   border-radius: 999px;
-  background: #edf2f7;
-  color: #4a5568;
+  background: var(--v-subtle-2);
+  color: var(--v-text-2);
   font-size: 11.5px;
 }
 
 .cz-chip.ok {
-  background: #c6f6d5;
-  color: #22543d;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
 }
 
 .cz-chip.warn {
-  background: #fefcbf;
-  color: #744210;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
 }
 
 .cz-item .cz-actions {
@@ -1712,7 +1712,7 @@ const formatSize = (bytes) =>
   align-items: center;
   gap: 4px;
   padding: 36px 20px;
-  color: #718096;
+  color: var(--v-muted);
   font-size: 13px;
   text-align: center;
 }
@@ -1722,7 +1722,7 @@ const formatSize = (bytes) =>
 }
 
 .cz-empty strong {
-  color: #2d3748;
+  color: var(--v-text);
   font-size: 14px;
   font-weight: 600;
 }

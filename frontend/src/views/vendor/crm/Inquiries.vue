@@ -340,7 +340,7 @@ onMounted(async () => {
   display: flex;
   gap: 14px;
   padding: 18px 4px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--v-border);
 }
 .iq-item:first-child {
   border-top: 0;
@@ -352,7 +352,7 @@ onMounted(async () => {
   margin: 0 -10px;
   padding: 18px 14px;
   border-radius: 14px;
-  background: #f8fdf9;
+  background: var(--v-subtle);
   box-shadow: inset 0 0 0 1px var(--bc-accent-muted);
 }
 .iq-main {
@@ -379,13 +379,13 @@ onMounted(async () => {
   max-width: 100%;
   margin-top: 10px;
   padding: 6px 12px 6px 6px;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
   border-radius: 12px;
-  background: #fff;
+  background: var(--v-surface);
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
-  color: #2d3748;
+  color: var(--v-text);
   text-align: left;
   cursor: pointer;
 }
@@ -418,13 +418,13 @@ onMounted(async () => {
   display: block;
   font-size: 11px;
   font-weight: 400;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .iq-question {
   margin: 12px 0 0;
   font-size: 14px;
   line-height: 1.55;
-  color: #1a202c;
+  color: var(--v-text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -433,7 +433,7 @@ onMounted(async () => {
   padding: 12px 14px;
   border-left: 3px solid var(--bc-accent);
   border-radius: 0 12px 12px 0;
-  background: #f7fafc;
+  background: var(--v-subtle);
 }
 .iq-answer-head {
   display: flex;
@@ -474,7 +474,7 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
   cursor: pointer;
 }
 .iq-public input {
@@ -488,7 +488,7 @@ onMounted(async () => {
   margin-top: 12px;
 }
 .st-link.muted {
-  color: #718096;
+  color: var(--v-muted);
 }
 .st-link:disabled {
   opacity: 0.5;
@@ -510,7 +510,7 @@ onMounted(async () => {
   gap: 14px;
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 1px solid #edf2f7;
+  border-top: 1px solid var(--v-border);
 }
 @media (max-width: 640px) {
   .iq-item > .st-avatar {

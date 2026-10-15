@@ -146,16 +146,16 @@ defineExpose({ refresh: fetchCount });
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #475569;
+  border: 1px solid var(--v-border-strong);
+  background: var(--v-surface);
+  color: var(--v-text-2);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
 }
 .bell:hover {
-  color: #5b4fc9;
+  color: var(--v-blue-text);
   border-color: #c7c2fb;
 }
 .dot {
@@ -179,8 +179,8 @@ defineExpose({ refresh: fetchCount });
   right: 0;
   top: calc(100% + 8px);
   width: min(360px, calc(100vw - 24px));
-  background: #fff;
-  border: 1px solid #e9edf3;
+  background: var(--v-raised);
+  border: 1px solid var(--v-border);
   border-radius: 14px;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
   z-index: 500;
@@ -192,9 +192,9 @@ defineExpose({ refresh: fetchCount });
   justify-content: space-between;
   align-items: center;
   padding: 12px 14px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--v-border);
   font-size: 13.5px;
-  color: #1e2739;
+  color: var(--v-text);
 }
 .link {
   border: none;
@@ -229,14 +229,14 @@ defineExpose({ refresh: fetchCount });
   cursor: pointer;
 }
 .item:hover {
-  background: #f8fafc;
+  background: var(--v-subtle);
 }
 .item.unread {
-  background: #f5f3ff;
+  background: var(--v-purple-soft);
 }
 .item.important .item-title::after {
   content: " · Important";
-  color: #e11d48;
+  color: var(--v-red-text);
   font-weight: 600;
 }
 .item-icon {
@@ -252,11 +252,11 @@ defineExpose({ refresh: fetchCount });
 .item-title {
   font-size: 13px;
   font-weight: 600;
-  color: #1e2739;
+  color: var(--v-text);
 }
 .item-body {
   font-size: 12.5px;
-  color: #475569;
+  color: var(--v-text-2);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -264,19 +264,19 @@ defineExpose({ refresh: fetchCount });
 }
 .item-time {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--v-faint);
 }
 .empty {
   margin: 0;
   padding: 24px 14px;
   text-align: center;
-  color: #94a3b8;
+  color: var(--v-faint);
   font-size: 13px;
 }
 .menu-foot {
   display: block;
   padding: 10px 14px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--v-border);
   font-size: 12.5px;
   color: #6d5ff0;
   text-decoration: none;
@@ -285,7 +285,7 @@ defineExpose({ refresh: fetchCount });
   display: block;
   height: 52px;
   border-radius: 10px;
-  background: linear-gradient(100deg, #eef1f6 30%, #f8fafc 50%, #eef1f6 70%);
+  background: linear-gradient(100deg, var(--v-subtle-2) 30%, var(--v-subtle) 50%, var(--v-subtle-2) 70%);
   background-size: 300% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
 }

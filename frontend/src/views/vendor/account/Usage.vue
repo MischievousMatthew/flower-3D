@@ -139,12 +139,12 @@ onMounted(load);
   gap: 6px;
   margin: 0;
   font-size: 13px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .us-count strong {
   font-size: 26px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .us-hint {
   margin: 0;
@@ -156,7 +156,7 @@ onMounted(load);
   margin: auto 0 0;
   font-size: 12px;
   font-weight: 500;
-  color: #6b46c1;
+  color: var(--v-purple-text);
 }
 .us-next :deep(svg) {
   flex: none;
@@ -176,7 +176,7 @@ onMounted(load);
   align-items: center;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid #f4f6f8;
+  border-bottom: 1px solid var(--v-border);
 }
 .us-feat-text {
   flex: 1;
@@ -190,10 +190,10 @@ onMounted(load);
 .us-feat-text small {
   display: block;
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .us-feats li.off b {
-  color: #718096;
+  color: var(--v-muted);
 }
 @media (max-width: 1100px) {
   .us-grid {

@@ -340,7 +340,7 @@ onMounted(() => {
 .sp-stat strong small {
   font-size: 13px;
   font-weight: 500;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .at-sk-row {
   display: grid;
@@ -363,18 +363,18 @@ onMounted(() => {
   margin: 0 0 6px;
   font-size: 13.5px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .at-day h3 span {
   font-size: 12px;
   font-weight: 400;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .at-day ul {
   margin: 0;
   padding: 0;
   list-style: none;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
   border-radius: 14px;
   overflow: hidden;
 }
@@ -384,10 +384,10 @@ onMounted(() => {
   align-items: center;
   gap: 14px;
   padding: 11px 14px;
-  background: #fff;
+  background: var(--v-surface);
 }
 .at-row + .at-row {
-  border-top: 1px solid #f4f6f8;
+  border-top: 1px solid var(--v-border);
 }
 .at-times {
   display: flex;
@@ -400,15 +400,15 @@ onMounted(() => {
 .at-times small {
   display: block;
   font-size: 10.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .at-times .arrow {
-  color: #cbd5e0;
+  color: var(--v-faint);
 }
 .at-hours {
   font-size: 13px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--v-text);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -422,7 +422,7 @@ onMounted(() => {
   grid-column: 1 / -1;
   margin: -4px 0 0 41px;
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
   overflow-wrap: anywhere;
 }
 @media (max-width: 900px) {

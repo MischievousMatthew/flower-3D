@@ -433,7 +433,7 @@ const fmtDateTime = (v) =>
 .rc-sk {
   display: block;
   border-radius: 8px;
-  background: linear-gradient(100deg, #eef1f4 30%, #f7f8fa 50%, #eef1f4 70%);
+  background: linear-gradient(100deg, var(--v-subtle-2) 30%, var(--v-subtle) 50%, var(--v-subtle-2) 70%);
   background-size: 300% 100%;
   animation: rc-shimmer 1.6s ease-in-out infinite;
 }
@@ -442,7 +442,7 @@ const fmtDateTime = (v) =>
   to { background-position: 0 0; }
 }
 .rc-error {
-  color: #b91c1c;
+  color: var(--v-red-text);
 }
 
 /* Header */
@@ -473,12 +473,12 @@ const fmtDateTime = (v) =>
   font-size: 11.5px;
   font-weight: 600;
   white-space: nowrap;
-  background: #f1f3f5;
-  color: #475569;
+  background: var(--v-subtle);
+  color: var(--v-text-2);
 }
-.rc-chip.hot { background: #fff4d6; color: #92590a; }
-.rc-chip.ok { background: #dcf5e6; color: #166534; }
-.rc-chip.off { background: #f1f3f5; color: #6b7280; }
+.rc-chip.hot { background: var(--v-amber-soft); color: var(--v-amber-text); }
+.rc-chip.ok { background: var(--v-green-soft); color: var(--v-green-text); }
+.rc-chip.off { background: var(--v-subtle); color: var(--v-muted); }
 
 /* Steps */
 .rc-steps {
@@ -495,7 +495,7 @@ const fmtDateTime = (v) =>
   gap: 6px;
   padding: 5px 10px 5px 5px;
   border-radius: 999px;
-  background: #f5f6f8;
+  background: var(--v-subtle);
   color: var(--rc-muted);
   font-size: 12px;
 }
@@ -506,7 +506,7 @@ const fmtDateTime = (v) =>
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  background: var(--v-surface);
   border: 1px solid var(--rc-line);
   font-size: 11px;
   font-weight: 700;
@@ -521,7 +521,7 @@ const fmtDateTime = (v) =>
   color: #fff;
 }
 .rc-steps li.now {
-  background: #fff;
+  background: var(--v-surface);
   color: var(--rc-ink);
   box-shadow: inset 0 0 0 1.5px var(--rc-accent);
   font-weight: 600;
@@ -529,8 +529,8 @@ const fmtDateTime = (v) =>
 .rc-closed {
   padding: 10px 12px;
   border-radius: 10px;
-  background: #f5f6f8;
-  color: #475569;
+  background: var(--v-subtle);
+  color: var(--v-text-2);
 }
 
 /* Terms */
@@ -566,7 +566,7 @@ const fmtDateTime = (v) =>
   gap: 10px;
   padding: 14px;
   border-radius: 12px;
-  background: #fafbfc;
+  background: var(--v-subtle);
   border: 1px solid var(--rc-line);
 }
 .rc-offer {
@@ -589,7 +589,7 @@ const fmtDateTime = (v) =>
   padding: 8px 14px;
   border-radius: 9px;
   border: 1px solid var(--rc-line);
-  background: #fff;
+  background: var(--v-surface);
   color: var(--rc-ink);
   font: inherit;
   font-size: 13px;
@@ -609,7 +609,7 @@ const fmtDateTime = (v) =>
   color: #fff;
 }
 .rc-btn--danger {
-  color: #b91c1c;
+  color: var(--v-red-text);
 }
 .rc-btn--danger.rc-btn--main,
 .rc-form--warn .rc-btn--danger {
@@ -638,7 +638,7 @@ const fmtDateTime = (v) =>
 .rc-form--warn {
   padding: 12px;
   border-radius: 10px;
-  background: #fff5f5;
+  background: var(--v-red-soft);
 }
 .rc-options {
   display: grid;
@@ -648,7 +648,7 @@ const fmtDateTime = (v) =>
 .rc-note {
   margin: 0;
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .rc-option {
   display: flex;
@@ -656,7 +656,7 @@ const fmtDateTime = (v) =>
   padding: 10px;
   border: 1px solid var(--rc-line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--v-surface);
   cursor: pointer;
 }
 .rc-option.on {
@@ -689,14 +689,14 @@ const fmtDateTime = (v) =>
   gap: 5px;
   font-size: 12px;
   font-weight: 500;
-  color: #475569;
+  color: var(--v-text-2);
 }
 .rc-input {
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid #d9dde3;
+  border: 1px solid var(--v-border-strong);
   border-radius: 9px;
-  background: #fff;
+  background: var(--v-input);
   font: inherit;
   font-size: 13px;
   color: var(--rc-ink);
@@ -711,8 +711,8 @@ const fmtDateTime = (v) =>
 .rc-done {
   padding: 10px 12px;
   border-radius: 10px;
-  background: #ecfdf3;
-  color: #166534;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
   font-weight: 500;
 }
 
@@ -769,7 +769,7 @@ const fmtDateTime = (v) =>
   max-width: 85%;
   padding: 8px 12px;
   border-radius: 12px;
-  background: #f1f3f5;
+  background: var(--v-subtle);
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
@@ -784,7 +784,7 @@ const fmtDateTime = (v) =>
   width: 100%;
   padding: 6px 10px;
   border-left: 3px solid var(--rc-line);
-  color: #475569;
+  color: var(--v-text-2);
   font-size: 12.5px;
 }
 .rc-event-note {

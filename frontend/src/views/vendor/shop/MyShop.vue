@@ -345,9 +345,9 @@ onMounted(fetch);
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
   border-radius: 12px;
-  background: #fbfdfc;
+  background: var(--v-subtle);
 }
 .pin-icon {
   display: inline-flex;
@@ -360,11 +360,11 @@ onMounted(fetch);
 .pin-text {
   flex: 1;
   font-size: 13px;
-  color: #2d3748;
+  color: var(--v-text);
   font-variant-numeric: tabular-nums;
 }
 .pin-text.muted {
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 /* Preview */
 .shop-preview {
@@ -396,8 +396,8 @@ onMounted(fetch);
 }
 .cover-btn {
   position: relative;
-  background: rgba(255, 255, 255, 0.92);
-  color: #1a202c;
+  background: var(--v-glass);
+  color: var(--v-text);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 .cover-btn input,
@@ -422,10 +422,10 @@ onMounted(fetch);
   place-items: center;
   width: 76px;
   height: 76px;
-  border: 4px solid #fff;
+  border: 4px solid var(--v-surface);
   border-radius: 22px;
   object-fit: cover;
-  background: #fff;
+  background: var(--v-surface);
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
   box-sizing: border-box;
 }
@@ -457,7 +457,7 @@ onMounted(fetch);
   margin: 12px 0 4px;
   font-size: 18px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .preview-meta {
   display: flex;
@@ -466,13 +466,13 @@ onMounted(fetch);
   gap: 8px;
   margin: 0;
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .preview-about {
   margin: 12px 0 0;
   font-size: 13px;
   line-height: 1.55;
-  color: #4a5568;
+  color: var(--v-text-2);
   white-space: pre-line;
   display: -webkit-box;
   -webkit-line-clamp: 4;
@@ -483,7 +483,7 @@ onMounted(fetch);
   list-style: none;
   margin: 14px 0 0;
   padding: 14px 0 0;
-  border-top: 1px solid #f1f5f3;
+  border-top: 1px solid var(--v-border);
   display: grid;
   gap: 9px;
 }
@@ -491,7 +491,7 @@ onMounted(fetch);
   display: flex;
   gap: 9px;
   font-size: 12.5px;
-  color: #2d3748;
+  color: var(--v-text);
   line-height: 1.45;
 }
 .preview-facts :deep(svg) {

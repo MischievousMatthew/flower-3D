@@ -292,9 +292,9 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
   gap: 2px;
   min-width: 0;
   padding: 14px 16px;
-  border: 1px solid #edf1ef;
+  border: 1px solid var(--v-border);
   border-radius: 16px;
-  background: #fff;
+  background: var(--v-surface);
   font-family: "Poppins", sans-serif;
   text-align: left;
   cursor: pointer;
@@ -333,12 +333,12 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
 .pipe-step strong {
   font-size: 24px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   line-height: 1.2;
 }
 .pipe-hint {
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .pipe-arrow {
   position: absolute;
@@ -351,8 +351,8 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
   height: 18px;
   transform: translateY(-50%);
   border-radius: 50%;
-  background: #f6f8f7;
-  color: #cbd5e0;
+  background: var(--v-subtle);
+  color: var(--v-faint);
 }
 .pipe-arrow :deep(svg) {
   width: 14px;
@@ -384,7 +384,7 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
   align-items: center;
   gap: 8px;
   font-size: 12.5px;
-  color: #718096;
+  color: var(--v-muted);
   white-space: nowrap;
 }
 .date-field .sp-input {
@@ -411,14 +411,14 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
   gap: 14px;
   padding: 12px;
   border-radius: 14px;
-  border-bottom: 1px solid #f2f5f3;
+  border-bottom: 1px solid var(--v-border);
   transition: background 0.15s;
 }
 .orow:last-child {
   border-bottom: 0;
 }
 .orow:hover {
-  background: #f8fcf9;
+  background: var(--v-subtle);
 }
 .orow.late {
   box-shadow: inset 3px 0 0 #fc8181;
@@ -457,7 +457,7 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
   right: -6px;
   bottom: -6px;
   padding: 1px 6px;
-  border: 2px solid #fff;
+  border: 2px solid var(--v-surface);
   border-radius: 999px;
   background: #1a202c;
   color: #fff;
@@ -479,7 +479,7 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
 .orow-top strong {
   font-size: 14px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -487,19 +487,19 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
 .on-num {
   flex: none;
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
   font-variant-numeric: tabular-nums;
 }
 .orow-items {
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .orow-items em {
   font-style: normal;
-  color: #6b46c1;
+  color: var(--v-purple-text);
 }
 .orow-meta {
   display: flex;
@@ -514,18 +514,18 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
   gap: 5px;
   font-size: 12px;
   font-weight: 500;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .meta-date :deep(svg) {
   width: 14px;
   height: 14px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .meta-date.soon {
-  color: #b45309;
+  color: var(--v-amber-text);
 }
 .meta-date.late {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .orow-side {
   flex: none;
@@ -542,11 +542,11 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
 .orow-money strong {
   font-size: 14px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .orow-money span {
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
   white-space: nowrap;
 }
 .orow-side > .sp-chip {
@@ -566,7 +566,7 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
   align-items: center;
   padding: 10px 12px 6px;
   font-size: 12.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .pager div {
   display: flex;

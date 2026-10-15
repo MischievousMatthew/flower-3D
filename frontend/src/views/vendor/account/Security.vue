@@ -386,7 +386,7 @@ onMounted(load);
   padding: 0;
   list-style: none;
   font-size: 12.5px;
-  color: #b45309;
+  color: var(--v-amber-text);
 }
 .sc-checks li {
   display: inline-flex;
@@ -394,7 +394,7 @@ onMounted(load);
   gap: 6px;
 }
 .sc-checks li.ok {
-  color: #22753f;
+  color: var(--v-green-text);
 }
 .sc-checks :deep(svg) {
   width: 14px;
@@ -422,7 +422,7 @@ onMounted(load);
   border: 0;
   border-radius: 8px;
   background: none;
-  color: #a0aec0;
+  color: var(--v-faint);
   cursor: pointer;
   transform: translateY(-50%);
 }
@@ -446,9 +446,9 @@ onMounted(load);
   font-size: 12px;
   font-weight: 600;
 }
-.sc-strength.weak small { color: #c53030; }
-.sc-strength.fair small { color: #b45309; }
-.sc-strength.strong small { color: #22753f; }
+.sc-strength.weak small { color: var(--v-red-text); }
+.sc-strength.fair small { color: var(--v-amber-text); }
+.sc-strength.strong small { color: var(--v-green-text); }
 .sc-form-foot {
   display: flex;
   justify-content: flex-end;
@@ -460,16 +460,16 @@ onMounted(load);
   margin-bottom: 14px;
   padding: 14px;
   border-radius: 14px;
-  background: #fffaf0;
+  background: var(--v-amber-soft);
 }
 .sc-2fa.on {
-  background: #f0fff4;
+  background: var(--v-green-soft);
 }
 .sc-2fa p {
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .sc-email {
   margin: 10px 0 0;
@@ -491,7 +491,7 @@ onMounted(load);
   align-items: center;
   gap: 12px;
   padding: 10px 0;
-  border-top: 1px solid #f4f6f8;
+  border-top: 1px solid var(--v-border);
 }
 .sc-list li:first-child {
   border-top: 0;
@@ -516,7 +516,7 @@ onMounted(load);
 .sc-list-main small {
   display: block;
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -531,7 +531,7 @@ onMounted(load);
   gap: 8px;
   margin: 0;
   font-size: 13px;
-  color: #22753f;
+  color: var(--v-green-text);
 }
 .sc-clean :deep(svg) {
   width: 16px;

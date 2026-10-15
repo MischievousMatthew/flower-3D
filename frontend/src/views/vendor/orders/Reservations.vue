@@ -318,12 +318,12 @@ onMounted(() => {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .rv-cal-head p {
   margin: 2px 0 0;
   font-size: 12.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .rv-nav {
   display: flex;
@@ -342,7 +342,7 @@ onMounted(() => {
   text-align: center;
   font-size: 11.5px;
   font-weight: 600;
-  color: #a0aec0;
+  color: var(--v-faint);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -358,8 +358,8 @@ onMounted(() => {
   align-items: flex-start;
   gap: 4px;
   padding: 8px;
-  border: 1px solid #edf2f7;
-  background: #fff;
+  border: 1px solid var(--v-border);
+  background: var(--v-surface);
   font-family: "Poppins", sans-serif;
   text-align: left;
   cursor: pointer;
@@ -370,10 +370,10 @@ onMounted(() => {
   border-color: var(--bc-accent-border);
 }
 .rv-day.past {
-  background: #fafbfa;
+  background: var(--v-subtle);
 }
 .rv-day.past .rv-num {
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .rv-day.today .rv-num {
   display: grid;
@@ -389,21 +389,21 @@ onMounted(() => {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 18%, transparent);
 }
 .rv-day.closed {
-  background: repeating-linear-gradient(135deg, #fff5f5, #fff5f5 6px, #fff 6px, #fff 12px);
+  background: repeating-linear-gradient(135deg, var(--v-red-soft), var(--v-red-soft) 6px, var(--v-surface) 6px, var(--v-surface) 12px);
 }
 .rv-day.off {
-  background: #f7f8f9;
+  background: var(--v-subtle);
 }
 .rv-num {
   font-size: 13px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--v-text);
   line-height: 24px;
 }
 .rv-count {
   font-size: 15px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   line-height: 1.1;
   white-space: nowrap;
 }
@@ -411,14 +411,14 @@ onMounted(() => {
   margin-left: 3px;
   font-size: 10.5px;
   font-weight: 500;
-  color: #718096;
+  color: var(--v-muted);
 }
 .rv-bar {
   width: 100%;
   height: 4px;
   margin-top: auto;
   border-radius: 999px;
-  background: #edf2f7;
+  background: var(--v-subtle-2);
   overflow: hidden;
 }
 .rv-bar span {
@@ -439,12 +439,12 @@ onMounted(() => {
   text-overflow: ellipsis;
 }
 .rv-tag.closed {
-  background: #fed7d7;
-  color: #c53030;
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
 }
 .rv-tag.off {
-  background: #edf2f7;
-  color: #718096;
+  background: var(--v-subtle-2);
+  color: var(--v-muted);
 }
 .rv-legend {
   display: flex;
@@ -452,7 +452,7 @@ onMounted(() => {
   gap: 14px;
   margin-top: 14px;
   font-size: 11.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .rv-legend span {
   display: inline-flex;
@@ -467,7 +467,7 @@ onMounted(() => {
 .lg-light { background: #68d391; }
 .lg-busy { background: #f6ad55; }
 .lg-full { background: #fc8181; }
-.lg-closed { background: repeating-linear-gradient(135deg, #feb2b2, #feb2b2 2px, #fff 2px, #fff 4px); }
+.lg-closed { background: repeating-linear-gradient(135deg, #feb2b2, #feb2b2 2px, var(--v-surface) 2px, var(--v-surface) 4px); }
 
 /* Side */
 .rv-side {
@@ -483,8 +483,8 @@ onMounted(() => {
   padding: 12px;
   margin-bottom: 12px;
   border-radius: 13px;
-  background: #fff5f5;
-  color: #c53030;
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
 }
 .closed-box > span {
   display: inline-flex;
@@ -504,7 +504,7 @@ onMounted(() => {
 }
 .closed-box div span {
   font-size: 12px;
-  color: #9b2c2c;
+  color: var(--v-red-text);
   overflow-wrap: anywhere;
 }
 .close-row {
@@ -516,7 +516,7 @@ onMounted(() => {
 }
 .close-row small {
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .day-orders,
 .closed-list {
@@ -528,7 +528,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  border-top: 1px solid #f2f5f3;
+  border-top: 1px solid var(--v-border);
 }
 .day-orders li > button {
   flex: 1;
@@ -555,14 +555,14 @@ onMounted(() => {
 .do-text strong {
   font-size: 13px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .do-text span {
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -576,7 +576,7 @@ onMounted(() => {
 }
 .do-side small {
   font-size: 11.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .sp-empty.small {
   padding: 22px 10px;
@@ -586,19 +586,19 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   padding: 9px 0;
-  border-top: 1px solid #f2f5f3;
+  border-top: 1px solid var(--v-border);
 }
 .cl-date {
   flex: none;
   font-size: 13px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .cl-reason {
   flex: 1;
   min-width: 0;
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -639,7 +639,7 @@ onMounted(() => {
     font-size: 13px;
   }
   .rv-day.closed .rv-num {
-    color: #c53030;
+    color: var(--v-red-text);
   }
 }
 </style>

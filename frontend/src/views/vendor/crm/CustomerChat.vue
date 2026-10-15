@@ -602,14 +602,14 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-right: 1px solid #edf2f7;
+  border-right: 1px solid var(--v-border);
 }
 .ch-list-head {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 14px;
-  border-bottom: 1px solid #edf2f7;
+  border-bottom: 1px solid var(--v-border);
 }
 .ch-search {
   width: 100%;
@@ -642,7 +642,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 .ch-item:hover {
-  background: #f7fafc;
+  background: var(--v-subtle);
 }
 .ch-item.on {
   background: var(--bc-accent-soft);
@@ -668,7 +668,7 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   font-size: 13.5px;
   font-weight: 500;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .ch-item.unread .ch-item-top strong {
   font-weight: 700;
@@ -676,17 +676,17 @@ onBeforeUnmount(() => {
 .ch-item-top small {
   flex: none;
   font-size: 11px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .ch-preview {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .ch-item.unread .ch-preview {
-  color: #2d3748;
+  color: var(--v-text);
   font-weight: 500;
 }
 .ch-badge {
@@ -709,7 +709,7 @@ onBeforeUnmount(() => {
   padding: 40px 24px;
   text-align: center;
   font-size: 13px;
-  color: #718096;
+  color: var(--v-muted);
 }
 
 .ch-avatar {
@@ -749,7 +749,7 @@ onBeforeUnmount(() => {
   bottom: 0;
   width: 11px;
   height: 11px;
-  border: 2px solid #fff;
+  border: 2px solid var(--v-surface);
   border-radius: 50%;
   background: #48bb78;
 }
@@ -760,7 +760,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: #fbfcfb;
+  background: var(--v-subtle);
 }
 .ch-placeholder {
   display: flex;
@@ -780,15 +780,15 @@ onBeforeUnmount(() => {
 .ch-placeholder p {
   margin: 0;
   font-size: 13px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .ch-thread-head {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid #edf2f7;
-  background: #fff;
+  border-bottom: 1px solid var(--v-border);
+  background: var(--v-surface);
 }
 .ch-back {
   display: none;
@@ -807,10 +807,10 @@ onBeforeUnmount(() => {
 }
 .ch-who small {
   font-size: 12px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .ch-who small.online {
-  color: #2f855a;
+  color: var(--v-green-text);
 }
 .ch-head-actions {
   display: flex;
@@ -848,9 +848,9 @@ onBeforeUnmount(() => {
 .ch-day span {
   padding: 3px 12px;
   border-radius: 999px;
-  background: #edf2f7;
+  background: var(--v-subtle-2);
   font-size: 11.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .ch-msg {
   display: flex;
@@ -867,9 +867,9 @@ onBeforeUnmount(() => {
   max-width: 100%;
   padding: 9px 13px;
   border-radius: 16px 16px 16px 4px;
-  background: #fff;
-  border: 1px solid #edf2f7;
-  color: #2d3748;
+  background: var(--v-surface);
+  border: 1px solid var(--v-border);
+  color: var(--v-text);
 }
 .ch-msg.own .ch-bubble {
   border-color: var(--bc-accent);
@@ -923,14 +923,14 @@ onBeforeUnmount(() => {
 .ch-meta {
   margin-top: 3px;
   font-size: 11px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 
 /* Composer */
 .ch-composer {
   padding: 10px 14px 8px;
-  border-top: 1px solid #edf2f7;
-  background: #fff;
+  border-top: 1px solid var(--v-border);
+  background: var(--v-surface);
 }
 .ch-compose-row {
   display: flex;
@@ -964,7 +964,7 @@ onBeforeUnmount(() => {
   display: block;
   margin-top: 4px;
   font-size: 11px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .ch-send-error {
   margin: 0 0 6px;
@@ -979,9 +979,9 @@ onBeforeUnmount(() => {
   z-index: 5;
   width: min(320px, 80vw);
   padding: 8px;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
   border-radius: 14px;
-  background: #fff;
+  background: var(--v-raised);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
 }
 .ch-quick-menu p {
@@ -990,7 +990,7 @@ onBeforeUnmount(() => {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .ch-quick-menu button {
   display: block;
@@ -1002,7 +1002,7 @@ onBeforeUnmount(() => {
   font-family: inherit;
   font-size: 12.5px;
   text-align: left;
-  color: #2d3748;
+  color: var(--v-text);
   cursor: pointer;
 }
 .ch-quick-menu button:hover {
@@ -1020,7 +1020,7 @@ onBeforeUnmount(() => {
   gap: 6px;
   max-width: 220px;
   padding: 4px 6px 4px 4px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--v-border-strong);
   border-radius: 10px;
   font-size: 12px;
 }
@@ -1047,7 +1047,7 @@ onBeforeUnmount(() => {
   padding: 0;
   border: 0;
   background: none;
-  color: #a0aec0;
+  color: var(--v-faint);
   cursor: pointer;
 }
 .ch-attach :deep(svg) {
@@ -1060,7 +1060,7 @@ onBeforeUnmount(() => {
   display: none;
   min-height: 0;
   padding: 18px;
-  border-left: 1px solid #edf2f7;
+  border-left: 1px solid var(--v-border);
   overflow-y: auto;
 }
 .show-info .ch-info {
@@ -1082,7 +1082,7 @@ onBeforeUnmount(() => {
 }
 .ch-info-head small {
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .ch-info-close {
   display: none;
@@ -1103,7 +1103,7 @@ onBeforeUnmount(() => {
 .ch-stats div {
   padding: 12px;
   border-radius: 12px;
-  background: #f7fafc;
+  background: var(--v-subtle);
   text-align: center;
   min-width: 0;
 }
@@ -1115,7 +1115,7 @@ onBeforeUnmount(() => {
 }
 .ch-stats span {
   font-size: 11.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .ch-contact {
   display: grid;
@@ -1125,7 +1125,7 @@ onBeforeUnmount(() => {
   font-size: 12.5px;
 }
 .ch-contact dt {
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .ch-contact dd {
   margin: 0;
@@ -1137,7 +1137,7 @@ onBeforeUnmount(() => {
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .ch-orders {
   margin: 0;
@@ -1159,7 +1159,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 .ch-orders button:hover {
-  background: #f7fafc;
+  background: var(--v-subtle);
 }
 .ch-orders button > span:first-child {
   min-width: 0;
@@ -1174,7 +1174,7 @@ onBeforeUnmount(() => {
 }
 .ch-orders small {
   font-size: 11.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .ch-orders .sp-chip {
   flex: none;
@@ -1213,7 +1213,7 @@ onBeforeUnmount(() => {
 }
 .nc-results small {
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .nc-to {
   display: flex;
@@ -1234,7 +1234,7 @@ onBeforeUnmount(() => {
     bottom: 0;
     z-index: 1100;
     width: min(320px, 92vw);
-    background: #fff;
+    background: var(--v-surface);
     box-shadow: -12px 0 30px rgba(0, 0, 0, 0.12);
   }
   .ch-info-close {

@@ -128,9 +128,9 @@ onBeforeUnmount(() => root.value?.removeEventListener("error", onImageError, tru
 .sl-page {
   margin-left: 260px;
   min-height: 100vh;
-  background: #f6f8f7;
+  background: var(--v-bg);
   font-family: "Poppins", sans-serif;
-  color: #1a202c;
+  color: var(--v-text);
   transition: margin-left 0.3s ease;
 }
 .sl-main {
@@ -147,8 +147,8 @@ onBeforeUnmount(() => root.value?.removeEventListener("error", onImageError, tru
   padding: 5px;
   margin-bottom: 22px;
   overflow-x: auto;
-  background: #fff;
-  border: 1px solid #e8eeeb;
+  background: var(--v-surface);
+  border: 1px solid var(--v-border-strong);
   border-radius: 14px;
   scrollbar-width: none;
 }
@@ -162,7 +162,7 @@ onBeforeUnmount(() => root.value?.removeEventListener("error", onImageError, tru
   gap: 7px;
   padding: 8px 14px;
   border-radius: 10px;
-  color: #4a5568;
+  color: var(--v-text-2);
   font-family: "Poppins", sans-serif;
   font-size: 13px;
   font-weight: 500;
@@ -176,8 +176,8 @@ button.sl-tab {
   cursor: pointer;
 }
 .sl-tab:hover {
-  background: #f3f8f5;
-  color: #1a202c;
+  background: var(--v-subtle);
+  color: var(--v-text);
 }
 .sl-tab.on {
   background: var(--bc-accent);
@@ -212,7 +212,7 @@ button.sl-tab {
   margin: 4px 0 0;
   max-width: 640px;
   font-size: 13.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .sl-actions {
   display: flex;

@@ -203,7 +203,7 @@ onMounted(() => load());
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .nt-list {
   margin: 0;
@@ -230,10 +230,10 @@ onMounted(() => load());
   flex: 1;
 }
 .nt-item:not(.sk):hover {
-  background: #f7fafc;
+  background: var(--v-subtle);
 }
 .nt-item.unread {
-  background: #f8fdf9;
+  background: var(--v-subtle);
 }
 .nt-item.important {
   box-shadow: inset 3px 0 0 var(--bc-accent);
@@ -258,7 +258,7 @@ onMounted(() => load());
   display: block;
   font-size: 13.5px;
   font-weight: 500;
-  color: #1a202c;
+  color: var(--v-text);
   overflow-wrap: anywhere;
 }
 .nt-item.unread .nt-main strong {
@@ -269,7 +269,7 @@ onMounted(() => load());
   margin-top: 2px;
   font-size: 12.5px;
   line-height: 1.45;
-  color: #4a5568;
+  color: var(--v-text-2);
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -280,7 +280,7 @@ onMounted(() => load());
   display: block;
   margin-top: 4px;
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .nt-dot {
   flex: none;
@@ -293,7 +293,7 @@ onMounted(() => load());
 .nt-go {
   flex: none;
   align-self: center;
-  color: #cbd5e0;
+  color: var(--v-faint);
 }
 .nt-go :deep(svg) {
   width: 16px;
@@ -306,7 +306,7 @@ onMounted(() => load());
   gap: 14px;
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 1px solid #edf2f7;
+  border-top: 1px solid var(--v-border);
 }
 .nt-prefs {
   position: sticky;
@@ -318,7 +318,7 @@ onMounted(() => load());
   list-style: none;
 }
 .nt-pref-list li + li {
-  border-top: 1px solid #f4f6f8;
+  border-top: 1px solid var(--v-border);
 }
 .nt-pref-list label {
   display: flex;
@@ -350,7 +350,7 @@ onMounted(() => load());
 }
 .nt-pref-text small {
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .nt-note {
   margin: 10px 0 0;

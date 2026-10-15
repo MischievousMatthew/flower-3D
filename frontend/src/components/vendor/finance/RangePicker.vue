@@ -56,11 +56,11 @@ function custom(field, value) {
 }
 .rp-to {
   font-size: 12.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .rp-label {
   font-size: 12.5px;
-  color: #718096;
+  color: var(--v-muted);
   white-space: nowrap;
 }
 @media (max-width: 640px) {

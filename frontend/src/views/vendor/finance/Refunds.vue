@@ -160,7 +160,7 @@ onMounted(load);
 }
 .fx-kpi.alert {
   border-color: #fbd38d;
-  background: #fffcf5;
+  background: var(--v-amber-soft);
 }
 .rf-layout {
   display: grid;
@@ -183,7 +183,7 @@ onMounted(load);
   align-items: center;
   gap: 12px;
   padding: 12px 2px;
-  border-top: 1px solid #f2f5f3;
+  border-top: 1px solid var(--v-border);
 }
 .rf-main-text {
   flex: 1;
@@ -194,21 +194,21 @@ onMounted(load);
 .rf-main-text strong {
   font-size: 13.5px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .rf-main-text span {
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .rf-main-text small {
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .rf-amt {
   flex: none;
@@ -216,14 +216,14 @@ onMounted(load);
   text-align: right;
   font-size: 14px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   white-space: nowrap;
 }
 .rf-amt.out {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .rf-amt.in {
-  color: #22753f;
+  color: var(--v-green-text);
 }
 .sp-empty.small {
   padding: 22px 10px;
@@ -246,16 +246,16 @@ onMounted(load);
   justify-content: space-between;
   gap: 10px;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .m-top b {
-  color: #1a202c;
+  color: var(--v-text);
 }
 .m-bar {
   height: 7px;
   margin: 5px 0 3px;
   border-radius: 999px;
-  background: #edf2f7;
+  background: var(--v-subtle-2);
   overflow: hidden;
 }
 .m-bar span {
@@ -265,7 +265,7 @@ onMounted(load);
 }
 .method-list small {
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .facts {
   margin: 0 0 10px;
@@ -277,19 +277,19 @@ onMounted(load);
   justify-content: space-between;
   gap: 10px;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .facts dd {
   margin: 0;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   white-space: nowrap;
 }
 .facts .pos {
-  color: #22753f;
+  color: var(--v-green-text);
 }
 .facts .neg {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 @media (max-width: 1100px) {
   .rf-layout {

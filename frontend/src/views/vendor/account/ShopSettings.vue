@@ -85,6 +85,41 @@
           </section>
 
           <div class="ss-side">
+            <!-- Appearance: applies right away and is saved in this browser, not by Save -->
+            <section class="sp-card">
+              <div class="sp-card-head"><div><h2>Appearance</h2><p>How your vendor pages look on this device. Changes apply right away.</p></div></div>
+              <div class="ss-rows">
+                <label class="ss-row">
+                  <span class="ss-row-text"><b>Dark mode</b><small>Darker pages that are easier on the eyes at night.</small></span>
+                  <span class="sp-switch"><input type="checkbox" :checked="isDark" aria-label="Dark mode" @change="setDark($event.target.checked)" /><span></span></span>
+                </label>
+                <label class="ss-row">
+                  <span class="ss-row-text"><b>Match my device</b><small>Follow this computer or phone's light or dark setting.</small></span>
+                  <span class="sp-switch"><input type="checkbox" :checked="matchDevice" aria-label="Match my device" @change="setMatchDevice($event.target.checked)" /><span></span></span>
+                </label>
+                <div class="ss-row ss-theme">
+                  <span class="ss-row-text"><b>Theme color</b><small>Used for buttons, tabs and highlights on every page.</small></span>
+                  <div class="ss-swatches">
+                    <button
+                      v-for="c in ACCENT_PRESETS"
+                      :key="c.value"
+                      type="button"
+                      class="ss-swatch"
+                      :class="{ on: accent === c.value }"
+                      :style="{ background: c.value }"
+                      :aria-label="c.name"
+                      :aria-pressed="accent === c.value"
+                      :title="c.name"
+                      @click="setAccent(c.value)"
+                    ></button>
+                    <label class="ss-swatch ss-swatch-any" title="Any color">
+                      <input type="color" :value="accent" aria-label="Any color" @input="setAccent($event.target.value)" />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <!-- Payments -->
             <section class="sp-card">
               <div class="sp-card-head"><div><h2>Shop preferences</h2><p>How customers can pay you.</p></div></div>
@@ -164,10 +199,12 @@ import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { hoursText, schedulesFrom, to12, weekFrom, weekFromText } from "../../../components/vendor/shop/businessHours";
 import { longDate } from "../../../components/vendor/account/accountUi";
+import { ACCENT_PRESETS, useVendorTheme } from "../../../composables/useVendorTheme";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/account/account.css";
 
 const LEAD_DAYS = [1, 2, 3, 4, 5, 7, 10, 14];
+const { accent, setAccent, isDark, setDark, matchDevice, setMatchDevice } = useVendorTheme();
 const FIELDS = ["same_day_delivery", "lead_time_days", "max_orders_per_day", "service_areas", "cancellation_policy"];
 
 const settings = ref(null);
@@ -338,11 +375,11 @@ onMounted(() => {
   gap: 16px;
 }
 .ss-status {
-  border-color: #c6f6d5;
+  border-color: var(--v-green-soft);
 }
 .ss-status.paused {
   border-color: #fbd38d;
-  background: #fffdf7;
+  background: var(--v-amber-soft);
 }
 .ss-status-row {
   display: flex;
@@ -361,12 +398,12 @@ onMounted(() => {
 }
 .ss-status-text small {
   font-size: 12.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .ss-away {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid #f6e7c8;
+  border-top: 1px solid var(--v-amber-soft);
 }
 .ss-note {
   margin: 10px 0 0;
@@ -387,7 +424,7 @@ onMounted(() => {
   cursor: pointer;
 }
 .ss-row + .ss-row {
-  border-top: 1px solid #f4f6f8;
+  border-top: 1px solid var(--v-border);
 }
 .ss-row.disabled {
   cursor: not-allowed;
@@ -404,7 +441,44 @@ onMounted(() => {
 }
 .ss-row-text small {
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
+}
+.ss-theme {
+  flex-wrap: wrap;
+  cursor: default;
+}
+.ss-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+.ss-swatch {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid var(--v-surface);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--v-border-strong);
+  cursor: pointer;
+}
+.ss-swatch.on {
+  box-shadow: 0 0 0 2px var(--v-text);
+}
+.ss-swatch:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.ss-swatch-any {
+  overflow: hidden;
+  background: conic-gradient(#e53e3e, #f6ad55, #ecc94b, #48bb78, #4299e1, #9f7aea, #e53e3e);
+}
+.ss-swatch-any input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 .ss-closed-add {
   display: grid;
@@ -422,7 +496,7 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
   padding: 8px 0;
-  border-top: 1px solid #f4f6f8;
+  border-top: 1px solid var(--v-border);
 }
 .ss-closed-date {
   display: grid;
@@ -432,18 +506,18 @@ onMounted(() => {
 .ss-closed-date b {
   font-size: 12px;
   font-weight: 600;
-  color: #a0aec0;
+  color: var(--v-faint);
   text-transform: uppercase;
 }
 .ss-closed-date small {
   font-size: 13px;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .ss-closed-reason {
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  color: #4a5568;
+  color: var(--v-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -462,10 +536,10 @@ onMounted(() => {
   gap: 10px;
   padding: 8px 10px;
   border-radius: 12px;
-  background: #fbfdfc;
+  background: var(--v-subtle);
 }
 .ss-hours li.closed {
-  background: #f8f9fa;
+  background: var(--v-subtle);
 }
 .ss-hours-day {
   display: flex;
@@ -477,7 +551,7 @@ onMounted(() => {
 .ss-hours-day strong {
   font-size: 13px;
   font-weight: 500;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .ss-time {
   width: 120px;
@@ -485,11 +559,11 @@ onMounted(() => {
 }
 .ss-to {
   font-size: 12px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .ss-closed-text {
   font-size: 12.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 @media (max-width: 1100px) {
   .ss-hours {

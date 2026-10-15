@@ -54,7 +54,7 @@ defineEmits(["close"]);
   gap: 16px;
   margin-top: 12px;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .m3d-colors span {
   display: inline-flex;

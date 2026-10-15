@@ -203,7 +203,7 @@ onMounted(load);
 }
 .dv-stats .sp-stat.alert {
   border-color: #feb2b2;
-  background: #fffafa;
+  background: var(--v-subtle);
 }
 .dv-layout {
   display: grid;
@@ -225,7 +225,7 @@ onMounted(load);
 }
 .dv-day.overdue {
   border-color: #feb2b2;
-  background: #fffafa;
+  background: var(--v-subtle);
 }
 .dv-day-head {
   display: flex;
@@ -238,12 +238,12 @@ onMounted(load);
   margin: 0;
   font-size: 15px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .dv-day-head p {
   margin: 2px 0 0;
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .cap {
   display: flex;
@@ -254,7 +254,7 @@ onMounted(load);
   width: 90px;
   height: 6px;
   border-radius: 999px;
-  background: #edf2f7;
+  background: var(--v-subtle-2);
   overflow: hidden;
 }
 .cap-bar span {
@@ -267,7 +267,7 @@ onMounted(load);
 }
 .cap small {
   font-size: 11.5px;
-  color: #718096;
+  color: var(--v-muted);
   font-variant-numeric: tabular-nums;
 }
 .dv-list {
@@ -280,7 +280,7 @@ onMounted(load);
   align-items: center;
   gap: 12px;
   padding: 10px 4px;
-  border-top: 1px solid #f2f5f3;
+  border-top: 1px solid var(--v-border);
 }
 :deep(.dv-row-main) {
   flex: 1;
@@ -310,7 +310,7 @@ onMounted(load);
 :deep(.dv-row-top strong) {
   font-size: 13.5px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -318,12 +318,12 @@ onMounted(load);
 :deep(.dv-num) {
   flex: none;
   font-size: 11px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 :deep(.dv-items),
 :deep(.dv-addr) {
   font-size: 12px;
-  color: #4a5568;
+  color: var(--v-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -335,21 +335,21 @@ onMounted(load);
   min-width: 0;
 }
 :deep(.dv-addr) {
-  color: #718096;
+  color: var(--v-muted);
   max-width: 100%;
 }
 :deep(.dv-prep) {
   font-size: 12px;
   font-weight: 500;
-  color: #718096;
+  color: var(--v-muted);
 }
 :deep(.dv-prep.now) {
-  color: #b45309;
+  color: var(--v-amber-text);
 }
 :deep(.dv-late) {
   font-size: 12px;
   font-weight: 600;
-  color: #c53030;
+  color: var(--v-red-text);
 }
 :deep(.dv-row-side) {
   flex: none;
@@ -360,7 +360,7 @@ onMounted(load);
 :deep(.dv-total) {
   font-size: 13px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   min-width: 80px;
   text-align: right;
 }
@@ -403,11 +403,11 @@ onMounted(load);
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .how small {
   font-size: 11.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .full {
   width: 100%;
@@ -424,7 +424,7 @@ onMounted(load);
   align-items: center;
   gap: 10px;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .legend .sp-chip {
   min-width: 118px;
@@ -436,7 +436,7 @@ onMounted(load);
   gap: 10px;
   margin-top: 16px;
   font-size: 13px;
-  color: #2d3748;
+  color: var(--v-text);
   cursor: pointer;
 }
 @media (max-width: 1180px) {

@@ -222,17 +222,17 @@ onMounted(load);
 
 .bl-invoice {
   padding: 22px;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
   border-radius: 14px;
   font-size: 13px;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .bl-inv-head {
   display: flex;
   justify-content: space-between;
   gap: 16px;
   padding-bottom: 16px;
-  border-bottom: 1px solid #edf2f7;
+  border-bottom: 1px solid var(--v-border);
 }
 .bl-inv-head > div:first-child {
   display: grid;
@@ -244,7 +244,7 @@ onMounted(load);
   color: var(--bc-accent-deep);
 }
 .bl-inv-head span {
-  color: #718096;
+  color: var(--v-muted);
 }
 .bl-inv-meta {
   display: grid;
@@ -259,7 +259,7 @@ onMounted(load);
   text-align: right;
 }
 .bl-inv-meta dt {
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .bl-inv-meta dd {
   margin: 0;
@@ -275,10 +275,10 @@ onMounted(load);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .bl-inv-to span {
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .bl-inv-lines {
   width: 100%;
@@ -286,13 +286,13 @@ onMounted(load);
 }
 .bl-inv-lines th {
   padding: 8px 0;
-  border-bottom: 1px solid #edf2f7;
+  border-bottom: 1px solid var(--v-border);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   text-align: left;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .bl-inv-lines td {
   padding: 12px 8px 12px 0;
@@ -300,7 +300,7 @@ onMounted(load);
 }
 .bl-inv-lines tfoot td {
   padding-top: 12px;
-  border-top: 1px solid #1a202c;
+  border-top: 1px solid var(--v-text);
   font-weight: 700;
 }
 .bl-inv-lines .num {
@@ -312,7 +312,7 @@ onMounted(load);
 .bl-inv-pay {
   margin: 16px 0 0;
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 @media (max-width: 960px) {
   .sp-stats {

@@ -84,7 +84,7 @@ const aria = (r) => `${r.label}: ${props.series.map((s) => `${s.label} ${money(r
   width: 44px;
   flex: none;
   font-size: 10.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
   text-align: right;
   transform: translateY(-6px);
 }
@@ -103,7 +103,7 @@ const aria = (r) => `${r.label}: ${props.series.map((s) => `${s.label} ${money(r
 .bc-grid i {
   display: block;
   height: 1px;
-  background: #edf2f7;
+  background: var(--v-subtle-2);
 }
 .bc-cols {
   position: relative;
@@ -150,7 +150,7 @@ const aria = (r) => `${r.label}: ${props.series.map((s) => `${s.label} ${money(r
   bottom: -20px;
   transform: translateX(-50%);
   font-size: 10.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
   white-space: nowrap;
 }
 .bc-x.hide {
@@ -215,7 +215,7 @@ const aria = (r) => `${r.label}: ${props.series.map((s) => `${s.label} ${money(r
   gap: 14px;
   margin-top: 6px;
   font-size: 12px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .bc-legend span {
   display: inline-flex;

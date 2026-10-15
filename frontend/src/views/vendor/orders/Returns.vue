@@ -219,7 +219,7 @@ onBeforeUnmount(() => clearTimeout(timer));
 }
 .sp-stat.alert {
   border-color: #fbd38d;
-  background: #fffcf5;
+  background: var(--v-amber-soft);
 }
 .rt-layout {
   display: grid;
@@ -253,7 +253,7 @@ onBeforeUnmount(() => clearTimeout(timer));
   padding: 0;
 }
 .rt-list li + li {
-  border-top: 1px solid #f2f5f3;
+  border-top: 1px solid var(--v-border);
 }
 .rt-row {
   display: flex;
@@ -271,7 +271,7 @@ onBeforeUnmount(() => clearTimeout(timer));
 }
 .rt-row:hover,
 .rt-row.on {
-  background: #f8fcf9;
+  background: var(--v-subtle);
 }
 .rt-row.mine {
   box-shadow: inset 3px 0 0 #f6ad55;
@@ -287,12 +287,12 @@ onBeforeUnmount(() => clearTimeout(timer));
   font-weight: 700;
 }
 .rt-type.return {
-  background: #f3f0ff;
-  color: #6b46c1;
+  background: var(--v-purple-soft);
+  color: var(--v-purple-text);
 }
 .rt-type.refund {
-  background: #fff0f6;
-  color: #b83280;
+  background: var(--v-pink-soft);
+  color: var(--v-pink-text);
 }
 .rt-text {
   flex: 1;
@@ -310,7 +310,7 @@ onBeforeUnmount(() => clearTimeout(timer));
 .rt-top strong {
   font-size: 13.5px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -318,7 +318,7 @@ onBeforeUnmount(() => clearTimeout(timer));
 .rt-num {
   flex: none;
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .rt-reason,
 .rt-terms {
@@ -328,10 +328,10 @@ onBeforeUnmount(() => clearTimeout(timer));
   white-space: nowrap;
 }
 .rt-reason {
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .rt-terms {
-  color: #718096;
+  color: var(--v-muted);
 }
 .rt-side {
   flex: none;
@@ -342,7 +342,7 @@ onBeforeUnmount(() => clearTimeout(timer));
 }
 .rt-side small {
   font-size: 11px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .pager {
   display: flex;
@@ -350,7 +350,7 @@ onBeforeUnmount(() => clearTimeout(timer));
   align-items: center;
   padding: 10px 12px 6px;
   font-size: 12.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .pager div {
   display: flex;
@@ -372,7 +372,7 @@ onBeforeUnmount(() => clearTimeout(timer));
   gap: 10px;
   font-size: 12.5px;
   line-height: 1.5;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .rt-policy b {
   flex: none;

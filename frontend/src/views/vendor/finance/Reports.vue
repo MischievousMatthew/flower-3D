@@ -232,10 +232,10 @@ onMounted(load);
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 1px;
   margin-bottom: 16px;
-  border: 1px solid #edf1ef;
+  border: 1px solid var(--v-border);
   border-radius: 16px;
   overflow: hidden;
-  background: #edf1ef;
+  background: var(--v-subtle-2);
 }
 .rp-total {
   display: flex;
@@ -243,20 +243,20 @@ onMounted(load);
   gap: 4px;
   min-width: 0;
   padding: 14px 16px;
-  background: #fff;
+  background: var(--v-surface);
 }
 .rp-total span {
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .rp-total strong {
   font-size: 17px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   overflow-wrap: anywhere;
 }
 .rp-total strong.neg {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .rp-total.hero {
   background: var(--bc-accent-soft);
@@ -276,14 +276,14 @@ onMounted(load);
   align-items: center;
   gap: 10px;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
   white-space: nowrap;
   cursor: pointer;
 }
 .rp-scroll {
   max-height: 520px;
   overflow: auto;
-  border: 1px solid #f2f5f3;
+  border: 1px solid var(--v-border);
   border-radius: 12px;
 }
 .rp {
@@ -300,7 +300,7 @@ onMounted(load);
   background: var(--bc-accent-soft);
   font-size: 11.5px;
   font-weight: 600;
-  color: #718096;
+  color: var(--v-muted);
   text-align: left;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -308,8 +308,8 @@ onMounted(load);
 }
 .rp td {
   padding: 9px 12px;
-  border-top: 1px solid #f2f5f3;
-  color: #2d3748;
+  border-top: 1px solid var(--v-border);
+  color: var(--v-text);
   white-space: nowrap;
 }
 .rp .num {
@@ -318,22 +318,22 @@ onMounted(load);
 }
 .rp .period {
   font-weight: 500;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .rp .muted {
-  color: #cbd5e0;
+  color: var(--v-faint);
 }
 .rp .strong {
   font-weight: 600;
 }
 .rp .pos {
-  color: #22753f;
+  color: var(--v-green-text);
 }
 .rp .neg {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .rp tbody tr:hover td {
-  background: #fafcfb;
+  background: var(--v-subtle);
 }
 .rp tfoot td {
   position: sticky;
@@ -342,12 +342,12 @@ onMounted(load);
   border-top: 2px solid var(--bc-accent-muted);
   background: var(--bc-accent-soft);
   font-weight: 700;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .rp .empty {
   padding: 28px;
   text-align: center;
-  color: #a0aec0;
+  color: var(--v-faint);
   white-space: normal;
 }
 @media (max-width: 1100px) {

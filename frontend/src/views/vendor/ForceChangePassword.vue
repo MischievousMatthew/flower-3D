@@ -217,7 +217,7 @@ const changePassword = async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #f7fafc;
+  background: var(--v-subtle);
   padding: 40px 20px;
   position: relative;
 }
@@ -235,13 +235,13 @@ const changePassword = async () => {
 .title {
   font-size: 28px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--v-text);
   margin-bottom: 12px;
 }
 
 .subtitle {
   font-size: 15px;
-  color: #4a5568;
+  color: var(--v-text-2);
   font-weight: 400;
   line-height: 1.5;
 }
@@ -249,7 +249,7 @@ const changePassword = async () => {
 .form-content {
   width: 100%;
   max-width: 400px;
-  background: white;
+  background: var(--v-surface);
   padding: 32px;
   border-radius: 12px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -261,8 +261,8 @@ const changePassword = async () => {
 
 .alert-error {
   padding: 12px 16px;
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
   border: 1px solid #fca5a5;
   border-radius: 8px;
   margin-bottom: 24px;
@@ -272,8 +272,8 @@ const changePassword = async () => {
 
 .alert-success {
   padding: 12px 16px;
-  background: #d1fae5;
-  color: #059669;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
   border: 1px solid #6ee7b7;
   border-radius: 8px;
   margin-bottom: 24px;
@@ -289,7 +289,7 @@ const changePassword = async () => {
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: #4a5568;
+  color: var(--v-text-2);
   margin-bottom: 8px;
 }
 
@@ -297,22 +297,22 @@ const changePassword = async () => {
   width: 100%; /* Use 100% since it's already properly padded */
   box-sizing: border-box;
   padding: 12px 40px 12px 16px; /* Space for the eye icon */
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--v-border-strong);
   border-radius: 6px;
   font-size: 15px;
-  color: #2d3748;
-  background: #ffffff;
+  color: var(--v-text);
+  background: var(--v-input);
   transition: all 0.2s ease;
 }
 
 .form-input:focus {
   outline: none;
-  border-color: #cbd5e0;
+  border-color: var(--v-border-strong);
   box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
 }
 
 .form-input::placeholder {
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 
 .password-field {
@@ -351,15 +351,15 @@ const changePassword = async () => {
   margin-top: 6px;
 }
 
-.password-requirements { margin-top: 10px; font-size: 12px; color: #718096; }
-.password-strength-track { height: 6px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }.password-strength-track span { display: block; height: 100%; border-radius: inherit; transition: width .2s ease, background .2s ease; }.password-strength-track .empty { background: #cbd5e0; }.password-strength-track .weak { background: #ef4444; }.password-strength-track .fair { background: #f59e0b; }.password-strength-track .strong { background: #16a34a; }
-.password-strength-label { display: flex; justify-content: space-between; margin-top: 7px; }.password-strength-label strong.empty { color: #718096; }.password-strength-label strong.weak { color: #dc2626; }.password-strength-label strong.fair { color: #d97706; }.password-strength-label strong.strong { color: #15803d; }
-.password-requirements ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 12px; margin: 10px 0 0; padding: 0; list-style: none; }.password-requirements li { color: #718096; }.password-requirements li span { display: inline-block; width: 14px; }.password-requirements li.met { color: #15803d; font-weight: 600; }
+.password-requirements { margin-top: 10px; font-size: 12px; color: var(--v-muted); }
+.password-strength-track { height: 6px; overflow: hidden; border-radius: 999px; background: var(--v-subtle-2); }.password-strength-track span { display: block; height: 100%; border-radius: inherit; transition: width .2s ease, background .2s ease; }.password-strength-track .empty { background: var(--v-border-strong); }.password-strength-track .weak { background: #ef4444; }.password-strength-track .fair { background: #f59e0b; }.password-strength-track .strong { background: #16a34a; }
+.password-strength-label { display: flex; justify-content: space-between; margin-top: 7px; }.password-strength-label strong.empty { color: var(--v-muted); }.password-strength-label strong.weak { color: var(--v-red-text); }.password-strength-label strong.fair { color: var(--v-amber-text); }.password-strength-label strong.strong { color: var(--v-green-text); }
+.password-requirements ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 12px; margin: 10px 0 0; padding: 0; list-style: none; }.password-requirements li { color: var(--v-muted); }.password-requirements li span { display: inline-block; width: 14px; }.password-requirements li.met { color: var(--v-green-text); font-weight: 600; }
 
 .submit-btn {
   width: 100%;
   padding: 14px;
-  background: var(--bc-accent-strong);
+  background: var(--bc-accent-solid);
   color: white;
   border: none;
   border-radius: 6px;
@@ -374,7 +374,7 @@ const changePassword = async () => {
 }
 
 .submit-btn:hover:not(:disabled) {
-  background: var(--bc-accent-deep);
+  background: var(--bc-accent-solid-hover);
 }
 
 .submit-btn:disabled {

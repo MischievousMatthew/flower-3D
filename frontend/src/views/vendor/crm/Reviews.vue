@@ -317,13 +317,13 @@ onMounted(async () => {
   display: block;
   margin-top: 3px;
   font-size: 12.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .rv-trend.up {
-  color: #2f855a;
+  color: var(--v-green-text);
 }
 .rv-trend.down {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .rv-stars {
   display: inline-flex;
@@ -333,7 +333,7 @@ onMounted(async () => {
   --fill: 0%;
   width: 20px;
   height: 20px;
-  background: linear-gradient(90deg, #f6ad55 var(--fill), #e2e8f0 var(--fill));
+  background: linear-gradient(90deg, #f6ad55 var(--fill), var(--v-subtle-2) var(--fill));
   clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
 }
 .rv-stars.sm i {
@@ -357,12 +357,12 @@ onMounted(async () => {
   background: none;
   font-family: inherit;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
   cursor: pointer;
 }
 .rv-dist button:hover,
 .rv-dist button.on {
-  background: #f7fafc;
+  background: var(--v-subtle);
 }
 .rv-dist button.on {
   box-shadow: inset 0 0 0 1px var(--bc-accent-border);
@@ -374,7 +374,7 @@ onMounted(async () => {
 .rv-bar {
   height: 8px;
   border-radius: 999px;
-  background: #edf2f7;
+  background: var(--v-subtle-2);
   overflow: hidden;
 }
 .rv-bar i {
@@ -401,7 +401,7 @@ onMounted(async () => {
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .rv-products {
   margin: 0;
@@ -420,7 +420,7 @@ onMounted(async () => {
   background: none;
   font-family: inherit;
   font-size: 13px;
-  color: #2d3748;
+  color: var(--v-text);
   cursor: pointer;
 }
 .rv-products button:hover,
@@ -434,13 +434,13 @@ onMounted(async () => {
 }
 .rv-pscore {
   flex: none;
-  color: #dd6b20;
+  color: var(--v-amber-text);
 }
 .rv-pscore b {
-  color: #1a202c;
+  color: var(--v-text);
 }
 .rv-pscore small {
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .rv-toolbar {
   display: flex;
@@ -476,7 +476,7 @@ onMounted(async () => {
   display: flex;
   gap: 14px;
   padding: 18px 4px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--v-border);
 }
 .rv-item:first-child {
   border-top: 0;
@@ -488,7 +488,7 @@ onMounted(async () => {
   margin: 0 -10px;
   padding: 18px 14px;
   border-radius: 14px;
-  background: #fffaf0;
+  background: var(--v-amber-soft);
   box-shadow: inset 0 0 0 1px #fbd38d;
 }
 .rv-item.hidden {
@@ -536,20 +536,20 @@ onMounted(async () => {
   gap: 8px;
   margin: 4px 0 0;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .rv-comment {
   margin: 10px 0 0;
   font-size: 14px;
   line-height: 1.55;
-  color: #1a202c;
+  color: var(--v-text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .rv-comment.empty {
   font-size: 13px;
   font-style: italic;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .rv-photo img {
   display: block;
@@ -564,7 +564,7 @@ onMounted(async () => {
   padding: 12px 14px;
   border-left: 3px solid var(--bc-accent);
   border-radius: 0 12px 12px 0;
-  background: #f7fafc;
+  background: var(--v-subtle);
 }
 .rv-reply-head {
   display: flex;
@@ -589,7 +589,7 @@ onMounted(async () => {
   margin-top: 8px;
 }
 .st-link.muted {
-  color: #718096;
+  color: var(--v-muted);
 }
 .rv-form {
   margin-top: 12px;
@@ -622,7 +622,7 @@ onMounted(async () => {
   gap: 14px;
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 1px solid #edf2f7;
+  border-top: 1px solid var(--v-border);
 }
 @media (max-width: 900px) {
   .rv-top {

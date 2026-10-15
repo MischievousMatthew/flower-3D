@@ -496,9 +496,9 @@ onMounted(load);
   gap: 12px;
   min-width: 0;
   padding: 16px;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
   border-radius: 16px;
-  background: #fff;
+  background: var(--v-surface);
   font-family: inherit;
   text-align: left;
   cursor: pointer;
@@ -519,29 +519,29 @@ button.em-profile:hover {
   gap: 10px;
   margin: 0;
   padding-top: 12px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--v-border);
 }
 .em-facts div {
   min-width: 0;
 }
 .em-facts dt {
   font-size: 11px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .em-facts dd {
   margin: 2px 0 0;
   font-size: 12.5px;
-  color: #2d3748;
+  color: var(--v-text);
   overflow-wrap: anywhere;
 }
 .em-facts dd.muted {
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .em-in {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #22753f !important;
+  color: var(--v-green-text) !important;
 }
 .em-in i {
   flex: none;
@@ -564,7 +564,7 @@ button.em-profile:hover {
   gap: 10px;
   min-width: 0;
   padding: 10px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--v-border-strong);
   border-radius: 12px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
@@ -601,7 +601,7 @@ button.em-profile:hover {
 }
 .em-role small {
   font-size: 11.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .em-pass {
   position: relative;
@@ -619,7 +619,7 @@ button.em-profile:hover {
   margin: 0;
   font-size: 13px;
   line-height: 1.6;
-  color: #2d3748;
+  color: var(--v-text);
 }
 .em-jump {
   display: flex;

@@ -413,7 +413,7 @@ function close() {
   margin-left: 6px;
   font-size: 11.5px;
   font-weight: 500;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .pe-photos {
   display: grid;
@@ -426,8 +426,8 @@ function close() {
   aspect-ratio: 1;
   border-radius: 14px;
   overflow: hidden;
-  background: #f7faf8;
-  border: 1px solid #edf2f7;
+  background: var(--v-subtle);
+  border: 1px solid var(--v-border);
 }
 .pe-photo img {
   width: 100%;
@@ -459,8 +459,8 @@ function close() {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  color: #c53030;
+  background: var(--v-glass);
+  color: var(--v-red-text);
   cursor: pointer;
 }
 .pe-photo-x :deep(svg) {
@@ -503,10 +503,10 @@ function close() {
   margin: 10px 0 4px;
   font-size: 12.5px;
   font-weight: 500;
-  color: #2f855a;
+  color: var(--v-green-text);
 }
 .pe-margin.bad {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .pe-toggles {
   display: flex;
@@ -519,7 +519,7 @@ function close() {
   align-items: center;
   gap: 10px;
   font-size: 13px;
-  color: #2d3748;
+  color: var(--v-text);
   cursor: pointer;
 }
 .pe-model {
@@ -527,9 +527,9 @@ function close() {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
   border-radius: 14px;
-  background: #fbfdfc;
+  background: var(--v-subtle);
 }
 .pe-model-icon {
   display: grid;
@@ -538,8 +538,8 @@ function close() {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: #e6fffa;
-  color: #2c7a7b;
+  background: var(--v-teal-soft);
+  color: var(--v-teal-text);
 }
 .pe-model-icon :deep(svg) {
   width: 20px;
@@ -560,7 +560,7 @@ function close() {
 }
 .pe-model-text span {
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .pe-file {
   position: relative;
@@ -575,9 +575,9 @@ function close() {
   flex-direction: column;
   gap: 2px;
   padding: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--v-border-strong);
   border-radius: 13px;
-  background: #fff;
+  background: var(--v-surface);
   font-family: "Poppins", sans-serif;
   text-align: left;
   cursor: pointer;
@@ -586,11 +586,11 @@ function close() {
 .pe-status-opt strong {
   font-size: 13px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .pe-status-opt span {
   font-size: 11.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .pe-status-opt.on {
   border-color: var(--bc-accent);

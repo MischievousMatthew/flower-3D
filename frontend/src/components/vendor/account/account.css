@@ -4,7 +4,7 @@
 .ac-meter {
   height: 8px;
   border-radius: 999px;
-  background: #edf2f7;
+  background: var(--v-subtle-2);
   overflow: hidden;
 }
 .ac-meter > i {
@@ -35,7 +35,7 @@
   padding: 9px 0;
 }
 .ac-feats li + li {
-  border-top: 1px solid #f4f6f8;
+  border-top: 1px solid var(--v-border);
 }
 .ac-feat-icon {
   flex: none;
@@ -53,15 +53,15 @@
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .ac-feats small {
   display: block;
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .ac-feats li.off b {
-  color: #718096;
+  color: var(--v-muted);
 }
 .ac-feats .ac-need {
   margin-left: auto;
@@ -86,7 +86,7 @@
 }
 
 .ac-muted {
-  color: #718096;
+  color: var(--v-muted);
 }
 .ac-num {
   font-variant-numeric: tabular-nums;

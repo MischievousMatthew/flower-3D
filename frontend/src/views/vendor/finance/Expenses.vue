@@ -377,7 +377,7 @@ onMounted(load);
   align-items: center;
   gap: 12px;
   padding: 12px 4px;
-  border-top: 1px solid #f2f5f3;
+  border-top: 1px solid var(--v-border);
 }
 .ex-main {
   flex: 1;
@@ -388,21 +388,21 @@ onMounted(load);
 .ex-main strong {
   font-size: 13.5px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .ex-main span {
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .ex-main small {
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .ex-receipt {
   flex: none;
@@ -413,7 +413,7 @@ onMounted(load);
   height: 36px;
   border-radius: 9px;
   object-fit: cover;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
 }
 .ex-amt {
   flex: none;
@@ -421,7 +421,7 @@ onMounted(load);
   text-align: right;
   font-size: 14px;
   font-weight: 600;
-  color: #c53030;
+  color: var(--v-red-text);
   white-space: nowrap;
 }
 .ex-actions {
@@ -431,7 +431,7 @@ onMounted(load);
 }
 .sp-icon-btn.danger:hover {
   border-color: #feb2b2;
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .ex-side {
   position: sticky;
@@ -452,7 +452,7 @@ onMounted(load);
   gap: 10px;
   margin-bottom: 5px;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .cat-top span {
   min-width: 0;
@@ -461,13 +461,13 @@ onMounted(load);
   white-space: nowrap;
 }
 .cat-top b {
-  color: #1a202c;
+  color: var(--v-text);
   white-space: nowrap;
 }
 .cat-bar {
   height: 7px;
   border-radius: 999px;
-  background: #edf2f7;
+  background: var(--v-subtle-2);
   overflow: hidden;
 }
 .cat-bar span {
@@ -492,7 +492,7 @@ onMounted(load);
   margin: 0;
   font-size: 12.5px;
   line-height: 1.55;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .ex-cats {
   display: flex;
@@ -511,7 +511,7 @@ onMounted(load);
   top: 50%;
   transform: translateY(-50%);
   font-style: normal;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .money-in .sp-input {
   padding-left: 28px;
@@ -526,7 +526,7 @@ onMounted(load);
   height: 40px;
   border-radius: 10px;
   object-fit: cover;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
 }
 .rc-file {
   position: relative;
@@ -539,7 +539,7 @@ onMounted(load);
 }
 .link {
   background: none;
-  color: #c53030;
+  color: var(--v-red-text);
 }
 @media (max-width: 1100px) {
   .ex-layout {

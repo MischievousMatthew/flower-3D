@@ -170,7 +170,7 @@ onMounted(() => load());
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .ac-list {
   margin: 0;
@@ -184,7 +184,7 @@ onMounted(() => load());
   padding: 11px 0;
 }
 .ac-row + .ac-row {
-  border-top: 1px solid #f4f6f8;
+  border-top: 1px solid var(--v-border);
 }
 .ac-row .grow,
 .ac-main {
@@ -194,12 +194,12 @@ onMounted(() => load());
 .ac-main p {
   margin: 0;
   font-size: 13.5px;
-  color: #2d3748;
+  color: var(--v-text);
   overflow-wrap: anywhere;
 }
 .ac-main b {
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .ac-main small {
   display: block;
@@ -208,7 +208,7 @@ onMounted(() => load());
 .ac-row time {
   flex: none;
   font-size: 12px;
-  color: #a0aec0;
+  color: var(--v-faint);
   font-variant-numeric: tabular-nums;
 }
 .ac-pages {
@@ -218,6 +218,6 @@ onMounted(() => load());
   gap: 14px;
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 1px solid #edf2f7;
+  border-top: 1px solid var(--v-border);
 }
 </style>

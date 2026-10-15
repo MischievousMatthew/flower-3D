@@ -309,7 +309,7 @@ onMounted(async () => {
   color: var(--accent);
 }
 .theme-shop .kicker {
-  color: #b86558;
+  color: var(--v-red-text);
 }
 .support-head h1 {
   margin: 6px 0 4px;
@@ -413,10 +413,10 @@ onMounted(async () => {
   white-space: nowrap;
   align-self: flex-start;
 }
-.s-open { background: #fef3c7; color: #92400e; }
-.s-waiting { background: #dbeafe; color: #1e40af; }
-.s-resolved { background: #dcfce7; color: #166534; }
-.s-closed { background: #f1f5f9; color: #64748b; }
+.s-open { background: var(--v-amber-soft); color: var(--v-amber-text); }
+.s-waiting { background: var(--v-blue-soft); color: var(--v-blue-text); }
+.s-resolved { background: var(--v-green-soft); color: var(--v-green-text); }
+.s-closed { background: var(--v-subtle); color: var(--v-muted); }
 .form {
   display: flex;
   flex-direction: column;
@@ -439,7 +439,7 @@ onMounted(async () => {
   font: inherit;
   font-size: 13.5px;
   color: var(--text);
-  background: #fff;
+  background: var(--v-input);
   resize: vertical;
   width: 100%;
   box-sizing: border-box;
@@ -461,7 +461,7 @@ onMounted(async () => {
   padding: 9px 16px;
   border-radius: 10px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--v-surface);
   color: var(--text);
   font: inherit;
   font-size: 13px;
@@ -485,7 +485,7 @@ onMounted(async () => {
 }
 .error {
   margin: 0;
-  color: #b91c1c;
+  color: var(--v-red-text);
   font-size: 12.5px;
 }
 .conv-head {
@@ -526,7 +526,7 @@ onMounted(async () => {
   margin: 0;
   padding: 10px 14px;
   border-radius: 14px;
-  background: #f1f5f9;
+  background: var(--v-subtle);
   font-size: 13.5px;
   line-height: 1.55;
   white-space: pre-wrap;
@@ -559,7 +559,7 @@ onMounted(async () => {
   display: block;
   height: 56px;
   border-radius: 10px;
-  background: linear-gradient(100deg, #eef1f6 30%, #f8fafc 50%, #eef1f6 70%);
+  background: linear-gradient(100deg, var(--v-subtle-2) 30%, var(--v-subtle) 50%, var(--v-subtle-2) 70%);
   background-size: 300% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
 }

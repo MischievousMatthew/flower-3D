@@ -289,9 +289,9 @@ onMounted(async () => {
   align-items: flex-start;
   gap: 4px;
   padding: 16px;
-  border: 1px solid #edf1ef;
+  border: 1px solid var(--v-border);
   border-radius: 16px;
-  background: #fff;
+  background: var(--v-surface);
   font-family: "Poppins", sans-serif;
   text-align: left;
   cursor: pointer;
@@ -307,7 +307,7 @@ onMounted(async () => {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 16%, transparent);
 }
 .cat-card.empty strong {
-  color: #718096;
+  color: var(--v-muted);
 }
 .cat-icon {
   display: grid;
@@ -324,11 +324,11 @@ onMounted(async () => {
 .cat-card strong {
   font-size: 14px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .cat-count {
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .cat-stack {
   display: flex;
@@ -339,7 +339,7 @@ onMounted(async () => {
   width: 28px;
   height: 28px;
   margin-right: -8px;
-  border: 2px solid #fff;
+  border: 2px solid var(--v-surface);
   border-radius: 50%;
   object-fit: cover;
   background: var(--bc-accent-soft);
@@ -351,12 +351,12 @@ onMounted(async () => {
   margin-left: 14px;
   font-size: 11.5px;
   font-weight: 600;
-  color: #718096;
+  color: var(--v-muted);
 }
 .cat-empty {
   margin-top: 8px;
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .cat-panel {
   position: sticky;
@@ -375,7 +375,7 @@ onMounted(async () => {
   align-items: center;
   gap: 10px;
   padding: 9px 2px;
-  border-bottom: 1px solid #f4f6f5;
+  border-bottom: 1px solid var(--v-border);
 }
 .cat-items li:last-child {
   border-bottom: 0;
@@ -389,14 +389,14 @@ onMounted(async () => {
 .cat-item-main strong {
   font-size: 13px;
   font-weight: 500;
-  color: #1a202c;
+  color: var(--v-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .cat-item-main span {
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -416,7 +416,7 @@ onMounted(async () => {
 .pick-list {
   max-height: 46vh;
   overflow-y: auto;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
   border-radius: 13px;
 }
 .pick-list label {
@@ -424,14 +424,14 @@ onMounted(async () => {
   align-items: center;
   gap: 10px;
   padding: 9px 12px;
-  border-bottom: 1px solid #f4f6f5;
+  border-bottom: 1px solid var(--v-border);
   cursor: pointer;
 }
 .pick-list li:last-child label {
   border-bottom: 0;
 }
 .pick-list label:hover {
-  background: #f8fcf9;
+  background: var(--v-subtle);
 }
 .pick-list label.disabled {
   opacity: 0.45;
@@ -446,7 +446,7 @@ onMounted(async () => {
   padding: 20px;
   text-align: center;
   font-size: 13px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 @media (max-width: 1100px) {
   .cat-layout {

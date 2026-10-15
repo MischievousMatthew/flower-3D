@@ -216,7 +216,7 @@ onBeforeUnmount(() => clearTimeout(timer));
   align-items: center;
   gap: 12px;
   padding: 12px 4px;
-  border-top: 1px solid #f2f5f3;
+  border-top: 1px solid var(--v-border);
 }
 .fx-main {
   flex: 1;
@@ -227,7 +227,7 @@ onBeforeUnmount(() => clearTimeout(timer));
 .fx-main strong {
   font-size: 13.5px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -235,14 +235,14 @@ onBeforeUnmount(() => clearTimeout(timer));
 .fx-party {
   font-size: 12.5px;
   font-weight: 500;
-  color: #2d3748;
+  color: var(--v-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .fx-meta {
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -259,10 +259,10 @@ onBeforeUnmount(() => clearTimeout(timer));
   white-space: nowrap;
 }
 .fx-amt.in {
-  color: #22753f;
+  color: var(--v-green-text);
 }
 .fx-amt.out {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .fx-pager {
   display: flex;
@@ -270,9 +270,9 @@ onBeforeUnmount(() => clearTimeout(timer));
   align-items: center;
   gap: 10px;
   padding-top: 12px;
-  border-top: 1px solid #f2f5f3;
+  border-top: 1px solid var(--v-border);
   font-size: 12.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .fx-pager div {
   display: flex;
@@ -289,7 +289,7 @@ onBeforeUnmount(() => clearTimeout(timer));
   height: 12px;
   border-radius: 999px;
   overflow: hidden;
-  background: #edf2f7;
+  background: var(--v-subtle-2);
 }
 .split-bar .cod {
   background: #48bb78;
@@ -309,14 +309,14 @@ onBeforeUnmount(() => clearTimeout(timer));
   align-items: center;
   gap: 8px;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .split-legend span {
   flex: 1;
   min-width: 0;
 }
 .split-legend b {
-  color: #1a202c;
+  color: var(--v-text);
   white-space: nowrap;
 }
 .split-legend i {
@@ -335,13 +335,13 @@ onBeforeUnmount(() => clearTimeout(timer));
   margin-bottom: 14px;
   font-size: 24px;
   font-weight: 600;
-  color: #22753f;
+  color: var(--v-green-text);
 }
 .net.zero {
-  color: #1a202c;
+  color: var(--v-text);
 }
 .net.neg {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .full {
   width: 100%;

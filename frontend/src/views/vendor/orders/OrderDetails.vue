@@ -285,7 +285,7 @@ onMounted(() => {
 .od-status-head p {
   margin: 0;
   font-size: 13px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .stepper {
   list-style: none;
@@ -311,7 +311,7 @@ onMounted(() => {
   right: calc(-50% + 20px);
   height: 2px;
   border-radius: 2px;
-  background: #e2e8f0;
+  background: var(--v-subtle-2);
 }
 .stepper li.done:not(:last-child)::after {
   background: var(--bc-accent);
@@ -322,9 +322,9 @@ onMounted(() => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: 2px solid #e2e8f0;
-  background: #fff;
-  color: #a0aec0;
+  border: 2px solid var(--v-border-strong);
+  background: var(--v-surface);
+  color: var(--v-faint);
   font-size: 12.5px;
   font-weight: 600;
 }
@@ -351,14 +351,14 @@ onMounted(() => {
 .step-text strong {
   font-size: 12.5px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--v-text);
 }
 .stepper li:not(.done):not(.current) .step-text strong {
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .step-text small {
   font-size: 11px;
-  color: #a0aec0;
+  color: var(--v-faint);
   overflow-wrap: anywhere;
 }
 
@@ -372,7 +372,7 @@ onMounted(() => {
   display: flex;
   gap: 14px;
   padding: 14px 0;
-  border-bottom: 1px solid #f2f5f3;
+  border-bottom: 1px solid var(--v-border);
 }
 .item:first-child {
   padding-top: 0;
@@ -414,18 +414,18 @@ onMounted(() => {
 .item-top strong {
   font-size: 14px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   overflow-wrap: anywhere;
 }
 .item-sub {
   flex: none;
   font-size: 14px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .item-qty {
   font-size: 12.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .item-details {
   display: flex;
@@ -440,7 +440,7 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .swatch i {
   width: 14px;
@@ -452,9 +452,9 @@ onMounted(() => {
   margin: 6px 0 0;
   padding: 8px 10px;
   border-radius: 10px;
-  background: #fffaf0;
+  background: var(--v-amber-soft);
   font-size: 12.5px;
-  color: #744210;
+  color: var(--v-amber-text);
   overflow-wrap: anywhere;
 }
 .link-btn {
@@ -479,8 +479,8 @@ onMounted(() => {
 .note-card {
   display: flex;
   gap: 12px;
-  background: #fffdf5;
-  border-color: #fbe9c6;
+  background: var(--v-amber-soft);
+  border-color: var(--v-amber-soft);
 }
 .note-card h2 {
   margin: 0 0 4px;
@@ -491,7 +491,7 @@ onMounted(() => {
   margin: 0;
   font-size: 13px;
   line-height: 1.55;
-  color: #4a5568;
+  color: var(--v-text-2);
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
@@ -502,8 +502,8 @@ onMounted(() => {
   width: 36px;
   height: 36px;
   border-radius: 11px;
-  background: #fef3c7;
-  color: #b45309;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
 }
 .note-icon :deep(svg) {
   width: 18px;
@@ -520,7 +520,7 @@ onMounted(() => {
   background: var(--bc-accent-soft);
 }
 .when.late {
-  background: #fff5f5;
+  background: var(--v-red-soft);
 }
 .when-icon {
   flex: none;
@@ -529,11 +529,11 @@ onMounted(() => {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: #fff;
+  background: var(--v-surface);
   color: var(--bc-accent-deep);
 }
 .when.late .when-icon {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .when-icon :deep(svg) {
   width: 19px;
@@ -543,14 +543,14 @@ onMounted(() => {
   display: block;
   font-size: 14px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .when span {
   font-size: 12px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .when.late span {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .prep {
   display: flex;
@@ -558,17 +558,17 @@ onMounted(() => {
   gap: 8px;
   margin-top: 10px;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .prep :deep(svg) {
   flex: none;
   width: 15px;
   height: 15px;
   margin-top: 2px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .prep.now {
-  color: #b45309;
+  color: var(--v-amber-text);
 }
 .facts {
   margin: 14px 0 0;
@@ -585,7 +585,7 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .facts dt :deep(svg) {
   width: 14px;
@@ -594,7 +594,7 @@ onMounted(() => {
 .facts dd {
   margin: 0;
   font-size: 13px;
-  color: #1a202c;
+  color: var(--v-text);
   overflow-wrap: anywhere;
 }
 .facts dd.break {
@@ -616,17 +616,17 @@ onMounted(() => {
   justify-content: space-between;
   gap: 10px;
   font-size: 13px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .totals dd {
   margin: 0;
 }
 .totals .grand {
   padding-top: 10px;
-  border-top: 1px dashed #e2e8f0;
+  border-top: 1px dashed var(--v-border-strong);
   font-size: 15px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .activity {
   list-style: none;
@@ -646,7 +646,7 @@ onMounted(() => {
   top: 14px;
   bottom: 0;
   width: 2px;
-  background: #edf2f7;
+  background: var(--v-subtle-2);
 }
 .act-dot {
   flex: none;
@@ -654,7 +654,7 @@ onMounted(() => {
   height: 12px;
   margin-top: 3px;
   border-radius: 50%;
-  background: #cbd5e0;
+  background: var(--v-border-strong);
 }
 .activity li:first-child .act-dot {
   background: var(--bc-accent);
@@ -667,11 +667,11 @@ onMounted(() => {
   display: block;
   font-size: 13px;
   font-weight: 500;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .activity span {
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 @media (max-width: 1100px) {
   .od-grid {

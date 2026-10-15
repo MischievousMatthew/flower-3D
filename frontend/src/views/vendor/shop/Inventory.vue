@@ -419,7 +419,7 @@ onMounted(() => {
   align-items: center;
   gap: 14px;
   padding: 12px 8px;
-  border-bottom: 1px solid #f2f5f3;
+  border-bottom: 1px solid var(--v-border);
   border-radius: 12px;
   transition: background 0.15s;
 }
@@ -428,7 +428,7 @@ onMounted(() => {
 }
 .inv-row:hover,
 .inv-row.focus {
-  background: #f8fcf9;
+  background: var(--v-subtle);
 }
 .inv-main {
   flex: 1;
@@ -443,7 +443,7 @@ onMounted(() => {
 .inv-name strong {
   font-size: 13.5px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   margin-right: 2px;
 }
 .inv-meter {
@@ -451,7 +451,7 @@ onMounted(() => {
   height: 6px;
   margin: 8px 0 6px;
   border-radius: 999px;
-  background: #edf2f7;
+  background: var(--v-subtle-2);
   max-width: 360px;
 }
 .inv-meter span {
@@ -481,10 +481,10 @@ onMounted(() => {
   flex-wrap: wrap;
   gap: 12px;
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .inv-sub strong {
-  color: #1a202c;
+  color: var(--v-text);
 }
 .inv-quick {
   display: flex;
@@ -518,7 +518,7 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   padding: 10px 4px;
-  border-bottom: 1px solid #f4f6f5;
+  border-bottom: 1px solid var(--v-border);
 }
 .hist li:last-child {
   border-bottom: 0;
@@ -535,12 +535,12 @@ onMounted(() => {
   font-weight: 700;
 }
 .hist-change.up {
-  background: #e6f9ee;
-  color: #22753f;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
 }
 .hist-change.down {
-  background: #fff1f1;
-  color: #c53030;
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
 }
 .hist-main {
   display: flex;
@@ -550,16 +550,16 @@ onMounted(() => {
 .hist-main strong {
   font-size: 13px;
   font-weight: 500;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .hist-main span {
   font-size: 11.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .hist-main em {
   margin-top: 2px;
   font-size: 12px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .sp-empty.small {
   padding: 24px 10px;
@@ -581,21 +581,21 @@ onMounted(() => {
   border-radius: 13px;
   background: var(--bc-accent-soft);
   font-size: 15px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .adj-preview strong {
   font-size: 18px;
   color: var(--bc-accent-strong);
 }
 .adj-preview .arrow {
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .adj-preview.bad {
-  background: #fff5f5;
+  background: var(--v-red-soft);
 }
 .adj-preview.bad strong {
   font-size: 14px;
-  color: #c53030;
+  color: var(--v-red-text);
 }
 @media (max-width: 1100px) {
   .inv-layout {

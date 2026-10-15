@@ -4,11 +4,10 @@ import App from "./App.vue";
 import router from "./router/index.js";
 import "vue3-toastify/dist/index.css";
 import { configurePhilippineDateTimeDefaults } from "./utils/philippineDateTime";
-import { applyVendorTheme } from "./composables/useSidebarTheme";
+import { applyVendorTheme } from "./composables/useVendorTheme";
+import "./styles/vendor-theme.css";
 
 configurePhilippineDateTimeDefaults();
-// The vendor's theme color, set before the first page renders
-applyVendorTheme();
 
 // After a new deploy, an open tab still runs the old code and its page files
 // no longer exist. Reload to pick up the new version — at most once every
@@ -28,5 +27,7 @@ window.addEventListener("vite:preloadError", (event) => {
 const app = createApp(App);
 
 app.use(router);
+// Theme color and dark mode for the vendor pages
+applyVendorTheme(router);
 
 app.mount("#app");

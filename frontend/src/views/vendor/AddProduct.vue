@@ -668,12 +668,12 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 15.5px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .ap-step-head p {
   margin: 2px 0 0;
   font-size: 12.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .ap-num {
   flex: none;
@@ -682,8 +682,8 @@ onBeforeUnmount(() => {
   width: 30px;
   height: 30px;
   border-radius: 10px;
-  background: #edf2f7;
-  color: #4a5568;
+  background: var(--v-subtle-2);
+  color: var(--v-text-2);
   font-size: 13px;
   font-weight: 600;
   transition: background 0.2s, color 0.2s;
@@ -697,7 +697,7 @@ onBeforeUnmount(() => {
   font-size: 11px;
   font-style: normal;
   font-weight: 500;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .ap-gap {
   margin-top: 16px;
@@ -721,8 +721,8 @@ onBeforeUnmount(() => {
   aspect-ratio: 1;
   border-radius: 14px;
   overflow: hidden;
-  background: #f7faf8;
-  border: 1px solid #edf2f7;
+  background: var(--v-subtle);
+  border: 1px solid var(--v-border);
   cursor: grab;
 }
 .ap-photo img {
@@ -771,8 +771,8 @@ onBeforeUnmount(() => {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.94);
-  color: #c53030;
+  background: var(--v-glass);
+  color: var(--v-red-text);
   cursor: pointer;
 }
 .ap-x :deep(svg) {
@@ -803,7 +803,7 @@ onBeforeUnmount(() => {
 }
 .ap-add small {
   font-size: 11.5px;
-  color: #68a882;
+  color: var(--v-green-text);
 }
 .ap-add :deep(svg) {
   width: 24px;
@@ -830,10 +830,10 @@ onBeforeUnmount(() => {
   width: 30px;
   height: 30px;
   padding: 0;
-  border: 2px solid #fff;
+  border: 2px solid var(--v-surface);
   border-radius: 50%;
   background: var(--sw);
-  box-shadow: 0 0 0 1px #e2e8f0;
+  box-shadow: 0 0 0 1px var(--v-border-strong);
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s;
 }
@@ -870,15 +870,15 @@ onBeforeUnmount(() => {
   margin-left: 6px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: #edf2f7;
-  color: #4a5568;
+  background: var(--v-subtle-2);
+  color: var(--v-text-2);
   font-size: 11px;
   font-style: normal;
   font-weight: 600;
 }
 .ap-count.full {
-  background: #e6f9ee;
-  color: #22753f;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
 }
 .ap-type-grid {
   display: grid;
@@ -890,9 +890,9 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 2px;
   padding: 10px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--v-border-strong);
   border-radius: 13px;
-  background: #fff;
+  background: var(--v-surface);
   font-family: "Poppins", sans-serif;
   text-align: left;
   cursor: pointer;
@@ -901,11 +901,11 @@ onBeforeUnmount(() => {
 .ap-type strong {
   font-size: 13px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .ap-type span {
   font-size: 11.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .ap-type.on {
   border-color: var(--bc-accent);
@@ -922,7 +922,7 @@ onBeforeUnmount(() => {
   top: 50%;
   transform: translateY(-50%);
   font-style: normal;
-  color: #a0aec0;
+  color: var(--v-faint);
   font-size: 13.5px;
 }
 .ap-money .sp-input {
@@ -936,13 +936,13 @@ onBeforeUnmount(() => {
   margin-top: 12px;
   padding: 11px 14px;
   border-radius: 12px;
-  background: #f0fff4;
-  color: #22753f;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
   font-size: 13px;
 }
 .ap-profit.bad {
-  background: #fff5f5;
-  color: #c53030;
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
 }
 .ap-switch-row {
   display: flex;
@@ -955,12 +955,12 @@ onBeforeUnmount(() => {
   display: block;
   font-size: 13.5px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .ap-switch-row small {
   display: block;
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .ap-switch-row .sp-switch {
   margin-top: 2px;
@@ -968,8 +968,8 @@ onBeforeUnmount(() => {
 .ap-save {
   padding: 10px 12px;
   border-radius: 11px;
-  background: #fff0f6;
-  color: #b83280;
+  background: var(--v-pink-soft);
+  color: var(--v-pink-text);
   font-weight: 600;
   font-size: 14px;
 }
@@ -986,9 +986,9 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   gap: 3px;
   padding: 14px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--v-border-strong);
   border-radius: 14px;
-  background: #fff;
+  background: var(--v-surface);
   font-family: "Poppins", sans-serif;
   text-align: left;
   cursor: pointer;
@@ -997,11 +997,11 @@ onBeforeUnmount(() => {
 .ap-sell strong {
   font-size: 13.5px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .ap-sell span:last-child {
   font-size: 11.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .ap-sell.on {
   border-color: var(--bc-accent);
@@ -1037,9 +1037,9 @@ onBeforeUnmount(() => {
   gap: 12px;
   margin-top: 16px;
   padding: 12px;
-  border: 1.5px dashed #cbd5e0;
+  border: 1.5px dashed var(--v-border-strong);
   border-radius: 14px;
-  background: #fbfdfc;
+  background: var(--v-subtle);
 }
 .ap-model.has {
   border-style: solid;
@@ -1052,8 +1052,8 @@ onBeforeUnmount(() => {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: #e6fffa;
-  color: #2c7a7b;
+  background: var(--v-teal-soft);
+  color: var(--v-teal-text);
 }
 .ap-model-icon :deep(svg) {
   width: 20px;
@@ -1074,14 +1074,14 @@ onBeforeUnmount(() => {
 }
 .ap-model-text span {
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .ap-file {
   position: relative;
 }
 .ap-more {
   margin-top: 16px;
-  border-top: 1px solid #f1f5f3;
+  border-top: 1px solid var(--v-border);
   padding-top: 12px;
 }
 .ap-more summary {
@@ -1104,10 +1104,10 @@ onBeforeUnmount(() => {
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .ap-card {
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
   border-radius: 16px;
   overflow: hidden;
 }
@@ -1144,22 +1144,22 @@ onBeforeUnmount(() => {
 }
 .ap-card-cat {
   font-size: 11.5px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .ap-card-body strong {
   font-size: 14.5px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   overflow-wrap: anywhere;
 }
 .ap-card-price b {
   font-size: 15px;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .ap-card-price s {
   margin-left: 6px;
   font-size: 12px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .ap-card-tags {
   display: flex;
@@ -1170,8 +1170,8 @@ onBeforeUnmount(() => {
 .ap-card-tags span {
   padding: 2px 9px;
   border-radius: 999px;
-  background: #fff0f6;
-  color: #b83280;
+  background: var(--v-pink-soft);
+  color: var(--v-pink-text);
   font-size: 11px;
   font-weight: 500;
 }
@@ -1189,11 +1189,11 @@ onBeforeUnmount(() => {
   padding: 6px 4px;
   border-radius: 9px;
   font-size: 13px;
-  color: #4a5568;
+  color: var(--v-text-2);
   text-decoration: none;
 }
 .ap-checklist a:hover {
-  background: #f8fcf9;
+  background: var(--v-subtle);
 }
 .ap-checklist li.done a {
   color: var(--bc-accent-strong);
@@ -1204,7 +1204,7 @@ onBeforeUnmount(() => {
   place-items: center;
   width: 20px;
   height: 20px;
-  border: 1.5px solid #cbd5e0;
+  border: 1.5px solid var(--v-border-strong);
   border-radius: 50%;
   color: #fff;
 }
@@ -1220,7 +1220,7 @@ onBeforeUnmount(() => {
   height: 6px;
   margin-bottom: 14px;
   border-radius: 999px;
-  background: #edf2f7;
+  background: var(--v-subtle-2);
   overflow: hidden;
 }
 .ap-progress span {

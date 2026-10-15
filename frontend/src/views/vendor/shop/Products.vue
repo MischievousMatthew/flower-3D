@@ -471,7 +471,7 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
 }
 .bulk-actions .link {
   background: none;
-  color: #cbd5e0;
+  color: var(--v-faint);
 }
 
 /* Grid */
@@ -483,9 +483,9 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
 .p-card {
   display: flex;
   flex-direction: column;
-  border: 1px solid #edf1ef;
+  border: 1px solid var(--v-border);
   border-radius: 18px;
-  background: #fff;
+  background: var(--v-surface);
   overflow: visible;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
@@ -532,7 +532,7 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
   width: 28px;
   height: 28px;
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--v-glass);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   cursor: pointer;
 }
@@ -572,7 +572,7 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -589,11 +589,11 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
   border: 0;
   border-radius: 8px;
   background: none;
-  color: #718096;
+  color: var(--v-muted);
   cursor: pointer;
 }
 .p-more:hover {
-  background: #f1f5f3;
+  background: var(--v-subtle);
 }
 .p-more :deep(svg) {
   width: 16px;
@@ -608,9 +608,9 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
   flex-direction: column;
   min-width: 180px;
   padding: 6px;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
   border-radius: 13px;
-  background: #fff;
+  background: var(--v-raised);
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.16);
 }
 .p-menu button,
@@ -622,7 +622,7 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
   border: 0;
   border-radius: 9px;
   background: none;
-  color: #2d3748;
+  color: var(--v-text);
   font-family: "Poppins", sans-serif;
   font-size: 13px;
   text-align: left;
@@ -631,10 +631,10 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
 }
 .p-menu button:hover,
 .p-menu a:hover {
-  background: #f3f8f5;
+  background: var(--v-subtle);
 }
 .p-menu .danger {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .p-menu :deep(svg) {
   width: 15px;
@@ -643,7 +643,7 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
 .p-meta {
   margin: 0;
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -658,25 +658,25 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
 .p-price strong {
   font-size: 15px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .old {
   margin-left: 6px;
   font-size: 12px;
-  color: #a0aec0;
+  color: var(--v-faint);
   text-decoration: line-through;
 }
 .p-stock {
   font-size: 11.5px;
   font-weight: 600;
-  color: #2f855a;
+  color: var(--v-green-text);
   white-space: nowrap;
 }
 .p-stock.low {
-  color: #b45309;
+  color: var(--v-amber-text);
 }
 .p-stock.out {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .p-flag {
   display: flex;
@@ -684,8 +684,8 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
   margin: 6px 0 0;
   padding: 7px 9px;
   border-radius: 10px;
-  background: #fff5f5;
-  color: #c53030;
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
   font-size: 11.5px;
   line-height: 1.4;
 }
@@ -698,7 +698,7 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
   margin: 4px 0 0;
   font-size: 11.5px;
   font-weight: 500;
-  color: #b83280;
+  color: var(--v-pink-text);
 }
 
 /* List */
@@ -718,13 +718,13 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #718096;
-  border-bottom: 1px solid #edf2f7;
+  color: var(--v-muted);
+  border-bottom: 1px solid var(--v-border);
   white-space: nowrap;
 }
 .p-table td {
   padding: 10px 14px;
-  border-bottom: 1px solid #f4f6f5;
+  border-bottom: 1px solid var(--v-border);
   vertical-align: middle;
 }
 .p-table tr:last-child td {
@@ -732,7 +732,7 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
 }
 .p-table tbody tr:hover,
 .p-table tr.picked {
-  background: #f8fcf9;
+  background: var(--v-subtle);
 }
 .p-table .num {
   text-align: right;
@@ -771,11 +771,11 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
 .p-row-text strong {
   font-size: 13.5px;
   font-weight: 500;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .p-row-text span {
   font-size: 12px;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .sr-only {
   position: absolute;

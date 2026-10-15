@@ -38,7 +38,7 @@
   display: block;
   font-size: 13.5px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -46,7 +46,7 @@
 .st-person small {
   display: block;
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -59,11 +59,11 @@
   max-width: 100%;
   padding: 3px 10px;
   border-radius: 999px;
-  background: #f7fafc;
-  border: 1px solid #edf2f7;
+  background: var(--v-subtle);
+  border: 1px solid var(--v-border);
   font-size: 12px;
   font-weight: 500;
-  color: #2d3748;
+  color: var(--v-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -85,20 +85,20 @@
 }
 .st-table th {
   padding: 10px 14px;
-  border-bottom: 1px solid #edf2f7;
+  border-bottom: 1px solid var(--v-border);
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   text-align: left;
-  color: #a0aec0;
+  color: var(--v-faint);
   white-space: nowrap;
 }
 .st-table td {
   padding: 12px 14px;
-  border-bottom: 1px solid #f4f6f8;
+  border-bottom: 1px solid var(--v-border);
   vertical-align: middle;
-  color: #2d3748;
+  color: var(--v-text);
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -112,7 +112,7 @@
   cursor: pointer;
 }
 .st-table tbody tr.clickable:hover {
-  background: #f9fbfa;
+  background: var(--v-subtle);
 }
 .st-table .num {
   text-align: right;
@@ -120,7 +120,7 @@
   white-space: nowrap;
 }
 .st-table .muted {
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .st-scroll {
   overflow-x: auto;
@@ -144,7 +144,7 @@
 
 .st-sub {
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 
 .st-dl {
@@ -155,11 +155,11 @@
   font-size: 13px;
 }
 .st-dl dt {
-  color: #718096;
+  color: var(--v-muted);
 }
 .st-dl dd {
   margin: 0;
-  color: #1a202c;
+  color: var(--v-text);
   overflow-wrap: anywhere;
 }
 
@@ -169,7 +169,7 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 
 .w70 { width: 70%; }
@@ -187,7 +187,7 @@
   }
   .st-table.cards tr {
     padding: 12px 0;
-    border-bottom: 1px solid #edf2f7;
+    border-bottom: 1px solid var(--v-border);
   }
   .st-table.cards td {
     padding: 3px 0;
@@ -196,7 +196,7 @@
   }
   .st-table.cards td[data-label]::before {
     content: attr(data-label) " · ";
-    color: #a0aec0;
+    color: var(--v-faint);
     font-size: 12px;
   }
   .st-table.cards .num {

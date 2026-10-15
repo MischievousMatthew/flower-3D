@@ -49,6 +49,11 @@
 
     <!-- Theme color: sidebar tabs and the buttons on every vendor page -->
     <div ref="colorRef" class="sidebar-foot">
+      <label class="color-toggle dark-row">
+        <span class="nav-icon" v-html="ICONS.moon"></span>
+        <span class="nav-text">Dark mode</span>
+        <span class="sp-switch"><input type="checkbox" :checked="isDark" aria-label="Dark mode" @change="setDark($event.target.checked)" /><span></span></span>
+      </label>
       <button type="button" class="color-toggle" :aria-expanded="showColors" aria-controls="sidebar-colors" @click="showColors = !showColors">
         <span class="nav-icon" v-html="ICONS.palette"></span>
         <span class="nav-text">Theme color</span>
@@ -97,15 +102,16 @@ import { useAuth } from "../../composables/useAuth";
 import { useSidebarState } from "../../composables/useSidebarState";
 import { useVendorProfile } from "../../composables/useVendorProfile";
 import { useSubscriptionAccess } from "../../composables/useSubscriptionAccess";
-import { ACCENT_PRESETS, DEFAULT_ACCENT, useSidebarTheme } from "../../composables/useSidebarTheme";
+import { ACCENT_PRESETS, DEFAULT_ACCENT, useVendorTheme } from "../../composables/useVendorTheme";
 import { SHOP_ICONS as ICONS } from "../../components/vendor/shop/shopIcons";
 import { VENDOR_NAV, navPlaceFor } from "./vendorNav";
+import "../../components/vendor/shop/shop.css";
 import api from "../../plugins/axios";
 
 const router = useRouter();
 const route = useRoute();
 const { isMobileOpen, closeMobile } = useSidebarState();
-const { accent, accentVars, setAccent, resetAccent } = useSidebarTheme();
+const { accent, accentVars, setAccent, resetAccent, isDark, setDark } = useVendorTheme();
 const { ACCESS_REUSE_MS, subscriptionAccess, loadSubscriptionAccess, subscriptionAllowsModule, subscriptionUpgradeMessage } = useSubscriptionAccess();
 const { vendorProfile, fetchProfile } = useVendorProfile({ autoFetch: false, showToast: false });
 
@@ -206,8 +212,8 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
   flex-direction: column;
   width: 260px;
   height: 100vh;
-  background: #ffffff;
-  border-right: 1px solid #edf0f3;
+  background: var(--v-surface);
+  border-right: 1px solid var(--v-border);
   font-family: "Poppins", sans-serif;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -220,12 +226,12 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
   margin: 14px 14px 6px;
   padding: 10px;
   border-radius: 16px;
-  background: #f7f9fa;
+  background: var(--v-subtle);
   text-decoration: none;
   transition: background 0.15s;
 }
 .brand:hover {
-  background: #f0f3f5;
+  background: var(--v-subtle);
 }
 .brand-logo {
   flex: none;
@@ -235,8 +241,8 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
   height: 42px;
   overflow: hidden;
   border-radius: 12px;
-  background: #d1fae5;
-  color: #065f46;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
   font-size: 15px;
   font-weight: 600;
 }
@@ -258,11 +264,11 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
 .brand-text b {
   font-size: 14px;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .brand-text small {
   font-size: 11.5px;
-  color: #8a94a6;
+  color: var(--v-faint);
 }
 
 /* Navigation */
@@ -271,7 +277,7 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
   overflow-y: auto;
   padding: 4px 14px 12px;
   scrollbar-width: thin;
-  scrollbar-color: #e2e8f0 transparent;
+  scrollbar-color: var(--v-border) transparent;
 }
 .nav-section + .nav-section {
   margin-top: 6px;
@@ -283,7 +289,7 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #a0aab8;
+  color: var(--v-faint);
 }
 .nav-item {
   position: relative;
@@ -293,7 +299,7 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
   margin-bottom: 2px;
   padding: 9px 12px;
   border-radius: 12px;
-  color: #5b6474;
+  color: var(--v-text-2);
   font-size: 13.5px;
   font-weight: 500;
   text-decoration: none;
@@ -301,7 +307,7 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
 }
 .nav-item:hover {
   background: var(--sb-accent-soft);
-  color: #1a202c;
+  color: var(--v-text);
 }
 .nav-item:hover .nav-icon {
   color: var(--sb-accent);
@@ -322,8 +328,8 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
   opacity: 0.5;
 }
 .nav-item.locked:hover {
-  background: #f7f9fa;
-  color: #5b6474;
+  background: var(--v-subtle);
+  color: var(--v-text-2);
 }
 .nav-item.locked:hover .nav-icon {
   color: inherit;
@@ -331,7 +337,7 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
 .nav-icon {
   flex: none;
   display: inline-flex;
-  color: #8a94a6;
+  color: var(--v-faint);
   transition: color 0.15s;
 }
 .nav-icon :deep(svg) {
@@ -368,8 +374,8 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
   background: #f59e0b;
 }
 .nav-item.active .nav-badge {
-  background: #fff;
-  color: #c53030;
+  background: var(--v-surface);
+  color: var(--v-red-text);
 }
 
 /* Locked-module hint */
@@ -380,8 +386,8 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
   padding: 12px;
   border: 1px solid #fde68a;
   border-radius: 12px;
-  background: #fffbeb;
-  color: #92400e;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -403,14 +409,14 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
 }
 .upgrade-dismiss {
   background: none;
-  color: #92400e;
+  color: var(--v-amber-text);
 }
 
 /* Tab color */
 .sidebar-foot {
   position: relative;
   padding: 10px 14px 14px;
-  border-top: 1px solid #edf0f3;
+  border-top: 1px solid var(--v-border);
 }
 .color-toggle {
   display: flex;
@@ -421,7 +427,7 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
   border: 0;
   border-radius: 12px;
   background: none;
-  color: #5b6474;
+  color: var(--v-text-2);
   font: inherit;
   font-size: 13px;
   font-weight: 500;
@@ -431,11 +437,14 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
 .color-toggle:hover {
   background: var(--sb-accent-soft);
 }
+.dark-row .nav-text {
+  flex: 1;
+}
 .color-dot {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  box-shadow: 0 0 0 2px #fff, 0 0 0 3px #e2e8f0;
+  box-shadow: 0 0 0 2px var(--v-surface), 0 0 0 3px var(--v-border-strong);
 }
 .color-pop {
   position: absolute;
@@ -443,22 +452,22 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
   right: 14px;
   bottom: calc(100% - 4px);
   padding: 14px;
-  border: 1px solid #edf0f3;
+  border: 1px solid var(--v-border);
   border-radius: 16px;
-  background: #fff;
+  background: var(--v-raised);
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
 }
 .color-title {
   margin: 0 0 2px;
   font-size: 12px;
   font-weight: 600;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .color-hint {
   margin: 0 0 10px;
   font-size: 11px;
   line-height: 1.4;
-  color: #718096;
+  color: var(--v-muted);
 }
 .swatches {
   display: grid;
@@ -477,7 +486,7 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
   transform: scale(1.1);
 }
 .swatch.on {
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1a202c;
+  box-shadow: 0 0 0 2px var(--v-surface), 0 0 0 4px var(--v-text);
 }
 .custom-color {
   display: flex;
@@ -485,10 +494,10 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
   gap: 10px;
   margin-top: 12px;
   padding: 8px 10px;
-  border: 1px solid #edf0f3;
+  border: 1px solid var(--v-border);
   border-radius: 10px;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
   cursor: pointer;
 }
 .custom-color input {
@@ -512,14 +521,14 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
 }
 .custom-color code {
   font-size: 11.5px;
-  color: #8a94a6;
+  color: var(--v-faint);
 }
 .color-reset {
   margin-top: 8px;
   padding: 0;
   border: 0;
   background: none;
-  color: #718096;
+  color: var(--v-muted);
   font: inherit;
   font-size: 12px;
   text-decoration: underline;

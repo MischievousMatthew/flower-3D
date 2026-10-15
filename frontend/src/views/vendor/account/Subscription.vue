@@ -293,14 +293,14 @@ onMounted(async () => {
   gap: 24px;
   align-items: center;
   margin-bottom: 16px;
-  background: linear-gradient(135deg, #f8fdf9 0%, #fff 60%);
+  background: linear-gradient(135deg, var(--v-subtle) 0%, var(--v-surface) 60%);
 }
 .sb-hero.tone-red,
 .sb-hero.tone-slate {
-  background: linear-gradient(135deg, #fff8f8 0%, #fff 60%);
+  background: linear-gradient(135deg, var(--v-red-soft) 0%, var(--v-surface) 60%);
 }
 .sb-hero.tone-violet {
-  background: linear-gradient(135deg, #f8f6ff 0%, #fff 60%);
+  background: linear-gradient(135deg, var(--v-purple-soft) 0%, var(--v-surface) 60%);
 }
 .sb-hero.empty {
   grid-template-columns: 1fr;
@@ -311,7 +311,7 @@ onMounted(async () => {
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .sb-hero h2 {
   display: flex;
@@ -327,12 +327,12 @@ onMounted(async () => {
   margin: 6px 0 0;
   font-size: 18px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--v-text);
 }
 .sb-price small {
   font-size: 13px;
   font-weight: 500;
-  color: #718096;
+  color: var(--v-muted);
 }
 .sb-period {
   display: grid;
@@ -342,7 +342,7 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   font-size: 13px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .sb-period .sp-hint {
   margin: 0;
@@ -351,7 +351,7 @@ onMounted(async () => {
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
-  color: #9b2c2c;
+  color: var(--v-red-text);
 }
 .sb-hero-actions {
   display: flex;
@@ -402,7 +402,7 @@ onMounted(async () => {
 .sb-plan-price small {
   font-size: 12px;
   font-weight: 500;
-  color: #718096;
+  color: var(--v-muted);
 }
 .sb-plan-limits {
   margin: 0;
@@ -415,10 +415,10 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 8px;
   padding: 6px 0;
-  border-top: 1px solid #f4f6f8;
+  border-top: 1px solid var(--v-border);
 }
 .sb-plan-limits span {
-  color: #718096;
+  color: var(--v-muted);
 }
 .sb-plan-limits b {
   font-weight: 600;
@@ -428,10 +428,10 @@ onMounted(async () => {
   margin: 0;
   font-size: 12px;
   line-height: 1.5;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .sb-plan-gains.loses {
-  color: #9c4221;
+  color: var(--v-amber-text);
 }
 .sb-plan-foot {
   margin-top: auto;

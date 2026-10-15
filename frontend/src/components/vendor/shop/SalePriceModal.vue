@@ -156,7 +156,7 @@ function close() {
 }
 .sale-preview .old {
   font-size: 13px;
-  color: #a0aec0;
+  color: var(--v-faint);
   text-decoration: line-through;
 }
 .sale-preview strong {

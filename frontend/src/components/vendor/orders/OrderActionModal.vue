@@ -88,7 +88,7 @@ function close() {
 }
 .oa-arrow {
   display: inline-flex;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .oa-arrow :deep(svg) {
   width: 16px;
@@ -98,6 +98,6 @@ function close() {
   margin: 0;
   font-size: 13px;
   line-height: 1.55;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 </style>

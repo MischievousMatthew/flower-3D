@@ -18,7 +18,7 @@ import SupportCenter from "../../components/support/SupportCenter.vue";
 .vs-page {
   margin-left: 260px;
   min-height: 100vh;
-  background: #f8f9fa;
+  background: var(--v-bg);
   font-family: "Poppins", sans-serif;
   transition: margin-left 0.3s ease;
 }

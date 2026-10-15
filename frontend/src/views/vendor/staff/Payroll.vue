@@ -505,7 +505,7 @@ onMounted(() => {
 
 <style scoped>
 .pr-kpi {
-  border: 1px solid #edf1ef;
+  border: 1px solid var(--v-border);
   font-family: inherit;
   text-align: left;
   cursor: pointer;
@@ -577,11 +577,11 @@ onMounted(() => {
   gap: 6px;
   padding: 16px;
   border-radius: 14px;
-  background: #f7fafc;
+  background: var(--v-subtle);
 }
 .pr-net > span:first-child {
   font-size: 12.5px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .pr-net strong {
   font-size: 26px;
@@ -594,26 +594,26 @@ onMounted(() => {
 }
 .pr-money .total {
   padding-top: 10px;
-  border-top: 1px solid #edf2f7;
+  border-top: 1px solid var(--v-border);
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
 }
 .pr-gap {
   margin-top: 14px;
   padding-top: 14px;
-  border-top: 1px dashed #e2e8f0;
+  border-top: 1px dashed var(--v-border-strong);
 }
 .pr-note {
   margin: 0 0 8px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #f7fafc;
+  background: var(--v-subtle);
   font-size: 13px;
-  color: #2d3748;
+  color: var(--v-text);
   overflow-wrap: anywhere;
 }
 .pr-note.review {
-  background: #fffaf0;
+  background: var(--v-amber-soft);
 }
 .pr-quick {
   display: flex;
@@ -626,7 +626,7 @@ onMounted(() => {
   align-items: flex-start;
   gap: 12px;
   padding: 12px 14px;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--v-border);
   border-radius: 12px;
   cursor: pointer;
 }
@@ -637,6 +637,6 @@ onMounted(() => {
 }
 .pr-switch small {
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 </style>

@@ -200,11 +200,11 @@ onMounted(load);
 
 <style scoped>
 .fx-kpi.hero {
-  background: linear-gradient(150deg, var(--bc-accent-soft) 0%, #fff 60%);
+  background: linear-gradient(150deg, var(--bc-accent-soft) 0%, var(--v-surface) 60%);
   border-color: var(--bc-accent-muted);
 }
 .fx-kpi strong.neg {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .pl-layout {
   display: grid;
@@ -231,15 +231,15 @@ onMounted(load);
   padding: 0 10px 10px;
   font-size: 11.5px;
   font-weight: 600;
-  color: #a0aec0;
+  color: var(--v-faint);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
 .pl td {
   padding: 10px;
-  border-top: 1px solid #f2f5f3;
-  color: #2d3748;
+  border-top: 1px solid var(--v-border);
+  color: var(--v-text);
   vertical-align: top;
 }
 .pl .num {
@@ -247,40 +247,40 @@ onMounted(load);
   white-space: nowrap;
 }
 .pl .muted {
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .pl tr.indent td:first-child {
   padding-left: 26px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .pl tr.sub td {
   font-weight: 600;
-  color: #1a202c;
-  background: #fafcfb;
+  color: var(--v-text);
+  background: var(--v-subtle);
 }
 .pl tr.total td {
   font-size: 15px;
   font-weight: 700;
-  color: #1a202c;
+  color: var(--v-text);
   background: var(--bc-accent-soft);
   border-top: 2px solid var(--bc-accent-muted);
 }
 .pl tr.total.loss td {
-  background: #fff5f5;
-  border-top-color: #fed7d7;
+  background: var(--v-red-soft);
+  border-top-color: var(--v-red-soft);
 }
 .pl td.neg {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .pl tr.total td.red {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .pl-hint {
   display: block;
   margin-top: 1px;
   font-size: 11.5px;
   font-weight: 400;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 .pl-note {
   margin: 12px 0 0;
@@ -294,7 +294,7 @@ onMounted(load);
   height: 14px;
   border-radius: 999px;
   overflow: hidden;
-  background: #edf2f7;
+  background: var(--v-subtle-2);
 }
 .stack .cogs,
 .stack-legend i.cogs {
@@ -320,13 +320,13 @@ onMounted(load);
   align-items: center;
   gap: 8px;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .stack-legend li.loss {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .stack-legend li.loss b {
-  color: #c53030;
+  color: var(--v-red-text);
 }
 .stack-legend i.loss {
   background: #fc8181;
@@ -335,7 +335,7 @@ onMounted(load);
   flex: 1;
 }
 .stack-legend b {
-  color: #1a202c;
+  color: var(--v-text);
 }
 .stack-legend i {
   width: 10px;
@@ -352,12 +352,12 @@ onMounted(load);
   justify-content: space-between;
   gap: 10px;
   font-size: 12.5px;
-  color: #4a5568;
+  color: var(--v-text-2);
 }
 .memo dd {
   margin: 0;
   font-weight: 600;
-  color: #1a202c;
+  color: var(--v-text);
   text-align: right;
 }
 .pl-trend {
