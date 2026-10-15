@@ -83,9 +83,16 @@
   </aside>
 </template>
 
+<script>
+// The sidebar remounts with every vendor page; keep the badge between them
+const orderCountCache = { userId: null, count: 0, at: 0 };
+const ORDER_COUNT_REUSE_MS = 60000;
+</script>
+
 <script setup>
 import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import { useAuth } from "../../composables/useAuth";
 import { useSidebarState } from "../../composables/useSidebarState";
 import { useVendorProfile } from "../../composables/useVendorProfile";
 import { useSubscriptionAccess } from "../../composables/useSubscriptionAccess";
@@ -98,11 +105,13 @@ const router = useRouter();
 const route = useRoute();
 const { isMobileOpen, closeMobile } = useSidebarState();
 const { accent, accentVars, setAccent, resetAccent } = useSidebarTheme();
-const { subscriptionAccess, loadSubscriptionAccess, subscriptionAllowsModule, subscriptionUpgradeMessage } = useSubscriptionAccess();
+const { ACCESS_REUSE_MS, subscriptionAccess, loadSubscriptionAccess, subscriptionAllowsModule, subscriptionUpgradeMessage } = useSubscriptionAccess();
 const { vendorProfile, fetchProfile } = useVendorProfile({ autoFetch: false, showToast: false });
 
 const logoLoadFailed = ref(false);
-const orderCount = ref(0);
+const { user } = useAuth();
+const cachedCount = () => (orderCountCache.userId === user.value?.id ? orderCountCache.count : 0);
+const orderCount = ref(cachedCount());
 const lockedModule = ref(null);
 const showColors = ref(false);
 const colorRef = ref(null);
@@ -143,11 +152,14 @@ const planAlert = computed(() => {
   return days <= 7 ? `Your plan ends in ${Math.max(0, days)} day${days === 1 ? "" : "s"}` : "";
 });
 
-const loadOrderCount = async () => {
+const loadOrderCount = async ({ reuse = false } = {}) => {
+  const userId = user.value?.id;
+  if (reuse && orderCountCache.userId === userId && Date.now() - orderCountCache.at < ORDER_COUNT_REUSE_MS) return;
   try {
     const response = await api.get("/vendor/orders/statistics");
     const status = response.data?.data?.status_breakdown ?? {};
     orderCount.value = Number(status.pending ?? 0) + Number(status.processing ?? 0);
+    Object.assign(orderCountCache, { userId, count: orderCount.value, at: Date.now() });
   } catch (_) {
     // The badge just stays as it was
   }
@@ -159,9 +171,9 @@ const onOutsideClick = (e) => {
 
 onMounted(() => {
   fetchProfile().catch(() => {});
-  loadSubscriptionAccess().catch(() => {});
-  loadOrderCount();
-  notificationInterval = window.setInterval(loadOrderCount, 60000);
+  loadSubscriptionAccess({ maxAge: ACCESS_REUSE_MS }).catch(() => {});
+  loadOrderCount({ reuse: true });
+  notificationInterval = window.setInterval(() => loadOrderCount(), 60000);
   subscriptionInterval = window.setInterval(() => loadSubscriptionAccess().catch(() => {}), 60000);
   document.addEventListener("click", onOutsideClick);
 });
@@ -176,7 +188,7 @@ watch(
   () => route.path,
   () => {
     lockedModule.value = null;
-    loadSubscriptionAccess().catch(() => {});
+    loadSubscriptionAccess({ maxAge: ACCESS_REUSE_MS }).catch(() => {});
     if (isMobileOpen.value) closeMobile();
   },
 );

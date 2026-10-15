@@ -247,6 +247,7 @@ const { unreadChatCount, chatRoute } = useChatNotifications();
 const { scOrdersBadgeCount } = useSupplyChainNotifications();
 const { isCollapsed, isMobileOpen, closeMobile } = useSidebarState();
 const {
+  ACCESS_REUSE_MS,
   subscriptionAccess,
   loadSubscriptionAccess,
   subscriptionAllowsModule,
@@ -376,7 +377,7 @@ const currentConfig = computed(() => {
 const themeGradient = "linear-gradient(135deg, #48bb78, #38a169)";
 
 onMounted(() => {
-  loadSubscriptionAccess().catch(() => {});
+  loadSubscriptionAccess({ maxAge: ACCESS_REUSE_MS }).catch(() => {});
   subscriptionInterval = window.setInterval(() => loadSubscriptionAccess().catch(() => {}), 60000);
 });
 
@@ -402,7 +403,7 @@ watch(
 
 // Close sidebar on route change (mobile)
 watch(() => route.path, () => {
-  loadSubscriptionAccess().catch(() => {});
+  loadSubscriptionAccess({ maxAge: ACCESS_REUSE_MS }).catch(() => {});
   if (isMobileOpen.value) closeMobile();
 });
 

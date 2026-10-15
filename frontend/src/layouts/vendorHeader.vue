@@ -84,10 +84,10 @@ import { useAuth } from "../composables/useAuth";
 import { useChatNotifications } from "../composables/useChatNotifications";
 import { useSidebarState } from "../composables/useSidebarState";
 import { useSubscriptionAccess } from "../composables/useSubscriptionAccess";
+import { useVendorProfile } from "../composables/useVendorProfile";
 import { SHOP_ICONS as ICONS } from "../components/vendor/shop/shopIcons";
 import { navPlaceFor } from "./Sidebar/vendorNav";
 import NotificationBell from "../components/support/NotificationBell.vue";
-import api from "../plugins/axios";
 
 defineProps({
   title: { type: String, default: "" },
@@ -110,24 +110,20 @@ const router = useRouter();
 const { user, logout } = useAuth();
 const { unreadChatCount, chatRoute } = useChatNotifications();
 const { toggleMobile } = useSidebarState();
-const { subscriptionAccess, loadSubscriptionAccess } = useSubscriptionAccess();
+const { ACCESS_REUSE_MS, subscriptionAccess, loadSubscriptionAccess } = useSubscriptionAccess();
 
 const showDropdown = ref(false);
 const dropdownRef = ref(null);
 const isLoggingOut = ref(false);
 const avatarFailed = ref(false);
-const vendorProfile = ref(null);
+// Shared with the sidebar, so moving between pages doesn't refetch it
+const { vendorProfile, fetchProfile } = useVendorProfile({ autoFetch: false, showToast: false });
 
 const place = computed(() => navPlaceFor(route.name));
 
-const loadVendorProfile = async () => {
-  try {
-    const res = await api.get("/vendor/profile");
-    if (res.data?.success || res.data?.data) vendorProfile.value = res.data.data ?? res.data;
-  } catch (_) {
-    // Falls back to the signed-in user's details
-  }
-};
+const loadVendorProfile = () => fetchProfile().catch(() => {
+  // Falls back to the signed-in user's details
+});
 
 const displayName = computed(() => {
   const vp = vendorProfile.value;
@@ -186,7 +182,7 @@ const onKey = (e) => {
 onMounted(() => {
   document.addEventListener("click", onOutsideClick);
   document.addEventListener("keydown", onKey);
-  loadSubscriptionAccess().catch(() => {});
+  loadSubscriptionAccess({ maxAge: ACCESS_REUSE_MS }).catch(() => {});
 });
 onUnmounted(() => {
   document.removeEventListener("click", onOutsideClick);

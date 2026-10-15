@@ -63,6 +63,8 @@ const sharedVendorProfile = ref({
 const isLoading = ref(false);
 const error = ref(null);
 const hasLoaded = ref(false);
+let profileRequest = null;
+let profileGeneration = 0;
 
 export function useVendorProfile(options = {}) {
   const {
@@ -85,7 +87,17 @@ export function useVendorProfile(options = {}) {
     error.value = null;
 
     try {
-      const response = await api.get("/vendor/profile");
+      // The sidebar, header and page often ask at once: share one request
+      if (!profileRequest) {
+        const request = api.get("/vendor/profile").finally(() => {
+          if (profileRequest === request) profileRequest = null;
+        });
+        profileRequest = request;
+      }
+      const gen = profileGeneration;
+      const response = await profileRequest;
+      // Signed out while it loaded: keep the old account's profile out
+      if (gen !== profileGeneration) return sharedVendorProfile.value;
 
       if (response.data.success) {
         // Update shared state
@@ -222,4 +234,6 @@ export function clearVendorProfile() {
     }
   });
   hasLoaded.value = false;
+  profileRequest = null;
+  profileGeneration += 1;
 }

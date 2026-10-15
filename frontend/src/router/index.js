@@ -11,7 +11,7 @@ import { useAdminAccess } from "../composables/useAdminAccess";
 import { HIDDEN_ID_KEYS, hideIdsInLocation } from "../utils/hiddenIds";
 
 const adminAccess = useAdminAccess();
-import { loadSubscriptionAccess, subscriptionAllowsModule } from "../composables/useSubscriptionAccess";
+import { ACCESS_REUSE_MS, loadSubscriptionAccess, subscriptionAllowsModule } from "../composables/useSubscriptionAccess";
 import { SUBSCRIPTION_MODULES as MODULE } from "../constants/subscriptionModules";
 
 const routes = [
@@ -1109,7 +1109,7 @@ router.beforeEach(async (to, from, next) => {
   // merely because their individual role allows it.
   if (subscriptionModule && (role === "vendor" || userType === "employee")) {
     try {
-      const access = await loadSubscriptionAccess();
+      const access = await loadSubscriptionAccess({ maxAge: ACCESS_REUSE_MS });
       if (!subscriptionAllowsModule(access, subscriptionModule)) {
         return next(userType === "employee" ? "/guest/login" : "/vendor/profile");
       }

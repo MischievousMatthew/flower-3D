@@ -12,6 +12,7 @@ import {
   getStoredUserToken,
 } from "../utils/authSession";
 import { clearSubscriptionAccess } from "./useSubscriptionAccess";
+import { clearVendorProfile } from "./useVendorProfile";
 import { useAdminAccess } from "./useAdminAccess";
 import { readPendingPlan } from "../constants/subscriptionPlans";
 
@@ -42,6 +43,7 @@ export function useAuth() {
 
   const setAuthData = (token, userData, type = "user") => {
     clearSubscriptionAccess();
+    clearVendorProfile();
     if (type === "employee") {
       localStorage.setItem("employee_token", token);
       localStorage.removeItem("auth_token");
@@ -62,6 +64,7 @@ export function useAuth() {
   const clearAuthData = () => {
     clearStoredAuth();
     clearSubscriptionAccess();
+    clearVendorProfile();
     // Forget the previous admin's permissions
     useAdminAccess().reset();
 

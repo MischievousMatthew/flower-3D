@@ -44,23 +44,31 @@ class ResourceLimitService
 
     public function summary(User $vendor): array
     {
-        return collect(array_keys(self::RESOURCES))->mapWithKeys(function (string $resource) use ($vendor) {
-            $limit = $this->getResourceLimit($vendor, $resource);
+        // Look the plan up once: this runs on every vendor page load
+        $planKey = $this->activePlan($vendor);
+
+        return collect(array_keys(self::RESOURCES))->mapWithKeys(function (string $resource) use ($vendor, $planKey) {
+            $limit = SubscriptionPlans::resourceLimit($planKey, $resource);
+            $usage = $this->currentUsage($vendor, $resource);
             return [$resource => [
                 'label' => self::RESOURCES[$resource]['label'],
-                'usage' => $this->currentUsage($vendor, $resource),
+                'usage' => $usage,
                 'limit' => $limit,
                 'unlimited' => $limit === null,
-                'can_create' => $this->canCreateResource($vendor, $resource),
-                'message' => $limit === null ? null : $this->limitMessage($vendor, $resource),
+                'can_create' => $limit === null || $usage < $limit,
+                'message' => $limit === null ? null : $this->limitMessageFor($planKey, $limit, $resource),
             ]];
         })->all();
     }
 
     public function limitMessage(User $vendor, string $resource): string
     {
-        $plan = SubscriptionPlans::get($this->activePlan($vendor));
-        $limit = $this->getResourceLimit($vendor, $resource);
+        return $this->limitMessageFor($this->activePlan($vendor), $this->getResourceLimit($vendor, $resource), $resource);
+    }
+
+    private function limitMessageFor(string $planKey, ?int $limit, string $resource): string
+    {
+        $plan = SubscriptionPlans::get($planKey);
         $label = strtolower(self::RESOURCES[$resource]['label'] ?? 'Resource');
         $plural = self::RESOURCES[$resource]['plural'] ?? "{$label}s";
         $nextPlan = SubscriptionPlans::nextPlanWithMoreOf($plan['key'], $resource);
