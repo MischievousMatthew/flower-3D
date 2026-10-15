@@ -298,13 +298,13 @@ onMounted(async () => {
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 .cat-card:hover {
-  border-color: #c6f6d5;
+  border-color: var(--bc-accent-muted);
   transform: translateY(-1px);
   box-shadow: 0 8px 20px rgba(16, 24, 40, 0.06);
 }
 .cat-card.on {
-  border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.16);
+  border-color: var(--bc-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 16%, transparent);
 }
 .cat-card.empty strong {
   color: #718096;
@@ -342,7 +342,7 @@ onMounted(async () => {
   border: 2px solid #fff;
   border-radius: 50%;
   object-fit: cover;
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
 }
 .cat-dot.blank {
   display: inline-block;
@@ -438,7 +438,7 @@ onMounted(async () => {
   cursor: not-allowed;
 }
 .pick-list input {
-  accent-color: #48bb78;
+  accent-color: var(--bc-accent);
   width: 16px;
   height: 16px;
 }

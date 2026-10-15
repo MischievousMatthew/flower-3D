@@ -107,8 +107,8 @@
             <svg :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" class="chart-svg" aria-hidden="true">
               <defs>
                 <linearGradient id="vdArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#48bb78" stop-opacity="0.32" />
-                  <stop offset="100%" stop-color="#48bb78" stop-opacity="0" />
+                  <stop offset="0%" style="stop-color: var(--bc-accent)" stop-opacity="0.32" />
+                  <stop offset="100%" style="stop-color: var(--bc-accent)" stop-opacity="0" />
                 </linearGradient>
               </defs>
               <line v-for="g in 4" :key="g" x1="0" :x2="W" :y1="(H - PAD) * (g / 4)" :y2="(H - PAD) * (g / 4)" class="grid" />
@@ -557,9 +557,9 @@ onMounted(async () => {
   color: #1a202c;
 }
 .vd-range button.on {
-  background: #48bb78;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(72, 187, 120, 0.35);
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--bc-accent) 35%, transparent);
 }
 .vd-error {
   padding: 12px 16px;
@@ -609,7 +609,7 @@ onMounted(async () => {
 .head-link {
   font-size: 12.5px;
   font-weight: 500;
-  color: #2f855a;
+  color: var(--bc-accent-deep);
   text-decoration: none;
   white-space: nowrap;
 }
@@ -712,7 +712,7 @@ onMounted(async () => {
   border-radius: 12px;
 }
 :deep(.locked-note a) {
-  color: #2f855a;
+  color: var(--bc-accent-deep);
   font-weight: 600;
 }
 
@@ -755,18 +755,18 @@ onMounted(async () => {
 }
 .chart-svg .line {
   fill: none;
-  stroke: #38a169;
+  stroke: var(--bc-accent-hover);
   stroke-width: 2.5;
   vector-effect: non-scaling-stroke;
 }
 .chart-svg .cursor {
-  stroke: #9ae6b4;
+  stroke: var(--bc-accent-border);
   stroke-dasharray: 4 4;
   vector-effect: non-scaling-stroke;
 }
 .chart-svg .dot {
   fill: #fff;
-  stroke: #38a169;
+  stroke: var(--bc-accent-hover);
   stroke-width: 3;
   vector-effect: non-scaling-stroke;
 }
@@ -833,7 +833,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: linear-gradient(160deg, #f0fff4 0%, #fff 55%);
+  background: linear-gradient(160deg, var(--bc-accent-soft) 0%, #fff 55%);
 }
 .plan-top {
   display: flex;
@@ -879,7 +879,7 @@ onMounted(async () => {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #48bb78;
+  background: var(--bc-accent);
 }
 .lim-bar span.full {
   background: #ed8936;
@@ -909,7 +909,7 @@ onMounted(async () => {
   margin-top: auto;
   padding: 10px;
   border-radius: 11px;
-  background: #1a202c;
+  background: var(--bc-accent-strong);
   color: #fff;
   text-align: center;
   font-size: 13px;
@@ -918,7 +918,7 @@ onMounted(async () => {
   transition: background 0.15s;
 }
 .plan-btn:hover {
-  background: #2d3748;
+  background: var(--bc-accent-deep);
 }
 
 /* Lists */
@@ -960,12 +960,12 @@ onMounted(async () => {
   height: 40px;
   border-radius: 11px;
   object-fit: cover;
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
 }
 .thumb.blank {
   display: grid;
   place-items: center;
-  color: #48bb78;
+  color: var(--bc-accent);
 }
 .li-main {
   flex: 1;
@@ -1014,7 +1014,7 @@ onMounted(async () => {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #68d391;
+  background: var(--bc-accent-border);
 }
 .stock-pill,
 .order-pill {
@@ -1125,9 +1125,9 @@ onMounted(async () => {
   transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 .action:hover {
-  border-color: #9ae6b4;
+  border-color: var(--bc-accent-border);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.12);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--bc-accent) 12%, transparent);
 }
 .action.locked {
   opacity: 0.6;

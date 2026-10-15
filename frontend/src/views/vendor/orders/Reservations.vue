@@ -367,7 +367,7 @@ onMounted(() => {
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 .rv-day:hover {
-  border-color: #9ae6b4;
+  border-color: var(--bc-accent-border);
 }
 .rv-day.past {
   background: #fafbfa;
@@ -381,12 +381,12 @@ onMounted(() => {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #48bb78;
-  color: #fff;
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
 }
 .rv-day.on {
-  border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.18);
+  border-color: var(--bc-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 18%, transparent);
 }
 .rv-day.closed {
   background: repeating-linear-gradient(135deg, #fff5f5, #fff5f5 6px, #fff 6px, #fff 12px);
@@ -544,7 +544,7 @@ onMounted(() => {
   cursor: pointer;
 }
 .day-orders li > button:hover strong {
-  color: #22753f;
+  color: var(--bc-accent-strong);
 }
 .do-text {
   flex: 1;

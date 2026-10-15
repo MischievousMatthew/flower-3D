@@ -259,7 +259,7 @@ onMounted(load);
   color: #c53030;
 }
 .rp-total.hero {
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
 }
 .rp-chart {
   margin-bottom: 16px;
@@ -297,7 +297,7 @@ onMounted(load);
   top: 0;
   z-index: 1;
   padding: 10px 12px;
-  background: #f7fdf9;
+  background: var(--bc-accent-soft);
   font-size: 11.5px;
   font-weight: 600;
   color: #718096;
@@ -339,8 +339,8 @@ onMounted(load);
   position: sticky;
   bottom: 0;
   padding: 11px 12px;
-  border-top: 2px solid #c6f6d5;
-  background: #f0fff4;
+  border-top: 2px solid var(--bc-accent-muted);
+  background: var(--bc-accent-soft);
   font-weight: 700;
   color: #1a202c;
 }

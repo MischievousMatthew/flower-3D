@@ -689,8 +689,8 @@ onBeforeUnmount(() => {
   transition: background 0.2s, color 0.2s;
 }
 .ap-step.done .ap-num {
-  background: #48bb78;
-  color: #fff;
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
 }
 .ap-optional {
   margin-left: 6px;
@@ -713,7 +713,7 @@ onBeforeUnmount(() => {
   transition: background 0.15s;
 }
 .ap-photos.dragging {
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
 }
 .ap-photo {
   position: relative;
@@ -736,8 +736,8 @@ onBeforeUnmount(() => {
   bottom: 8px;
   padding: 2px 9px;
   border-radius: 999px;
-  background: #48bb78;
-  color: #fff;
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
   font-size: 11px;
   font-weight: 600;
 }
@@ -786,9 +786,9 @@ onBeforeUnmount(() => {
   justify-content: center;
   gap: 4px;
   padding: 10px;
-  border: 1.5px dashed #9ae6b4;
-  background: #f7fdf9;
-  color: #2f855a;
+  border: 1.5px dashed var(--bc-accent-border);
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
   text-align: center;
   cursor: pointer;
 }
@@ -817,7 +817,7 @@ onBeforeUnmount(() => {
   opacity: 0;
 }
 .ap-add:focus-within {
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.25);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 25%, transparent);
 }
 
 /* Basics */
@@ -841,7 +841,7 @@ onBeforeUnmount(() => {
   transform: scale(1.08);
 }
 .ap-swatch.on {
-  box-shadow: 0 0 0 2px #48bb78;
+  box-shadow: 0 0 0 2px var(--bc-accent);
   transform: scale(1.1);
 }
 .ap-inline {
@@ -908,8 +908,8 @@ onBeforeUnmount(() => {
   color: #718096;
 }
 .ap-type.on {
-  border-color: #48bb78;
-  background: #f0fff4;
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
 }
 
 /* Price */
@@ -1004,8 +1004,8 @@ onBeforeUnmount(() => {
   color: #718096;
 }
 .ap-sell.on {
-  border-color: #48bb78;
-  background: #f0fff4;
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
 }
 .ap-sell-icon {
   display: grid;
@@ -1014,8 +1014,8 @@ onBeforeUnmount(() => {
   height: 32px;
   margin-bottom: 4px;
   border-radius: 10px;
-  background: #e6f9ee;
-  color: #22753f;
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-strong);
 }
 .ap-sell-icon :deep(svg) {
   width: 17px;
@@ -1043,7 +1043,7 @@ onBeforeUnmount(() => {
 }
 .ap-model.has {
   border-style: solid;
-  border-color: #9ae6b4;
+  border-color: var(--bc-accent-border);
 }
 .ap-model-icon {
   flex: none;
@@ -1087,7 +1087,7 @@ onBeforeUnmount(() => {
 .ap-more summary {
   font-size: 13px;
   font-weight: 600;
-  color: #2f855a;
+  color: var(--bc-accent-deep);
   cursor: pointer;
 }
 
@@ -1114,7 +1114,7 @@ onBeforeUnmount(() => {
 .ap-card-media {
   position: relative;
   aspect-ratio: 4 / 3;
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
 }
 .ap-card-media img {
   width: 100%;
@@ -1125,7 +1125,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   height: 100%;
-  color: #9ae6b4;
+  color: var(--bc-accent-border);
 }
 .ap-card-blank :deep(svg) {
   width: 36px;
@@ -1196,7 +1196,7 @@ onBeforeUnmount(() => {
   background: #f8fcf9;
 }
 .ap-checklist li.done a {
-  color: #22753f;
+  color: var(--bc-accent-strong);
 }
 .ap-tick {
   flex: none;
@@ -1213,8 +1213,8 @@ onBeforeUnmount(() => {
   height: 12px;
 }
 .ap-checklist li.done .ap-tick {
-  border-color: #48bb78;
-  background: #48bb78;
+  border-color: var(--bc-accent);
+  background: var(--bc-accent);
 }
 .ap-progress {
   height: 6px;
@@ -1226,7 +1226,7 @@ onBeforeUnmount(() => {
 .ap-progress span {
   display: block;
   height: 100%;
-  background: #48bb78;
+  background: var(--bc-accent);
   transition: width 0.3s;
 }
 .ap-publish {

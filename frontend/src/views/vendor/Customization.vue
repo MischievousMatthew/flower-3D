@@ -897,7 +897,7 @@ const formatSize = (bytes) =>
 
 .cz-kicker {
   margin: 0;
-  color: #48bb78;
+  color: var(--bc-accent);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -945,7 +945,7 @@ const formatSize = (bytes) =>
 }
 
 .cz-tab.active {
-  border-bottom-color: #48bb78;
+  border-bottom-color: var(--bc-accent);
   color: #2d3748;
 }
 
@@ -960,8 +960,8 @@ const formatSize = (bytes) =>
 }
 
 .cz-tab.active .cz-count {
-  background: #c6f6d5;
-  color: #22543d;
+  background: var(--bc-accent-muted);
+  color: var(--bc-accent-strong);
 }
 
 /* ---- Panels and cards ---- */
@@ -1037,8 +1037,8 @@ const formatSize = (bytes) =>
 
 .cz-input:focus {
   outline: none;
-  border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.15);
+  border-color: var(--bc-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 15%, transparent);
 }
 
 .cz-input.invalid,
@@ -1090,7 +1090,7 @@ const formatSize = (bytes) =>
 }
 
 .cz-swatch-picker:focus-within {
-  outline: 2px solid #48bb78;
+  outline: 2px solid var(--bc-accent);
   outline-offset: 2px;
 }
 
@@ -1185,7 +1185,7 @@ const formatSize = (bytes) =>
 }
 
 .cz-slider input[type="range"]:focus-visible {
-  outline: 2px solid #48bb78;
+  outline: 2px solid var(--bc-accent);
   outline-offset: 3px;
 }
 
@@ -1204,8 +1204,8 @@ const formatSize = (bytes) =>
 
 .cz-upload:hover,
 .cz-upload:focus-within {
-  border-color: #48bb78;
-  background: #f0fff4;
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
 }
 
 .cz-upload.filled {
@@ -1220,7 +1220,7 @@ const formatSize = (bytes) =>
   height: 36px;
   border-radius: 8px;
   background: #fff;
-  color: #48bb78;
+  color: var(--bc-accent);
   font-size: 16px;
 }
 
@@ -1273,12 +1273,12 @@ const formatSize = (bytes) =>
 }
 
 .cz-btn-primary {
-  background: #48bb78;
-  color: #fff;
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
 }
 
 .cz-btn-primary:hover:not(:disabled) {
-  background: #38a169;
+  background: var(--bc-accent-hover);
 }
 
 .cz-btn-ghost {
@@ -1294,7 +1294,7 @@ const formatSize = (bytes) =>
 .cz-btn:focus-visible,
 .cz-link:focus-visible,
 .cz-tab:focus-visible {
-  outline: 2px solid #48bb78;
+  outline: 2px solid var(--bc-accent);
   outline-offset: 2px;
 }
 
@@ -1302,7 +1302,7 @@ const formatSize = (bytes) =>
   padding: 0;
   border: none;
   background: none;
-  color: #2f855a;
+  color: var(--bc-accent-deep);
   font: inherit;
   font-size: 13px;
   font-weight: 500;
@@ -1361,8 +1361,8 @@ const formatSize = (bytes) =>
 }
 
 .cz-row.editing {
-  border-color: #48bb78;
-  background: #f0fff4;
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
 }
 
 .cz-row.off .cz-dot,
@@ -1440,7 +1440,7 @@ const formatSize = (bytes) =>
 
 .cz-segment button:focus-visible,
 .cz-icon-btn:focus-visible {
-  outline: 2px solid #48bb78;
+  outline: 2px solid var(--bc-accent);
   outline-offset: 2px;
 }
 
@@ -1527,7 +1527,7 @@ const formatSize = (bytes) =>
 
 .cz-price {
   flex-shrink: 0;
-  color: #2f855a;
+  color: var(--bc-accent-deep);
   font-size: 13px;
   font-weight: 600;
 }
@@ -1614,7 +1614,7 @@ const formatSize = (bytes) =>
 }
 
 .cz-switch input:checked + .cz-switch-track {
-  background: #48bb78;
+  background: var(--bc-accent);
 }
 
 .cz-switch input:checked + .cz-switch-track::after {
@@ -1622,7 +1622,7 @@ const formatSize = (bytes) =>
 }
 
 .cz-switch input:focus-visible + .cz-switch-track {
-  outline: 2px solid #48bb78;
+  outline: 2px solid var(--bc-accent);
   outline-offset: 2px;
 }
 

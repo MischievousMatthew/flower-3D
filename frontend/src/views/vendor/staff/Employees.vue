@@ -505,8 +505,8 @@ onMounted(load);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 button.em-profile:hover {
-  border-color: #9ae6b4;
-  box-shadow: 0 4px 14px rgba(72, 187, 120, 0.12);
+  border-color: var(--bc-accent-border);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--bc-accent) 12%, transparent);
 }
 .em-tags {
   display: flex;
@@ -570,9 +570,9 @@ button.em-profile:hover {
   transition: border-color 0.15s, background 0.15s;
 }
 .em-role.on {
-  border-color: #48bb78;
-  background: #f0fff4;
-  box-shadow: 0 0 0 1px #48bb78;
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
+  box-shadow: 0 0 0 1px var(--bc-accent);
 }
 .em-role input {
   position: absolute;
@@ -580,7 +580,7 @@ button.em-profile:hover {
   pointer-events: none;
 }
 .em-role:has(input:focus-visible) {
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.3);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 30%, transparent);
 }
 .em-role i {
   flex: none;

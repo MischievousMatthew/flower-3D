@@ -15,10 +15,10 @@
         <div v-for="n in 4" :key="n" class="sp-stat"><div class="bc-skeleton sp-stat-icon"></div><div class="grow"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div></div>
       </template>
       <template v-else>
-        <div class="sp-stat">
+        <button type="button" class="sp-stat" :class="{ on: filter === 'all' && !search }" title="Show all products" @click="showAll">
           <span class="sp-stat-icon tone-green" v-html="ICONS.box"></span>
           <div><strong>{{ totals.units.toLocaleString() }}</strong><span>Items in stock</span></div>
-        </div>
+        </button>
         <div class="sp-stat">
           <span class="sp-stat-icon tone-blue" v-html="ICONS.tag"></span>
           <div><strong>{{ money(totals.value) }}</strong><span>Stock value at cost</span></div>
@@ -36,7 +36,7 @@
 
     <div class="inv-layout">
       <!-- Stock table -->
-      <section class="sp-card inv-table-card" aria-label="Stock levels">
+      <section ref="tableCard" class="sp-card inv-table-card" aria-label="Stock levels">
         <div class="sp-toolbar inv-toolbar">
           <div class="sp-seg" role="tablist" aria-label="Filter by stock">
             <button v-for="f in FILTERS" :key="f.key" type="button" role="tab" :aria-selected="filter === f.key" :class="{ on: filter === f.key }" @click="filter = f.key">
@@ -234,6 +234,14 @@ const MODES = [
 
 const filter = ref("all");
 const search = ref("");
+const tableCard = ref(null);
+
+// "Items in stock" card: list every product and bring the list into view
+const showAll = () => {
+  filter.value = "all";
+  search.value = "";
+  tableCard.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
 const history = ref(null);
 const historyError = ref("");
 const historyFor = ref(null);
@@ -571,13 +579,13 @@ onMounted(() => {
   margin-top: 16px;
   padding: 12px 14px;
   border-radius: 13px;
-  background: #f7fdf9;
+  background: var(--bc-accent-soft);
   font-size: 15px;
   color: #4a5568;
 }
 .adj-preview strong {
   font-size: 18px;
-  color: #22753f;
+  color: var(--bc-accent-strong);
 }
 .adj-preview .arrow {
   color: #a0aec0;

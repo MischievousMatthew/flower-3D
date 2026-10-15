@@ -56,19 +56,19 @@
   cursor: not-allowed;
 }
 .sp-btn-primary {
-  background: #48bb78;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--bc-accent) 30%, transparent);
 }
 .sp-btn-primary:hover:not(:disabled) {
-  background: #38a169;
+  background: var(--bc-accent-hover);
 }
 .sp-btn-dark {
-  background: #1a202c;
+  background: var(--bc-accent-strong);
   color: #fff;
 }
 .sp-btn-dark:hover:not(:disabled) {
-  background: #2d3748;
+  background: var(--bc-accent-deep);
 }
 .sp-btn-ghost {
   background: #fff;
@@ -76,8 +76,8 @@
   color: #2d3748;
 }
 .sp-btn-ghost:hover:not(:disabled) {
-  border-color: #9ae6b4;
-  color: #22543d;
+  border-color: var(--bc-accent-border);
+  color: var(--bc-accent-strong);
 }
 .sp-btn-danger {
   background: #fff5f5;
@@ -110,13 +110,13 @@
   height: 16px;
 }
 .sp-icon-btn:hover {
-  border-color: #9ae6b4;
-  color: #22543d;
+  border-color: var(--bc-accent-border);
+  color: var(--bc-accent-strong);
 }
 .sp-icon-btn.on {
-  background: #f0fff4;
-  border-color: #9ae6b4;
-  color: #22543d;
+  background: var(--bc-accent-soft);
+  border-color: var(--bc-accent-border);
+  color: var(--bc-accent-strong);
 }
 
 /* Inputs */
@@ -159,8 +159,8 @@
 .sp-input:focus,
 .sp-select:focus,
 .sp-textarea:focus {
-  border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.15);
+  border-color: var(--bc-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 15%, transparent);
 }
 .sp-input.invalid,
 .sp-select.invalid,
@@ -240,13 +240,13 @@
   transition: transform 0.2s;
 }
 .sp-switch input:checked + span {
-  background: #48bb78;
+  background: var(--bc-accent);
 }
 .sp-switch input:checked + span::after {
   transform: translateX(16px);
 }
 .sp-switch input:focus-visible + span {
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.3);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 30%, transparent);
 }
 
 /* Chips & pills */
@@ -286,12 +286,12 @@
   transition: all 0.15s;
 }
 .sp-pick:hover {
-  border-color: #9ae6b4;
+  border-color: var(--bc-accent-border);
 }
 .sp-pick.on {
-  background: #f0fff4;
-  border-color: #48bb78;
-  color: #22543d;
+  background: var(--bc-accent-soft);
+  border-color: var(--bc-accent);
+  color: var(--bc-accent-strong);
 }
 .sp-pick:disabled {
   opacity: 0.45;
@@ -323,8 +323,8 @@
   cursor: pointer;
 }
 .sp-seg button.on {
-  background: #1a202c;
-  color: #fff;
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
 }
 .sp-seg .count {
   padding: 0 6px;
@@ -360,8 +360,8 @@ button.sp-stat {
 }
 button.sp-stat:hover,
 button.sp-stat.on {
-  border-color: #9ae6b4;
-  box-shadow: 0 4px 14px rgba(72, 187, 120, 0.12);
+  border-color: var(--bc-accent-border);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--bc-accent) 12%, transparent);
 }
 .sp-stat-icon {
   flex: none;
@@ -409,12 +409,12 @@ button.sp-stat.on {
   height: 44px;
   border-radius: 12px;
   object-fit: cover;
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
 }
 .sp-thumb.blank {
   display: grid;
   place-items: center;
-  color: #68d391;
+  color: var(--bc-accent-border);
 }
 .sp-thumb.blank svg {
   width: 20px;
@@ -437,8 +437,8 @@ button.sp-stat.on {
   width: 56px;
   height: 56px;
   border-radius: 18px;
-  background: #f0fff4;
-  color: #48bb78;
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent);
 }
 .sp-empty-icon svg {
   width: 26px;
@@ -472,7 +472,7 @@ button.sp-stat.on {
   height: 18px;
 }
 .sp-banner.error { background: #fff5f5; color: #c53030; }
-.sp-banner.info { background: #f0fff4; color: #22543d; }
+.sp-banner.info { background: var(--bc-accent-soft); color: var(--bc-accent-strong); }
 .sp-banner.warn { background: #fffaf0; color: #9c4221; }
 .sp-banner button {
   margin-left: auto;
@@ -674,6 +674,6 @@ button.sp-stat.on {
 
 /* A photo that failed to load (see ShopLayout) keeps its size as a soft tile */
 img[data-broken] {
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
   color: transparent;
 }

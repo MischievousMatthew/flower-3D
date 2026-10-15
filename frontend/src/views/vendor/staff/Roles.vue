@@ -428,8 +428,8 @@ onMounted(load);
   width: 16px;
   height: 16px;
   border-radius: 5px;
-  background: #e6f9ee;
-  color: #2f855a;
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
   align-self: center;
 }
 .ro-check :deep(svg) {
@@ -447,7 +447,7 @@ onMounted(load);
   overflow-wrap: anywhere;
 }
 li.full .ro-acts {
-  color: #2f855a;
+  color: var(--bc-accent-deep);
   font-weight: 500;
 }
 .ro-foot {
@@ -589,19 +589,19 @@ li.full .ro-acts {
   transition: border-color 0.15s, background 0.15s;
 }
 .ro-perm.on {
-  border-color: #9ae6b4;
-  background: #f0fff4;
-  color: #22543d;
+  border-color: var(--bc-accent-border);
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-strong);
 }
 .ro-perm input {
   margin: 0;
-  accent-color: #48bb78;
+  accent-color: var(--bc-accent);
 }
 .ro-perm:has(input:disabled) {
   cursor: not-allowed;
 }
 .ro-all input {
-  accent-color: #48bb78;
+  accent-color: var(--bc-accent);
 }
 @media (max-width: 640px) {
   .ro-grid {

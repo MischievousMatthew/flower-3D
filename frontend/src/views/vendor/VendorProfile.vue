@@ -1313,7 +1313,7 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 .subscription-card h2 { margin: 0 0 4px; color: #1e293b; font-size: 20px; }
 .subscription-card p:not(.subscription-card__eyebrow) { margin: 0; color: #64748b; font-size: 14px; }
 .subscription-card__status { margin-left: auto; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-.subscription-card__manage { color: #2f855a; font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.subscription-card__manage { color: var(--bc-accent-deep); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; }
 .subscription-card__manage:hover { text-decoration: underline; }
 .status-trialing { color: #1d4ed8; background: #dbeafe; }.status-active { color: #047857; background: #d1fae5; }.status-pending, .status-past_due { color: #92400e; background: #fef3c7; }
 
@@ -1490,7 +1490,7 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 .logo-card__fallback {
   font-size: 28px;
   font-weight: 700;
-  color: #2f855a;
+  color: var(--bc-accent-deep);
 }
 
 .logo-card__title {
@@ -1528,7 +1528,7 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 .completion-percentage {
   font-size: 36px;
   font-weight: 800;
-  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  background: linear-gradient(135deg, var(--bc-accent) 0%, var(--bc-accent-hover) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1542,10 +1542,10 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 }
 .completion-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #48bb78 0%, #38a169 100%);
+  background: linear-gradient(90deg, var(--bc-accent) 0%, var(--bc-accent-hover) 100%);
   transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 10px;
-  box-shadow: 0 0 10px rgba(72, 187, 120, 0.5);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--bc-accent) 50%, transparent);
 }
 .completion-items {
   display: grid;
@@ -1564,7 +1564,7 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 }
 .completion-item.completed {
   background: #d1fae5;
-  border-color: #48bb78;
+  border-color: var(--bc-accent);
 }
 .completion-icon {
   width: 28px;
@@ -1580,8 +1580,8 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
   flex-shrink: 0;
 }
 .completion-item.completed .completion-icon {
-  background: #48bb78;
-  color: white;
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
 }
 .completion-text {
   flex: 1;
@@ -1591,8 +1591,8 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 }
 .completion-action {
   padding: 6px 14px;
-  background: #48bb78;
-  color: white;
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
   border: none;
   border-radius: 8px;
   font-size: 13px;
@@ -1601,7 +1601,7 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
   transition: all 0.2s;
 }
 .completion-action:hover {
-  background: #38a169;
+  background: var(--bc-accent-hover);
   transform: translateX(2px);
 }
 
@@ -1638,9 +1638,9 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
   background: #f8fafc;
 }
 .tab-button.active {
-  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-  color: white;
-  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.25);
+  background: linear-gradient(135deg, var(--bc-accent) 0%, var(--bc-accent-hover) 100%);
+  color: var(--bc-accent-ink);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--bc-accent) 25%, transparent);
 }
 .tab-icon {
   font-size: 18px;
@@ -1659,7 +1659,7 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 }
 .tab-button.active .tab-badge {
   background: white;
-  color: #48bb78;
+  color: var(--bc-accent);
 }
 .tab-content {
   animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1802,8 +1802,8 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 }
 .form-input:focus {
   outline: none;
-  border-color: #48bb78;
-  box-shadow: 0 0 0 4px rgba(72, 187, 120, 0.1);
+  border-color: var(--bc-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--bc-accent) 10%, transparent);
 }
 .form-input::placeholder {
   color: #cbd5e0;
@@ -1851,7 +1851,7 @@ select.form-input {
 }
 .checkbox-label:hover,
 .radio-label:hover {
-  border-color: #48bb78;
+  border-color: var(--bc-accent);
   background: #f0fdf4;
 }
 .checkbox-input,
@@ -1859,7 +1859,7 @@ select.form-input {
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #48bb78;
+  accent-color: var(--bc-accent);
 }
 
 /* Info box */
@@ -1904,16 +1904,16 @@ select.form-input {
   font-family: inherit;
 }
 .btn-primary {
-  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-  color: white;
-  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.25);
+  background: linear-gradient(135deg, var(--bc-accent) 0%, var(--bc-accent-hover) 100%);
+  color: var(--bc-accent-ink);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--bc-accent) 25%, transparent);
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(72, 187, 120, 0.35);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--bc-accent) 35%, transparent);
 }
 .btn-primary:disabled {
   opacity: 0.6;
@@ -1926,8 +1926,8 @@ select.form-input {
   border: 2px solid #e2e8f0;
 }
 .btn-secondary:hover {
-  border-color: #48bb78;
-  color: #48bb78;
+  border-color: var(--bc-accent);
+  color: var(--bc-accent);
 }
 .btn-spinner-wrap {
   display: inline-flex;
@@ -1992,9 +1992,9 @@ select.form-input {
   gap: 8px;
   padding: 12px 20px;
   background: #f0fdf4;
-  border: 2px dashed #48bb78;
+  border: 2px dashed var(--bc-accent);
   border-radius: 10px;
-  color: #48bb78;
+  color: var(--bc-accent);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -2003,8 +2003,8 @@ select.form-input {
   font-family: inherit;
 }
 .btn-add-cutoff:hover {
-  background: #dcfce7;
-  border-color: #38a169;
+  background: var(--bc-accent-soft);
+  border-color: var(--bc-accent-hover);
 }
 .add-icon {
   font-size: 18px;
@@ -2021,7 +2021,7 @@ select.form-input {
   background: #f0fdf4;
   border: 1px solid #a7f3d0;
   border-radius: 12px;
-  border-left: 4px solid #48bb78;
+  border-left: 4px solid var(--bc-accent);
 }
 .security-icon {
   font-size: 24px;
@@ -2192,7 +2192,7 @@ select.form-input {
   overflow: hidden;
 }
 .photo-upload-area:hover {
-  border-color: #48bb78;
+  border-color: var(--bc-accent);
   background: #f0fdf4;
 }
 .photo-preview {

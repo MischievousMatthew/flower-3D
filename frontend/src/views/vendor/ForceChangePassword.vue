@@ -359,7 +359,7 @@ const changePassword = async () => {
 .submit-btn {
   width: 100%;
   padding: 14px;
-  background: #2d3748;
+  background: var(--bc-accent-strong);
   color: white;
   border: none;
   border-radius: 6px;
@@ -374,7 +374,7 @@ const changePassword = async () => {
 }
 
 .submit-btn:hover:not(:disabled) {
-  background: #1a202c;
+  background: var(--bc-accent-deep);
 }
 
 .submit-btn:disabled {

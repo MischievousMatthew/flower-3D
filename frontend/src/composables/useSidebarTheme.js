@@ -1,6 +1,8 @@
-// The vendor's chosen color for the sidebar tabs (active and hover states).
-// Saved in this browser; every page's sidebar shares the same ref.
-import { computed, ref } from "vue";
+// The vendor's chosen theme color. It colors the sidebar tabs and every
+// button, tab, toggle and highlight on the vendor pages (those use the
+// --bc-accent* variables set on <html> here). Status colors such as "paid"
+// or "in stock" stay green on purpose. Saved in this browser.
+import { computed, ref, watchEffect } from "vue";
 
 const STORAGE_KEY = "bc_vendor_sidebar_accent";
 export const DEFAULT_ACCENT = "#48bb78";
@@ -31,6 +33,9 @@ const read = () => {
 const accent = ref(read());
 
 const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+const toHex = (parts) => `#${parts.map((c) => Math.round(c).toString(16).padStart(2, "0")).join("")}`;
+// Blend toward black (0) or white (255) by `amount` (0–1)
+const mix = (hex, target, amount) => toHex(rgb(hex).map((c) => c + (target - c) * amount));
 
 // White text on dark colors, near-black on light ones (WCAG relative luminance)
 const inkFor = (hex) => {
@@ -40,6 +45,28 @@ const inkFor = (hex) => {
   });
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? "#1a202c" : "#ffffff";
 };
+
+// The default keeps the exact greens the pages were designed with
+const DEFAULT_SHADES = {
+  hover: "#38a169",
+  deep: "#2f855a",
+  strong: "#22543d",
+  soft: "#f0fff4",
+  muted: "#c6f6d5",
+  border: "#9ae6b4",
+};
+
+const shadesFor = (hex) =>
+  hex === DEFAULT_ACCENT
+    ? DEFAULT_SHADES
+    : {
+        hover: mix(hex, 0, 0.15),
+        deep: mix(hex, 0, 0.35),
+        strong: mix(hex, 0, 0.55),
+        soft: mix(hex, 255, 0.93),
+        muted: mix(hex, 255, 0.75),
+        border: mix(hex, 255, 0.5),
+      };
 
 /** CSS variables the sidebar uses for its tabs */
 const accentVars = computed(() => {
@@ -51,6 +78,17 @@ const accentVars = computed(() => {
     "--sb-accent-glow": `rgba(${r}, ${g}, ${b}, 0.32)`,
   };
 });
+
+/** Puts the theme on <html> so every vendor page picks it up */
+export function applyVendorTheme() {
+  watchEffect(() => {
+    const root = document.documentElement.style;
+    const shades = shadesFor(accent.value);
+    root.setProperty("--bc-accent", accent.value);
+    root.setProperty("--bc-accent-ink", inkFor(accent.value));
+    for (const [name, value] of Object.entries(shades)) root.setProperty(`--bc-accent-${name}`, value);
+  });
+}
 
 function setAccent(value) {
   if (!isHex(value)) return;

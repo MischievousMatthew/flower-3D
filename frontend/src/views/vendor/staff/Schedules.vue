@@ -354,7 +354,7 @@ onMounted(load);
   border-radius: 4px;
 }
 .sc-legend i.usual { background: #f7fafc; border: 1px solid #e2e8f0; }
-.sc-legend i.custom { background: #f0fff4; border: 1px solid #68d391; }
+.sc-legend i.custom { background: var(--bc-accent-soft); border: 1px solid var(--bc-accent-border); }
 .sc-legend i.off { background: repeating-linear-gradient(45deg, #f1f5f9, #f1f5f9 3px, #fff 3px, #fff 6px); border: 1px solid #e2e8f0; }
 .sc-legend b {
   color: #2d3748;
@@ -405,8 +405,8 @@ onMounted(load);
   color: #2d3748;
 }
 .sc-grid thead th.today b {
-  background: #48bb78;
-  color: #fff;
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
 }
 .sc-person-col {
   width: 210px;
@@ -458,8 +458,8 @@ onMounted(load);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .sc-cell:hover {
-  border-color: #48bb78;
-  box-shadow: 0 2px 8px rgba(72, 187, 120, 0.15);
+  border-color: var(--bc-accent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--bc-accent) 15%, transparent);
 }
 .sc-cell .t {
   font-weight: 600;
@@ -469,14 +469,14 @@ onMounted(load);
 .sc-cell .l {
   max-width: 100%;
   font-size: 10.5px;
-  color: #2f855a;
+  color: var(--bc-accent-deep);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .sc-cell.custom {
-  border-color: #68d391;
-  background: #f0fff4;
+  border-color: var(--bc-accent-border);
+  background: var(--bc-accent-soft);
 }
 .sc-cell.off {
   background: repeating-linear-gradient(45deg, #f7fafc, #f7fafc 4px, #fff 4px, #fff 8px);
@@ -513,16 +513,16 @@ onMounted(load);
   pointer-events: none;
 }
 .sc-day.on {
-  border-color: #48bb78;
-  background: #f0fff4;
-  color: #22543d;
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-strong);
 }
 .sc-day.self {
   cursor: default;
   font-weight: 600;
 }
 .sc-day:has(input:focus-visible) {
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.3);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 30%, transparent);
 }
 .sc-foot {
   flex-wrap: wrap;

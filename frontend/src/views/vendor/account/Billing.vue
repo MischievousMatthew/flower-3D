@@ -241,7 +241,7 @@ onMounted(load);
 .bl-brand {
   font-size: 20px;
   font-weight: 700;
-  color: #2f855a;
+  color: var(--bc-accent-deep);
 }
 .bl-inv-head span {
   color: #718096;

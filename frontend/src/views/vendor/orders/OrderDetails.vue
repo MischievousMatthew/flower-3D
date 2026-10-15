@@ -314,7 +314,7 @@ onMounted(() => {
   background: #e2e8f0;
 }
 .stepper li.done:not(:last-child)::after {
-  background: #48bb78;
+  background: var(--bc-accent);
 }
 .step-dot {
   display: grid;
@@ -333,14 +333,14 @@ onMounted(() => {
   height: 15px;
 }
 .stepper li.done .step-dot {
-  border-color: #48bb78;
-  background: #48bb78;
-  color: #fff;
+  border-color: var(--bc-accent);
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
 }
 .stepper li.current .step-dot {
-  border-color: #48bb78;
-  color: #22753f;
-  box-shadow: 0 0 0 4px rgba(72, 187, 120, 0.18);
+  border-color: var(--bc-accent);
+  color: var(--bc-accent-strong);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--bc-accent) 18%, transparent);
 }
 .step-text {
   display: flex;
@@ -387,12 +387,12 @@ onMounted(() => {
   height: 72px;
   border-radius: 14px;
   object-fit: cover;
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
 }
 .item-img.blank {
   display: grid;
   place-items: center;
-  color: #9ae6b4;
+  color: var(--bc-accent-border);
 }
 .item-img.blank :deep(svg) {
   width: 26px;
@@ -469,7 +469,7 @@ onMounted(() => {
   font-family: "Poppins", sans-serif;
   font-size: 12.5px;
   font-weight: 600;
-  color: #2f855a;
+  color: var(--bc-accent-deep);
   cursor: pointer;
 }
 .link-btn :deep(svg) {
@@ -517,7 +517,7 @@ onMounted(() => {
   gap: 12px;
   padding: 12px;
   border-radius: 14px;
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
 }
 .when.late {
   background: #fff5f5;
@@ -530,7 +530,7 @@ onMounted(() => {
   height: 40px;
   border-radius: 12px;
   background: #fff;
-  color: #2f855a;
+  color: var(--bc-accent-deep);
 }
 .when.late .when-icon {
   color: #c53030;
@@ -602,7 +602,7 @@ onMounted(() => {
   word-break: break-all;
 }
 .facts a {
-  color: #2f855a;
+  color: var(--bc-accent-deep);
   font-weight: 500;
   text-decoration: none;
 }
@@ -657,8 +657,8 @@ onMounted(() => {
   background: #cbd5e0;
 }
 .activity li:first-child .act-dot {
-  background: #48bb78;
-  box-shadow: 0 0 0 4px rgba(72, 187, 120, 0.18);
+  background: var(--bc-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--bc-accent) 18%, transparent);
 }
 .act-dot.cancelled {
   background: #a0aec0;

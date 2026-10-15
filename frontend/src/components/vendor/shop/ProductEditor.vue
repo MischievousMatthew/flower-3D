@@ -446,7 +446,7 @@ function close() {
   font-weight: 600;
 }
 .pe-cover.new {
-  background: #48bb78;
+  background: var(--bc-accent);
 }
 .pe-photo-x {
   position: absolute;
@@ -473,9 +473,9 @@ function close() {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  border: 1.5px dashed #9ae6b4;
-  background: #f7fdf9;
-  color: #2f855a;
+  border: 1.5px dashed var(--bc-accent-border);
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -492,7 +492,7 @@ function close() {
   height: 20px;
 }
 .pe-photo.add:focus-within {
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.25);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 25%, transparent);
 }
 .pe-picks {
   display: flex;
@@ -593,8 +593,8 @@ function close() {
   color: #718096;
 }
 .pe-status-opt.on {
-  border-color: #48bb78;
-  background: #f0fff4;
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
 }
 @media (max-width: 560px) {
   .pe-status {

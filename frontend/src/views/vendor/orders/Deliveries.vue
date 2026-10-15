@@ -220,8 +220,8 @@ onMounted(load);
   padding: 16px 16px 8px;
 }
 .dv-day.today {
-  border-color: #9ae6b4;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
+  border-color: var(--bc-accent-border);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 10%, transparent);
 }
 .dv-day.overdue {
   border-color: #feb2b2;
@@ -260,7 +260,7 @@ onMounted(load);
 .cap-bar span {
   display: block;
   height: 100%;
-  background: #48bb78;
+  background: var(--bc-accent);
 }
 .cap-bar span.full {
   background: #ed8936;
@@ -392,8 +392,8 @@ onMounted(load);
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  background: #f0fff4;
-  color: #2f855a;
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
 }
 .how :deep(svg) {
   width: 16px;

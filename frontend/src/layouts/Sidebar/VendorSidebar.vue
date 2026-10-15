@@ -47,16 +47,17 @@
       </div>
     </div>
 
-    <!-- Tab color -->
+    <!-- Theme color: sidebar tabs and the buttons on every vendor page -->
     <div ref="colorRef" class="sidebar-foot">
       <button type="button" class="color-toggle" :aria-expanded="showColors" aria-controls="sidebar-colors" @click="showColors = !showColors">
         <span class="nav-icon" v-html="ICONS.palette"></span>
-        <span class="nav-text">Sidebar color</span>
+        <span class="nav-text">Theme color</span>
         <span class="color-dot" :style="{ background: accent }"></span>
       </button>
       <Transition name="pop">
-        <div v-if="showColors" id="sidebar-colors" class="color-pop" role="dialog" aria-label="Sidebar color">
-          <p class="color-title">Tab color</p>
+        <div v-if="showColors" id="sidebar-colors" class="color-pop" role="dialog" aria-label="Theme color">
+          <p class="color-title">Theme color</p>
+          <p class="color-hint">Used for buttons, tabs and highlights on every page.</p>
           <div class="swatches">
             <button
               v-for="c in ACCENT_PRESETS"
@@ -448,10 +449,16 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
 }
 .color-title {
-  margin: 0 0 10px;
+  margin: 0 0 2px;
   font-size: 12px;
   font-weight: 600;
   color: #4a5568;
+}
+.color-hint {
+  margin: 0 0 10px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #718096;
 }
 .swatches {
   display: grid;

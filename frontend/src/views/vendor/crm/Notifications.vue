@@ -192,8 +192,8 @@ onMounted(() => load());
   margin-left: 6px;
   padding: 0 6px;
   border-radius: 999px;
-  background: #48bb78;
-  color: #fff;
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
   font-size: 11px;
   font-weight: 600;
 }
@@ -236,7 +236,7 @@ onMounted(() => load());
   background: #f8fdf9;
 }
 .nt-item.important {
-  box-shadow: inset 3px 0 0 #48bb78;
+  box-shadow: inset 3px 0 0 var(--bc-accent);
 }
 .nt-icon {
   flex: none;
@@ -288,7 +288,7 @@ onMounted(() => load());
   height: 9px;
   margin-top: 6px;
   border-radius: 50%;
-  background: #48bb78;
+  background: var(--bc-accent);
 }
 .nt-go {
   flex: none;

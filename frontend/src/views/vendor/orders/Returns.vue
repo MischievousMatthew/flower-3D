@@ -381,8 +381,8 @@ onBeforeUnmount(() => clearTimeout(timer));
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #e6f9ee;
-  color: #22753f;
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-strong);
   font-size: 11.5px;
 }
 .drawer-actions {
@@ -390,8 +390,8 @@ onBeforeUnmount(() => clearTimeout(timer));
   gap: 6px;
 }
 .rt-drawer {
-  --return-accent: #38a169;
-  --return-accent-soft: #f0fff4;
+  --return-accent: var(--bc-accent-hover);
+  --return-accent-soft: var(--bc-accent-soft);
 }
 @media (max-width: 1100px) {
   .rt-layout {

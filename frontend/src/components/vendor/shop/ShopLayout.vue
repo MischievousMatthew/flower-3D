@@ -180,9 +180,9 @@ button.sl-tab {
   color: #1a202c;
 }
 .sl-tab.on {
-  background: #48bb78;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--bc-accent) 30%, transparent);
 }
 .sl-tab.locked {
   opacity: 0.55;

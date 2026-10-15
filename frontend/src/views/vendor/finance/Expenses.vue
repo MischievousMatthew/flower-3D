@@ -486,7 +486,7 @@ onMounted(load);
 .ex-tip {
   display: flex;
   gap: 12px;
-  background: #f7fdf9;
+  background: var(--bc-accent-soft);
 }
 .ex-tip p {
   margin: 0;

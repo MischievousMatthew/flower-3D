@@ -128,7 +128,7 @@ const aria = (r) => `${r.label}: ${props.series.map((s) => `${s.label} ${money(r
 }
 .bc-col:hover,
 .bc-col:focus-visible {
-  background: rgba(72, 187, 120, 0.06);
+  background: color-mix(in srgb, var(--bc-accent) 6%, transparent);
 }
 .bc-bars {
   display: flex;

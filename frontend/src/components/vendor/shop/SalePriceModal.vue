@@ -152,7 +152,7 @@ function close() {
   margin-top: 16px;
   padding: 12px 14px;
   border-radius: 13px;
-  background: #f7fdf9;
+  background: var(--bc-accent-soft);
 }
 .sale-preview .old {
   font-size: 13px;
@@ -162,7 +162,7 @@ function close() {
 .sale-preview strong {
   font-size: 18px;
   font-weight: 600;
-  color: #22753f;
+  color: var(--bc-accent-strong);
 }
 .grow {
   flex: 1;

@@ -365,7 +365,7 @@ onMounted(async () => {
   background: #f7fafc;
 }
 .rv-dist button.on {
-  box-shadow: inset 0 0 0 1px #9ae6b4;
+  box-shadow: inset 0 0 0 1px var(--bc-accent-border);
 }
 .rv-dist b {
   text-align: right;
@@ -425,7 +425,7 @@ onMounted(async () => {
 }
 .rv-products button:hover,
 .rv-products button.on {
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
 }
 .rv-pname {
   overflow: hidden;
@@ -504,8 +504,8 @@ onMounted(async () => {
 .rv-thumb-icon {
   display: grid;
   place-items: center;
-  background: #f0fff4;
-  color: #2f855a;
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
 }
 .rv-thumb-icon :deep(svg) {
   width: 22px;
@@ -562,7 +562,7 @@ onMounted(async () => {
 .rv-reply {
   margin-top: 12px;
   padding: 12px 14px;
-  border-left: 3px solid #48bb78;
+  border-left: 3px solid var(--bc-accent);
   border-radius: 0 12px 12px 0;
   background: #f7fafc;
 }
@@ -574,7 +574,7 @@ onMounted(async () => {
 }
 .rv-reply-head b {
   font-size: 12.5px;
-  color: #2f855a;
+  color: var(--bc-accent-deep);
 }
 .rv-reply p {
   margin: 0;

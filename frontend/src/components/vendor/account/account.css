@@ -11,13 +11,13 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #48bb78;
+  background: var(--bc-accent);
   transition: width 0.4s ease;
 }
 .ac-meter.near > i { background: #ed8936; }
 .ac-meter.full > i { background: #e53e3e; }
 .ac-meter.open > i {
-  background: repeating-linear-gradient(-45deg, #c6f6d5 0 6px, #e6f9ee 6px 12px);
+  background: repeating-linear-gradient(-45deg, var(--bc-accent-muted) 0 6px, var(--bc-accent-soft) 6px 12px);
 }
 
 /* Feature lists: included (check) and not included (lock) */

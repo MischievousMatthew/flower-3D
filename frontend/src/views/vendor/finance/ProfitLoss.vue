@@ -200,8 +200,8 @@ onMounted(load);
 
 <style scoped>
 .fx-kpi.hero {
-  background: linear-gradient(150deg, #f0fff4 0%, #fff 60%);
-  border-color: #c6f6d5;
+  background: linear-gradient(150deg, var(--bc-accent-soft) 0%, #fff 60%);
+  border-color: var(--bc-accent-muted);
 }
 .fx-kpi strong.neg {
   color: #c53030;
@@ -262,8 +262,8 @@ onMounted(load);
   font-size: 15px;
   font-weight: 700;
   color: #1a202c;
-  background: #f0fff4;
-  border-top: 2px solid #c6f6d5;
+  background: var(--bc-accent-soft);
+  border-top: 2px solid var(--bc-accent-muted);
 }
 .pl tr.total.loss td {
   background: #fff5f5;

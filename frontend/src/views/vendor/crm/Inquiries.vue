@@ -353,7 +353,7 @@ onMounted(async () => {
   padding: 18px 14px;
   border-radius: 14px;
   background: #f8fdf9;
-  box-shadow: inset 0 0 0 1px #c6f6d5;
+  box-shadow: inset 0 0 0 1px var(--bc-accent-muted);
 }
 .iq-main {
   flex: 1;
@@ -390,7 +390,7 @@ onMounted(async () => {
   cursor: pointer;
 }
 .iq-about:hover {
-  border-color: #9ae6b4;
+  border-color: var(--bc-accent-border);
 }
 .iq-about img,
 .iq-about-icon {
@@ -401,8 +401,8 @@ onMounted(async () => {
   height: 36px;
   border-radius: 9px;
   object-fit: cover;
-  background: #f0fff4;
-  color: #2f855a;
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
 }
 .iq-about-icon :deep(svg) {
   width: 18px;
@@ -431,7 +431,7 @@ onMounted(async () => {
 .iq-answer {
   margin-top: 12px;
   padding: 12px 14px;
-  border-left: 3px solid #48bb78;
+  border-left: 3px solid var(--bc-accent);
   border-radius: 0 12px 12px 0;
   background: #f7fafc;
 }
@@ -445,7 +445,7 @@ onMounted(async () => {
 .iq-answer-head b {
   font-size: 12.5px;
   font-weight: 600;
-  color: #2f855a;
+  color: var(--bc-accent-deep);
 }
 .iq-answer p {
   margin: 0;
@@ -478,7 +478,7 @@ onMounted(async () => {
   cursor: pointer;
 }
 .iq-public input {
-  accent-color: #48bb78;
+  accent-color: var(--bc-accent);
 }
 .iq-actions {
   display: flex;

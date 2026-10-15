@@ -645,7 +645,7 @@ onBeforeUnmount(() => {
   background: #f7fafc;
 }
 .ch-item.on {
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
 }
 .ch-item.sk {
   cursor: default;
@@ -695,8 +695,8 @@ onBeforeUnmount(() => {
   height: 19px;
   padding: 0 5px;
   border-radius: 999px;
-  background: #48bb78;
-  color: #fff;
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
   font-size: 11px;
   line-height: 19px;
   text-align: center;
@@ -818,8 +818,8 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 .ch-info-btn.on {
-  background: #f0fff4;
-  color: #2f855a;
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
 }
 .ch-messages {
   flex: 1;
@@ -872,10 +872,10 @@ onBeforeUnmount(() => {
   color: #2d3748;
 }
 .ch-msg.own .ch-bubble {
-  border-color: #48bb78;
+  border-color: var(--bc-accent);
   border-radius: 16px 16px 4px 16px;
-  background: #48bb78;
-  color: #fff;
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
 }
 .ch-msg.pending .ch-bubble {
   opacity: 0.65;
@@ -1006,7 +1006,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 .ch-quick-menu button:hover {
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
 }
 .ch-attach-list {
   display: flex;
@@ -1205,7 +1205,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 .nc-results button:hover {
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
 }
 .nc-results b {
   display: block;

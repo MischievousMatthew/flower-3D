@@ -381,8 +381,8 @@ onMounted(async () => {
   gap: 10px;
 }
 .sb-plan.current {
-  border-color: #48bb78;
-  box-shadow: 0 0 0 1px #48bb78;
+  border-color: var(--bc-accent);
+  box-shadow: 0 0 0 1px var(--bc-accent);
 }
 .sb-plan-tag {
   position: absolute;

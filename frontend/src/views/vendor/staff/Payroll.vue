@@ -513,8 +513,8 @@ onMounted(() => {
 }
 .pr-kpi:hover,
 .pr-kpi.on {
-  border-color: #9ae6b4;
-  box-shadow: 0 4px 14px rgba(72, 187, 120, 0.12);
+  border-color: var(--bc-accent-border);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--bc-accent) 12%, transparent);
 }
 .pr-toolbar {
   display: flex;
@@ -545,10 +545,10 @@ onMounted(() => {
   margin-bottom: 10px;
   padding: 10px 14px;
   border-radius: 12px;
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
   font-size: 13px;
   font-weight: 500;
-  color: #22543d;
+  color: var(--bc-accent-strong);
 }
 .pr-bulk div {
   display: flex;
@@ -562,7 +562,7 @@ onMounted(() => {
   gap: 10px;
 }
 .pr-table input[type="checkbox"] {
-  accent-color: #48bb78;
+  accent-color: var(--bc-accent);
 }
 .pr-status {
   display: flex;

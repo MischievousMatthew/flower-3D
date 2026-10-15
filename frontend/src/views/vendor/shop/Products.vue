@@ -490,13 +490,13 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 .p-card:hover {
-  border-color: #c6f6d5;
+  border-color: var(--bc-accent-muted);
   box-shadow: 0 10px 26px rgba(16, 24, 40, 0.07);
   transform: translateY(-2px);
 }
 .p-card.picked {
-  border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.18);
+  border-color: var(--bc-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 18%, transparent);
 }
 .p-card.dim .p-img {
   filter: grayscale(0.4);
@@ -512,12 +512,12 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
   aspect-ratio: 4 / 3;
   object-fit: cover;
   border-radius: 17px 17px 0 0;
-  background: #f0fff4;
+  background: var(--bc-accent-soft);
 }
 .p-img.blank {
   display: grid;
   place-items: center;
-  color: #9ae6b4;
+  color: var(--bc-accent-border);
 }
 .p-img.blank :deep(svg) {
   width: 34px;
@@ -540,7 +540,7 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: #48bb78;
+  accent-color: var(--bc-accent);
   cursor: pointer;
 }
 .p-badges {
@@ -742,7 +742,7 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenu));
   width: 36px;
 }
 .c-check input {
-  accent-color: #48bb78;
+  accent-color: var(--bc-accent);
 }
 .c-act {
   width: 92px;

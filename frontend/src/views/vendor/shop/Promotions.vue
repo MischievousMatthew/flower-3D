@@ -589,7 +589,7 @@ onMounted(loadAll);
 .promo-progress span {
   display: block;
   height: 100%;
-  background: #48bb78;
+  background: var(--bc-accent);
 }
 .promo-products {
   margin: 10px 0 0;
@@ -650,7 +650,7 @@ onMounted(loadAll);
   color: #718096;
 }
 .sale-main b {
-  color: #22753f;
+  color: var(--bc-accent-strong);
 }
 .sale-main s {
   color: #a0aec0;
@@ -666,7 +666,7 @@ onMounted(loadAll);
   margin-top: 16px;
   padding: 12px 14px;
   border-radius: 13px;
-  background: #f7fdf9;
+  background: var(--bc-accent-soft);
   font-size: 13px;
   color: #2d3748;
 }
@@ -674,7 +674,7 @@ onMounted(loadAll);
   color: #a0aec0;
 }
 .promo-preview b {
-  color: #22753f;
+  color: var(--bc-accent-strong);
 }
 @media (max-width: 1100px) {
   .promo-layout {

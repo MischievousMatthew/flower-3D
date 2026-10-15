@@ -351,7 +351,7 @@ onMounted(fetch);
 }
 .pin-icon {
   display: inline-flex;
-  color: #48bb78;
+  color: var(--bc-accent);
 }
 .pin-icon :deep(svg) {
   width: 18px;
@@ -430,8 +430,8 @@ onMounted(fetch);
   box-sizing: border-box;
 }
 .logo.blank {
-  background: #48bb78;
-  color: #fff;
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
   font-size: 24px;
   font-weight: 600;
 }
@@ -499,7 +499,7 @@ onMounted(fetch);
   width: 15px;
   height: 15px;
   margin-top: 1px;
-  color: #48bb78;
+  color: var(--bc-accent);
 }
 .remove-logo {
   margin-top: 14px;
