@@ -486,10 +486,12 @@ const centerAndScaleModel = () => {
 
   model.scale.setScalar(scale);
 
-  // Center the model
+  // Center the model, resting its lowest point on the ground (y = -0.5).
+  // Models built from the ground up are unchanged; centred ones (e.g. AI
+  // photo-to-3D) no longer sink halfway into the floor.
   const offset = center.multiplyScalar(-scale);
   model.position.copy(offset);
-  model.position.y = -0.5;
+  model.position.y = -0.5 - box.min.y * scale;
 };
 
 const createFallbackFlower = () => {

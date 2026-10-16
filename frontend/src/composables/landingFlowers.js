@@ -248,6 +248,24 @@ const BUILDERS = {
   },
 };
 
+export const HEAD_TYPES = Object.keys(BUILDERS);
+
+/**
+ * One sculpted head (rose, tulip, peony or daisy), scaled so its largest side
+ * is 1, standing on +Y with its base at the origin. Colors are the variety's
+ * own; callers may recolor the `color` attribute.
+ */
+export function createHeadGeometry(head, seed = head.length * 977) {
+  const g = BUILDERS[head](seeded(seed));
+  g.computeBoundingBox();
+  const size = g.boundingBox.getSize(new THREE.Vector3());
+  const k = 1 / Math.max(size.x, size.y, size.z);
+  g.scale(k, k, k);
+  g.computeBoundingBox();
+  g.translate(0, -g.boundingBox.min.y, 0);
+  return g;
+}
+
 // Which variety goes in each slot for the signature mix.
 const SIGNATURE_PATTERN = ["peony", "rose", "daisy", "rose", "peony", "tulip", "rose", "daisy", "peony", "rose", "tulip", "daisy", "rose", "peony"];
 const VARIETY_HEAD = { roses: "rose", tulips: "tulip", peonies: "peony", daisies: "daisy" };

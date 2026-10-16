@@ -293,6 +293,10 @@
             </label>
           </div>
           <p v-if="errors.model_file" class="sp-error">{{ errors.model_file }}</p>
+          <!-- New tab, so this unsaved form stays as it is -->
+          <p v-else-if="!modelFile" class="sp-hint">
+            No 3D file? <router-link :to="{ name: 'VendorPhotoTo3D' }" target="_blank" rel="noopener">Make one from a photo</router-link>, download it, then upload it here.
+          </p>
 
           <details class="ap-more">
             <summary>Supplier &amp; notes</summary>

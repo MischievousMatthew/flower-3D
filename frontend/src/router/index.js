@@ -166,6 +166,13 @@ const routes = [
         component: () => import("../views/vendor/shop/Categories.vue"),
       },
       {
+        // Turns a flower or bouquet photo into a 3D model (free AI in the browser)
+        path: "photo-to-3d",
+        name: "VendorPhotoTo3D",
+        meta: { subscriptionModule: MODULE.PRODUCTS },
+        component: () => import("../views/vendor/shop/PhotoTo3D.vue"),
+      },
+      {
         path: "promotions",
         name: "VendorPromotions",
         meta: { subscriptionModule: MODULE.PRODUCTS },

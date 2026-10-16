@@ -17,7 +17,7 @@ export const VENDOR_NAV = [
       { name: "VendorShop", label: "Shop Profile", icon: "store" },
       { name: "VendorProducts", label: "Products", icon: "flower", module: "products", match: ["VendorAddProduct", "VendorCategories"] },
       { name: "VendorInventory", label: "Inventory", icon: "box", module: "products" },
-      { name: "VendorCustomization", label: "3D Bouquet Management", icon: "cube", module: "products" },
+      { name: "VendorCustomization", label: "3D Bouquet Management", icon: "cube", module: "products", match: ["VendorPhotoTo3D"] },
       { name: "VendorPromotions", label: "Promotions", icon: "percent", module: "products" },
     ],
   },
