@@ -49,11 +49,6 @@
 
     <!-- Theme color: sidebar tabs and the buttons on every vendor page -->
     <div ref="colorRef" class="sidebar-foot">
-      <label class="color-toggle dark-row">
-        <span class="nav-icon" v-html="ICONS.moon"></span>
-        <span class="nav-text">Dark mode</span>
-        <span class="sp-switch"><input type="checkbox" :checked="isDark" aria-label="Dark mode" @change="setDark($event.target.checked)" /><span></span></span>
-      </label>
       <button type="button" class="color-toggle" :aria-expanded="showColors" aria-controls="sidebar-colors" @click="showColors = !showColors">
         <span class="nav-icon" v-html="ICONS.palette"></span>
         <span class="nav-text">Theme color</span>
@@ -105,13 +100,12 @@ import { useSubscriptionAccess } from "../../composables/useSubscriptionAccess";
 import { ACCENT_PRESETS, DEFAULT_ACCENT, useVendorTheme } from "../../composables/useVendorTheme";
 import { SHOP_ICONS as ICONS } from "../../components/vendor/shop/shopIcons";
 import { VENDOR_NAV, navPlaceFor } from "./vendorNav";
-import "../../components/vendor/shop/shop.css";
 import api from "../../plugins/axios";
 
 const router = useRouter();
 const route = useRoute();
 const { isMobileOpen, closeMobile } = useSidebarState();
-const { accent, accentVars, setAccent, resetAccent, isDark, setDark } = useVendorTheme();
+const { accent, accentVars, setAccent, resetAccent } = useVendorTheme();
 const { ACCESS_REUSE_MS, subscriptionAccess, loadSubscriptionAccess, subscriptionAllowsModule, subscriptionUpgradeMessage } = useSubscriptionAccess();
 const { vendorProfile, fetchProfile } = useVendorProfile({ autoFetch: false, showToast: false });
 
@@ -436,9 +430,6 @@ watch(() => vendorProfile.value?.store_logo_url, () => (logoLoadFailed.value = f
 }
 .color-toggle:hover {
   background: var(--sb-accent-soft);
-}
-.dark-row .nav-text {
-  flex: 1;
 }
 .color-dot {
   width: 18px;

@@ -174,6 +174,11 @@ class VendorSubscriptionTest extends TestCase
         $this->assertTrue(SubscriptionPlans::includesModule(SubscriptionPlans::BUSINESS, 'warehouse'));
         $this->assertFalse(SubscriptionPlans::includesModule(SubscriptionPlans::BUSINESS, 'payroll'));
 
+        // Photo to 3D is a Business-and-up feature
+        $this->assertFalse(SubscriptionPlans::includesModule(SubscriptionPlans::STARTER, 'photo_to_3d'));
+        $this->assertTrue(SubscriptionPlans::includesModule(SubscriptionPlans::BUSINESS, 'photo_to_3d'));
+        $this->assertSame('Business', SubscriptionPlans::requiredPlanForModule('photo_to_3d')['name']);
+
         foreach (SubscriptionPlans::MODULES as $module) {
             $this->assertTrue(SubscriptionPlans::includesModule(SubscriptionPlans::PROFESSIONAL, $module));
             $this->assertTrue(SubscriptionPlans::includesModule(SubscriptionPlans::ENTERPRISE, $module));

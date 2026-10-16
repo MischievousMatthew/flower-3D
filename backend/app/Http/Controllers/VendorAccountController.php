@@ -44,6 +44,7 @@ class VendorAccountController extends Controller
         'attendance'   => ['Attendance', 'Clock-ins, QR attendance and timesheets'],
         'payroll'      => ['Payroll', 'Pay runs and payslips'],
         'leave'        => ['Leave management', 'Leave requests and approvals'],
+        'photo_to_3d'  => ['Photo to 3D', 'Turn a flower or bouquet photo into a 3D model for your products'],
     ];
 
     private const PENDING_CHECKOUT_HOURS = 24;

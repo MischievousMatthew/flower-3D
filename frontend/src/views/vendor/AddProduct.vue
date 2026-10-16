@@ -294,7 +294,7 @@
           </div>
           <p v-if="errors.model_file" class="sp-error">{{ errors.model_file }}</p>
           <!-- New tab, so this unsaved form stays as it is -->
-          <p v-else-if="!modelFile" class="sp-hint">
+          <p v-else-if="!modelFile && canPhotoTo3D" class="sp-hint">
             No 3D file? <router-link :to="{ name: 'VendorPhotoTo3D' }" target="_blank" rel="noopener">Make one from a photo</router-link>, download it, then upload it here.
           </p>
 
@@ -367,6 +367,8 @@ import ShopLayout from "../../components/vendor/shop/ShopLayout.vue";
 import { SHOP_ICONS as ICONS } from "../../components/vendor/shop/shopIcons";
 import { apiMessage, money, useVendorCatalog } from "../../components/vendor/shop/useVendorCatalog";
 import { useProductTaxonomies } from "../../composables/useProductTaxonomies";
+import { useSubscriptionAccess } from "../../composables/useSubscriptionAccess";
+import { SUBSCRIPTION_MODULES } from "../../constants/subscriptionModules";
 import "../../components/vendor/shop/shop.css";
 
 const route = useRoute();
@@ -437,6 +439,9 @@ const blank = () => ({
 const form = reactive(blank());
 const images = ref([]);
 const modelFile = ref(null);
+// "Make one from a photo" is a Business-and-up feature
+const { subscriptionAccess, subscriptionAllowsModule } = useSubscriptionAccess();
+const canPhotoTo3D = computed(() => subscriptionAllowsModule(subscriptionAccess.value, SUBSCRIPTION_MODULES.PHOTO_TO_3D));
 const errors = reactive({});
 const submitting = ref(null);
 const dropping = ref(false);

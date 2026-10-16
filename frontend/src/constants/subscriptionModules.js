@@ -20,6 +20,7 @@ export const SUBSCRIPTION_MODULES = Object.freeze({
   ATTENDANCE: "attendance",
   PAYROLL: "payroll",
   LEAVE: "leave",
+  PHOTO_TO_3D: "photo_to_3d",
 });
 
 // Existing employee-RBAC keys resolve to the Stage 2 subscription keys.

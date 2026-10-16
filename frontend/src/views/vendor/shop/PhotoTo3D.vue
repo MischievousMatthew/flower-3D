@@ -70,10 +70,8 @@
         </div>
 
         <div v-else-if="result" class="p3-result">
-          <div class="p3-viewer">
-            <ThreeDModelViewer :model-url="result.url" model-type="glb" :background-color="viewerBg" />
-          </div>
-          <p class="p3-size">{{ fileSize(result.blob.size) }}<template v-if="result.note"> · {{ result.note }}</template><template v-if="tooBig"> · too large to attach (10 MB max on the free plan); download it instead.</template></p>
+          <ModelEditor ref="editor" :model-url="result.url" :reset-key="resultKey" :dark="isDark" :clean="result.source === 'ai'" @cleaned="(n) => (cleaned = n)" />
+          <p class="p3-size">{{ fileSize(result.blob.size) }}<template v-if="cleaned"> · removed {{ cleaned }} stray {{ cleaned === 1 ? "fragment triangle" : "fragment triangles" }}</template><template v-if="result.note"> · {{ result.note }}</template><template v-if="tooBig"> · too large to attach (10 MB max on the free plan); download it instead.</template></p>
         </div>
 
         <div v-else class="sp-empty p3-stage">
@@ -117,7 +115,7 @@
         <!-- What to do with it -->
         <div v-if="result && !working" class="p3-use">
           <div class="p3-actions">
-            <button type="button" class="sp-btn sp-btn-primary" @click="download"><span v-html="ICONS.download"></span>Download .glb</button>
+            <button type="button" class="sp-btn sp-btn-primary" :disabled="exporting" title="Saves your rotation, size and brightness changes in the file" @click="download"><span v-html="ICONS.download"></span>{{ exporting ? "Preparing…" : "Download .glb" }}</button>
             <button type="button" class="sp-btn sp-btn-ghost" @click="reset">Start over</button>
           </div>
           <div class="p3-attach">
@@ -142,7 +140,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
-import ThreeDModelViewer from "../../../layouts/3D/3DModelViewer.vue";
+import ModelEditor from "../../../components/vendor/photo3d/ModelEditor.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage, useVendorCatalog } from "../../../components/vendor/shop/useVendorCatalog";
 import { convertWithAI } from "../../../components/vendor/photo3d/aiProviders";
@@ -198,7 +196,10 @@ const paper = ref(PAPER_PRESETS[0]);
 const productId = ref(null);
 const attaching = ref(false);
 
-const viewerBg = computed(() => (isDark.value ? "#1b222c" : "#f7fafc"));
+const editor = ref(null);
+const resultKey = ref(0); // a new key resets the editor's changes
+const cleaned = ref(0);
+const exporting = ref(false);
 const tooBig = computed(() => (result.value?.blob.size ?? 0) > MAX_ATTACH_BYTES);
 const selectedProduct = computed(() => products.value?.find((p) => p.id === productId.value) ?? null);
 const headTotal = computed(() => HEAD_TYPES.reduce((n, h) => n + (Number(counts[h]) || 0), 0));
@@ -279,7 +280,12 @@ const RESULT_NOTES = {
 };
 
 function showResult(blob, source, provider = "") {
+  const fresh = !result.value || result.value.source !== source || source === "ai";
   if (result.value?.url) URL.revokeObjectURL(result.value.url);
+  if (fresh) {
+    resultKey.value++;
+    cleaned.value = 0;
+  }
   result.value = { blob, url: URL.createObjectURL(blob), source, provider, note: RESULT_NOTES[provider] || "" };
 }
 
@@ -384,20 +390,43 @@ function clampCounts(changed) {
 }
 
 // ── Download / attach ──────────────────────────────────────────────────
-function download() {
-  const a = document.createElement("a");
-  a.href = result.value.url;
-  a.download = `${photoName.value}-3d.glb`;
-  a.click();
+// The model with the editor's changes (rotation, size, brightness) saved in
+async function editedBlob() {
+  try {
+    return (await editor.value?.exportEdited()) ?? result.value.blob;
+  } catch (_) {
+    return result.value.blob;
+  }
+}
+
+async function download() {
+  if (exporting.value) return;
+  exporting.value = true;
+  try {
+    const blob = await editedBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${photoName.value}-3d.glb`;
+    a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } finally {
+    exporting.value = false;
+  }
 }
 
 async function attach() {
   if (!result.value || !productId.value || attaching.value) return;
   attaching.value = true;
   try {
+    const blob = await editedBlob();
+    if (blob.size > MAX_ATTACH_BYTES) {
+      toast.error("The edited model is over 10 MB, too large to attach on the free plan. Download it instead.");
+      return;
+    }
     const fd = new FormData();
     fd.append("_method", "PUT");
-    fd.append("model_file", new File([result.value.blob], `${photoName.value}-3d.glb`, { type: "model/gltf-binary" }));
+    fd.append("model_file", new File([blob], `${photoName.value}-3d.glb`, { type: "model/gltf-binary" }));
     await api.post(`vendor/products/${productId.value}`, fd);
     toast.success(`3D model attached to ${selectedProduct.value?.name ?? "the product"}.`);
     loadProducts();
@@ -564,16 +593,6 @@ onBeforeUnmount(() => {
 .p3-message .sp-banner p {
   margin: 2px 0 0;
 }
-.p3-viewer {
-  height: 420px;
-  overflow: hidden;
-  border-radius: 14px;
-  border: 1px solid var(--v-border);
-}
-/* The shared viewer shows a spinner while loading; this page uses text only */
-.p3-viewer :deep(.loading-spinner) {
-  display: none;
-}
 .p3-size {
   margin: 6px 0 0;
   font-size: 12px;
@@ -646,9 +665,6 @@ onBeforeUnmount(() => {
 @media (max-width: 900px) {
   .p3-layout {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .p3-viewer {
-    height: 340px;
   }
   .p3-counts {
     grid-template-columns: repeat(2, minmax(0, 1fr));

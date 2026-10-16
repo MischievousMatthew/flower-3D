@@ -23,7 +23,7 @@ final class SubscriptionPlans
         'products', 'reservations', 'calendar', 'finance', 'staff',
         'procurement', 'suppliers', 'warehouse', 'supply_chain', 'orders',
         'logistics', 'deliveries', 'scanning', 'crm', 'hr', 'employees',
-        'attendance', 'payroll', 'leave',
+        'attendance', 'payroll', 'leave', 'photo_to_3d',
     ];
 
     /** Existing employee-RBAC keys mapped to subscription module keys. */
@@ -62,7 +62,7 @@ final class SubscriptionPlans
             'monthly_price' => 2999.00,
             'currency' => 'PHP',
             'custom_pricing' => false,
-            'included_modules' => ['products', 'reservations', 'calendar', 'finance', 'staff', 'procurement', 'suppliers', 'warehouse', 'supply_chain', 'orders', 'logistics', 'deliveries', 'scanning', 'crm'],
+            'included_modules' => ['products', 'reservations', 'calendar', 'finance', 'staff', 'procurement', 'suppliers', 'warehouse', 'supply_chain', 'orders', 'logistics', 'deliveries', 'scanning', 'crm', 'photo_to_3d'],
             'resource_limits' => ['branches' => 2, 'warehouses' => 1, 'staff_employees' => 15, 'products' => 300],
             'free_trial_available' => true,
             'trial_duration_months' => 1,

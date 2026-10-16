@@ -59,7 +59,7 @@ const TABS = [
   { name: "VendorInventory", label: "Inventory", icon: "box", module: "products" },
   { name: "VendorCategories", label: "Categories & Occasions", icon: "tag", module: "products" },
   { name: "VendorCustomization", label: "3D Bouquets", icon: "cube", module: "products" },
-  { name: "VendorPhotoTo3D", label: "Photo to 3D", icon: "sparkle", module: "products" },
+  { name: "VendorPhotoTo3D", label: "Photo to 3D", icon: "sparkle", module: "photo_to_3d" },
   { name: "VendorPromotions", label: "Promotions", icon: "percent", module: "products" },
 ];
 

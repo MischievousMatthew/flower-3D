@@ -169,7 +169,8 @@ const routes = [
         // Turns a flower or bouquet photo into a 3D model (free AI in the browser)
         path: "photo-to-3d",
         name: "VendorPhotoTo3D",
-        meta: { subscriptionModule: MODULE.PRODUCTS },
+        // Business plan and up (the guard sends other plans to their profile)
+        meta: { subscriptionModule: MODULE.PHOTO_TO_3D },
         component: () => import("../views/vendor/shop/PhotoTo3D.vue"),
       },
       {
