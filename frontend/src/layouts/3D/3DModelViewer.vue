@@ -47,7 +47,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from "vue";
 import * as THREE from "three";
-import { dressBouquet } from "../../utils/bouquetDressing.js";
+import { LEGACY_DESIGN, createBouquetBase } from "../../utils/bouquetDesigns/index.js";
 import { createCard } from "../../utils/bouquetCard.js";
 
 const props = defineProps({
@@ -352,28 +352,18 @@ const fitFlowerModel = (flowerModel) => {
 };
 
 const loadBouquetArrangement = async (arrangement) => {
-  // The base model is a public application asset. Older orders saved the
-  // lower-case path, which fails on case-sensitive hosting, so use the
-  // canonical asset path for every saved bouquet.
-  const bouquetUrl = "/Boquet.glb";
-  const bouquetResult = await loadGltf(bouquetUrl);
-  const bouquet = bouquetResult.scene || bouquetResult.scenes?.[0];
-  if (!bouquet) throw new Error("The saved bouquet base model is unavailable.");
-
+  // The same base the customizer built: the design saved with the bouquet
+  // (older ones saved none and keep the original model, fillers and all),
+  // sized by its wrapper scale.
+  const base = await createBouquetBase(arrangement.design || LEGACY_DESIGN, {
+    loadGltf,
+    wrapperScale: Number(arrangement.wrapper_scale ?? 1),
+  });
+  const bouquet = base.root;
   prepareModel(bouquet);
 
-  const bouquetBox = new THREE.Box3().setFromObject(bouquet);
-  const bouquetSize = bouquetBox.getSize(new THREE.Vector3());
-  const bouquetCenter = bouquetBox.getCenter(new THREE.Vector3());
-  const bouquetScale = 3.5 / Math.max(bouquetSize.x, bouquetSize.y, bouquetSize.z, 1);
-  bouquet.scale.setScalar(bouquetScale);
-  bouquet.position.sub(bouquetCenter.multiplyScalar(bouquetScale));
-  const scaledBox = new THREE.Box3().setFromObject(bouquet);
-  bouquet.position.y -= scaledBox.min.y;
-  bouquet.scale.multiplyScalar(Number(arrangement.wrapper_scale ?? 1));
-
-  // Tint only the outer and inner papers (empty = original) and tie the ribbon.
-  const dressing = dressBouquet(bouquet);
+  // Tint the two colour layers (empty = the design's own) and tie the ribbon.
+  const dressing = base.dressing;
   dressing.outer.apply(arrangement.paper_color || null);
   dressing.inner.apply(arrangement.inner_paper_color || null);
   dressing.applyRibbon(arrangement.ribbon_color || null);

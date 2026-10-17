@@ -3,22 +3,22 @@
 // backend/app/Support/BouquetPresets.php for shops that send none.
 
 export const DEFAULT_PRESETS = [
-  { key: "wedding", label: "Wedding", wrapper: false, ribbon: true, sizes: [6, 12, 24] },
-  { key: "romance", label: "Anniversary / Valentine's", wrapper: true, ribbon: true, sizes: [6, 12, 24] },
-  { key: "birthday", label: "Birthday", wrapper: true, ribbon: true, sizes: [4, 8, 12] },
-  { key: "graduation", label: "Graduation", wrapper: true, ribbon: true, sizes: [3, 6, 9] },
-  { key: "sympathy", label: "Sympathy", wrapper: true, ribbon: false, sizes: [6, 12] },
-  { key: "just_because", label: "Just because", wrapper: true, ribbon: true, sizes: [3, 6, 12] },
+  { key: "wedding", label: "Wedding", design: "hand_tied", wrapper: false, ribbon: true, sizes: [6, 12, 24] },
+  { key: "romance", label: "Anniversary / Valentine's", design: "korean", wrapper: true, ribbon: true, sizes: [6, 12, 24] },
+  { key: "birthday", label: "Birthday", design: "box", wrapper: true, ribbon: true, sizes: [4, 8, 12] },
+  { key: "graduation", label: "Graduation", design: "classic", wrapper: true, ribbon: true, sizes: [3, 6, 9] },
+  { key: "sympathy", label: "Sympathy", design: "basket", wrapper: true, ribbon: false, sizes: [6, 12] },
+  { key: "just_because", label: "Just because", design: "classic", wrapper: true, ribbon: true, sizes: [3, 6, 12] },
 ];
 
 // Words and icons for the occasion cards
 export const OCCASION_INFO = {
   wedding: { icon: "rings", blurb: "A hand-tied bridal bouquet finished with a satin ribbon." },
-  romance: { icon: "heart", blurb: "Roses and romance for anniversaries and Valentine's Day." },
-  birthday: { icon: "gift", blurb: "Bright and cheerful, wrapped and tied with a bow." },
-  graduation: { icon: "cap", blurb: "A proud bunch for the big day." },
-  sympathy: { icon: "dove", blurb: "Quiet, simple wrapping to share your condolences." },
-  just_because: { icon: "flower", blurb: "No reason needed. Build it exactly how you like." },
+  romance: { icon: "heart", blurb: "A Korean-style layered wrap, open and airy, for anniversaries and Valentine's Day." },
+  birthday: { icon: "gift", blurb: "Flowers in a round hat box, tied with a satin bow." },
+  graduation: { icon: "cap", blurb: "The classic paper cone, for the big day." },
+  sympathy: { icon: "dove", blurb: "A woven basket of flowers to share your condolences." },
+  just_because: { icon: "flower", blurb: "The classic paper cone. No reason needed." },
 };
 
 // Names for sizes, by their place in the occasion's list

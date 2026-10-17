@@ -125,6 +125,22 @@ class BouquetPresetsTest extends TestCase
         $this->assertSame(5, BouquetPresets::check($presets, $this->bouquet(null, 2))['filler_limit']);
     }
 
+    public function test_each_occasion_has_its_bouquet_design_and_saved_bouquets_record_it(): void
+    {
+        $designs = array_column(BouquetPresets::merge(null), 'design', 'key');
+        $this->assertSame([
+            'wedding' => 'hand_tied', 'romance' => 'korean', 'birthday' => 'box',
+            'graduation' => 'classic', 'sympathy' => 'basket', 'just_because' => 'classic',
+        ], $designs);
+
+        // The server decides the design, whatever the browser sent
+        $result = BouquetPresets::check(
+            BouquetPresets::merge(null),
+            $this->bouquet(['key' => 'birthday', 'size' => 4], 2, ['design' => 'basket'])
+        );
+        $this->assertSame('box', $result['customizations']['design']);
+    }
+
     public function test_largest_size_is_the_checkout_cap(): void
     {
         $this->assertSame(24, BouquetPresets::largestSize(BouquetPresets::merge(null)));

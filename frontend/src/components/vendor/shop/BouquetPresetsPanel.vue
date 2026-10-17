@@ -29,7 +29,7 @@
           <span class="bp-icon" v-html="OCCASION_ICONS[OCCASION_INFO[p.key]?.icon] || OCCASION_ICONS.flower"></span>
           <div class="bp-title">
             <h3>{{ p.label }}</h3>
-            <small>{{ buildText(p) }}</small>
+            <small>{{ DESIGNS[p.design]?.label ?? "Classic cone" }} · {{ buildText(p) }}</small>
           </div>
           <label class="bp-toggle" :title="p.enabled && enabledCount === 1 ? 'Keep at least one occasion on' : p.enabled ? 'Customers can pick this occasion' : 'Hidden from customers'">
             <span class="bc-sr-only">Offer {{ p.label }}</span>
@@ -80,6 +80,7 @@ import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
 import { OCCASION_INFO, sizeName } from "../../../constants/bouquetPresets";
 import { OCCASION_ICONS } from "../../../constants/occasionIcons";
+import { DESIGNS } from "../../../utils/bouquetDesigns/index.js";
 import "./shop.css";
 
 const emit = defineEmits(["count"]);

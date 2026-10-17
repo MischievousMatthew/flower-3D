@@ -24,12 +24,12 @@ class BouquetPresets
     public const LEGACY_MAX_FLOWERS = 3;
 
     public const DEFAULTS = [
-        'wedding' => ['label' => 'Wedding', 'wrapper' => false, 'ribbon' => true, 'sizes' => [6, 12, 24]],
-        'romance' => ['label' => "Anniversary / Valentine's", 'wrapper' => true, 'ribbon' => true, 'sizes' => [6, 12, 24]],
-        'birthday' => ['label' => 'Birthday', 'wrapper' => true, 'ribbon' => true, 'sizes' => [4, 8, 12]],
-        'graduation' => ['label' => 'Graduation', 'wrapper' => true, 'ribbon' => true, 'sizes' => [3, 6, 9]],
-        'sympathy' => ['label' => 'Sympathy', 'wrapper' => true, 'ribbon' => false, 'sizes' => [6, 12]],
-        'just_because' => ['label' => 'Just because', 'wrapper' => true, 'ribbon' => true, 'sizes' => [3, 6, 12]],
+        'wedding' => ['label' => 'Wedding', 'design' => 'hand_tied', 'wrapper' => false, 'ribbon' => true, 'sizes' => [6, 12, 24]],
+        'romance' => ['label' => "Anniversary / Valentine's", 'design' => 'korean', 'wrapper' => true, 'ribbon' => true, 'sizes' => [6, 12, 24]],
+        'birthday' => ['label' => 'Birthday', 'design' => 'box', 'wrapper' => true, 'ribbon' => true, 'sizes' => [4, 8, 12]],
+        'graduation' => ['label' => 'Graduation', 'design' => 'classic', 'wrapper' => true, 'ribbon' => true, 'sizes' => [3, 6, 9]],
+        'sympathy' => ['label' => 'Sympathy', 'design' => 'basket', 'wrapper' => true, 'ribbon' => false, 'sizes' => [6, 12]],
+        'just_because' => ['label' => 'Just because', 'design' => 'classic', 'wrapper' => true, 'ribbon' => true, 'sizes' => [3, 6, 12]],
     ];
 
     /**
@@ -49,6 +49,7 @@ class BouquetPresets
             return [
                 'key' => $key,
                 'label' => $default['label'],
+                'design' => $default['design'],
                 'wrapper' => $default['wrapper'],
                 'ribbon' => $default['ribbon'],
                 'enabled' => array_key_exists('enabled', $own) ? (bool) $own['enabled'] : true,
@@ -185,6 +186,8 @@ class BouquetPresets
         }
 
         $customizations['preset'] = ['key' => $occasion['key'], 'size' => $size, 'label' => $occasion['label']];
+        // The bouquet's design follows its occasion (the viewer rebuilds it from this)
+        $customizations['design'] = $occasion['design'];
         if (! $occasion['wrapper']) {
             unset($customizations['wrapper'], $customizations['inner_wrapper']);
         }

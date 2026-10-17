@@ -608,7 +608,7 @@
 
               <div class="fc-segment" role="tablist" aria-label="Wrapper layer">
                 <button
-                  v-for="layer in WRAP_LAYERS"
+                  v-for="layer in wrapLayers"
                   :key="layer.key"
                   type="button"
                   role="tab"
@@ -617,7 +617,7 @@
                   :aria-selected="activeWrapLayer === layer.key"
                   @click="activeWrapLayer = layer.key"
                 >
-                  <span class="fc-segment-dot" :style="{ background: wrap[layer.key].color || ORIGINAL_WRAP[layer.key] }"></span>
+                  <span class="fc-segment-dot" :style="{ background: wrap[layer.key].color || originalWrap[layer.key] }"></span>
                   {{ layer.label }}
                 </button>
               </div>
@@ -631,7 +631,7 @@
                   :aria-checked="!activeWrap.id && !activeWrap.color"
                   @click="selectWrapper(activeWrapLayer, null)"
                 >
-                  <span class="fc-option-swatch" :style="{ background: ORIGINAL_WRAP[activeWrapLayer] }"></span>
+                  <span class="fc-option-swatch" :style="{ background: originalWrap[activeWrapLayer] }"></span>
                   <span class="fc-option-copy">
                     <strong>Original</strong>
                     <small>The paper this bouquet comes with</small>
@@ -663,7 +663,7 @@
                   type="button"
                   class="fc-swatch fc-swatch-original"
                   :class="{ active: !activeWrap.color }"
-                  :style="{ background: ORIGINAL_WRAP[activeWrapLayer] }"
+                  :style="{ background: originalWrap[activeWrapLayer] }"
                   title="Original paper"
                   aria-label="Original paper"
                   @click="applyWrapColor(activeWrapLayer, null)"
@@ -680,7 +680,7 @@
                 ></button>
                 <label class="fc-swatch fc-swatch-custom" title="Custom colour">
                   <span class="bc-sr-only">Custom wrapper colour</span>
-                  <input type="color" :value="activeWrap.color || ORIGINAL_WRAP[activeWrapLayer]" @input="pickWrapPreset($event.target.value)" />
+                  <input type="color" :value="activeWrap.color || originalWrap[activeWrapLayer]" @input="pickWrapPreset($event.target.value)" />
                   <BcIcon name="plus" />
                 </label>
               </div>
@@ -827,7 +827,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import api from "../../plugins/axios.js";
-import { dressBouquet } from "../../utils/bouquetDressing.js";
+import { LEGACY_DESIGN, createBouquetBase, designForOccasion } from "../../utils/bouquetDesigns/index.js";
 import {
   DEFAULT_PRESETS,
   LEGACY_PRESET,
@@ -917,12 +917,15 @@ const MOVE_STEP = 0.08;
 const FINE_MOVE_STEP = 0.02;
 // Used only when the vendor has not added their own wrappers or ribbons.
 const paperPresets = ["#d3b18f", "#f3e9dc", "#d7d2c8", "#e2c7cf", "#c8b6a6"];
-// Approximate colours of the model's own papers, for the "Original" swatch.
+// Approximate colours of the classic model's own papers, for the "Original" swatch.
 const ORIGINAL_WRAP = { outer: "#d6b68c", inner: "#ab9196" };
-const WRAP_LAYERS = [
-  { key: "outer", label: "Outer" },
-  { key: "inner", label: "Inner" },
-];
+// What the two colour layers are called on each design
+const LAYER_NAMES = {
+  classic: ["Outer", "Inner"],
+  korean: ["Outer sheets", "Inner sheets"],
+  box: ["Box", "Liner"],
+  basket: ["Basket", "Liner"],
+};
 const ribbonPresets = ["#caa6d9", "#d95f76", "#7d8f69", "#f0dfb2", "#6c5b7b"];
 
 const route = useRoute();
@@ -971,6 +974,27 @@ const maxFlowers = computed(() => preset.value?.size ?? LEGACY_PRESET.size);
 const maxFillers = computed(() => fillerLimitFor(maxFlowers.value));
 const hasWrapper = computed(() => occasion.value?.wrapper ?? true);
 const hasRibbon = computed(() => occasion.value?.ribbon ?? true);
+// The bouquet's design follows its occasion (classic for older bouquets)
+const baseDesign = ref("classic"); // what's built in the scene right now
+// Editing a bouquet saved before designs existed: keep its original model
+// (fillers and all) until the customer picks a different occasion or size
+const legacyBase = ref(false);
+const baseDefaults = ref({ outer: null, inner: null });
+const currentDesign = computed(() => {
+  if (legacyBase.value) return LEGACY_DESIGN;
+  return occasion.value?.design ?? (preset.value ? designForOccasion(preset.value.key) : "classic");
+});
+const originalWrap = computed(() => ({
+  outer: baseDefaults.value.outer || ORIGINAL_WRAP.outer,
+  inner: baseDefaults.value.inner || ORIGINAL_WRAP.inner,
+}));
+const wrapLayers = computed(() => {
+  const [outer, inner] = LAYER_NAMES[baseDesign.value] ?? LAYER_NAMES.classic;
+  return [
+    { key: "outer", label: outer },
+    { key: "inner", label: inner },
+  ];
+});
 const presetLabel = computed(() => (occasion.value ? `${occasion.value.label} · ${maxFlowers.value} stems` : `${maxFlowers.value} stems`));
 const isLoading3D = ref(true);
 const sceneReady = ref(false);
@@ -1075,7 +1099,9 @@ onMounted(async () => {
   if (isAuthenticated.value) await cartStore.initialize?.();
   initScene();
   await loadEditingCustomization();
-  await Promise.all([loadBouquetModel(), fetchFlowers(), fetchCustomizationOptions()]);
+  // A saved bouquet opens on its own design; a new one starts on the classic cone
+  const startDesign = editingCustomization.value ? editingCustomization.value.design || LEGACY_DESIGN : "classic";
+  await Promise.all([loadBouquetModel(startDesign), fetchFlowers(), fetchCustomizationOptions()]);
   if (editingCustomization.value) {
     const saved = editingCustomization.value.preset;
     preset.value = saved?.key ? { key: saved.key, size: Number(saved.size) } : { ...LEGACY_PRESET };
@@ -1141,34 +1167,22 @@ function initScene() {
   animateScene();
 }
 
-async function loadBouquetModel() {
+async function loadBouquetModel(design = currentDesign.value) {
   isLoading3D.value = true;
   bouquetLoadError.value = "";
   try {
-    const gltf = await loadFirstAvailableGltf(["/bouquet.glb", "/Boquet.glb"]);
-    bouquetRoot = gltf.scene || gltf.scenes?.[0];
-    if (!bouquetRoot) throw new Error("No scene found inside bouquet.glb.");
-
-    bouquetRoot.traverse((child) => {
-      if (!child.isMesh) return;
-      child.castShadow = true;
-      child.receiveShadow = true;
-      bouquetTargets.push(child);
-    });
-
-    const box = new THREE.Box3().setFromObject(bouquetRoot);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    const scale = 3.5 / Math.max(size.x, size.y, size.z, 1);
-    bouquetRoot.scale.setScalar(scale);
-    bouquetRoot.position.sub(center.multiplyScalar(scale));
-    const scaledBox = new THREE.Box3().setFromObject(bouquetRoot);
-    bouquetRoot.position.y -= scaledBox.min.y;
-    bouquetRoot.scale.multiplyScalar(wrapperScale.value);
-    bouquetRoot.position.multiplyScalar(wrapperScale.value);
+    const base = await createBouquetBase(design, { loadGltf, wrapperScale: wrapperScale.value });
+    if (bouquetRoot) {
+      arrangement.remove(bouquetRoot);
+      disposeBase(bouquetRoot);
+    }
+    bouquetRoot = base.root;
+    bouquetTargets.length = 0;
+    bouquetTargets.push(...base.targets);
     arrangement.add(bouquetRoot);
-    // Only the two paper layers are tinted; the ribbon is generated.
-    dressing = dressBouquet(bouquetRoot);
+    dressing = base.dressing;
+    baseDesign.value = base.design;
+    baseDefaults.value = base.defaults;
     dressing.outer.apply(wrap.outer.color);
     dressing.inner.apply(wrap.inner.color);
     dressing.applyRibbon(ribbonColor.value);
@@ -1176,11 +1190,24 @@ async function loadBouquetModel() {
     sceneReady.value = true;
   } catch (error) {
     console.error("Failed to load bouquet base model:", error);
-    bouquetLoadError.value = "Make sure the bouquet base model exists in `frontend/public` as `/bouquet.glb` or `/Boquet.glb`.";
+    bouquetLoadError.value = "The bouquet couldn't be shown. Refresh the page to try again.";
   } finally {
     isLoading3D.value = false;
   }
 }
+
+function disposeBase(root) {
+  root.traverse((child) => {
+    if (!child.isMesh) return;
+    child.geometry?.dispose();
+    [].concat(child.material).forEach((m) => m?.dispose?.());
+  });
+}
+
+// A different occasion can mean a different bouquet (wedding → hand-tied, …)
+watch(currentDesign, (design) => {
+  if (sceneReady.value && design !== baseDesign.value) loadBouquetModel(design);
+});
 
 async function fetchFlowers() {
   if (!storeId.value) return;
@@ -1878,6 +1905,7 @@ function choosePreset(size) {
   const key = draftOccasion.value;
   if (!key || sizeBlocked(size)) return;
   preset.value = { key, size };
+  legacyBase.value = false; // a chosen occasion gets its own design
   setWrapperScale(wrapperScaleFor(size));
   startStep.value = null;
 }
@@ -1891,11 +1919,13 @@ async function fillWithFlower(flower) {
   if (count <= 0) return enforceFlowerLimit(flower);
 
   // Aim at the top of what's showing: the wrapper's opening, or the stems
+  const bed = shownTargets().filter((mesh) => mesh.name === "FlowerBed");
+  const aimAt = bed.length ? bed : shownTargets();
   const box = new THREE.Box3();
-  shownTargets().forEach((mesh) => box.expandByObject(mesh));
+  aimAt.forEach((mesh) => box.expandByObject(mesh));
   const center = box.getCenter(new THREE.Vector3());
   const size = box.getSize(new THREE.Vector3());
-  const radius = Math.max(size.x, size.z) * 0.3;
+  const radius = Math.max(size.x, size.z) * (bed.length ? 0.42 : 0.3);
   const taken = placedFlowers.value.map((f) => placedObjects.get(f.sceneId)?.getWorldPosition(new THREE.Vector3())).filter(Boolean);
   const gap = (radius * 2) / Math.sqrt(maxFlowers.value + 1);
 
@@ -1907,7 +1937,7 @@ async function fillWithFlower(flower) {
     const used = [...taken, ...spots.map((s) => s.point)];
     if (used.some((t) => Math.hypot(t.x - origin.x, t.z - origin.z) < gap * 0.7)) continue;
     down.set(origin, new THREE.Vector3(0, -1, 0));
-    const hit = down.intersectObjects(shownTargets(), true)[0];
+    const hit = down.intersectObjects(aimAt, true)[0];
     if (!hit) continue;
     const point = hit.point.clone().add(new THREE.Vector3(0, 0.05, 0));
     flowerLayer.updateMatrixWorld();
@@ -2194,7 +2224,9 @@ function buildBouquetCustomization() {
     inner_paper_color: wrap.inner.color,
     ribbon_color: ribbonColor.value,
     wrapper_scale: wrapperScale.value,
-    preset: preset.value ? { key: preset.value.key, size: preset.value.size } : { ...LEGACY_PRESET },
+    // Older bouquets (original model) keep the old rules: no occasion is sent
+    preset: !legacyBase.value && preset.value ? { key: preset.value.key, size: preset.value.size } : null,
+    design: baseDesign.value,
     // Prices for these are looked up by id on the server.
     wrapper: hasWrapper.value && selectedOuterWrapper.value ? { id: selectedOuterWrapper.value.id, name: selectedOuterWrapper.value.name } : null,
     inner_wrapper: hasWrapper.value && selectedInnerWrapper.value ? { id: selectedInnerWrapper.value.id, name: selectedInnerWrapper.value.name } : null,
@@ -2288,6 +2320,8 @@ async function loadEditingCustomization() {
     return;
   }
   editingCustomization.value = customization;
+  // Saved before designs existed: it keeps its original model (see legacyBase)
+  legacyBase.value = !customization.design;
   wrapperScale.value = Number(customization.wrapper_scale ?? 1);
 }
 
@@ -2438,18 +2472,6 @@ function cleanupScene() {
 
 function loadGltf(url) {
   return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
-}
-
-async function loadFirstAvailableGltf(urls) {
-  let lastError = null;
-  for (const url of urls) {
-    try {
-      return await loadGltf(url);
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError || new Error("Unable to load bouquet model.");
 }
 
 function showToast(message, type = "success") {
