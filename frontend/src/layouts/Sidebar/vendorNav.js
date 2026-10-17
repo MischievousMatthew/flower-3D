@@ -17,7 +17,9 @@ export const VENDOR_NAV = [
       { name: "VendorShop", label: "Shop Profile", icon: "store" },
       { name: "VendorProducts", label: "Products", icon: "flower", module: "products", match: ["VendorAddProduct", "VendorCategories"] },
       { name: "VendorInventory", label: "Inventory", icon: "box", module: "products" },
-      { name: "VendorCustomization", label: "3D Bouquet Management", icon: "cube", module: "products", match: ["VendorPhotoTo3D"] },
+      { name: "VendorCustomization", label: "3D Bouquet Management", icon: "cube", module: "products" },
+      // Business plan and up; other plans see it locked with an upgrade note
+      { name: "VendorPhotoTo3D", label: "Photo to 3D", icon: "sparkle", module: "photo_to_3d" },
       { name: "VendorPromotions", label: "Promotions", icon: "percent", module: "products" },
     ],
   },
