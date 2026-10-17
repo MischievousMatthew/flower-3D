@@ -6,11 +6,14 @@ use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\CreatesSubscriptionTables;
+use Tests\Concerns\SignsInWithApiToken;
 use Tests\TestCase;
 
 class SupplierStatusActionsTest extends TestCase
 {
+    use CreatesSubscriptionTables, SignsInWithApiToken;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -20,6 +23,7 @@ class SupplierStatusActionsTest extends TestCase
         Schema::dropIfExists('suppliers');
         Schema::dropIfExists('users');
         Schema::enableForeignKeyConstraints();
+        $this->createSubscriptionTables();
 
         Schema::create('users', function (Blueprint $table) {
             $table->id();
@@ -28,6 +32,7 @@ class SupplierStatusActionsTest extends TestCase
             $table->string('password');
             $table->string('role')->default('vendor');
             $table->rememberToken()->nullable();
+            $table->string('api_token', 80)->nullable()->unique();
             $table->timestamps();
         });
 
@@ -63,7 +68,7 @@ class SupplierStatusActionsTest extends TestCase
         $vendor = $this->createVendor('activate@example.com');
         $supplier = $this->createSupplier($vendor->id, 'inactive', 'activate-supplier@example.com');
 
-        Sanctum::actingAs($vendor);
+        $this->signIn($vendor);
 
         $this->patchJson("/api/procurement/supply-chain/suppliers/{$supplier->id}/activate")
             ->assertOk()
@@ -77,7 +82,7 @@ class SupplierStatusActionsTest extends TestCase
         $vendor = $this->createVendor('deactivate@example.com');
         $supplier = $this->createSupplier($vendor->id, 'active', 'deactivate-supplier@example.com');
 
-        Sanctum::actingAs($vendor);
+        $this->signIn($vendor);
 
         $this->patchJson("/api/procurement/supply-chain/suppliers/{$supplier->id}/deactivate")
             ->assertOk()
@@ -91,7 +96,7 @@ class SupplierStatusActionsTest extends TestCase
         $vendor = $this->createVendor('blacklist@example.com');
         $supplier = $this->createSupplier($vendor->id, 'active', 'blacklist-supplier@example.com');
 
-        Sanctum::actingAs($vendor);
+        $this->signIn($vendor);
 
         $this->patchJson("/api/procurement/supply-chain/suppliers/{$supplier->id}/blacklist")
             ->assertOk()
@@ -106,7 +111,7 @@ class SupplierStatusActionsTest extends TestCase
         $otherVendor = $this->createVendor('other-owner@example.com');
         $supplier = $this->createSupplier($otherVendor->id, 'inactive', 'other-owner-supplier@example.com');
 
-        Sanctum::actingAs($vendor);
+        $this->signIn($vendor);
 
         $this->patchJson("/api/procurement/supply-chain/suppliers/{$supplier->id}/activate")
             ->assertNotFound();
@@ -116,7 +121,7 @@ class SupplierStatusActionsTest extends TestCase
     {
         $vendor = $this->createVendor('missing-owner@example.com');
 
-        Sanctum::actingAs($vendor);
+        $this->signIn($vendor);
 
         $this->patchJson('/api/procurement/supply-chain/suppliers/999999/blacklist')
             ->assertNotFound();
@@ -127,7 +132,7 @@ class SupplierStatusActionsTest extends TestCase
         $vendor = $this->createVendor('contacts-owner@example.com');
         $supplier = $this->createSupplier($vendor->id, 'active', 'contacts-supplier@example.com');
 
-        Sanctum::actingAs($vendor);
+        $this->signIn($vendor);
 
         $createResponse = $this->postJson("/api/procurement/supply-chain/suppliers/{$supplier->id}/contacts", [
             'company_name' => 'Branch One',
@@ -172,12 +177,16 @@ class SupplierStatusActionsTest extends TestCase
 
     private function createVendor(string $email): User
     {
-        return User::query()->create([
+        $vendor = User::query()->create([
             'name' => 'Vendor User',
             'email' => $email,
             'password' => 'password',
             'role' => 'vendor',
         ]);
+        // Suppliers are a Business-plan feature
+        $this->giveActivePlan($vendor);
+
+        return $vendor;
     }
 
     private function createSupplier(int $ownerId, string $status, string $email): Supplier

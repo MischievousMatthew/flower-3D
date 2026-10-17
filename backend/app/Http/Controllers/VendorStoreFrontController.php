@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\BouquetCustomizationOption;
+use App\Support\BouquetPresets;
 use App\Models\VendorApplication;
 use App\Models\Product;
 use App\Models\User;
@@ -405,7 +406,7 @@ class VendorStorefrontController extends Controller
      */
     public function getCustomizationOptions(Request $request, $storeId)
     {
-        $empty = ['wrappers' => [], 'fillers' => [], 'ribbons' => [], 'cards' => []];
+        $empty = ['wrappers' => [], 'fillers' => [], 'ribbons' => [], 'cards' => [], 'presets' => []];
 
         try {
             $ownerId = $this->resolveCustomizableOwnerId($storeId, $request);
@@ -430,6 +431,11 @@ class VendorStorefrontController extends Controller
                     'fillers' => $options->where('type', BouquetCustomizationOption::TYPE_FILLER)->values(),
                     'ribbons' => $options->where('type', BouquetCustomizationOption::TYPE_RIBBON)->values(),
                     'cards' => $options->where('type', BouquetCustomizationOption::TYPE_CARD)->values(),
+                    // Occasions the shop offers, with their sizes (only the ones turned on)
+                    'presets' => array_values(array_map(
+                        fn ($p) => array_diff_key($p, ['enabled' => true]),
+                        array_filter(BouquetPresets::forOwner($ownerId), fn ($p) => $p['enabled'])
+                    )),
                 ],
             ]);
         } catch (\Exception $e) {

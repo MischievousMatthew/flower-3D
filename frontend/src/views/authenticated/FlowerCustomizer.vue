@@ -7,11 +7,19 @@
         <div class="fc-head-copy">
           <p class="fc-store">{{ storeName ? `Arranged by ${storeName}` : "Custom bouquet" }}</p>
           <h1>Build your bouquet</h1>
-          <p class="fc-lede">Choose up to {{ MAX_FLOWERS }} stems, set them on the wrap, then finish with a wrapper and ribbon.</p>
+          <p class="fc-lede">Pick an occasion and how many flowers, set the stems on the bouquet, then finish {{ hasWrapper ? "with a wrapper and ribbon" : hasRibbon ? "with a ribbon" : "your way" }}.</p>
         </div>
 
         <div class="fc-head-meta">
-          <ol class="fc-stems" aria-label="Stems on the bouquet">
+          <button v-if="preset" type="button" class="fc-preset-chip" title="Change the occasion or size" @click="openStart">
+            <span class="fc-preset-icon" v-html="OCCASION_ICONS[OCCASION_INFO[preset.key]?.icon] || OCCASION_ICONS.flower"></span>
+            <span>{{ presetLabel }}</span>
+            <small>Change</small>
+          </button>
+          <div v-if="maxFlowers > 12" class="fc-stem-bar" role="img" :aria-label="`${placedFlowers.length} of ${maxFlowers} stems placed`">
+            <span :style="{ width: `${(placedFlowers.length / maxFlowers) * 100}%` }"></span>
+          </div>
+          <ol v-else class="fc-stems" aria-label="Stems on the bouquet">
             <li
               v-for="(slot, index) in stemSlots"
               :key="index"
@@ -26,7 +34,7 @@
             </li>
           </ol>
           <div class="fc-head-total">
-            <span>{{ placedFlowers.length }} of {{ MAX_FLOWERS }} stems</span>
+            <span>{{ placedFlowers.length }} of {{ maxFlowers }} stems</span>
             <strong>{{ formatPeso(totalPrice) }}</strong>
           </div>
         </div>
@@ -37,6 +45,60 @@
         class="fc-layout"
         :class="{ 'left-collapsed': isLeftSidebarCollapsed, 'right-collapsed': isRightSidebarCollapsed, fullscreen: isFullscreen }"
       >
+        <!-- Start: pick an occasion, then how many flowers -->
+        <div v-if="startStep" class="fc-start" role="dialog" aria-modal="true" :aria-label="startStep === 'occasion' ? 'Choose an occasion' : 'Choose how many flowers'">
+          <div class="fc-start-card">
+            <template v-if="startStep === 'occasion'">
+              <p class="fc-start-step">Step 1 of 2</p>
+              <h2>What's the bouquet for?</h2>
+              <p class="fc-start-lede">Each occasion has its own style and sizes. You can change it later.</p>
+              <div class="fc-occasions">
+                <button
+                  v-for="p in presets"
+                  :key="p.key"
+                  type="button"
+                  class="fc-occasion"
+                  :class="{ on: draftOccasion === p.key }"
+                  @click="pickOccasion(p.key)"
+                >
+                  <span class="fc-occasion-icon" v-html="OCCASION_ICONS[OCCASION_INFO[p.key]?.icon] || OCCASION_ICONS.flower"></span>
+                  <strong>{{ p.label }}</strong>
+                  <span class="fc-occasion-blurb">{{ OCCASION_INFO[p.key]?.blurb }}</span>
+                  <span class="fc-occasion-meta">{{ p.sizes.join(" · ") }} flowers · {{ p.wrapper && p.ribbon ? "wrapper & ribbon" : p.wrapper ? "wrapper" : "ribbon, no wrapper" }}</span>
+                </button>
+              </div>
+              <button v-if="preset" type="button" class="fc-text-btn fc-start-cancel" @click="startStep = null">Keep {{ presetLabel }}</button>
+            </template>
+
+            <template v-else-if="draftPreset">
+              <p class="fc-start-step">{{ presets.length > 1 ? "Step 2 of 2" : "Choose a size" }}</p>
+              <h2>How many flowers?</h2>
+              <p class="fc-start-lede">{{ draftPreset.label }}: {{ OCCASION_INFO[draftPreset.key]?.blurb }} Bigger bouquets come in a bigger wrap.</p>
+              <div class="fc-sizes">
+                <button
+                  v-for="(size, i) in draftPreset.sizes"
+                  :key="size"
+                  type="button"
+                  class="fc-size"
+                  :class="{ on: preset?.key === draftPreset.key && preset?.size === size }"
+                  :disabled="!!sizeBlocked(size)"
+                  :title="sizeBlocked(size) || `${size} flowers, up to ${fillerLimitFor(size)} fillers`"
+                  @click="choosePreset(size)"
+                >
+                  <strong>{{ size }}</strong>
+                  <span>{{ size === 1 ? "flower" : "flowers" }}</span>
+                  <small>{{ sizeName(draftPreset.sizes, i) }}</small>
+                </button>
+              </div>
+              <p v-if="draftPreset.sizes.some((s) => sizeBlocked(s))" class="fc-start-note">Sizes smaller than what's on your bouquet are greyed out. Hover one to see why.</p>
+              <div class="fc-start-actions">
+                <button v-if="presets.length > 1" type="button" class="fc-text-btn" @click="startStep = 'occasion'">← All occasions</button>
+                <button v-if="preset" type="button" class="fc-text-btn" @click="startStep = null">Keep {{ presetLabel }}</button>
+              </div>
+            </template>
+          </div>
+        </div>
+
         <!-- Catalog -->
         <aside v-if="!isLeftSidebarCollapsed" class="fc-panel fc-catalog" aria-label="Flowers and fillers">
           <div class="fc-panel-head">
@@ -93,16 +155,25 @@
                 <span class="fc-tile-name">{{ flower.product_name }}</span>
                 <span class="fc-tile-meta">
                   <span>{{ formatPeso(flower.price) }}</span>
-                  <span v-if="!canUseFlower(flower)" class="fc-tile-flag">{{ placedFlowers.length >= MAX_FLOWERS ? "Full" : "Sold out" }}</span>
+                  <span v-if="!canUseFlower(flower)" class="fc-tile-flag">{{ placedFlowers.length >= maxFlowers ? "Full" : "Sold out" }}</span>
                   <span v-else class="fc-tile-stock">{{ flower.quantity_in_stock }} left</span>
                 </span>
+                <button
+                  v-if="canUseFlower(flower) && maxFlowers - placedFlowers.length > 1"
+                  type="button"
+                  class="fc-tile-fill"
+                  :title="`Add ${Math.min(maxFlowers - placedFlowers.length, flower.quantity_in_stock - countOfFlower(flower.id))} ${flower.product_name}, spread evenly over the bouquet`"
+                  @click.stop="fillWithFlower(flower)"
+                  @keydown.enter.stop
+                  @keydown.space.stop
+                >Fill the rest</button>
               </div>
             </div>
 
             <template v-if="fillers.length">
               <div class="fc-panel-head fc-subhead">
                 <h2>Fillers</h2>
-                <span>{{ placedFillers.length }} of {{ MAX_FILLERS }} used</span>
+                <span>{{ placedFillers.length }} of {{ maxFillers }} used</span>
               </div>
               <ul class="fc-fillers">
                 <li v-for="filler in filteredFillers" :key="`filler-${filler.id}`">
@@ -528,7 +599,8 @@
               </div>
             </section>
 
-            <section class="fc-section">
+            <p v-if="!hasWrapper" class="fc-note fc-build-note">{{ occasion?.label }} bouquets are hand-tied: no wrapper, just {{ hasRibbon ? "a ribbon" : "the stems" }}.</p>
+            <section v-if="hasWrapper" class="fc-section">
               <div class="fc-panel-head">
                 <h2>Wrapper</h2>
                 <span>{{ wrap.outer.color || wrap.inner.color ? "Custom" : "Original paper" }}</span>
@@ -614,7 +686,7 @@
               </div>
             </section>
 
-            <section class="fc-section">
+            <section v-if="hasRibbon" class="fc-section">
               <div class="fc-panel-head">
                 <h2>Ribbon</h2>
                 <span v-if="!ribbonOptions.length">{{ ribbonColor.toUpperCase() }}</span>
@@ -757,6 +829,17 @@ import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import api from "../../plugins/axios.js";
 import { dressBouquet } from "../../utils/bouquetDressing.js";
 import {
+  DEFAULT_PRESETS,
+  LEGACY_PRESET,
+  OCCASION_INFO,
+  fillerLimitFor,
+  presetsOrDefaults,
+  sizeName,
+  spiralPoints,
+  wrapperScaleFor,
+} from "../../constants/bouquetPresets.js";
+import { OCCASION_ICONS } from "../../constants/occasionIcons.js";
+import {
   clampCardMessage,
   countCardMessage,
   createCard,
@@ -832,8 +915,6 @@ const ROTATION_AXES = [
 ];
 const MOVE_STEP = 0.08;
 const FINE_MOVE_STEP = 0.02;
-const MAX_FLOWERS = 3;
-const MAX_FILLERS = 5;
 // Used only when the vendor has not added their own wrappers or ribbons.
 const paperPresets = ["#d3b18f", "#f3e9dc", "#d7d2c8", "#e2c7cf", "#c8b6a6"];
 // Approximate colours of the model's own papers, for the "Original" swatch.
@@ -878,6 +959,19 @@ const isFullscreen = ref(false);
 const dragFeedback = ref("");
 const ribbonColor = ref("#caa6d9");
 const wrapperScale = ref(1);
+// Occasion preset: what the bouquet is for and how many flowers it holds.
+// The shop's own occasions and sizes arrive with its customization options.
+const presets = ref(DEFAULT_PRESETS);
+const preset = ref(null); // { key, size } once chosen
+const startStep = ref(null); // "occasion" | "size" while the start screen shows
+const draftOccasion = ref(null);
+const occasion = computed(() => presets.value.find((p) => p.key === preset.value?.key) || null);
+const draftPreset = computed(() => presets.value.find((p) => p.key === draftOccasion.value) || null);
+const maxFlowers = computed(() => preset.value?.size ?? LEGACY_PRESET.size);
+const maxFillers = computed(() => fillerLimitFor(maxFlowers.value));
+const hasWrapper = computed(() => occasion.value?.wrapper ?? true);
+const hasRibbon = computed(() => occasion.value?.ribbon ?? true);
+const presetLabel = computed(() => (occasion.value ? `${occasion.value.label} · ${maxFlowers.value} stems` : `${maxFlowers.value} stems`));
 const isLoading3D = ref(true);
 const sceneReady = ref(false);
 const bouquetLoadError = ref("");
@@ -923,13 +1017,15 @@ const selectedInnerWrapper = computed(() => findWrapper(wrap.inner.id));
 const activeWrap = computed(() => wrap[activeWrapLayer.value]);
 const selectedRibbon = computed(() => ribbonOptions.value.find((option) => option.id === selectedRibbonId.value) || null);
 const extrasPrice = computed(
-  () => Number(selectedOuterWrapper.value?.price || 0) + Number(selectedInnerWrapper.value?.price || 0) + Number(selectedRibbon.value?.price || 0),
+  () =>
+    (hasWrapper.value ? Number(selectedOuterWrapper.value?.price || 0) + Number(selectedInnerWrapper.value?.price || 0) : 0) +
+    (hasRibbon.value ? Number(selectedRibbon.value?.price || 0) : 0),
 );
 const totalPrice = computed(() => selectedFlowers.value.reduce((sum, flower) => sum + flower.price, 0) + extrasPrice.value);
 const selectedFlower = computed(() => selectedFlowers.value.find((flower) => flower.sceneId === selectedSceneId.value) || null);
 const flowersSubtotal = computed(() => placedFlowers.value.reduce((sum, flower) => sum + flower.price, 0));
 const fillersSubtotal = computed(() => placedFillers.value.reduce((sum, filler) => sum + filler.price, 0));
-const stemSlots = computed(() => Array.from({ length: MAX_FLOWERS }, (_, index) => placedFlowers.value[index] || null));
+const stemSlots = computed(() => Array.from({ length: maxFlowers.value }, (_, index) => placedFlowers.value[index] || null));
 const flowerImage = (flowerId) => flowers.value.find((flower) => flower.id === flowerId)?.image || null;
 const rangeFill = (value, min, max) => ({ "--fill": `${((Number(value) - min) / (max - min)) * 100}%` });
 const hasTransformTarget = computed(() => bouquetSelected.value || !!selectedFlower.value);
@@ -947,7 +1043,7 @@ const stageHint = computed(() => {
       ? { title: `${selectedFlower.value.product_name} is locked`, detail: "Unlock it in Adjust to move it again." }
       : { title: `Drag ${selectedFlower.value.product_name} over the wrap, or use the handles`, detail: "G move · R rotate · S size · arrow keys nudge · Esc deselect" };
   }
-  if (placedFlowers.value.length >= MAX_FLOWERS) return { title: "All stems placed", detail: "Click one to adjust it, or click the wrap to move the whole bouquet." };
+  if (placedFlowers.value.length >= maxFlowers.value) return { title: "All stems placed", detail: "Click one to adjust it, or click the wrap to move the whole bouquet." };
   return { title: "Pick a flower, then click the wrap", detail: "Drag empty space to look around, scroll to zoom." };
 });
 
@@ -971,8 +1067,8 @@ const countOfFlower = (flowerId, kind = "flower") =>
 const canUseFlower = (flower) => {
   if (isCard(flower)) return !placedCard.value; // one card per bouquet
   if (!flower?.model) return false;
-  if (isFiller(flower)) return placedFillers.value.length < MAX_FILLERS;
-  return placedFlowers.value.length < MAX_FLOWERS && flower.quantity_in_stock > countOfFlower(flower.id);
+  if (isFiller(flower)) return placedFillers.value.length < maxFillers.value;
+  return placedFlowers.value.length < maxFlowers.value && flower.quantity_in_stock > countOfFlower(flower.id);
 };
 
 onMounted(async () => {
@@ -980,7 +1076,18 @@ onMounted(async () => {
   initScene();
   await loadEditingCustomization();
   await Promise.all([loadBouquetModel(), fetchFlowers(), fetchCustomizationOptions()]);
-  if (editingCustomization.value) await restoreBouquet(editingCustomization.value);
+  if (editingCustomization.value) {
+    const saved = editingCustomization.value.preset;
+    preset.value = saved?.key ? { key: saved.key, size: Number(saved.size) } : { ...LEGACY_PRESET };
+    await restoreBouquet(editingCustomization.value);
+    if (saved?.key && !occasion.value) {
+      showToast("This shop no longer offers that occasion. Choose another one to continue.", "error");
+      openStart();
+    }
+  } else {
+    openStart();
+  }
+  applyOccasionBuild();
   window.addEventListener("resize", handleResize);
   window.addEventListener("keydown", onKeydown);
   document.addEventListener("fullscreenchange", syncFullscreenState);
@@ -1058,12 +1165,14 @@ async function loadBouquetModel() {
     const scaledBox = new THREE.Box3().setFromObject(bouquetRoot);
     bouquetRoot.position.y -= scaledBox.min.y;
     bouquetRoot.scale.multiplyScalar(wrapperScale.value);
+    bouquetRoot.position.multiplyScalar(wrapperScale.value);
     arrangement.add(bouquetRoot);
     // Only the two paper layers are tinted; the ribbon is generated.
     dressing = dressBouquet(bouquetRoot);
     dressing.outer.apply(wrap.outer.color);
     dressing.inner.apply(wrap.inner.color);
     dressing.applyRibbon(ribbonColor.value);
+    applyOccasionBuild();
     sceneReady.value = true;
   } catch (error) {
     console.error("Failed to load bouquet base model:", error);
@@ -1102,6 +1211,7 @@ async function fetchCustomizationOptions() {
     });
     const data = response.data?.data || {};
     const toOption = (option) => ({ ...option, id: Number(option.id), price: Number(option.price || 0) });
+    presets.value = presetsOrDefaults(data.presets);
     wrapperOptions.value = (data.wrappers || []).map(toOption);
     ribbonOptions.value = (data.ribbons || []).map(toOption);
     fillers.value = (data.fillers || []).filter((filler) => filler.model_url).map((filler) => ({
@@ -1430,7 +1540,7 @@ function getPlacement(clientX, clientY) {
   pointer.x = ((clientX - bounds.left) / bounds.width) * 2 - 1;
   pointer.y = -((clientY - bounds.top) / bounds.height) * 2 + 1;
   raycaster.setFromCamera(pointer, camera);
-  const intersections = raycaster.intersectObjects(bouquetTargets, true);
+  const intersections = raycaster.intersectObjects(shownTargets(), true);
   if (!intersections.length) return null;
   const hit = intersections[0];
   const normal = hit.face?.normal ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() : new THREE.Vector3(0, 1, 0);
@@ -1484,12 +1594,11 @@ function endTransformDrag(pointerId = null) {
 async function placeFlowerOnBouquet(flower, placement) {
   if (isCard(flower)) return placeCardOnBouquet(flower, placement);
   const filler = isFiller(flower);
-  if (filler && placedFillers.value.length >= MAX_FILLERS) {
-    return showToast(`Maximum of ${MAX_FILLERS} fillers only.`, "error");
+  if (filler && placedFillers.value.length >= maxFillers.value) {
+    return showToast(`Maximum of ${maxFillers.value} fillers only.`, "error");
   }
-  if (!filler && placedFlowers.value.length >= MAX_FLOWERS) {
-    window.alert("Maximum of 3 flowers only");
-    showToast("Maximum of 3 flowers only.", "error");
+  if (!filler && placedFlowers.value.length >= maxFlowers.value) {
+    showToast(`This ${maxFlowers.value}-flower bouquet is full. Choose a bigger size to add more.`, "error");
     return;
   }
   if (!filler && countOfFlower(flower.id) >= Number(flower.quantity_in_stock || 0)) {
@@ -1695,7 +1804,7 @@ function saveCardMessage() {
 
 function applyRibbonColor(color) {
   ribbonColor.value = color;
-  dressing?.applyRibbon(color);
+  dressing?.applyRibbon(hasRibbon.value ? color : null);
 }
 
 function removeFlower(sceneId) {
@@ -1711,6 +1820,109 @@ function removeFlower(sceneId) {
     placedObjects.delete(sceneId);
   }
   if (cardEditor.sceneId === sceneId) closeCardEditor();
+}
+
+// ── Occasion presets ───────────────────────────────────────────────────
+
+// Bouquet parts that are showing (a wedding bouquet hides its paper)
+function isShown(object) {
+  for (let o = object; o; o = o.parent) if (!o.visible) return false;
+  return true;
+}
+const shownTargets = () => bouquetTargets.filter(isShown);
+
+/** Shows or hides the wrapper and ribbon for the chosen occasion */
+function applyOccasionBuild() {
+  if (!dressing) return;
+  dressing.wrapMeshes.forEach((mesh) => (mesh.visible = hasWrapper.value));
+  dressing.applyRibbon(hasRibbon.value ? ribbonColor.value : null);
+}
+watch(occasion, applyOccasionBuild);
+
+/**
+ * Resizes the wrapper for the bouquet size. Everything scales about the floor
+ * centre and placed items move outward with it, keeping their own size.
+ */
+function setWrapperScale(next) {
+  const k = next / (wrapperScale.value || 1);
+  wrapperScale.value = next;
+  if (!bouquetRoot || Math.abs(k - 1) < 1e-6) return;
+  bouquetRoot.scale.multiplyScalar(k);
+  bouquetRoot.position.multiplyScalar(k);
+  for (const [sceneId, object] of placedObjects) {
+    object.position.multiplyScalar(k);
+    const item = selectedFlowers.value.find((f) => f.sceneId === sceneId);
+    if (item) item.position = { x: object.position.x, y: object.position.y, z: object.position.z };
+  }
+}
+
+/** Why a size can't be picked right now (it's smaller than what's placed), or "" */
+function sizeBlocked(size) {
+  if (size < placedFlowers.value.length) return `You've placed ${placedFlowers.value.length} flowers. Remove some to choose ${size}.`;
+  if (fillerLimitFor(size) < placedFillers.value.length) return `You've placed ${placedFillers.value.length} fillers; this size allows ${fillerLimitFor(size)}.`;
+  return "";
+}
+
+function openStart() {
+  const only = presets.value.length === 1 ? presets.value[0].key : null;
+  draftOccasion.value = preset.value?.key ?? only;
+  startStep.value = only ? "size" : "occasion";
+}
+
+function pickOccasion(key) {
+  draftOccasion.value = key;
+  startStep.value = "size";
+}
+
+function choosePreset(size) {
+  const key = draftOccasion.value;
+  if (!key || sizeBlocked(size)) return;
+  preset.value = { key, size };
+  setWrapperScale(wrapperScaleFor(size));
+  startStep.value = null;
+}
+
+/** Places copies of one flower evenly over the bouquet top, up to the size */
+async function fillWithFlower(flower) {
+  if (!bouquetRoot || isFiller(flower) || isCard(flower)) return;
+  const room = maxFlowers.value - placedFlowers.value.length;
+  const stock = Number(flower.quantity_in_stock || 0) - countOfFlower(flower.id);
+  const count = Math.min(room, stock);
+  if (count <= 0) return enforceFlowerLimit(flower);
+
+  // Aim at the top of what's showing: the wrapper's opening, or the stems
+  const box = new THREE.Box3();
+  shownTargets().forEach((mesh) => box.expandByObject(mesh));
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const radius = Math.max(size.x, size.z) * 0.3;
+  const taken = placedFlowers.value.map((f) => placedObjects.get(f.sceneId)?.getWorldPosition(new THREE.Vector3())).filter(Boolean);
+  const gap = (radius * 2) / Math.sqrt(maxFlowers.value + 1);
+
+  const down = new THREE.Raycaster();
+  const spots = [];
+  for (const p of spiralPoints(maxFlowers.value * 2, radius)) {
+    if (spots.length >= count) break;
+    const origin = new THREE.Vector3(center.x + p.x, box.max.y + 1, center.z + p.z);
+    const used = [...taken, ...spots.map((s) => s.point)];
+    if (used.some((t) => Math.hypot(t.x - origin.x, t.z - origin.z) < gap * 0.7)) continue;
+    down.set(origin, new THREE.Vector3(0, -1, 0));
+    const hit = down.intersectObjects(shownTargets(), true)[0];
+    if (!hit) continue;
+    const point = hit.point.clone().add(new THREE.Vector3(0, 0.05, 0));
+    flowerLayer.updateMatrixWorld();
+    spots.push({ point, normal: new THREE.Vector3(0, 1, 0), local: flowerLayer.worldToLocal(point.clone()) });
+  }
+  if (!spots.length) return showToast("There's no free space left on the bouquet. Move some flowers or choose a bigger size.", "error");
+
+  for (const spot of spots) await placeFlowerOnBouquet(flower, spot);
+  const short = count - spots.length;
+  showToast(
+    short > 0
+      ? `Added ${spots.length} ${flower.product_name}. There was only room for ${spots.length}; move flowers to make space for more.`
+      : `Added ${spots.length} ${flower.product_name}. Drag any of them to adjust.`,
+    "success",
+  );
 }
 
 function resetDesign() {
@@ -1918,11 +2130,10 @@ function enforceFlowerLimit(flower) {
     return showToast("A bouquet can have one card. Remove the current card to choose another.", "error");
   }
   if (isFiller(flower)) {
-    return showToast(`Maximum of ${MAX_FILLERS} fillers only.`, "error");
+    return showToast(`Maximum of ${maxFillers.value} fillers only.`, "error");
   }
-  if (placedFlowers.value.length >= MAX_FLOWERS) {
-    window.alert("Maximum of 3 flowers only");
-    return showToast("Maximum of 3 flowers only.", "error");
+  if (placedFlowers.value.length >= maxFlowers.value) {
+    return showToast(`This ${maxFlowers.value}-flower bouquet is full. Choose a bigger size to add more.`, "error");
   }
   if (flower.quantity_in_stock <= countOfFlower(flower.id)) {
     return showToast(`${flower.product_name} is out of stock.`, "error");
@@ -1983,10 +2194,11 @@ function buildBouquetCustomization() {
     inner_paper_color: wrap.inner.color,
     ribbon_color: ribbonColor.value,
     wrapper_scale: wrapperScale.value,
+    preset: preset.value ? { key: preset.value.key, size: preset.value.size } : { ...LEGACY_PRESET },
     // Prices for these are looked up by id on the server.
-    wrapper: selectedOuterWrapper.value ? { id: selectedOuterWrapper.value.id, name: selectedOuterWrapper.value.name } : null,
-    inner_wrapper: selectedInnerWrapper.value ? { id: selectedInnerWrapper.value.id, name: selectedInnerWrapper.value.name } : null,
-    ribbon: selectedRibbon.value ? { id: selectedRibbon.value.id, name: selectedRibbon.value.name } : null,
+    wrapper: hasWrapper.value && selectedOuterWrapper.value ? { id: selectedOuterWrapper.value.id, name: selectedOuterWrapper.value.name } : null,
+    inner_wrapper: hasWrapper.value && selectedInnerWrapper.value ? { id: selectedInnerWrapper.value.id, name: selectedInnerWrapper.value.name } : null,
+    ribbon: hasRibbon.value && selectedRibbon.value ? { id: selectedRibbon.value.id, name: selectedRibbon.value.name } : null,
     // The card's price comes from its size on the server, and the message is
     // checked against the card's allowance there too.
     card: placedCard.value
@@ -4064,6 +4276,239 @@ function showToast(message, type = "success") {
   .fc-page *::before,
   .fc-page *::after {
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Occasion presets ─────────────────────────────────────────────── */
+.fc-layout {
+  position: relative;
+}
+.fc-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.fc-preset-chip:hover {
+  border-color: var(--rosewood);
+}
+.fc-preset-chip small {
+  color: var(--rosewood);
+  font-weight: 600;
+}
+.fc-preset-icon,
+.fc-occasion-icon {
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--ivory-deep);
+  color: var(--rosewood-dark);
+}
+.fc-preset-icon {
+  width: 26px;
+  height: 26px;
+}
+.fc-preset-icon :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
+.fc-stem-bar {
+  width: 160px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ivory-deep);
+}
+.fc-stem-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--rosewood);
+  transition: width 0.25s var(--ease-out);
+}
+
+.fc-start {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--ivory) 88%, transparent);
+  backdrop-filter: blur(6px);
+  overflow-y: auto;
+}
+.fc-start-card {
+  width: min(880px, 100%);
+  padding: 32px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+  box-shadow: 0 24px 60px rgba(30, 27, 24, 0.12);
+}
+.fc-start-step {
+  margin: 0 0 6px;
+  color: var(--rosewood);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.fc-start-card h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.fc-start-lede {
+  margin: 6px 0 22px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+.fc-occasions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+.fc-occasion {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--ivory);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s var(--ease-out), box-shadow 0.15s;
+}
+.fc-occasion:hover,
+.fc-occasion.on {
+  border-color: var(--rosewood);
+  box-shadow: 0 10px 24px rgba(30, 27, 24, 0.08);
+  transform: translateY(-2px);
+}
+.fc-occasion-icon {
+  width: 42px;
+  height: 42px;
+  margin-bottom: 4px;
+}
+.fc-occasion-icon :deep(svg) {
+  width: 22px;
+  height: 22px;
+}
+.fc-occasion strong {
+  font-size: 15px;
+}
+.fc-occasion-blurb {
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.fc-occasion-meta {
+  margin-top: 4px;
+  color: var(--rosewood-dark);
+  font-size: 12px;
+  font-weight: 500;
+}
+.fc-sizes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.fc-size {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 22px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--ivory);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s var(--ease-out);
+}
+.fc-size strong {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 500;
+  line-height: 1;
+}
+.fc-size span {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.fc-size small {
+  margin-top: 6px;
+  color: var(--rosewood);
+  font-size: 12px;
+  font-weight: 600;
+}
+.fc-size:hover:not(:disabled),
+.fc-size.on {
+  border-color: var(--rosewood);
+  transform: translateY(-2px);
+}
+.fc-size:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.fc-start-note {
+  margin: 14px 0 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+.fc-start-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 18px;
+}
+.fc-start-cancel {
+  margin-top: 18px;
+}
+.fc-tile-fill {
+  margin-top: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--rosewood-dark);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fc-tile-fill:hover {
+  border-color: var(--rosewood);
+  background: var(--ivory-deep);
+}
+.fc-build-note {
+  margin: 0 0 4px;
+}
+
+@media (max-width: 720px) {
+  .fc-start {
+    padding: 12px;
+  }
+  .fc-start-card {
+    padding: 22px 18px;
+  }
+  .fc-start-card h2 {
+    font-size: 26px;
   }
 }
 </style>

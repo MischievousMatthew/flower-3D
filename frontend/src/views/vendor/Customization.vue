@@ -10,7 +10,7 @@
           <p class="cz-kicker">Flower customizer</p>
           <h1>3D Bouquets</h1>
           <p class="cz-lede">
-            Choose what customers can use when they build a bouquet in 3D: wrappers, flowers,
+            Choose what customers can use when they build a bouquet in 3D: occasions and sizes, wrappers, flowers,
             fillers and ribbons.
           </p>
         </div>
@@ -30,7 +30,7 @@
           @click="switchTab(tab.key)"
         >
           <span>{{ tab.label }}</span>
-          <span class="cz-count">{{ tabCount(tab.key) }}</span>
+          <span v-if="tabCount(tab.key) !== null" class="cz-count">{{ tabCount(tab.key) }}</span>
         </button>
       </nav>
 
@@ -98,6 +98,9 @@
           </article>
         </div>
       </section>
+
+      <!-- Occasions (Wedding, Birthday, …) and their sizes for the customizer -->
+      <BouquetPresetsPanel v-else-if="activeTab === 'presets'" class="cz-panel" @count="(n) => (presetCount = n)" />
 
       <!-- Wrappers, fillers and ribbons share one form and one list. -->
       <section
@@ -428,6 +431,7 @@ import api from "../../plugins/axios";
 import vendorHeader from "../../layouts/vendorHeader.vue";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import ShopLayout from "../../components/vendor/shop/ShopLayout.vue";
+import BouquetPresetsPanel from "../../components/vendor/shop/BouquetPresetsPanel.vue";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import "../../styles/bloomcraft.css";
@@ -438,6 +442,7 @@ const TABS = [
   { key: "filler", label: "Fillers" },
   { key: "ribbon", label: "Ribbons" },
   { key: "card", label: "Cards" },
+  { key: "presets", label: "Occasions" },
 ];
 
 const CARD_SIZES = ["Small", "Medium", "Large"];
@@ -531,7 +536,9 @@ const savingLabel = computed(() =>
     : "Saving…",
 );
 
-const tabCount = (key) => (key === "flowers" ? flowers.value.length : options[key].length);
+// Occasions shows how many are on; the rest count their items
+const presetCount = ref(null); // unknown until the tab loads
+const tabCount = (key) => (key === "presets" ? presetCount.value : key === "flowers" ? flowers.value.length : options[key].length);
 
 onMounted(() => {
   resetForm();

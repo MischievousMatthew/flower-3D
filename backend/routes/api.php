@@ -71,6 +71,7 @@ use App\Http\Controllers\ProductReportController; // ← NEW
 use App\Http\Controllers\VendorSubscriptionController;
 use App\Http\Controllers\VendorAccountController;
 use App\Http\Controllers\VendorCustomizationOptionController;
+use App\Http\Controllers\VendorBouquetPresetController;
 
 /*
 |--------------------------------------------------------------------------
@@ -398,6 +399,9 @@ Route::middleware('token.auth')->group(function () {
 
             // 3D customizer wrappers, fillers and ribbons.
             Route::get('/customization-options',               [VendorCustomizationOptionController::class, 'index']);
+            // Occasion presets (Wedding, Birthday, …) and their sizes for the customizer
+            Route::get('/bouquet-presets',                     [VendorBouquetPresetController::class, 'index']);
+            Route::put('/bouquet-presets',                     [VendorBouquetPresetController::class, 'update']);
             Route::post('/customization-options',              [VendorCustomizationOptionController::class, 'store']);
             Route::post('/customization-options/{id}',         [VendorCustomizationOptionController::class, 'update'])->whereNumber('id');
             Route::patch('/customization-options/{id}/active', [VendorCustomizationOptionController::class, 'setActive'])->whereNumber('id');

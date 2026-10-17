@@ -9,11 +9,14 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\CreatesSubscriptionTables;
+use Tests\Concerns\SignsInWithApiToken;
 use Tests\TestCase;
 
 class VendorPaymentDetailsTest extends TestCase
 {
+    use CreatesSubscriptionTables, SignsInWithApiToken;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -32,6 +35,7 @@ class VendorPaymentDetailsTest extends TestCase
             $table->string('role')->default('customer');
             $table->json('vendor_data')->nullable();
             $table->rememberToken()->nullable();
+            $table->string('api_token', 80)->nullable()->unique();
             $table->timestamps();
         });
 
@@ -77,9 +81,13 @@ class VendorPaymentDetailsTest extends TestCase
             $table->string('phone')->nullable();
             $table->text('address')->nullable();
             $table->rememberToken()->nullable();
+            $table->string('api_token', 80)->nullable()->unique();
             $table->softDeletes();
             $table->timestamps();
         });
+
+        // After this test's own tables, so its employees table is the one used
+        $this->createSubscriptionTables();
     }
 
     public function test_vendor_can_update_payment_details_with_large_numeric_account_number(): void
@@ -87,7 +95,7 @@ class VendorPaymentDetailsTest extends TestCase
         $user = $this->createVendorUser();
         $vendorApplication = $this->createApprovedVendorApplication($user);
 
-        Sanctum::actingAs($user);
+        $this->signIn($user);
 
         $accountNumber = '091712345678901234567890';
 
@@ -117,7 +125,7 @@ class VendorPaymentDetailsTest extends TestCase
     {
         $user = $this->createVendorUser();
 
-        Sanctum::actingAs($user);
+        $this->signIn($user);
 
         $response = $this->putJson('/api/vendor/profile/payment-details', [
             'payout_method'       => 'bank',
@@ -142,7 +150,7 @@ class VendorPaymentDetailsTest extends TestCase
             ->where('id', $vendorApplication->id)
             ->update(['account_number' => 'corrupted-ciphertext']);
 
-        Sanctum::actingAs($user);
+        $this->signIn($user);
 
         $response = $this->getJson('/api/vendor/profile');
 
@@ -161,7 +169,7 @@ class VendorPaymentDetailsTest extends TestCase
             ->where('id', $vendorApplication->id)
             ->update(['account_number' => Crypt::encryptString('09171234567')]);
 
-        Sanctum::actingAs($user);
+        $this->signIn($user);
 
         $response = $this->getJson('/api/vendor/profile');
 
@@ -187,7 +195,7 @@ class VendorPaymentDetailsTest extends TestCase
                 'same_day_delivery' => 'not-a-bool',
             ]);
 
-        Sanctum::actingAs($user);
+        $this->signIn($user);
 
         $response = $this->putJson('/api/vendor/profile/payment-details', [
             'payout_method'       => 'bank',
@@ -220,7 +228,7 @@ class VendorPaymentDetailsTest extends TestCase
             'status'    => 'Active',
         ]);
 
-        Sanctum::actingAs($employee);
+        $this->signIn($employee);
 
         $response = $this->putJson('/api/vendor/profile/payment-details', [
             'payout_method'       => 'bank',

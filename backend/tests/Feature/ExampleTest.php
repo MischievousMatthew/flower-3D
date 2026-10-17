@@ -2,18 +2,18 @@
 
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
+/**
+ * The backend is API-only (there's no page at "/"), so this smoke test checks
+ * the API is up and its token sign-in guards protected routes.
+ */
 class ExampleTest extends TestCase
 {
-    /**
-     * A basic test example.
-     */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_protected_api_routes_require_a_token(): void
     {
-        $response = $this->get('/');
-
-        $response->assertStatus(200);
+        $this->getJson('/api/vendor/profile')
+            ->assertStatus(401)
+            ->assertJson(['success' => false, 'message' => 'Unauthenticated']);
     }
 }

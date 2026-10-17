@@ -64,8 +64,9 @@
                   <span class="item-qty">{{ item.quantity }} × {{ money(item.unit_price) }}</span>
                   <div v-if="hasDetails(item)" class="item-details">
                     <span v-if="item.is_custom_bouquet" class="sp-chip violet">Part of a custom 3D bouquet</span>
-                    <span v-if="custom(item).paper_color" class="swatch"><i :style="{ background: custom(item).paper_color }"></i>Wrapper</span>
-                    <span v-if="custom(item).ribbon_color" class="swatch"><i :style="{ background: custom(item).ribbon_color }"></i>Ribbon</span>
+                    <span v-if="presetOf(item)" class="sp-chip blue">{{ presetOf(item).label }} · {{ presetOf(item).size }} stems</span>
+                    <span v-if="custom(item).paper_color && presetOf(item)?.wrapper !== false" class="swatch"><i :style="{ background: custom(item).paper_color }"></i>Wrapper</span>
+                    <span v-if="custom(item).ribbon_color && presetOf(item)?.ribbon !== false" class="swatch"><i :style="{ background: custom(item).ribbon_color }"></i>Ribbon</span>
                     <span v-if="item.color" class="detail">Colour: {{ item.color }}</span>
                     <span v-if="item.size" class="detail">Size: {{ item.size }}</span>
                     <span v-for="(v, k) in extraCustom(item)" :key="k" class="detail">{{ k }}: {{ v }}</span>
@@ -163,11 +164,20 @@ import {
   PAYMENT_LABEL, STATUS_HINT, STATUS_TONE, dayLabel, daysFromToday, formatDateTime, isLate, money, parseCustomizations, shouldPrepare,
 } from "../../../components/vendor/orders/orderUi";
 import "../../../components/vendor/shop/shop.css";
+import { DEFAULT_PRESETS } from "../../../constants/bouquetPresets";
 
 const router = useRouter();
 const ENDED = ["cancelled", "returned", "refunded"];
 // Keys stored with each customization that aren't worth showing
-const HIDDEN_CUSTOM = ["type", "store_id", "vendor_id", "placement", "paper_color", "ribbon_color", "flowers", "bouquet_model_url", "model_3d_url", "scene_id"];
+const HIDDEN_CUSTOM = ["type", "store_id", "vendor_id", "placement", "paper_color", "ribbon_color", "flowers", "bouquet_model_url", "model_3d_url", "scene_id", "preset"];
+
+// The bouquet's occasion and size, with whether it has a wrapper and ribbon
+const presetOf = (item) => {
+  const saved = custom(item)?.preset;
+  if (!saved?.key) return null;
+  const known = DEFAULT_PRESETS.find((p) => p.key === saved.key);
+  return { label: saved.label || known?.label || saved.key, size: saved.size, wrapper: known?.wrapper, ribbon: known?.ribbon };
+};
 
 const order = ref(null);
 const error = ref("");

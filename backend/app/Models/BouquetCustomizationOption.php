@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\BouquetPresets;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
@@ -91,6 +92,15 @@ class BouquetCustomizationOption extends Model
      */
     public static function resolveSelections(int $ownerId, array $customizations): array
     {
+        // The occasion preset first: its size caps the flowers and fillers, and
+        // parts the occasion doesn't have (a wedding bouquet's wrapper) are dropped
+        $preset = BouquetPresets::check(BouquetPresets::forOwner($ownerId), $customizations);
+        if (! $preset['ok']) {
+            return self::failure($preset['message'], $customizations);
+        }
+        $customizations = $preset['customizations'];
+        $maxFillers = $preset['filler_limit'];
+
         // 'wrapper' is the outer paper; 'inner_wrapper' the inner layer.
         $wrapperId = (int) data_get($customizations, 'wrapper.id', 0);
         $innerWrapperId = (int) data_get($customizations, 'inner_wrapper.id', 0);
@@ -99,8 +109,8 @@ class BouquetCustomizationOption extends Model
         $fillers = data_get($customizations, 'fillers', []);
         $fillers = is_array($fillers) ? array_values($fillers) : [];
 
-        if (count($fillers) > self::MAX_FILLERS) {
-            return self::failure('A custom bouquet can have up to ' . self::MAX_FILLERS . ' fillers.', $customizations);
+        if (count($fillers) > $maxFillers) {
+            return self::failure('This bouquet can have up to ' . $maxFillers . ' fillers.', $customizations);
         }
 
         $ids = array_filter(array_merge(
