@@ -28,9 +28,27 @@
           :style="fill(scale, 0.25, 2)"
           @input="$emit('scale', Number($event.target.value))"
         />
-        <output>{{ Number(scale).toFixed(2) }}&times;</output>
+        <span class="sc-size-field" :class="{ disabled: locked }">
+          <input
+            type="number"
+            inputmode="decimal"
+            min="0.25"
+            max="2"
+            step="0.01"
+            aria-label="Size, from 0.25 to 2"
+            :disabled="locked"
+            :value="sizeDraft ?? Number(scale).toFixed(2)"
+            @focus="sizeDraft = Number(scale).toFixed(2)"
+            @input="sizeDraft = $event.target.value"
+            @keydown.enter.prevent="commitSize($event)"
+            @keydown.esc.stop="cancelSize($event)"
+            @blur="commitSize($event)"
+          />
+          <span aria-hidden="true">&times;</span>
+        </span>
       </span>
     </div>
+    <p v-if="mode === 'flower'" class="sc-note-size">Size is for the preview only. It doesn't change the real flower's size.</p>
 
     <button type="button" class="sc-row sc-more" :aria-expanded="open" @click="open = !open">
       <span>{{ mode === "flower" ? "Tilt & position" : "Position" }}</span>
@@ -107,9 +125,25 @@ defineProps({
   side: { type: String, default: "right" },
   docked: { type: Boolean, default: false },
 });
-defineEmits(["nudge-turn", "scale", "rotate", "nudge-rotate", "nudge", "lock", "remove", "reset", "close"]);
+const emit = defineEmits(["nudge-turn", "scale", "rotate", "nudge-rotate", "nudge", "lock", "remove", "reset", "close"]);
 
 const open = ref(false);
+
+// Typed size: applied on Enter or leaving the box, kept within the slider's range
+const sizeDraft = ref(null);
+
+function commitSize(event) {
+  if (sizeDraft.value === null) return;
+  const typed = Number.parseFloat(String(sizeDraft.value).replace(",", "."));
+  sizeDraft.value = null;
+  if (Number.isFinite(typed)) emit("scale", Math.round(Math.min(Math.max(typed, 0.25), 2) * 100) / 100);
+  if (event.type === "keydown") event.target.blur();
+}
+
+function cancelSize(event) {
+  sizeDraft.value = null;
+  event.target.blur();
+}
 
 // Fills the slider track up to the thumb
 function fill(value, min, max) {
@@ -258,10 +292,55 @@ function fill(value, min, max) {
   color: var(--ink);
 }
 
-.sc-size output {
-  min-width: 36px;
-  text-align: right;
+.sc-size-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 26px;
+  padding: 0 6px 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink-soft);
+  transition: border-color 0.2s ease;
+}
+
+.sc-size-field:focus-within {
+  border-color: var(--ink);
+}
+
+.sc-size-field.disabled {
+  opacity: 0.4;
+}
+
+.sc-size-field input {
+  width: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
   font-variant-numeric: tabular-nums;
+  text-align: right;
+  outline: none;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.sc-size-field input::-webkit-outer-spin-button,
+.sc-size-field input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.sc .sc-size-field input:focus-visible {
+  outline: none;
+}
+
+.sc-note-size {
+  margin: -4px 0 8px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-soft);
 }
 
 .sc input[type="range"] {
