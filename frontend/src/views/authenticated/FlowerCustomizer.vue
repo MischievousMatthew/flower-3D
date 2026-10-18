@@ -126,7 +126,7 @@
 
             <section v-else-if="activeStep === 'wrap'" class="fc-step-panel">
               <h2>Choose the wrap</h2>
-              <p class="fc-step-lede">{{ wrap.outer.color || wrap.inner.color ? "Custom paper." : "It comes in its original paper." }} Pick each layer.</p>
+              <p class="fc-step-lede">Papers this shop has in stock. Pick one for each layer.</p>
 
               <div class="fc-segment" role="tablist" aria-label="Wrapper layer">
                 <button
@@ -140,27 +140,11 @@
                   @click="activeWrapLayer = layer.key"
                 >
                   <span class="fc-segment-dot" :style="{ background: wrap[layer.key].color || originalWrap[layer.key] }"></span>
-                  {{ layer.label }}
+                  <span class="fc-segment-label">{{ layer.label }}</span>
                 </button>
               </div>
 
               <div v-if="wrapperOptions.length" class="fc-options" role="radiogroup" :aria-label="`${activeWrapLayer === 'outer' ? 'Outer' : 'Inner'} wrapper`">
-                <button
-                  type="button"
-                  role="radio"
-                  class="fc-option"
-                  :class="{ active: !activeWrap.id && !activeWrap.color }"
-                  :aria-checked="!activeWrap.id && !activeWrap.color"
-                  @click="selectWrapper(activeWrapLayer, null)"
-                >
-                  <span class="fc-option-swatch" :style="{ background: originalWrap[activeWrapLayer] }"></span>
-                  <span class="fc-option-copy">
-                    <strong>Original</strong>
-                    <small>The paper this bouquet comes with</small>
-                  </span>
-                  <span class="fc-option-price">Free</span>
-                  <BcIcon v-if="!activeWrap.id && !activeWrap.color" name="check" class="fc-option-check" />
-                </button>
                 <button
                   v-for="option in wrapperOptions"
                   :key="option.id"
@@ -179,32 +163,6 @@
                   <span class="fc-option-price">{{ option.price ? `+${formatPeso(option.price)}` : "Free" }}</span>
                   <BcIcon v-if="activeWrap.id === option.id" name="check" class="fc-option-check" />
                 </button>
-              </div>
-              <div v-else class="fc-swatches">
-                <button
-                  type="button"
-                  class="fc-swatch fc-swatch-original"
-                  :class="{ active: !activeWrap.color }"
-                  :style="{ background: originalWrap[activeWrapLayer] }"
-                  title="Original paper"
-                  aria-label="Original paper"
-                  @click="applyWrapColor(activeWrapLayer, null)"
-                ><BcIcon name="reset" /></button>
-                <button
-                  v-for="color in paperPresets"
-                  :key="color"
-                  type="button"
-                  class="fc-swatch"
-                  :class="{ active: activeWrap.color === color }"
-                  :style="{ background: color }"
-                  :aria-label="`${activeWrapLayer === 'outer' ? 'Outer' : 'Inner'} wrapper colour ${color}`"
-                  @click="pickWrapPreset(color)"
-                ></button>
-                <label class="fc-swatch fc-swatch-custom" title="Custom colour">
-                  <span class="bc-sr-only">Custom wrapper colour</span>
-                  <input type="color" :value="activeWrap.color || originalWrap[activeWrapLayer]" @input="pickWrapPreset($event.target.value)" />
-                  <BcIcon name="plus" />
-                </label>
               </div>
             </section>
 
@@ -230,23 +188,6 @@
                   <span class="fc-option-price">{{ option.price ? `+${formatPeso(option.price)}` : "Free" }}</span>
                   <BcIcon v-if="selectedRibbonId === option.id" name="check" class="fc-option-check" />
                 </button>
-              </div>
-              <div v-else class="fc-swatches">
-                <button
-                  v-for="color in ribbonPresets"
-                  :key="color"
-                  type="button"
-                  class="fc-swatch"
-                  :class="{ active: ribbonColor === color }"
-                  :style="{ background: color }"
-                  :aria-label="`Ribbon colour ${color}`"
-                  @click="applyRibbonColor(color)"
-                ></button>
-                <label class="fc-swatch fc-swatch-custom" title="Custom colour">
-                  <span class="bc-sr-only">Custom ribbon colour</span>
-                  <input v-model="ribbonColor" type="color" @input="applyRibbonColor(ribbonColor)" />
-                  <BcIcon name="plus" />
-                </label>
               </div>
             </section>
 
@@ -355,12 +296,12 @@
                 </li>
               </ul>
               <dl class="fc-review-extras">
-                <div v-if="hasWrapper"><dt>Wrap</dt><dd>{{ wrapSummary }}</dd></div>
-                <div v-if="hasRibbon">
+                <div v-if="hasWrapper && wrapperOptions.length"><dt>Wrap</dt><dd>{{ wrapSummary }}</dd></div>
+                <div v-if="showsRibbon">
                   <dt>Ribbon</dt>
                   <dd>
                     <span class="fc-dot" :style="{ background: selectedRibbon?.color_hex || ribbonColor }"></span>
-                    {{ selectedRibbon?.name || (ribbonOptions.length ? "None" : "Custom colour") }}
+                    {{ selectedRibbon?.name || "None" }}
                   </dd>
                 </div>
                 <div v-if="cards.length"><dt>Card</dt><dd>{{ placedCard ? `${placedCard.product_name} · ${placedCard.message ? "message written" : "no message yet"}` : "None" }}</dd></div>
@@ -462,8 +403,10 @@
             </template>
             <span v-else class="fc-hint-keys">
               {{ selectedFlower?.kind === "card" ? stageHint.title : selectedFlower?.locked ? `${selectedFlower.product_name} is locked` : "Drag to look around" }}
-              <span class="fc-hint-sep" aria-hidden="true">·</span>
-              <kbd>G</kbd> move <kbd>R</kbd> rotate <kbd>S</kbd> size <kbd>F</kbd> focus
+              <span class="fc-hint-shortcuts">
+                <span class="fc-hint-sep" aria-hidden="true">·</span>
+                <kbd>G</kbd> move <kbd>R</kbd> rotate <kbd>S</kbd> size <kbd>F</kbd> focus
+              </span>
             </span>
           </div>
         </main>
@@ -585,8 +528,7 @@ const ROTATION_AXES = [
 const MOVE_STEP = 0.08;
 const FINE_MOVE_STEP = 0.02;
 // Used only when the vendor has not added their own wrappers or ribbons.
-const paperPresets = ["#d3b18f", "#f3e9dc", "#d7d2c8", "#e2c7cf", "#c8b6a6"];
-// Approximate colours of the classic model's own papers, for the "Original" swatch.
+// Approximate colours of the classic model's own papers, shown on the layer tabs until a paper is picked.
 const ORIGINAL_WRAP = { outer: "#d6b68c", inner: "#ab9196" };
 // What the two colour layers are called on each design
 const LAYER_NAMES = {
@@ -594,7 +536,6 @@ const LAYER_NAMES = {
   korean: ["Outer sheets", "Inner sheets"],
   basket: ["Basket", "Liner"],
 };
-const ribbonPresets = ["#caa6d9", "#d95f76", "#7d8f69", "#f0dfb2", "#6c5b7b"];
 
 const route = useRoute();
 const router = useRouter();
@@ -642,6 +583,8 @@ const maxFlowers = computed(() => preset.value?.size ?? LEGACY_PRESET.size);
 const maxFillers = computed(() => fillerLimitFor(maxFlowers.value));
 const hasWrapper = computed(() => occasion.value?.wrapper ?? true);
 const hasRibbon = computed(() => occasion.value?.ribbon ?? true);
+// A ribbon only shows when the occasion has one and the shop stocks ribbons
+const showsRibbon = computed(() => hasRibbon.value && ribbonOptions.value.length > 0);
 // The bouquet's design follows its occasion (classic for older bouquets)
 const baseDesign = ref("classic"); // what's built in the scene right now
 // Editing a bouquet saved before designs existed: keep its original model
@@ -748,8 +691,8 @@ const activeStep = ref("flowers");
 const steps = computed(() =>
   buildSteps({
     hasFillers: fillers.value.length > 0,
-    hasWrapper: hasWrapper.value,
-    hasRibbon: hasRibbon.value,
+    hasWrapper: hasWrapper.value && wrapperOptions.value.length > 0,
+    hasRibbon: showsRibbon.value,
     hasCards: cards.value.length > 0,
   }),
 );
@@ -770,17 +713,16 @@ const orderLines = computed(() =>
   receiptLines({
     flowers: placedFlowers.value,
     fillers: placedFillers.value,
-    outerWrapper: selectedOuterWrapper.value,
-    innerWrapper: selectedInnerWrapper.value,
-    ribbon: selectedRibbon.value,
+    outerWrapper: hasWrapper.value ? selectedOuterWrapper.value : null,
+    innerWrapper: hasWrapper.value ? selectedInnerWrapper.value : null,
+    ribbon: hasRibbon.value ? selectedRibbon.value : null,
     card: placedCard.value,
   }),
 );
 const wrapSummary = computed(() =>
   wrapLayers.value
     .map((layer) => {
-      const picked = findWrapper(wrap[layer.key].id);
-      return `${layer.label}: ${picked?.name || (wrap[layer.key].color ? "custom colour" : "original")}`;
+      return `${layer.label}: ${findWrapper(wrap[layer.key].id)?.name || "None"}`;
     })
     .join(" · "),
 );
@@ -857,6 +799,7 @@ onMounted(async () => {
   } else {
     openStart();
   }
+  applyStockDressing();
   applyOccasionBuild();
   window.addEventListener("resize", handleResize);
   window.addEventListener("keydown", onKeydown);
@@ -887,6 +830,10 @@ function initScene() {
   controls.enableDamping = true;
   controls.target.set(0, 1.5, 0);
   controls.minDistance = 3.8;
+  // Dragging the view yourself takes over from the glide back
+  controls.addEventListener("start", () => {
+    cameraTween = null;
+  });
   controls.maxDistance = 9;
   controls.maxPolarAngle = Math.PI * 0.48;
   const ambient = new THREE.AmbientLight(0xffffff, 1.2);
@@ -929,7 +876,6 @@ async function loadBouquetModel(design = currentDesign.value) {
     baseDefaults.value = base.defaults;
     dressing.outer.apply(wrap.outer.color);
     dressing.inner.apply(wrap.inner.color);
-    dressing.applyRibbon(ribbonColor.value);
     applyOccasionBuild();
     sceneReady.value = true;
   } catch (error) {
@@ -1032,9 +978,17 @@ function applyWrapColor(layer, color) {
   dressing?.[layer].apply(wrap[layer].color);
 }
 
-function pickWrapPreset(color) {
-  wrap[activeWrapLayer.value].id = null;
-  applyWrapColor(activeWrapLayer.value, color);
+const cheapest = (options) => [...options].sort((first, second) => first.price - second.price)[0] || null;
+
+// Wrapper and ribbon always come from the shop's stock: anything not picked yet
+// (or no longer offered) starts on the cheapest option
+function applyStockDressing() {
+  if (wrapperOptions.value.length) {
+    for (const layer of ["outer", "inner"]) {
+      if (!findWrapper(wrap[layer].id)) selectWrapper(layer, cheapest(wrapperOptions.value));
+    }
+  }
+  if (ribbonOptions.value.length && !selectedRibbon.value) selectRibbon(cheapest(ribbonOptions.value));
 }
 
 function selectRibbon(option) {
@@ -1575,7 +1529,7 @@ function saveCardMessage() {
 
 function applyRibbonColor(color) {
   ribbonColor.value = color;
-  dressing?.applyRibbon(hasRibbon.value ? color : null);
+  dressing?.applyRibbon(showsRibbon.value ? color : null);
 }
 
 function removeFlower(sceneId) {
@@ -1606,9 +1560,9 @@ const shownTargets = () => bouquetTargets.filter(isShown);
 function applyOccasionBuild() {
   if (!dressing) return;
   dressing.wrapMeshes.forEach((mesh) => (mesh.visible = hasWrapper.value));
-  dressing.applyRibbon(hasRibbon.value ? ribbonColor.value : null);
+  dressing.applyRibbon(showsRibbon.value ? ribbonColor.value : null);
 }
-watch(occasion, applyOccasionBuild);
+watch([occasion, showsRibbon], applyOccasionBuild);
 
 /**
  * Resizes the wrapper for the bouquet size. Everything scales about the floor
@@ -1730,6 +1684,11 @@ function clearSelection() {
   selectedSceneId.value = null;
   bouquetSelected.value = false;
 }
+
+// Deselecting in any way (Esc, ×, empty space, Remove, Start over) undoes Focus
+watch(hasTransformTarget, (selected) => {
+  if (!selected) restoreViewBeforeFocus();
+});
 
 function toggleBouquetSelection() {
   if (bouquetSelected.value) clearSelection();
@@ -1855,10 +1814,38 @@ function focusSelection() {
   const box = new THREE.Box3().setFromObject(target);
   if (box.isEmpty()) return;
   const center = box.getCenter(new THREE.Vector3());
+  // Remember the view from before the first focus, so deselecting can go back to it
+  if (!viewBeforeFocus) viewBeforeFocus = { position: camera.position.clone(), target: controls.target.clone() };
+  cameraTween = null;
   const shift = center.sub(controls.target);
   controls.target.add(shift);
   camera.position.add(shift);
   controls.update();
+}
+
+let viewBeforeFocus = null;
+let cameraTween = null;
+
+// Glides the camera back to where it was before Focus
+function restoreViewBeforeFocus() {
+  if (!viewBeforeFocus || !camera || !controls) return;
+  cameraTween = {
+    start: performance.now(),
+    fromPosition: camera.position.clone(),
+    fromTarget: controls.target.clone(),
+    toPosition: viewBeforeFocus.position,
+    toTarget: viewBeforeFocus.target,
+  };
+  viewBeforeFocus = null;
+}
+
+function stepCameraTween() {
+  if (!cameraTween) return;
+  const t = Math.min((performance.now() - cameraTween.start) / 450, 1);
+  const eased = 1 - (1 - t) ** 3;
+  camera.position.lerpVectors(cameraTween.fromPosition, cameraTween.toPosition, eased);
+  controls.target.lerpVectors(cameraTween.fromTarget, cameraTween.toTarget, eased);
+  if (t === 1) cameraTween = null;
 }
 
 function onKeydown(event) {
@@ -1963,7 +1950,7 @@ function buildBouquetCustomization() {
     vendor_id: vendorOwnerId.value,
     paper_color: wrap.outer.color,
     inner_paper_color: wrap.inner.color,
-    ribbon_color: ribbonColor.value,
+    ribbon_color: showsRibbon.value ? ribbonColor.value : null,
     wrapper_scale: wrapperScale.value,
     // Older bouquets (original model) keep the old rules: no occasion is sent
     preset: !legacyBase.value && preset.value ? { key: preset.value.key, size: preset.value.size } : null,
@@ -2181,11 +2168,21 @@ function queueResize() {
 const anchorBox = new THREE.Box3();
 const anchorPoint = new THREE.Vector3();
 
+// The card is placed once per selection, then stays put while the flower is
+// sized, turned or moved. Selecting again (or resizing the window) re-places it.
+let anchoredTo = null;
+
 function placeSelectionCard() {
   const stage = stageEl.value;
   const card = selectionCardEl.value?.$el;
   const target = gizmo?.object;
   if (!stage || !card || !target || !camera) return;
+  const key = bouquetSelected.value ? "bouquet" : selectedSceneId.value;
+  if (anchoredTo === key) {
+    keepCardInStage(stage, card);
+    return;
+  }
+  anchoredTo = key;
   const width = stage.clientWidth;
   const height = stage.clientHeight;
   const cardWidth = card.offsetWidth || 232;
@@ -2207,14 +2204,25 @@ function placeSelectionCard() {
   if (spot.side !== selectionCardSide.value) selectionCardSide.value = spot.side;
 }
 
+// Opening Fine-tune makes the card taller; nudge it up only if it would spill off the stage
+function keepCardInStage(stage, card) {
+  if (selectionCardDocked.value || !selectionCardPosition.value) return;
+  const top = parseFloat(selectionCardPosition.value.top);
+  const maxTop = Math.max(16, stage.clientHeight - 16 - card.offsetHeight);
+  if (top > maxTop + 1) selectionCardPosition.value = { ...selectionCardPosition.value, top: `${Math.round(maxTop)}px` };
+}
+
 function animateScene() {
   animationFrameId = window.requestAnimationFrame(animateScene);
   if (hasTransformTarget.value) placeSelectionCard();
+  else anchoredTo = null;
+  stepCameraTween();
   controls?.update();
   renderer?.render(scene, camera);
 }
 
 function handleResize() {
+  anchoredTo = null;
   if (!viewerContainer.value || !camera || !renderer) return;
   camera.aspect = viewerContainer.value.clientWidth / viewerContainer.value.clientHeight;
   camera.updateProjectionMatrix();
@@ -2891,50 +2899,11 @@ function showToast(message, type = "success") {
   color: var(--rosewood-dark);
 }
 
-.fc-swatches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
 
-.fc-swatch {
-  position: relative;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(30, 27, 24, 0.12);
-  cursor: pointer;
-  transition: box-shadow 0.25s;
-}
 
-.fc-swatch.active {
-  box-shadow: inset 0 0 0 1px rgba(30, 27, 24, 0.12), 0 0 0 2px var(--paper), 0 0 0 3px var(--ink);
-}
 
-.fc-swatch-original {
-  display: grid;
-  place-items: center;
-  color: rgba(30, 27, 24, 0.55);
-}
 
-.fc-swatch-custom {
-  display: grid;
-  place-items: center;
-  border: 1px dashed rgba(30, 27, 24, 0.3);
-  box-shadow: none;
-  color: var(--ink-soft);
-}
 
-.fc-swatch-custom input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
 
 /* ============================================================
    TOAST
@@ -3241,14 +3210,18 @@ function showToast(message, type = "success") {
 }
 
 .fc-sheet-body {
+  min-width: 0;
   min-height: 0;
   padding: 20px 26px 24px;
+  overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: thin;
 }
 
 .fc-step-panel {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 14px;
   align-content: start;
 }
@@ -3274,7 +3247,35 @@ function showToast(message, type = "success") {
 }
 
 .fc-segment-btn {
+  min-width: 0;
+  padding-inline: 8px !important;
   border-radius: 8px !important;
+  font-size: 12.5px !important;
+}
+
+.fc-segment-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-options .fc-option {
+  min-width: 0;
+}
+
+.fc-options .fc-option-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.fc-options .fc-option-copy strong,
+.fc-options .fc-option-copy small {
+  overflow-wrap: anywhere;
+}
+
+.fc-options .fc-option-price {
+  flex-shrink: 0;
+  font-size: 12px;
 }
 
 .fc-card-settings {
@@ -3382,6 +3383,12 @@ function showToast(message, type = "success") {
   margin: 0 4px;
 }
 
+.fc-hint-shortcuts {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .fc-hint kbd {
   padding: 1px 6px;
   border: 1px solid var(--line);
@@ -3442,9 +3449,8 @@ function showToast(message, type = "success") {
     bottom: 12px;
   }
 
-  .fc-hint-keys kbd,
-  .fc-hint-sep {
-    display: none;
+  .fc-hint-shortcuts {
+    display: none !important;
   }
 }
 </style>
