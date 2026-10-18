@@ -1,0 +1,11 @@
+/* Base look for the customizer line icons; components size them as needed */
+.fc-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

@@ -37,3 +37,5 @@ backend/.env              # Environment file
 # ========================
 /backend/_ide_helper.php
 /backend/_ide_helper_models.php
+# Brainstorming mockups and plan scratch
+.superpowers/

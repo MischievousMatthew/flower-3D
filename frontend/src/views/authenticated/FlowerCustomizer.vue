@@ -3,47 +3,10 @@
     <NavHeader :cartCount="cartCount" :isAuthenticated="isAuthenticated" />
 
     <div class="fc-shell">
-      <header class="fc-head">
-        <div class="fc-head-copy">
-          <p class="fc-store">{{ storeName ? `Arranged by ${storeName}` : "Custom bouquet" }}</p>
-          <h1>Build your bouquet</h1>
-          <p class="fc-lede">Pick an occasion and how many flowers, set the stems on the bouquet, then finish {{ hasWrapper ? "with a wrapper and ribbon" : hasRibbon ? "with a ribbon" : "your way" }}.</p>
-        </div>
-
-        <div class="fc-head-meta">
-          <button v-if="preset" type="button" class="fc-preset-chip" title="Change the occasion or size" @click="openStart">
-            <span class="fc-preset-icon" v-html="OCCASION_ICONS[OCCASION_INFO[preset.key]?.icon] || OCCASION_ICONS.flower"></span>
-            <span>{{ presetLabel }}</span>
-            <small>Change</small>
-          </button>
-          <div v-if="maxFlowers > 12" class="fc-stem-bar" role="img" :aria-label="`${placedFlowers.length} of ${maxFlowers} stems placed`">
-            <span :style="{ width: `${(placedFlowers.length / maxFlowers) * 100}%` }"></span>
-          </div>
-          <ol v-else class="fc-stems" aria-label="Stems on the bouquet">
-            <li
-              v-for="(slot, index) in stemSlots"
-              :key="index"
-              class="fc-stem"
-              :class="{ filled: slot, active: slot && slot.sceneId === selectedSceneId }"
-            >
-              <button v-if="slot" type="button" :aria-label="`Select ${slot.product_name}`" @click="selectPlacedFlower(slot.sceneId)">
-                <img v-if="flowerImage(slot.id)" :src="flowerImage(slot.id)" alt="" />
-                <BcIcon v-else name="flower" />
-              </button>
-              <span v-else class="fc-stem-empty" aria-label="Empty stem slot"><BcIcon name="plus" /></span>
-            </li>
-          </ol>
-          <div class="fc-head-total">
-            <span>{{ placedFlowers.length }} of {{ maxFlowers }} stems</span>
-            <strong>{{ formatPeso(totalPrice) }}</strong>
-          </div>
-        </div>
-      </header>
-
       <div
         ref="layoutContainer"
         class="fc-layout"
-        :class="{ 'left-collapsed': isLeftSidebarCollapsed, 'right-collapsed': isRightSidebarCollapsed, fullscreen: isFullscreen }"
+        :class="{ fullscreen: isFullscreen }"
       >
         <!-- Start: pick an occasion, then how many flowers -->
         <div v-if="startStep" class="fc-start" role="dialog" aria-modal="true" :aria-label="startStep === 'occasion' ? 'Choose an occasion' : 'Choose how many flowers'">
@@ -99,512 +62,71 @@
           </div>
         </div>
 
-        <!-- Catalog -->
-        <aside v-if="!isLeftSidebarCollapsed" class="fc-panel fc-catalog" aria-label="Flowers and fillers">
-          <div class="fc-panel-head">
-            <h2>Flowers</h2>
-            <span v-if="flowers.length">{{ filteredFlowers.length }} available</span>
-          </div>
+        <!-- The sheet: one step's choices at a time, the receipt underneath -->
+        <aside class="fc-sheet" aria-label="Build your bouquet">
+          <header class="fc-sheet-head">
+            <button type="button" class="fc-back" @click="goBack">
+              <BcIcon name="chevronLeft" />
+              {{ storeName || "Back" }}
+            </button>
+            <h1>Build your bouquet</h1>
+            <p class="fc-occasion-line">
+              <span>{{ occasionLine }}</span>
+              <button type="button" class="fc-change" @click="openStart">Change</button>
+            </p>
+          </header>
 
-          <label class="fc-search">
-            <span class="bc-sr-only">Search flowers</span>
-            <BcIcon name="search" />
-            <input v-model="search" type="search" placeholder="Search flowers" />
-          </label>
+          <CustomizerSteps :steps="steps" :active="activeStep" :done="doneSteps" @select="activeStep = $event" />
 
-          <div class="fc-catalog-scroll">
+          <div class="fc-sheet-body">
             <p v-if="!storeId" class="fc-note">Open the customizer from a flower shop's page to see the stems they offer.</p>
 
-            <div v-else-if="loadingFlowers" class="fc-grid" aria-busy="true" aria-label="Loading flowers">
-              <div v-for="n in 4" :key="n" class="fc-tile is-skeleton">
-                <div class="fc-tile-media bc-skeleton"></div>
-                <div class="bc-skeleton fc-skel-line"></div>
-                <div class="bc-skeleton fc-skel-line short"></div>
-              </div>
-            </div>
-
-            <p v-else-if="!filteredFlowers.length" class="fc-note">
-              {{ search ? `No flowers match “${search}”.` : "This shop hasn't added any stems for custom bouquets yet." }}
-            </p>
-
-            <div v-else class="fc-grid">
-              <div
-                v-for="flower in filteredFlowers"
-                :key="flower.id"
-                role="button"
-                tabindex="0"
-                class="fc-tile"
-                :class="{
-                  active: pendingFlower?.kind !== 'filler' && pendingFlower?.id === flower.id,
-                  disabled: !canUseFlower(flower),
-                  dragging: draggedFlower?.kind !== 'filler' && draggedFlower?.id === flower.id,
-                }"
-                :aria-disabled="!canUseFlower(flower)"
-                :draggable="canUseFlower(flower)"
-                @dragstart="onDragStart($event, flower)"
+            <section v-else-if="activeStep === 'flowers'" class="fc-step-panel">
+              <h2>Choose your flowers</h2>
+              <p class="fc-step-lede">Pick a flower, then click where it goes on the bouquet. Or drag it on.</p>
+              <StemPicker
+                kind="flower"
+                :items="filteredFlowers"
+                :loading="loadingFlowers"
+                :search="search"
+                :empty-text="search ? `No flowers match “${search}”.` : 'This shop hasn\'t added any stems for custom bouquets yet.'"
+                :count-of="(id) => countOfFlower(id)"
+                :can-use="canUseFlower"
+                :pending-id="pendingFlower && pendingFlower.kind !== 'filler' && pendingFlower.kind !== 'card' ? pendingFlower.id : null"
+                :show-fill="maxFlowers - placedFlowers.length > 1"
+                :price-label="stemMeta"
+                :unavailable-text="() => (placedFlowers.length >= maxFlowers ? 'Full' : 'Sold out')"
+                @update:search="search = $event"
+                @pick="selectFlower"
+                @fill="fillWithFlower"
+                @dragstart="onDragStart"
                 @dragend="onDragEnd"
-                @click="selectFlower(flower)"
-                @keydown.enter.prevent="selectFlower(flower)"
-                @keydown.space.prevent="selectFlower(flower)"
-              >
-                <span class="fc-tile-media">
-                  <img v-if="flower.image" :src="flower.image" :alt="flower.product_name" />
-                  <BcIcon v-else name="flower" class="fc-tile-fallback" />
-                  <span v-if="countOfFlower(flower.id)" class="fc-tile-count">{{ countOfFlower(flower.id) }}</span>
-                </span>
-                <span class="fc-tile-name">{{ flower.product_name }}</span>
-                <span class="fc-tile-meta">
-                  <span>{{ formatPeso(flower.price) }}</span>
-                  <span v-if="!canUseFlower(flower)" class="fc-tile-flag">{{ placedFlowers.length >= maxFlowers ? "Full" : "Sold out" }}</span>
-                  <span v-else class="fc-tile-stock">{{ flower.quantity_in_stock }} left</span>
-                </span>
-                <button
-                  v-if="canUseFlower(flower) && maxFlowers - placedFlowers.length > 1"
-                  type="button"
-                  class="fc-tile-fill"
-                  :title="`Add ${Math.min(maxFlowers - placedFlowers.length, flower.quantity_in_stock - countOfFlower(flower.id))} ${flower.product_name}, spread evenly over the bouquet`"
-                  @click.stop="fillWithFlower(flower)"
-                  @keydown.enter.stop
-                  @keydown.space.stop
-                >Fill the rest</button>
-              </div>
-            </div>
-
-            <template v-if="fillers.length">
-              <div class="fc-panel-head fc-subhead">
-                <h2>Fillers</h2>
-                <span>{{ placedFillers.length }} of {{ maxFillers }} used</span>
-              </div>
-              <ul class="fc-fillers">
-                <li v-for="filler in filteredFillers" :key="`filler-${filler.id}`">
-                  <div
-                    role="button"
-                    tabindex="0"
-                    class="fc-filler"
-                    :class="{
-                      active: pendingFlower?.kind === 'filler' && pendingFlower?.id === filler.id,
-                      disabled: !canUseFlower(filler),
-                      dragging: draggedFlower?.kind === 'filler' && draggedFlower?.id === filler.id,
-                    }"
-                    :aria-disabled="!canUseFlower(filler)"
-                    :draggable="canUseFlower(filler)"
-                    @dragstart="onDragStart($event, filler)"
-                    @dragend="onDragEnd"
-                    @click="selectFlower(filler)"
-                    @keydown.enter.prevent="selectFlower(filler)"
-                    @keydown.space.prevent="selectFlower(filler)"
-                  >
-                    <span class="fc-filler-icon"><BcIcon name="leaf" /></span>
-                    <span class="fc-filler-copy">
-                      <strong>{{ filler.product_name }}</strong>
-                      <small v-if="filler.description">{{ filler.description }}</small>
-                    </span>
-                    <span class="fc-filler-price">
-                      {{ filler.price ? `+${formatPeso(filler.price)}` : "Free" }}
-                      <small v-if="countOfFlower(filler.id, 'filler')">{{ countOfFlower(filler.id, "filler") }} on bouquet</small>
-                    </span>
-                  </div>
-                </li>
-              </ul>
-            </template>
-
-            <!-- Message cards (one per bouquet) -->
-            <template v-if="cards.length">
-              <div class="fc-panel-head fc-subhead">
-                <h2>Cards</h2>
-                <span>{{ placedCard ? "1 of 1 used" : "Add one message card" }}</span>
-              </div>
-              <ul class="fc-cards">
-                <li v-for="card in cards" :key="`card-${card.id}`">
-                  <div
-                    role="button"
-                    tabindex="0"
-                    class="fc-card-option"
-                    :class="{
-                      active: pendingFlower?.kind === 'card' && pendingFlower?.id === card.id,
-                      placed: placedCard?.id === card.id,
-                      disabled: !canUseFlower(card),
-                      dragging: draggedFlower?.kind === 'card' && draggedFlower?.id === card.id,
-                    }"
-                    :aria-disabled="!canUseFlower(card)"
-                    :draggable="canUseFlower(card)"
-                    @dragstart="onDragStart($event, card)"
-                    @dragend="onDragEnd"
-                    @click="selectFlower(card)"
-                    @keydown.enter.prevent="selectFlower(card)"
-                    @keydown.space.prevent="selectFlower(card)"
-                  >
-                    <span class="fc-card-photo">
-                      <img v-if="card.image" :src="card.image" :alt="card.product_name" />
-                      <BcIcon v-else name="card" />
-                    </span>
-                    <span class="fc-card-copy">
-                      <strong>{{ card.product_name }}</strong>
-                      <small>Up to {{ card.limit }} {{ card.limit_type }}</small>
-                      <small>{{ card.sizes.map((size) => size.label).join(", ") }}</small>
-                    </span>
-                    <span class="fc-filler-price">
-                      {{ cardPriceLabel(card) }}
-                      <small v-if="placedCard?.id === card.id">On bouquet</small>
-                    </span>
-                  </div>
-                </li>
-              </ul>
-            </template>
-          </div>
-        </aside>
-
-        <!-- Stage -->
-        <main
-          class="fc-stage"
-          :class="{ over: isDragOver, dragging: isTransformDragging, placing: pendingFlower || draggedFlower }"
-          @dragover.prevent="onCanvasDragOver"
-          @dragleave="onCanvasDragLeave"
-          @drop.prevent="onCanvasDrop"
-        >
-          <div ref="viewerContainer" class="fc-viewer"></div>
-
-          <div class="fc-toolbar fc-toolbar-left">
-            <button
-              type="button"
-              class="fc-tool"
-              :class="{ on: !isLeftSidebarCollapsed }"
-              :data-tip="isLeftSidebarCollapsed ? 'Show flowers' : 'Hide flowers'"
-              :aria-label="isLeftSidebarCollapsed ? 'Show flowers' : 'Hide flowers'"
-              :aria-pressed="!isLeftSidebarCollapsed"
-              @click="toggleLeftSidebar"
-            >
-              <BcIcon name="panelLeft" />
-            </button>
-          </div>
-
-          <div class="fc-toolbar fc-toolbar-right">
-            <button type="button" class="fc-tool" data-tip="Start over" aria-label="Start over" :disabled="!selectedFlowers.length" @click="resetDesign">
-              <BcIcon name="reset" />
-            </button>
-            <button type="button" class="fc-tool" data-tip="Save as image" aria-label="Save as image" :disabled="!sceneReady" @click="takeScreenshot">
-              <BcIcon name="camera" />
-            </button>
-            <button
-              type="button"
-              class="fc-tool"
-              :data-tip="isFullscreen ? 'Exit full screen' : 'Full screen'"
-              :aria-label="isFullscreen ? 'Exit full screen' : 'Full screen'"
-              :disabled="!sceneReady"
-              @click="toggleFullscreen"
-            >
-              <BcIcon :name="isFullscreen ? 'minimize' : 'maximize'" />
-            </button>
-            <span class="fc-toolbar-rule" aria-hidden="true"></span>
-            <button
-              type="button"
-              class="fc-tool"
-              :class="{ on: !isRightSidebarCollapsed }"
-              :data-tip="isRightSidebarCollapsed ? 'Show details' : 'Hide details'"
-              :aria-label="isRightSidebarCollapsed ? 'Show details' : 'Hide details'"
-              :aria-pressed="!isRightSidebarCollapsed"
-              @click="toggleRightSidebar"
-            >
-              <BcIcon name="panelRight" />
-            </button>
-          </div>
-
-          <div v-if="sceneReady" class="fc-toolbar fc-toolbar-center" role="toolbar" aria-label="Move, rotate and size">
-            <button
-              type="button"
-              class="fc-tool"
-              :class="{ on: bouquetSelected }"
-              :data-tip="bouquetSelected ? 'Deselect bouquet (Esc)' : 'Select whole bouquet'"
-              :aria-pressed="bouquetSelected"
-              aria-label="Select whole bouquet"
-              @click="toggleBouquetSelection"
-            >
-              <BcIcon name="bouquet" />
-            </button>
-            <span class="fc-toolbar-rule" aria-hidden="true"></span>
-            <button
-              v-for="mode in TRANSFORM_MODES"
-              :key="mode.value"
-              type="button"
-              class="fc-tool"
-              :class="{ on: hasTransformTarget && transformMode === mode.value }"
-              :data-tip="`${mode.label} (${mode.key})`"
-              :aria-label="mode.label"
-              :aria-pressed="transformMode === mode.value"
-              :disabled="!hasTransformTarget || (mode.value === 'scale' && bouquetSelected)"
-              @click="transformMode = mode.value"
-            >
-              <BcIcon :name="mode.icon" />
-            </button>
-            <span class="fc-toolbar-rule" aria-hidden="true"></span>
-            <button type="button" class="fc-tool" data-tip="Focus view (F)" aria-label="Focus the view on the selection" :disabled="!hasTransformTarget" @click="focusSelection">
-              <BcIcon name="target" />
-            </button>
-          </div>
-
-          <div v-if="bouquetLoadError" class="fc-stage-center">
-            <div class="fc-stage-message">
-              <BcIcon name="info" />
-              <h3>The bouquet couldn't load</h3>
-              <p>{{ bouquetLoadError }}</p>
-            </div>
-          </div>
-          <div v-else-if="isLoading3D" class="fc-stage-center">
-            <div class="fc-stage-loading">
-              <span class="bc-skeleton fc-skel-arch"></span>
-              <p>Setting up the bouquet</p>
-            </div>
-          </div>
-
-          <div v-if="sceneReady" class="fc-hint" :class="{ live: dragFeedback || pendingFlower }" role="status" aria-live="polite">
-            <BcIcon :name="pendingFlower || draggedFlower ? 'target' : selectedFlower ? 'move' : 'rotate'" />
-            <span class="fc-hint-copy">
-              <strong>{{ dragFeedback || stageHint.title }}</strong>
-              <span v-if="!dragFeedback">{{ stageHint.detail }}</span>
-            </span>
-            <button v-if="pendingFlower" type="button" class="fc-hint-cancel" aria-label="Cancel placing" @click="pendingFlower = null">
-              <BcIcon name="x" />
-            </button>
-          </div>
-        </main>
-
-        <!-- Inspector -->
-        <aside v-if="!isRightSidebarCollapsed" class="fc-panel fc-inspector" aria-label="Bouquet details">
-          <div class="fc-inspector-scroll">
-            <section class="fc-section">
-              <div class="fc-panel-head">
-                <h2>On the bouquet</h2>
-                <span v-if="selectedFlowers.length">{{ selectedFlowers.length }} item{{ selectedFlowers.length === 1 ? "" : "s" }}</span>
-              </div>
-              <p v-if="!selectedFlowers.length" class="fc-note">Nothing placed yet. Pick a flower on the left, then click the wrap.</p>
-              <ul v-else class="fc-placed">
-                <li
-                  v-for="selection in selectedFlowers"
-                  :key="selection.sceneId"
-                  class="fc-placed-row"
-                  :class="{ active: selectedSceneId === selection.sceneId }"
-                >
-                  <button type="button" class="fc-placed-main" @click="selectPlacedFlower(selection.sceneId)">
-                    <span class="fc-placed-thumb">
-                      <img v-if="selection.kind === 'card' && selection.image" :src="selection.image" alt="" />
-                      <img v-else-if="isStem(selection) && flowerImage(selection.id)" :src="flowerImage(selection.id)" alt="" />
-                      <BcIcon v-else :name="selection.kind === 'filler' ? 'leaf' : selection.kind === 'card' ? 'card' : 'flower'" />
-                    </span>
-                    <span class="fc-placed-copy">
-                      <strong>{{ selection.product_name }}</strong>
-                      <small>{{ placedKindLabel(selection) }} · {{ formatPeso(selection.price) }}</small>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    class="fc-mini"
-                    :class="{ on: selection.locked }"
-                    :aria-label="selection.locked ? `Unlock ${selection.product_name}` : `Lock ${selection.product_name}`"
-                    :title="selection.locked ? 'Unlock position' : 'Lock position'"
-                    @click="toggleFlowerLock(selection.sceneId)"
-                  >
-                    <BcIcon :name="selection.locked ? 'lock' : 'unlock'" />
-                  </button>
-                  <button
-                    type="button"
-                    class="fc-mini danger"
-                    :aria-label="`Remove ${selection.product_name}`"
-                    title="Remove"
-                    @click="removeFlower(selection.sceneId)"
-                  >
-                    <BcIcon name="trash" />
-                  </button>
-                </li>
-              </ul>
+              />
             </section>
 
-            <section class="fc-section">
-              <div class="fc-panel-head">
-                <h2>Adjust</h2>
-                <span v-if="bouquetSelected" class="fc-truncate">Whole bouquet</span>
-                <span v-else-if="selectedFlower" class="fc-truncate">{{ selectedFlower.product_name }}</span>
-              </div>
-              <p v-if="!hasTransformTarget" class="fc-note">
-                Click a flower to adjust it, or click the wrap (or the bouquet button above the stage) to move the whole bouquet.
-              </p>
-
-              <div v-else class="fc-adjust">
-                <!-- Whole bouquet -->
-                <template v-if="bouquetSelected">
-                  <p class="fc-note">Moves the whole arrangement in the view. Your flowers stay where you placed them on the wrap.</p>
-                  <div class="fc-control">
-                    <div class="fc-control-head">
-                      <label for="fc-bouquet-turn">Turn</label>
-                      <output>{{ Math.round(bouquetTurn) }}&deg;</output>
-                    </div>
-                    <div class="fc-control-row">
-                      <button type="button" class="fc-step" aria-label="Turn left 15 degrees" @click="setBouquetTurn(bouquetTurn - 15)"><BcIcon name="minus" /></button>
-                      <input
-                        id="fc-bouquet-turn"
-                        class="fc-range"
-                        type="range"
-                        min="-180"
-                        max="180"
-                        :value="bouquetTurn"
-                        :style="rangeFill(bouquetTurn, -180, 180)"
-                        @input="setBouquetTurn(Number($event.target.value))"
-                      />
-                      <button type="button" class="fc-step" aria-label="Turn right 15 degrees" @click="setBouquetTurn(bouquetTurn + 15)"><BcIcon name="plus" /></button>
-                    </div>
-                  </div>
-                </template>
-
-                <!-- A flower, filler or card -->
-                <template v-else>
-                  <button
-                    type="button"
-                    class="fc-switch"
-                    role="switch"
-                    :aria-checked="selectedFlower.locked"
-                    @click="toggleSelectedLock"
-                  >
-                    <span class="fc-switch-copy">
-                      <strong><BcIcon :name="selectedFlower.locked ? 'lock' : 'unlock'" /> Hold position</strong>
-                      <small>{{ selectedFlower.locked ? "Moving, turning and sizing are off." : "Drag it on the wrap, use the handles or the buttons below." }}</small>
-                    </span>
-                    <span class="fc-switch-track"><span class="fc-switch-knob"></span></span>
-                  </button>
-
-                  <div class="fc-control">
-                    <div class="fc-control-head">
-                      <label for="fc-size">Size</label>
-                      <output>{{ Number(selectedFlower.scale ?? 1).toFixed(2) }}&times;</output>
-                    </div>
-                    <input
-                      id="fc-size"
-                      class="fc-range"
-                      type="range"
-                      min="0.25"
-                      max="2"
-                      step="0.01"
-                      :disabled="selectedFlower.locked"
-                      :value="selectedFlower.scale ?? 1"
-                      :style="rangeFill(selectedFlower.scale ?? 1, 0.25, 2)"
-                      @input="updateSelectedScale(Number($event.target.value))"
-                    />
-                  </div>
-
-                  <div v-for="axis in ROTATION_AXES" :key="axis.key" class="fc-control">
-                    <div class="fc-control-head">
-                      <label :for="`fc-rot-${axis.key}`">{{ axis.label }}</label>
-                      <output>{{ Math.round(selectedFlower.rotation[`${axis.key}Deg`] || 0) }}&deg;</output>
-                    </div>
-                    <div class="fc-control-row">
-                      <button type="button" class="fc-step" :aria-label="`${axis.minus} 15 degrees`" :disabled="selectedFlower.locked" @click="nudgeSelectedRotation(axis.key, -15)"><BcIcon name="minus" /></button>
-                      <input
-                        :id="`fc-rot-${axis.key}`"
-                        class="fc-range"
-                        type="range"
-                        min="-180"
-                        max="180"
-                        :disabled="selectedFlower.locked"
-                        :value="selectedFlower.rotation[`${axis.key}Deg`] || 0"
-                        :style="rangeFill(selectedFlower.rotation[`${axis.key}Deg`] || 0, -180, 180)"
-                        @input="updateSelectedRotation(axis.key, Number($event.target.value))"
-                      />
-                      <button type="button" class="fc-step" :aria-label="`${axis.plus} 15 degrees`" :disabled="selectedFlower.locked" @click="nudgeSelectedRotation(axis.key, 15)"><BcIcon name="plus" /></button>
-                    </div>
-                  </div>
-                </template>
-
-                <!-- Up, down, left, right as seen on screen; forward/back via the handles or E / Q -->
-                <div class="fc-move">
-                  <div class="fc-move-copy">
-                    <span>Move</span>
-                    <small>Hold Shift for small steps. E / Q move it away from or toward you.</small>
-                  </div>
-                  <div class="fc-pad" :class="{ locked: moveLocked }">
-                    <button type="button" class="fc-pad-up" aria-label="Move up" title="Up (↑)" :disabled="moveLocked" @click="nudgeSelectedPosition('up', $event)"><BcIcon name="arrowUp" /></button>
-                    <button type="button" class="fc-pad-left" aria-label="Move left" title="Left (←)" :disabled="moveLocked" @click="nudgeSelectedPosition('left', $event)"><BcIcon name="arrowLeft" /></button>
-                    <button type="button" class="fc-pad-right" aria-label="Move right" title="Right (→)" :disabled="moveLocked" @click="nudgeSelectedPosition('right', $event)"><BcIcon name="arrowRight" /></button>
-                    <button type="button" class="fc-pad-down" aria-label="Move down" title="Down (↓)" :disabled="moveLocked" @click="nudgeSelectedPosition('down', $event)"><BcIcon name="arrowDown" /></button>
-                  </div>
-                </div>
-
-                <button v-if="bouquetSelected" type="button" class="fc-text-btn" @click="resetBouquetPlacement">
-                  <BcIcon name="reset" /> Put the bouquet back in the centre
-                </button>
-                <button v-else type="button" class="fc-text-btn" :disabled="selectedFlower.locked" @click="resetSelectedTransform">
-                  <BcIcon name="reset" /> Reset size and angle
-                </button>
-
-                <details class="fc-keys">
-                  <summary>Keyboard shortcuts</summary>
-                  <dl>
-                    <div><dt>G / R / S</dt><dd>Move, rotate or size with the handles</dd></div>
-                    <div><dt>Arrow keys</dt><dd>Up, down, left, right</dd></div>
-                    <div><dt>E / Q</dt><dd>Away from you / toward you</dd></div>
-                    <div><dt>Shift</dt><dd>Smaller steps</dd></div>
-                    <div><dt>F</dt><dd>Focus the view on the selection</dd></div>
-                    <div><dt>Delete</dt><dd>Remove the selected item</dd></div>
-                    <div><dt>Esc</dt><dd>Deselect</dd></div>
-                  </dl>
-                </details>
-              </div>
+            <section v-else-if="activeStep === 'fillers'" class="fc-step-panel">
+              <h2>Add fillers</h2>
+              <p class="fc-step-lede">Greenery and small blooms between the stems. {{ placedFillers.length }} of {{ maxFillers }} used.</p>
+              <StemPicker
+                kind="filler"
+                :items="filteredFillers"
+                :search="search"
+                :empty-text="search ? `No fillers match “${search}”.` : 'This shop has no fillers.'"
+                :count-of="(id) => countOfFlower(id, 'filler')"
+                :can-use="canUseFlower"
+                :pending-id="pendingFlower?.kind === 'filler' ? pendingFlower.id : null"
+                :price-label="(item) => (item.price ? `+${formatPeso(item.price)}` : 'Free') + (item.description ? ` · ${item.description}` : '')"
+                :unavailable-text="() => 'Full'"
+                @update:search="search = $event"
+                @pick="selectFlower"
+                @dragstart="onDragStart"
+                @dragend="onDragEnd"
+              />
             </section>
 
-            <section v-if="cards.length" class="fc-section">
-              <div class="fc-panel-head">
-                <h2>Card</h2>
-                <span v-if="placedCard" class="fc-truncate">{{ placedCard.product_name }}</span>
-              </div>
-              <p v-if="!placedCard" class="fc-note">Pick a card on the left, then click the bouquet to place it.</p>
-
-              <div v-else class="fc-card-settings">
-                <div class="fc-control">
-                  <div class="fc-control-head">
-                    <span id="fc-card-size-label">Size</span>
-                    <output>{{ placedCard.price ? formatPeso(placedCard.price) : "Free" }}</output>
-                  </div>
-                  <div class="fc-segment" role="radiogroup" aria-labelledby="fc-card-size-label">
-                    <button
-                      v-for="size in placedCard.sizes"
-                      :key="size.label"
-                      type="button"
-                      role="radio"
-                      class="fc-segment-btn"
-                      :class="{ active: placedCard.size === size.label }"
-                      :aria-checked="placedCard.size === size.label"
-                      @click="setPlacedCardSize(size.label)"
-                    >
-                      {{ size.label }}
-                    </button>
-                  </div>
-                </div>
-
-                <button type="button" class="fc-switch" role="switch" :aria-checked="placedCard.open" @click="setPlacedCardOpen(!placedCard.open)">
-                  <span class="fc-switch-copy">
-                    <strong><BcIcon name="card" /> {{ placedCard.open ? "Card open" : "Card closed" }}</strong>
-                    <small>{{ placedCard.open ? "Your message shows on the inside." : "Open it to show your message." }}</small>
-                  </span>
-                  <span class="fc-switch-track"><span class="fc-switch-knob"></span></span>
-                </button>
-
-                <div class="fc-card-message">
-                  <div class="fc-control-head">
-                    <span>Message</span>
-                    <output>{{ cardUsage(placedCard) }} / {{ placedCard.limit }} {{ placedCard.limit_type }}</output>
-                  </div>
-                  <p :class="{ empty: !placedCard.message }">{{ placedCard.message || "No message yet." }}</p>
-                  <button type="button" class="fc-text-btn" @click="openCardEditor(placedCard.sceneId)">
-                    <BcIcon name="card" /> {{ placedCard.message ? "Edit message" : "Write message" }}
-                  </button>
-                  <small class="fc-card-tip">Tip: double-click the card on the bouquet to write.</small>
-                </div>
-              </div>
-            </section>
-
-            <p v-if="!hasWrapper" class="fc-note fc-build-note">{{ occasion?.label }} bouquets are hand-tied: no wrapper, just {{ hasRibbon ? "a ribbon" : "the stems" }}.</p>
-            <section v-if="hasWrapper" class="fc-section">
-              <div class="fc-panel-head">
-                <h2>Wrapper</h2>
-                <span>{{ wrap.outer.color || wrap.inner.color ? "Custom" : "Original paper" }}</span>
-              </div>
+            <section v-else-if="activeStep === 'wrap'" class="fc-step-panel">
+              <h2>Choose the wrap</h2>
+              <p class="fc-step-lede">{{ wrap.outer.color || wrap.inner.color ? "Custom paper." : "It comes in its original paper." }} Pick each layer.</p>
 
               <div class="fc-segment" role="tablist" aria-label="Wrapper layer">
                 <button
@@ -686,11 +208,9 @@
               </div>
             </section>
 
-            <section v-if="hasRibbon" class="fc-section">
-              <div class="fc-panel-head">
-                <h2>Ribbon</h2>
-                <span v-if="!ribbonOptions.length">{{ ribbonColor.toUpperCase() }}</span>
-              </div>
+            <section v-else-if="activeStep === 'ribbon'" class="fc-step-panel">
+              <h2>Choose the ribbon</h2>
+              <p class="fc-step-lede">{{ hasWrapper ? "Tied around the wrap." : `${occasion?.label || "This"} bouquet is hand-tied: no wrapper, just the ribbon.` }}</p>
               <div v-if="ribbonOptions.length" class="fc-options" role="radiogroup" aria-label="Ribbon">
                 <button
                   v-for="option in ribbonOptions"
@@ -729,35 +249,224 @@
                 </label>
               </div>
             </section>
+
+            <section v-else-if="activeStep === 'card'" class="fc-step-panel">
+              <h2>Add a card</h2>
+              <p class="fc-step-lede">One message card per bouquet. Pick it, then click the bouquet to place it.</p>
+              <StemPicker
+                kind="card"
+                :items="cards"
+                :count-of="(id) => (placedCard?.id === id ? 1 : 0)"
+                :can-use="canUseFlower"
+                :pending-id="pendingFlower?.kind === 'card' ? pendingFlower.id : null"
+                :price-label="(card) => `${cardPriceLabel(card)} · up to ${card.limit} ${card.limit_type}`"
+                :unavailable-text="() => 'One per bouquet'"
+                @pick="selectFlower"
+                @dragstart="onDragStart"
+                @dragend="onDragEnd"
+              />
+
+              <div v-if="placedCard" class="fc-card-settings">
+                <div class="fc-control">
+                  <div class="fc-control-head">
+                    <span id="fc-card-size-label">Size</span>
+                    <output>{{ placedCard.price ? formatPeso(placedCard.price) : "Free" }}</output>
+                  </div>
+                  <div class="fc-segment" role="radiogroup" aria-labelledby="fc-card-size-label">
+                    <button
+                      v-for="size in placedCard.sizes"
+                      :key="size.label"
+                      type="button"
+                      role="radio"
+                      class="fc-segment-btn"
+                      :class="{ active: placedCard.size === size.label }"
+                      :aria-checked="placedCard.size === size.label"
+                      @click="setPlacedCardSize(size.label)"
+                    >
+                      {{ size.label }}
+                    </button>
+                  </div>
+                </div>
+
+                <button type="button" class="fc-switch" role="switch" :aria-checked="placedCard.open" @click="setPlacedCardOpen(!placedCard.open)">
+                  <span class="fc-switch-copy">
+                    <strong><BcIcon name="card" /> {{ placedCard.open ? "Card open" : "Card closed" }}</strong>
+                    <small>{{ placedCard.open ? "Your message shows on the inside." : "Open it to show your message." }}</small>
+                  </span>
+                  <span class="fc-switch-track"><span class="fc-switch-knob"></span></span>
+                </button>
+
+                <div class="fc-card-message">
+                  <div class="fc-control-head">
+                    <span>Message</span>
+                    <output>{{ cardUsage(placedCard) }} / {{ placedCard.limit }} {{ placedCard.limit_type }}</output>
+                  </div>
+                  <p :class="{ empty: !placedCard.message }">{{ placedCard.message || "No message yet." }}</p>
+                  <button type="button" class="fc-text-btn" @click="openCardEditor(placedCard.sceneId)">
+                    <BcIcon name="card" /> {{ placedCard.message ? "Edit message" : "Write message" }}
+                  </button>
+                  <small class="fc-card-tip">Tip: double-click the card on the bouquet to write.</small>
+                </div>
+              </div>
+            </section>
+
+            <section v-else-if="activeStep === 'review'" class="fc-step-panel">
+              <h2>Review your bouquet</h2>
+              <p class="fc-step-lede">
+                {{ selectedFlowers.length ? "Click anything to select it on the bouquet." : "Nothing placed yet. Start with the flowers." }}
+              </p>
+              <ul v-if="selectedFlowers.length" class="fc-placed">
+                <li
+                  v-for="selection in selectedFlowers"
+                  :key="selection.sceneId"
+                  class="fc-placed-row"
+                  :class="{ active: selectedSceneId === selection.sceneId }"
+                >
+                  <button type="button" class="fc-placed-main" @click="selectPlacedFlower(selection.sceneId)">
+                    <span class="fc-placed-thumb">
+                      <img v-if="selection.kind === 'card' && selection.image" :src="selection.image" alt="" />
+                      <img v-else-if="isStem(selection) && flowerImage(selection.id)" :src="flowerImage(selection.id)" alt="" />
+                      <BcIcon v-else :name="selection.kind === 'filler' ? 'leaf' : selection.kind === 'card' ? 'card' : 'flower'" />
+                    </span>
+                    <span class="fc-placed-copy">
+                      <strong>{{ selection.product_name }}</strong>
+                      <small>{{ placedKindLabel(selection) }} · {{ formatPeso(selection.price) }}</small>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="fc-mini"
+                    :class="{ on: selection.locked }"
+                    :aria-label="selection.locked ? `Unlock ${selection.product_name}` : `Lock ${selection.product_name}`"
+                    :title="selection.locked ? 'Unlock position' : 'Lock position'"
+                    @click="toggleFlowerLock(selection.sceneId)"
+                  >
+                    <BcIcon :name="selection.locked ? 'lock' : 'unlock'" />
+                  </button>
+                  <button
+                    type="button"
+                    class="fc-mini danger"
+                    :aria-label="`Remove ${selection.product_name}`"
+                    title="Remove"
+                    @click="removeFlower(selection.sceneId)"
+                  >
+                    <BcIcon name="trash" />
+                  </button>
+                </li>
+              </ul>
+              <dl class="fc-review-extras">
+                <div v-if="hasWrapper"><dt>Wrap</dt><dd>{{ wrapSummary }}</dd></div>
+                <div v-if="hasRibbon">
+                  <dt>Ribbon</dt>
+                  <dd>
+                    <span class="fc-dot" :style="{ background: selectedRibbon?.color_hex || ribbonColor }"></span>
+                    {{ selectedRibbon?.name || (ribbonOptions.length ? "None" : "Custom colour") }}
+                  </dd>
+                </div>
+                <div v-if="cards.length"><dt>Card</dt><dd>{{ placedCard ? `${placedCard.product_name} · ${placedCard.message ? "message written" : "no message yet"}` : "None" }}</dd></div>
+              </dl>
+            </section>
           </div>
 
-          <footer class="fc-order">
-            <dl class="fc-receipt">
-              <div><dt>Stems ({{ placedFlowers.length }})</dt><dd>{{ formatPeso(flowersSubtotal) }}</dd></div>
-              <div v-if="placedFillers.length"><dt>Fillers ({{ placedFillers.length }})</dt><dd>{{ formatPeso(fillersSubtotal) }}</dd></div>
-              <div v-if="selectedOuterWrapper"><dt>Outer: {{ selectedOuterWrapper.name }}</dt><dd>{{ selectedOuterWrapper.price ? formatPeso(selectedOuterWrapper.price) : "Free" }}</dd></div>
-              <div v-if="selectedInnerWrapper"><dt>Inner: {{ selectedInnerWrapper.name }}</dt><dd>{{ selectedInnerWrapper.price ? formatPeso(selectedInnerWrapper.price) : "Free" }}</dd></div>
-              <div v-if="selectedRibbon"><dt>{{ selectedRibbon.name }}</dt><dd>{{ selectedRibbon.price ? formatPeso(selectedRibbon.price) : "Free" }}</dd></div>
-              <div v-if="placedCard"><dt>Card: {{ placedCard.product_name }} ({{ placedCard.size }})</dt><dd>{{ placedCard.price ? formatPeso(placedCard.price) : "Free" }}</dd></div>
-              <div class="fc-receipt-total"><dt>Total</dt><dd>{{ formatPeso(totalPrice) }}</dd></div>
-            </dl>
-            <div class="fc-order-actions">
-              <button type="button" class="bc-btn bc-btn--dark fc-order-btn" :disabled="!placedFlowers.length || isCheckingOut" @click="checkout">
-                {{ isCheckingOut ? "Processing" : "Checkout" }}
-              </button>
-              <button
-                type="button"
-                class="bc-btn fc-order-btn fc-order-btn-outline"
-                :disabled="!placedFlowers.length || isCheckingOut"
-                @click="addCart"
-              >
-                <BcIcon name="bag" />
-                {{ editingCartItemId ? "Update cart" : "Add to cart" }}
-              </button>
-            </div>
-            <p v-if="!placedFlowers.length" class="fc-order-hint">Add at least one stem to continue.</p>
-          </footer>
+          <OrderReceipt
+            :stems="placedFlowers.length"
+            :max-stems="maxFlowers"
+            :lines="orderLines"
+            :total="totalPrice"
+            :busy="isCheckingOut"
+            :disabled="!placedFlowers.length"
+            :editing="!!editingCartItemId"
+            :format="formatPeso"
+            @add-to-cart="addCart"
+            @checkout="checkout"
+          />
         </aside>
+
+        <!-- Stage -->
+        <main
+          ref="stageEl"
+          class="fc-stage"
+          :class="{ over: isDragOver, dragging: isTransformDragging, placing: pendingFlower || draggedFlower }"
+          @dragover.prevent="onCanvasDragOver"
+          @dragleave="onCanvasDragLeave"
+          @drop.prevent="onCanvasDrop"
+        >
+          <div ref="viewerContainer" class="fc-viewer"></div>
+
+          <StageTools
+            :modes="TRANSFORM_MODES"
+            :mode="transformMode"
+            :has-target="hasTransformTarget"
+            :bouquet-selected="bouquetSelected"
+            :ready="sceneReady"
+            :fullscreen="isFullscreen"
+            :can-reset="selectedFlowers.length > 0"
+            @mode="transformMode = $event"
+            @toggle-bouquet="toggleBouquetSelection"
+            @focus="focusSelection"
+            @reset="resetDesign"
+            @screenshot="takeScreenshot"
+            @fullscreen="toggleFullscreen"
+          />
+
+          <div v-if="bouquetLoadError" class="fc-stage-center">
+            <div class="fc-stage-message">
+              <BcIcon name="info" />
+              <h3>The bouquet couldn't load</h3>
+              <p>{{ bouquetLoadError }}</p>
+            </div>
+          </div>
+          <div v-else-if="isLoading3D" class="fc-stage-center">
+            <div class="fc-stage-loading">
+              <span class="bc-skeleton fc-skel-arch"></span>
+              <p>Setting up the bouquet</p>
+            </div>
+          </div>
+
+          <SelectionCard
+            v-if="sceneReady && hasTransformTarget"
+            ref="selectionCardEl"
+            :title="bouquetSelected ? 'Whole bouquet' : selectedFlower.product_name"
+            :subtitle="selectionSubtitle"
+            :mode="bouquetSelected ? 'bouquet' : 'flower'"
+            :locked="!bouquetSelected && !!selectedFlower?.locked"
+            :scale="Number(selectedFlower?.scale ?? 1)"
+            :rotation="selectedFlower?.rotation || {}"
+            :turn="bouquetSelected ? bouquetTurn : selectedFlower?.rotation?.yDeg || 0"
+            :axes="ROTATION_AXES"
+            :move-locked="moveLocked"
+            :position="selectionCardPosition"
+            :side="selectionCardSide"
+            :docked="selectionCardDocked"
+            @nudge-turn="nudgeTurn"
+            @scale="updateSelectedScale"
+            @rotate="updateSelectedRotation"
+            @nudge-rotate="nudgeSelectedRotation"
+            @nudge="nudgeSelectedPosition"
+            @lock="toggleSelectedLock"
+            @remove="removeFlower(selectedFlower.sceneId)"
+            @reset="bouquetSelected ? resetBouquetPlacement() : resetSelectedTransform()"
+            @close="clearSelection"
+          />
+
+          <div v-if="sceneReady" class="fc-hint" :class="{ live: dragFeedback || pendingFlower }" role="status" aria-live="polite">
+            <template v-if="dragFeedback || pendingFlower || draggedFlower">
+              <BcIcon name="target" />
+              <span class="fc-hint-copy">
+                <strong>{{ dragFeedback || stageHint.title }}</strong>
+                <span v-if="!dragFeedback">{{ stageHint.detail }}</span>
+              </span>
+              <button v-if="pendingFlower" type="button" class="fc-hint-cancel" aria-label="Cancel placing" @click="pendingFlower = null">
+                <BcIcon name="x" />
+              </button>
+            </template>
+            <span v-else class="fc-hint-keys">
+              {{ selectedFlower?.kind === "card" ? stageHint.title : selectedFlower?.locked ? `${selectedFlower.product_name} is locked` : "Drag to look around" }}
+              <span class="fc-hint-sep" aria-hidden="true">·</span>
+              <kbd>G</kbd> move <kbd>R</kbd> rotate <kbd>S</kbd> size <kbd>F</kbd> focus
+            </span>
+          </div>
+        </main>
       </div>
     </div>
 
@@ -819,7 +528,7 @@
 </template>
 
 <script setup>
-import { computed, h, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -848,60 +557,20 @@ import {
   setCardOpen,
   setCardSize,
 } from "../../utils/bouquetCard.js";
+import { anchorCard, buildSteps, keyAction, receiptLines } from "../../utils/customizerUi.js";
 import NavHeader from "../../layouts/NavHeader.vue";
+import BcIcon from "../../components/customizer/CustomizerIcon.js";
+import CustomizerSteps from "../../components/customizer/CustomizerSteps.vue";
+import StemPicker from "../../components/customizer/StemPicker.vue";
+import SelectionCard from "../../components/customizer/SelectionCard.vue";
+import OrderReceipt from "../../components/customizer/OrderReceipt.vue";
+import StageTools from "../../components/customizer/StageTools.vue";
 import { useAuth } from "../../composables/useAuth";
 import { useCart } from "../../composables/useCart";
 import { toast as toastify } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import "../../styles/bloomcraft.css";
 
-// Line icons drawn on a 24px grid with a 1.5 stroke, matching Shop.vue.
-const ICONS = {
-  search: [["circle", { cx: 11, cy: 11, r: 6.5 }], ["path", { d: "m16 16 4 4" }]],
-  panelLeft: [["rect", { x: 3, y: 4, width: 18, height: 16, rx: 2 }], ["path", { d: "M9 4v16" }]],
-  panelRight: [["rect", { x: 3, y: 4, width: 18, height: 16, rx: 2 }], ["path", { d: "M15 4v16" }]],
-  maximize: [["path", { d: "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" }]],
-  minimize: [["path", { d: "M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" }]],
-  camera: [["path", { d: "M4 8h3l2-3h6l2 3h3v11H4z" }], ["circle", { cx: 12, cy: 13, r: 3.5 }]],
-  reset: [["path", { d: "M4 12a8 8 0 1 0 2.4-5.7L4 8.5" }], ["path", { d: "M4 4v4.5h4.5" }]],
-  rotate: [["path", { d: "M20 12a8 8 0 1 1-2.4-5.7L20 8.5" }], ["path", { d: "M20 4v4.5h-4.5" }]],
-  lock: [["rect", { x: 5, y: 11, width: 14, height: 9, rx: 2 }], ["path", { d: "M8 11V8a4 4 0 0 1 8 0v3" }]],
-  unlock: [["rect", { x: 5, y: 11, width: 14, height: 9, rx: 2 }], ["path", { d: "M8 11V8a4 4 0 0 1 7.6-1.7" }]],
-  trash: [["path", { d: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" }]],
-  arrowUp: [["path", { d: "M12 19V5M6 11l6-6 6 6" }]],
-  arrowDown: [["path", { d: "M12 5v14M6 13l6 6 6-6" }]],
-  arrowLeft: [["path", { d: "M19 12H5M11 6l-6 6 6 6" }]],
-  arrowRight: [["path", { d: "M5 12h14M13 6l6 6-6 6" }]],
-  plus: [["path", { d: "M12 5v14M5 12h14" }]],
-  minus: [["path", { d: "M5 12h14" }]],
-  check: [["path", { d: "m5 12.5 4.5 4.5L19 7.5" }]],
-  x: [["path", { d: "M6 6l12 12M18 6 6 18" }]],
-  info: [["circle", { cx: 12, cy: 12, r: 9 }], ["path", { d: "M12 11v5M12 8h.01" }]],
-  bag: [["path", { d: "M5 8h14l-1 12H6z" }], ["path", { d: "M9 8V6.5a3 3 0 0 1 6 0V8" }]],
-  move: [["path", { d: "M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" }]],
-  scale: [["path", { d: "M4 20h7v-7H4zM14 4h6v6M20 4l-8 8" }]],
-  bouquet: [
-    ["path", { d: "M7 10l5 11 5-11" }],
-    ["circle", { cx: 9, cy: 7, r: 2.5 }],
-    ["circle", { cx: 15, cy: 7, r: 2.5 }],
-    ["circle", { cx: 12, cy: 4.5, r: 2.5 }],
-  ],
-  target: [["circle", { cx: 12, cy: 12, r: 7 }], ["circle", { cx: 12, cy: 12, r: 2 }], ["path", { d: "M12 2v3M12 19v3M2 12h3M19 12h3" }]],
-  leaf: [["path", { d: "M5 19c0-8 5-14 14-14 0 9-6 14-14 14z" }], ["path", { d: "M5 19l7.5-7.5" }]],
-  card: [["rect", { x: 3, y: 6, width: 18, height: 13, rx: 2 }], ["path", { d: "m3.5 7.5 8.5 6 8.5-6" }]],
-  flower: [
-    ["circle", { cx: 12, cy: 9, r: 2 }],
-    ["path", { d: "M12 7a2.5 2.5 0 1 1 0-5 2.5 2.5 0 1 1 0 5M14 9a2.5 2.5 0 1 1 5 0 2.5 2.5 0 1 1-5 0M12 11a2.5 2.5 0 1 1 0 5 2.5 2.5 0 1 1 0-5M10 9a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0" }],
-    ["path", { d: "M12 16v6M12 19.5c-1.5-1.8-3.5-2.2-5-1.8" }],
-  ],
-};
-const BcIcon = (props) =>
-  h(
-    "svg",
-    { class: "fc-icon", viewBox: "0 0 24 24", "aria-hidden": "true", focusable: "false" },
-    (ICONS[props.name] || []).map(([tag, attrs]) => h(tag, attrs)),
-  );
-BcIcon.props = ["name"];
 
 const TRANSFORM_MODES = [
   { value: "translate", label: "Move", key: "G", icon: "move" },
@@ -934,6 +603,8 @@ const cartStore = useCart();
 
 const viewerContainer = ref(null);
 const layoutContainer = ref(null);
+const stageEl = ref(null);
+const selectionCardEl = ref(null);
 const flowers = ref([]);
 const fillers = ref([]);
 const cards = ref([]);
@@ -955,8 +626,6 @@ const isTransformDragging = ref(false);
 const bouquetSelected = ref(false);
 const transformMode = ref("translate");
 const bouquetTurn = ref(0);
-const isLeftSidebarCollapsed = ref(false);
-const isRightSidebarCollapsed = ref(false);
 const isFullscreen = ref(false);
 const dragFeedback = ref("");
 const ribbonColor = ref("#caa6d9");
@@ -1048,7 +717,6 @@ const totalPrice = computed(() => selectedFlowers.value.reduce((sum, flower) => 
 const selectedFlower = computed(() => selectedFlowers.value.find((flower) => flower.sceneId === selectedSceneId.value) || null);
 const flowersSubtotal = computed(() => placedFlowers.value.reduce((sum, flower) => sum + flower.price, 0));
 const fillersSubtotal = computed(() => placedFillers.value.reduce((sum, filler) => sum + filler.price, 0));
-const stemSlots = computed(() => Array.from({ length: maxFlowers.value }, (_, index) => placedFlowers.value[index] || null));
 const flowerImage = (flowerId) => flowers.value.find((flower) => flower.id === flowerId)?.image || null;
 const rangeFill = (value, min, max) => ({ "--fill": `${((Number(value) - min) / (max - min)) * 100}%` });
 const hasTransformTarget = computed(() => bouquetSelected.value || !!selectedFlower.value);
@@ -1069,6 +737,77 @@ const stageHint = computed(() => {
   if (placedFlowers.value.length >= maxFlowers.value) return { title: "All stems placed", detail: "Click one to adjust it, or click the wrap to move the whole bouquet." };
   return { title: "Pick a flower, then click the wrap", detail: "Drag empty space to look around, scroll to zoom." };
 });
+
+
+// What the bouquet is called in the occasion line under the title
+const DESIGN_NAMES = { classic: "classic wrap", korean: "Korean wrap", hand_tied: "hand-tied", basket: "basket", classic_full: "classic wrap" };
+const occasionLine = computed(() => [presetLabel.value, DESIGN_NAMES[baseDesign.value]].filter(Boolean).join(" · "));
+
+// One step's choices show at a time; steps for parts this bouquet doesn't have are left out
+const activeStep = ref("flowers");
+const steps = computed(() =>
+  buildSteps({
+    hasFillers: fillers.value.length > 0,
+    hasWrapper: hasWrapper.value,
+    hasRibbon: hasRibbon.value,
+    hasCards: cards.value.length > 0,
+  }),
+);
+const doneSteps = computed(() => {
+  const done = [];
+  if (placedFlowers.value.length) done.push("flowers");
+  if (placedFillers.value.length) done.push("fillers");
+  if (wrap.outer.id || wrap.outer.color || wrap.inner.id || wrap.inner.color) done.push("wrap");
+  if (selectedRibbonId.value) done.push("ribbon");
+  if (placedCard.value) done.push("card");
+  return done;
+});
+watch(steps, (list) => {
+  if (!list.some((step) => step.key === activeStep.value)) activeStep.value = "flowers";
+});
+
+const orderLines = computed(() =>
+  receiptLines({
+    flowers: placedFlowers.value,
+    fillers: placedFillers.value,
+    outerWrapper: selectedOuterWrapper.value,
+    innerWrapper: selectedInnerWrapper.value,
+    ribbon: selectedRibbon.value,
+    card: placedCard.value,
+  }),
+);
+const wrapSummary = computed(() =>
+  wrapLayers.value
+    .map((layer) => {
+      const picked = findWrapper(wrap[layer.key].id);
+      return `${layer.label}: ${picked?.name || (wrap[layer.key].color ? "custom colour" : "original")}`;
+    })
+    .join(" · "),
+);
+const stemMeta = (item) => (item.quantity_in_stock != null ? `${formatPeso(item.price)} · ${item.quantity_in_stock} left` : formatPeso(item.price));
+
+// "2 of 4" for the selected flower among the same kind of stem
+const selectionSubtitle = computed(() => {
+  const flower = selectedFlower.value;
+  if (bouquetSelected.value || !flower) return "";
+  const same = selectedFlowers.value.filter((item) => item.id === flower.id && item.kind === flower.kind);
+  return same.length > 1 ? `${same.findIndex((item) => item.sceneId === flower.sceneId) + 1} of ${same.length}` : "";
+});
+
+// The selection card sits beside whatever is selected on the stage
+const selectionCardPosition = ref(null);
+const selectionCardSide = ref("right");
+const selectionCardDocked = ref(false);
+
+function nudgeTurn(delta) {
+  if (bouquetSelected.value) setBouquetTurn(bouquetTurn.value + delta);
+  else nudgeSelectedRotation("y", delta);
+}
+
+function goBack() {
+  if (window.history.length > 1) router.back();
+  else router.push("/");
+}
 
 let scene, camera, renderer, controls, bouquetRoot, flowerLayer, hoverMarker, animationFrameId = 0, pointerDown = null, transformDrag = null, toastTimer;
 // arrangement holds the wrap and every placed item, so moving the bouquet moves them together
@@ -1094,7 +833,13 @@ const canUseFlower = (flower) => {
   return placedFlowers.value.length < maxFlowers.value && flower.quantity_in_stock > countOfFlower(flower.id);
 };
 
+let stageResize = null;
+
 onMounted(async () => {
+  if (window.ResizeObserver) {
+    stageResize = new ResizeObserver(() => queueResize());
+    if (stageEl.value) stageResize.observe(stageEl.value);
+  }
   if (isAuthenticated.value) await cartStore.initialize?.();
   initScene();
   await loadEditingCustomization();
@@ -1120,6 +865,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener("resize", handleResize);
+  stageResize?.disconnect();
   window.removeEventListener("keydown", onKeydown);
   document.removeEventListener("fullscreenchange", syncFullscreenState);
   cleanupScene();
@@ -1129,10 +875,9 @@ onUnmounted(() => {
 function initScene() {
   if (!viewerContainer.value) return;
   scene = new THREE.Scene();
-  scene.background = new THREE.Color("#ece6dd");
   camera = new THREE.PerspectiveCamera(42, viewerContainer.value.clientWidth / viewerContainer.value.clientHeight, 0.1, 100);
   camera.position.set(0, 2.1, 6.4);
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(viewerContainer.value.clientWidth, viewerContainer.value.clientHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -2116,36 +1861,33 @@ function focusSelection() {
   controls.update();
 }
 
-// Arrow keys match the on-screen pad; E / Q move away from / toward you
-const MOVE_KEYS = {
-  arrowup: "up",
-  arrowdown: "down",
-  arrowleft: "left",
-  arrowright: "right",
-  e: "forward",
-  q: "backward",
-};
-
 function onKeydown(event) {
-  if (!sceneReady.value || cardEditor.open || event.ctrlKey || event.metaKey || event.altKey) return;
-  if (event.target?.closest?.("input, textarea, select, [contenteditable='true']")) return;
-  const key = event.key.toLowerCase();
-  let handled = true;
+  const action = keyAction(
+    {
+      key: event.key,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      altKey: event.altKey,
+      inField: !!event.target?.closest?.("input, textarea, select, [contenteditable='true']"),
+    },
+    {
+      ready: sceneReady.value,
+      modalOpen: cardEditor.open,
+      hasTarget: hasTransformTarget.value,
+      bouquetSelected: bouquetSelected.value,
+      hasSelectedFlower: !!selectedFlower.value,
+      placing: !!pendingFlower.value,
+    },
+  );
+  if (!action) return;
+  event.preventDefault();
 
-  if (key === "escape") {
-    if (pendingFlower.value) pendingFlower.value = null;
-    else clearSelection();
-  } else if (!hasTransformTarget.value) {
-    handled = false;
-  } else if (key === "g") transformMode.value = "translate";
-  else if (key === "r") transformMode.value = "rotate";
-  else if (key === "s" && !bouquetSelected.value) transformMode.value = "scale";
-  else if (key === "f") focusSelection();
-  else if ((key === "delete" || key === "backspace") && selectedFlower.value) removeFlower(selectedFlower.value.sceneId);
-  else if (MOVE_KEYS[key]) nudgeSelectedPosition(MOVE_KEYS[key], event);
-  else handled = false;
-
-  if (handled) event.preventDefault();
+  if (action === "cancel-placing") pendingFlower.value = null;
+  else if (action === "deselect") clearSelection();
+  else if (action === "focus") focusSelection();
+  else if (action === "remove") removeFlower(selectedFlower.value.sceneId);
+  else if (action.startsWith("mode:")) transformMode.value = action.slice(5);
+  else if (action.startsWith("nudge:")) nudgeSelectedPosition(action.slice(6), event);
 }
 
 function updateFlowerState(sceneId, patch) {
@@ -2400,21 +2142,13 @@ async function restoreBouquet(customization) {
 
 function takeScreenshot() {
   if (!renderer) return;
+  scene.background = new THREE.Color("#f4f1ec");
   renderer.render(scene, camera);
   const link = document.createElement("a");
   link.href = renderer.domElement.toDataURL("image/png");
+  scene.background = null;
   link.download = "flower-customizer.png";
   link.click();
-}
-
-function toggleLeftSidebar() {
-  isLeftSidebarCollapsed.value = !isLeftSidebarCollapsed.value;
-  queueResize();
-}
-
-function toggleRightSidebar() {
-  isRightSidebarCollapsed.value = !isRightSidebarCollapsed.value;
-  queueResize();
 }
 
 async function toggleFullscreen() {
@@ -2444,8 +2178,38 @@ function queueResize() {
   });
 }
 
+const anchorBox = new THREE.Box3();
+const anchorPoint = new THREE.Vector3();
+
+function placeSelectionCard() {
+  const stage = stageEl.value;
+  const card = selectionCardEl.value?.$el;
+  const target = gizmo?.object;
+  if (!stage || !card || !target || !camera) return;
+  const width = stage.clientWidth;
+  const height = stage.clientHeight;
+  const cardWidth = card.offsetWidth || 232;
+  const docked = cardWidth > width - 32 || width < 640;
+  if (docked !== selectionCardDocked.value) selectionCardDocked.value = docked;
+  if (docked) return;
+
+  anchorBox.setFromObject(target);
+  // Clear of the object and the gizmo's handles (about 90px across on screen)
+  const toScreen = (v) => ({ x: ((v.x + 1) / 2) * width, y: ((1 - v.y) / 2) * height });
+  const center = toScreen(anchorBox.getCenter(anchorPoint).project(camera));
+  const edge = toScreen(anchorPoint.set(anchorBox.max.x, (anchorBox.min.y + anchorBox.max.y) / 2, (anchorBox.min.z + anchorBox.max.z) / 2).project(camera));
+  const gap = Math.min(Math.abs(edge.x - center.x), width / 4) + 96;
+  const spot = anchorCard(center, { width, height }, { cardWidth, cardHeight: card.offsetHeight || 200, gap, margin: 72 });
+  const previous = selectionCardPosition.value;
+  if (!previous || Math.abs(parseFloat(previous.left) - spot.left) > 1 || Math.abs(parseFloat(previous.top) - spot.top) > 1) {
+    selectionCardPosition.value = { left: `${Math.round(spot.left)}px`, top: `${Math.round(spot.top)}px` };
+  }
+  if (spot.side !== selectionCardSide.value) selectionCardSide.value = spot.side;
+}
+
 function animateScene() {
   animationFrameId = window.requestAnimationFrame(animateScene);
+  if (hasTransformTarget.value) placeSelectionCard();
   controls?.update();
   renderer?.render(scene, camera);
 }
@@ -2515,557 +2279,15 @@ function showToast(message, type = "success") {
   overflow-x: hidden;
 }
 
-.fc-page button,
-.fc-page input {
-  font-family: var(--font-sans);
-  color: inherit;
-}
-
 .fc-page :is(button, [role="button"], input, label):focus-visible {
   outline: 2px solid var(--rosewood);
   outline-offset: 2px;
-}
-
-.fc-icon {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.fc-shell {
-  max-width: 1560px;
-  margin: 0 auto;
-  padding: 116px clamp(16px, 2.4vw, 32px) 32px;
-}
-
-/* ============================================================
-   HEADER
-============================================================= */
-.fc-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 32px;
-  padding-bottom: 24px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid var(--line);
-}
-
-.fc-store {
-  color: var(--rosewood-dark);
-  font-size: 13.5px;
-  font-weight: 500;
-}
-
-.fc-head h1 {
-  margin: 6px 0 10px;
-  font-size: clamp(40px, 4.4vw, 60px);
-}
-
-.fc-lede {
-  max-width: 520px;
-  color: var(--ink-soft);
-  font-size: 15px;
-  line-height: 1.7;
-}
-
-.fc-head-meta {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  flex-shrink: 0;
-}
-
-/* Stem slots echo the arched frame of the shop hero */
-.fc-stems {
-  display: flex;
-  gap: 8px;
-}
-
-.fc-stem {
-  width: 46px;
-  height: 58px;
-  border-radius: 999px 999px 8px 8px;
-  overflow: hidden;
-}
-
-.fc-stem-empty,
-.fc-stem button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-}
-
-.fc-stem-empty {
-  border: 1px dashed rgba(30, 27, 24, 0.22);
-  border-radius: inherit;
-  color: rgba(30, 27, 24, 0.28);
-}
-
-.fc-stem-empty .fc-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.fc-stem button {
-  padding: 0;
-  border: none;
-  border-radius: inherit;
-  background: var(--ivory-deep);
-  color: var(--rosewood-dark);
-  cursor: pointer;
-}
-
-.fc-stem img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.fc-stem.active button {
-  box-shadow: inset 0 0 0 2px var(--ink);
-}
-
-.fc-head-total {
-  display: grid;
-  gap: 2px;
-  padding-left: 24px;
-  border-left: 1px solid var(--line);
-  text-align: right;
-}
-
-.fc-head-total span {
-  color: var(--ink-soft);
-  font-size: 12.5px;
-}
-
-.fc-head-total strong {
-  font-family: var(--font-display);
-  font-size: 32px;
-  font-weight: 500;
-  line-height: 1;
-  font-variant-numeric: lining-nums tabular-nums;
-}
-
-/* ============================================================
-   LAYOUT
-============================================================= */
-.fc-layout {
-  display: grid;
-  grid-template-columns: 312px minmax(0, 1fr) 348px;
-  gap: 16px;
-  height: calc(100vh - 140px);
-  min-height: 640px;
-}
-
-.fc-layout.left-collapsed {
-  grid-template-columns: minmax(0, 1fr) 348px;
-}
-
-.fc-layout.right-collapsed {
-  grid-template-columns: 312px minmax(0, 1fr);
-}
-
-.fc-layout.left-collapsed.right-collapsed {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.fc-layout:fullscreen,
-.fc-layout.fullscreen {
-  width: 100vw;
-  height: 100vh;
-  padding: 16px;
-  background: var(--ivory);
-}
-
-.fc-layout:-webkit-full-screen {
-  width: 100vw;
-  height: 100vh;
-  padding: 16px;
-  background: var(--ivory);
-}
-
-.fc-panel {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  background: var(--paper);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
-}
-
-.fc-panel-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.fc-panel-head h2 {
-  font-size: 24px;
-  white-space: nowrap;
-}
-
-.fc-panel-head > span {
-  min-width: 0;
-  color: var(--ink-soft);
-  font-size: 12.5px;
-}
-
-.fc-truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .fc-note {
   color: var(--ink-soft);
   font-size: 13.5px;
   line-height: 1.65;
-}
-
-/* ============================================================
-   CATALOG
-============================================================= */
-.fc-catalog {
-  padding: 20px 0 0;
-}
-
-.fc-catalog > .fc-panel-head,
-.fc-search {
-  margin-inline: 20px;
-}
-
-.fc-search {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 2px 10px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--line);
-  color: var(--ink-soft);
-  transition: border-color 0.3s;
-}
-
-.fc-search:focus-within {
-  border-color: var(--ink);
-}
-
-.fc-search input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  outline: none;
-  background: none;
-  color: var(--ink);
-  font-size: 14px;
-}
-
-.fc-search input::placeholder {
-  color: var(--ink-soft);
-  opacity: 0.8;
-}
-
-.fc-catalog-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 16px 20px 20px;
-  scrollbar-width: thin;
-}
-
-.fc-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px 12px;
-}
-
-.fc-tile {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  padding: 0;
-  border: none;
-  background: none;
-  text-align: left;
-  cursor: pointer;
-  border-radius: var(--radius-md);
-}
-
-.fc-tile-media {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  aspect-ratio: 4 / 5;
-  margin-bottom: 10px;
-  overflow: hidden;
-  border-radius: 999px 999px var(--radius-md) var(--radius-md);
-  background: var(--ivory-deep);
-  transition: box-shadow 0.3s var(--ease-out);
-}
-
-.fc-tile-media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.6s var(--ease-out);
-}
-
-.fc-tile-fallback {
-  width: 28px;
-  height: 28px;
-  color: var(--ink-soft);
-  opacity: 0.6;
-}
-
-.fc-tile:hover:not(.disabled) .fc-tile-media img {
-  transform: scale(1.04);
-}
-
-.fc-tile.active .fc-tile-media {
-  box-shadow: inset 0 0 0 2px var(--ink), 0 0 0 3px var(--paper), 0 0 0 4px var(--rosewood);
-}
-
-.fc-tile.disabled {
-  cursor: not-allowed;
-}
-
-.fc-tile.disabled .fc-tile-media {
-  filter: grayscale(0.7);
-  opacity: 0.55;
-}
-
-.fc-tile.dragging {
-  opacity: 0.5;
-}
-
-.fc-tile-count {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  display: grid;
-  place-items: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 7px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--ivory);
-  font-size: 11.5px;
-  font-weight: 500;
-}
-
-.fc-tile-name {
-  overflow: hidden;
-  color: var(--ink);
-  font-size: 13.5px;
-  font-weight: 500;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fc-tile-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
-  margin-top: 2px;
-  color: var(--ink-soft);
-  font-size: 12.5px;
-  font-variant-numeric: tabular-nums;
-}
-
-.fc-tile-stock {
-  opacity: 0.75;
-}
-
-.fc-tile-flag {
-  color: var(--rosewood-dark);
-  font-weight: 500;
-}
-
-.fc-tile.is-skeleton {
-  cursor: default;
-}
-
-.fc-tile.is-skeleton .fc-tile-media {
-  background: none;
-}
-
-.fc-skel-line {
-  height: 11px;
-  margin-top: 4px;
-  border-radius: 6px;
-}
-
-.fc-skel-line.short {
-  width: 55%;
-}
-
-.fc-subhead {
-  margin-top: 28px;
-  padding-top: 20px;
-  border-top: 1px solid var(--line);
-}
-
-.fc-fillers {
-  display: grid;
-  gap: 6px;
-}
-
-.fc-filler {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 10px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: none;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.25s, border-color 0.25s;
-}
-
-.fc-filler:hover:not(.disabled) {
-  background: var(--ivory);
-}
-
-.fc-filler.active {
-  border-color: var(--ink);
-  background: var(--ivory);
-}
-
-.fc-filler.disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.fc-filler-icon {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--ivory-deep);
-  color: #5f7353;
-}
-
-.fc-filler-copy {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.fc-filler-copy strong {
-  font-size: 13.5px;
-  font-weight: 500;
-}
-
-.fc-filler-copy small,
-.fc-filler-price small {
-  overflow: hidden;
-  color: var(--ink-soft);
-  font-size: 11.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fc-filler-price {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  flex-shrink: 0;
-  font-size: 12.5px;
-  font-weight: 500;
-}
-
-/* ── Message cards ─────────────────────────────────────────────────── */
-.fc-cards {
-  display: grid;
-  gap: 6px;
-}
-
-.fc-card-option {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 10px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.25s, border-color 0.25s;
-}
-
-.fc-card-option:hover:not(.disabled) {
-  background: var(--ivory);
-}
-
-.fc-card-option.active,
-.fc-card-option.placed {
-  border-color: var(--ink);
-  background: var(--ivory);
-}
-
-.fc-card-option.disabled:not(.placed) {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.fc-card-option:focus-visible {
-  outline: 2px solid var(--rosewood);
-  outline-offset: 2px;
-}
-
-.fc-card-photo {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 46px;
-  height: 58px;
-  overflow: hidden;
-  border-radius: 8px;
-  background: var(--ivory-deep);
-  color: var(--ink-soft);
-}
-
-.fc-card-photo img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.fc-card-copy {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.fc-card-copy strong {
-  font-size: 13.5px;
-  font-weight: 500;
-}
-
-.fc-card-copy small {
-  overflow: hidden;
-  color: var(--ink-soft);
-  font-size: 11.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .fc-card-settings {
@@ -3226,139 +2448,6 @@ function showToast(message, type = "success") {
   outline-offset: 3px;
 }
 
-/* ============================================================
-   STAGE
-============================================================= */
-.fc-stage {
-  position: relative;
-  min-height: 0;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
-  background: var(--stage);
-  transition: box-shadow 0.3s var(--ease-out);
-}
-
-.fc-stage.over {
-  box-shadow: inset 0 0 0 2px var(--rosewood);
-}
-
-.fc-viewer {
-  position: absolute;
-  inset: 0;
-  cursor: grab;
-}
-
-.fc-stage.placing .fc-viewer {
-  cursor: crosshair;
-}
-
-.fc-stage.dragging .fc-viewer {
-  cursor: grabbing;
-}
-
-.fc-toolbar {
-  position: absolute;
-  top: 16px;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px;
-  border: 1px solid var(--line-soft);
-  border-radius: 999px;
-  background: rgba(250, 248, 244, 0.86);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.fc-toolbar-left {
-  left: 16px;
-}
-
-.fc-toolbar-right {
-  right: 16px;
-}
-
-.fc-toolbar-center {
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.fc-toolbar-rule {
-  width: 1px;
-  height: 18px;
-  margin: 0 4px;
-  background: var(--line);
-}
-
-.fc-tool {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: none;
-  color: var(--ink);
-  cursor: pointer;
-  transition: background 0.25s, color 0.25s;
-}
-
-.fc-tool:hover:not(:disabled) {
-  background: var(--ivory-deep);
-}
-
-.fc-tool.on {
-  color: var(--rosewood-dark);
-}
-
-.fc-tool:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-/* Tooltip */
-.fc-tool::after {
-  content: attr(data-tip);
-  position: absolute;
-  top: calc(100% + 10px);
-  left: 50%;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: var(--ink);
-  color: var(--ivory);
-  font-size: 12px;
-  font-weight: 400;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transform: translate(-50%, -4px);
-  transition: opacity 0.2s, transform 0.2s var(--ease-out);
-}
-
-.fc-toolbar-right .fc-tool:last-child::after {
-  left: auto;
-  right: 0;
-  transform: translate(0, -4px);
-}
-
-.fc-toolbar-left .fc-tool::after {
-  left: 0;
-  transform: translate(0, -4px);
-}
-
-.fc-tool:is(:hover, :focus-visible):not(:disabled)::after {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-
-.fc-toolbar-right .fc-tool:last-child:is(:hover, :focus-visible)::after,
-.fc-toolbar-left .fc-tool:is(:hover, :focus-visible)::after {
-  transform: translate(0, 0);
-}
-
 .fc-hint {
   position: absolute;
   left: 50%;
@@ -3379,18 +2468,10 @@ function showToast(message, type = "success") {
   transition: background 0.3s, color 0.3s;
 }
 
-.fc-hint > .fc-icon {
-  color: var(--rosewood);
-}
-
 .fc-hint.live {
   background: var(--ink);
   border-color: var(--ink);
   color: var(--ivory);
-}
-
-.fc-hint.live > .fc-icon {
-  color: var(--gold);
 }
 
 .fc-hint-copy {
@@ -3425,11 +2506,6 @@ function showToast(message, type = "success") {
   border-radius: 50%;
   background: rgba(244, 241, 236, 0.12);
   cursor: pointer;
-}
-
-.fc-hint-cancel .fc-icon {
-  width: 14px;
-  height: 14px;
 }
 
 .fc-stage-center {
@@ -3469,12 +2545,6 @@ function showToast(message, type = "success") {
   pointer-events: auto;
 }
 
-.fc-stage-message > .fc-icon {
-  width: 24px;
-  height: 24px;
-  color: var(--rosewood-dark);
-}
-
 .fc-stage-message h3 {
   font-size: 24px;
 }
@@ -3483,28 +2553,6 @@ function showToast(message, type = "success") {
   color: var(--ink-soft);
   font-size: 13.5px;
   line-height: 1.6;
-}
-
-/* ============================================================
-   INSPECTOR
-============================================================= */
-.fc-inspector {
-  overflow: hidden;
-}
-
-.fc-inspector-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
-
-.fc-section {
-  padding: 20px;
-}
-
-.fc-section + .fc-section {
-  border-top: 1px solid var(--line-soft);
 }
 
 .fc-placed {
@@ -3600,11 +2648,6 @@ function showToast(message, type = "success") {
   transition: background 0.25s, color 0.25s;
 }
 
-.fc-mini .fc-icon {
-  width: 16px;
-  height: 16px;
-}
-
 .fc-mini:hover {
   background: var(--paper);
   color: var(--ink);
@@ -3616,12 +2659,6 @@ function showToast(message, type = "success") {
 
 .fc-mini.danger:hover {
   color: var(--rosewood-dark);
-}
-
-/* Adjust */
-.fc-adjust {
-  display: grid;
-  gap: 20px;
 }
 
 .fc-switch {
@@ -3660,11 +2697,6 @@ function showToast(message, type = "success") {
   gap: 8px;
   font-size: 13.5px;
   font-weight: 500;
-}
-
-.fc-switch-copy strong .fc-icon {
-  width: 15px;
-  height: 15px;
 }
 
 .fc-switch-copy small {
@@ -3724,181 +2756,10 @@ function showToast(message, type = "success") {
   gap: 10px;
 }
 
-.fc-step {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: none;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-
-.fc-step:hover {
-  border-color: var(--ink);
-}
-
-.fc-step .fc-icon {
-  width: 14px;
-  height: 14px;
-}
-
-/* Range: thin ink track that fills up to the thumb */
-.fc-range {
-  --fill: 50%;
-  flex: 1;
-  width: 100%;
-  height: 20px;
-  margin: 0;
-  background: none;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-}
-
-.fc-range::-webkit-slider-runnable-track {
-  height: 3px;
-  border-radius: 999px;
-  background: linear-gradient(to right, var(--ink) var(--fill), rgba(30, 27, 24, 0.14) var(--fill));
-}
-
-.fc-range::-moz-range-track {
-  height: 3px;
-  border-radius: 999px;
-  background: rgba(30, 27, 24, 0.14);
-}
-
-.fc-range::-moz-range-progress {
-  height: 3px;
-  border-radius: 999px;
-  background: var(--ink);
-}
-
-.fc-range::-webkit-slider-thumb {
-  width: 16px;
-  height: 16px;
-  margin-top: -6.5px;
-  border: 2px solid var(--paper);
-  border-radius: 50%;
-  background: var(--rosewood-dark);
-  box-shadow: 0 0 0 1px var(--rosewood-dark);
-  -webkit-appearance: none;
-}
-
-.fc-range::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--paper);
-  border-radius: 50%;
-  background: var(--rosewood-dark);
-  box-shadow: 0 0 0 1px var(--rosewood-dark);
-}
-
-.fc-move {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.fc-move-copy {
-  display: flex;
-  flex-direction: column;
-  font-size: 13px;
-}
-
-.fc-move-copy span {
-  font-weight: 500;
-}
-
-.fc-move-copy small {
-  color: var(--ink-soft);
-  font-size: 12px;
-}
-
-.fc-pad {
-  display: grid;
-  grid-template-columns: repeat(3, 34px);
-  grid-template-rows: repeat(3, 34px);
-  grid-template-areas:
-    ". up ."
-    "left . right"
-    ". down .";
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-}
-
-.fc-pad button {
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: none;
-  cursor: pointer;
-  transition: background 0.25s;
-}
-
-.fc-pad button:hover:not(:disabled) {
-  background: var(--ivory-deep);
-}
-
-.fc-pad.locked {
-  opacity: 0.6;
-}
-
-.fc-pad button:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.fc-pad .fc-icon {
-  width: 16px;
-  height: 16px;
-}
-
 .fc-pad-up { grid-area: up; }
 .fc-pad-left { grid-area: left; }
 .fc-pad-right { grid-area: right; }
 .fc-pad-down { grid-area: down; }
-
-.fc-keys {
-  font-size: 12px;
-  color: var(--ink-soft);
-}
-
-.fc-keys summary {
-  cursor: pointer;
-  width: fit-content;
-}
-
-.fc-keys dl {
-  display: grid;
-  gap: 4px;
-  margin: 8px 0 0;
-}
-
-.fc-keys dl div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.fc-keys dt {
-  font-weight: 600;
-  color: var(--ink, inherit);
-  white-space: nowrap;
-}
-
-.fc-keys dd {
-  margin: 0;
-  text-align: right;
-}
 
 .fc-text-btn {
   display: inline-flex;
@@ -3918,11 +2779,6 @@ function showToast(message, type = "success") {
 .fc-text-btn:hover {
   color: var(--ink);
   border-color: var(--ink);
-}
-
-.fc-text-btn .fc-icon {
-  width: 15px;
-  height: 15px;
 }
 
 /* Wrapper and ribbon */
@@ -4063,11 +2919,6 @@ function showToast(message, type = "success") {
   color: rgba(30, 27, 24, 0.55);
 }
 
-.fc-swatch-original .fc-icon {
-  width: 14px;
-  height: 14px;
-}
-
 .fc-swatch-custom {
   display: grid;
   place-items: center;
@@ -4083,106 +2934,6 @@ function showToast(message, type = "success") {
   height: 100%;
   opacity: 0;
   cursor: pointer;
-}
-
-.fc-swatch-custom .fc-icon {
-  width: 14px;
-  height: 14px;
-}
-
-/* Order footer */
-.fc-order {
-  padding: 18px 20px 20px;
-  border-top: 1px solid var(--line);
-  background: var(--paper);
-}
-
-.fc-receipt {
-  display: grid;
-  gap: 6px;
-  margin-bottom: 16px;
-  font-size: 13px;
-}
-
-.fc-receipt > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.fc-receipt dt {
-  overflow: hidden;
-  color: var(--ink-soft);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fc-receipt dd {
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-}
-
-.fc-receipt-total {
-  align-items: baseline;
-  margin-top: 6px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line-soft);
-}
-
-.fc-receipt-total dt {
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.fc-receipt-total dd {
-  font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 500;
-  line-height: 1;
-  font-variant-numeric: lining-nums tabular-nums;
-}
-
-.fc-order-actions {
-  display: grid;
-  gap: 8px;
-}
-
-.fc-order-btn {
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  padding: 14px 24px;
-}
-
-.fc-order-btn-outline {
-  background: transparent;
-  color: var(--ink);
-  border-color: var(--line);
-}
-
-.fc-order-btn-outline:hover:not(:disabled) {
-  border-color: var(--ink);
-}
-
-.fc-order-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.bc-btn--dark.fc-order-btn:disabled:hover {
-  background: var(--ink);
-}
-
-.fc-order-btn .fc-icon {
-  width: 16px;
-  height: 16px;
-}
-
-.fc-order-hint {
-  margin-top: 10px;
-  color: var(--ink-soft);
-  font-size: 12px;
-  text-align: center;
 }
 
 /* ============================================================
@@ -4205,14 +2956,6 @@ function showToast(message, type = "success") {
   box-shadow: 0 16px 40px rgba(30, 27, 24, 0.18);
 }
 
-.fc-toast .fc-icon {
-  color: var(--gold);
-}
-
-.fc-toast.error .fc-icon {
-  color: #e7a497;
-}
-
 .fc-toast-enter-active,
 .fc-toast-leave-active {
   transition: opacity 0.3s var(--ease-out), transform 0.3s var(--ease-out);
@@ -4224,137 +2967,12 @@ function showToast(message, type = "success") {
   transform: translateY(8px);
 }
 
-/* ============================================================
-   RESPONSIVE
-============================================================= */
-@media (max-width: 1240px) {
-  .fc-layout {
-    grid-template-columns: 272px minmax(0, 1fr) 316px;
-  }
-
-  .fc-layout.left-collapsed {
-    grid-template-columns: minmax(0, 1fr) 316px;
-  }
-
-  .fc-layout.right-collapsed {
-    grid-template-columns: 272px minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 980px) {
-  .fc-head {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 20px;
-  }
-
-  .fc-layout,
-  .fc-layout.left-collapsed,
-  .fc-layout.right-collapsed,
-  .fc-layout.left-collapsed.right-collapsed {
-    grid-template-columns: minmax(0, 1fr);
-    height: auto;
-    min-height: 0;
-  }
-
-  .fc-stage {
-    order: -1;
-    height: 62vh;
-    min-height: 420px;
-  }
-
-  .fc-catalog-scroll,
-  .fc-inspector-scroll {
-    overflow: visible;
-  }
-
-  .fc-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  }
-}
-
-@media (max-width: 640px) {
-  .fc-shell {
-    padding: 96px 16px 24px;
-  }
-
-  .fc-head-meta {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .fc-hint-copy span {
-    display: none;
-  }
-
-  .fc-tool::after {
-    display: none;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .fc-page *,
   .fc-page *::before,
   .fc-page *::after {
     transition-duration: 0.01ms !important;
   }
-}
-
-/* ── Occasion presets ─────────────────────────────────────────────── */
-.fc-layout {
-  position: relative;
-}
-.fc-preset-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 12px 7px 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--paper);
-  color: var(--ink);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-.fc-preset-chip:hover {
-  border-color: var(--rosewood);
-}
-.fc-preset-chip small {
-  color: var(--rosewood);
-  font-weight: 600;
-}
-.fc-preset-icon,
-.fc-occasion-icon {
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--ivory-deep);
-  color: var(--rosewood-dark);
-}
-.fc-preset-icon {
-  width: 26px;
-  height: 26px;
-}
-.fc-preset-icon :deep(svg) {
-  width: 15px;
-  height: 15px;
-}
-.fc-stem-bar {
-  width: 160px;
-  height: 8px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--ivory-deep);
-}
-.fc-stem-bar span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--rosewood);
-  transition: width 0.25s var(--ease-out);
 }
 
 .fc-start {
@@ -4501,25 +3119,6 @@ function showToast(message, type = "success") {
 .fc-start-cancel {
   margin-top: 18px;
 }
-.fc-tile-fill {
-  margin-top: 6px;
-  padding: 5px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--paper);
-  color: var(--rosewood-dark);
-  font: inherit;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.fc-tile-fill:hover {
-  border-color: var(--rosewood);
-  background: var(--ivory-deep);
-}
-.fc-build-note {
-  margin: 0 0 4px;
-}
 
 @media (max-width: 720px) {
   .fc-start {
@@ -4530,6 +3129,322 @@ function showToast(message, type = "success") {
   }
   .fc-start-card h2 {
     font-size: 26px;
+  }
+}
+
+/* ============================================================
+   STUDIO LAYOUT: one sheet on the left, the stage edge to edge
+   ============================================================ */
+.fc-page {
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --sheet: 340px;
+}
+
+.fc-page button,
+.fc-page input {
+  font-family: var(--font-sans);
+}
+
+.fc-shell {
+  padding-top: var(--fc-nav, 88px);
+}
+
+.fc-layout {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--sheet) minmax(0, 1fr);
+  height: calc(100vh - var(--fc-nav, 88px));
+  height: calc(100dvh - var(--fc-nav, 88px));
+  min-height: 560px;
+  border-top: 1px solid var(--line);
+}
+
+.fc-layout:fullscreen,
+.fc-layout.fullscreen {
+  height: 100vh;
+  min-height: 0;
+  border-top: 0;
+  background: var(--ivory);
+}
+
+.fc-layout:-webkit-full-screen {
+  height: 100vh;
+  background: var(--ivory);
+}
+
+/* The sheet */
+.fc-sheet {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.fc-sheet-head {
+  padding: 20px 26px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.fc-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: -4px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fc-back:hover {
+  color: var(--ink);
+}
+
+.fc-back .fc-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.fc-sheet-head h1 {
+  margin: 6px 0 4px;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.fc-occasion-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.fc-change {
+  flex-shrink: 0;
+  padding: 0 0 1px;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: none;
+  color: var(--rosewood-dark);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.fc-sheet-body {
+  min-height: 0;
+  padding: 20px 26px 24px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.fc-step-panel {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.fc-step-panel > h2 {
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-weight: 500;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.fc-step-lede {
+  margin-top: -10px !important;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.fc-segment {
+  border-radius: 10px;
+  margin-bottom: 0;
+}
+
+.fc-segment-btn {
+  border-radius: 8px !important;
+}
+
+.fc-card-settings {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.fc-review-extras {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+.fc-review-extras > div {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 12.5px;
+}
+
+.fc-review-extras dt {
+  color: var(--ink-soft);
+}
+
+.fc-review-extras dd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+
+.fc-dot {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+
+.fc-occasion-line {
+  align-items: flex-start;
+}
+
+/* The stage */
+.fc-stage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 55% 38%, #fbf8f3 0%, #efe8de 55%, #e6ddd0 100%);
+  transition: box-shadow 0.3s var(--ease-out);
+}
+
+.fc-stage.over {
+  box-shadow: inset 0 0 0 2px var(--rosewood);
+}
+
+.fc-viewer {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+
+.fc-stage.placing .fc-viewer {
+  cursor: crosshair;
+}
+
+.fc-stage.dragging .fc-viewer {
+  cursor: grabbing;
+}
+
+.fc-start {
+  border-radius: 0;
+}
+
+/* Quiet hint line; turns into a dark pill while placing */
+.fc-hint {
+  bottom: 18px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(250, 248, 244, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.fc-hint.live {
+  padding: 10px 18px 10px 14px;
+  border-radius: 12px;
+}
+
+.fc-hint-keys {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  text-align: center;
+}
+
+.fc-hint-sep {
+  margin: 0 4px;
+}
+
+.fc-hint kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 500 11px/1.4 var(--font-sans);
+}
+
+/* Phones and small tablets: stage on top, the sheet below */
+@media (max-width: 900px) {
+  .fc-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 55vh auto;
+    height: auto;
+    min-height: 0;
+  }
+
+  .fc-stage {
+    order: -1;
+    min-height: 360px;
+  }
+
+  .fc-sheet {
+    display: block;
+    border-right: 0;
+  }
+
+  .fc-sheet-head {
+    padding: 18px 16px 14px;
+  }
+
+  .fc-sheet-body {
+    overflow: visible;
+    padding: 18px 16px 24px;
+  }
+
+  .fc-sheet :deep(.cs-steps) {
+    display: flex !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .fc-sheet :deep(.cs-step) {
+    flex: 1 0 64px;
+  }
+
+  .fc-sheet :deep(.or) {
+    position: sticky;
+    bottom: 0;
+    z-index: 8;
+    padding: 12px 16px 14px;
+    box-shadow: 0 -10px 24px -18px rgba(30, 27, 24, 0.3);
+  }
+
+  .fc-hint {
+    bottom: 12px;
+  }
+
+  .fc-hint-keys kbd,
+  .fc-hint-sep {
+    display: none;
   }
 }
 </style>
