@@ -923,7 +923,6 @@ const ORIGINAL_WRAP = { outer: "#d6b68c", inner: "#ab9196" };
 const LAYER_NAMES = {
   classic: ["Outer", "Inner"],
   korean: ["Outer sheets", "Inner sheets"],
-  box: ["Box", "Liner"],
   basket: ["Basket", "Liner"],
 };
 const ribbonPresets = ["#caa6d9", "#d95f76", "#7d8f69", "#f0dfb2", "#6c5b7b"];

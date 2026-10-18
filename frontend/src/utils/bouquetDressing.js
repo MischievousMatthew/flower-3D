@@ -25,7 +25,7 @@ function classifyMesh(mesh) {
 
 // Each wrap layer gets its own material copies so tinting can never leak
 // onto another mesh that happens to share a material.
-function createLayer(meshes) {
+export function createLayer(meshes) {
   const entries = [];
   meshes.forEach((mesh) => {
     const cloned = materialsOf(mesh).map((material) => {

@@ -99,7 +99,7 @@
         </div>
       </section>
 
-      <!-- Occasions (Wedding, Birthday, …) and their sizes for the customizer -->
+      <!-- Occasions (Wedding, Sympathy, …) and their sizes for the customizer -->
       <BouquetPresetsPanel v-else-if="activeTab === 'presets'" class="cz-panel" @count="(n) => (presetCount = n)" />
 
       <!-- Wrappers, fillers and ribbons share one form and one list. -->

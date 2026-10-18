@@ -7,20 +7,18 @@
 //   targets   meshes flowers can be placed on (the flower bed first)
 //   defaults  the design's own colours
 import { buildClassic } from "./classic.js";
-import { buildBasket, buildBox, buildHandTied, buildKorean } from "./generated.js";
+import { MODEL_BASES, buildFromModel } from "./modelBases.js";
 
 export const DESIGNS = {
   classic: { label: "Classic cone" },
   korean: { label: "Korean layered wrap" },
   hand_tied: { label: "Round hand-tied" },
-  box: { label: "Flower box" },
   basket: { label: "Basket" },
 };
 
 export const DESIGN_FOR_OCCASION = {
   wedding: "hand_tied",
   romance: "korean",
-  birthday: "box",
   graduation: "classic",
   sympathy: "basket",
   just_because: "classic",
@@ -31,8 +29,6 @@ export const DESIGN_FOR_OCCASION = {
 export const LEGACY_DESIGN = "classic_full";
 
 export const designForOccasion = (occasion) => DESIGN_FOR_OCCASION[occasion] ?? "classic";
-
-const BUILDERS = { korean: buildKorean, hand_tied: buildHandTied, box: buildBox, basket: buildBasket };
 
 /**
  * Wrapper size grows the whole base about the floor centre; placed flowers
@@ -50,7 +46,7 @@ export async function createBouquetBase(design, { loadGltf, wrapperScale = 1 } =
       ? await buildClassic(loadGltf, { withFillers: true })
       : key === "classic"
         ? await buildClassic(loadGltf)
-        : BUILDERS[key]();
+        : await buildFromModel(key, loadGltf);
   base.design = key;
   if (wrapperScale !== 1) applyWrapperScale(base.root, wrapperScale);
   return base;

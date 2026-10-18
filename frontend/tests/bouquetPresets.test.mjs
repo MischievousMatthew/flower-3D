@@ -30,13 +30,13 @@ test("fillers allowed follow the size, never below 5", () => {
 });
 
 test("defaults mirror the server and are used when the shop sends none", () => {
-  assert.deepEqual(DEFAULT_PRESETS.map((p) => p.key), ["wedding", "romance", "birthday", "graduation", "sympathy", "just_because"]);
+  assert.deepEqual(DEFAULT_PRESETS.map((p) => p.key), ["wedding", "romance", "graduation", "sympathy", "just_because"]);
   const wedding = DEFAULT_PRESETS[0];
   assert.equal(wedding.wrapper, false);
   assert.equal(wedding.ribbon, true);
   assert.deepEqual(presetsOrDefaults([]), DEFAULT_PRESETS);
   assert.deepEqual(presetsOrDefaults(null), DEFAULT_PRESETS);
-  const own = [{ key: "birthday", label: "Birthday", wrapper: true, ribbon: true, sizes: [5] }];
+  const own = [{ key: "graduation", label: "Graduation", wrapper: true, ribbon: true, sizes: [5] }];
   assert.deepEqual(presetsOrDefaults(own), own);
 });
 

@@ -14,7 +14,8 @@ use Illuminate\Validation\ValidationException;
  */
 class BouquetPresets
 {
-    public const KEYS = ['wedding', 'romance', 'birthday', 'graduation', 'sympathy', 'just_because'];
+    // Birthday is left out until the shop has a model for it
+    public const KEYS = ['wedding', 'romance', 'graduation', 'sympathy', 'just_because'];
 
     public const MAX_SIZE = 36;
     public const MAX_SIZES_PER_OCCASION = 4;
@@ -26,7 +27,6 @@ class BouquetPresets
     public const DEFAULTS = [
         'wedding' => ['label' => 'Wedding', 'design' => 'hand_tied', 'wrapper' => false, 'ribbon' => true, 'sizes' => [6, 12, 24]],
         'romance' => ['label' => "Anniversary / Valentine's", 'design' => 'korean', 'wrapper' => true, 'ribbon' => true, 'sizes' => [6, 12, 24]],
-        'birthday' => ['label' => 'Birthday', 'design' => 'box', 'wrapper' => true, 'ribbon' => true, 'sizes' => [4, 8, 12]],
         'graduation' => ['label' => 'Graduation', 'design' => 'classic', 'wrapper' => true, 'ribbon' => true, 'sizes' => [3, 6, 9]],
         'sympathy' => ['label' => 'Sympathy', 'design' => 'basket', 'wrapper' => true, 'ribbon' => false, 'sizes' => [6, 12]],
         'just_because' => ['label' => 'Just because', 'design' => 'classic', 'wrapper' => true, 'ribbon' => true, 'sizes' => [3, 6, 12]],

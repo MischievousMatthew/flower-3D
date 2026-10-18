@@ -1,11 +1,11 @@
 // Occasion presets for the 3D customizer. The shop's own settings come from
 // GET /stores/{id}/customization-options (`presets`); these defaults mirror
 // backend/app/Support/BouquetPresets.php for shops that send none.
+// (Birthday is left out until the shop has a model for it.)
 
 export const DEFAULT_PRESETS = [
   { key: "wedding", label: "Wedding", design: "hand_tied", wrapper: false, ribbon: true, sizes: [6, 12, 24] },
   { key: "romance", label: "Anniversary / Valentine's", design: "korean", wrapper: true, ribbon: true, sizes: [6, 12, 24] },
-  { key: "birthday", label: "Birthday", design: "box", wrapper: true, ribbon: true, sizes: [4, 8, 12] },
   { key: "graduation", label: "Graduation", design: "classic", wrapper: true, ribbon: true, sizes: [3, 6, 9] },
   { key: "sympathy", label: "Sympathy", design: "basket", wrapper: true, ribbon: false, sizes: [6, 12] },
   { key: "just_because", label: "Just because", design: "classic", wrapper: true, ribbon: true, sizes: [3, 6, 12] },
@@ -15,7 +15,6 @@ export const DEFAULT_PRESETS = [
 export const OCCASION_INFO = {
   wedding: { icon: "rings", blurb: "A hand-tied bridal bouquet finished with a satin ribbon." },
   romance: { icon: "heart", blurb: "A Korean-style layered wrap, open and airy, for anniversaries and Valentine's Day." },
-  birthday: { icon: "gift", blurb: "Flowers in a round hat box, tied with a satin bow." },
   graduation: { icon: "cap", blurb: "The classic paper cone, for the big day." },
   sympathy: { icon: "dove", blurb: "A woven basket of flowers to share your condolences." },
   just_because: { icon: "flower", blurb: "The classic paper cone. No reason needed." },

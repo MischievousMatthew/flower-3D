@@ -21,7 +21,7 @@ class BouquetPresetsTest extends TestCase
     {
         $presets = BouquetPresets::merge(null);
 
-        $this->assertSame(['wedding', 'romance', 'birthday', 'graduation', 'sympathy', 'just_because'], array_column($presets, 'key'));
+        $this->assertSame(['wedding', 'romance', 'graduation', 'sympathy', 'just_because'], array_column($presets, 'key'));
         $wedding = $presets[0];
         $this->assertTrue($wedding['enabled']);
         $this->assertSame([6, 12, 24], $wedding['sizes']);
@@ -32,12 +32,12 @@ class BouquetPresetsTest extends TestCase
     public function test_saved_settings_override_defaults_and_unknown_keys_are_ignored(): void
     {
         $presets = collect(BouquetPresets::merge([
-            'birthday' => ['enabled' => false, 'sizes' => [5, 10]],
+            'graduation' => ['enabled' => false, 'sizes' => [5, 10]],
             'made_up' => ['enabled' => true, 'sizes' => [2]],
         ]))->keyBy('key');
 
-        $this->assertFalse($presets['birthday']['enabled']);
-        $this->assertSame([5, 10], $presets['birthday']['sizes']);
+        $this->assertFalse($presets['graduation']['enabled']);
+        $this->assertSame([5, 10], $presets['graduation']['sizes']);
         $this->assertFalse($presets->has('made_up'));
     }
 
@@ -92,13 +92,13 @@ class BouquetPresetsTest extends TestCase
 
     public function test_check_rejects_too_many_flowers_a_size_not_offered_and_a_disabled_occasion(): void
     {
-        $presets = BouquetPresets::merge(['birthday' => ['enabled' => false, 'sizes' => [4]]]);
+        $presets = BouquetPresets::merge(['graduation' => ['enabled' => false, 'sizes' => [4]]]);
 
         $this->assertFalse(BouquetPresets::check($presets, $this->bouquet(['key' => 'romance', 'size' => 12], 13))['ok']);
         $this->assertFalse(BouquetPresets::check($presets, $this->bouquet(['key' => 'romance', 'size' => 7], 3))['ok']);
-        $disabled = BouquetPresets::check($presets, $this->bouquet(['key' => 'birthday', 'size' => 4], 2));
+        $disabled = BouquetPresets::check($presets, $this->bouquet(['key' => 'graduation', 'size' => 4], 2));
         $this->assertFalse($disabled['ok']);
-        $this->assertStringContainsString('Birthday', $disabled['message']);
+        $this->assertStringContainsString('Graduation', $disabled['message']);
     }
 
     public function test_wedding_drops_wrappers_and_sympathy_drops_the_ribbon(): void
@@ -116,6 +116,13 @@ class BouquetPresetsTest extends TestCase
         $this->assertSame(['id' => 5], $sympathy['customizations']['wrapper']);
     }
 
+    public function test_birthday_is_not_offered_for_now(): void
+    {
+        $this->assertNotContains('birthday', array_column(BouquetPresets::merge(['birthday' => ['enabled' => true, 'sizes' => [4]]]), 'key'));
+        $result = BouquetPresets::check(BouquetPresets::merge(null), $this->bouquet(['key' => 'birthday', 'size' => 4], 2));
+        $this->assertFalse($result['ok']);
+    }
+
     public function test_bouquets_from_before_presets_keep_the_three_flower_limit(): void
     {
         $presets = BouquetPresets::merge(null);
@@ -129,16 +136,16 @@ class BouquetPresetsTest extends TestCase
     {
         $designs = array_column(BouquetPresets::merge(null), 'design', 'key');
         $this->assertSame([
-            'wedding' => 'hand_tied', 'romance' => 'korean', 'birthday' => 'box',
+            'wedding' => 'hand_tied', 'romance' => 'korean',
             'graduation' => 'classic', 'sympathy' => 'basket', 'just_because' => 'classic',
         ], $designs);
 
         // The server decides the design, whatever the browser sent
         $result = BouquetPresets::check(
             BouquetPresets::merge(null),
-            $this->bouquet(['key' => 'birthday', 'size' => 4], 2, ['design' => 'basket'])
+            $this->bouquet(['key' => 'sympathy', 'size' => 6], 2, ['design' => 'korean'])
         );
-        $this->assertSame('box', $result['customizations']['design']);
+        $this->assertSame('basket', $result['customizations']['design']);
     }
 
     public function test_largest_size_is_the_checkout_cap(): void
