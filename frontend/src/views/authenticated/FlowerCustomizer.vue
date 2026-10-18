@@ -319,7 +319,7 @@
             :editing="!!editingCartItemId"
             :format="formatPeso"
             @add-to-cart="addCart"
-            @checkout="checkout"
+            @checkout="requestCheckout"
           />
         </aside>
 
@@ -410,6 +410,36 @@
             </span>
           </div>
         </main>
+      </div>
+    </div>
+
+    <!-- Asked before checking out a bouquet that still has empty stem slots -->
+    <div v-if="incompleteCheckout" class="fc-modal-backdrop" @click.self="incompleteCheckout = false">
+      <div
+        class="fc-modal fc-confirm"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="fc-confirm-title"
+        aria-describedby="fc-confirm-copy"
+        @keydown.esc="incompleteCheckout = false"
+      >
+        <div class="fc-modal-head">
+          <div>
+            <p class="bc-label">{{ placedFlowers.length }} of {{ maxFlowers }} stems placed</p>
+            <h2 id="fc-confirm-title">Your bouquet isn't finished yet</h2>
+          </div>
+          <button type="button" class="fc-modal-close" aria-label="Close" @click="incompleteCheckout = false">
+            <BcIcon name="x" />
+          </button>
+        </div>
+        <p id="fc-confirm-copy" class="fc-confirm-copy">
+          There {{ maxFlowers - placedFlowers.length === 1 ? "is" : "are" }} still {{ maxFlowers - placedFlowers.length }}
+          empty stem {{ maxFlowers - placedFlowers.length === 1 ? "slot" : "slots" }} on this bouquet. Do you still want to checkout?
+        </p>
+        <div class="fc-modal-actions">
+          <button ref="keepBuildingButton" type="button" class="bc-link fc-modal-cancel" @click="incompleteCheckout = false">Keep building</button>
+          <button type="button" class="bc-btn bc-btn--dark fc-confirm-go" @click="confirmIncompleteCheckout">Checkout anyway</button>
+        </div>
       </div>
     </div>
 
@@ -1859,7 +1889,7 @@ function onKeydown(event) {
     },
     {
       ready: sceneReady.value,
-      modalOpen: cardEditor.open,
+      modalOpen: cardEditor.open || incompleteCheckout.value,
       hasTarget: hasTransformTarget.value,
       bouquetSelected: bouquetSelected.value,
       hasSelectedFlower: !!selectedFlower.value,
@@ -1899,6 +1929,25 @@ function enforceFlowerLimit(flower) {
   if (!flower.model) {
     return showToast(`${flower.product_name} has no 3D model.`, "error");
   }
+}
+
+// Checking out with empty stem slots asks first
+const incompleteCheckout = ref(false);
+const keepBuildingButton = ref(null);
+
+function requestCheckout() {
+  if (!placedFlowers.value.length || isCheckingOut.value) return;
+  if (placedFlowers.value.length < maxFlowers.value) {
+    incompleteCheckout.value = true;
+    nextTick(() => keepBuildingButton.value?.focus());
+    return;
+  }
+  checkout();
+}
+
+function confirmIncompleteCheckout() {
+  incompleteCheckout.value = false;
+  checkout();
 }
 
 async function checkout() {
@@ -3452,5 +3501,21 @@ function showToast(message, type = "success") {
   .fc-hint-shortcuts {
     display: none !important;
   }
+}
+
+.fc-confirm {
+  width: min(440px, calc(100vw - 32px));
+}
+
+.fc-confirm-copy {
+  margin: 4px 0 4px !important;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.fc-page .fc-confirm-go,
+.fc-confirm-go {
+  color: var(--paper);
 }
 </style>
