@@ -49,54 +49,71 @@
       </div>
     </div>
 
-    <!-- Hero -->
-    <section class="shop-hero" :class="{ 'shop-hero--banners': site.banners.length }">
-      <div class="bc-container">
+    <!-- Announcements, then the hero slideshow (Admin → Website) -->
+    <div class="shop-top">
+      <div v-if="site.announcements.length" class="bc-container shop-announce">
         <AnnouncementBar />
       </div>
-      <div v-if="site.banners.length" class="bc-container">
-        <BannerCarousel :banners="site.banners" />
-      </div>
-      <div v-else class="bc-container shop-hero-grid">
-        <div class="shop-hero-copy">
-          <p class="bc-label">Fresh flowers</p>
-          <h1>The ultimate <em>flower</em> shopping destination</h1>
-          <p class="shop-hero-desc">
-            Discover beautiful, fresh flowers from local vendors. Perfect for
-            every occasion.
-          </p>
-          <div class="shop-hero-actions">
-            <button
-              class="bc-btn bc-btn--dark"
-              @click="scrollToSection('products')"
-            >
-              Shop now <span class="bc-btn-arrow" aria-hidden="true">→</span>
-            </button>
-            <button
-              v-if="!isAuthenticated"
-              class="bc-link shop-link-btn"
-              @click="goToRegister"
-            >
-              Create free account
-            </button>
+      <ShopHero :banners="site.banners" @shop="scrollToSection('products')" @design="openDesigner" />
+    </div>
+
+    <ShopTrustStrip variant="top" />
+
+    <ShopOccasions
+      id="occasions"
+      :occasions="filterOptions.occasions"
+      :images="occasionImages"
+      :active="selectedFilters.occasion.length === 1 ? selectedFilters.occasion[0] : null"
+      :loading="!filterOptionsLoaded"
+      :promotions="site.promotions"
+      @pick="shopByOccasion"
+      @browse="scrollToSection('products')"
+    />
+
+    <!-- Top sellers and featured shops, with the bouquet finder beside them -->
+    <section class="shop-picks" aria-label="Popular right now">
+      <div class="bc-container shop-picks-grid">
+        <div class="shop-picks-main">
+          <div class="shop-row-head">
+            <h2>Top Selling Flowers</h2>
+            <button type="button" class="shop-row-all" @click="viewAllPopular">View all <span aria-hidden="true">→</span></button>
           </div>
-          <ul class="shop-hero-notes">
-            <li>Fast delivery</li>
-            <li>Secure payment</li>
-            <li>Fresh &amp; quality</li>
-          </ul>
-        </div>
-        <figure class="shop-hero-figure">
-          <img
-            src="https://images.unsplash.com/photo-1563241527-3004b7be0ffd?w=1100&h=1300&fit=crop&q=80"
-            alt="Hand-tied bouquet of soft pink and peach roses"
+          <div v-if="loadingPopular" class="top-grid" aria-label="Loading top sellers">
+            <span v-for="n in 5" :key="n" class="bc-skeleton top-skel"></span>
+          </div>
+          <div v-else-if="topSelling.length" class="top-grid">
+            <ShopProductTile
+              v-for="(product, i) in topSelling"
+              :key="`top-${product.id}`"
+              :product="product"
+              :best-seller="i === 0 && Number(product.sold_count) > 0"
+              :adding="addingToCartProductId === product.id"
+              @open="openProductModal"
+              @add="addToCartDirect"
+            />
+          </div>
+          <p v-else class="shop-empty-line">Top sellers show up here once shops start selling.</p>
+
+          <FeaturedShops
+            class="shop-picks-shops"
+            :shops="vendors"
+            :loading="loadingVendors"
+            @visit="goToStorefront"
+            @view-all="scrollToSection('vendors')"
           />
-        </figure>
+        </div>
+
+        <BouquetFinder
+          class="shop-picks-finder"
+          :occasions="filterOptions.occasions"
+          :colors="filterOptions.colors"
+          :adding-id="addingToCartProductId"
+          @open="openProductModal"
+          @add="addToCartDirect"
+          @see-all="showFinderMatches"
+        />
       </div>
     </section>
-
-    <!-- Promotions (Admin → Website) -->
-    <PromotionCards :promotions="site.promotions" />
 
     <!-- Featured picks (Admin → Website) -->
     <section v-if="featuredProducts.length" class="shop-featured" id="featured" aria-labelledby="featured-title">
@@ -126,7 +143,7 @@
       <div class="bc-container">
         <div class="bc-section-head bc-section-head--split shop-head">
           <div>
-            <p class="bc-label">Our stores</p>
+            <p class="bc-label">All flower shops</p>
             <h2>Shop from trusted <em>local florists</em></h2>
           </div>
           <label class="store-search">
@@ -336,56 +353,6 @@
             </button>
           </li>
         </ul>
-      </div>
-    </section>
-
-    <!-- Shop by occasion (from the real occasion filter values) -->
-    <section class="shop-occasions" id="occasions">
-      <div class="bc-container">
-        <div class="bc-section-head shop-head">
-          <p class="bc-label">Shop by occasion</p>
-          <h2>Flowers for every <em>moment</em></h2>
-        </div>
-        <div
-          v-if="!filterOptionsLoaded"
-          class="occasion-list"
-          aria-label="Loading occasions"
-        >
-          <span
-            v-for="n in 5"
-            :key="n"
-            class="bc-skeleton occasion-skeleton"
-          ></span>
-        </div>
-        <ul v-else-if="filterOptions.occasions.length" class="occasion-list">
-          <li v-for="(occasion, i) in filterOptions.occasions" :key="occasion">
-            <button
-              type="button"
-              class="occasion-item"
-              :class="{
-                'occasion-item--empty': !occasionCount(occasion),
-                'occasion-item--active':
-                  selectedFilters.occasion.length === 1 &&
-                  selectedFilters.occasion[0] === occasion,
-              }"
-              :aria-pressed="
-                selectedFilters.occasion.length === 1 &&
-                selectedFilters.occasion[0] === occasion
-              "
-              @click="shopByOccasion(occasion)"
-            >
-              <span class="occasion-index">{{
-                String(i + 1).padStart(2, "0")
-              }}</span>
-              <span class="occasion-name">{{ occasion }}</span>
-              <span class="occasion-count">{{ occasionCountText(occasion) }}</span>
-              <span class="occasion-arrow" aria-hidden="true">→</span>
-            </button>
-          </li>
-        </ul>
-        <p v-else class="shop-empty-line">
-          Occasions appear here as vendors tag their flowers.
-        </p>
       </div>
     </section>
 
@@ -759,6 +726,8 @@
     <!-- Journal (Admin → Website → Journal) -->
     <JournalTeaser :articles="site.articles" />
 
+    <ShopTrustStrip variant="bottom" />
+
     <SiteFooter />
 
     <!-- Product details -->
@@ -999,8 +968,12 @@ import ProductReviews from "../../layouts/components/ProductReviews.vue";
 import ProductQuestions from "../../layouts/components/ProductQuestions.vue";
 import ProductCard from "../../layouts/components/ProductCard.vue";
 import AnnouncementBar from "../../components/site/AnnouncementBar.vue";
-import BannerCarousel from "../../components/site/BannerCarousel.vue";
-import PromotionCards from "../../components/site/PromotionCards.vue";
+import ShopHero from "../../components/shop/ShopHero.vue";
+import ShopTrustStrip from "../../components/shop/ShopTrustStrip.vue";
+import ShopOccasions from "../../components/shop/ShopOccasions.vue";
+import ShopProductTile from "../../components/shop/ShopProductTile.vue";
+import BouquetFinder from "../../components/shop/BouquetFinder.vue";
+import FeaturedShops from "../../components/shop/FeaturedShops.vue";
 import JournalTeaser from "../../components/site/JournalTeaser.vue";
 import SiteFooter from "../../components/site/SiteFooter.vue";
 import { useSiteContent } from "../../composables/useSiteContent";
@@ -1020,6 +993,34 @@ const fetchFeatured = async () => {
     featuredProducts.value = [];
   }
 };
+// Most popular products: the Top Selling row, and a photo for each occasion circle
+const popularProducts = ref([]);
+const loadingPopular = ref(true);
+const fetchPopular = async () => {
+  try {
+    const { data } = await api.get("customer/products", {
+      params: { page: 1, per_page: 40, sort_by: "popular_desc", in_stock_only: 1 },
+    });
+    const list = Array.isArray(data?.data?.data) ? data.data.data : [];
+    popularProducts.value = list.filter(isShopVisibleProduct);
+  } catch {
+    popularProducts.value = [];
+  } finally {
+    loadingPopular.value = false;
+  }
+};
+const topSelling = computed(() => popularProducts.value.slice(0, 5));
+const productImage = (p) => p.primary_image?.image_url || p.images?.[0]?.image_url || null;
+const occasionImages = computed(() => {
+  const images = {};
+  for (const product of popularProducts.value) {
+    const image = productImage(product);
+    if (!image) continue;
+    for (const tag of product.occasion_tags || []) images[tag] ??= image;
+  }
+  return images;
+});
+
 // Categories that currently have something to buy, in the admin's order
 const shopCategories = computed(() => site.categories.filter((c) => c.products > 0));
 const { isAuthenticated, user } = useAuth();
@@ -1107,10 +1108,6 @@ const customerCityCoordinates = {
 
 // How many live products are tagged with an occasion (0 shows as "Coming soon")
 const occasionCount = (occasion) => filterOptions.value.occasion_counts?.[occasion] ?? 0;
-const occasionCountText = (occasion) => {
-  const n = occasionCount(occasion);
-  return n ? `${n} ${n === 1 ? "design" : "designs"}` : "Coming soon";
-};
 
 const filterOptions = ref({
   categories: [],
@@ -1730,6 +1727,36 @@ watch(
   },
 );
 
+// "View all" on Top Selling: the full list, most popular first
+const viewAllPopular = () => {
+  sortBy.value = "popular_desc";
+  pagination.value.current_page = 1;
+  fetchProducts();
+  scrollToSection("products");
+};
+
+// "See all matches" from the bouquet finder: same filters on the full list
+const showFinderMatches = ({ occasion, color, priceMin, priceMax }) => {
+  selectedFilters.value.occasion = occasion ? [occasion] : [];
+  selectedFilters.value.color = color ? [color] : [];
+  selectedFilters.value.priceMin = priceMin;
+  selectedFilters.value.priceMax = priceMax;
+  sortBy.value = "popular_desc";
+  pagination.value.current_page = 1;
+  fetchProducts();
+  scrollToSection("products");
+};
+
+// "Explore 3D Designer": the bouquet customizer of the first shop that offers it
+const openDesigner = () => {
+  const shop = vendors.value[0];
+  if (!shop) {
+    scrollToSection("vendors");
+    return;
+  }
+  router.push({ name: "FlowerCustomizer", params: { id: String(shop.id) }, query: { store_name: shop.store_name } });
+};
+
 // Shop by occasion: filter the grid to one occasion and jump to it.
 const shopByOccasion = (occasion) => {
   selectedFilters.value.occasion = [occasion];
@@ -1836,7 +1863,7 @@ const buyNowDirect = async (product) => {
 
 onMounted(async () => {
   const fromContentLink = applyContentLink(route.query);
-  await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors(), fetchFeatured()]);
+  await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors(), fetchFeatured(), fetchPopular()]);
   if (fromContentLink) setTimeout(() => scrollToSection("products"), 50);
   if (isAuthenticated.value) {
     await Promise.all([loadCart(), fetchNearbyStores()]);
@@ -1898,14 +1925,8 @@ onUnmounted(() => {
   border-color: var(--ink);
 }
 
-.shop-link-btn {
-  border: none;
-  background: none;
-  cursor: pointer;
-}
-
 .shop-head h2 {
-  font-size: clamp(40px, 4.6vw, 68px);
+  font-size: clamp(32px, 3.4vw, 46px);
 }
 
 /* Anchored sections clear the fixed header */
@@ -1921,20 +1942,9 @@ onUnmounted(() => {
   font-size: 15px;
 }
 
-/* ============================================================
-   HERO
-============================================================= */
-.shop-hero {
-  padding: 150px 0 clamp(80px, 9vw, 130px);
-}
-
-.shop-hero--banners {
-  padding-bottom: clamp(40px, 5vw, 70px);
-}
-
 .shop-featured,
 .shop-categories {
-  padding: clamp(40px, 6vw, 80px) 0;
+  padding: clamp(24px, 3vw, 40px) 0;
 }
 
 .category-chips {
@@ -1974,76 +1984,11 @@ onUnmounted(() => {
   color: var(--gold);
 }
 
-.shop-hero-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-  gap: clamp(40px, 6vw, 96px);
-  align-items: center;
-}
-
-.shop-hero-copy h1 {
-  margin: 26px 0 26px;
-  font-size: clamp(54px, 6.4vw, 104px);
-}
-
-.shop-hero-desc {
-  max-width: 440px;
-  margin-bottom: 40px;
-  color: var(--ink-soft);
-  font-size: 16.5px;
-  line-height: 1.8;
-}
-
-.shop-hero-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 32px;
-}
-
-.shop-hero-notes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 0;
-  margin-top: 48px;
-  padding-top: 24px;
-  border-top: 1px solid var(--line);
-  color: var(--ink-soft);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.shop-hero-notes li + li::before {
-  content: "·";
-  margin: 0 14px;
-  color: var(--rosewood);
-}
-
-.shop-hero-figure {
-  position: relative;
-  aspect-ratio: 11 / 13;
-  max-height: 640px;
-  justify-self: end;
-  width: 100%;
-  overflow: hidden;
-  border-radius: 999px 999px 18px 18px;
-  background: var(--ivory-deep);
-}
-
-.shop-hero-figure img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 /* ============================================================
    STORES
 ============================================================= */
-.shop-stores,
-.shop-occasions {
-  padding-bottom: clamp(90px, 10vw, 140px);
+.shop-stores {
+  padding-bottom: clamp(32px, 4vw, 48px);
 }
 
 .store-search {
@@ -2348,107 +2293,18 @@ onUnmounted(() => {
   width: 60%;
 }
 
-/* ============================================================
-   SHOP BY OCCASION
-============================================================= */
-.occasion-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 64px;
-  margin-top: 64px;
-  border-top: 1px solid var(--line);
-}
-
-.occasion-item {
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) auto 24px;
-  column-gap: 12px;
-  align-items: center;
-  width: 100%;
-  padding: 26px 0;
-  border: none;
-  border-bottom: 1px solid var(--line);
-  background: none;
-  color: var(--ink);
-  text-align: left;
-  cursor: pointer;
-}
-
-.occasion-count {
-  font-size: 13px;
-  color: var(--ink-soft);
-  white-space: nowrap;
-}
-
-.occasion-item--empty .occasion-name {
-  color: var(--ink-soft);
-}
-
 .filter-count {
   margin-left: auto;
   font-size: 12px;
   color: var(--ink-soft);
 }
 
-.occasion-index {
-  font-family: var(--font-display);
-  font-size: 19px;
-  font-style: italic;
-  color: var(--ink-soft);
-}
-
-.occasion-name {
-  font-family: var(--font-display);
-  font-size: clamp(26px, 2.6vw, 38px);
-  font-weight: 500;
-  line-height: 1.1;
-  text-transform: capitalize;
-  transition:
-    transform 0.5s var(--ease-out),
-    color 0.3s;
-}
-
-.occasion-arrow {
-  color: var(--ink-soft);
-  opacity: 0;
-  transform: translateX(-6px);
-  transition:
-    opacity 0.4s,
-    transform 0.4s var(--ease-out);
-}
-
-.occasion-item:hover .occasion-name,
-.occasion-item:focus-visible .occasion-name {
-  transform: translateX(10px);
-  color: var(--rosewood-dark);
-}
-
-.occasion-item:hover .occasion-arrow,
-.occasion-item:focus-visible .occasion-arrow,
-.occasion-item--active .occasion-arrow {
-  opacity: 1;
-  transform: none;
-}
-
-.occasion-item--active .occasion-name {
-  color: var(--rosewood-dark);
-  font-style: italic;
-}
-
-.occasion-item:focus-visible {
-  outline: none;
-}
-
-.occasion-skeleton {
-  height: 30px;
-  margin: 28px 0;
-}
-
 /* ============================================================
    PRODUCTS + FILTERS
 ============================================================= */
 .shop-products {
-  padding-bottom: var(--section-space);
+  padding-top: clamp(16px, 2vw, 28px);
+  padding-bottom: clamp(32px, 4vw, 56px);
 }
 
 .products-layout {
@@ -3229,20 +3085,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 968px) {
-  .shop-hero {
-    padding-top: 120px;
-  }
-
-  .shop-hero-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .shop-hero-figure {
-    justify-self: stretch;
-    max-height: 460px;
-    aspect-ratio: 4 / 3;
-    border-radius: 18px;
-  }
 
   .store-search {
     justify-self: stretch;
@@ -3252,10 +3094,6 @@ onUnmounted(() => {
   .stores-grid,
   .occasion-list {
     margin-top: 40px;
-  }
-
-  .occasion-list {
-    grid-template-columns: 1fr;
   }
 
   .products-layout {
@@ -3325,6 +3163,100 @@ onUnmounted(() => {
   .auth-modal-content,
   .modal-content {
     animation: none;
+  }
+}
+
+/* ── Redesigned top of the shop ─────────────────────────────────────── */
+.shop-top {
+  padding-top: var(--shop-nav-h, 96px);
+}
+
+.shop-announce {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.shop-picks {
+  margin-top: 30px;
+}
+
+.shop-picks-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 26px;
+  align-items: start;
+}
+
+.shop-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.shop-row-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.shop-row-all {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--rosewood-dark);
+  cursor: pointer;
+}
+
+.top-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.top-skel {
+  height: 250px;
+  border-radius: 12px;
+}
+
+.shop-picks-shops {
+  margin-top: 32px;
+}
+
+/* The full store list and everything after it sit lower on the page */
+.shop-picks + * {
+  margin-top: clamp(40px, 5vw, 64px);
+}
+
+.shop-picks-finder {
+  position: sticky;
+  top: 110px;
+}
+
+@media (max-width: 1180px) {
+  .shop-picks-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shop-picks-finder {
+    position: static;
+  }
+}
+
+@media (max-width: 960px) {
+  .top-grid {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .top-grid > * {
+    flex: 0 0 190px;
   }
 }
 </style>
