@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\AccountSuspensionService;
+use App\Support\SingleSession;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -36,6 +37,15 @@ class TokenAuth
         }
 
         if (!$authenticatable) {
+            // Signed out because the account logged in on another browser: say so
+            if ($type !== 'employee' && SingleSession::replacedBy($hashedToken)) {
+                return response()->json([
+                    'success' => false,
+                    'code' => 'session_replaced',
+                    'message' => SingleSession::REPLACED_MESSAGE,
+                ], 401);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthenticated',
@@ -48,6 +58,10 @@ class TokenAuth
                 'code' => 'account_suspended',
                 'message' => AccountSuspensionService::messageFor($authenticatable),
             ], 403);
+        }
+
+        if ($authenticatable instanceof User) {
+            SingleSession::touch($authenticatable);
         }
 
         Auth::setUser($authenticatable);

@@ -103,11 +103,34 @@
         <button class="try-another-way" :disabled="loading" @click="cancelTwoFactorLogin">Cancel</button>
       </section>
     </div>
+
+    <!-- The account is in use on another browser: ask before signing in here -->
+    <div v-if="sessionActiveOpen" class="session-backdrop" @click.self="sessionActiveOpen = false">
+      <div
+        class="session-modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="session-title"
+        aria-describedby="session-copy"
+        @keydown.esc="sessionActiveOpen = false"
+      >
+        <span class="session-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="13" height="10" rx="1.5" /><path d="M7 18h5M9.5 14v4" /><rect x="15" y="9" width="6" height="11" rx="1.2" /><path d="M17.5 17.5h1" /></svg>
+        </span>
+        <h2 id="session-title">Already logged in</h2>
+        <p id="session-copy" class="session-copy">This account is already logged in on another device or browser. If you continue, it will be signed out there.</p>
+        <button ref="continueButton" type="button" class="login-btn" :disabled="loading" @click="continueHere">
+          {{ loading ? "Signing in..." : "Continue logging in" }}
+        </button>
+        <button type="button" class="try-another-way" :disabled="loading" @click="sessionActiveOpen = false">Cancel</button>
+        <p class="session-note">Not you? Someone else may know your password. Log in and change it right away.</p>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from "vue";
+import { ref, reactive, onMounted, computed, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import api from "../../plugins/axios";
@@ -136,18 +159,34 @@ const maskedEmail = ref("");
 const codeInputs = [];
 const isCompleteTwoFactorCode = computed(() => /^\d{6}$/.test(twoFactorCode.value.join("")));
 
-const handleLogin = async () => {
+const sessionActiveOpen = ref(false);
+const continueButton = ref(null);
+
+// "Continue logging in": sign in here and end the session on the other browser
+const continueHere = async () => {
+  await handleLogin({ continueHere: true });
+  sessionActiveOpen.value = false;
+};
+
+const handleLogin = async (options = {}) => {
   errors.value = {};
   errorMessage.value = "";
 
   try {
-    const result = await combinedLogin(form);
+    const result = await combinedLogin({ ...form, continueHere: options.continueHere === true });
 
     if (result.requiresTwoFactor) {
       twoFactorChallengeToken.value = result.challengeToken;
       twoFactorRequired.value = true;
       twoFactorMethod.value = "passkey";
       twoFactorCode.value = Array(6).fill("");
+      return;
+    }
+
+    // Signed in on another browser: ask first (see the modal)
+    if (result.code === "session_active") {
+      sessionActiveOpen.value = true;
+      nextTick(() => continueButton.value?.focus());
       return;
     }
 
@@ -618,5 +657,78 @@ onMounted(() => {
   .form-content {
     max-width: 100%;
   }
+}
+
+/* "Already logged in on another device" */
+.session-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(30, 27, 24, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.session-modal {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  width: min(420px, 100%);
+  padding: 30px 28px 24px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 30px 70px -20px rgba(30, 27, 24, 0.45);
+  text-align: center;
+}
+
+.session-modal .login-btn,
+.session-modal .try-another-way {
+  width: 100%;
+  margin: 0;
+}
+
+.session-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(184, 101, 88, 0.12);
+  color: #8e443a;
+}
+
+.session-icon svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.session-modal h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.session-copy {
+  margin: 0 0 6px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #4b5563;
+}
+
+.session-note {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(184, 101, 88, 0.08);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #8e443a;
 }
 </style>

@@ -49,10 +49,13 @@ class User extends Authenticatable
         'remember_token',
         'api_token',
         'two_factor_passkey_hash',
+        'session_device',
+        'replaced_token_hash',
     ];
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'last_seen_at' => 'datetime',
         'password_changed_at' => 'datetime',
         'password' => 'hashed',
         'is_verified' => 'boolean',

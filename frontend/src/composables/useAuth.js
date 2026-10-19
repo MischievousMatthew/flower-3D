@@ -15,6 +15,8 @@ import { clearSubscriptionAccess } from "./useSubscriptionAccess";
 import { clearVendorProfile } from "./useVendorProfile";
 import { useAdminAccess } from "./useAdminAccess";
 import { readPendingPlan } from "../constants/subscriptionPlans";
+import { getDeviceId } from "../utils/deviceId";
+import { clearSessionReplaced } from "../utils/sessionReplaced";
 
 const user = ref(null);
 const loading = ref(false);
@@ -57,6 +59,8 @@ export function useAuth() {
     localStorage.setItem("user_type", type);
     localStorage.setItem("user", JSON.stringify(userData));
     user.value = userData;
+    // A fresh sign-in on this browser: any "signed in elsewhere" notice is over
+    clearSessionReplaced();
 
     setAuthHeader(type);
   };
@@ -158,6 +162,9 @@ export function useAuth() {
         username: credentials.username,
         password: credentials.password,
         login_context: loginContext,
+        device_id: getDeviceId(),
+        // Set after the person chose "Continue logging in" in the "already logged in" modal
+        continue_here: credentials.continueHere ? true : undefined,
       });
 
       if (data?.requires_two_factor) {
@@ -255,6 +262,7 @@ export function useAuth() {
         challenge_token: challengeToken,
         [method === "otp" ? "otp" : "passkey"]: code,
         login_context: await buildLoginContext(),
+        device_id: getDeviceId(),
       };
       const { data } = await api.post(endpoint, payload);
       if (!data?.token) throw new Error("Login verification failed");
@@ -298,6 +306,7 @@ export function useAuth() {
         password: formData.password,
         password_confirmation: formData.password_confirmation,
         otp: formData.otp,
+        device_id: getDeviceId(),
       };
 
       const { data } = await api.post("/auth/register", payload);
@@ -476,6 +485,7 @@ export function useAuth() {
     combinedLogin,
     completeTwoFactorLogin,
     logout,
+    clearAuthData,
     fetchUser,
     loadUser,
     initAuth,

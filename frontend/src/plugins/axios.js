@@ -2,6 +2,7 @@
 import axios from "axios";
 import { toast } from "vue3-toastify";
 import { clearStoredAuth, getPreferredAuthToken } from "../utils/authSession";
+import { markSessionReplaced } from "../utils/sessionReplaced";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL?.trim();
 
@@ -120,6 +121,14 @@ api.interceptors.response.use(
       (error.config?.method ?? "get").toLowerCase() !== "get"
     ) {
       toast.error(error.response.data.message);
+    }
+
+    // ================= SIGNED IN ELSEWHERE =================
+    // The account logged in on another browser. Explain it in a modal instead
+    // of silently bouncing to the login page; the modal's Log out finishes up.
+    if (error.response?.status === 401 && error.response?.data?.code === "session_replaced") {
+      markSessionReplaced(error.response.data.message);
+      return Promise.reject(error);
     }
 
     // ================= HANDLE 401 =================

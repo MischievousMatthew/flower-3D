@@ -209,6 +209,7 @@ Route::middleware('token.auth')->group(function () {
 
     Route::middleware('token.auth:user')->group(function () {
         Route::get('/auth/me',      [AuthController::class, 'me']);
+        Route::get('/auth/session', [AuthController::class, 'session']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
     });
 

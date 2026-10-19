@@ -9,6 +9,7 @@ use App\Services\LoginAuditService;
 use App\Services\AccountSuspensionService;
 use App\Services\LoginGuard;
 use App\Support\PlatformSettings;
+use App\Support\SingleSession;
 use App\Services\EmailOtpService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -98,9 +99,7 @@ class AuthController extends Controller
         ]);
 
         $token = Str::random(80);
-        $user->forceFill([
-            'api_token' => hash('sha256', $token),
-        ])->save();
+        SingleSession::start($user, hash('sha256', $token), $request->input('device_id'));
 
         return response()->json([
             'message' => 'Registration successful',
@@ -187,6 +186,9 @@ class AuthController extends Controller
                 $guard->recordFailure($request, $identifier, 'unverified', $user->id);
                 $this->refuseLogin('account_unverified', "Your account isn't verified yet. Open the verification link we emailed you, then sign in again.");
             }
+
+            // Only after the password is right, so it never reveals anything to a stranger
+            $this->askBeforeTakingOver($user, $request);
 
             if (in_array($user->role, [User::ROLE_CUSTOMER, User::ROLE_VENDOR], true) && $user->two_factor_enabled) {
                 $challengeToken = Str::random(80);
@@ -301,12 +303,24 @@ class AuthController extends Controller
         return $challenge;
     }
 
+    /** "Already logged in elsewhere": the sign-in page asks, then retries with continue_here */
+    private function askBeforeTakingOver(User $user, Request $request): void
+    {
+        if ($request->boolean('continue_here') || !SingleSession::isActiveElsewhere($user, $request->input('device_id'))) {
+            return;
+        }
+
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'code' => 'session_active',
+            'message' => SingleSession::ACTIVE_MESSAGE,
+        ], 409));
+    }
+
     private function completeUserLogin(User $user, Request $request)
     {
         $token = Str::random(80);
-            $user->forceFill([
-                'api_token' => hash('sha256', $token),
-            ])->save();
+            SingleSession::start($user, hash('sha256', $token), $request->input('device_id'));
             $this->loginAuditService->logUserLogin($user, $request);
 
             Log::info('Login successful', [
@@ -459,15 +473,19 @@ class AuthController extends Controller
         }
     }
 
+    /** GET /api/auth/session: 200 while this browser's session is current */
+    public function session()
+    {
+        return response()->json(['success' => true]);
+    }
+
     public function logout(Request $request)
     {
         try {
             $user = $request->user();
 
-            if ($user) {
-                $user->forceFill([
-                    'api_token' => null,
-                ])->save();
+            if ($user instanceof User) {
+                SingleSession::end($user);
             }
             
             Log::info('User logged out successfully');
@@ -674,10 +692,10 @@ class AuthController extends Controller
                 ]);
             }
             
+            $this->askBeforeTakingOver($user, $request);
+
             $token = Str::random(80);
-            $user->forceFill([
-                'api_token' => hash('sha256', $token),
-            ])->save();
+            SingleSession::start($user, hash('sha256', $token), $request->input('device_id'));
             $this->loginAuditService->logUserLogin($user, $request);
 
             return response()->json([
