@@ -340,20 +340,24 @@ export function useAuth() {
       isLoggingOut.value = true;
 
       const userType = localStorage.getItem("user_type");
+      const token = userType === "employee" ? getStoredEmployeeToken() : getStoredUserToken();
 
       const endpoint =
         userType === "employee" ? "/auth/employee-logout" : "/auth/logout";
 
-      try {
-        await api.post(endpoint);
-      } catch (error) {
-        console.warn("Server logout failed, clearing locally...");
-      }
-
+      // Sign out here straight away. The server is told in the background:
+      // on a sleeping free-tier server that call can take half a minute, and
+      // waiting for it made the Log out button look like it did nothing.
       clearAuthData();
       if (userType === "employee") {
         const { clearAssignment } = useAssignment();
         clearAssignment();
+      }
+
+      if (token) {
+        api
+          .post(endpoint, null, { headers: { Authorization: `Bearer ${token}` }, keepAuthorization: true })
+          .catch(() => console.warn("Server logout failed; this browser is signed out anyway."));
       }
 
       await router.push("/guest/login");

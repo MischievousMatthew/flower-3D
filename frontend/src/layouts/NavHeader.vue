@@ -297,7 +297,7 @@ import { toast } from "vue3-toastify";
 import "../styles/bloomcraft.css";
 
 const router = useRouter();
-const { isAuthenticated, logout, isLoggingOut, user } = useAuth();
+const { isAuthenticated, logout, user } = useAuth();
 const { unreadChatCount, chatRoute } = useChatNotifications();
 
 const showUserDropdown = ref(false);
@@ -560,21 +560,10 @@ const handleLogout = async () => {
   if (isLoading.value) return;
 
   try {
-    isLoading.value = isLoggingOut.value = true;
-
-    await logout();
-
-    await new Promise((r) => setTimeout(r, 600));
-
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("user");
-
-    user.value = null;
-
-    await router.push("/guest/login");
-
+    isLoading.value = true;
     showUserDropdown.value = false;
-    toast.success("Logged out successfully!");
+    // Signs out here at once, tells the server, and opens the login page
+    await logout();
   } catch {
     toast.error("Logout failed");
   } finally {

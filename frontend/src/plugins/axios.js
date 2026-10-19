@@ -61,7 +61,11 @@ api.interceptors.request.use(
 
     const token = getPreferredAuthToken(window.location.pathname);
 
-    if (token) {
+    // keepAuthorization: the caller passed a token on purpose (logging out
+    // in the background after the stored one was already cleared)
+    if (config.keepAuthorization && config.headers.Authorization) {
+      // leave it as given
+    } else if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     } else {
       delete config.headers.Authorization;

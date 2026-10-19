@@ -1040,6 +1040,26 @@ const employeeModuleForPath = (path) => {
 /**
  * Global Route Guard
  */
+// Where a signed-in customer, vendor or admin goes instead of a page that isn't
+// theirs (null = the page is fine). Uses the stored account, so it never waits
+// on the network.
+const SIGNED_IN_HOMES = { customer: "/shop", vendor: "/vendor/finance-dashboard", admin: "/admin/dashboard" };
+function signedInHomeFor(to, user) {
+  let role = user?.role;
+  if (!role) {
+    try {
+      role = JSON.parse(localStorage.getItem("user") || "null")?.role;
+    } catch {
+      role = null;
+    }
+  }
+  const home = SIGNED_IN_HOMES[role];
+  if (!home) return null;
+  if (to.name === "Home") return home;
+  if ((role === "vendor" || role === "admin") && to.meta.onlyCustomerOrGuest) return home;
+  return null;
+}
+
 router.beforeEach(async (to, from, next) => {
   // A URL opened directly (bookmark, new tab) may still carry IDs: move them out
   if (HIDDEN_ID_KEYS.some((key) => key in to.query)) {
@@ -1051,6 +1071,14 @@ router.beforeEach(async (to, from, next) => {
   const authContext = to.meta.authContext || canonicalPath;
   const userType = getPreferredUserType(authContext);
   const token = getPreferredAuthToken(authContext);
+
+  // Signed-in accounts stay in their own area: customers skip the landing page
+  // for the shop; vendors and admins skip the landing page and the shop pages
+  // for their dashboard.
+  const roleHome = token && userType !== "employee" ? signedInHomeFor(to, auth.user.value) : null;
+  if (roleHome && roleHome !== canonicalPath) {
+    return next({ path: roleHome, replace: true });
+  }
 
   if (to.meta.public) {
     return next();

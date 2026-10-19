@@ -975,8 +975,10 @@ function onIntroFinished() {
 // Everything is created inside a gsap.context so a resize can
 // revert and rebuild it cleanly.
 // ==========================================================
-const STORY_LENGTH = 11; // timeline units
-const STEP_TIMES = [0.2, 4.2, 6.8, 9.2]; // when each story step enters
+// Each bloom variety gets 1 unit and each paper colour 0.8, so every scroll
+// changes them gently instead of flicking through them all at once.
+const STORY_LENGTH = 16; // timeline units
+const STEP_TIMES = [0.2, 6.2, 11.4, 14.2]; // when each story step enters
 const STORY_ANCHORS = { features: 0.12 }; // nav targets inside the pinned story (progress)
 let journeyCtx = null;
 let pageCtx = null; // hero intro + background parallax
@@ -1076,8 +1078,18 @@ function setupJourney() {
   const isMobile = window.innerWidth < 968;
   const scale = isMobile ? 0.62 : 0.95;
   // Where the bouquet sits on screen in the hero and during the story.
-  const heroSx = isMobile ? 0 : 0.42;
-  const heroSy = isMobile ? -0.56 : 0;
+  let heroSx = isMobile ? 0 : 0.42;
+  let heroSy = isMobile ? -0.56 : 0;
+  // On wide screens, aim at the middle of the gold halo so the bouquet sits
+  // centred in its circle at any window size (the canvas fills the viewport).
+  const halo = heroSection.value?.querySelector(".hero-halo");
+  if (!isMobile && halo) {
+    const box = halo.getBoundingClientRect();
+    const centerX = box.left + box.width / 2;
+    const centerY = box.top + window.scrollY + box.height / 2;
+    heroSx = (centerX / window.innerWidth) * 2 - 1;
+    heroSy = 1 - (centerY / window.innerHeight) * 2;
+  }
   const storySx = isMobile ? 0 : 0.36;
   const storySy = isMobile ? 0.3 : 0;
   const origin = { x: 0, y: 0, z: 0 };
@@ -1159,9 +1171,10 @@ function setupJourney() {
         scrollTrigger: {
           trigger: story,
           start: "top top",
-          end: isMobile ? "+=380%" : "+=520%",
+          // About 0.6 of a screen of scrolling per timeline unit
+          end: isMobile ? "+=760%" : "+=960%",
           pin: true,
-          scrub: 1,
+          scrub: 1.6,
           anticipatePin: 1,
         },
       });
@@ -1184,7 +1197,7 @@ function setupJourney() {
         bloomProxy,
         {
           i: BLOOM_VARIETIES.length - 0.01,
-          duration: 2.8,
+          duration: BLOOM_VARIETIES.length * 1,
           ease: "none",
           onUpdate: () => cycleBloom(Math.floor(bloomProxy.i)),
         },
@@ -1192,29 +1205,29 @@ function setupJourney() {
       );
 
       // 02 Wrapper: pull back and orbit to the paper; cycle swatches.
-      tl.to(bouquet.view, { ...wrapper, duration: 1.4 }, 4);
-      tl.to(rig.rotation, { y: 0.55, duration: 1.6 }, 4);
-      tl.to(bouquet.focus, { flowers: 0.35, wrapper: 1, fillers: 0.3, duration: 1 }, 4);
+      tl.to(bouquet.view, { ...wrapper, duration: 1.4 }, 6);
+      tl.to(rig.rotation, { y: 0.55, duration: 1.6 }, 6);
+      tl.to(bouquet.focus, { flowers: 0.35, wrapper: 1, fillers: 0.3, duration: 1 }, 6);
       tl.to(
         paperProxy,
         {
           i: PAPER_PRESETS.length - 0.01,
-          duration: 2,
+          duration: PAPER_PRESETS.length * 0.8,
           ease: "none",
           onUpdate: () => cyclePaper(Math.floor(paperProxy.i)),
         },
-        4.6,
+        6.8,
       );
 
       // 03 Fillers: zoom onto leaves and small plants.
-      tl.to(bouquet.view, { ...fillers, duration: 1.4 }, 6.6);
-      tl.to(rig.rotation, { y: -0.45, duration: 1.6 }, 6.6);
-      tl.to(bouquet.focus, { flowers: 0.35, wrapper: 0.25, fillers: 1, duration: 1 }, 6.6);
+      tl.to(bouquet.view, { ...fillers, duration: 1.4 }, 11.2);
+      tl.to(rig.rotation, { y: -0.45, duration: 1.6 }, 11.2);
+      tl.to(bouquet.focus, { flowers: 0.35, wrapper: 0.25, fillers: 1, duration: 1 }, 11.2);
 
       // Reveal: full bouquet, one slow turn.
-      tl.to(bouquet.view, { ...finale, duration: 1.6 }, 9);
-      tl.to(bouquet.focus, { flowers: 1, wrapper: 1, fillers: 1, duration: 1 }, 9);
-      tl.to(rig.rotation, { y: Math.PI * 2, duration: 2, ease: "power1.inOut" }, 9);
+      tl.to(bouquet.view, { ...finale, duration: 1.6 }, 14);
+      tl.to(bouquet.focus, { flowers: 1, wrapper: 1, fillers: 1, duration: 1 }, 14);
+      tl.to(rig.rotation, { y: Math.PI * 2, duration: 2, ease: "power1.inOut" }, 14);
       tl.set({}, {}, STORY_LENGTH);
 
       storyTrigger = tl.scrollTrigger;
