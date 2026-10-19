@@ -131,7 +131,20 @@
               <span class="pd-qty-label">Quantity</span>
               <div class="pd-qty" role="group" aria-label="Quantity">
                 <button type="button" aria-label="Fewer" :disabled="qty <= 1" @click="qty--">−</button>
-                <output aria-live="polite">{{ qty }}</output>
+                <input
+                  type="number"
+                  inputmode="numeric"
+                  min="1"
+                  :max="maxQty"
+                  step="1"
+                  aria-label="Quantity"
+                  :value="qtyDraft ?? qty"
+                  :disabled="soldOut"
+                  @focus="$event.target.select()"
+                  @input="qtyDraft = $event.target.value"
+                  @keydown.enter.prevent="commitQty($event)"
+                  @blur="commitQty($event)"
+                />
                 <button type="button" aria-label="More" :disabled="qty >= maxQty" @click="qty++">+</button>
               </div>
               <span class="pd-stock" :class="{ out: soldOut }">{{ soldOut ? "Sold out" : `${product.quantity_in_stock} in stock` }}</span>
@@ -310,6 +323,8 @@ const related = ref([]);
 const active = ref(0);
 const show3D = ref(false);
 const qty = ref(1);
+// What's being typed in the quantity box; applied on Enter or leaving the box
+const qtyDraft = ref(null);
 const busy = ref(null); // "cart" | "buy"
 const addingRelatedId = ref(null);
 const activeTab = ref("description");
@@ -356,6 +371,18 @@ const specs = computed(() => {
 });
 
 const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`;
+
+// Typed quantities are whole numbers from 1 up to what's in stock
+function commitQty(event) {
+  if (qtyDraft.value === null) return;
+  const typed = Math.floor(Number(qtyDraft.value));
+  qtyDraft.value = null;
+  if (Number.isFinite(typed) && typed > 0) {
+    if (typed > maxQty.value) toast.info(`Only ${maxQty.value} in stock.`);
+    qty.value = Math.min(typed, maxQty.value);
+  }
+  if (event.type === "keydown") event.target.blur();
+}
 
 function showImage(i) {
   show3D.value = false;
@@ -861,10 +888,29 @@ watch(
   opacity: 0.35;
 }
 
-.pd-qty output {
-  min-width: 30px;
+.pd-qty input {
+  width: 52px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: 500 14px var(--font-sans);
+  color: var(--ink);
   text-align: center;
-  font-size: 14px;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.pd-qty input::-webkit-outer-spin-button,
+.pd-qty input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.pd-qty input:focus {
+  background: var(--ivory);
+  outline: 1px solid var(--rosewood);
 }
 
 .pd-stock {
