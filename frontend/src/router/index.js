@@ -50,6 +50,12 @@ const routes = [
         meta: { public: true, onlyCustomerOrGuest: true },
       },
       {
+        path: "product/:id",
+        name: "ProductDetails",
+        component: () => import("../views/authenticated/ProductDetails.vue"),
+        meta: { public: true, onlyCustomerOrGuest: true },
+      },
+      {
         path: "customize/flower",
         name: "FlowerCustomizerStore",
         component: () => import("../views/authenticated/FlowerCustomizer.vue"),

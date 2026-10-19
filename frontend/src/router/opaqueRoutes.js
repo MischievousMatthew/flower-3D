@@ -9,6 +9,7 @@
 export const opaqueRouteTokens = Object.freeze({
   Home: "rZwzsCBCFiXAx1KIUDQDSJn1HrcdXa4faWUkZp4YqjR",
   Shop: "rGvHbV0RVtS0XNO4OAcvXCuqS1IgQFQxwFypAeZ0NQc",
+  ProductDetails: "kU0nxEV3i3x_dQlVuQlUWloBdjUNuv88lZvvHnu5GaI",
   FlowerCustomizerStore: "Mfsb6vmjBr0jT6ZCQpLdtK2EZrCWnDOAiZ3umuflqPQ",
   FlowerCustomizer: "kCs7yQgXCX7PugmSwQod4h6lSySWKNbL0zIFbKN2S6S",
   VendorStorefront: "7Oqj1mn5AkJ51NW1lAP60YBLCpKxgO4zc8QikIoLsv0",

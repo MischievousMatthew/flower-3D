@@ -2,14 +2,13 @@
   <section class="fs" aria-labelledby="fs-title">
     <div class="fs-head">
       <h2 id="fs-title">Featured Flower Shops</h2>
-      <button type="button" class="fs-all" @click="$emit('view-all')">View all shops <span aria-hidden="true">→</span></button>
     </div>
 
     <ul v-if="loading" class="fs-list" aria-label="Loading shops">
       <li v-for="n in 4" :key="n" class="bc-skeleton fs-skel"></li>
     </ul>
     <ul v-else-if="shops.length" class="fs-list">
-      <li v-for="shop in shops.slice(0, 4)" :key="shop.id">
+      <li v-for="shop in ordered" :key="shop.id">
         <article class="fs-card" @click="$emit('visit', shop.id)">
           <img v-if="shop.store_cover_url" :src="shop.store_cover_url" :alt="''" class="fs-cover" loading="lazy" />
           <div v-else class="fs-cover fs-cover--logo">
@@ -17,6 +16,10 @@
             <span v-else>{{ shop.store_name?.charAt(0) || "B" }}</span>
           </div>
           <div class="fs-shade" aria-hidden="true"></div>
+          <span v-if="nearby[shop.id] != null" class="fs-near">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z" /><circle cx="12" cy="10" r="2.2" /></svg>
+            Near you · {{ distance(nearby[shop.id]) }}
+          </span>
           <span v-if="shop.verification_level === 'verified'" class="fs-verified">Verified</span>
           <div class="fs-copy">
             <h3>{{ shop.store_name }}</h3>
@@ -37,12 +40,27 @@
 </template>
 
 <script setup>
-/** Four shops as photo cards (cover photo, or the logo on a soft background) */
-defineProps({
+import { computed } from "vue";
+
+/**
+ * Shops as photo cards (cover photo, or the logo on a soft background).
+ * Shops near the customer's pinned location come first, tagged "Near you".
+ */
+const props = defineProps({
   shops: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
+  nearby: { type: Object, default: () => ({}) }, // shop id → distance in km
+  byRoad: { type: Boolean, default: true },
 });
-defineEmits(["visit", "view-all"]);
+defineEmits(["visit"]);
+
+const ordered = computed(() =>
+  [...props.shops].sort((a, b) => (props.nearby[a.id] ?? Infinity) - (props.nearby[b.id] ?? Infinity)).slice(0, 8),
+);
+const distance = (km) => {
+  const text = km < 1 ? `${Math.round(km * 1000)} m` : `${Number(km).toFixed(1)} km`;
+  return props.byRoad ? text : `${text} away`;
+};
 </script>
 
 <style scoped>
@@ -65,15 +83,6 @@ defineEmits(["visit", "view-all"]);
   font-size: 28px;
   font-weight: 500;
   color: var(--ink);
-}
-
-.fs-all {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: 500 12.5px var(--font-sans);
-  color: var(--rosewood-dark);
-  cursor: pointer;
 }
 
 .fs-list {
@@ -141,6 +150,31 @@ defineEmits(["visit", "view-all"]);
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg, rgba(20, 15, 12, 0) 30%, rgba(20, 15, 12, 0.78) 100%);
+}
+
+.fs-near {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  background: var(--rosewood-dark);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--paper);
+  box-shadow: 0 6px 14px -8px rgba(30, 27, 24, 0.6);
+}
+
+.fs-near svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
 }
 
 .fs-verified {
