@@ -52,6 +52,14 @@ class SiteContentController extends Controller
     }
 
     /**
+     * GET /api/site/status: whether sign-ups and checkout are open right now
+     */
+    public function status(): JsonResponse
+    {
+        return response()->json(['success' => true, 'data' => \App\Support\PlatformSettings::publicStatus()]);
+    }
+
+    /**
      * GET /api/site/articles?category=care
      */
     public function articles(Request $request): JsonResponse

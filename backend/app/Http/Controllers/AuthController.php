@@ -28,6 +28,11 @@ class AuthController extends Controller
 
     public function sendOtp(Request $request)
     {
+        // The code is only for signing up, so don't send one while sign-ups are closed
+        if (!PlatformSettings::get('registrations_open')) {
+            return response()->json(['success' => false, 'message' => 'New customer sign-ups are paused right now. Please try again later.'], 403);
+        }
+
         $request->validate([
             'email' => 'required|email|max:255',
         ]);

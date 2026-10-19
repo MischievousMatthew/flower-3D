@@ -1,0 +1,31 @@
+import { reactive } from "vue";
+import api from "../plugins/axios.js";
+
+// Whether sign-ups and checkout are open, as set by admins in Security → Platform settings.
+// The server enforces these too; this only lets pages say so up front.
+const OPEN = {
+  registrations_open: true,
+  vendor_applications_open: true,
+  checkout_paused: false,
+  checkout_pause_message: "Ordering is paused for a moment. Please try again later.",
+};
+
+export function usePlatformStatus() {
+  const status = reactive({ ...OPEN, loaded: false });
+
+  // Always asks the server, so a switch an admin just flipped applies straight away.
+  // If the check itself fails the page stays usable; the server still refuses.
+  async function refresh() {
+    try {
+      const { data } = await api.get("/site/status");
+      Object.assign(status, OPEN, data?.data || {});
+    } catch {
+      Object.assign(status, OPEN);
+    } finally {
+      status.loaded = true;
+    }
+    return status;
+  }
+
+  return { status, refresh };
+}

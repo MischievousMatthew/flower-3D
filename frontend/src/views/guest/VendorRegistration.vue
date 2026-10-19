@@ -24,6 +24,15 @@
       </p>
     </div>
 
+    <!-- Applications closed by an admin (Security → Platform settings) -->
+    <div v-if="!platform.vendor_applications_open" class="closed-notice" role="status">
+      <h2>Vendor applications are closed</h2>
+      <p>We're not taking new store applications right now. Please check back soon.</p>
+      <router-link to="/" class="link">Back to the shop</router-link>
+    </div>
+
+    <!-- Kept on the page (not removed) so the store map can still set itself up -->
+    <div v-show="platform.vendor_applications_open">
     <!-- Progress Steps -->
     <div class="steps-indicator">
       <template v-for="(step, index) in steps" :key="step.number">
@@ -1212,6 +1221,7 @@
         </div>
       </div>
     </div>
+    </div>
   </div>
 </template>
 
@@ -1227,6 +1237,7 @@ import {
 } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../plugins/axios";
+import { usePlatformStatus } from "../../composables/usePlatformStatus";
 import { toast } from "vue3-toastify";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -2626,6 +2637,8 @@ const handleSubmit = async () => {
   } catch (error) {
     console.error("Registration error:", error);
     const responseData = error?.response?.data;
+    // Applications were closed while the form was open
+    if (error?.response?.status === 403) refreshPlatform();
 
     if (responseData?.errors) {
       const firstMessage = applyBackendErrors(responseData.errors);
@@ -2655,7 +2668,10 @@ const closeModal = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Lifecycle hooks (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
+const { status: platform, refresh: refreshPlatform } = usePlatformStatus();
+
 onMounted(async () => {
+  refreshPlatform();
   loadProgress();
   await initialiseStoreLocationMap();
   saveInterval.value = setInterval(saveProgress, 30000);
@@ -2691,6 +2707,28 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.closed-notice {
+  max-width: 440px;
+  margin: 8px auto 0;
+  padding: 28px 24px;
+  border: 1px solid rgba(30, 27, 24, 0.12);
+  border-radius: 14px;
+  background: #faf8f4;
+  text-align: center;
+}
+
+.closed-notice h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.closed-notice p {
+  margin: 0 0 16px;
+  color: #6e6761;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 /* ─── All original styles (unchanged) ──────────────────────────────────────── */
 .register-container {
   min-height: 100vh;

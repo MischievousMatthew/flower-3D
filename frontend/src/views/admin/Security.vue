@@ -240,7 +240,7 @@
           <div class="panel-head">
             <div>
               <h2 class="panel-title">Platform settings</h2>
-              <p class="panel-sub">These take effect straight away for everyone.</p>
+              <p class="panel-sub">Switches save the moment you flip them. Use Save settings for the message and numbers.</p>
             </div>
           </div>
           <div v-if="!settings" class="sk-list"><span v-for="n in 4" :key="n" class="sk sk-row"></span></div>
@@ -249,15 +249,15 @@
               <h3 class="set-group">Sign-ups &amp; ordering</h3>
               <label class="toggle-row">
                 <div><span class="strong">Customer sign-ups</span><span class="sub">When off, new customers can't create accounts. Existing customers still sign in.</span></div>
-                <input v-model="settings.registrations_open" type="checkbox" class="switch" />
+                <input v-model="settings.registrations_open" type="checkbox" class="switch" :disabled="switchSaving" @change="saveSwitch('registrations_open')" />
               </label>
               <label class="toggle-row">
                 <div><span class="strong">Vendor applications</span><span class="sub">When off, the vendor registration form is refused.</span></div>
-                <input v-model="settings.vendor_applications_open" type="checkbox" class="switch" />
+                <input v-model="settings.vendor_applications_open" type="checkbox" class="switch" :disabled="switchSaving" @change="saveSwitch('vendor_applications_open')" />
               </label>
               <label class="toggle-row" :class="{ alarm: settings.checkout_paused }">
                 <div><span class="strong">Pause all checkout</span><span class="sub">Stops every new order across all stores, e.g. during an incident. Payments already made aren't affected.</span></div>
-                <input v-model="settings.checkout_paused" type="checkbox" class="switch danger" />
+                <input v-model="settings.checkout_paused" type="checkbox" class="switch danger" :disabled="switchSaving" @change="saveSwitch('checkout_paused')" />
               </label>
               <label class="field">
                 <span>Message customers see while checkout is paused</span>
@@ -762,6 +762,32 @@ const saveSettings = async () => {
     settingsError.value = errors ? Object.values(errors)[0]?.[0] : e.response?.data?.message || "Settings couldn't be saved.";
   } finally {
     busy.value = false;
+  }
+};
+
+// Sign-up and checkout switches apply as soon as they're flipped; a failed save flips them back
+const SWITCH_TOASTS = {
+  registrations_open: (on) => (on ? "Customer sign-ups are open." : "Customer sign-ups are closed."),
+  vendor_applications_open: (on) => (on ? "Vendor applications are open." : "Vendor applications are closed."),
+  checkout_paused: (on) => (on ? "Checkout is paused for every store." : "Checkout is open again."),
+};
+const switchSaving = ref(false);
+const saveSwitch = async (key) => {
+  const value = settings.value[key];
+  switchSaving.value = true;
+  settingsError.value = "";
+  try {
+    // Only the switch itself; unsaved edits to other fields stay as they are
+    const saved = (await api.get("/admin/security/settings")).data.data;
+    const { data } = await api.put("/admin/security/settings", { ...saved, [key]: value });
+    settings.value = { ...settings.value, [key]: data.data[key] };
+    toast.success(SWITCH_TOASTS[key](data.data[key]));
+  } catch (e) {
+    settings.value[key] = !value;
+    const errors = e.response?.data?.errors;
+    settingsError.value = errors ? Object.values(errors)[0]?.[0] : e.response?.data?.message || "That change couldn't be saved.";
+  } finally {
+    switchSaving.value = false;
   }
 };
 

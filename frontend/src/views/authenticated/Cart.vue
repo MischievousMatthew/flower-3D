@@ -425,12 +425,14 @@ import { usePrice } from "../../composables/usePrice";
 import { useCart } from "../../composables/useCart";
 import NavHeader from "../../layouts/NavHeader.vue";
 import api from "../../plugins/axios"; // ✅ needed to fetch profile
+import { usePlatformStatus } from "../../composables/usePlatformStatus";
 import { toast } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import "../../styles/bloomcraft.css";
 import ThreeDModelViewer from "../../layouts/3D/3DModelViewer.vue";
 
 const router = useRouter();
+const { refresh: refreshPlatform } = usePlatformStatus();
 const { isAuthenticated } = useAuth();
 const cartStore = useCart();
 const {
@@ -821,6 +823,13 @@ const proceedToCheckout = async () => {
   }
   if (hasSelectedOutOfStock.value) {
     toast.error("Please remove out of stock items");
+    return;
+  }
+
+  // An admin may have paused checkout for every store
+  const platform = await refreshPlatform();
+  if (platform.checkout_paused) {
+    toast.error(platform.checkout_pause_message);
     return;
   }
 

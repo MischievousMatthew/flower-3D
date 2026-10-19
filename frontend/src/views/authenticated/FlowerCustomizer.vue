@@ -540,6 +540,7 @@ import OrderReceipt from "../../components/customizer/OrderReceipt.vue";
 import StageTools from "../../components/customizer/StageTools.vue";
 import { useAuth } from "../../composables/useAuth";
 import { useCart } from "../../composables/useCart";
+import { usePlatformStatus } from "../../composables/usePlatformStatus";
 import { toast as toastify } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import "../../styles/bloomcraft.css";
@@ -571,6 +572,7 @@ const route = useRoute();
 const router = useRouter();
 const { isAuthenticated } = useAuth();
 const cartStore = useCart();
+const { refresh: refreshPlatform } = usePlatformStatus();
 
 const viewerContainer = ref(null);
 const layoutContainer = ref(null);
@@ -1935,8 +1937,14 @@ function enforceFlowerLimit(flower) {
 const incompleteCheckout = ref(false);
 const keepBuildingButton = ref(null);
 
-function requestCheckout() {
+async function requestCheckout() {
   if (!placedFlowers.value.length || isCheckingOut.value) return;
+  // An admin may have paused checkout for every store
+  const platform = await refreshPlatform();
+  if (platform.checkout_paused) {
+    showToast(platform.checkout_pause_message, "error");
+    return;
+  }
   if (placedFlowers.value.length < maxFlowers.value) {
     incompleteCheckout.value = true;
     nextTick(() => keepBuildingButton.value?.focus());

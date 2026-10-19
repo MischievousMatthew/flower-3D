@@ -24,6 +24,14 @@
       </p>
     </div>
 
+    <!-- Sign-ups closed by an admin (Security → Platform settings) -->
+    <div v-if="!platform.registrations_open" class="closed-notice" role="status">
+      <h2>Sign-ups are paused</h2>
+      <p>We're not taking new customer accounts right now. Please check back soon.</p>
+      <router-link to="/" class="link">Back to the shop</router-link>
+    </div>
+
+    <template v-else>
     <!-- Progress Steps -->
     <div class="steps-indicator">
       <div
@@ -226,17 +234,21 @@
         </button>
       </form>
     </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed } from "vue";
+import { ref, reactive, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
+import { usePlatformStatus } from "../../composables/usePlatformStatus";
 import api from "../../plugins/axios";
 
 const router = useRouter();
 const { register, loading } = useAuth();
+const { status: platform, refresh: refreshPlatform } = usePlatformStatus();
+onMounted(refreshPlatform);
 
 const currentStep = ref(1);
 const otpLoading = ref(false);
@@ -308,6 +320,8 @@ async function handleSendOtp() {
     startCooldown(60);
   } catch (err) {
     console.log("422 details:", err.response?.data); // ← ADD THIS
+    // Sign-ups were closed while the form was open
+    if (err.response?.status === 403) refreshPlatform();
     if (err.response?.data?.errors?.email) {
       errors.value.email = err.response.data.errors.email[0];
     } else {
@@ -550,6 +564,28 @@ async function handleRegister() {
 .form-content {
   width: 100%;
   max-width: 480px;
+}
+
+.closed-notice {
+  max-width: 420px;
+  margin: 8px auto 0;
+  padding: 28px 24px;
+  border: 1px solid rgba(30, 27, 24, 0.12);
+  border-radius: 14px;
+  background: #faf8f4;
+  text-align: center;
+}
+
+.closed-notice h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.closed-notice p {
+  margin: 0 0 16px;
+  color: #6e6761;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .alert-error {

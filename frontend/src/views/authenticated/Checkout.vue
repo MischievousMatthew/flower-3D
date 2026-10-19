@@ -1042,7 +1042,12 @@ async function loadCheckoutData() {
     restoreCheckoutDraft();
   } catch (error) {
     console.error("Error loading checkout:", error);
-    toast.error("Failed to initialize checkout");
+    // 503 = an admin paused checkout; show their message instead of a generic error
+    toast.error(
+      error.response?.status === 503
+        ? error.response.data?.message || "Ordering is paused for a moment. Please try again later."
+        : "Failed to initialize checkout",
+    );
     router.push("/customer/cart");
   } finally {
     isLoading.value = false;

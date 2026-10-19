@@ -138,6 +138,7 @@ Route::get('/stores/{storeId}/customization-options', [VendorStoreFrontControlle
 Route::prefix('site')->group(function () {
     Route::get('/home',            [SiteContentController::class, 'home']);
     Route::get('/settings',        [SiteContentController::class, 'settings']);
+    Route::get('/status',          [SiteContentController::class, 'status']);
     Route::get('/articles',        [SiteContentController::class, 'articles']);
     Route::get('/articles/{slug}', [SiteContentController::class, 'article']);
 });

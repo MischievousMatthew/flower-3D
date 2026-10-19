@@ -43,6 +43,19 @@ final class PlatformSettings
         return self::$cache = array_merge(self::DEFAULTS, array_intersect_key($stored, self::DEFAULTS));
     }
 
+    /** What customers and stores may know: whether sign-ups and checkout are open */
+    public static function publicStatus(): array
+    {
+        $all = self::all();
+
+        return [
+            'registrations_open' => (bool) $all['registrations_open'],
+            'vendor_applications_open' => (bool) $all['vendor_applications_open'],
+            'checkout_paused' => (bool) $all['checkout_paused'],
+            'checkout_pause_message' => (string) $all['checkout_pause_message'],
+        ];
+    }
+
     public static function get(string $key): mixed
     {
         return self::all()[$key] ?? self::DEFAULTS[$key] ?? null;
