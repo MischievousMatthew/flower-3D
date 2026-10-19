@@ -1,9 +1,11 @@
 <template>
   <router-view />
+  <CheckoutPausedModal />
 </template>
 
 <script setup>
 import { onMounted } from "vue";
+import CheckoutPausedModal from "./components/site/CheckoutPausedModal.vue";
 import { useRoute } from "vue-router";
 import { useAuth } from "./composables/useAuth";
 import { useInactivityTimeout } from "./composables/useInactivityTimeout";

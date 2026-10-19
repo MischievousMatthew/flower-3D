@@ -540,7 +540,7 @@ import OrderReceipt from "../../components/customizer/OrderReceipt.vue";
 import StageTools from "../../components/customizer/StageTools.vue";
 import { useAuth } from "../../composables/useAuth";
 import { useCart } from "../../composables/useCart";
-import { usePlatformStatus } from "../../composables/usePlatformStatus";
+import { checkoutPausedNotice, showCheckoutPaused, usePlatformStatus } from "../../composables/usePlatformStatus";
 import { toast as toastify } from "vue3-toastify";
 import "vue3-toastify/dist/index.css";
 import "../../styles/bloomcraft.css";
@@ -1891,7 +1891,7 @@ function onKeydown(event) {
     },
     {
       ready: sceneReady.value,
-      modalOpen: cardEditor.open || incompleteCheckout.value,
+      modalOpen: cardEditor.open || incompleteCheckout.value || checkoutPausedNotice.open,
       hasTarget: hasTransformTarget.value,
       bouquetSelected: bouquetSelected.value,
       hasSelectedFlower: !!selectedFlower.value,
@@ -1942,7 +1942,7 @@ async function requestCheckout() {
   // An admin may have paused checkout for every store
   const platform = await refreshPlatform();
   if (platform.checkout_paused) {
-    showToast(platform.checkout_pause_message, "error");
+    showCheckoutPaused(platform.checkout_pause_message);
     return;
   }
   if (placedFlowers.value.length < maxFlowers.value) {

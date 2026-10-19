@@ -10,6 +10,14 @@ const OPEN = {
   checkout_pause_message: "Ordering is paused for a moment. Please try again later.",
 };
 
+// The "checkout is paused" modal, shared by every page (mounted once in App.vue)
+export const checkoutPausedNotice = reactive({ open: false, message: "" });
+
+export function showCheckoutPaused(message) {
+  checkoutPausedNotice.message = message || OPEN.checkout_pause_message;
+  checkoutPausedNotice.open = true;
+}
+
 export function usePlatformStatus() {
   const status = reactive({ ...OPEN, loaded: false });
 

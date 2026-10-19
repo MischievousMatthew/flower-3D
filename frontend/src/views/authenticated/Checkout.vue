@@ -489,6 +489,7 @@ import { useRouter, useRoute } from "vue-router";
 import NavHeader from "../../layouts/NavHeader.vue";
 import "../../styles/bloomcraft.css";
 import api from "../../plugins/axios.js";
+import { showCheckoutPaused } from "../../composables/usePlatformStatus";
 import { toast } from "vue3-toastify";
 import { usePrice } from "../../composables/usePrice.js";
 
@@ -1042,12 +1043,9 @@ async function loadCheckoutData() {
     restoreCheckoutDraft();
   } catch (error) {
     console.error("Error loading checkout:", error);
-    // 503 = an admin paused checkout; show their message instead of a generic error
-    toast.error(
-      error.response?.status === 503
-        ? error.response.data?.message || "Ordering is paused for a moment. Please try again later."
-        : "Failed to initialize checkout",
-    );
+    // 503 = an admin paused checkout; explain it in the maintenance modal
+    if (error.response?.status === 503) showCheckoutPaused(error.response.data?.message);
+    else toast.error("Failed to initialize checkout");
     router.push("/customer/cart");
   } finally {
     isLoading.value = false;
@@ -1153,7 +1151,9 @@ async function placeOrder() {
       pendingOnlineOrderId.value = retryOrderId;
       sessionStorage.setItem("pending_online_order_id", String(retryOrderId));
     }
-    toast.error(error.response?.data?.message || "Failed to place order");
+    // Checkout was paused while the customer was on this page
+    if (error.response?.status === 503) showCheckoutPaused(error.response.data?.message);
+    else toast.error(error.response?.data?.message || "Failed to place order");
   } finally {
     isProcessing.value = false;
   }
