@@ -128,5 +128,10 @@ return [
         'FRONTEND_VENDOR_PROFILE_PATH',
         '/MySju890iPNSbkf2RtOrclCnGLtzdKvUT0bk0tXnZoD'
     ),
+    // Where a vendor lands after a confirmed subscription payment
+    'frontend_vendor_subscription_path' => env(
+        'FRONTEND_VENDOR_SUBSCRIPTION_PATH',
+        '/pxHiyrGwDDpBO9v5VMswSWCpO333d4GMKwtrZwpHbpg'
+    ),
 
 ];

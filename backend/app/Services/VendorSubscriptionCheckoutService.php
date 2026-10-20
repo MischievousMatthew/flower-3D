@@ -14,7 +14,7 @@ use LogicException;
 
 class VendorSubscriptionCheckoutService
 {
-    public function create(User $vendor, string $planKey): VendorSubscriptionCheckout
+    public function create(User $vendor, string $planKey, ?string $callbackBase = null): VendorSubscriptionCheckout
     {
         if (! $vendor->isVendor()) throw new LogicException('Only vendor owners can purchase subscriptions.');
         if (! SubscriptionPlans::exists($planKey)) throw new LogicException('Unknown subscription plan.');
@@ -30,7 +30,7 @@ class VendorSubscriptionCheckoutService
             'amount' => $plan['monthly_price'], 'currency' => $plan['currency'], 'billing_period' => 'monthly',
             'payment_attempt' => $attempt, 'reference_number' => 'BC-SUB-' . $vendor->id . '-' . strtoupper(substr($attempt, 0, 12)),
         ]);
-        $callbackBase = rtrim((string) config('services.paymongo.subscription_callback_url', config('app.url')), '/');
+        $callbackBase = rtrim((string) ($callbackBase ?: config('services.paymongo.subscription_callback_url', config('app.url'))), '/');
         $callback = $callbackBase . '/api/subscription/payment/callback?checkout_id=' . $checkout->id;
         $attributes = [
             'send_email_receipt' => true, 'show_description' => true, 'show_line_items' => true,

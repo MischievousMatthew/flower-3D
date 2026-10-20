@@ -467,11 +467,36 @@ class VendorSubscriptionTest extends TestCase
         $this->assertSame(SubscriptionPlans::STARTER, $otherVendor->fresh()->subscription->plan_key);
     }
 
-    public function test_paymongo_return_verification_activates_and_redirects_to_the_vendor_profile(): void
+    public function test_checkout_returns_to_the_api_host_that_created_it(): void
+    {
+        config()->set('services.paymongo.secret_key', 'test-key');
+        // A stale dashboard value must not strand the vendor on a dead host
+        config()->set('services.paymongo.subscription_callback_url', 'https://bloomcraft-backend.onrender.com');
+        $vendor = $this->vendor();
+        Http::fake([
+            'https://api.paymongo.com/v1/checkout_sessions' => Http::response([
+                'data' => ['id' => 'cs_host_1', 'attributes' => ['checkout_url' => 'https://paymongo.test/checkout']],
+            ], 200),
+        ]);
+
+        $request = \Illuminate\Http\Request::create('https://flower-3d.onrender.com/api/vendor/subscription/checkout', 'POST', ['plan_key' => SubscriptionPlans::PROFESSIONAL]);
+        $request->setUserResolver(fn () => $vendor);
+        $response = app(\App\Http\Controllers\VendorSubscriptionController::class)
+            ->createCheckout($request, app(VendorSubscriptionCheckoutService::class));
+
+        $this->assertSame(201, $response->getStatusCode());
+        $checkoutId = $response->getData(true)['data']['checkout_id'];
+        Http::assertSent(fn (\Illuminate\Http\Client\Request $sent) =>
+            data_get($sent->data(), 'data.attributes.success_url')
+                === 'https://flower-3d.onrender.com/api/subscription/payment/callback?checkout_id=' . $checkoutId . '&success=true'
+        );
+    }
+
+    public function test_paymongo_return_verification_activates_and_redirects_to_the_subscription_page(): void
     {
         config()->set('services.paymongo.secret_key', 'test-key');
         config()->set('app.frontend_url', 'bloomcraft-app.vercel.app');
-        config()->set('app.frontend_vendor_profile_path', '/MySju890iPNSbkf2RtOrclCnGLtzdKvUT0bk0tXnZoD');
+        config()->set('app.frontend_vendor_subscription_path', '/pxHiyrGwDDpBO9v5VMswSWCpO333d4GMKwtrZwpHbpg');
         $vendor = $this->vendor();
         $checkout = \App\Models\VendorSubscriptionCheckout::create([
             'vendor_id' => $vendor->id,
@@ -494,7 +519,7 @@ class VendorSubscriptionTest extends TestCase
         ]);
 
         $response = $this->get('/api/subscription/payment/callback?checkout_id=' . $checkout->id . '&success=true');
-        $response->assertRedirect('https://bloomcraft-app.vercel.app/MySju890iPNSbkf2RtOrclCnGLtzdKvUT0bk0tXnZoD');
+        $response->assertRedirect('https://bloomcraft-app.vercel.app/pxHiyrGwDDpBO9v5VMswSWCpO333d4GMKwtrZwpHbpg?subscription_success=professional');
         $subscription = $vendor->fresh()->subscription;
         $this->assertSame(SubscriptionPlans::PROFESSIONAL, $subscription->plan_key);
         $this->assertSame(SubscriptionStatus::Active, $subscription->status);

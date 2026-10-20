@@ -45,7 +45,8 @@ class VendorSubscriptionController extends Controller
     {
         $data = $request->validate(['plan_key' => ['required', 'string']]);
         try {
-            $checkout = $checkouts->create($request->user(), $data['plan_key']);
+            // PayMongo returns to the API host that created the checkout, so a stale APP_URL can't strand the vendor
+            $checkout = $checkouts->create($request->user(), $data['plan_key'], $request->getSchemeAndHttpHost());
             return response()->json(['success' => true, 'data' => [
                 'checkout_id' => $checkout->id, 'checkout_url' => $checkout->checkout_url,
                 'status' => $checkout->status, 'plan_key' => $checkout->plan_key,
@@ -87,8 +88,8 @@ class VendorSubscriptionController extends Controller
         $state = $paid ? 'paid' : ($request->boolean('success') ? 'pending' : 'cancelled');
 
         if ($paid) {
-            $profilePath = '/' . ltrim((string) config('app.frontend_vendor_profile_path'), '/');
-            return redirect($frontend . $profilePath);
+            $subscriptionPath = '/' . ltrim((string) config('app.frontend_vendor_subscription_path'), '/');
+            return redirect($frontend . $subscriptionPath . '?subscription_success=' . urlencode($checkout->plan_key));
         }
 
         return redirect($frontend . '/pricing?subscription_payment=' . $state . '&checkout_id=' . urlencode((string) $request->query('checkout_id')));

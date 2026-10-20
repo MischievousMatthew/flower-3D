@@ -906,9 +906,9 @@ const fetchHistory = async (page = 1) => {
   loading.history = true;
   try {
     const params = { page, per_page: 25, search: historyFilters.search || undefined, actor_type: historyFilters.actor_type || undefined };
-    const page = (await api.get("/admin/login-logs", { params })).data.data;
-    history.value = page.data;
-    historyMeta.value = { current_page: page.current_page, last_page: page.last_page, per_page: page.per_page, total: page.total };
+    const result = (await api.get("/admin/login-logs", { params })).data.data;
+    history.value = result.data;
+    historyMeta.value = { current_page: result.current_page, last_page: result.last_page, per_page: result.per_page, total: result.total };
   } catch {
     toast.error("Sign-in history couldn't be loaded.");
   } finally {
