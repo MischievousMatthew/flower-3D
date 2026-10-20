@@ -281,6 +281,15 @@ onMounted(async () => {
   --radius: 14px;
   color: var(--text);
 }
+/* Vendor pages follow the vendor light/dark tokens */
+.theme-vendor {
+  --accent-soft: var(--v-purple-soft);
+  --text: var(--v-text);
+  --muted: var(--v-muted);
+  --line: var(--v-border);
+  --card: var(--v-surface);
+  --mine: var(--v-purple-soft);
+}
 .theme-shop {
   --accent: #1b1612;
   --accent-dark: #000;

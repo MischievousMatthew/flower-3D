@@ -308,10 +308,10 @@ onBeforeUnmount(() => clearTimeout(searchTimer));
 .pipe-step.on {
   background: var(--tone-soft);
 }
-.tone-amber { --tone: #f6ad55; --tone-soft: #fffaf0; --tone-ink: #b45309; }
-.tone-blue { --tone: #63b3ed; --tone-soft: #f0f7ff; --tone-ink: #2b6cb0; }
-.tone-violet { --tone: #b794f4; --tone-soft: #f7f3ff; --tone-ink: #6b46c1; }
-.tone-teal { --tone: #4fd1c5; --tone-soft: #effcfa; --tone-ink: #2c7a7b; }
+.tone-amber { --tone: #f6ad55; --tone-soft: var(--v-amber-soft); --tone-ink: var(--v-amber-text); }
+.tone-blue { --tone: #63b3ed; --tone-soft: var(--v-blue-soft); --tone-ink: var(--v-blue-text); }
+.tone-violet { --tone: #b794f4; --tone-soft: var(--v-purple-soft); --tone-ink: var(--v-purple-text); }
+.tone-teal { --tone: #4fd1c5; --tone-soft: var(--v-teal-soft); --tone-ink: var(--v-teal-text); }
 .pipe-label {
   display: flex;
   align-items: center;

@@ -413,9 +413,10 @@ const fmtDateTime = (v) =>
 .rc {
   --rc-accent: var(--return-accent, #3f6f5a);
   --rc-accent-soft: var(--return-accent-soft, #e8f1ec);
-  --rc-ink: #1f2933;
-  --rc-muted: #6b7280;
-  --rc-line: #e6e8ec;
+  /* Vendor tokens, so the panel follows vendor dark mode (customer pages stay light) */
+  --rc-ink: var(--v-text);
+  --rc-muted: var(--v-muted);
+  --rc-line: var(--v-border);
   display: flex;
   flex-direction: column;
   gap: 14px;

@@ -40,6 +40,12 @@ html[data-vendor-theme="dark"] .bc-skeleton {
   background-size: 300% 100%;
 }
 
+/* Placeholders: the browser's default grey (and the faint token) is too dim on dark fields */
+html[data-vendor-theme="dark"] ::placeholder {
+  color: ${DARK_TOKENS.muted} !important;
+  opacity: 1;
+}
+
 /* Photos and the 3D view keep their own colors; soften glare a little */
 html[data-vendor-theme="dark"] img:not([src$=".svg"]) {
   filter: brightness(0.94);

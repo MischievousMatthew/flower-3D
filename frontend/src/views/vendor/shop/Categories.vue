@@ -169,8 +169,8 @@ const { products, error, load, taxonomies, categoryLabel } = useVendorCatalog();
 
 const UNSET = { value: "__none__", label: "Not sorted yet", description: null };
 const PALETTE = [
-  { bg: "#e6f9ee", fg: "#22753f" }, { bg: "#fff0f6", fg: "#b83280" }, { bg: "#ebf4ff", fg: "#2b6cb0" },
-  { bg: "#fff6e5", fg: "#b45309" }, { bg: "#f3f0ff", fg: "#6b46c1" }, { bg: "#e6fffa", fg: "#2c7a7b" },
+  { bg: "var(--v-green-soft)", fg: "var(--v-green-text)" }, { bg: "var(--v-pink-soft)", fg: "var(--v-pink-text)" }, { bg: "var(--v-blue-soft)", fg: "var(--v-blue-text)" },
+  { bg: "var(--v-amber-soft)", fg: "var(--v-amber-text)" }, { bg: "var(--v-purple-soft)", fg: "var(--v-purple-text)" }, { bg: "var(--v-teal-soft)", fg: "var(--v-teal-text)" },
 ];
 
 const route = useRoute();
