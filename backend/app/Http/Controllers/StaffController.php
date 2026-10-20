@@ -194,8 +194,8 @@ class StaffController extends Controller
         $ownerId = $this->resolveOwnerId($request);
         $data = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:employees,email',
-            'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[A-Za-z0-9._-]+$/', 'unique:employees,username'],
+            // The email is also the username they sign in with
+            'email' => 'required|email|max:255|unique:employees,email|unique:employees,username',
             'password' => 'required|string|min:8|max:100',
             'title' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:20',
@@ -203,8 +203,6 @@ class StaffController extends Controller
             'joining_date' => 'required|date',
             'staff_role_id' => ['required', Rule::exists('staff_roles', 'id')->where('owner_id', $ownerId)],
         ], [
-            'username.regex' => 'Use letters, numbers, dots, dashes or underscores only.',
-            'username.unique' => 'Someone already uses that username.',
             'email.unique' => 'Someone already uses that email.',
             'staff_role_id.required' => 'Choose a role.',
         ]);
@@ -214,7 +212,7 @@ class StaffController extends Controller
                 'owner_id' => $ownerId,
                 'name' => $data['name'],
                 'email' => $data['email'],
-                'username' => $data['username'],
+                'username' => $data['email'],
                 'password' => Hash::make($data['password']),
                 'role' => $data['title'] ?? null,
                 'phone' => $data['phone'] ?? null,

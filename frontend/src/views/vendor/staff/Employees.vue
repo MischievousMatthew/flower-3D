@@ -99,7 +99,7 @@
                     <span class="st-avatar" :style="{ background: a.role?.color || personColor(a.name) }">{{ a.initials }}</span>
                     <div>
                       <strong>{{ a.name }}</strong>
-                      <small>@{{ a.username }}<template v-if="a.title"> · {{ a.title }}</template></small>
+                      <small>{{ a.username.includes("@") ? a.username : `@${a.username}` }}<template v-if="a.title"> · {{ a.title }}</template></small>
                     </div>
                   </div>
                 </td>
@@ -172,7 +172,7 @@
           <div class="sp-drawer-head">
             <div>
               <h3 id="em-title">{{ form.id ? form.original : "Add an employee" }}</h3>
-              <p>{{ form.id ? `Signs in to the ERP as @${form.username}` : "They sign in to the ERP with the username and password you set here." }}</p>
+              <p>{{ form.id ? `Signs in to the ERP as ${form.username.includes("@") ? "" : "@"}${form.username}` : "They sign in to the ERP with their email as the username, and the password you set here." }}</p>
             </div>
             <button type="button" class="sp-icon-btn" aria-label="Close" @click="closeAccount"><span v-html="ICONS.close"></span></button>
           </div>
@@ -237,8 +237,9 @@
             <div class="sp-grid-2">
               <label v-if="!form.id" class="sp-field">
                 <span>Username</span>
-                <input v-model="form.username" class="sp-input" :class="{ invalid: errors.username }" maxlength="50" autocomplete="off" autocapitalize="off" spellcheck="false" />
+                <input :value="form.email.trim()" class="sp-input" :class="{ invalid: errors.username }" placeholder="Same as their email" readonly tabindex="-1" />
                 <small v-if="errors.username" class="sp-error">{{ errors.username }}</small>
+                <small v-else class="st-sub">Their email is their username.</small>
               </label>
               <label class="sp-field">
                 <span>{{ form.id ? "New password" : "Password" }} <small v-if="form.id">(leave blank to keep)</small></span>
@@ -408,7 +409,6 @@ function validate() {
   if (!/^\S+@\S+\.\S+$/.test(f.email.trim())) errors.email = "Enter a valid email.";
   if (!f.joining_date) errors.joining_date = "Pick the day they started.";
   if (!f.id) {
-    if (!/^[A-Za-z0-9._-]{3,50}$/.test(f.username.trim())) errors.username = "At least 3 letters or numbers (dots, dashes and underscores are fine).";
     if (f.password.length < 8) errors.password = "Use at least 8 characters.";
   } else if (f.password && f.password.length < 8) {
     errors.password = "Use at least 8 characters.";
@@ -426,7 +426,7 @@ async function saveAccount() {
   try {
     const { data: res } = f.id
       ? await api.put(`vendor/staff/employees/${f.id}`, { ...body, status: f.status })
-      : await api.post("vendor/staff/employees", { ...body, username: f.username.trim() });
+      : await api.post("vendor/staff/employees", { ...body, username: body.email });
     toast.success(res.message);
     form.value = null;
     await load();
