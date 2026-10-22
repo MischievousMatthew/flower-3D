@@ -135,8 +135,10 @@ class CloudinaryHelper
             ]);
 
             return [
-                'public_id'  => $publicId,
-                'secure_url' => $secureUrl,
+                'public_id'     => $publicId,
+                'secure_url'    => $secureUrl,
+                'resource_type' => $data['resource_type'] ?? null,
+                'format'        => $data['format'] ?? null,
             ];
 
         } catch (\Cloudinary\Exception\Error $e) {
@@ -241,6 +243,18 @@ class CloudinaryHelper
         };
 
         return "https://res.cloudinary.com/{$cloudName}/{$type}/upload/{$publicId}";
+    }
+
+    /**
+     * A signed link to an asset uploaded with type "authenticated", valid for $ttl seconds.
+     */
+    public static function privateDownloadUrl(string $publicId, ?string $format, string $resourceType = 'image', int $ttl = 300): string
+    {
+        return self::getClient()->uploadApi()->privateDownloadUrl($publicId, (string) $format, [
+            'type'          => 'authenticated',
+            'resource_type' => $resourceType,
+            'expires_at'    => time() + $ttl,
+        ]);
     }
 
     /**

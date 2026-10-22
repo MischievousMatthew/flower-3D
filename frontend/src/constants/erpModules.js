@@ -32,11 +32,22 @@ export const ERP_MODULES = [
     group: "HR",
     path: "/erp/hr/attendance",
     children: [
-      { label: "Logs", path: "/erp/hr/attendance/logs" },
-      { label: "QR Scanner", path: "/erp/hr/attendance/qrscanner" },
+      { label: "Daily log", path: "/erp/hr/attendance/logs" },
+      { label: "Review", path: "/erp/hr/attendance/review" },
+      { label: "Reports", path: "/erp/hr/attendance/reports" },
+      { label: "Scanner", path: "/erp/hr/attendance/qrscanner" },
     ],
     description:
       "Allows you to view and manage employee attendance, working hours, and attendance records.",
+  },
+  {
+    key: "schedules",
+    label: "Schedules",
+    icon: "schedules",
+    group: "HR",
+    path: "/erp/hr/schedules",
+    description:
+      "Create shifts, put people on them by drag and drop, cover no-shows, and see who's free.",
   },
   {
     key: "payroll",
@@ -45,20 +56,20 @@ export const ERP_MODULES = [
     group: "HR",
     path: "/erp/hr/payroll",
     children: [
-      { label: "Payroll list", path: "/erp/hr/payroll/list" },
-      { label: "Create payroll", path: "/erp/hr/payroll/create" },
+      { label: "Payrolls", path: "/erp/hr/payroll/list" },
+      { label: "New payroll", path: "/erp/hr/payroll/create" },
     ],
     description:
       "Allows you to manage employee salaries, deductions, and payroll-related records.",
   },
   {
     key: "leave_management",
-    label: "Leave Management",
+    label: "Leave & Overtime",
     icon: "leave",
     group: "HR",
     path: "/erp/hr/leave/management-requests",
     description:
-      "Allows you to review employee leave requests and manage approved or pending leaves.",
+      "Approve leave and overtime requests, track leave balances and rules, and print the leave QR poster.",
   },
 
   {
@@ -207,9 +218,11 @@ export const MODULE_KEYS = ERP_MODULES.map((m) => m.key);
 export const MODULE_PERMISSIONS = {
   hr_dashboard: ["view", "export"],
   employees: ["view", "create", "edit", "delete", "export", "print"],
-  attendance: ["view", "create", "edit", "delete"],
+  // Keep in sync with backend app/Constants/ErpModule.php MODULE_PERMISSIONS
+  attendance: ["view", "create", "edit", "delete", "approve"],
+  schedules: ["view", "create", "edit", "delete"],
   payroll: ["view", "create", "delete", "approve"],
-  leave_management: ["view", "approve", "reject", "delete"],
+  leave_management: ["view", "create", "edit", "approve", "reject", "delete"],
   finance_dashboard: ["view"],
   funding_requests: ["view", "approve", "reject"],
   payroll_requests: ["view", "edit", "approve", "reject"],

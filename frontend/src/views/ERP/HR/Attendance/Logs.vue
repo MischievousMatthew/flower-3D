@@ -1,1506 +1,341 @@
 <template>
-  <div class="time-in-out-page">
-    <!-- Page Header -->
-    <div class="page-header">
-      <div class="header-left">
-        <h1 class="page-title">Time In / Time Out</h1>
-        <p class="page-subtitle">
-          View employee attendance for {{ formattedSelectedDate }}
-        </p>
-      </div>
-      <div class="header-right">
-        <button @click="goToScanner" class="btn-scanner">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <rect x="2" y="2" width="20" height="20" rx="2" ry="2"></rect>
-            <path d="M8 2v20M16 2v20M2 8h20M2 16h20"></path>
-          </svg>
-          Open Scanner
+  <HrPage title="Daily log" subtitle="Who came in, when, and who was late, left early or didn't come — against each person's schedule." :tabs="ATTENDANCE_TABS">
+    <template #actions>
+      <button v-if="canEdit" type="button" class="sp-btn sp-btn-ghost" @click="openCorrection()"><span v-html="ICONS.plus"></span>Add a missing day</button>
+      <router-link :to="{ name: 'AttendanceQRScanner' }" class="sp-btn sp-btn-primary dl-link"><span v-html="ICONS.grid"></span>Open scanner</router-link>
+    </template>
+
+    <section class="sp-stats" aria-label="Summary">
+      <template v-if="!report">
+        <div v-for="n in 6" :key="n" class="sp-stat"><div class="bc-skeleton sp-stat-icon"></div><div class="grow"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div></div>
+      </template>
+      <template v-else>
+        <button v-for="t in tiles" :key="t.key" type="button" class="sp-stat" :class="{ on: flag === t.key }" @click="flag = flag === t.key ? '' : t.key">
+          <span class="sp-stat-icon" :class="`tone-${t.tone}`" v-html="ICONS[t.icon]"></span>
+          <div><strong>{{ t.value }}</strong><span>{{ t.label }}</span></div>
         </button>
-      </div>
-    </div>
+      </template>
+    </section>
 
-    <div class="content-wrapper">
-      <!-- Main Content -->
-      <div class="main-content">
-        <!-- Filters -->
-        <div class="filters-section">
-          <div class="filter-group">
-            <label>Employee</label>
-            <div class="select-wrapper">
-              <select v-model="filters.employee_id" @change="loadRecords">
-                <option value="">All Employees</option>
-                <option v-for="emp in employees" :key="emp.id" :value="emp.id">
-                  {{ emp.full_name }}
-                </option>
-              </select>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </div>
-          </div>
-
-          <div class="filter-group">
-            <label>Status</label>
-            <div class="select-wrapper">
-              <select v-model="filters.status" @change="loadRecords">
-                <option value="">All Status</option>
-                <option value="complete">Complete</option>
-                <option value="incomplete">Incomplete</option>
-              </select>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </div>
-          </div>
-
-          <button @click="resetFilters" class="btn-reset">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
-              ></path>
-              <path d="M3 3v5h5"></path>
-            </svg>
-            Reset
-          </button>
+    <section class="sp-card">
+      <div class="sp-toolbar dl-toolbar">
+        <div class="sp-seg" role="tablist" aria-label="Period">
+          <button v-for="p in PERIODS" :key="p.key" type="button" role="tab" :class="{ on: period === p.key }" :aria-selected="period === p.key" @click="setPeriod(p.key)">{{ p.label }}</button>
         </div>
-
-        <!-- Summary Cards -->
-        <div class="summary-cards">
-          <div class="summary-card">
-            <div class="card-icon gray">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-              </svg>
-            </div>
-            <div class="card-content">
-              <div class="card-value">{{ summary.total_records }}</div>
-              <div class="card-label">TOTAL RECORDS</div>
-            </div>
-          </div>
-
-          <div class="summary-card">
-            <div class="card-icon green">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-              >
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </div>
-            <div class="card-content">
-              <div class="card-value">{{ summary.complete_records }}</div>
-              <div class="card-label">COMPLETE</div>
-            </div>
-          </div>
-
-          <div class="summary-card">
-            <div class="card-icon yellow">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-              </svg>
-            </div>
-            <div class="card-content">
-              <div class="card-value">{{ summary.incomplete_records }}</div>
-              <div class="card-label">INCOMPLETE</div>
-            </div>
-          </div>
-
-          <div class="summary-card">
-            <div class="card-icon blue">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-              </svg>
-            </div>
-            <div class="card-content">
-              <div class="card-value">{{ summary.total_hours }}</div>
-              <div class="card-label">TOTAL HOURS</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Attendance Table -->
-        <div class="table-container">
-          <div v-if="isLoading" class="loading-state">
-            <div class="spinner"></div>
-            <p>Loading records...</p>
-          </div>
-
-          <table v-else class="attendance-table">
-            <thead>
-              <tr>
-                <th>EMPLOYEE</th>
-                <th>TIME IN</th>
-                <th>TIME OUT</th>
-                <th>TOTAL HOURS</th>
-                <th>STATUS</th>
-                <th>ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="record in records" :key="record.id">
-                <td>
-                  <div class="employee-cell">
-                    <div class="employee-avatar">
-                      {{ getInitials(record.employee?.full_name) }}
-                    </div>
-                    <div class="employee-info">
-                      <div class="employee-name">
-                        {{ record.employee?.full_name }}
-                      </div>
-                      <div class="employee-id">
-                        {{ record.employee?.employee_id }}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td class="time-cell">{{ formatTime(record.time_in) }}</td>
-                <td class="time-cell">{{ formatTime(record.time_out) }}</td>
-                <td class="hours-cell">
-                  {{ formatHours(record.total_hours) }}
-                </td>
-                <td>
-                  <span class="status-badge" :class="record.status">
-                    {{
-                      record.status === "complete" ? "Complete" : "Incomplete"
-                    }}
-                  </span>
-                </td>
-                <td class="action-cell">
-                  <button @click="openEditModal(record)" class="btn-action">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path
-                        d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
-                      ></path>
-                      <path
-                        d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
-                      ></path>
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-              <tr v-if="records.length === 0">
-                <td colspan="6" class="no-data">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="48"
-                    height="48"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                  >
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                  </svg>
-                  <p>No records found for {{ formattedSelectedDate }}</p>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="dl-filters">
+          <template v-if="period === 'custom'">
+            <input v-model="from" type="date" class="sp-input" aria-label="From" :max="to" @change="load" />
+            <input v-model="to" type="date" class="sp-input" aria-label="To" :min="from" :max="today" @change="load" />
+          </template>
+          <select v-model="person" class="sp-select" aria-label="Person">
+            <option value="">Everyone</option>
+            <option v-for="p in report?.people ?? []" :key="p.employee_id" :value="p.employee_id">{{ p.name }}</option>
+          </select>
         </div>
       </div>
 
-      <!-- Calendar Sidebar -->
-      <div class="calendar-sidebar">
-        <div class="calendar-container">
-          <div class="calendar-header">
-            <button @click="previousMonth" class="month-nav">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <polyline points="15 18 9 12 15 6"></polyline>
-              </svg>
-            </button>
-            <h3 class="calendar-title">{{ calendarTitle }}</h3>
-            <button @click="nextMonth" class="month-nav">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
-            </button>
-          </div>
-
-          <div class="calendar-grid">
-            <div class="calendar-weekdays">
-              <div v-for="day in weekdays" :key="day" class="weekday">
-                {{ day }}
-              </div>
-            </div>
-            <div class="calendar-dates">
-              <button
-                v-for="date in calendarDates"
-                :key="date.key"
-                @click="selectDate(date)"
-                class="calendar-date"
-                :class="{
-                  'other-month': !date.isCurrentMonth,
-                  selected: isSelectedDate(date),
-                  today: isToday(date),
-                }"
-                :disabled="!date.isCurrentMonth"
-              >
-                {{ date.day }}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Quick Stats -->
-        <div class="quick-stats">
-          <h4>Selected Date Stats</h4>
-          <div class="stat-item">
-            <span class="stat-label">Total Employees:</span>
-            <span class="stat-value">{{ summary.total_records }}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Completed:</span>
-            <span class="stat-value success">{{
-              summary.complete_records
-            }}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Incomplete:</span>
-            <span class="stat-value warning">{{
-              summary.incomplete_records
-            }}</span>
-          </div>
-        </div>
+      <p v-if="error" class="sp-banner error"><span v-html="ICONS.alert"></span>{{ error }}<button type="button" @click="load">Try again</button></p>
+      <ul v-else-if="!report" class="dl-sk">
+        <li v-for="n in 6" :key="n"><div class="bc-skeleton st-avatar"></div><div class="grow"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div></li>
+      </ul>
+      <div v-else-if="!rows.length" class="sp-empty">
+        <span class="sp-empty-icon" v-html="ICONS.calendar"></span>
+        <h3>{{ report.days.length ? "Nothing matches" : "No attendance in this period" }}</h3>
+        <p>{{ report.days.length ? "Try another filter or person." : "Days show up once someone scans in, or when a scheduled day passes." }}</p>
       </div>
-    </div>
-  </div>
-
-  <!-- Edit Modal -->
-  <div v-if="showEditModal" class="modal-overlay" @click="closeEditModal">
-    <div class="modal" @click.stop>
-      <div class="modal-header">
-        <h2>Edit Attendance</h2>
-        <button class="btn-close" @click="closeEditModal">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
+      <div v-else class="st-scroll">
+        <table class="st-table cards">
+          <colgroup>
+            <col style="width: 25%" />
+            <col style="width: 14%" />
+            <col style="width: 20%" />
+            <col style="width: 9%" />
+            <col style="width: 26%" />
+            <col style="width: 6%" />
+          </colgroup>
+          <thead><tr><th>Person</th><th>Day</th><th>In – out</th><th>Hours</th><th>Notes</th><th><span class="dl-sr">Actions</span></th></tr></thead>
+          <tbody>
+            <tr v-for="d in rows" :key="`${d.employee_id}-${d.date}`">
+              <td>
+                <div class="st-person">
+                  <span class="st-avatar sm" :style="{ background: personColor(d.employee) }">{{ initialsOf(d.employee) }}</span>
+                  <div><strong>{{ d.employee }}</strong><small>{{ d.expected ? `Scheduled ${range12(d.expected)}` : "Not scheduled" }}</small></div>
+                </div>
+              </td>
+              <td data-label="Day">{{ dayLabel(d.date) }}</td>
+              <td data-label="In – out">
+                <template v-if="d.time_in">{{ time12(d.time_in) }} – {{ d.time_out ? time12(d.time_out) : "…" }}</template>
+                <span v-else class="muted">—</span>
+              </td>
+              <td data-label="Hours">{{ d.hours !== null ? hoursText(d.hours) : "—" }}</td>
+              <td data-label="Notes">
+                <div class="dl-chips">
+                  <span class="sp-chip" :class="STATUS[d.status]?.tone ?? 'slate'">{{ STATUS[d.status]?.label ?? d.status }}</span>
+                  <span v-if="d.late_minutes" class="sp-chip amber">{{ lateText(d.late_minutes) }}</span>
+                  <span v-if="d.undertime_minutes" class="sp-chip violet">Left {{ minutesText(d.undertime_minutes) }} early</span>
+                  <span v-if="d.overtime_status === 'pending'" class="sp-chip violet">{{ minutesText(d.overtime_minutes) }} overtime · waiting</span>
+                  <span v-else-if="d.overtime_status === 'approved'" class="sp-chip green">{{ minutesText(d.overtime_approved_minutes) }} overtime</span>
+                  <span v-else-if="d.overtime_status === 'rejected'" class="sp-chip slate">Overtime not approved</span>
+                  <span v-if="d.review_status === 'pending'" class="sp-chip amber" :title="d.review_reasons.join(' ')">Needs review</span>
+                  <span v-if="d.source === 'correction'" class="sp-chip blue">Corrected</span>
+                </div>
+              </td>
+              <td class="num">
+                <button v-if="canEdit && d.status !== 'on_leave'" type="button" class="sp-icon-btn" :aria-label="`Ask to correct ${d.employee} on ${d.date}`" title="Ask for a correction" @click="openCorrection(d)"><span v-html="ICONS.edit"></span></button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
+    </section>
 
-      <form @submit.prevent="saveRecord" class="modal-body">
-        <div class="form-group">
-          <label>Employee</label>
-          <input type="text" :value="editForm.employee_name" disabled />
-        </div>
-
-        <div class="form-group">
-          <label>Date</label>
-          <input type="text" :value="editForm.formatted_date" disabled />
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>Time In *</label>
-            <input type="time" v-model="editForm.time_in" required />
+    <!-- Correction request -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="form" class="sp-backdrop" @click="closeForm"></div></Transition>
+      <Transition name="sp-slide">
+        <form v-if="form" class="sp-drawer" role="dialog" aria-modal="true" aria-labelledby="dl-form-title" novalidate @submit.prevent="send">
+          <div class="sp-drawer-head">
+            <div>
+              <h3 id="dl-form-title">{{ form.locked ? `Correct ${form.employeeName}` : "Add a missing day" }}</h3>
+              <p>Someone else — the shop owner or a manager with approval access — approves it before it changes the record.</p>
+            </div>
+            <button type="button" class="sp-icon-btn" aria-label="Close" @click="closeForm"><span v-html="ICONS.close"></span></button>
           </div>
-
-          <div class="form-group">
-            <label>Time Out</label>
-            <input type="time" v-model="editForm.time_out" />
+          <div class="sp-drawer-body">
+            <div class="sp-grid-2">
+              <label class="sp-field sp-span-all">
+                <span class="sp-label">Person</span>
+                <select v-model="form.employee_id" class="sp-select" :disabled="form.locked" :class="{ invalid: errors.employee_id }">
+                  <option :value="null" disabled>Choose…</option>
+                  <option v-for="p in report?.people ?? []" :key="p.employee_id" :value="p.employee_id">{{ p.name }}</option>
+                </select>
+                <small v-if="errors.employee_id" class="sp-error">{{ errors.employee_id }}</small>
+              </label>
+              <label class="sp-field">
+                <span class="sp-label">Day</span>
+                <input v-model="form.date" type="date" class="sp-input" :max="today" :disabled="form.locked" :class="{ invalid: errors.date }" />
+                <small v-if="errors.date" class="sp-error">{{ errors.date }}</small>
+              </label>
+              <div></div>
+              <label class="sp-field">
+                <span class="sp-label">Time in</span>
+                <input v-model="form.time_in" type="time" class="sp-input" :class="{ invalid: errors.time_in }" />
+                <small v-if="errors.time_in" class="sp-error">{{ errors.time_in }}</small>
+              </label>
+              <label class="sp-field">
+                <span class="sp-label">Time out <small>(optional)</small></span>
+                <input v-model="form.time_out" type="time" class="sp-input" :class="{ invalid: errors.time_out }" />
+                <small v-if="errors.time_out" class="sp-error">{{ errors.time_out }}</small>
+              </label>
+              <label class="sp-field sp-span-all">
+                <span class="sp-label">Why</span>
+                <textarea v-model="form.reason" class="sp-textarea" maxlength="500" placeholder="e.g. The scanner was down from 8 to 9 AM; seen at the counter by the manager." :class="{ invalid: errors.reason }"></textarea>
+                <small v-if="errors.reason" class="sp-error">{{ errors.reason }}</small>
+              </label>
+            </div>
+            <p v-if="formError" class="sp-error">{{ formError }}</p>
           </div>
-        </div>
-
-        <div class="form-group">
-          <label>Notes</label>
-          <textarea
-            v-model="editForm.notes"
-            rows="3"
-            placeholder="Optional notes..."
-          ></textarea>
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn-cancel" @click="closeEditModal">
-            Cancel
-          </button>
-          <button type="submit" class="btn-submit" :disabled="isSaving">
-            {{ isSaving ? "Saving..." : "Update Attendance" }}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
+          <div class="sp-drawer-foot">
+            <button type="button" class="sp-btn sp-btn-ghost" @click="closeForm">Cancel</button>
+            <button type="submit" class="sp-btn sp-btn-primary" :disabled="saving">{{ saving ? "Sending…" : "Send for approval" }}</button>
+          </div>
+        </form>
+      </Transition>
+    </Teleport>
+  </HrPage>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, reactive, ref } from "vue";
+import { toast } from "vue3-toastify";
+import HrPage from "../../../../components/hr/HrPage.vue";
+import { ATTENDANCE_TABS, initialsOf } from "../../../../components/hr/hrUi";
+import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcons";
+import { ymd } from "../../../../components/vendor/finance/financeUi";
+import { hoursText, lateText, personColor, range12, time12 } from "../../../../components/vendor/staff/staffUi";
+import { useAssignment } from "../../../../composables/useAssignment";
 import attendanceApi from "../../../../services/attendanceApi";
 
-const router = useRouter();
-
-// State
-const isLoading = ref(false);
-const isSaving = ref(false);
-const showEditModal = ref(false);
-const records = ref([]);
-const employees = ref([]);
-
-// Initialize with today's date at midnight (local time)
-const today = new Date();
-today.setHours(0, 0, 0, 0);
-const selectedDate = ref(today);
-const currentMonth = ref(new Date(today.getFullYear(), today.getMonth(), 1));
-
-const filters = ref({
-  employee_id: "",
-  status: "",
-});
-
-const summary = ref({
-  total_records: 0,
-  complete_records: 0,
-  incomplete_records: 0,
-  total_hours: "0.00",
-});
-
-const editForm = ref({
-  id: null,
-  employee_name: "",
-  formatted_date: "",
-  time_in: "",
-  time_out: "",
-  notes: "",
-});
-
-const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-// Computed
-const formattedSelectedDate = computed(() => {
-  return selectedDate.value.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-});
-
-const calendarTitle = computed(() => {
-  return currentMonth.value.toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
-});
-
-const calendarDates = computed(() => {
-  const year = currentMonth.value.getFullYear();
-  const month = currentMonth.value.getMonth();
-
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const prevLastDay = new Date(year, month, 0);
-
-  const firstDayOfWeek = firstDay.getDay();
-  const lastDate = lastDay.getDate();
-  const prevLastDate = prevLastDay.getDate();
-
-  const dates = [];
-
-  // Previous month dates
-  for (let i = firstDayOfWeek - 1; i >= 0; i--) {
-    dates.push({
-      day: prevLastDate - i,
-      month: month - 1,
-      year: month === 0 ? year - 1 : year,
-      isCurrentMonth: false,
-      key: `prev-${prevLastDate - i}`,
-    });
-  }
-
-  // Current month dates
-  for (let i = 1; i <= lastDate; i++) {
-    dates.push({
-      day: i,
-      month: month,
-      year: year,
-      isCurrentMonth: true,
-      key: `current-${i}`,
-    });
-  }
-
-  // Next month dates
-  const remainingDays = 42 - dates.length;
-  for (let i = 1; i <= remainingDays; i++) {
-    dates.push({
-      day: i,
-      month: month + 1,
-      year: month === 11 ? year + 1 : year,
-      isCurrentMonth: false,
-      key: `next-${i}`,
-    });
-  }
-
-  return dates;
-});
-
-// Helper function to format date for API (YYYY-MM-DD)
-function formatDateForAPI(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-// Calendar Methods
-function previousMonth() {
-  currentMonth.value = new Date(
-    currentMonth.value.getFullYear(),
-    currentMonth.value.getMonth() - 1,
-    1,
-  );
-}
-
-function nextMonth() {
-  currentMonth.value = new Date(
-    currentMonth.value.getFullYear(),
-    currentMonth.value.getMonth() + 1,
-    1,
-  );
-}
-
-function selectDate(date) {
-  if (!date.isCurrentMonth) return;
-
-  // Create new date at midnight local time
-  const newDate = new Date(date.year, date.month, date.day);
-  newDate.setHours(0, 0, 0, 0);
-
-  selectedDate.value = newDate;
-  loadRecords();
-}
-
-function isSelectedDate(date) {
-  if (!date.isCurrentMonth) return false;
-  return (
-    date.day === selectedDate.value.getDate() &&
-    date.month === selectedDate.value.getMonth() &&
-    date.year === selectedDate.value.getFullYear()
-  );
-}
-
-function isToday(date) {
-  const today = new Date();
-  return (
-    date.day === today.getDate() &&
-    date.month === today.getMonth() &&
-    date.year === today.getFullYear()
-  );
-}
-
-// Data Loading
-const loadRecords = async () => {
-  try {
-    isLoading.value = true;
-
-    const formattedDate = formatDateForAPI(selectedDate.value);
-
-    console.log("Loading records for date:", formattedDate);
-
-    const data = await attendanceApi.getRecords({
-      date: formattedDate,
-      ...filters.value,
-    });
-
-    console.log("API Raw Response:", data);
-
-    // Backend returns: { success: true, data: [], pagination: {} }
-    records.value = Array.isArray(data?.data) ? data.data : [];
-
-    console.log("Processed records:", records.value);
-
-    summary.value = {
-      total_records: records.value.length,
-      complete_records: records.value.filter((r) => r.status === "complete")
-        .length,
-      incomplete_records: records.value.filter((r) => r.status === "incomplete")
-        .length,
-      total_hours: records.value
-        .reduce((sum, r) => sum + (parseFloat(r.total_hours) || 0), 0)
-        .toFixed(2),
-    };
-  } catch (error) {
-    console.error("Error loading records:", error);
-    records.value = [];
-  } finally {
-    isLoading.value = false;
-  }
+const PERIODS = [
+  { key: "today", label: "Today" },
+  { key: "week", label: "This week" },
+  { key: "month", label: "This month" },
+  { key: "custom", label: "Custom" },
+];
+const STATUS = {
+  present: { label: "Present", tone: "green" },
+  in: { label: "At work", tone: "blue" },
+  missing_out: { label: "No time out", tone: "red" },
+  absent: { label: "Absent", tone: "red" },
+  on_leave: { label: "On leave", tone: "teal" },
+  not_in_yet: { label: "Not in yet", tone: "slate" },
+  rejected: { label: "Rejected", tone: "slate" },
 };
 
-function resetFilters() {
-  filters.value = {
-    employee_id: "",
-    status: "",
-  };
-  loadRecords();
-}
+const { can } = useAssignment();
+const canEdit = computed(() => can("attendance", "edit"));
+const today = ymd(new Date());
 
-// Edit Modal Functions
-function openEditModal(record) {
-  editForm.value = {
-    id: record.id,
-    employee_name: record.employee?.full_name,
-    formatted_date: formatDate(record.attendance_date),
-    time_in: record.time_in ? record.time_in.substring(0, 5) : "",
-    time_out: record.time_out ? record.time_out.substring(0, 5) : "",
-    notes: record.notes || "",
-  };
-  showEditModal.value = true;
-}
+const report = ref(null);
+const error = ref("");
+const period = ref("week");
+const from = ref("");
+const to = ref("");
+const person = ref("");
+const flag = ref("");
+const form = ref(null);
+const errors = reactive({});
+const formError = ref("");
+const saving = ref(false);
 
-function closeEditModal() {
-  showEditModal.value = false;
-  editForm.value = {
-    id: null,
-    employee_name: "",
-    formatted_date: "",
-    time_in: "",
-    time_out: "",
-    notes: "",
-  };
-}
-
-async function saveRecord() {
-  try {
-    isSaving.value = true;
-
-    // Make API call
-    const response = await attendanceApi.update(editForm.value.id, {
-      time_in: editForm.value.time_in,
-      time_out: editForm.value.time_out,
-      notes: editForm.value.notes,
-    });
-
-    if (response.success) {
-      alert("Attendance updated successfully!");
-      closeEditModal();
-      loadRecords();
-    } else {
-      alert("Failed to save record: " + (response.message || "Unknown error"));
+const t = computed(() => report.value?.totals ?? {});
+const tiles = computed(() => [
+  { key: "present", label: "Days present", value: t.value.present ?? 0, tone: "green", icon: "check" },
+  { key: "late", label: "Late arrivals", value: t.value.late ?? 0, tone: "amber", icon: "clock" },
+  { key: "undertime", label: "Left early", value: t.value.undertime ?? 0, tone: "violet", icon: "logout" },
+  { key: "absent", label: "Absences", value: t.value.absent ?? 0, tone: "red", icon: "minus" },
+  { key: "review", label: "Needs review", value: t.value.needs_review ?? 0, tone: "amber", icon: "eye" },
+  { key: "overtime", label: "Overtime waiting", value: t.value.overtime_pending_minutes ? minutesText(t.value.overtime_pending_minutes) : 0, tone: "blue", icon: "clock" },
+]);
+const rows = computed(() =>
+  (report.value?.days ?? []).filter((d) => {
+    if (person.value && d.employee_id !== person.value) return false;
+    switch (flag.value) {
+      case "present": return ["present", "in", "missing_out"].includes(d.status);
+      case "late": return d.late_minutes > 0;
+      case "undertime": return d.undertime_minutes > 0;
+      case "absent": return d.status === "absent";
+      case "review": return d.review_status === "pending";
+      case "overtime": return d.overtime_status === "pending";
+      default: return true;
     }
-  } catch (error) {
-    console.error("Error saving record:", error);
-    alert(
-      "Failed to save record: " +
-        (error.response?.data?.message || error.message || "Unknown error"),
-    );
-  } finally {
-    isSaving.value = false;
+  }),
+);
+
+const minutesText = (m) => (m >= 60 ? `${Math.floor(m / 60)} h ${m % 60 ? `${m % 60} min` : ""}`.trim() : `${m} min`);
+function dayLabel(date) {
+  const d = new Date(`${date}T00:00:00`);
+  return date === today ? "Today" : d.toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric" });
+}
+
+function setPeriod(key) {
+  period.value = key;
+  const now = new Date();
+  if (key === "today") from.value = today;
+  if (key === "week") {
+    const start = new Date(now);
+    start.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    from.value = ymd(start);
+  }
+  if (key === "month") from.value = ymd(new Date(now.getFullYear(), now.getMonth(), 1));
+  if (key !== "custom") to.value = today;
+  load();
+}
+
+async function load() {
+  error.value = "";
+  report.value = null;
+  try {
+    report.value = await attendanceApi.report(from.value, to.value);
+  } catch (e) {
+    error.value = e?.response?.data?.errors?.from?.[0] || e?.response?.data?.message || "Couldn't load the daily log.";
   }
 }
 
-// Navigation
-function goToScanner() {
-  router.push("/erp/hr/attendance/qrscanner");
+function openCorrection(d = null) {
+  Object.keys(errors).forEach((k) => delete errors[k]);
+  formError.value = "";
+  form.value = d
+    ? { locked: true, employeeName: d.employee, employee_id: d.employee_id, date: d.date, time_in: d.time_in ?? d.expected?.slice(0, 5) ?? "", time_out: d.time_out ?? "", reason: "" }
+    : { locked: false, employee_id: person.value || null, date: today, time_in: "", time_out: "", reason: "" };
 }
 
-// Helper Functions
-function getInitials(name) {
-  if (!name) return "?";
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .substring(0, 2);
+function closeForm() {
+  if (!saving.value) form.value = null;
 }
 
-function formatDate(date) {
-  if (!date) return "---";
-  return new Date(date).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+async function send() {
+  const f = form.value;
+  Object.keys(errors).forEach((k) => delete errors[k]);
+  if (!f.employee_id) errors.employee_id = "Choose who it's for.";
+  if (!f.time_in) errors.time_in = "Enter the time in.";
+  if (f.time_out && f.time_out <= f.time_in) errors.time_out = "Time out must be after time in.";
+  if (f.reason.trim().length < 5) errors.reason = "Say why the times need fixing.";
+  if (Object.keys(errors).length) return;
+  saving.value = true;
+  formError.value = "";
+  try {
+    const res = await attendanceApi.requestCorrection({ employee_id: f.employee_id, date: f.date, time_in: f.time_in, time_out: f.time_out || null, reason: f.reason.trim() });
+    toast.success(res.message);
+    form.value = null;
+  } catch (e) {
+    const list = e?.response?.data?.errors ?? {};
+    for (const [k, v] of Object.entries(list)) errors[k] = [].concat(v)[0];
+    formError.value = Object.keys(list).length ? "" : e?.response?.data?.message || "Couldn't send it.";
+  } finally {
+    saving.value = false;
+  }
 }
 
-function formatTime(time) {
-  if (!time) return "---";
-  const [hours, minutes] = time.split(":");
-  const hour = parseInt(hours);
-  const ampm = hour >= 12 ? "PM" : "AM";
-  const displayHour = hour % 12 || 12;
-  return `${displayHour}:${minutes} ${ampm}`;
-}
-
-function formatHours(hours) {
-  if (!hours) return "0.00 hrs";
-  return `${parseFloat(hours).toFixed(2)} hrs`;
-}
-
-// Lifecycle
-onMounted(() => {
-  console.log(
-    "Component mounted, loading records for:",
-    formattedSelectedDate.value,
-  ); // Debug log
-  loadRecords();
-});
+onMounted(() => setPeriod("week"));
 </script>
 
 <style scoped>
-.time-in-out-page {
-  padding: 24px;
-  background: #f8f9fa;
-  min-height: 100vh;
+.dl-link {
+  text-decoration: none;
 }
-
-/* Page Header */
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
+.sp-stats {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  margin-bottom: 18px;
 }
-
-.header-left {
+.sp-stat .grow {
   flex: 1;
 }
-
-.page-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: #2d3748;
-  margin: 0 0 6px 0;
-}
-
-.page-subtitle {
-  font-size: 14px;
-  color: #718096;
-  margin: 0;
-}
-
-.header-right {
-  display: flex;
-  gap: 12px;
-}
-
-.btn-scanner {
+.dl-toolbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.dl-filters {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-  background: #48bb78;
-  color: white;
 }
-
-.btn-scanner:hover {
-  background: #38a169;
+.dl-filters .sp-input,
+.dl-filters .sp-select {
+  width: auto;
+  min-width: 140px;
 }
-
-/* Content Wrapper */
-.content-wrapper {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 24px;
+.dl-sk {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-
-/* Main Content */
-.main-content {
+.dl-sk li {
   display: flex;
-  flex-direction: column;
-  gap: 20px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
 }
-
-/* Filters */
-.filters-section {
-  display: flex;
-  gap: 16px;
-  align-items: flex-end;
-}
-
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.dl-sk .grow {
   flex: 1;
 }
-
-.filter-group label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #4a5568;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.dl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
 }
-
-.select-wrapper {
-  position: relative;
+.muted {
+  color: var(--v-faint);
 }
-
-.select-wrapper select {
-  width: 100%;
-  padding: 11px 40px 11px 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #2d3748;
-  background: #ffffff;
-  cursor: pointer;
-  appearance: none;
-  transition: all 0.2s;
-}
-
-.select-wrapper select:hover {
-  border-color: #cbd5e0;
-}
-
-.select-wrapper select:focus {
-  outline: none;
-  border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
-}
-
-.select-wrapper svg {
+.dl-sr {
   position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #718096;
-  pointer-events: none;
-}
-
-.btn-reset {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 11px 16px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #2d3748;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-reset:hover {
-  background: #f7fafc;
-  border-color: #cbd5e0;
-}
-
-/* Summary Cards */
-.summary-cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
-
-.summary-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 18px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-}
-
-.card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.card-icon.gray {
-  background: #f7fafc;
-  color: #4a5568;
-}
-
-.card-icon.green {
-  background: #c6f6d5;
-  color: #22543d;
-}
-
-.card-icon.yellow {
-  background: #fef5e7;
-  color: #c27803;
-}
-
-.card-icon.blue {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.card-content {
-  flex: 1;
-}
-
-.card-value {
-  font-size: 26px;
-  font-weight: 700;
-  color: #2d3748;
-  margin-bottom: 2px;
-  line-height: 1;
-}
-
-.card-label {
-  font-size: 10px;
-  color: #a0aec0;
-  font-weight: 600;
-  letter-spacing: 0.8px;
-}
-
-/* Table */
-.table-container {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  width: 1px;
+  height: 1px;
   overflow: hidden;
-}
-
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid #e2e8f0;
-  border-top-color: #48bb78;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-bottom: 16px;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.loading-state p {
-  font-size: 14px;
-  color: #718096;
-}
-
-.attendance-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.attendance-table thead {
-  background: #ffffff;
-}
-
-.attendance-table th {
-  padding: 14px 18px;
-  text-align: left;
-  font-size: 10px;
-  font-weight: 700;
-  color: #a0aec0;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.attendance-table tbody tr {
-  border-bottom: 1px solid #f7fafc;
-  transition: all 0.2s;
-}
-
-.attendance-table tbody tr:hover {
-  background: #f7fafc;
-}
-
-.attendance-table td {
-  padding: 14px 18px;
-  font-size: 14px;
-  color: #2d3748;
-}
-
-.employee-cell {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.employee-avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: #48bb78;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.employee-info {
-  flex: 1;
-}
-
-.employee-name {
-  font-weight: 600;
-  color: #2d3748;
-  margin-bottom: 2px;
-}
-
-.employee-id {
-  font-size: 12px;
-  color: #a0aec0;
-}
-
-.time-cell {
-  font-weight: 600;
-  color: #2d3748;
-}
-
-.hours-cell {
-  font-weight: 600;
-  color: #2d3748;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 5px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.status-badge.complete {
-  background: #c6f6d5;
-  color: #22543d;
-}
-
-.status-badge.incomplete {
-  background: #fef5e7;
-  color: #c27803;
-}
-
-.action-cell {
-  text-align: center;
-}
-
-.btn-action {
-  padding: 6px;
-  background: transparent;
-  border: none;
-  color: #a0aec0;
-  cursor: pointer;
-  transition: all 0.2s;
-  border-radius: 6px;
-}
-
-.btn-action:hover {
-  color: #48bb78;
-  background: #f0fff4;
-}
-
-.no-data {
-  padding: 60px 20px;
-  text-align: center;
-}
-
-.no-data svg {
-  color: #cbd5e0;
-  margin-bottom: 16px;
-}
-
-.no-data p {
-  margin: 0;
-  font-size: 14px;
-  color: #a0aec0;
-}
-
-/* Calendar Sidebar */
-.calendar-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.calendar-container {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 20px;
-}
-
-.calendar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.calendar-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0;
-}
-
-.month-nav {
-  background: transparent;
-  border: none;
-  color: #718096;
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
-.month-nav:hover {
-  background: #f7fafc;
-  color: #48bb78;
-}
-
-.calendar-grid {
-  width: 100%;
-}
-
-.calendar-weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-.weekday {
-  text-align: center;
-  font-size: 11px;
-  font-weight: 600;
-  color: #a0aec0;
-  padding: 6px 0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.calendar-dates {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-}
-
-.calendar-date {
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 500;
-  color: #2d3748;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.calendar-date:hover:not(:disabled) {
-  background: #f7fafc;
-  border: 1px solid #48bb78;
-  color: #48bb78;
-  font-weight: bolder;
-}
-
-.calendar-date.other-month {
-  color: #cbd5e0;
-  cursor: default;
-}
-
-.calendar-date.selected {
-  background: #48bb78;
-  color: white;
-  font-weight: 700;
-}
-
-.calendar-date.today {
-  background: #e0f2f7;
-  color: #48bb78;
-  font-weight: 700;
-}
-
-.calendar-date.selected.today {
-  background: #48bb78;
-  color: white;
-}
-
-/* Quick Stats */
-.quick-stats {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 20px;
-}
-
-.quick-stats h4 {
-  font-size: 14px;
-  font-weight: 600;
-  color: #2d3748;
-  margin: 0 0 16px 0;
-}
-
-.stat-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #f7fafc;
-}
-
-.stat-item:last-child {
-  border-bottom: none;
-}
-
-.stat-label {
-  font-size: 13px;
-  color: #718096;
-}
-
-.stat-value {
-  font-size: 16px;
-  font-weight: 700;
-  color: #2d3748;
-}
-
-.stat-value.success {
-  color: #48bb78;
-}
-
-.stat-value.warning {
-  color: #ed8936;
-}
-
-/* Edit Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-  animation: fadeIn 0.2s;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.modal {
-  background: #ffffff;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 500px;
-  overflow: hidden;
-  animation: slideUp 0.3s;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(30px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.modal-header h2 {
-  font-size: 18px;
-  font-weight: 700;
-  color: #2d3748;
-  margin: 0;
-}
-
-.btn-close {
-  background: #f7fafc;
-  border: none;
-  color: #718096;
-  cursor: pointer;
-  padding: 6px;
-  display: flex;
-  align-items: center;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
-.btn-close:hover {
-  background: #e2e8f0;
-  color: #2d3748;
-}
-
-.modal-body {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-group label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #4a5568;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.form-group input,
-.form-group textarea {
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #2d3748;
-  transition: all 0.2s;
-}
-
-.form-group input:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
-}
-
-.form-group input:disabled {
-  background: #f7fafc;
-  cursor: not-allowed;
-  color: #718096;
-}
-
-.form-group textarea {
-  resize: vertical;
-  font-family: inherit;
-}
-
-.modal-footer {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  padding-top: 20px;
-  border-top: 1px solid #e2e8f0;
-}
-
-.btn-cancel,
-.btn-submit {
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-}
-
-.btn-cancel {
-  background: #f7fafc;
-  color: #2d3748;
-  border: 1px solid #e2e8f0;
-}
-
-.btn-cancel:hover {
-  background: #e2e8f0;
-}
-
-.btn-submit {
-  background: #48bb78;
-  color: white;
-}
-
-.btn-submit:hover:not(:disabled) {
-  background: #38a169;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
-}
-
-.btn-submit:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* Responsive */
-@media (max-width: 1200px) {
-  .content-wrapper {
-    grid-template-columns: 1fr;
-  }
-
-  .calendar-sidebar {
-    order: -1;
-  }
-
-  .summary-cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 768px) {
-  .time-in-out-page {
-    padding: 16px;
-  }
-
-  .page-header {
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .filters-section {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .summary-cards {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 600px) {
-  .modal {
-    max-width: 100%;
-    margin: 0 10px;
-  }
-
-  .form-row {
-    grid-template-columns: 1fr;
-  }
+  clip: rect(0 0 0 0);
 }
 </style>

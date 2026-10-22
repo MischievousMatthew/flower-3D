@@ -1,19 +1,45 @@
 import api from "../plugins/axios";
 
+// Time in / out goes through the shop scanner (services/attendanceKiosk.js), not here.
 const attendanceApi = {
-  /**
-   * Scan QR code for attendance
-   */
-  async scanQR(qrData) {
-    try {
-      const response = await api.post("/attendance/scan", {
-        qr_data: qrData,
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Scan QR Error:", error.response?.data || error.message);
-      throw error;
-    }
+  /** Daily log with late / undertime / absent, plus per-person totals */
+  async report(from, to, employeeId = null) {
+    const { data } = await api.get("/attendance/report", { params: { from, to, ...(employeeId ? { employee_id: employeeId } : {}) } });
+    return data.data;
+  },
+
+  /** Flagged scans, corrections waiting, and blocked attempts */
+  async reviewQueue() {
+    const { data } = await api.get("/attendance/review");
+    return data.data;
+  },
+
+  async decide(recordId, decision, note) {
+    const { data } = await api.post(`/attendance/${recordId}/review`, { decision, note });
+    return data;
+  },
+
+  /** Approve overtime (optionally fewer minutes than worked) or reject it */
+  async decideOvertime(recordId, decision, minutes, note) {
+    const { data } = await api.post(`/attendance/${recordId}/overtime`, { decision, minutes, note });
+    return data;
+  },
+
+  /** Ask for a day's times to be fixed or added; someone else approves it */
+  async requestCorrection(body) {
+    const { data } = await api.post("/attendance/corrections", body);
+    return data;
+  },
+
+  async decideCorrection(id, decision, note) {
+    const { data } = await api.post(`/attendance/corrections/${id}/review`, { decision, note });
+    return data;
+  },
+
+  /** A short-lived link to an evidence photo */
+  async evidence(recordId, which, index) {
+    const { data } = await api.get(`/attendance/${recordId}/evidence/${which}/${index}`);
+    return data.data.url;
   },
 
   /**

@@ -25,8 +25,20 @@ class EmployeeLeave extends Model
         'submission_device',
         'submitted_at',
         'reviewed_by',
-        'reviewed_at'
+        'reviewed_at',
+        'reviewer_name',
+        'filed_by',
+        'filed_by_name',
+        'badge_verified',
+        'document_public_id',
+        'document_name',
+        'document_format',
+        'document_resource_type',
+        'cancelled_at',
     ];
+
+    // The document is private; pages ask for a short-lived link
+    protected $hidden = ['document_public_id', 'submission_token', 'submission_ip', 'submission_device'];
 
     protected $casts = [
         'start_date' => 'date',
@@ -34,14 +46,17 @@ class EmployeeLeave extends Model
         'is_paid' => 'boolean',
         'submitted_at' => 'datetime',
         'reviewed_at' => 'datetime',
+        'cancelled_at' => 'datetime',
+        'badge_verified' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];
 
     // Relationships
+    // The shop (users.id). Before 2026-10-22 this held an HR employee's id; see the rework_leave_management migration.
     public function owner(): BelongsTo
     {
-        return $this->belongsTo(Employee::class, 'owner_id');
+        return $this->belongsTo(User::class, 'owner_id');
     }
 
     public function employee(): BelongsTo

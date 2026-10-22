@@ -18,6 +18,7 @@ import {
   resolveDark,
   shadesFor,
 } from "./vendorThemeCore";
+import { erpIsDark } from "./useErpTheme";
 
 export { ACCENT_PRESETS, DEFAULT_ACCENT };
 
@@ -92,20 +93,23 @@ const signedInAsVendor = () => {
 
 /**
  * Keeps <html> in step with the theme: accent variables everywhere, the dark
- * marker only on vendor pages so customer and admin pages stay light.
+ * marker only on vendor pages and ERP pages marked meta.erpTheme (with the
+ * ERP's own choice, see useErpTheme), so every other page stays light.
  */
 export function applyVendorTheme(router) {
   // URLs are opaque tokens, so go by the route's vendor flag, not the path.
   // Until the first navigation resolves (it waits on the API), assume a
   // signed-in vendor is headed to a vendor page so a refresh doesn't flash white.
   const onVendorPage = ref(signedInAsVendor());
+  const onErpThemedPage = ref(false);
   router.afterEach((to) => {
     onVendorPage.value = to.meta?.requiresVendor === true;
+    onErpThemedPage.value = to.matched.some((r) => r.meta?.erpTheme === true);
   });
 
   watchEffect(() => {
     const root = document.documentElement;
-    const dark = isDark.value && onVendorPage.value;
+    const dark = (isDark.value && onVendorPage.value) || (erpIsDark.value && onErpThemedPage.value);
     const shades = shadesFor(accent.value, dark);
     root.style.setProperty("--bc-accent", accent.value);
     root.style.setProperty("--bc-accent-ink", inkFor(accent.value));

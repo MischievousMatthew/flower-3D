@@ -6,12 +6,12 @@ use App\Constants\ErpModule;
 use App\Models\Employee;
 use App\Models\EmployeeAttendance;
 use App\Models\EmployeeInfo;
-use App\Models\Payroll;
 use App\Models\StaffActivityLog;
 use App\Models\StaffRole;
 use App\Models\StaffShift;
 use App\Models\User;
-use App\Services\PayrollService;
+use App\Services\Attendance\AttendanceCalculator;
+use App\Services\Attendance\AttendanceLocationService;
 use App\Services\ResourceLimitService;
 use App\Services\StaffAccessService;
 use App\Services\SubscriptionAccessService;
@@ -36,8 +36,6 @@ use Illuminate\Validation\ValidationException;
 class StaffController extends Controller
 {
     use ResolvesOwner;
-
-    private const LATE_GRACE_MINUTES = 10;
 
     private const TIME = 'regex:/^([01]\d|2[0-3]):[0-5]\d$/';
 
@@ -127,7 +125,7 @@ class StaffController extends Controller
         $vendor = User::find($ownerId);
 
         $accounts = Employee::forOwner($ownerId)->with('staffRole:id,name,color')->orderBy('name')->get();
-        $profiles = EmployeeInfo::forOwner($ownerId)->orderBy('first_name')->get();
+        $profiles = EmployeeInfo::forOwner($ownerId)->with('createdBy:id,name')->orderBy('first_name')->get();
         $links = $this->accountProfileLinks($accounts, $profiles);
 
         $lastActive = StaffActivityLog::where('owner_id', $ownerId)
@@ -177,6 +175,7 @@ class StaffController extends Controller
                         'rest_days' => $this->restDays($p),
                         'account' => $account ? ['id' => $account->id, 'name' => $account->name, 'role' => $account->staffRole?->name] : null,
                         'today' => $att ? ['time_in' => $this->hm($att->time_in), 'time_out' => $this->hm($att->time_out)] : null,
+                        'added_by' => $p->added_by,
                     ];
                 })->values(),
                 'limit' => $limit,
@@ -301,16 +300,14 @@ class StaffController extends Controller
             ->orderByDesc('attendance_date')->orderByDesc('time_in')->get();
         $shifts = $this->shiftsBetween($ownerId, $from, $to);
         $byId = $profiles->keyBy('id');
+        $calculator = app(AttendanceCalculator::class);
+        $grace = app(AttendanceLocationService::class)->settings($ownerId)->late_grace_minutes;
 
-        $records = $rows->map(function ($a) use ($shifts, $byId) {
+        $records = $rows->map(function ($a) use ($shifts, $byId, $calculator, $grace) {
             $date = Carbon::parse($a->attendance_date)->toDateString();
             $profile = $byId->get($a->employee_id);
             $expected = $profile ? $this->expectedHours($profile, $date, $shifts->get($a->employee_id . '|' . $date)) : null;
-            $late = null;
-            if ($expected && $a->time_in) {
-                $mins = (int) Carbon::parse("{$date} {$expected['start']}")->diffInMinutes(Carbon::parse("{$date} {$a->time_in}"), false);
-                $late = $mins > self::LATE_GRACE_MINUTES ? $mins : 0;
-            }
+            $facts = $calculator->facts($a, $expected, $grace);
 
             return [
                 'id' => $a->id,
@@ -321,11 +318,20 @@ class StaffController extends Controller
                 'time_out' => $this->hm($a->time_out),
                 'hours' => $a->total_hours !== null ? (float) $a->total_hours : null,
                 'status' => $a->time_out ? 'complete' : ($date < today()->toDateString() ? 'missing_out' : 'open'),
-                'late_minutes' => $late,
+                'late_minutes' => $facts['late_minutes'],
+                'undertime_minutes' => $facts['undertime_minutes'],
                 'expected' => $expected ? "{$expected['start']}–{$expected['end']}" : null,
                 'verified' => str_contains((string) $a->notes, 'Face verified'),
                 'by_owner' => str_contains((string) $a->notes, 'by the shop owner'),
                 'note' => $this->cleanNote($a->notes),
+                'source' => $a->source,
+                'review_status' => $a->review_status,
+                'review_reasons' => $a->review_reasons ?? [],
+                'reviewed_by' => $a->reviewed_by,
+                'photos' => ['time_in' => count($a->time_in_evidence['photos'] ?? []), 'time_out' => count($a->time_out_evidence['photos'] ?? [])],
+                'overtime_minutes' => $a->overtime_minutes,
+                'overtime_status' => $a->overtime_status,
+                'overtime_approved_minutes' => $a->overtime_approved_minutes,
             ];
         })->values();
 
@@ -348,7 +354,14 @@ class StaffController extends Controller
                     'not_in_yet' => $working->pluck('id')->diff($inToday)->count(),
                     'hours' => round((float) $records->sum('hours'), 2),
                     'late' => $records->where('late_minutes', '>', 0)->count(),
+                    'undertime' => $records->where('undertime_minutes', '>', 0)->count(),
                     'missing_out' => $records->where('status', 'missing_out')->count(),
+                    'needs_review' => $records->where('review_status', 'pending')->count(),
+                    'overtime_pending' => $records->where('overtime_status', 'pending')->count(),
+                    // Absences need a day-by-day pass, so only for ranges up to three months
+                    'absent' => $from->diffInDays($to) <= AttendanceCalculator::MAX_RANGE_DAYS
+                        ? $calculator->report($ownerId, $from, $to, $data['employee_id'] ?? null)['totals']['absent']
+                        : null,
                 ],
             ],
         ]);
@@ -365,7 +378,7 @@ class StaffController extends Controller
             return response()->json(['success' => false, 'message' => 'There is already a record for that day. Edit it instead.'], 422);
         }
         $date = Carbon::parse($data['date']);
-        EmployeeAttendance::forOwner($ownerId)->create([
+        $record = EmployeeAttendance::forOwner($ownerId)->make([
             'owner_id' => $ownerId,
             'employee_id' => $data['employee_id'],
             'attendance_date' => $date->toDateString(),
@@ -377,7 +390,11 @@ class StaffController extends Controller
             'total_hours' => $this->hours($data['time_in'], $data['time_out'] ?? null),
             'status' => ! empty($data['time_out']) ? 'complete' : 'incomplete',
             'notes' => 'Added by the shop owner' . (! empty($data['note']) ? ' | ' . $data['note'] : ''),
+            'source' => 'owner',
         ]);
+        // Times the owner enters themselves count as approved, overtime included
+        app(AttendanceCalculator::class)->applyOvertime($ownerId, $record, EmployeeInfo::forOwner($ownerId)->findOrFail($data['employee_id']), 'Shop owner');
+        $record->save();
 
         return response()->json(['success' => true, 'message' => 'Attendance added.'], 201);
     }
@@ -395,13 +412,21 @@ class StaffController extends Controller
         if (! empty($data['note'])) {
             $notes .= ' | ' . $data['note'];
         }
-        $record->update([
+        $record->fill([
             'time_in' => $data['time_in'] . ':00',
             'time_out' => ! empty($data['time_out']) ? $data['time_out'] . ':00' : null,
             'total_hours' => $this->hours($data['time_in'], $data['time_out'] ?? null),
             'status' => ! empty($data['time_out']) ? 'complete' : 'incomplete',
             'notes' => mb_substr($notes, 0, 1000),
-        ]);
+            'source' => 'owner',
+        ] + ($record->review_status === 'pending'
+            // The owner fixing a flagged day settles it
+            ? ['review_status' => 'approved', 'reviewed_by' => 'Shop owner', 'reviewed_at' => now()]
+            : []));
+        if ($profile = EmployeeInfo::forOwner($ownerId)->find($record->employee_id)) {
+            app(AttendanceCalculator::class)->applyOvertime($ownerId, $record, $profile, 'Shop owner');
+        }
+        $record->save();
 
         return response()->json(['success' => true, 'message' => 'Attendance updated.']);
     }
@@ -507,6 +532,13 @@ class StaffController extends Controller
                     'end_time' => $off ? null : $data['end_time'],
                     'label' => $data['label'] ?? null,
                     'note' => $data['note'] ?? null,
+                    // Custom hours take the place of any planned shift or replacement that day
+                    'shift_template_id' => null,
+                    'status' => 'scheduled',
+                    'replaced_reason' => null,
+                    'replaced_note' => null,
+                    'replaced_by_employee_id' => null,
+                    'assigned_by' => 'Shop owner',
                 ],
             );
         }
@@ -536,7 +568,7 @@ class StaffController extends Controller
         $data = $request->validate(['week' => 'required|date']);
         $start = Carbon::parse($data['week'])->startOfWeek();
         $previous = StaffShift::where('owner_id', $ownerId)
-            ->whereBetween('shift_date', [$start->copy()->subWeek()->toDateString(), $start->copy()->subDay()->toDateString()])->get();
+            ->onDays($start->copy()->subWeek()->toDateString(), $start->copy()->subDay()->toDateString())->get();
 
         if ($previous->isEmpty()) {
             return response()->json(['success' => false, 'message' => 'Last week only had usual hours, so there is nothing to copy.'], 422);
@@ -551,110 +583,6 @@ class StaffController extends Controller
         }
 
         return response()->json(['success' => true, 'message' => $copied ? "Copied {$copied} " . ($copied === 1 ? 'change' : 'changes') . ' from last week.' : 'This week already has those changes.']);
-    }
-
-    // ── Payroll ────────────────────────────────────────────────────────────
-
-    /** GET /vendor/staff/payroll?from&to&status */
-    public function payroll(Request $request): JsonResponse
-    {
-        $ownerId = $this->resolveOwnerId($request);
-        $data = $request->validate([
-            'from' => 'nullable|date',
-            'to' => 'nullable|date|after_or_equal:from',
-            'status' => 'nullable|in:pending,approved,rejected,paid',
-        ]);
-        $from = Carbon::parse($data['from'] ?? now()->startOfYear())->toDateString();
-        $to = Carbon::parse($data['to'] ?? now())->toDateString();
-
-        $profiles = EmployeeInfo::forOwner($ownerId)->withTrashed()->get()->keyBy('id');
-        $rows = Payroll::forOwner($ownerId)
-            ->where('period_end', '>=', $from)->where('period_start', '<=', $to)
-            ->orderByDesc('period_end')->orderByDesc('id')->get();
-
-        $list = $rows->map(fn (Payroll $p) => [
-            'id' => $p->id,
-            'employee' => $profiles->get($p->employee_id)?->full_name ?? 'Former employee',
-            'position' => $profiles->get($p->employee_id)?->position,
-            'period_start' => $p->period_start?->toDateString(),
-            'period_end' => $p->period_end?->toDateString(),
-            'salary_type' => $p->salary_type,
-            'days_worked' => (float) $p->actual_work_days,
-            'expected_days' => (float) $p->expected_work_days,
-            'absent_days' => (float) $p->absent_days,
-            'paid_leave_days' => (float) $p->paid_leave_days,
-            'hours' => (float) $p->total_hours_worked,
-            'gross' => (float) $p->gross_salary,
-            'deductions' => (float) $p->deduction_amount,
-            'contributions' => round((float) $p->sss_contribution + (float) $p->philhealth_contribution + (float) $p->pagibig_contribution, 2),
-            'net' => (float) $p->net_salary,
-            'status' => $p->status,
-            'paid_at' => $p->paid_at?->toIso8601String(),
-            'created_at' => $p->created_at?->toIso8601String(),
-            'notes' => $p->notes,
-            'review_note' => $p->finance_notes,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'range' => ['from' => $from, 'to' => $to],
-                'records' => $list->when($data['status'] ?? null, fn ($c, $s) => $c->where('status', $s))->values(),
-                'counts' => $list->countBy('status'),
-                'totals' => [
-                    'pending' => round((float) $list->where('status', 'pending')->sum('net'), 2),
-                    'approved' => round((float) $list->where('status', 'approved')->sum('net'), 2),
-                    'paid' => round((float) $list->where('status', 'paid')->sum('net'), 2),
-                ],
-                // Only people with salary details can have payroll made for them
-                'profiles' => $profiles->filter(fn ($p) => ! $p->trashed() && $this->isActive($p))->map(fn ($p) => [
-                    'id' => $p->id,
-                    'name' => $p->full_name,
-                    'position' => $p->position,
-                    'salary' => $p->basic_salary !== null ? (float) $p->basic_salary : null,
-                    'salary_type' => $p->salary_type,
-                    'ready' => $p->basic_salary !== null && (float) $p->basic_salary > 0 && (bool) $p->salary_type,
-                ])->sortBy('name')->values(),
-            ],
-        ]);
-    }
-
-    /** POST /vendor/staff/payroll/preview */
-    public function previewPayroll(Request $request, PayrollService $service): JsonResponse
-    {
-        $data = $this->validatePayroll($request);
-        $result = $service->previewPayroll($this->resolveOwnerId($request), $data['employee_id'], $data['period_start'], $data['period_end'], (bool) ($data['include_contributions'] ?? false));
-
-        return $this->payrollResult($result);
-    }
-
-    /** POST /vendor/staff/payroll */
-    public function createPayroll(Request $request, PayrollService $service): JsonResponse
-    {
-        $data = $this->validatePayroll($request);
-        $result = $service->generatePayroll($this->resolveOwnerId($request), $data['employee_id'], $data['period_start'], $data['period_end'], $data['notes'] ?? null, (bool) ($data['include_contributions'] ?? false));
-        unset($result['data']); // the saved row; the page reloads the list instead
-
-        return $this->payrollResult($result, 'Payroll created. Approve it when you are ready to pay.');
-    }
-
-    /** POST /vendor/staff/payroll/{action} — approve, reject or mark as paid. */
-    public function payrollAction(Request $request, PayrollService $service, string $action): JsonResponse
-    {
-        $data = $request->validate([
-            'ids' => 'required|array|min:1|max:100',
-            'ids.*' => 'integer',
-            'note' => [$action === 'reject' ? 'required' : 'nullable', 'string', 'max:1000'],
-        ], ['note.required' => 'Say why, so whoever made it can fix it.']);
-        $ownerId = $this->resolveOwnerId($request);
-
-        $result = match ($action) {
-            'approve' => $service->financeApprovePayrolls($ownerId, $data['ids'], $data['note'] ?? null),
-            'reject' => $service->financeRejectPayrolls($ownerId, $data['ids'], $data['note']),
-            'paid' => $service->markPayrollsAsPaid($ownerId, $data['ids']),
-        };
-
-        return $this->payrollResult($result);
     }
 
     // ── Activity ───────────────────────────────────────────────────────────
@@ -786,24 +714,14 @@ class StaffController extends Controller
         }
 
         return StaffShift::where('owner_id', $ownerId)
-            ->whereBetween('shift_date', [$from->toDateString(), $to->toDateString()])->get()
+            ->onDays($from->toDateString(), $to->toDateString())->get()
             ->keyBy(fn ($s) => $s->employee_id . '|' . $s->shift_date->toDateString());
     }
 
     /** The hours someone should work on a day: a set shift, else their usual hours unless it's a rest day. Null means off. */
     private function expectedHours(EmployeeInfo $p, string $date, ?StaffShift $shift): ?array
     {
-        if ($shift) {
-            return $shift->is_off ? null : ['start' => $this->hm($shift->start_time), 'end' => $this->hm($shift->end_time)];
-        }
-        if (! $p->shift_start || ! $p->shift_end) {
-            return null;
-        }
-        if (in_array(Carbon::parse($date)->format('l'), $this->restDays($p), true)) {
-            return null;
-        }
-
-        return ['start' => $this->hm($p->shift_start), 'end' => $this->hm($p->shift_end)];
+        return app(AttendanceCalculator::class)->expected($p, $date, $shift);
     }
 
     private function usualHours(EmployeeInfo $p): ?string
@@ -843,37 +761,6 @@ class StaffController extends Controller
         }
 
         return $data;
-    }
-
-    private function validatePayroll(Request $request): array
-    {
-        $ownerId = $this->resolveOwnerId($request);
-
-        return $request->validate([
-            'employee_id' => ['required', Rule::exists('employees_info', 'id')->where('owner_id', $ownerId)->whereNull('deleted_at')],
-            'period_start' => 'required|date',
-            'period_end' => 'required|date|after_or_equal:period_start',
-            'include_contributions' => 'nullable|boolean',
-            'notes' => 'nullable|string|max:1000',
-        ], [
-            'employee_id.required' => 'Choose who this payroll is for.',
-            'period_end.after_or_equal' => 'The period must end on or after its start.',
-        ]);
-    }
-
-    /** The payroll service reports {success, message}; keep its words but never internal errors. */
-    private function payrollResult(array $result, ?string $message = null): JsonResponse
-    {
-        if (! ($result['success'] ?? false)) {
-            $text = (string) ($result['message'] ?? '');
-            $safe = str_starts_with($text, 'Failed to') ? 'That didn\'t work. Please try again.' : str_replace('for the selected IDs', 'among the ones you picked', $text);
-
-            return response()->json(['success' => false, 'message' => $safe ?: 'That didn\'t work.'], 422);
-        }
-
-        $text = $message ?? preg_replace_callback('/(\d+) payroll\(s\)/', fn ($m) => $m[1] . ' ' . ($m[1] === '1' ? 'payroll' : 'payrolls'), (string) ($result['message'] ?? 'Done.'));
-
-        return response()->json(['success' => true, 'message' => $text, 'data' => $result['data'] ?? null]);
     }
 
     private function hours(string $in, ?string $out): ?float

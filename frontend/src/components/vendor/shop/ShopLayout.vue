@@ -80,7 +80,11 @@ const STAFF_TABS = [
   { name: "VendorStaffList", label: "Employees", icon: "users", module: "staff" },
   { name: "VendorStaffRoles", label: "Roles & Permissions", icon: "shield", module: "staff" },
   { name: "VendorStaffAttendance", label: "Attendance", icon: "clock", module: "attendance" },
+  { name: "VendorStaffAttendanceReview", label: "Attendance Review", icon: "eye", module: "attendance" },
+  { name: "VendorStaffAttendanceDevices", label: "Attendance Devices", icon: "lock", module: "attendance" },
   { name: "VendorStaffSchedules", label: "Schedules", icon: "calendar", module: "staff" },
+  { name: "VendorStaffPlanner", label: "Shift Planner", icon: "grid", module: "staff" },
+  { name: "VendorStaffLeave", label: "Leave & Overtime", icon: "calendar", module: "leave" },
   { name: "VendorStaffPayroll", label: "Payroll", icon: "card", module: "payroll" },
   { name: "VendorStaffActivity", label: "Activity Logs", icon: "activity", module: "staff" },
 ];

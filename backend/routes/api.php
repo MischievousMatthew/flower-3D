@@ -34,6 +34,11 @@ use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\VendorOrdersController;
 use App\Http\Controllers\EmployeeAuthController;
 use App\Http\Controllers\EmployeeInfoController;
+use App\Http\Controllers\EmployeeDocumentController;
+use App\Http\Controllers\AttendanceKioskController;
+use App\Http\Controllers\VendorAttendanceController;
+use App\Http\Controllers\ScheduleController;
+use App\Http\Controllers\PublicLeaveController;
 use App\Http\Controllers\FundingRequestController;
 use App\Http\Controllers\AccountingFundingRequestController;
 use App\Http\Controllers\EmployeeQRController;
@@ -167,8 +172,20 @@ Route::get('/subscription/payment/callback', [VendorSubscriptionController::clas
 // ============================================================
 
 Route::prefix('public/leave')->group(function () {
-    Route::post('/verify-qr', [EmployeeLeaveController::class, 'verifyQRToken']);
-    Route::post('/submit',    [EmployeeLeaveController::class, 'submitLeaveRequest']);
+    // Replaced: these accepted a made-up base64 token
+    Route::post('/verify-qr', [EmployeeLeaveController::class, 'retired']);
+    Route::post('/submit',    [EmployeeLeaveController::class, 'retired']);
+
+    // The leave page opened from the shop's QR poster; employees sign in by scanning their badge
+    Route::middleware('throttle:30,1')->group(function () {
+        Route::post('/shop',                       [PublicLeaveController::class, 'shop']);
+        Route::post('/identify',                   [PublicLeaveController::class, 'identify'])->middleware('throttle:10,1');
+        Route::post('/me',                         [PublicLeaveController::class, 'me']);
+        Route::post('/requests',                   [PublicLeaveController::class, 'file']);
+        Route::post('/requests/{id}/cancel',       [PublicLeaveController::class, 'cancel'])->whereNumber('id');
+        Route::post('/overtime',                   [PublicLeaveController::class, 'overtime']);
+        Route::post('/overtime/{id}/cancel',       [PublicLeaveController::class, 'cancelOvertime'])->whereNumber('id');
+    });
 });
 
 Route::middleware('token.auth')->group(function () {
@@ -519,17 +536,38 @@ Route::middleware('token.auth')->group(function () {
                 Route::post('/shifts/copy-week',   [StaffController::class, 'copyWeek']);
                 Route::delete('/shifts/{id}',      [StaffController::class, 'destroyShift'])->whereNumber('id');
                 Route::get('/activity',            [StaffController::class, 'activity']);
+                // Shift planner: the same endpoints the ERP uses, for the shop owner
+                Route::prefix('planner')->controller(ScheduleController::class)->group(function () {
+                    Route::get('/board', 'board');
+                    Route::post('/assign', 'assign');
+                    Route::post('/templates', 'storeTemplate');
+                    Route::put('/templates/{id}', 'updateTemplate')->whereNumber('id');
+                    Route::delete('/templates/{id}', 'destroyTemplate')->whereNumber('id');
+                    Route::post('/templates/{id}/link', 'link')->whereNumber('id');
+                    Route::post('/shifts/{id}/replace', 'replace')->whereNumber('id');
+                    Route::post('/shifts/{id}/undo-replace', 'undoReplace')->whereNumber('id');
+                    Route::delete('/shifts/{id}', 'remove')->whereNumber('id');
+                    Route::post('/copy-week', 'copyWeek');
+                });
             });
             Route::middleware('subscription.module:attendance')->group(function () {
                 Route::get('/attendance',          [StaffController::class, 'attendance']);
                 Route::post('/attendance',         [StaffController::class, 'storeAttendance']);
                 Route::put('/attendance/{id}',     [StaffController::class, 'updateAttendance'])->whereNumber('id');
-            });
-            Route::middleware('subscription.module:payroll')->group(function () {
-                Route::get('/payroll',             [StaffController::class, 'payroll']);
-                Route::post('/payroll/preview',    [StaffController::class, 'previewPayroll']);
-                Route::post('/payroll',            [StaffController::class, 'createPayroll']);
-                Route::post('/payroll/{action}',   [StaffController::class, 'payrollAction'])->whereIn('action', ['approve', 'reject', 'paid']);
+                // Shop location, scanner devices (up to 3), reviews and reports
+                Route::get('/attendance/setup',                  [VendorAttendanceController::class, 'setup']);
+                Route::put('/attendance/setup',                  [VendorAttendanceController::class, 'saveSetup']);
+                Route::post('/attendance/devices/{id}/approve',  [VendorAttendanceController::class, 'approveDevice'])->whereNumber('id');
+                Route::post('/attendance/devices/{id}/revoke',   [VendorAttendanceController::class, 'revokeDevice'])->whereNumber('id');
+                Route::put('/attendance/devices/{id}',           [VendorAttendanceController::class, 'renameDevice'])->whereNumber('id');
+                Route::delete('/attendance/devices/{id}',        [VendorAttendanceController::class, 'deleteDevice'])->whereNumber('id');
+                Route::get('/attendance/review',                 [VendorAttendanceController::class, 'reviewQueue']);
+                Route::post('/attendance/review/{id}',           [VendorAttendanceController::class, 'review'])->whereNumber('id');
+                Route::post('/attendance/corrections/{id}',      [VendorAttendanceController::class, 'reviewCorrection'])->whereNumber('id');
+                Route::post('/attendance/overtime/{id}',         [VendorAttendanceController::class, 'overtime'])->whereNumber('id');
+                Route::get('/attendance/{id}/evidence/{which}/{index}', [VendorAttendanceController::class, 'evidence'])
+                    ->whereNumber(['id', 'index'])->whereIn('which', ['time_in', 'time_out']);
+                Route::get('/attendance/report',                 [VendorAttendanceController::class, 'report']);
             });
         });
 
@@ -576,7 +614,13 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/',              [EmployeeInfoController::class, 'index']);
             Route::get('/statistics',    [EmployeeInfoController::class, 'statistics']);
             Route::get('/{id}',          [EmployeeInfoController::class, 'show']);
+            Route::get('/{id}/documents', [EmployeeDocumentController::class, 'index'])->whereNumber('id');
+            Route::get('/{id}/documents/{documentId}/link', [EmployeeDocumentController::class, 'link'])->whereNumber(['id', 'documentId']);
         });
+
+        // Employment documents (shared by the shop owner and HR)
+        Route::post('/{id}/documents', [EmployeeDocumentController::class, 'store'])->whereNumber('id')->middleware('employee.module:employees,edit');
+        Route::delete('/{id}/documents/{documentId}', [EmployeeDocumentController::class, 'destroy'])->whereNumber(['id', 'documentId'])->middleware('employee.module:employees,edit');
 
         Route::post('/', [EmployeeInfoController::class, 'store'])->middleware('employee.module:employees,create');
         Route::put('/{id}', [EmployeeInfoController::class, 'update'])->middleware('employee.module:employees,edit');
@@ -585,26 +629,72 @@ Route::middleware('token.auth')->group(function () {
     });
 
     Route::prefix('attendance')->group(function () {
+        // Replaced by the shop scanner below; these trusted the browser's word
+        Route::post('/scan',     [AttendanceController::class, 'retired']);
+        Route::post('/time-in',  [AttendanceController::class, 'retired']);
+        Route::post('/time-out', [AttendanceController::class, 'retired']);
+
         Route::middleware('employee.module:attendance,view')->group(function () {
             Route::get('/',        [AttendanceController::class, 'index']);
             Route::get('/summary', [AttendanceController::class, 'summary']);
+            Route::get('/report',  [AttendanceController::class, 'report']);
+            Route::get('/review',  [AttendanceController::class, 'reviewQueue']);
+            Route::get('/{id}/evidence/{which}/{index}', [AttendanceController::class, 'evidence'])
+                ->whereNumber(['id', 'index'])->whereIn('which', ['time_in', 'time_out']);
         });
 
-        Route::middleware('employee.module:attendance,create')->group(function () {
-            Route::post('/scan',     [AttendanceController::class, 'scanQR']);
-            Route::post('/',         [AttendanceController::class, 'store']);
-            Route::post('/time-in',  [AttendanceController::class, 'timeIn']);
-            Route::post('/time-out', [AttendanceController::class, 'timeOut']);
+        // The shop scanner: approved devices at the shop only (AttendanceKioskService)
+        Route::prefix('kiosk')->middleware('employee.module:attendance,create')->group(function () {
+            // POST so the device token never lands in URLs or access logs
+            Route::post('/status',                [AttendanceKioskController::class, 'status']);
+            Route::post('/devices',               [AttendanceKioskController::class, 'requestDevice']);
+            Route::post('/sessions',              [AttendanceKioskController::class, 'start']);
+            Route::post('/sessions/{id}/complete', [AttendanceKioskController::class, 'complete'])->whereUuid('id');
+            Route::post('/sessions/{id}/enroll',   [AttendanceKioskController::class, 'enroll'])->whereUuid('id');
         });
-        Route::put('/{id}', [AttendanceController::class, 'update'])->middleware('employee.module:attendance,edit');
-        Route::delete('/{id}', [AttendanceController::class, 'destroy'])->middleware('employee.module:attendance,delete');
+
+        // Corrections are requests; someone else approves them
+        Route::middleware('employee.module:attendance,edit')->group(function () {
+            Route::post('/',            [AttendanceController::class, 'store']);
+            Route::post('/corrections', [AttendanceController::class, 'requestCorrection']);
+            Route::put('/{id}',         [AttendanceController::class, 'update'])->whereNumber('id');
+        });
+        Route::middleware('employee.module:attendance,approve')->group(function () {
+            Route::post('/{id}/review',              [AttendanceController::class, 'review'])->whereNumber('id');
+            Route::post('/{id}/overtime',            [AttendanceController::class, 'overtime'])->whereNumber('id');
+            Route::post('/corrections/{id}/review',  [AttendanceController::class, 'reviewCorrection'])->whereNumber('id');
+        });
+        Route::delete('/{id}', [AttendanceController::class, 'destroy'])->whereNumber('id')->middleware('employee.module:attendance,delete');
+    });
+
+    // Shift planner (also in the vendor portal, same data)
+    Route::prefix('schedules')->group(function () {
+        Route::get('/board', [ScheduleController::class, 'board'])->middleware('employee.module:schedules,view');
+        Route::middleware('employee.module:schedules,create')->group(function () {
+            Route::post('/assign',                [ScheduleController::class, 'assign']);
+            Route::post('/templates/{id}/link',   [ScheduleController::class, 'link'])->whereNumber('id');
+            Route::post('/copy-week',             [ScheduleController::class, 'copyWeek']);
+        });
+        Route::middleware('employee.module:schedules,edit')->group(function () {
+            Route::post('/templates',                  [ScheduleController::class, 'storeTemplate']);
+            Route::put('/templates/{id}',              [ScheduleController::class, 'updateTemplate'])->whereNumber('id');
+            Route::post('/shifts/{id}/replace',        [ScheduleController::class, 'replace'])->whereNumber('id');
+            Route::post('/shifts/{id}/undo-replace',   [ScheduleController::class, 'undoReplace'])->whereNumber('id');
+        });
+        Route::middleware('employee.module:schedules,delete')->group(function () {
+            Route::delete('/templates/{id}', [ScheduleController::class, 'destroyTemplate'])->whereNumber('id');
+            Route::delete('/shifts/{id}',    [ScheduleController::class, 'remove'])->whereNumber('id');
+        });
     });
 
         Route::prefix('employees/{employeeId}/qr-code')->group(function () {
             Route::middleware('employee.module:employees,view')->group(function () {
                 Route::get('/svg',       [EmployeeQRController::class, 'getSVG']);
                 Route::get('/base64',    [EmployeeQRController::class, 'getBase64']);
+                Route::get('/payload',   [EmployeeQRController::class, 'payload']);
             });
+            Route::post('/reissue', [EmployeeQRController::class, 'reissue'])
+                ->middleware('employee.module:employees,edit');
 
             Route::get('/download', [EmployeeQRController::class, 'download'])
                 ->middleware('employee.module:employees,export');
@@ -615,38 +705,65 @@ Route::middleware('token.auth')->group(function () {
     });
 
     Route::prefix('payroll')->group(function () {
+        // Finance (payroll_requests): see, approve, send back, mark paid
         Route::middleware('employee.module:payroll_requests,view')->group(function () {
-            Route::get('/finance-requests', [PayrollController::class, 'financeRequests']);
-            Route::get('/finance-summary',  [PayrollController::class, 'financeSummary']);
+            Route::get('/finance-requests',   [PayrollController::class, 'financeRequests']);
+            Route::get('/finance-summary',    [PayrollController::class, 'financeSummary']);
+            Route::get('/finance/{id}',       [PayrollController::class, 'show'])->whereNumber('id');
         });
-
         Route::post('/finance-approve', [PayrollController::class, 'financeApprove'])->middleware('employee.module:payroll_requests,approve');
         Route::post('/finance-reject', [PayrollController::class, 'financeReject'])->middleware('employee.module:payroll_requests,reject');
         Route::post('/mark-paid', [PayrollController::class, 'markAsPaid'])->middleware('employee.module:payroll_requests,edit');
 
+        // HR (payroll): see, create, revise, delete unapproved; recurring pay items; salary history
         Route::middleware('employee.module:payroll,view')->group(function () {
-            Route::get('/',                 [PayrollController::class, 'index']);
-            Route::get('/summary',          [PayrollController::class, 'summary']);
-            Route::get('/{id}',             [PayrollController::class, 'show'])->whereNumber('id');
+            Route::get('/',                             [PayrollController::class, 'index']);
+            Route::get('/summary',                      [PayrollController::class, 'summary']);
+            Route::get('/people',                       [PayrollController::class, 'people']);
+            Route::get('/components',                   [PayrollController::class, 'components']);
+            Route::get('/salary-history/{employeeId}',  [PayrollController::class, 'salaryHistory'])->whereNumber('employeeId');
+            Route::get('/{id}',                         [PayrollController::class, 'show'])->whereNumber('id');
         });
-
         Route::middleware('employee.module:payroll,create')->group(function () {
-            Route::post('/',                [PayrollController::class, 'store']);
-            Route::post('/preview',         [PayrollController::class, 'preview']);
+            Route::post('/',                    [PayrollController::class, 'store']);
+            Route::post('/preview',             [PayrollController::class, 'preview']);
+            Route::post('/batch-preview',       [PayrollController::class, 'batchPreview']);
+            Route::post('/batch',               [PayrollController::class, 'batch']);
+            Route::put('/{id}',                 [PayrollController::class, 'revise'])->whereNumber('id');
+            Route::post('/components',          [PayrollController::class, 'storeComponent']);
+            Route::put('/components/{id}',      [PayrollController::class, 'updateComponent'])->whereNumber('id');
+            Route::delete('/components/{id}',   [PayrollController::class, 'destroyComponent'])->whereNumber('id');
         });
-        Route::post('/hr-approve', [PayrollController::class, 'hrApprove'])->middleware('employee.module:payroll,approve');
         Route::delete('/{id}', [PayrollController::class, 'destroy'])->whereNumber('id')->middleware('employee.module:payroll,delete');
     });
 
     Route::prefix('leaves')->group(function () {
         Route::middleware('employee.module:leave_management,view')->group(function () {
-            Route::get('/',            [EmployeeLeaveController::class, 'index']);
-            Route::get('/statistics',  [EmployeeLeaveController::class, 'getStatistics']);
+            Route::get('/',              [EmployeeLeaveController::class, 'index']);
+            Route::get('/statistics',    [EmployeeLeaveController::class, 'getStatistics']);
+            Route::get('/balances',      [EmployeeLeaveController::class, 'balances']);
+            Route::get('/policies',      [EmployeeLeaveController::class, 'policies']);
+            Route::get('/poster',        [EmployeeLeaveController::class, 'poster']);
+            Route::get('/{id}/document', [EmployeeLeaveController::class, 'document'])->whereNumber('id');
+        });
+        Route::post('/', [EmployeeLeaveController::class, 'store'])->middleware('employee.module:leave_management,create');
+        Route::middleware('employee.module:leave_management,edit')->group(function () {
+            Route::put('/policies',         [EmployeeLeaveController::class, 'savePolicies']);
+            Route::post('/balances/adjust', [EmployeeLeaveController::class, 'adjust']);
+            Route::post('/{id}/cancel',     [EmployeeLeaveController::class, 'cancel'])->whereNumber('id');
         });
 
         Route::put('/{id}/status', [EmployeeLeaveController::class, 'updateStatus'])
-            ->middleware('employee.leave-review');
-        Route::delete('/{id}', [EmployeeLeaveController::class, 'destroy'])->middleware('employee.module:leave_management,delete');
+            ->whereNumber('id')->middleware('employee.leave-review');
+        Route::delete('/{id}', [EmployeeLeaveController::class, 'destroy'])->whereNumber('id')->middleware('employee.module:leave_management,delete');
+    });
+
+    // Overtime asked for ahead of time (shown on the Leave & overtime page)
+    Route::prefix('overtime-requests')->group(function () {
+        Route::get('/', [EmployeeLeaveController::class, 'overtimeIndex'])->middleware('employee.module:leave_management,view');
+        Route::post('/', [EmployeeLeaveController::class, 'overtimeStore'])->middleware('employee.module:leave_management,create');
+        Route::put('/{id}/status', [EmployeeLeaveController::class, 'overtimeDecide'])->whereNumber('id')->middleware('employee.module:leave_management,view');
+        Route::post('/{id}/cancel', [EmployeeLeaveController::class, 'overtimeCancel'])->whereNumber('id')->middleware('employee.module:leave_management,edit');
     });
 
     // ----------------------------------------------------------

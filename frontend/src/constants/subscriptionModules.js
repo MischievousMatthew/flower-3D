@@ -36,4 +36,6 @@ export const subscriptionModuleFor = (module) =>
     sc_dashboard: SUBSCRIPTION_MODULES.SUPPLY_CHAIN,
     sc_orders: SUBSCRIPTION_MODULES.ORDERS,
     order_scan: SUBSCRIPTION_MODULES.SCANNING,
+    // The ERP shift planner is the vendor's Staff → Schedules feature
+    schedules: SUBSCRIPTION_MODULES.STAFF,
   })[module] ?? module;

@@ -37,7 +37,7 @@ export const VENDOR_NAV = [
     label: "Business Operations",
     items: [
       { name: "VendorStaffList", label: "Employees & Permissions", icon: "users", module: "staff", match: ["VendorStaffRoles", "VendorStaffPayroll", "VendorStaffActivity"] },
-      { name: "VendorStaffAttendance", label: "Attendance & Schedules", icon: "clock", module: "attendance", match: ["VendorStaffSchedules"] },
+      { name: "VendorStaffAttendance", label: "Attendance & Schedules", icon: "clock", module: "attendance", match: ["VendorStaffSchedules", "VendorStaffPlanner", "VendorStaffLeave", "VendorStaffAttendanceReview", "VendorStaffAttendanceDevices"] },
       { name: "VendorChat", label: "Customer Chat", icon: "chat", module: "crm", match: ["VendorInquiries"] },
       { name: "VendorReviews", label: "Reviews", icon: "star", module: "products" },
       { name: "VendorNotifications", label: "Notifications", icon: "bell" },

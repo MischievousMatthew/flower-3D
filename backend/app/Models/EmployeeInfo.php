@@ -82,9 +82,17 @@ class EmployeeInfo extends Model
         'deleted_at' => 'datetime',
     ];
 
+    // createdBy: only its name is shown, as added_by.
+    // Pay and bank details: only for people with payroll access (App\Services\Payroll\PayAccess::reveal).
+    protected $hidden = [
+        'createdBy',
+        'basic_salary', 'salary_type', 'payment_method', 'bank_name', 'account_number', 'tax_status', 'allowance',
+    ];
+
     protected $appends = [
         'full_name',
         'avatar_url',
+        'added_by',
     ];
 
     // Accessor for full_name
@@ -106,7 +114,45 @@ class EmployeeInfo extends Model
     }
 
 
+    /** The shop owner can always manage their own HR profiles; employees must be in HR. */
+    public static function canBeManagedBy($user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+        if ($user instanceof User) {
+            return $user->role === User::ROLE_VENDOR;
+        }
+        if (! $user instanceof Employee) {
+            return false;
+        }
+
+        $userDepartment = strtolower(trim($user->department ?? ''));
+        foreach (['hr', 'human resources'] as $dept) {
+            if (str_contains($userDepartment, $dept) || str_contains($dept, $userDepartment)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Who added the profile: an HR employee in the ERP, or the shop owner in the vendor portal
+    public function getAddedByAttribute(): string
+    {
+        if (! $this->created_by_employee_id) {
+            return 'Shop owner';
+        }
+
+        return $this->relationLoaded('createdBy') ? ($this->createdBy?->name ?? 'HR') : 'HR';
+    }
+
     // Relationships
+    public function documents()
+    {
+        return $this->hasMany(EmployeeDocument::class, 'employee_info_id');
+    }
+
     public function owner()
     {
         return $this->belongsTo(User::class, 'owner_id');

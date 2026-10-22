@@ -15,6 +15,7 @@ class ErpModule
         'attendance',
         'payroll',
         'leave_management',
+        'schedules',
 
         // Finance
         'finance_dashboard',
@@ -45,9 +46,13 @@ class ErpModule
     public const MODULE_PERMISSIONS = [
         'hr_dashboard'       => ['view', 'export'],
         'employees'          => ['view', 'create', 'edit', 'delete', 'export', 'print'],
-        'attendance'         => ['view', 'create', 'edit', 'delete'],
+        // edit = request corrections; approve = approve flagged scans and others' corrections
+        'attendance'         => ['view', 'create', 'edit', 'delete', 'approve'],
         'payroll'            => ['view', 'create', 'delete', 'approve'],
-        'leave_management'   => ['view', 'approve', 'reject', 'delete'],
+        // create = file leave/overtime for someone; edit = leave rules, balances, cancelling approved leave
+        'leave_management'   => ['view', 'create', 'edit', 'approve', 'reject', 'delete'],
+        // create = put people on shifts; edit = shifts, replacements, day-off overrides; delete = remove shifts
+        'schedules'          => ['view', 'create', 'edit', 'delete'],
         'finance_dashboard'  => ['view'],
         'funding_requests'   => ['view', 'approve', 'reject'],
         'payroll_requests'   => ['view', 'edit', 'approve', 'reject'],

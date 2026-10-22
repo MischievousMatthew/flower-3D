@@ -152,10 +152,16 @@
         </button>
         <div class="sub-menu" v-show="expandedModules.includes('attendance')">
           <router-link to="/erp/hr/attendance/logs" class="sub-item"
-            >Attendance Logs</router-link
+            >Daily log</router-link
+          >
+          <router-link to="/erp/hr/attendance/review" class="sub-item"
+            >Review</router-link
+          >
+          <router-link to="/erp/hr/attendance/reports" class="sub-item"
+            >Reports</router-link
           >
           <router-link to="/erp/hr/attendance/qrscanner" class="sub-item"
-            >QR Scanner</router-link
+            >Scanner</router-link
           >
         </div>
       </div>

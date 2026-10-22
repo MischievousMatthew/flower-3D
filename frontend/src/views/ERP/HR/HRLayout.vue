@@ -44,6 +44,7 @@
             </router-link>
           </div>
         </div>
+        <ErpThemeToggle v-if="themed" />
       </div>
       <div class="page-container">
         <router-view />
@@ -58,8 +59,11 @@ import { useRoute } from "vue-router";
 import { useSidebarState } from "../../../composables/useSidebarState";
 import { ref, onMounted, onUnmounted } from "vue";
 import DynamicSidebar from "../../../layouts/Sidebar/DynamicSidebar.vue";
+import ErpThemeToggle from "../../../components/hr/ErpThemeToggle.vue";
 
 const route = useRoute();
+// Pages built for light and dark mode (route meta.erpTheme) show the switch
+const themed = computed(() => route.matched.some((r) => r.meta?.erpTheme === true));
 const { isCollapsed, toggleMobile } = useSidebarState();
 
 const width = ref(window.innerWidth);
@@ -116,6 +120,33 @@ const currentPage = computed(() => {
   border-bottom: 1px solid #e2e8f0;
   padding: 18px 32px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.top-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Dark mode (only on pages with meta.erpTheme; light stays as it was) */
+:global(html[data-vendor-theme="dark"]) .hr-layout,
+:global(html[data-vendor-theme="dark"]) .main-content {
+  background: var(--v-bg);
+}
+:global(html[data-vendor-theme="dark"]) .top-section {
+  background: var(--v-surface);
+  border-bottom-color: var(--v-border);
+  box-shadow: none;
+}
+:global(html[data-vendor-theme="dark"]) .breadcrumbs,
+:global(html[data-vendor-theme="dark"]) .breadcrumbs a,
+:global(html[data-vendor-theme="dark"]) .mobile-toggle {
+  color: var(--v-text-2);
+}
+:global(html[data-vendor-theme="dark"]) .mobile-toggle:hover {
+  background: var(--v-subtle);
+  color: var(--v-text);
 }
 
 .header-left {

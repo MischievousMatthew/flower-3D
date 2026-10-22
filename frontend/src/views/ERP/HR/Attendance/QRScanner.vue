@@ -1,854 +1,426 @@
 <template>
-  <div class="qr-scanner-page">
-    <!-- Header -->
-    <div class="scanner-header">
-      <button @click="goBack" class="btn-back">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-        Back
-      </button>
-      <h1 class="page-title">Attendance Scanner</h1>
-    </div>
+  <HrPage title="Attendance scanner" subtitle="Works only on a device the shop owner approved, while it's at the shop." :tabs="ATTENDANCE_TABS">
+    <template #actions>
+      <span v-if="status?.device" class="sp-chip" :class="DEVICE_TONE[status.device.status]">
+        {{ status.device.name }} · {{ DEVICE_LABEL[status.device.status] }}
+      </span>
+    </template>
 
-    <!-- Scanner Section -->
-    <div class="scanner-container">
-      <!-- Camera Permission -->
-      <div v-if="!cameraReady" class="permission-screen">
-        <div class="permission-icon">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="64"
-            height="64"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path
-              d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
-            ></path>
-            <circle cx="12" cy="13" r="4"></circle>
-          </svg>
-        </div>
-        <h3>Camera Access Required</h3>
-        <p>Please allow camera access to scan QR codes</p>
-        <button @click="initCamera" class="btn-allow">Enable Camera</button>
+    <section class="sp-card ks">
+      <!-- Checking -->
+      <div v-if="state === 'checking'" class="ks-center">
+        <div class="bc-skeleton ks-sk"></div>
+        <p class="sp-hint">Checking this device…</p>
       </div>
 
-      <!-- Active Scanner -->
-      <div v-else-if="!scanResult && !showVerifier" class="scanner-view">
-        <div class="camera-container">
-          <video
-            ref="videoElement"
-            autoplay
-            playsinline
-            class="camera-feed"
-          ></video>
-          <canvas ref="canvasElement" class="scanner-canvas"></canvas>
+      <!-- Problems before scanning -->
+      <div v-else-if="state === 'blocked'" class="sp-empty">
+        <span class="sp-empty-icon" v-html="ICONS.lock"></span>
+        <h3>{{ blocked.title }}</h3>
+        <p>{{ blocked.text }}</p>
+        <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="check"><span v-html="ICONS.history"></span>Check again</button>
+      </div>
 
-          <!-- Scanning Frame -->
-          <div class="scan-frame">
-            <div class="frame-corner tl"></div>
-            <div class="frame-corner tr"></div>
-            <div class="frame-corner bl"></div>
-            <div class="frame-corner br"></div>
-            <div v-if="isScanning" class="scan-line"></div>
+      <!-- Ask for this device to be allowed -->
+      <form v-else-if="state === 'request'" class="ks-request" novalidate @submit.prevent="requestDevice">
+        <span class="sp-empty-icon" v-html="ICONS.shield"></span>
+        <h3>Set up this device for attendance</h3>
+        <p>Only devices the shop owner approves can take attendance, and only while they're at the shop. Ask from here, at the shop.</p>
+        <label class="sp-field">
+          <span class="sp-label">Name this device</span>
+          <input v-model="deviceName" class="sp-input" maxlength="80" placeholder="e.g. Front counter tablet" />
+        </label>
+        <p v-if="requestError" class="sp-error">{{ requestError }}</p>
+        <button type="submit" class="sp-btn sp-btn-primary" :disabled="busy || !deviceName.trim()">{{ busy ? "Checking your location…" : "Ask the owner to approve" }}</button>
+      </form>
+
+      <!-- Waiting for approval -->
+      <div v-else-if="state === 'pending'" class="sp-empty">
+        <span class="sp-empty-icon" v-html="ICONS.clock"></span>
+        <h3>Waiting for the shop owner</h3>
+        <p>They can approve "{{ status.device.name }}" in the vendor portal under Staff → Attendance devices.</p>
+        <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="check"><span v-html="ICONS.history"></span>Check again</button>
+      </div>
+
+      <!-- Scanner -->
+      <template v-else-if="state === 'scan' || state === 'starting'">
+        <div class="ks-bar">
+          <div v-if="canEnroll" class="sp-seg" role="tablist" aria-label="Mode">
+            <button type="button" role="tab" :class="{ on: mode === 'attendance' }" :aria-selected="mode === 'attendance'" @click="mode = 'attendance'">Time in / out</button>
+            <button type="button" role="tab" :class="{ on: mode === 'enroll' }" :aria-selected="mode === 'enroll'" @click="mode = 'enroll'">Enroll a face</button>
           </div>
+          <span v-if="position" class="ks-loc"><span v-html="ICONS.pin"></span>Location ±{{ position.accuracy }} m</span>
         </div>
+        <div class="ks-camera">
+          <video ref="qrVideo" class="ks-video" playsinline muted></video>
+          <div class="ks-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div v-if="state === 'starting'" class="ks-cover">Checking the QR code and your location…</div>
+        </div>
+        <p class="ks-tip">{{ mode === "enroll" ? "Scan the QR code of the person whose face you're enrolling. They must be here in person." : "Hold the employee's QR code up to the camera." }}</p>
+        <p v-if="cameraError" class="sp-banner error"><span v-html="ICONS.alert"></span>{{ cameraError }}<button type="button" @click="startQr">Try again</button></p>
+      </template>
 
-        <p class="scan-instruction">Position QR code within the frame</p>
+      <!-- Face check -->
+      <KioskFaceCheck v-else-if="state === 'face'" :session="session" @done="finish" @fail="showError" @cancel="reset" />
+
+      <!-- Sending -->
+      <div v-else-if="state === 'sending'" class="ks-center">
+        <div class="bc-skeleton ks-sk"></div>
+        <p class="sp-hint">Saving…</p>
       </div>
 
-      <!-- Loading Employee (between QR scan and face verifier opening) -->
-      <div v-else-if="isLoadingEmployee" class="loading-employee">
-        <div class="spinner"></div>
-        <p>Loading employee data...</p>
+      <!-- Result -->
+      <div v-else-if="state === 'result'" class="ks-result" :class="result.tone" role="status">
+        <span class="ks-result-icon" v-html="result.tone === 'error' ? ICONS.alert : ICONS.check"></span>
+        <h3>{{ result.title }}</h3>
+        <p>{{ result.text }}</p>
+        <ul v-if="result.reasons?.length" class="ks-reasons">
+          <li v-for="r in result.reasons" :key="r">{{ r }}</li>
+        </ul>
+        <button type="button" class="sp-btn sp-btn-primary" @click="reset">Scan the next person</button>
+        <small v-if="autoReset" class="sp-hint">Next scan in {{ autoReset }}s</small>
       </div>
-
-      <!-- Scan Result -->
-      <div
-        v-else-if="scanResult"
-        class="result-screen"
-        :class="scanResult.success ? 'success' : 'error'"
-      >
-        <div class="result-icon">
-          <svg
-            v-if="scanResult.success"
-            xmlns="http://www.w3.org/2000/svg"
-            width="64"
-            height="64"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="3"
-          >
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
-          <svg
-            v-else
-            xmlns="http://www.w3.org/2000/svg"
-            width="64"
-            height="64"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="3"
-          >
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="15" y1="9" x2="9" y2="15"></line>
-            <line x1="9" y1="9" x2="15" y2="15"></line>
-          </svg>
-        </div>
-
-        <h2 class="result-title">{{ scanResult.message }}</h2>
-
-        <div
-          v-if="scanResult.success && scanResult.data"
-          class="result-details"
-        >
-          <div class="employee-card">
-            <div class="employee-avatar">
-              {{ getInitials(scanResult.data.employee_name) }}
-            </div>
-            <div class="employee-data">
-              <h3>{{ scanResult.data.employee_name }}</h3>
-              <p>{{ scanResult.data.employee_id }}</p>
-            </div>
-          </div>
-
-          <div class="attendance-info">
-            <div class="info-row">
-              <span class="label">Date</span>
-              <span class="value">{{ scanResult.data.date }}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">Day</span>
-              <span class="value">{{ scanResult.data.day }}</span>
-            </div>
-
-            <div
-              v-if="scanResult.type === 'time_in'"
-              class="info-row highlight"
-            >
-              <span class="label">Time In</span>
-              <span class="value time">{{ scanResult.data.time_in }}</span>
-            </div>
-
-            <template v-if="scanResult.type === 'time_out'">
-              <div class="info-row">
-                <span class="label">Time In</span>
-                <span class="value">{{ scanResult.data.time_in }}</span>
-              </div>
-              <div class="info-row highlight">
-                <span class="label">Time Out</span>
-                <span class="value time">{{ scanResult.data.time_out }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Total Hours</span>
-                <span class="value hours"
-                  >{{ scanResult.data.total_hours }} hrs</span
-                >
-              </div>
-            </template>
-          </div>
-        </div>
-
-        <button @click="resetScanner" class="btn-scan-again">
-          Scan Next Employee
-        </button>
-      </div>
-    </div>
-
-    <FaceAttendanceVerifier
-      v-model:isOpen="showVerifier"
-      :employee="scannedEmployee"
-      :attendance-type="attendanceType"
-      models-path="/models"
-      @success="onVerifySuccess"
-      @failure="onVerifyFailure"
-    />
-  </div>
+    </section>
+  </HrPage>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from "vue";
-import { useRouter } from "vue-router";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import jsQR from "jsqr";
-import attendanceApi from "../../../../services/attendanceApi";
-import api from "../../../../plugins/axios";
-import FaceAttendanceVerifier from "../../../../layouts/components/FaceAttendanceVerifier.vue";
+import HrPage from "../../../../components/hr/HrPage.vue";
+import KioskFaceCheck from "../../../../components/hr/attendance/KioskFaceCheck.vue";
+import { ATTENDANCE_TABS } from "../../../../components/hr/hrUi";
+import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcons";
+import { useAssignment } from "../../../../composables/useAssignment";
+import attendanceKiosk, { currentPosition, deviceToken, kioskMessage } from "../../../../services/attendanceKiosk";
 
-const router = useRouter();
+const DEVICE_LABEL = { pending: "waiting for approval", approved: "approved", revoked: "removed" };
+const DEVICE_TONE = { pending: "amber", approved: "green", revoked: "red" };
 
-// ── QR Scanner Refs ───────────────────────────────────────────────────────────
-const videoElement = ref(null);
-const canvasElement = ref(null);
-const cameraReady = ref(false);
-const isScanning = ref(false);
-const scanResult = ref(null);
-let stream = null;
-let animationFrame = null;
+const { can } = useAssignment();
+const canEnroll = computed(() => can("attendance", "edit"));
 
-// ── Face Verifier State ───────────────────────────────────────────────────────
-const showVerifier = ref(false);
-const scannedEmployee = ref(null);
-const attendanceType = ref("time_in");
-const isLoadingEmployee = ref(false);
+const state = ref("checking");
+const status = ref(null);
+const blocked = ref({ title: "", text: "" });
+const position = ref(null);
+const deviceName = ref("");
+const requestError = ref("");
+const busy = ref(false);
+const mode = ref("attendance");
+const qrVideo = ref(null);
+const cameraError = ref("");
+const session = ref(null);
+const result = ref(null);
+const autoReset = ref(0);
 
-// ── Camera ────────────────────────────────────────────────────────────────────
+let qrStream = null;
+let scanTimer = null;
+let resetTimer = null;
 
-const initCamera = async () => {
+async function check() {
+  state.value = "checking";
   try {
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: isMobile ? { facingMode: { ideal: "environment" } } : true,
-      audio: false,
-    });
-
-    cameraReady.value = true;
-    await nextTick();
-
-    if (videoElement.value) {
-      videoElement.value.srcObject = stream;
-      await videoElement.value.play();
-      isScanning.value = true;
-      startScanning();
-    }
-  } catch (error) {
-    console.error("Camera error:", error);
-    alert("Unable to access camera.");
+    status.value = await attendanceKiosk.status();
+  } catch (e) {
+    return block("Couldn't reach the server", kioskMessage(e, "Check the internet connection and try again."));
   }
-};
+  if (!status.value.location_set) {
+    return block("The shop location isn't set", "The shop owner sets it in the vendor portal under Staff → Attendance devices.");
+  }
+  const device = status.value.device;
+  if (!device || device.status === "revoked") {
+    if (device?.status === "revoked") deviceToken.clear();
+    state.value = "request";
+    return;
+  }
+  if (device.status === "pending") {
+    state.value = "pending";
+    return;
+  }
+  try {
+    position.value = await currentPosition();
+  } catch (e) {
+    return block("Location is needed", e.message);
+  }
+  state.value = "scan";
+  startQr();
+}
 
-const startScanning = () => {
-  const canvas = canvasElement.value;
-  const video = videoElement.value;
-  if (!canvas || !video) return;
+function block(title, text) {
+  stopQr();
+  blocked.value = { title, text };
+  state.value = "blocked";
+}
 
+async function requestDevice() {
+  busy.value = true;
+  requestError.value = "";
+  try {
+    const pos = await currentPosition();
+    await attendanceKiosk.requestDevice(deviceName.value.trim(), pos);
+    await check();
+  } catch (e) {
+    requestError.value = kioskMessage(e, "Couldn't send the request.");
+  } finally {
+    busy.value = false;
+  }
+}
+
+// ── QR scanning ──
+
+async function startQr() {
+  cameraError.value = "";
+  await nextTick();
+  try {
+    qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+    qrVideo.value.srcObject = qrStream;
+    await qrVideo.value.play();
+  } catch (e) {
+    cameraError.value = e?.name === "NotAllowedError" ? "Allow the camera for this site to scan QR codes." : "Couldn't start the camera.";
+    return;
+  }
+  const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  scanTimer = setInterval(() => {
+    const v = qrVideo.value;
+    if (!v || v.readyState < 2 || state.value !== "scan") return;
+    canvas.width = v.videoWidth;
+    canvas.height = v.videoHeight;
+    ctx.drawImage(v, 0, 0);
+    const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+    if (code?.data) onQr(code.data);
+  }, 200);
+}
 
-  const scan = () => {
-    if (video.readyState === video.HAVE_ENOUGH_DATA && isScanning.value) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+function stopQr() {
+  clearInterval(scanTimer);
+  qrStream?.getTracks().forEach((t) => t.stop());
+  qrStream = null;
+}
 
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-      if (code && code.data) {
-        processQRCode(code.data);
-      }
-    }
-
-    if (isScanning.value) {
-      animationFrame = requestAnimationFrame(scan);
-    }
-  };
-
-  scan();
-};
-
-// ── QR Processing (now opens face verifier instead of directly recording) ─────
-
-const processQRCode = async (qrData) => {
-  if (scanResult.value || showVerifier.value || isLoadingEmployee.value) return;
-
-  // Stop QR scanning immediately
-  isScanning.value = false;
-  stopCamera();
-
-  isLoadingEmployee.value = true;
-
+async function onQr(text) {
+  state.value = "starting";
   try {
-    // Step 1: Parse and validate the QR payload
-    let payload;
-    try {
-      payload = JSON.parse(qrData);
-    } catch {
-      scanResult.value = {
-        success: false,
-        message: "Invalid QR code format",
-        type: "error",
-      };
-      isLoadingEmployee.value = false;
-      return;
-    }
-
-    if (payload.type !== "employee_attendance") {
-      scanResult.value = {
-        success: false,
-        message: "This QR code is not for attendance",
-        type: "error",
-      };
-      isLoadingEmployee.value = false;
-      return;
-    }
-
-    // Step 2: Fetch full employee details from backend
-    // We need avatar_url for the face recognition comparison
-    const { data } = await api.get(`/employees-info/${payload.employee_id}`);
-
-    if (!data.success || !data.data) {
-      scanResult.value = {
-        success: false,
-        message: "Employee not found",
-        type: "error",
-      };
-      isLoadingEmployee.value = false;
-      return;
-    }
-
-    const employee = data.data;
-
-    // Step 3: Check if employee has a photo stored
-    if (!employee.avatar_url) {
-      scanResult.value = {
-        success: false,
-        message: `No photo on file for ${employee.full_name}. Ask admin to upload a photo first.`,
-        type: "error",
-      };
-      isLoadingEmployee.value = false;
-      return;
-    }
-
-    // Step 4: Determine time_in or time_out based on today's attendance
-    // Check if they already have a time_in for today
-    const today = new Date().toISOString().split("T")[0];
-    const attendanceResponse = await attendanceApi.getRecords({
-      date: today,
-      employee_id: employee.id,
-    });
-    const todayRecord = attendanceResponse?.data?.find(
-      (r) => r.employee_id === employee.id,
-    );
-
-    if (todayRecord?.status === "complete") {
-      scanResult.value = {
-        success: false,
-        message: `${employee.full_name} has already completed attendance for today`,
-        type: "error",
-      };
-      isLoadingEmployee.value = false;
-      return;
-    }
-
-    attendanceType.value =
-      todayRecord?.time_in && !todayRecord?.time_out ? "time_out" : "time_in";
-    scannedEmployee.value = employee;
-    isLoadingEmployee.value = false;
-
-    // Step 5: Open face verifier modal
-    showVerifier.value = true;
-  } catch (error) {
-    console.error("QR processing error:", error);
-    scanResult.value = {
-      success: false,
-      message: error.response?.data?.message || "Failed to process QR code",
-      type: "error",
-    };
-    isLoadingEmployee.value = false;
+    position.value = await currentPosition();
+    session.value = await attendanceKiosk.start(text, position.value, mode.value === "enroll");
+    stopQr();
+    state.value = "face";
+  } catch (e) {
+    stopQr();
+    showError(kioskMessage(e, "Couldn't start the check."));
   }
-};
+}
 
-// ── Face Verifier Callbacks ───────────────────────────────────────────────────
+// ── After the face check ──
 
-const onVerifySuccess = ({ employee, type, result }) => {
-  showVerifier.value = false;
-
-  // Display the same result screen that was there before
-  const now = new Date();
-  const time = now.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const date = now.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-  const day = now.toLocaleDateString("en-US", { weekday: "long" });
-
-  scanResult.value = {
-    success: true,
-    message: type === "time_in" ? "Time In Recorded" : "Time Out Recorded",
-    type: type,
-    data: {
-      employee_name: employee.full_name,
-      employee_id: employee.employee_id,
-      time_in: result?.time_in || time,
-      time_out: result?.time_out || time,
-      total_hours: result?.total_hours || "0.00",
-      date: result?.date || date,
-      day: result?.day || day,
-    },
-  };
-};
-
-const onVerifyFailure = ({ reason, score }) => {
-  // The verifier modal shows its own failure screen with retry button.
-  // This callback fires only if the user clicks Cancel on the failure screen.
-  showVerifier.value = false;
-
-  scanResult.value = {
-    success: false,
-    message:
-      reason === "face_mismatch"
-        ? `Face verification failed. Please try again or contact admin.`
-        : "Face verification was cancelled.",
-    type: "error",
-  };
-};
-
-// ── Reset / Navigation ────────────────────────────────────────────────────────
-
-const resetScanner = () => {
-  scanResult.value = null;
-  scannedEmployee.value = null;
-  showVerifier.value = false;
-  isLoadingEmployee.value = false;
-  initCamera();
-};
-
-const stopCamera = () => {
-  if (stream) {
-    stream.getTracks().forEach((track) => track.stop());
-    stream = null;
+async function finish(payload) {
+  state.value = "sending";
+  try {
+    const pos = await currentPosition();
+    if (session.value.purpose === "enroll") {
+      const res = await attendanceKiosk.enroll(session.value.session_id, payload, pos);
+      showResult({ tone: "ok", title: "Face enrolled", text: res.message });
+    } else {
+      const r = await attendanceKiosk.complete(session.value.session_id, payload, pos);
+      const notes = [];
+      if (r.type === "time_in" && r.late_minutes) notes.push(`Late by ${minutes(r.late_minutes)}`);
+      if (r.undertime_minutes) notes.push(`Left ${minutes(r.undertime_minutes)} early`);
+      if (r.overtime_minutes) notes.push(`${minutes(r.overtime_minutes)} overtime — paid once HR approves it`);
+      const what = (r.type === "time_in" ? `Timed in at ${r.time_in}` : `Timed out at ${r.time_out} · ${r.total_hours} h today`) + (notes.length ? `. ${notes.join(". ")}` : "");
+      showResult(r.needs_review
+        ? { tone: "warn", title: `${r.employee_name}: saved, needs review`, text: `${what}. A manager will check it before it counts for pay.`, reasons: r.reasons }
+        : { tone: r.late_minutes && r.type === "time_in" ? "warn" : "ok", title: `${r.employee_name}`, text: what });
+    }
+  } catch (e) {
+    showError(kioskMessage(e, "Couldn't save the attendance."));
   }
-  if (animationFrame) {
-    cancelAnimationFrame(animationFrame);
-    animationFrame = null;
+}
+
+const minutes = (m) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}` : `${m} min`);
+
+function showError(message) {
+  showResult({ tone: "error", title: "Not recorded", text: message });
+}
+
+function showResult(r) {
+  result.value = r;
+  state.value = "result";
+  autoReset.value = r.tone === "error" ? 0 : 8;
+  clearInterval(resetTimer);
+  if (autoReset.value) {
+    resetTimer = setInterval(() => {
+      autoReset.value--;
+      if (autoReset.value <= 0) reset();
+    }, 1000);
   }
-  isScanning.value = false;
-};
+}
 
-const getInitials = (name) => {
-  if (!name) return "?";
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .substring(0, 2);
-};
+function reset() {
+  clearInterval(resetTimer);
+  autoReset.value = 0;
+  session.value = null;
+  result.value = null;
+  check();
+}
 
-const goBack = () => {
-  stopCamera();
-  router.back();
-};
-
-onMounted(() => {
-  initCamera();
+watch(mode, () => {
+  if (state.value === "scan") cameraError.value = "";
 });
 
-onUnmounted(() => {
-  stopCamera();
+onMounted(check);
+onBeforeUnmount(() => {
+  stopQr();
+  clearInterval(resetTimer);
 });
 </script>
 
 <style scoped>
-.qr-scanner-page {
-  min-height: 100vh;
-  background: #f7fafc;
-  padding: 20px;
-}
-
-.scanner-header {
-  max-width: 600px;
-  margin: 0 auto 24px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.btn-back {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #4a5568;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-back:hover {
-  border-color: #48bb78;
-  color: #48bb78;
-  background: #f0fff4;
-}
-
-.page-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1a202c;
-  margin: 0;
-}
-
-.scanner-container {
-  max-width: 600px;
+.ks {
+  max-width: 640px;
   margin: 0 auto;
-  background: #ffffff;
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
 }
-
-/* Permission Screen */
-.permission-screen {
-  padding: 80px 40px;
-  text-align: center;
-}
-
-.permission-icon {
-  color: #48bb78;
-  margin-bottom: 24px;
-}
-
-.permission-screen h3 {
-  font-size: 22px;
-  font-weight: 700;
-  color: #1a202c;
-  margin-bottom: 12px;
-}
-
-.permission-screen p {
-  font-size: 16px;
-  color: #718096;
-  margin-bottom: 32px;
-}
-
-.btn-allow {
-  padding: 14px 32px;
-  background: #48bb78;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-allow:hover {
-  background: #38a169;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(72, 187, 120, 0.35);
-}
-
-/* Loading Employee */
-.loading-employee {
-  padding: 80px 40px;
-  text-align: center;
+.ks-center {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  padding: 24px 0;
 }
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e2e8f0;
-  border-top-color: #48bb78;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.loading-employee p {
-  font-size: 14px;
-  color: #718096;
-  margin: 0;
-}
-
-/* Scanner View */
-.scanner-view {
-  position: relative;
-}
-
-.camera-container {
-  position: relative;
+.ks-sk {
   width: 100%;
-  height: 400px;
-  background: #000;
+  aspect-ratio: 4 / 3;
+  border-radius: 18px;
 }
-
-.camera-feed {
+.ks-request {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 12px 0;
+  text-align: center;
+}
+.ks-request .sp-empty-icon {
+  margin: 0 auto;
+}
+.ks-request h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+.ks-request p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--v-muted);
+}
+.ks-request .sp-field {
+  text-align: left;
+}
+.ks-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.ks-loc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--v-muted);
+}
+.ks-loc :deep(svg) {
+  width: 14px;
+  height: 14px;
+}
+.ks-camera {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border-radius: 18px;
+  background: #0b0f14;
+}
+.ks-video {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transform: scaleX(-1);
 }
-
-.scanner-canvas {
-  display: none;
-}
-
-.scan-frame {
+.ks-frame {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 280px;
-  height: 280px;
-  border: 2px solid #48bb78;
-  border-radius: 20px;
+  inset: 22% 28%;
 }
-
-.frame-corner {
+.ks-frame i {
   position: absolute;
-  width: 30px;
-  height: 30px;
-  border: 4px solid #48bb78;
+  width: 28px;
+  height: 28px;
+  border: 4px solid #fff;
 }
-
-.frame-corner.tl {
-  top: -2px;
-  left: -2px;
-  border-right: none;
-  border-bottom: none;
-  border-top-left-radius: 20px;
-}
-
-.frame-corner.tr {
-  top: -2px;
-  right: -2px;
-  border-left: none;
-  border-bottom: none;
-  border-top-right-radius: 20px;
-}
-
-.frame-corner.bl {
-  bottom: -2px;
-  left: -2px;
-  border-right: none;
-  border-top: none;
-  border-bottom-left-radius: 20px;
-}
-
-.frame-corner.br {
-  bottom: -2px;
-  right: -2px;
-  border-left: none;
-  border-top: none;
-  border-bottom-right-radius: 20px;
-}
-
-.scan-line {
+.ks-frame i:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; border-radius: 10px 0 0 0; }
+.ks-frame i:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; border-radius: 0 10px 0 0; }
+.ks-frame i:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 10px; }
+.ks-frame i:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; border-radius: 0 0 10px 0; }
+.ks-cover {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, #48bb78, transparent);
-  animation: scan 2s linear infinite;
-}
-
-@keyframes scan {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(280px);
-  }
-}
-
-.scan-instruction {
-  padding: 20px;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(11, 15, 20, 0.7);
+  color: #e6eaf0;
+  font-size: 13px;
   text-align: center;
-  background: #f7fafc;
-  font-size: 14px;
-  color: #718096;
-  font-weight: 500;
-  margin: 0;
 }
-
-/* Result Screen */
-.result-screen {
-  padding: 60px 40px;
+.ks-tip {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--v-muted);
   text-align: center;
-  animation: fadeIn 0.3s;
 }
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.result-icon {
-  margin-bottom: 24px;
-  display: inline-flex;
-  padding: 20px;
-  border-radius: 50%;
-}
-
-.result-screen.success .result-icon {
-  background: #c6f6d5;
-  color: #22543d;
-}
-
-.result-screen.error .result-icon {
-  background: #fed7e2;
-  color: #9b2c2c;
-}
-
-.result-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #1a202c;
-  margin: 0 0 32px 0;
-}
-
-.result-details {
-  margin-bottom: 32px;
-}
-
-.employee-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px;
-  background: #f7fafc;
-  border-radius: 12px;
-  margin-bottom: 20px;
-}
-
-.employee-avatar {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: #48bb78;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.employee-data {
-  flex: 1;
-  text-align: left;
-}
-
-.employee-data h3 {
-  font-size: 18px;
-  font-weight: 700;
-  color: #1a202c;
-  margin: 0 0 4px 0;
-}
-
-.employee-data p {
-  font-size: 14px;
-  color: #718096;
-  margin: 0;
-}
-
-.attendance-info {
+.ks-result {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 14px 20px;
-  background: #f7fafc;
-  border-radius: 10px;
+  gap: 10px;
+  padding: 18px 0;
+  text-align: center;
 }
-
-.info-row.highlight {
-  background: #c6f6d5;
-  border: 2px solid #48bb78;
-}
-
-.info-row .label {
-  font-size: 14px;
-  color: #718096;
-  font-weight: 500;
-}
-
-.info-row .value {
-  font-size: 16px;
-  color: #1a202c;
+.ks-result h3 {
+  margin: 0;
+  font-size: 19px;
   font-weight: 600;
 }
-
-.info-row .value.time {
-  font-size: 18px;
-  color: #48bb78;
+.ks-result p {
+  margin: 0;
+  max-width: 440px;
+  font-size: 13.5px;
+  color: var(--v-muted);
 }
-
-.info-row .value.hours {
-  color: #48bb78;
+.ks-result-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
 }
-
-.btn-scan-again {
-  width: 100%;
-  padding: 14px 32px;
-  background: #48bb78;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+.ks-result-icon :deep(svg) {
+  width: 30px;
+  height: 30px;
 }
-
-.btn-scan-again:hover {
-  background: #38a169;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(72, 187, 120, 0.35);
-}
-
-@media (max-width: 768px) {
-  .qr-scanner-page {
-    padding: 12px;
-  }
-
-  .scanner-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .scan-frame {
-    width: 220px;
-    height: 220px;
-  }
-
-  .result-screen {
-    padding: 40px 20px;
-  }
+.ks-result.ok .ks-result-icon { background: var(--v-green-soft); color: var(--v-green-text); }
+.ks-result.warn .ks-result-icon { background: var(--v-amber-soft); color: var(--v-amber-text); }
+.ks-result.error .ks-result-icon { background: var(--v-red-soft); color: var(--v-red-text); }
+.ks-reasons {
+  margin: 0;
+  padding: 10px 14px 10px 28px;
+  border-radius: 12px;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
+  font-size: 12.5px;
+  text-align: left;
 }
 </style>

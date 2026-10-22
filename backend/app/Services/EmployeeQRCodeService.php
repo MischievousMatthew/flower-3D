@@ -8,6 +8,68 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class EmployeeQRCodeService
 {
+    public const TYPE = 'employee_attendance';
+
+    /**
+     * The text inside an employee's QR code. It is signed with the app key, so a code
+     * can't be made by hand, and carries the QR version, so reissuing one retires old copies.
+     */
+    public function payload(EmployeeInfo $employee): string
+    {
+        $version = (int) ($employee->qr_version ?? 1);
+
+        return json_encode([
+            'owner_id' => $employee->owner_id,
+            'employee_id' => $employee->id,
+            'employee_code' => $employee->employee_id,
+            'type' => self::TYPE,
+            'v' => $version,
+            'sig' => $this->signature((int) $employee->owner_id, (int) $employee->id, $version),
+        ]);
+    }
+
+    public function signature(int $ownerId, int $employeeId, int $version): string
+    {
+        return substr(hash_hmac('sha256', "{$ownerId}|{$employeeId}|{$version}", (string) config('app.key')), 0, 32);
+    }
+
+    /**
+     * Check a scanned code for this shop.
+     *
+     * @return array{employee: EmployeeInfo, legacy: bool}|array{error: string}
+     */
+    public function verify(string $qrText, int $ownerId): array
+    {
+        $data = $this->decodeQRData($qrText);
+        if (! $data || ($data['type'] ?? null) !== self::TYPE) {
+            return ['error' => 'This isn\'t an attendance QR code.'];
+        }
+        if ((int) $data['owner_id'] !== $ownerId) {
+            return ['error' => 'This QR code is for another shop.'];
+        }
+
+        $employee = EmployeeInfo::forOwner($ownerId)->find((int) $data['employee_id']);
+        if (! $employee) {
+            return ['error' => 'No one at this shop has this QR code.'];
+        }
+
+        // Codes printed before signing still work for now, but each scan goes to review
+        if (! isset($data['sig'])) {
+            return ['employee' => $employee, 'legacy' => true];
+        }
+
+        $version = (int) ($data['v'] ?? 0);
+        $expected = $this->signature($ownerId, (int) $employee->id, $version);
+        if (! hash_equals($expected, (string) $data['sig'])) {
+            return ['error' => 'This QR code isn\'t genuine.'];
+        }
+        if ($version !== (int) ($employee->qr_version ?? 1)) {
+            return ['error' => 'This QR code was replaced. Use the newest one.'];
+        }
+
+        return ['employee' => $employee, 'legacy' => false];
+    }
+
     /**
      * Generate QR code for an employee
      *
@@ -17,12 +79,7 @@ class EmployeeQRCodeService
     public function generateQRCode(EmployeeInfo $employee): array
     {
         // Create QR data payload
-        $qrData = json_encode([
-            'owner_id' => $employee->owner_id,
-            'employee_id' => $employee->id,
-            'employee_code' => $employee->employee_id,
-            'type' => 'employee_attendance'
-        ]);
+        $qrData = $this->payload($employee);
 
         // Generate QR code
         $qrCode = QrCode::format('png')
@@ -60,12 +117,7 @@ class EmployeeQRCodeService
      */
     public function generateQRCodeSVG(EmployeeInfo $employee): string
     {
-        $qrData = json_encode([
-            'owner_id' => $employee->owner_id,
-            'employee_id' => $employee->id,
-            'employee_code' => $employee->employee_id,
-            'type' => 'employee_attendance'
-        ]);
+        $qrData = $this->payload($employee);
 
         return QrCode::format('svg')
             ->size(300)
@@ -81,12 +133,7 @@ class EmployeeQRCodeService
      */
     public function generateQRCodeBase64(EmployeeInfo $employee): string
     {
-        $qrData = json_encode([
-            'owner_id' => $employee->owner_id,
-            'employee_id' => $employee->id,
-            'employee_code' => $employee->employee_id,
-            'type' => 'employee_attendance'
-        ]);
+        $qrData = $this->payload($employee);
 
         $qrCode = QrCode::format('png')
             ->size(300)

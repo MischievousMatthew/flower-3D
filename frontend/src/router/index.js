@@ -320,10 +320,34 @@ const routes = [
         component: () => import("../views/vendor/staff/Attendance.vue"),
       },
       {
+        path: "staff/attendance/review",
+        name: "VendorStaffAttendanceReview",
+        meta: { subscriptionModule: MODULE.ATTENDANCE },
+        component: () => import("../views/vendor/staff/AttendanceReview.vue"),
+      },
+      {
+        path: "staff/attendance/devices",
+        name: "VendorStaffAttendanceDevices",
+        meta: { subscriptionModule: MODULE.ATTENDANCE },
+        component: () => import("../views/vendor/staff/AttendanceDevices.vue"),
+      },
+      {
         path: "staff/schedules",
         name: "VendorStaffSchedules",
         meta: { subscriptionModule: MODULE.STAFF },
         component: () => import("../views/vendor/staff/Schedules.vue"),
+      },
+      {
+        path: "staff/leave",
+        name: "VendorStaffLeave",
+        meta: { subscriptionModule: MODULE.LEAVE },
+        component: () => import("../views/vendor/staff/Leave.vue"),
+      },
+      {
+        path: "staff/planner",
+        name: "VendorStaffPlanner",
+        meta: { subscriptionModule: MODULE.STAFF },
+        component: () => import("../views/vendor/staff/ShiftPlanner.vue"),
       },
       {
         path: "staff/payroll",
@@ -693,7 +717,8 @@ const routes = [
           {
             path: "employees",
             name: "Employees",
-            meta: { subscriptionModule: MODULE.EMPLOYEES },
+            // erpTheme: these pages follow the ERP light/dark switch
+            meta: { subscriptionModule: MODULE.EMPLOYEES, erpTheme: true },
             children: [
               {
                 path: "directory",
@@ -710,14 +735,30 @@ const routes = [
             ],
           },
           {
+            path: "schedules",
+            name: "ShiftSchedules",
+            meta: { subscriptionModule: MODULE.STAFF, erpTheme: true },
+            component: () => import("../views/ERP/HR/Schedules/ShiftPlanner.vue"),
+          },
+          {
             path: "attendance",
             name: "Attendance",
-            meta: { subscriptionModule: MODULE.ATTENDANCE },
+            meta: { subscriptionModule: MODULE.ATTENDANCE, erpTheme: true },
             children: [
               {
                 path: "logs",
                 name: "AttendanceLogs",
                 component: () => import("../views/ERP/HR/Attendance/Logs.vue"),
+              },
+              {
+                path: "review",
+                name: "AttendanceReview",
+                component: () => import("../views/ERP/HR/Attendance/Review.vue"),
+              },
+              {
+                path: "reports",
+                name: "AttendanceReports",
+                component: () => import("../views/ERP/HR/Attendance/Reports.vue"),
               },
               {
                 path: "qrscanner",
@@ -730,7 +771,7 @@ const routes = [
           {
             path: "payroll",
             name: "Payroll",
-            meta: { subscriptionModule: MODULE.PAYROLL },
+            meta: { subscriptionModule: MODULE.PAYROLL, erpTheme: true },
             children: [
               {
                 path: "list",
@@ -749,7 +790,7 @@ const routes = [
           {
             path: "leave",
             name: "LeaveManagement",
-            meta: { subscriptionModule: MODULE.LEAVE },
+            meta: { subscriptionModule: MODULE.LEAVE, erpTheme: true },
             children: [
               {
                 path: "employee-request",

@@ -26,12 +26,44 @@ class EmployeeAttendance extends Model
         'total_hours',
         'status',
         'notes',
+        'review_status',
+        'review_reasons',
+        'reviewed_by',
+        'reviewed_at',
+        'review_note',
+        'time_in_evidence',
+        'time_out_evidence',
+        'source',
+        'overtime_minutes',
+        'overtime_status',
+        'overtime_approved_minutes',
+        'overtime_reviewed_by',
+        'overtime_reviewed_at',
+        'overtime_note',
     ];
 
+    // Evidence holds private Cloudinary ids; pages ask for short-lived links instead
+    protected $hidden = ['time_in_evidence', 'time_out_evidence'];
+
     protected $casts = [
-        'attendance_date' => 'date',
-        'total_hours'     => 'decimal:2',
+        'attendance_date'   => 'date',
+        'total_hours'       => 'decimal:2',
+        'review_reasons'    => 'array',
+        'reviewed_at'       => 'datetime',
+        'time_in_evidence'  => 'array',
+        'time_out_evidence' => 'array',
+        'overtime_minutes' => 'integer',
+        'overtime_approved_minutes' => 'integer',
+        'overtime_reviewed_at' => 'datetime',
     ];
+
+    /** Pending and rejected scans don't count for payroll until someone approves them. */
+    public function scopeCountable($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('review_status')->orWhere('review_status', 'approved');
+        });
+    }
 
     protected $appends = ['employee_name', 'formatted_date', 'formatted_time_in', 'formatted_time_out'];
 

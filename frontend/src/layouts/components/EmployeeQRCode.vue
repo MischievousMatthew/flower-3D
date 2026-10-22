@@ -13,7 +13,7 @@
           <img :src="qrCodeDataUrl" alt="QR Code" class="qr-image" />
         </div>
         <div v-else class="qr-loading">
-          <p>Generating QR code...</p>
+          <p>{{ qrError || "Loading the QR code…" }}</p>
         </div>
       </div>
 
@@ -61,13 +61,17 @@
       </button>
     </div>
 
+    <button v-if="canReissue" type="button" class="btn-reissue" :disabled="reissuing" @click="reissue">
+      {{ reissuing ? "Making a new code…" : confirmReissue ? "Yes, make a new code — old copies stop working" : "Lost or shared? Make a new code" }}
+    </button>
+
     <!-- Instructions -->
     <div class="qr-instructions">
       <h4>How to use:</h4>
       <ol>
-        <li>Open the Attendance Scanner</li>
-        <li>Scan this QR code with your camera</li>
-        <li>First scan = Clock In | Second scan = Clock Out</li>
+        <li>Open the attendance scanner on the shop's approved device</li>
+        <li>Hold this code up to its camera, then follow the face check</li>
+        <li>First scan = time in · second scan = time out</li>
       </ol>
     </div>
   </div>
@@ -76,6 +80,8 @@
 <script setup>
 import { ref, onMounted, watch, computed } from "vue";
 import QRCode from "qrcode";
+import { toast } from "vue3-toastify";
+import api from "../../plugins/axios";
 import { useAssignment } from "../../composables/useAssignment";
 
 const props = defineProps({
@@ -102,22 +108,16 @@ const permissionMessages = {
   print: "You don't have permission to print this information.",
 };
 
-// Generate QR code data
-const generateQRData = () => {
-  return JSON.stringify({
-    owner_id: props.owner_id,
-    employee_id: props.employee_id,
-    type: "employee_attendance",
-    timestamp: Date.now(),
-  });
-};
+const canReissue = computed(() => can("employees", "edit"));
+const qrError = ref("");
+const reissuing = ref(false);
+const confirmReissue = ref(false);
 
-// Render QR code as Data URL
-const renderQRCode = async () => {
+// The server signs the code, so it can't be made by hand
+const renderQRCode = async (signed = null) => {
+  qrError.value = "";
   try {
-    const qrData = generateQRData();
-
-    console.log("Generating QR Code with data:", qrData); // Debug
+    const qrData = signed ?? (await api.get(`/employees/${props.employee_id}/qr-code/payload`)).data.data.qr_data;
 
     const dataUrl = await QRCode.toDataURL(qrData, {
       width: 280,
@@ -130,9 +130,27 @@ const renderQRCode = async () => {
     });
 
     qrCodeDataUrl.value = dataUrl;
-    console.log("QR Code generated successfully"); // Debug
   } catch (error) {
-    console.error("Error generating QR code:", error);
+    qrError.value = error?.response?.data?.message || "Couldn't load the QR code.";
+  }
+};
+
+// A lost or shared code: make a new one; every older copy stops working
+const reissue = async () => {
+  if (!confirmReissue.value) {
+    confirmReissue.value = true;
+    return;
+  }
+  reissuing.value = true;
+  try {
+    const { data } = await api.post(`/employees/${props.employee_id}/qr-code/reissue`);
+    await renderQRCode(data.data.qr_data);
+    toast.success(data.message);
+  } catch (error) {
+    toast.error(error?.response?.data?.message || "Couldn't make a new code.");
+  } finally {
+    reissuing.value = false;
+    confirmReissue.value = false;
   }
 };
 
@@ -241,18 +259,11 @@ const printQR = () => {
 };
 
 // Lifecycle
-onMounted(() => {
-  console.log("EmployeeQRCode mounted with props:", props); // Debug
-  renderQRCode();
-});
+onMounted(() => renderQRCode());
 
-// Watch for prop changes
 watch(
   () => [props.employee_id, props.owner_id],
-  () => {
-    console.log("Props changed, regenerating QR code"); // Debug
-    renderQRCode();
-  },
+  () => renderQRCode(),
 );
 </script>
 
@@ -389,6 +400,28 @@ watch(
   border-color: #48bb78;
   color: #48bb78;
   background: #f0fff4;
+}
+
+.btn-reissue {
+  display: block;
+  width: 100%;
+  margin: -8px 0 20px;
+  padding: 9px 12px;
+  border: 1px dashed #cbd5e0;
+  border-radius: 10px;
+  background: none;
+  color: #4a5568;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.btn-reissue:hover:not(:disabled) {
+  border-color: #e53e3e;
+  color: #c53030;
+}
+.btn-reissue:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .qr-instructions {

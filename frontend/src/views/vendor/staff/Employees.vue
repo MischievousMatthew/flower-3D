@@ -1,7 +1,10 @@
 <template>
   <ShopLayout section="staff" title="Employees" subtitle="Who works with you, what each person can do in the ERP, and their HR details.">
     <template #actions>
-      <button v-if="data" type="button" class="sp-btn sp-btn-primary" :disabled="!canAdd" :title="canAdd ? '' : data.limit?.message" @click="openAccount()">
+      <button v-if="data && tab === 'profiles'" type="button" class="sp-btn sp-btn-primary" :disabled="!data.hr_available" :title="data.hr_available ? '' : 'Needs the Professional plan'" @click="openProfileForm()">
+        <span v-html="ICONS.plus"></span>Add HR profile
+      </button>
+      <button v-else-if="data" type="button" class="sp-btn sp-btn-primary" :disabled="!canAdd" :title="canAdd ? '' : data.limit?.message" @click="openAccount()">
         <span v-html="ICONS.plus"></span>Add employee
       </button>
     </template>
@@ -130,10 +133,11 @@
         <div v-else-if="!profiles.length" class="sp-empty">
           <span class="sp-empty-icon" v-html="ICONS.note"></span>
           <h3>{{ data.profiles.length ? "Nobody matches" : "No HR profiles yet" }}</h3>
-          <p>{{ data.profiles.length ? "Try another search." : "HR profiles hold job details, usual hours and pay. Your HR staff add them in the ERP under HR → Employees." }}</p>
+          <p>{{ data.profiles.length ? "Try another search." : "HR profiles hold contact details, emergency contacts, job details, documents and pay. Add them here, or your HR staff can add them in the ERP — both of you see the same profiles." }}</p>
+          <button v-if="!data.profiles.length && data.hr_available" type="button" class="sp-btn sp-btn-primary sp-btn-sm" @click="openProfileForm()"><span v-html="ICONS.plus"></span>Add HR profile</button>
         </div>
         <div v-else class="em-grid">
-          <button v-for="p in profiles" :key="p.id" type="button" class="em-profile" @click="profile = p">
+          <button v-for="p in profiles" :key="p.id" type="button" class="em-profile" @click="openProfile(p)">
             <div class="st-person">
               <span class="st-avatar" :style="{ background: personColor(p.name) }">
                 <img v-if="p.avatar" :src="p.avatar" alt="" />
@@ -159,6 +163,7 @@
                 <dd v-else class="muted">Not timed in</dd>
               </div>
             </dl>
+            <small class="em-by">Added by {{ p.added_by || "HR" }}</small>
           </button>
         </div>
       </template>
@@ -232,6 +237,10 @@
               </label>
             </div>
             <p v-if="form.id && form.status === 'Resign'" class="sp-banner warn em-note"><span v-html="ICONS.alert"></span>They'll be signed out and can't sign in again until you set them back to Active.</p>
+            <p v-if="form.id && !form.profile_id && data?.hr_available" class="sp-hint">
+              No HR profile yet, so HR can't see their contact details, emergency contact or documents.
+              <button type="button" class="st-link" @click="profileFromAccount">Create HR profile</button>
+            </p>
 
             <h4 class="st-section-title">Sign-in</h4>
             <div class="sp-grid-2">
@@ -264,7 +273,7 @@
 
     <!-- HR profile -->
     <Teleport to="body">
-      <Transition name="sp-fade"><div v-if="profile" class="sp-backdrop" @click="profile = null"></div></Transition>
+      <Transition name="sp-fade"><div v-if="profile" class="sp-backdrop" @click="closeProfile"></div></Transition>
       <Transition name="sp-slide">
         <aside v-if="profile" class="sp-drawer" role="dialog" aria-modal="true" aria-labelledby="pf-title">
           <div class="sp-drawer-head">
@@ -278,23 +287,54 @@
                 <p>{{ [...new Set([profile.position, profile.department].filter(Boolean))].join(" · ") || "No position set" }}</p>
               </div>
             </div>
-            <button type="button" class="sp-icon-btn" aria-label="Close" @click="profile = null"><span v-html="ICONS.close"></span></button>
+            <div class="em-head-actions">
+              <button v-if="data?.hr_available" type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="!full" @click="openProfileForm(full)"><span v-html="ICONS.edit"></span>Edit</button>
+              <button type="button" class="sp-icon-btn" aria-label="Close" @click="closeProfile"><span v-html="ICONS.close"></span></button>
+            </div>
           </div>
           <div class="sp-drawer-body">
+            <p class="em-by">{{ full?.employee_id ? `${full.employee_id} · ` : "" }}Added by {{ full?.added_by || profile.added_by || "HR" }}</p>
             <h4 class="st-section-title first">Work</h4>
             <dl class="st-dl">
               <dt>Status</dt><dd>{{ profile.employment_status || "Active" }}</dd>
               <dt>Type</dt><dd>{{ profile.employment_type || "—" }}</dd>
               <dt>Hired</dt><dd>{{ profile.date_hired ? formatDate(profile.date_hired) : "—" }}</dd>
+              <template v-if="full">
+                <dt>Location</dt><dd>{{ full.work_location || "—" }}</dd>
+                <dt>Reports to</dt><dd>{{ full.reporting_manager || "—" }}</dd>
+              </template>
               <dt>Usual hours</dt><dd>{{ profile.usual_hours ? range12(profile.usual_hours) : "Not set" }}</dd>
               <dt>Rest days</dt><dd>{{ profile.rest_days.length ? profile.rest_days.join(", ") : "None" }}</dd>
               <dt>Pay</dt><dd>{{ profile.salary ? `${money(profile.salary)} ${PER[profile.salary_type] ?? ""}` : "Not set" }}</dd>
             </dl>
-            <h4 class="st-section-title">Contact</h4>
-            <dl class="st-dl">
-              <dt>Email</dt><dd>{{ profile.email || "—" }}</dd>
-              <dt>Mobile</dt><dd>{{ profile.mobile || "—" }}</dd>
-            </dl>
+
+            <p v-if="fullError" class="sp-banner error em-note"><span v-html="ICONS.alert"></span>{{ fullError }}</p>
+            <div v-else-if="!full" class="em-sk-block">
+              <div v-for="n in 4" :key="n" class="bc-skeleton sp-sk-line" :class="n % 2 ? 'w70' : 'w50'"></div>
+            </div>
+            <template v-else>
+              <h4 class="st-section-title">Personal</h4>
+              <dl class="st-dl">
+                <dt>Gender</dt><dd>{{ full.gender || "—" }}</dd>
+                <dt>Birthday</dt><dd>{{ full.date_of_birth ? formatDate(full.date_of_birth.slice(0, 10)) : "—" }}</dd>
+                <dt>Civil status</dt><dd>{{ full.civil_status || "—" }}</dd>
+              </dl>
+              <h4 class="st-section-title">Contact</h4>
+              <dl class="st-dl">
+                <dt>Work email</dt><dd>{{ full.work_email || "—" }}</dd>
+                <dt>Personal email</dt><dd>{{ full.personal_email || "—" }}</dd>
+                <dt>Mobile</dt><dd>{{ full.mobile_number || "—" }}</dd>
+                <dt>Address</dt><dd>{{ full.address || "—" }}</dd>
+              </dl>
+              <h4 class="st-section-title">Emergency contact</h4>
+              <dl class="st-dl">
+                <dt>Name</dt><dd>{{ full.emergency_contact_name || "—" }}</dd>
+                <dt>Relationship</dt><dd>{{ full.emergency_relationship || "—" }}</dd>
+                <dt>Number</dt><dd>{{ full.emergency_contact_number || "—" }}</dd>
+              </dl>
+              <h4 class="st-section-title">Employment documents</h4>
+              <EmployeeDocuments :profile-id="full.id" :can-edit="!!data?.hr_available" />
+            </template>
             <h4 class="st-section-title">ERP access</h4>
             <p v-if="profile.account" class="em-access">
               Signs in as <b>{{ profile.account.name }}</b><template v-if="profile.account.role"> with the <b>{{ profile.account.role }}</b> role</template>.
@@ -310,6 +350,151 @@
         </aside>
       </Transition>
     </Teleport>
+
+    <!-- HR profile form -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="pform" class="sp-backdrop" @click="closeProfileForm"></div></Transition>
+      <Transition name="sp-slide">
+        <form v-if="pform" class="sp-drawer" role="dialog" aria-modal="true" aria-labelledby="pform-title" novalidate @submit.prevent="saveProfile">
+          <div class="sp-drawer-head">
+            <div>
+              <h3 id="pform-title">{{ pform.id ? `Edit ${pform.original}` : "Add an HR profile" }}</h3>
+              <p>Your HR staff see this profile in the ERP too, and anything they change shows here.</p>
+            </div>
+            <button type="button" class="sp-icon-btn" aria-label="Close" @click="closeProfileForm"><span v-html="ICONS.close"></span></button>
+          </div>
+
+          <div class="sp-drawer-body">
+            <h4 class="st-section-title first">Personal</h4>
+            <div class="sp-grid-2">
+              <label v-for="f in PERSONAL" :key="f.key" class="sp-field" :class="{ 'sp-span-all': f.wide }">
+                <span>{{ f.label }} <small v-if="f.optional">(optional)</small></span>
+                <select v-if="f.options" v-model="pform[f.key]" class="sp-select" :class="{ invalid: perrors[f.key] }">
+                  <option value="" disabled>Choose…</option>
+                  <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
+                </select>
+                <input v-else v-model="pform[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: perrors[f.key] }" :maxlength="f.max" :max="f.type === 'date' ? today : undefined" />
+                <small v-if="perrors[f.key]" class="sp-error">{{ perrors[f.key] }}</small>
+              </label>
+            </div>
+
+            <h4 class="st-section-title">Contact</h4>
+            <div class="sp-grid-2">
+              <label v-for="f in CONTACT" :key="f.key" class="sp-field" :class="{ 'sp-span-all': f.wide }">
+                <span>{{ f.label }}</span>
+                <input v-model="pform[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: perrors[f.key] }" :maxlength="f.max" :inputmode="f.type === 'tel' ? 'tel' : undefined" />
+                <small v-if="perrors[f.key]" class="sp-error">{{ perrors[f.key] }}</small>
+              </label>
+            </div>
+
+            <h4 class="st-section-title">Emergency contact</h4>
+            <div class="sp-grid-2">
+              <label v-for="f in EMERGENCY" :key="f.key" class="sp-field" :class="{ 'sp-span-all': f.wide }">
+                <span>{{ f.label }}</span>
+                <input v-model="pform[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: perrors[f.key] }" :maxlength="f.max" :placeholder="f.placeholder" />
+                <small v-if="perrors[f.key]" class="sp-error">{{ perrors[f.key] }}</small>
+              </label>
+            </div>
+
+            <h4 class="st-section-title">Job</h4>
+            <div class="sp-grid-2">
+              <label v-for="f in JOB" :key="f.key" class="sp-field">
+                <span>{{ f.label }}</span>
+                <select v-if="f.options" v-model="pform[f.key]" class="sp-select" :class="{ invalid: perrors[f.key] }">
+                  <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
+                </select>
+                <input v-else v-model="pform[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: perrors[f.key] }" :maxlength="f.max" :placeholder="f.placeholder" />
+                <small v-if="perrors[f.key]" class="sp-error">{{ perrors[f.key] }}</small>
+              </label>
+            </div>
+
+            <h4 class="st-section-title">Usual hours</h4>
+            <div class="sp-grid-2">
+              <label class="sp-field">
+                <span>Schedule</span>
+                <select v-model="pform.work_schedule" class="sp-select">
+                  <option value="Fixed">Fixed</option>
+                  <option value="Shifting">Shifting</option>
+                </select>
+              </label>
+              <div class="sp-field">
+                <span>Hours</span>
+                <div class="em-hours">
+                  <input v-model="pform.shift_start" type="time" class="sp-input" :class="{ invalid: perrors.shift_start }" aria-label="Starts" />
+                  <span>to</span>
+                  <input v-model="pform.shift_end" type="time" class="sp-input" :class="{ invalid: perrors.shift_end }" aria-label="Ends" />
+                </div>
+                <small v-if="perrors.shift_start || perrors.shift_end" class="sp-error">{{ perrors.shift_start || perrors.shift_end }}</small>
+              </div>
+              <div class="sp-field sp-span-all">
+                <span>Rest days</span>
+                <div class="em-days" role="group" aria-label="Rest days">
+                  <label v-for="d in DAYS" :key="d" class="em-day" :class="{ on: pform.rest_days.includes(d) }">
+                    <input v-model="pform.rest_days" type="checkbox" :value="d" />{{ d.slice(0, 3) }}
+                  </label>
+                </div>
+                <small v-if="perrors.rest_days" class="sp-error">{{ perrors.rest_days }}</small>
+              </div>
+            </div>
+
+            <h4 class="st-section-title">Pay <small>(optional)</small></h4>
+            <div class="sp-grid-2">
+              <label class="sp-field">
+                <span>Paid</span>
+                <select v-model="pform.salary_type" class="sp-select">
+                  <option value="">Not set</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </label>
+              <label class="sp-field">
+                <span>Basic salary</span>
+                <input v-model="pform.basic_salary" type="number" min="0" step="0.01" class="sp-input" :class="{ invalid: perrors.basic_salary }" :disabled="!pform.salary_type" />
+                <small v-if="perrors.basic_salary" class="sp-error">{{ perrors.basic_salary }}</small>
+              </label>
+              <label class="sp-field">
+                <span>Hours a day</span>
+                <input v-model="pform.standard_work_hours_per_day" type="number" min="1" max="24" step="0.5" class="sp-input" :class="{ invalid: perrors.standard_work_hours_per_day }" />
+              </label>
+              <label v-if="pform.salary_type === 'weekly'" class="sp-field">
+                <span>Days a week</span>
+                <input v-model="pform.working_days_per_week" type="number" min="1" max="7" class="sp-input" :class="{ invalid: perrors.working_days_per_week }" />
+              </label>
+              <label v-else class="sp-field">
+                <span>Days a month</span>
+                <input v-model="pform.working_days_per_month" type="number" min="1" max="31" class="sp-input" :class="{ invalid: perrors.working_days_per_month }" />
+              </label>
+              <label class="sp-field">
+                <span>Paid by</span>
+                <select v-model="pform.payment_method" class="sp-select">
+                  <option value="">Not set</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Bank">Bank</option>
+                </select>
+              </label>
+              <template v-if="pform.payment_method === 'Bank'">
+                <label class="sp-field">
+                  <span>Bank</span>
+                  <input v-model="pform.bank_name" class="sp-input" maxlength="150" />
+                </label>
+                <label class="sp-field">
+                  <span>Account number</span>
+                  <input v-model="pform.account_number" class="sp-input" maxlength="50" autocomplete="off" />
+                </label>
+              </template>
+            </div>
+            <p v-if="!pform.id" class="sp-hint">You can add documents (contracts, IDs) after you save.</p>
+            <p v-if="pformError" class="sp-error">{{ pformError }}</p>
+          </div>
+
+          <div class="sp-drawer-foot">
+            <button type="button" class="sp-btn sp-btn-ghost" @click="closeProfileForm">Cancel</button>
+            <button type="submit" class="sp-btn sp-btn-primary" :disabled="psaving">{{ psaving ? "Saving…" : pform.id ? "Save changes" : "Add profile" }}</button>
+          </div>
+        </form>
+      </Transition>
+    </Teleport>
   </ShopLayout>
 </template>
 
@@ -318,6 +503,8 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute } from "vue-router";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
+import employeeInfoService from "../../../services/employeeInfoService";
+import EmployeeDocuments from "../../../components/hr/EmployeeDocuments.vue";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
@@ -325,8 +512,9 @@ import { formatDate, money, ymd } from "../../../components/vendor/finance/finan
 import { STATUS_LABEL, STATUS_TONE, personColor, range12, relativeTime, time12 } from "../../../components/vendor/staff/staffUi";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
+import { CONTACT_FIELDS as CONTACT, DAYS, EMERGENCY_FIELDS as EMERGENCY, JOB_FIELDS as JOB, PER, PERSONAL_FIELDS as PERSONAL, PROFILE_KEYS, REQUIRED_FIELDS as REQUIRED, day10, hm5 } from "../../../components/hr/hrUi";
 
-const PER = { daily: "a day", weekly: "a week", monthly: "a month", hourly: "an hour" };
+const today = ymd(new Date());
 
 const route = useRoute();
 const data = ref(null);
@@ -343,6 +531,12 @@ const formError = ref("");
 const saving = ref(false);
 const showPass = ref(false);
 const profile = ref(null);
+const full = ref(null);
+const fullError = ref("");
+const pform = ref(null);
+const perrors = reactive({});
+const pformError = ref("");
+const psaving = ref(false);
 
 const canAdd = computed(() => !!data.value && (data.value.limit?.can_create ?? true));
 const counts = computed(() => ({
@@ -389,7 +583,7 @@ function openAccount(a = null) {
   formError.value = "";
   showPass.value = false;
   form.value = a
-    ? { id: a.id, original: a.name, username: a.username, name: a.name, title: a.title ?? "", email: a.email ?? "", phone: a.phone ?? "", address: a.address ?? "", joining_date: a.joining_date ?? ymd(new Date()), status: a.status, staff_role_id: a.role?.id ?? null, password: "" }
+    ? { id: a.id, original: a.name, username: a.username, profile_id: a.profile_id, name: a.name, title: a.title ?? "", email: a.email ?? "", phone: a.phone ?? "", address: a.address ?? "", joining_date: a.joining_date ?? ymd(new Date()), status: a.status, staff_role_id: a.role?.id ?? null, password: "" }
     : { id: null, username: "", name: "", title: "", email: "", phone: "", address: "", joining_date: ymd(new Date()), status: "Active", staff_role_id: roles.value.length === 1 ? roles.value[0].id : null, password: "" };
 }
 function closeAccount() {
@@ -436,6 +630,100 @@ async function saveAccount() {
     formError.value = Object.keys(fieldErrors).length ? "" : apiMessage(e, "Couldn't save.");
   } finally {
     saving.value = false;
+  }
+}
+
+// ── HR profiles (the same records HR edits in the ERP) ──
+
+async function openProfile(p) {
+  profile.value = p;
+  full.value = null;
+  fullError.value = "";
+  try {
+    const res = await employeeInfoService.getById(p.id);
+    if (profile.value?.id === p.id) full.value = res.data;
+  } catch (e) {
+    if (profile.value?.id === p.id) fullError.value = e?.message || "Couldn't load the rest of this profile.";
+  }
+}
+function closeProfile() {
+  profile.value = null;
+  full.value = null;
+}
+
+
+function openProfileForm(source = null, prefill = {}) {
+  Object.keys(perrors).forEach((k) => delete perrors[k]);
+  pformError.value = "";
+  const blank = Object.fromEntries(PROFILE_KEYS.map((k) => [k, ""]));
+  const f = { ...blank, employment_status: "Probationary", employment_type: "Full-time", work_schedule: "Fixed", shift_start: "08:00", shift_end: "17:00", rest_days: ["Sunday"], standard_work_hours_per_day: 8, working_days_per_week: 6, working_days_per_month: 26, date_hired: today, ...prefill };
+  if (source) {
+    for (const k of PROFILE_KEYS) f[k] = source[k] ?? "";
+    f.id = source.id;
+    f.original = source.full_name;
+    f.date_of_birth = day10(source.date_of_birth);
+    f.date_hired = day10(source.date_hired);
+    f.shift_start = hm5(source.shift_start);
+    f.shift_end = hm5(source.shift_end);
+    f.rest_days = String(source.rest_days ?? "").split(",").map((d) => d.trim()).filter((d) => DAYS.includes(d));
+  }
+  pform.value = f;
+}
+function closeProfileForm() {
+  if (!psaving.value) pform.value = null;
+}
+function profileFromAccount() {
+  const f = form.value;
+  const parts = f.name.trim().split(/\s+/);
+  const last = parts.length > 1 ? parts.pop() : "";
+  form.value = null;
+  openProfileForm(null, { first_name: parts.join(" "), last_name: last, work_email: f.email, mobile_number: f.phone, address: f.address, position: f.title, date_hired: f.joining_date });
+}
+
+function validateProfile() {
+  Object.keys(perrors).forEach((k) => delete perrors[k]);
+  const f = pform.value;
+  for (const k of REQUIRED) if (!String(f[k] ?? "").trim()) perrors[k] = "Required.";
+  for (const k of ["work_email", "personal_email"]) if (f[k] && !/^\S+@\S+\.\S+$/.test(f[k].trim())) perrors[k] = "Enter a valid email.";
+  if (f.date_of_birth && f.date_of_birth >= today) perrors.date_of_birth = "Pick a day in the past.";
+  if (f.shift_start && f.shift_end && f.shift_end <= f.shift_start) perrors.shift_end = "End after it starts.";
+  if (f.salary_type && !f.basic_salary) perrors.basic_salary = "Enter the salary.";
+  return !Object.keys(perrors).length;
+}
+
+async function saveProfile() {
+  if (psaving.value) return;
+  if (!validateProfile()) {
+    pformError.value = "Fill in the highlighted fields.";
+    return;
+  }
+  psaving.value = true;
+  pformError.value = "";
+  const f = pform.value;
+  const body = {};
+  for (const k of PROFILE_KEYS) {
+    const v = typeof f[k] === "string" ? f[k].trim() : f[k];
+    body[k] = v === "" ? null : v;
+  }
+  body.rest_days = DAYS.filter((d) => f.rest_days.includes(d)).join(", ") || "None";
+  if (!body.salary_type) body.basic_salary = null;
+  if (body.payment_method !== "Bank") {
+    body.bank_name = null;
+    body.account_number = null;
+  }
+  try {
+    const res = f.id ? await employeeInfoService.update(f.id, body) : await employeeInfoService.create(body);
+    toast.success(f.id ? "Profile saved." : "Profile added. HR can see it in the ERP.");
+    pform.value = null;
+    await load();
+    const saved = data.value?.profiles.find((p) => p.id === (res.data?.id ?? f.id));
+    if (saved) openProfile(saved);
+  } catch (e) {
+    const fieldErrors = e?.errors ?? {};
+    for (const [key, list] of Object.entries(fieldErrors)) perrors[key] = [].concat(list)[0];
+    pformError.value = Object.keys(fieldErrors).length ? "Fix the highlighted fields." : e?.message || "Couldn't save.";
+  } finally {
+    psaving.value = false;
   }
 }
 
@@ -614,6 +902,73 @@ button.em-profile:hover {
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
+}
+.em-by {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--v-faint);
+}
+.sp-drawer-body > .em-by {
+  margin-bottom: 14px;
+}
+.em-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.em-sk-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 22px;
+}
+.em-hours {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.em-hours .sp-input {
+  flex: 1;
+  min-width: 0;
+}
+.em-hours > span {
+  font-size: 12.5px;
+  color: var(--v-muted);
+}
+.em-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.em-day {
+  position: relative;
+  padding: 7px 12px;
+  border: 1px solid var(--v-border-strong);
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--v-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.em-day.on {
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
+  color: var(--v-text);
+}
+.em-day input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.em-day:has(input:focus-visible) {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 30%, transparent);
+}
+.st-section-title small {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
 }
 .em-access {
   margin: 0;

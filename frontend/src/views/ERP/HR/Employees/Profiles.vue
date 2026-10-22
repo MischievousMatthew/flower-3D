@@ -1,2751 +1,1008 @@
 <template>
-  <div class="employee-profiles">
-    
+  <HrPage title="Employee profiles" subtitle="Contact details, job, emergency contacts, pay and documents. The shop owner sees and edits the same profiles in the vendor portal." :tabs="EMPLOYEE_TABS">
+    <template #actions>
+      <button type="button" class="sp-btn sp-btn-primary" :disabled="!canCreate" :title="canCreate ? '' : NO_PERMISSION.create" @click="openForm()">
+        <span v-html="ICONS.plus"></span>Add profile
+      </button>
+    </template>
 
-    <div class="profiles-content">
-      <!-- Header -->
-      <div class="page-header">
-        <h1 class="page-title">Employee Profiles</h1>
+    <p v-if="readOnly" class="sp-banner warn pf-note"><span v-html="ICONS.lock"></span>You can look at profiles, but your role can't add, edit or remove them.</p>
 
-        <div class="header-actions">
-          <div class="search-box">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <circle cx="11" cy="11" r="8"></circle>
-              <path d="m21 21-4.35-4.35"></path>
-            </svg>
-            <input
-              type="text"
-              placeholder="Search"
-              v-model="searchQuery"
-              @input="debouncedSearch"
-            />
-          </div>
-
-          <button class="filter-btn" @click="toggleFilter('location')">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"
-              />
-            </svg>
-            Location
-          </button>
-
-          <button class="filter-btn" @click="toggleFilter('department')">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"
-              />
-            </svg>
-            Department
-          </button>
-
-          <button class="filter-btn" @click="toggleFilter('status')">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"
-              />
-            </svg>
-            Status
-          </button>
-
-          <button
-            class="add-employee-btn"
-            @click="openAddModal"
-            :disabled="!canCreateEmployees"
-            :title="canCreateEmployees ? '' : permissionMessages.create"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-          </button>
-        </div>
-        <p v-if="isEmployeeReadOnly" class="permission-banner">
-          Read-only mode. You can review employee records, but cannot create, edit, or delete profiles.
-        </p>
-      </div>
-
-      <!-- Loading Overlay -->
-      <LoadingOverlay :visible="isLoading" :message="loadingMessage" />
-
-      <!-- Employee Table -->
-      <div class="table-container">
-        <table class="employee-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Location</th>
-              <th>Department</th>
-              <th>Position</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="employee in employees"
-              :key="employee.id"
-              @click="selectEmployee(employee)"
-              :class="{ selected: selectedEmployee?.id === employee.id }"
-            >
-              <td class="name-cell">
-                <img
-                  :src="
-                    employee.avatar_url || 'https://i.pravatar.cc/150?img=1'
-                  "
-                  :alt="employee.full_name"
-                  class="avatar"
-                  @error="handleImageError"
-                />
-                <span>{{ employee.full_name }}</span>
-              </td>
-              <td>{{ employee.work_location }}</td>
-              <td>{{ employee.department }}</td>
-              <td>{{ employee.position }}</td>
-              <td>
-                <span
-                  class="status-badge"
-                  :class="employee.employment_status.toLowerCase()"
-                >
-                  {{ employee.employment_status }}
-                </span>
-              </td>
-              <td class="action-cell" @click.stop>
-                <button
-                  class="action-btn"
-                  @click="toggleMenu(employee.id)"
-                  :disabled="!canManageEmployee"
-                  :title="canManageEmployee ? 'Open actions' : permissionMessages.edit"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <circle cx="12" cy="5" r="2"></circle>
-                    <circle cx="12" cy="12" r="2"></circle>
-                    <circle cx="12" cy="19" r="2"></circle>
-                  </svg>
-                </button>
-                <div v-if="openMenuId === employee.id" class="dropdown-menu">
-                  <button @click="selectEmployee(employee)">
-                    View Details
-                  </button>
-                  <button :disabled="!canEditEmployees" :title="canEditEmployees ? '' : permissionMessages.edit" @click="openEditModal(employee)">Edit</button>
-                  <button :disabled="!canEditEmployees" :title="canEditEmployees ? '' : permissionMessages.edit" @click="updateEmployeeStatus(employee, 'Regular')">
-                    Mark as Regular
-                  </button>
-                  <button
-                    :disabled="!canEditEmployees"
-                    @click="updateEmployeeStatus(employee, 'Probationary')"
-                  >
-                    Mark as Probationary
-                  </button>
-                  <button class="delete-btn" :disabled="!canDeleteEmployees" :title="canDeleteEmployees ? '' : permissionMessages.delete" @click="deleteEmployee(employee)">
-                    Delete
-                  </button>
-                </div>
-              </td>
-            </tr>
-            <tr v-if="employees.length === 0">
-              <td colspan="6" class="no-data">
-                <div class="no-data-message">
-                  <p>No employees found</p>
-                  <button @click="openAddModal" class="btn-add-first" :disabled="!canCreateEmployees" :title="canCreateEmployees ? '' : permissionMessages.create">
-                    Add First Employee
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <!-- Pagination -->
-        <div class="pagination" v-if="pagination.last_page > 1">
-          <button
-            class="page-btn"
-            :disabled="pagination.current_page === 1"
-            @click="goToPage(pagination.current_page - 1)"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <polyline points="15 18 9 12 15 6"></polyline>
-            </svg>
-          </button>
-          <span class="page-info">
-            Showing {{ pagination.from }}-{{ pagination.to }} of
-            {{ pagination.total }}
-          </span>
-          <button
-            class="page-btn"
-            :disabled="pagination.current_page === pagination.last_page"
-            @click="goToPage(pagination.current_page + 1)"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Right Sidebar -->
-    <transition name="slide">
-      <div v-if="selectedEmployee" class="employee-sidebar">
-        <button class="close-sidebar" @click="selectedEmployee = null">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
+    <!-- Summary -->
+    <section class="sp-stats" aria-label="Summary">
+      <template v-if="!stats">
+        <div v-for="n in 4" :key="n" class="sp-stat"><div class="bc-skeleton sp-stat-icon"></div><div class="grow"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div></div>
+      </template>
+      <template v-else>
+        <button v-for="s in statTiles" :key="s.label" type="button" class="sp-stat" :class="{ on: filters.status === s.status }" @click="setStatus(s.status)">
+          <span class="sp-stat-icon" :class="`tone-${s.tone}`" v-html="ICONS[s.icon]"></span>
+          <div><strong>{{ s.count }}</strong><span>{{ s.label }}</span></div>
         </button>
+      </template>
+    </section>
 
-        <div class="sidebar-content">
-          <div class="employee-profile">
-            <img
-              :src="
-                selectedEmployee.avatar_url || 'https://i.pravatar.cc/150?img=1'
-              "
-              :alt="selectedEmployee.full_name"
-              class="profile-avatar"
-              @error="handleImageError"
-            />
-            <h2>{{ selectedEmployee.full_name }}</h2>
-            <p class="employee-id">{{ selectedEmployee.employee_id }}</p>
-            <span
-              class="status-badge large"
-              :class="selectedEmployee.employment_status.toLowerCase()"
-            >
-              {{ selectedEmployee.employment_status }}
-            </span>
-          </div>
-
-          <div class="contact-actions">
-            <button
-              class="contact-btn"
-              @click="sendEmail(selectedEmployee.work_email)"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <rect x="3" y="5" width="18" height="14" rx="2"></rect>
-                <path d="m3 7 9 6 9-6"></path>
-              </svg>
-              <span>Email</span>
-            </button>
-            <button
-              class="contact-btn"
-              @click="callNumber(selectedEmployee.mobile_number)"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"
-                ></path>
-              </svg>
-              <span>Call</span>
-            </button>
-            <button class="contact-btn">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-                ></path>
-              </svg>
-              <span>Message</span>
-            </button>
-          </div>
-
-          <div class="tabs">
-            <button
-              :class="{ active: activeTab === 'basic' }"
-              @click="activeTab = 'basic'"
-            >
-              Basic Info
-            </button>
-            <button
-              :class="{ active: activeTab === 'employment' }"
-              @click="activeTab = 'employment'"
-            >
-              Employment
-            </button>
-            <button
-              :class="{ active: activeTab === 'payroll' }"
-              @click="activeTab = 'payroll'"
-            >
-              Payroll
-            </button>
-            <button
-              :class="{ active: activeTab === 'qrcode' }"
-              @click="activeTab = 'qrcode'"
-            >
-              QR Code
-            </button>
-          </div>
-
-          <!-- Basic Information Tab -->
-          <div v-if="activeTab === 'basic'" class="tab-content">
-            <div class="info-section">
-              <h3>Personal Information</h3>
-              <div class="info-row">
-                <span class="label">Full Name</span>
-                <span class="value">{{ selectedEmployee.full_name }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Gender</span>
-                <span class="value">{{ selectedEmployee.gender }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Date of Birth</span>
-                <span class="value">{{
-                  formatDate(selectedEmployee.date_of_birth)
-                }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Civil Status</span>
-                <span class="value">{{ selectedEmployee.civil_status }}</span>
-              </div>
-            </div>
-
-            <div class="info-section">
-              <h3>Contact Information</h3>
-              <div class="info-row">
-                <span class="label">Personal Email</span>
-                <span class="value">{{ selectedEmployee.personal_email }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Work Email</span>
-                <span class="value">{{ selectedEmployee.work_email }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Mobile Number</span>
-                <span class="value">{{ selectedEmployee.mobile_number }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Address</span>
-                <span class="value">{{ selectedEmployee.address }}</span>
-              </div>
-            </div>
-
-            <div class="info-section">
-              <h3>Emergency Contact</h3>
-              <div class="info-row">
-                <span class="label">Contact Name</span>
-                <span class="value">{{
-                  selectedEmployee.emergency_contact_name
-                }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Contact Number</span>
-                <span class="value">{{
-                  selectedEmployee.emergency_contact_number
-                }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Relationship</span>
-                <span class="value">{{
-                  selectedEmployee.emergency_relationship
-                }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Employment Tab -->
-          <div v-if="activeTab === 'employment'" class="tab-content">
-            <div class="info-section">
-              <h3>Employment Details</h3>
-              <div class="info-row">
-                <span class="label">Employee ID</span>
-                <span class="value">{{ selectedEmployee.employee_id }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Employment Status</span>
-                <span class="value">{{
-                  selectedEmployee.employment_status
-                }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Position</span>
-                <span class="value">{{ selectedEmployee.position }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Department</span>
-                <span class="value">{{ selectedEmployee.department }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Employment Type</span>
-                <span class="value">{{
-                  selectedEmployee.employment_type
-                }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Date Hired</span>
-                <span class="value">{{
-                  formatDate(selectedEmployee.date_hired)
-                }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Work Location</span>
-                <span class="value">{{ selectedEmployee.work_location }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Reporting Manager</span>
-                <span class="value">{{
-                  selectedEmployee.reporting_manager
-                }}</span>
-              </div>
-            </div>
-
-            <div class="info-section">
-              <h3>Work Schedule</h3>
-              <div class="info-row">
-                <span class="label">Work Schedule</span>
-                <span class="value">{{ selectedEmployee.work_schedule }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Shift Time</span>
-                <span class="value">
-                  {{ selectedEmployee.shift_start }} -
-                  {{ selectedEmployee.shift_end }}
-                </span>
-              </div>
-              <div class="info-row">
-                <span class="label">Rest Days</span>
-                <span class="value">{{ selectedEmployee.rest_days }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Payroll Tab -->
-          <div v-if="activeTab === 'payroll'" class="tab-content">
-            <div class="info-section">
-              <h3>Payroll Information</h3>
-              <div class="info-row">
-                <span class="label">Basic Salary</span>
-                <span class="value">
-                  {{
-                    selectedEmployee.basic_salary
-                      ? `₱${Number(selectedEmployee.basic_salary).toLocaleString()}`
-                      : "N/A"
-                  }}
-                </span>
-              </div>
-              <div class="info-row">
-                <span class="label">Salary Type</span>
-                <span class="value">{{
-                  selectedEmployee.salary_type || "N/A"
-                }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Payment Method</span>
-                <span class="value">{{
-                  selectedEmployee.payment_method || "N/A"
-                }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Bank Name</span>
-                <span class="value">{{
-                  selectedEmployee.bank_name || "N/A"
-                }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Account Number</span>
-                <span class="value">{{
-                  selectedEmployee.account_number || "N/A"
-                }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">Tax Status</span>
-                <span class="value">{{
-                  selectedEmployee.tax_status || "N/A"
-                }}</span>
-              </div>
-              <div class="info-row" v-if="selectedEmployee.allowance">
-                <span class="label">Allowance</span>
-                <span class="value"
-                  >₱{{
-                    Number(selectedEmployee.allowance).toLocaleString()
-                  }}</span
-                >
-              </div>
-            </div>
-          </div>
-          <!-- QR Code Tab -->
-          <div v-if="activeTab === 'qrcode'" class="tab-content qr-tab">
-            <EmployeeQRCode
-              v-if="selectedEmployee"
-              :employee_id="selectedEmployee.id"
-              :owner_id="selectedEmployee.owner_id"
-              :employee_name="selectedEmployee.full_name"
-            />
-          </div>
+    <section class="sp-card">
+      <div class="sp-toolbar pf-toolbar">
+        <label class="sp-search">
+          <span v-html="ICONS.search"></span>
+          <input v-model="search" class="sp-input" type="search" placeholder="Name, ID, email or mobile" aria-label="Search profiles" />
+        </label>
+        <div class="pf-filters">
+          <select v-model="filters.department" class="sp-select" aria-label="Department">
+            <option value="">All departments</option>
+            <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
+          </select>
+          <select v-model="filters.location" class="sp-select" aria-label="Work location">
+            <option value="">All locations</option>
+            <option v-for="l in locations" :key="l" :value="l">{{ l }}</option>
+          </select>
+          <select v-model="filters.status" class="sp-select" aria-label="Status">
+            <option value="">Every status</option>
+            <option v-for="s in EMPLOYMENT_STATUSES" :key="s" :value="s">{{ s }}</option>
+          </select>
         </div>
       </div>
-    </transition>
 
-    <!-- Add/Edit Employee Modal -->
-    <div class="modal-overlay" v-if="showModal" @click="closeModal">
-      <div class="modal" @click.stop>
-        <div class="modal-header">
-          <h2>{{ isEditMode ? "Edit Employee" : "Add New Employee" }}</h2>
-          <button class="close-btn" @click="closeModal">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
+      <p v-if="loadError" class="sp-banner error"><span v-html="ICONS.alert"></span>{{ loadError }}<button type="button" @click="load(page.current_page)">Try again</button></p>
+
+      <ul v-else-if="employees === null" class="pf-sk">
+        <li v-for="n in 6" :key="n"><div class="bc-skeleton st-avatar"></div><div class="grow"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div></li>
+      </ul>
+
+      <div v-else-if="!employees.length" class="sp-empty">
+        <span class="sp-empty-icon" v-html="ICONS.users"></span>
+        <h3>{{ filtered ? "Nobody matches" : "No profiles yet" }}</h3>
+        <p>{{ filtered ? "Try another search or filter." : "Add the people who work at the shop. The shop owner sees them in the vendor portal too." }}</p>
+        <button v-if="!filtered && canCreate" type="button" class="sp-btn sp-btn-primary sp-btn-sm" @click="openForm()"><span v-html="ICONS.plus"></span>Add profile</button>
+      </div>
+
+      <template v-else>
+        <div class="st-scroll">
+          <table class="st-table cards">
+            <colgroup>
+              <col style="width: 30%" />
+              <col style="width: 24%" />
+              <col style="width: 15%" />
+              <col style="width: 13%" />
+              <col style="width: 12%" />
+              <col style="width: 6%" />
+            </colgroup>
+            <thead>
+              <tr><th>Person</th><th>Job</th><th>Location</th><th>Status</th><th>Hired</th><th><span class="pf-sr">Actions</span></th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="e in employees" :key="e.id" class="clickable" @click="openDetails(e)">
+                <td>
+                  <div class="st-person">
+                    <span class="st-avatar" :style="{ background: personColor(e.full_name) }">
+                      <img v-if="e.avatar_url" :src="e.avatar_url" alt="" />
+                      <template v-else>{{ initialsOf(e.full_name) }}</template>
+                    </span>
+                    <div>
+                      <strong>{{ e.full_name }}</strong>
+                      <small>{{ e.employee_id }} · added by {{ e.added_by || "HR" }}</small>
+                    </div>
+                  </div>
+                </td>
+                <td data-label="Job">
+                  <span class="pf-two"><b>{{ e.position || "—" }}</b><small>{{ e.department }}</small></span>
+                </td>
+                <td data-label="Location">{{ e.work_location || "—" }}</td>
+                <td data-label="Status"><span class="sp-chip" :class="statusTone(e.employment_status)">{{ e.employment_status }}</span></td>
+                <td data-label="Hired">{{ e.date_hired ? formatDate(day10(e.date_hired)) : "—" }}</td>
+                <td class="num" @click.stop>
+                  <div class="pf-menu-wrap">
+                    <button type="button" class="sp-icon-btn" :aria-label="`More for ${e.full_name}`" :aria-expanded="menuId === e.id" @click="menuId = menuId === e.id ? null : e.id"><span v-html="ICONS.more"></span></button>
+                    <div v-if="menuId === e.id" class="pf-menu" role="menu">
+                      <button type="button" role="menuitem" @click="openDetails(e)"><span v-html="ICONS.eye"></span>View</button>
+                      <button type="button" role="menuitem" :disabled="!canEdit" :title="canEdit ? '' : NO_PERMISSION.edit" @click="openForm(e)"><span v-html="ICONS.edit"></span>Edit</button>
+                      <button v-for="s in quickStatuses(e)" :key="s" type="button" role="menuitem" :disabled="!canEdit" @click="setEmploymentStatus(e, s)"><span v-html="ICONS.check"></span>Mark as {{ s }}</button>
+                      <button type="button" role="menuitem" class="danger" :disabled="!canDelete" :title="canDelete ? '' : NO_PERMISSION.delete" @click="askDelete(e)"><span v-html="ICONS.trash"></span>Delete</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
-        <form @submit.prevent="saveEmployee" class="modal-body">
-          <p v-if="isEmployeeReadOnly" class="permission-banner">
-            Read-only mode. Form fields are disabled because you only have view access to Employees.
-          </p>
-          <fieldset :disabled="isEditMode ? !canEditEmployees : !canCreateEmployees" class="permission-fieldset">
-          <!-- Profile Picture -->
-          <div class="form-section">
-            <h3 class="section-title">Profile Photo</h3>
-            <div class="image-upload">
-              <div class="image-preview">
-                <img
-                  v-if="formData.avatarPreview"
-                  :src="formData.avatarPreview"
-                  alt="Preview"
-                />
-                <div v-else class="placeholder">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="40"
-                    height="40"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="12" cy="7" r="4"></circle>
-                  </svg>
+        <footer v-if="page.last_page > 1" class="pf-pages">
+          <span>{{ page.from }}–{{ page.to }} of {{ page.total }}</span>
+          <div>
+            <button type="button" class="sp-icon-btn" aria-label="Previous page" :disabled="page.current_page === 1" @click="load(page.current_page - 1)"><span v-html="ICONS.chevronLeft"></span></button>
+            <button type="button" class="sp-icon-btn" aria-label="Next page" :disabled="page.current_page === page.last_page" @click="load(page.current_page + 1)"><span v-html="ICONS.chevronRight"></span></button>
+          </div>
+        </footer>
+      </template>
+    </section>
+
+    <!-- Profile details -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="selected" class="sp-backdrop" @click="selected = null"></div></Transition>
+      <Transition name="sp-slide">
+        <aside v-if="selected" class="sp-drawer" role="dialog" aria-modal="true" aria-labelledby="pf-title">
+          <div class="sp-drawer-head">
+            <div class="st-person">
+              <span class="st-avatar pf-avatar-lg" :style="{ background: personColor(selected.full_name) }">
+                <img v-if="selected.avatar_url" :src="selected.avatar_url" alt="" />
+                <template v-else>{{ initialsOf(selected.full_name) }}</template>
+              </span>
+              <div>
+                <h3 id="pf-title">{{ selected.full_name }}</h3>
+                <p>{{ [selected.position, selected.department].filter(Boolean).join(" · ") }}</p>
+                <div class="pf-tags">
+                  <span class="sp-chip" :class="statusTone(selected.employment_status)">{{ selected.employment_status }}</span>
+                  <span class="sp-chip slate">{{ selected.employee_id }}</span>
                 </div>
               </div>
-              <div class="upload-actions">
-                <input
-                  type="file"
-                  ref="fileInput"
-                  @change="handleFileUpload"
-                  accept="image/*"
-                  style="display: none"
-                />
-                <button
-                  type="button"
-                  @click="$refs.fileInput.click()"
-                  class="upload-btn"
-                >
-                  Choose File
-                </button>
-              </div>
+            </div>
+            <div class="pf-head-actions">
+              <button v-if="canEdit" type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="openForm(selected)"><span v-html="ICONS.edit"></span>Edit</button>
+              <button type="button" class="sp-icon-btn" aria-label="Close" @click="selected = null"><span v-html="ICONS.close"></span></button>
             </div>
           </div>
 
-          <!-- Basic Information -->
-          <div class="form-section">
-            <h3 class="section-title">Basic Information</h3>
-            <div class="form-row">
-              <div class="form-group">
-                <label>First Name *</label>
-                <input
-                  type="text"
-                  v-model="formData.first_name"
-                  placeholder="Enter first name"
-                  required
-                />
-                <span v-if="validationErrors.first_name" class="error-message">
-                  {{ validationErrors.first_name[0] }}
-                </span>
-              </div>
-              <div class="form-group">
-                <label>Middle Name</label>
-                <input
-                  type="text"
-                  v-model="formData.middle_name"
-                  placeholder="Enter middle name"
-                />
-              </div>
+          <div class="sp-drawer-body">
+            <div class="pf-quick">
+              <a v-if="selected.work_email" class="sp-btn sp-btn-ghost sp-btn-sm" :href="`mailto:${selected.work_email}`"><span v-html="ICONS.send"></span>Email</a>
+              <a v-if="selected.mobile_number" class="sp-btn sp-btn-ghost sp-btn-sm" :href="`tel:${selected.mobile_number}`"><span v-html="ICONS.phone"></span>Call</a>
+              <span class="pf-by">Added by {{ selected.added_by || "HR" }}</span>
             </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Last Name *</label>
-                <input
-                  type="text"
-                  v-model="formData.last_name"
-                  placeholder="Enter last name"
-                  required
-                />
-                <span v-if="validationErrors.last_name" class="error-message">
-                  {{ validationErrors.last_name[0] }}
-                </span>
-              </div>
-              <div class="form-group">
-                <label>Gender *</label>
-                <select v-model="formData.gender" required>
-                  <option value="">Select gender</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
+
+            <div class="sp-seg pf-seg" role="tablist" aria-label="Profile sections">
+              <button v-for="t in DETAIL_TABS" :key="t.key" type="button" role="tab" :class="{ on: detailTab === t.key }" :aria-selected="detailTab === t.key" @click="detailTab = t.key">{{ t.label }}</button>
             </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Date of Birth *</label>
-                <input type="date" v-model="formData.date_of_birth" required />
-              </div>
-              <div class="form-group">
-                <label>Civil Status *</label>
-                <select v-model="formData.civil_status" required>
-                  <option value="">Select status</option>
-                  <option value="Single">Single</option>
-                  <option value="Married">Married</option>
-                  <option value="Divorced">Divorced</option>
-                  <option value="Widowed">Widowed</option>
-                </select>
-              </div>
+
+            <template v-if="detailTab === 'profile'">
+              <h4 class="st-section-title">Personal</h4>
+              <dl class="st-dl">
+                <dt>Full name</dt><dd>{{ selected.full_name }}</dd>
+                <dt>Gender</dt><dd>{{ selected.gender || "—" }}</dd>
+                <dt>Birthday</dt><dd>{{ selected.date_of_birth ? formatDate(day10(selected.date_of_birth)) : "—" }}</dd>
+                <dt>Civil status</dt><dd>{{ selected.civil_status || "—" }}</dd>
+              </dl>
+              <h4 class="st-section-title">Contact</h4>
+              <dl class="st-dl">
+                <dt>Work email</dt><dd>{{ selected.work_email || "—" }}</dd>
+                <dt>Personal email</dt><dd>{{ selected.personal_email || "—" }}</dd>
+                <dt>Mobile</dt><dd>{{ selected.mobile_number || "—" }}</dd>
+                <dt>Address</dt><dd>{{ selected.address || "—" }}</dd>
+              </dl>
+              <h4 class="st-section-title">Emergency contact</h4>
+              <dl class="st-dl">
+                <dt>Name</dt><dd>{{ selected.emergency_contact_name || "—" }}</dd>
+                <dt>Relationship</dt><dd>{{ selected.emergency_relationship || "—" }}</dd>
+                <dt>Number</dt><dd>{{ selected.emergency_contact_number || "—" }}</dd>
+              </dl>
+            </template>
+
+            <template v-else-if="detailTab === 'job'">
+              <h4 class="st-section-title">Employment</h4>
+              <dl class="st-dl">
+                <dt>Employee ID</dt><dd>{{ selected.employee_id }}</dd>
+                <dt>Status</dt><dd>{{ selected.employment_status }}</dd>
+                <dt>Type</dt><dd>{{ selected.employment_type || "—" }}</dd>
+                <dt>Hired</dt><dd>{{ selected.date_hired ? formatDate(day10(selected.date_hired)) : "—" }}</dd>
+                <dt>Location</dt><dd>{{ selected.work_location || "—" }}</dd>
+                <dt>Reports to</dt><dd>{{ selected.reporting_manager || "—" }}</dd>
+              </dl>
+              <h4 class="st-section-title">Usual hours</h4>
+              <dl class="st-dl">
+                <dt>Schedule</dt><dd>{{ selected.work_schedule || "—" }}</dd>
+                <dt>Hours</dt><dd>{{ selected.shift_start ? `${time12(hm5(selected.shift_start))} – ${time12(hm5(selected.shift_end))}` : "—" }}</dd>
+                <dt>Rest days</dt><dd>{{ selected.rest_days || "None" }}</dd>
+              </dl>
+              <template v-if="canSeePay">
+              <h4 class="st-section-title">Pay</h4>
+              <dl class="st-dl">
+                <dt>Basic salary</dt><dd>{{ selected.basic_salary ? `${money(selected.basic_salary)} ${PER[selected.salary_type] ?? ""}` : "Not set" }}</dd>
+                <dt>Hourly rate</dt><dd>{{ hourlyRate(selected) ? `${money(hourlyRate(selected))} an hour` : "—" }}</dd>
+                <dt>Paid by</dt><dd>{{ selected.payment_method || "—" }}<template v-if="selected.payment_method === 'Bank' && selected.bank_name"> · {{ selected.bank_name }}</template></dd>
+                <dt>Account number</dt><dd>{{ selected.account_number ? masked(selected.account_number) : "—" }}</dd>
+                <dt>Tax status</dt><dd>{{ selected.tax_status || "—" }}</dd>
+                <dt>Allowance</dt><dd>{{ selected.allowance ? money(selected.allowance) : "—" }}</dd>
+              </dl>
+              </template>
+            </template>
+
+            <template v-else-if="detailTab === 'documents'">
+              <h4 class="st-section-title">Employment documents</h4>
+              <EmployeeDocuments :profile-id="selected.id" :can-edit="canEdit" />
+            </template>
+
+            <div v-else class="pf-qr">
+              <EmployeeQRCode :employee_id="selected.id" :owner_id="selected.owner_id" :employee_name="selected.full_name" />
             </div>
           </div>
+        </aside>
+      </Transition>
+    </Teleport>
 
-          <!-- Contact Information -->
-          <div class="form-section">
-            <h3 class="section-title">Contact Information</h3>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Personal Email *</label>
-                <input
-                  type="email"
-                  v-model="formData.personal_email"
-                  placeholder="personal@email.com"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label>Work Email *</label>
-                <input
-                  type="email"
-                  v-model="formData.work_email"
-                  placeholder="work@company.com"
-                  required
-                />
-              </div>
+    <!-- Add / edit -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="form" class="sp-backdrop" @click="closeForm"></div></Transition>
+      <Transition name="sp-slide">
+        <form v-if="form" class="sp-drawer" role="dialog" aria-modal="true" aria-labelledby="pf-form-title" novalidate @submit.prevent="save">
+          <div class="sp-drawer-head">
+            <div>
+              <h3 id="pf-form-title">{{ form.id ? `Edit ${form.original}` : "Add a profile" }}</h3>
+              <p>The shop owner sees this profile in the vendor portal too.</p>
             </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Mobile Number *</label>
-                <input
-                  type="tel"
-                  v-model="formData.mobile_number"
-                  placeholder="+63 XXX XXX XXXX"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label>Address *</label>
-                <input
-                  type="text"
-                  v-model="formData.address"
-                  placeholder="Complete address"
-                  required
-                />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Emergency Contact Name *</label>
-                <input
-                  type="text"
-                  v-model="formData.emergency_contact_name"
-                  placeholder="Contact person"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label>Emergency Contact Number *</label>
-                <input
-                  type="tel"
-                  v-model="formData.emergency_contact_number"
-                  placeholder="+63 XXX XXX XXXX"
-                  required
-                />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Relationship *</label>
-                <input
-                  type="text"
-                  v-model="formData.emergency_relationship"
-                  placeholder="e.g., Spouse, Parent"
-                  required
-                />
-              </div>
-            </div>
+            <button type="button" class="sp-icon-btn" aria-label="Close" @click="closeForm"><span v-html="ICONS.close"></span></button>
           </div>
 
-          <!-- Employment Details -->
-          <div class="form-section">
-            <h3 class="section-title">Employment Details</h3>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Employment Status *</label>
-                <select v-model="formData.employment_status" required>
-                  <option value="">Select status</option>
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                  <option value="Probationary">Probationary</option>
-                  <option value="Regular">Regular</option>
-                  <option value="Contractual">Contractual</option>
-                  <option value="Part-time">Part-time</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Position *</label>
-                <input
-                  type="text"
-                  v-model="formData.position"
-                  placeholder="Job title"
-                  required
-                />
-              </div>
+          <fieldset class="sp-drawer-body pf-fieldset" :disabled="form.id ? !canEdit : !canCreate">
+            <h4 class="st-section-title first">Photo</h4>
+            <div class="pf-photo">
+              <span class="st-avatar pf-avatar-lg" :style="{ background: personColor(`${form.first_name} ${form.last_name}`) }">
+                <img v-if="form.avatarPreview" :src="form.avatarPreview" alt="" />
+                <template v-else>{{ initialsOf(`${form.first_name} ${form.last_name}`) || "?" }}</template>
+              </span>
+              <label class="sp-btn sp-btn-ghost sp-btn-sm pf-upload">
+                <span v-html="ICONS.upload"></span>{{ form.avatarPreview ? "Change photo" : "Upload photo" }}
+                <input type="file" accept="image/*" @change="pickPhoto" />
+              </label>
+              <small class="sp-hint">Up to 5 MB.</small>
             </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Department *</label>
-                <input
-                  type="text"
-                  v-model="formData.department"
-                  placeholder="e.g., IT, HR"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label>Employment Type *</label>
-                <select v-model="formData.employment_type" required>
-                  <option value="">Select type</option>
-                  <option value="Full-time">Full-time</option>
-                  <option value="Part-time">Part-time</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Date Hired *</label>
-                <input type="date" v-model="formData.date_hired" required />
-              </div>
-              <div class="form-group">
-                <label>Work Location *</label>
-                <input
-                  type="text"
-                  v-model="formData.work_location"
-                  placeholder="Office/Branch"
-                  required
-                />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Reporting Manager *</label>
-                <input
-                  type="text"
-                  v-model="formData.reporting_manager"
-                  placeholder="Manager name"
-                  required
-                />
-              </div>
-            </div>
-          </div>
 
-          <!-- Attendance & Work Setup -->
-          <div class="form-section">
-            <h3 class="section-title">Attendance & Work Setup</h3>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Work Schedule *</label>
-                <select v-model="formData.work_schedule" required>
-                  <option value="">Select schedule</option>
+            <h4 class="st-section-title">Personal</h4>
+            <div class="sp-grid-2">
+              <label v-for="f in PERSONAL_FIELDS" :key="f.key" class="sp-field">
+                <span class="sp-label">{{ f.label }} <small v-if="f.optional">(optional)</small></span>
+                <select v-if="f.options" v-model="form[f.key]" class="sp-select" :class="{ invalid: errors[f.key] }">
+                  <option value="" disabled>Choose…</option>
+                  <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
+                </select>
+                <input v-else v-model="form[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: errors[f.key] }" :maxlength="f.max" :max="f.type === 'date' ? today : undefined" />
+                <small v-if="errors[f.key]" class="sp-error">{{ errors[f.key] }}</small>
+              </label>
+            </div>
+
+            <h4 class="st-section-title">Contact</h4>
+            <div class="sp-grid-2">
+              <label v-for="f in CONTACT_FIELDS" :key="f.key" class="sp-field" :class="{ 'sp-span-all': f.wide }">
+                <span class="sp-label">{{ f.label }}</span>
+                <input v-model="form[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: errors[f.key] }" :maxlength="f.max" :inputmode="f.type === 'tel' ? 'tel' : undefined" />
+                <small v-if="errors[f.key]" class="sp-error">{{ errors[f.key] }}</small>
+              </label>
+            </div>
+
+            <h4 class="st-section-title">Emergency contact</h4>
+            <div class="sp-grid-2">
+              <label v-for="f in EMERGENCY_FIELDS" :key="f.key" class="sp-field">
+                <span class="sp-label">{{ f.label }}</span>
+                <input v-model="form[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: errors[f.key] }" :maxlength="f.max" :placeholder="f.placeholder" />
+                <small v-if="errors[f.key]" class="sp-error">{{ errors[f.key] }}</small>
+              </label>
+            </div>
+
+            <h4 class="st-section-title">Job</h4>
+            <div class="sp-grid-2">
+              <label v-for="f in JOB_FIELDS" :key="f.key" class="sp-field">
+                <span class="sp-label">{{ f.label }}</span>
+                <select v-if="f.options" v-model="form[f.key]" class="sp-select" :class="{ invalid: errors[f.key] }">
+                  <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
+                </select>
+                <input v-else v-model="form[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: errors[f.key] }" :maxlength="f.max" :placeholder="f.placeholder" />
+                <small v-if="errors[f.key]" class="sp-error">{{ errors[f.key] }}</small>
+              </label>
+            </div>
+
+            <h4 class="st-section-title">Usual hours</h4>
+            <div class="sp-grid-2">
+              <label class="sp-field">
+                <span class="sp-label">Schedule</span>
+                <select v-model="form.work_schedule" class="sp-select">
                   <option value="Fixed">Fixed</option>
                   <option value="Shifting">Shifting</option>
                 </select>
-              </div>
-              <div class="form-group">
-                <label>Standard Work Hours/Day *</label>
-                <input
-                  type="number"
-                  v-model.number="formData.standard_work_hours_per_day"
-                  placeholder="8.00"
-                  step="0.01"
-                  min="0.01"
-                  max="24"
-                  required
-                />
-              </div>
-            </div>
-
-            <!-- NEW: Multiple Rest Days Selection -->
-            <div class="form-group-full">
-              <label>Rest Days *</label>
-              <div class="rest-days-selector">
-                <div class="selected-days">
-                  <div
-                    v-for="(day, index) in formData.rest_days_array"
-                    :key="index"
-                    class="day-chip"
-                  >
-                    {{ day }}
-                    <button
-                      type="button"
-                      @click="removeRestDay(index)"
-                      class="remove-day"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                      >
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                      </svg>
-                    </button>
-                  </div>
-                  <button
-                    v-if="formData.rest_days_array.length < 7"
-                    type="button"
-                    @click="showDayPicker = true"
-                    class="add-day-btn"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <line x1="12" y1="5" x2="12" y2="19"></line>
-                      <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                    Add Day
-                  </button>
+              </label>
+              <div class="sp-field">
+                <span class="sp-label">Hours</span>
+                <div class="pf-hours">
+                  <input v-model="form.shift_start" type="time" class="sp-input" :class="{ invalid: errors.shift_start }" aria-label="Starts" />
+                  <span>to</span>
+                  <input v-model="form.shift_end" type="time" class="sp-input" :class="{ invalid: errors.shift_end }" aria-label="Ends" />
                 </div>
-
-                <!-- Day Picker Dropdown -->
-                <div v-if="showDayPicker" class="day-picker-dropdown">
-                  <button
-                    v-for="day in availableRestDays"
-                    :key="day"
-                    type="button"
-                    @click="addRestDay(day)"
-                    class="day-option"
-                  >
-                    {{ day }}
-                  </button>
+                <small v-if="errors.shift_start || errors.shift_end" class="sp-error">{{ errors.shift_start || errors.shift_end }}</small>
+              </div>
+              <div class="sp-field sp-span-all">
+                <span class="sp-label">Rest days</span>
+                <div class="pf-days" role="group" aria-label="Rest days">
+                  <label v-for="d in DAYS" :key="d" class="pf-day" :class="{ on: form.rest_days.includes(d) }">
+                    <input v-model="form.rest_days" type="checkbox" :value="d" />{{ d.slice(0, 3) }}
+                  </label>
                 </div>
               </div>
-              <span class="field-hint"
-                >Select one or more rest days (e.g., Saturday, Sunday)</span
-              >
             </div>
 
-            <div class="form-row">
-              <div class="form-group">
-                <label>Shift Start Time *</label>
-                <input type="time" v-model="formData.shift_start" required />
-              </div>
-              <div class="form-group">
-                <label>Shift End Time *</label>
-                <input type="time" v-model="formData.shift_end" required />
-              </div>
-            </div>
-          </div>
-
-          <!-- Payroll Information -->
-          <div class="form-section">
-            <h3 class="section-title">Payroll Configuration</h3>
-
-            <div class="info-alert">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="16" x2="12" y2="12"></line>
-                <line x1="12" y1="8" x2="12.01" y2="8"></line>
-              </svg>
-              <div>
-                <strong>Required for Payroll Generation</strong>
-                <p>
-                  Configure these fields to enable automatic payroll calculation
-                  for this employee.
-                </p>
-              </div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label>Basic Salary *</label>
-                <input
-                  type="number"
-                  v-model="formData.basic_salary"
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0"
-                  required
-                />
-                <span class="field-hint">Base salary amount per period</span>
-                <span
-                  v-if="validationErrors.basic_salary"
-                  class="error-message"
-                >
-                  {{ validationErrors.basic_salary[0] }}
-                </span>
-              </div>
-
-              <div class="form-group">
-                <label>Salary Type *</label>
-                <select v-model="formData.salary_type" required>
-                  <option value="">Select type</option>
+            <template v-if="canEditPay">
+            <h4 class="st-section-title">Pay</h4>
+            <p class="sp-hint pf-hint">Payroll uses these to work out pay. Leave them blank if you're not running payroll for this person yet.</p>
+            <div class="sp-grid-2">
+              <label class="sp-field">
+                <span class="sp-label">Paid</span>
+                <select v-model="form.salary_type" class="sp-select" :class="{ invalid: errors.salary_type }">
+                  <option value="">Not set</option>
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
                   <option value="monthly">Monthly</option>
                 </select>
-                <span class="field-hint">How often the employee is paid</span>
-                <span v-if="validationErrors.salary_type" class="error-message">
-                  {{ validationErrors.salary_type[0] }}
-                </span>
-              </div>
+              </label>
+              <label class="sp-field">
+                <span class="sp-label">Basic salary</span>
+                <input v-model="form.basic_salary" type="number" min="0" step="0.01" class="sp-input" :class="{ invalid: errors.basic_salary }" :disabled="!form.salary_type" />
+                <small v-if="errors.basic_salary" class="sp-error">{{ errors.basic_salary }}</small>
+              </label>
+              <label class="sp-field">
+                <span class="sp-label">Hours a day</span>
+                <input v-model="form.standard_work_hours_per_day" type="number" min="1" max="24" step="0.5" class="sp-input" :class="{ invalid: errors.standard_work_hours_per_day }" />
+                <small v-if="errors.standard_work_hours_per_day" class="sp-error">{{ errors.standard_work_hours_per_day }}</small>
+              </label>
+              <label v-if="form.salary_type === 'weekly'" class="sp-field">
+                <span class="sp-label">Days a week</span>
+                <input v-model="form.working_days_per_week" type="number" min="1" max="7" class="sp-input" :class="{ invalid: errors.working_days_per_week }" />
+                <small v-if="errors.working_days_per_week" class="sp-error">{{ errors.working_days_per_week }}</small>
+              </label>
+              <label v-else class="sp-field">
+                <span class="sp-label">Days a month</span>
+                <input v-model="form.working_days_per_month" type="number" min="1" max="31" class="sp-input" :class="{ invalid: errors.working_days_per_month }" />
+                <small v-if="errors.working_days_per_month" class="sp-error">{{ errors.working_days_per_month }}</small>
+              </label>
+              <label class="sp-field">
+                <span class="sp-label">Paid by</span>
+                <select v-model="form.payment_method" class="sp-select">
+                  <option value="">Not set</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Bank">Bank</option>
+                </select>
+              </label>
+              <template v-if="form.payment_method === 'Bank'">
+                <label class="sp-field">
+                  <span class="sp-label">Bank</span>
+                  <input v-model="form.bank_name" class="sp-input" maxlength="150" />
+                </label>
+                <label class="sp-field">
+                  <span class="sp-label">Account number</span>
+                  <input v-model="form.account_number" class="sp-input" maxlength="50" autocomplete="off" />
+                </label>
+              </template>
+              <label class="sp-field">
+                <span class="sp-label">Tax status <small>(optional)</small></span>
+                <input v-model="form.tax_status" class="sp-input" maxlength="20" placeholder="e.g. S, ME1" />
+              </label>
+              <label class="sp-field">
+                <span class="sp-label">Allowance <small>(optional)</small></span>
+                <input v-model="form.allowance" type="number" min="0" step="0.01" class="sp-input" />
+              </label>
             </div>
-
-            <!-- Conditional: Working Days per Week (for weekly salary) -->
-            <div v-if="formData.salary_type === 'weekly'" class="form-row">
-              <div class="form-group">
-                <label>Working Days per Week *</label>
-                <input
-                  type="number"
-                  v-model.number="formData.working_days_per_week"
-                  placeholder="5"
-                  min="1"
-                  max="7"
-                  required
-                />
-                <span class="field-hint"
-                  >Number of working days in a week (e.g., 5 for Mon-Fri)</span
-                >
-                <span
-                  v-if="validationErrors.working_days_per_week"
-                  class="error-message"
-                >
-                  {{ validationErrors.working_days_per_week[0] }}
-                </span>
-              </div>
+            <div v-if="hourlyRate(form)" class="pf-rate">
+              <span v-html="ICONS.wallet"></span>
+              <div><strong>{{ money(hourlyRate(form)) }} an hour</strong><small>Worked out from the salary, hours a day and working days.</small></div>
             </div>
+            </template>
 
-            <!-- Conditional: Working Days per Month (for monthly salary) -->
-            <div v-if="formData.salary_type === 'monthly'" class="form-row">
-              <div class="form-group">
-                <label>Working Days per Month *</label>
-                <input
-                  type="number"
-                  v-model.number="formData.working_days_per_month"
-                  placeholder="22"
-                  min="1"
-                  max="31"
-                  required
-                />
-                <span class="field-hint"
-                  >Average working days per month (typically 22)</span
-                >
-                <span
-                  v-if="validationErrors.working_days_per_month"
-                  class="error-message"
-                >
-                  {{ validationErrors.working_days_per_month[0] }}
-                </span>
-              </div>
-            </div>
-
-            <!-- Salary Calculation Preview -->
-            <div
-              v-if="
-                formData.basic_salary &&
-                formData.salary_type &&
-                formData.standard_work_hours_per_day
-              "
-              class="salary-preview"
-            >
-              <div class="preview-header">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <line x1="12" y1="1" x2="12" y2="23"></line>
-                  <path
-                    d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
-                  ></path>
-                </svg>
-                <span>Hourly Rate Preview</span>
-              </div>
-              <div class="preview-value">₱{{ calculateHourlyRate() }}/hour</div>
-              <div class="preview-note">
-                This is automatically calculated based on salary type and work
-                hours.
-              </div>
-            </div>
-          </div>
-
-          <div class="modal-footer">
-            <button type="button" class="btn-cancel" @click="closeModal">
-              Cancel
-            </button>
-            <button type="submit" class="btn-submit" :disabled="(isEditMode ? !canEditEmployees : !canCreateEmployees) || isSaving">
-              {{
-                isSaving
-                  ? "Saving..."
-                  : isEditMode
-                    ? "Update Employee"
-                    : "Add Employee"
-              }}
-            </button>
-          </div>
+            <p v-if="!form.id" class="sp-hint pf-hint">You can add documents (contracts, IDs) after you save.</p>
+            <p v-if="formError" class="sp-error">{{ formError }}</p>
           </fieldset>
+
+          <div class="sp-drawer-foot">
+            <button type="button" class="sp-btn sp-btn-ghost" @click="closeForm">Cancel</button>
+            <button type="submit" class="sp-btn sp-btn-primary" :disabled="saving || (form.id ? !canEdit : !canCreate)">{{ saving ? "Saving…" : form.id ? "Save changes" : "Add profile" }}</button>
+          </div>
         </form>
-      </div>
-    </div>
-  </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Delete -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="deleting" class="sp-backdrop" @click="deleting = null"></div></Transition>
+      <Transition name="sp-pop">
+        <div v-if="deleting" class="sp-modal-wrap">
+          <div class="sp-modal" role="alertdialog" aria-modal="true" aria-labelledby="pf-del-title">
+            <div class="sp-modal-head">
+              <div>
+                <h3 id="pf-del-title">Delete {{ deleting.full_name }}?</h3>
+                <p>Their profile, documents and QR code stop working here and in the vendor portal. Past attendance and payroll stay.</p>
+              </div>
+            </div>
+            <div class="sp-modal-foot">
+              <button type="button" class="sp-btn sp-btn-ghost" @click="deleting = null">Cancel</button>
+              <button type="button" class="sp-btn sp-btn-danger" :disabled="busy" @click="confirmDelete">{{ busy ? "Deleting…" : "Delete" }}</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+  </HrPage>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { toast } from "vue3-toastify";
-
-import LoadingOverlay from "../../../../layouts/components/LoadingOverlay.vue";
+import HrPage from "../../../../components/hr/HrPage.vue";
+import EmployeeDocuments from "../../../../components/hr/EmployeeDocuments.vue";
 import EmployeeQRCode from "../../../../layouts/components/EmployeeQRCode.vue";
 import employeeInfoService from "../../../../services/employeeInfoService";
 import { useAssignment } from "../../../../composables/useAssignment";
+import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcons";
+import { formatDate, money, ymd } from "../../../../components/vendor/finance/financeUi";
+import { personColor, time12 } from "../../../../components/vendor/staff/staffUi";
+import { buildMultipartFormData, getSelectedFile, readImagePreview, validateImageFile } from "../../../../utils/imageUpload";
 import {
-  buildMultipartFormData,
-  clearFileInput,
-  getSelectedFile,
-  readImagePreview,
-  validateImageFile,
-} from "../../../../utils/imageUpload";
+  CONTACT_FIELDS, DAYS, EMERGENCY_FIELDS, EMPLOYEE_TABS, EMPLOYMENT_STATUSES, JOB_FIELDS, PER, PERSONAL_FIELDS, PROFILE_KEYS,
+  REQUIRED_FIELDS, day10, hm5, hourlyRate, initialsOf, restDaysList, statusTone,
+} from "../../../../components/hr/hrUi";
 
-// State
-const searchQuery = ref("");
-const { can } = useAssignment();
-const selectedEmployee = ref(null);
-const activeTab = ref("basic");
-const showModal = ref(false);
-const isEditMode = ref(false);
-const openMenuId = ref(null);
-const isLoading = ref(false);
-const loadingMessage = ref("Loading employees...");
-const isSaving = ref(false);
-const employees = ref([]);
-const validationErrors = ref({});
-const showDayPicker = ref(false);
-const canCreateEmployees = computed(() => can("employees", "create"));
-const canEditEmployees = computed(() => can("employees", "edit"));
-const canDeleteEmployees = computed(() => can("employees", "delete"));
-const canViewEmployees = computed(() => can("employees", "view"));
-const canManageEmployee = computed(() => canEditEmployees.value || canDeleteEmployees.value);
-const isEmployeeReadOnly = computed(() => canViewEmployees.value && !canCreateEmployees.value && !canEditEmployees.value && !canDeleteEmployees.value);
-const permissionMessages = { create: "You don't have permission to create new records.", edit: "You don't have permission to edit this information.", delete: "You don't have permission to delete this record." };
-
-const allWeekDays = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
+const NO_PERMISSION = {
+  create: "Your role can't add profiles.",
+  edit: "Your role can't edit profiles.",
+  delete: "Your role can't delete profiles.",
+};
+const DETAIL_TABS = [
+  { key: "profile", label: "Profile" },
+  { key: "job", label: "Job & pay" },
+  { key: "documents", label: "Documents" },
+  { key: "qr", label: "QR code" },
 ];
+const today = ymd(new Date());
 
-const pagination = ref({
-  total: 0,
-  per_page: 15,
-  current_page: 1,
-  last_page: 1,
-  from: 0,
-  to: 0,
+const route = useRoute();
+const { can } = useAssignment();
+const canCreate = computed(() => can("employees", "create"));
+const canEdit = computed(() => can("employees", "edit"));
+const canDelete = computed(() => can("employees", "delete"));
+const readOnly = computed(() => can("employees", "view") && !canCreate.value && !canEdit.value && !canDelete.value);
+// Salary and bank details are only for payroll and finance staff (the server hides them too)
+const canSeePay = computed(() => can("payroll", "view") || can("payroll_requests", "view"));
+const canEditPay = computed(() => can("payroll", "create"));
+
+const employees = ref(null);
+const loadError = ref("");
+const page = ref({ current_page: 1, last_page: 1, total: 0, from: 0, to: 0 });
+const stats = ref(null);
+const search = ref("");
+const filters = reactive({ status: "", department: "", location: "" });
+const menuId = ref(null);
+const selected = ref(null);
+const detailTab = ref("profile");
+const form = ref(null);
+const errors = reactive({});
+const formError = ref("");
+const saving = ref(false);
+const deleting = ref(null);
+const busy = ref(false);
+
+const filtered = computed(() => !!(search.value.trim() || filters.status || filters.department || filters.location));
+const departments = computed(() => (stats.value?.by_department ?? []).map((d) => d.department).filter(Boolean));
+const locations = computed(() => (stats.value?.by_location ?? []).map((l) => l.work_location).filter(Boolean));
+const statTiles = computed(() => {
+  const s = stats.value?.by_status ?? {};
+  return [
+    { label: "Everyone", status: "", count: stats.value?.total_employees ?? 0, tone: "blue", icon: "users" },
+    { label: "Regular", status: "Regular", count: s.regular ?? 0, tone: "green", icon: "check" },
+    { label: "Probationary", status: "Probationary", count: s.probationary ?? 0, tone: "amber", icon: "clock" },
+    { label: "Contractual", status: "Contractual", count: s.contractual ?? 0, tone: "violet", icon: "note" },
+  ];
 });
 
-// Form
-const formData = ref({
-  first_name: "",
-  middle_name: "",
-  last_name: "",
-  gender: "",
-  date_of_birth: "",
-  civil_status: "",
-  avatar: null,
-  avatarPreview: "",
-  personal_email: "",
-  work_email: "",
-  mobile_number: "",
-  address: "",
-  emergency_contact_name: "",
-  emergency_contact_number: "",
-  emergency_relationship: "",
-  employment_status: "",
-  position: "",
-  department: "",
-  employment_type: "",
-  date_hired: "",
-  work_location: "",
-  reporting_manager: "",
-  work_schedule: "",
-  rest_days: "",
-  rest_days_array: [],
-  shift_start: "",
-  shift_end: "",
-  rest_days: "",
-  basic_salary: null,
-  salary_type: "",
-  payment_method: "",
-  bank_name: "",
-  account_number: "",
-  tax_status: "",
-  allowance: null,
-});
+const masked = (n) => (String(n).length > 4 ? `•••• ${String(n).slice(-4)}` : n);
+const quickStatuses = (e) => ["Regular", "Probationary"].filter((s) => s !== e.employment_status);
 
-const availableRestDays = computed(() => {
-  return allWeekDays.filter(
-    (day) => !formData.value.rest_days_array.includes(day),
-  );
-});
-
-// Calculate hourly rate preview
-function calculateHourlyRate() {
-  const salary = parseFloat(formData.value.basic_salary) || 0;
-  const hoursPerDay =
-    parseFloat(formData.value.standard_work_hours_per_day) || 8;
-  const salaryType = formData.value.salary_type;
-
-  if (!salary || !salaryType || !hoursPerDay) {
-    return "0.00";
-  }
-
-  let hourlyRate = 0;
-
-  switch (salaryType) {
-    case "daily":
-      hourlyRate = salary / hoursPerDay;
-      break;
-    case "weekly":
-      const daysPerWeek = parseFloat(formData.value.working_days_per_week) || 5;
-      hourlyRate = salary / (hoursPerDay * daysPerWeek);
-      break;
-    case "monthly":
-      const daysPerMonth =
-        parseFloat(formData.value.working_days_per_month) || 22;
-      hourlyRate = salary / (hoursPerDay * daysPerMonth);
-      break;
-  }
-
-  return hourlyRate.toFixed(2);
-}
-
-onMounted(async () => {
-  const route = useRoute();
-  const editId = route.query.id || route.query.edit;
-
-  await loadEmployees();
-
-  if (editId) {
-    await openRequestedEmployeeForEdit(editId);
-  }
-});
-
-async function openRequestedEmployeeForEdit(editId) {
-  const employeeToEdit = employees.value.find(
-    (employee) => employee.id == editId || employee.employee_id == editId,
-  );
-
-  if (employeeToEdit) {
-    openEditModal(employeeToEdit);
-    return;
-  }
-
+async function load(p = 1) {
+  loadError.value = "";
+  employees.value = null;
   try {
-    const response = await employeeInfoService.getById(editId);
-    const requestedEmployee = response?.data;
-
-    if (response?.success && requestedEmployee) {
-      openEditModal(requestedEmployee);
-    }
-  } catch (error) {
-    console.error("Error loading requested employee for edit:", error);
+    const res = await employeeInfoService.getAll({
+      page: p,
+      per_page: 15,
+      search: search.value.trim() || undefined,
+      status: filters.status || undefined,
+      department: filters.department || undefined,
+      location: filters.location || undefined,
+    });
+    employees.value = res.data ?? [];
+    page.value = res.pagination ?? page.value;
+  } catch (e) {
+    employees.value = [];
+    loadError.value = e?.message || "Couldn't load the profiles.";
   }
 }
 
-// Load employees
-async function loadEmployees(page = 1) {
+async function loadStats() {
   try {
-    isLoading.value = true;
-    loadingMessage.value = "Loading employees...";
+    const res = await employeeInfoService.getStatistics();
+    stats.value = res.data;
+  } catch (_) {
+    stats.value = { total_employees: 0, by_status: {}, by_department: [], by_location: [] };
+  }
+}
 
-    const params = {
-      page,
-      per_page: pagination.value.per_page,
-      search: searchQuery.value,
-    };
+function setStatus(status) {
+  filters.status = filters.status === status ? "" : status;
+}
 
-    const response = await employeeInfoService.getAll(params);
+let searchTimer;
+watch(search, () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => load(1), 350);
+});
+watch(filters, () => load(1));
 
-    if (response.success) {
-      employees.value = response.data;
-      pagination.value = response.pagination;
-    }
-  } catch (error) {
-    toast.error(error.message || "Failed to load employees");
-    console.error("Error loading employees:", error);
+function openDetails(e) {
+  menuId.value = null;
+  detailTab.value = "profile";
+  selected.value = e;
+}
+
+async function setEmploymentStatus(e, status) {
+  menuId.value = null;
+  try {
+    await employeeInfoService.updateStatus(e.id, status);
+    e.employment_status = status;
+    toast.success(`${e.full_name} is now ${status}.`);
+    loadStats();
+  } catch (err) {
+    toast.error(err?.message || "Couldn't change the status.");
+  }
+}
+
+function askDelete(e) {
+  menuId.value = null;
+  deleting.value = e;
+}
+
+async function confirmDelete() {
+  if (busy.value) return;
+  busy.value = true;
+  const e = deleting.value;
+  try {
+    await employeeInfoService.delete(e.id);
+    toast.success(`${e.full_name} was deleted.`);
+    if (selected.value?.id === e.id) selected.value = null;
+    deleting.value = null;
+    await Promise.all([load(employees.value?.length === 1 && page.value.current_page > 1 ? page.value.current_page - 1 : page.value.current_page), loadStats()]);
+  } catch (err) {
+    toast.error(err?.message || "Couldn't delete the profile.");
   } finally {
-    isLoading.value = false;
+    busy.value = false;
   }
 }
 
-let searchTimeout;
-function debouncedSearch() {
-  clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(() => {
-    loadEmployees(1);
-  }, 500);
-}
+// ── Form ──
 
-function goToPage(page) {
-  loadEmployees(page);
-}
-
-function addRestDay(day) {
-  if (!formData.value.rest_days_array.includes(day)) {
-    formData.value.rest_days_array.push(day);
-    formData.value.rest_days = formData.value.rest_days_array.join(", ");
-  }
-  showDayPicker.value = false;
-}
-
-function removeRestDay(index) {
-  formData.value.rest_days_array.splice(index, 1);
-  formData.value.rest_days = formData.value.rest_days_array.join(", ");
-}
-
-const selectEmployee = (employee) => {
-  selectedEmployee.value = employee;
-  activeTab.value = "basic";
-  openMenuId.value = null;
-};
-
-const toggleMenu = (id) => {
-  if (!canManageEmployee.value) {
-    openMenuId.value = null;
+function openForm(source = null) {
+  if (source ? !canEdit.value : !canCreate.value) {
+    toast.error(source ? NO_PERMISSION.edit : NO_PERMISSION.create);
     return;
   }
-  openMenuId.value = openMenuId.value === id ? null : id;
-};
-
-async function updateEmployeeStatus(employee, status) {
-  if (!canEditEmployees.value) {
-    toast.error("You do not have permission to update employee status.");
-    return;
-  }
-  try {
-    loadingMessage.value = "Updating employee status...";
-    isLoading.value = true;
-
-    const response = await employeeInfoService.updateStatus(
-      employee.id,
-      status,
-    );
-
-    if (response.success) {
-      toast.success("Employment status updated successfully");
-      employee.employment_status = status;
-      if (selectedEmployee.value?.id === employee.id) {
-        selectedEmployee.value.employment_status = status;
-      }
-    }
-  } catch (error) {
-    toast.error(error.message || "Failed to update status");
-  } finally {
-    isLoading.value = false;
-    openMenuId.value = null;
-  }
-}
-
-async function deleteEmployee(employee) {
-  if (!canDeleteEmployees.value) {
-    toast.error("You do not have permission to delete employees.");
-    return;
-  }
-  if (!confirm(`Are you sure you want to delete ${employee.full_name}?`)) {
-    return;
-  }
-
-  try {
-    loadingMessage.value = "Deleting employee...";
-    isLoading.value = true;
-
-    const response = await employeeInfoService.delete(employee.id);
-
-    if (response.success) {
-      toast.success("Employee deleted successfully");
-
-      if (selectedEmployee.value?.id === employee.id) {
-        selectedEmployee.value = null;
-      }
-
-      await loadEmployees(pagination.value.current_page);
-    }
-  } catch (error) {
-    toast.error(error.message || "Failed to delete employee");
-    isLoading.value = false;
-  } finally {
-    openMenuId.value = null;
-  }
-}
-
-// Open modal
-const openAddModal = () => {
-  if (!canCreateEmployees.value) {
-    toast.error("You do not have permission to add employees.");
-    return;
-  }
-  isEditMode.value = false;
-  validationErrors.value = {};
-  showDayPicker.value = false;
-  formData.value = {
-    first_name: "",
-    middle_name: "",
-    last_name: "",
-    gender: "",
-    date_of_birth: "",
-    civil_status: "",
+  menuId.value = null;
+  Object.keys(errors).forEach((k) => delete errors[k]);
+  formError.value = "";
+  const f = Object.fromEntries(PROFILE_KEYS.map((k) => [k, ""]));
+  Object.assign(f, {
+    employment_status: "Probationary",
+    employment_type: "Full-time",
+    work_schedule: "Fixed",
+    shift_start: "08:00",
+    shift_end: "17:00",
+    rest_days: ["Sunday"],
+    standard_work_hours_per_day: 8,
+    working_days_per_week: 6,
+    working_days_per_month: 26,
+    date_hired: today,
     avatar: null,
     avatarPreview: "",
-    personal_email: "",
-    work_email: "",
-    mobile_number: "",
-    address: "",
-    emergency_contact_name: "",
-    emergency_contact_number: "",
-    emergency_relationship: "",
-    employment_status: "",
-    position: "",
-    department: "",
-    employment_type: "",
-    date_hired: "",
-    work_location: "",
-    reporting_manager: "",
-    work_schedule: "",
-    rest_days: "",
-    rest_days_array: [],
-    shift_start: "",
-    shift_end: "",
-    rest_days: "",
-    basic_salary: null,
-    salary_type: "",
-    standard_work_hours_per_day: null,
-    working_days_per_week: null,
-    working_days_per_month: null,
-  };
-  showModal.value = true;
-};
-
-const formatDateForInput = (dateString) => {
-  if (!dateString) return "";
-  return dateString.split("T")[0];
-};
-
-const openEditModal = (employee) => {
-  if (!canEditEmployees.value) {
-    toast.error("You do not have permission to edit employees.");
-    return;
-  }
-  isEditMode.value = true;
-  validationErrors.value = {};
-  showDayPicker.value = false;
-
-  const restDaysArray = employee.rest_days
-    ? employee.rest_days.split(",").map((d) => d.trim())
-    : [];
-
-  formData.value = {
-    id: employee.id,
-    first_name: employee.first_name,
-    middle_name: employee.middle_name,
-    last_name: employee.last_name,
-    gender: employee.gender,
-    date_of_birth: formatDateForInput(employee.date_of_birth),
-    civil_status: employee.civil_status,
-    avatar: null,
-    avatarPreview: employee.avatar_url || "https://i.pravatar.cc/150?img=1",
-    personal_email: employee.personal_email,
-    work_email: employee.work_email,
-    mobile_number: employee.mobile_number,
-    address: employee.address,
-    emergency_contact_name: employee.emergency_contact_name,
-    emergency_contact_number: employee.emergency_contact_number,
-    emergency_relationship: employee.emergency_relationship,
-    employment_status: employee.employment_status,
-    position: employee.position,
-    department: employee.department,
-    employment_type: employee.employment_type,
-    date_hired: formatDateForInput(employee.date_hired),
-    work_location: employee.work_location,
-    reporting_manager: employee.reporting_manager,
-    work_schedule: employee.work_schedule,
-    est_days: employee.rest_days,
-    rest_days_array: restDaysArray,
-    shift_start: employee.shift_start,
-    shift_end: employee.shift_end,
-    rest_days: employee.rest_days,
-    basic_salary: employee.basic_salary,
-    salary_type: employee.salary_type,
-    payment_method: employee.payment_method,
-    bank_name: employee.bank_name,
-    account_number: employee.account_number,
-    tax_status: employee.tax_status,
-    allowance: employee.allowance,
-  };
-
-  showModal.value = true;
-  openMenuId.value = null;
-};
-
-if (typeof document !== "undefined") {
-  document.addEventListener("click", (e) => {
-    if (!e.target.closest(".rest-days-selector")) {
-      showDayPicker.value = false;
-    }
-    openMenuId.value = null;
   });
+  if (source) {
+    for (const k of PROFILE_KEYS) f[k] = source[k] ?? "";
+    Object.assign(f, {
+      id: source.id,
+      original: source.full_name,
+      date_of_birth: day10(source.date_of_birth),
+      date_hired: day10(source.date_hired),
+      shift_start: hm5(source.shift_start),
+      shift_end: hm5(source.shift_end),
+      rest_days: restDaysList(source.rest_days),
+      avatarPreview: source.avatar_url || "",
+    });
+  }
+  form.value = f;
 }
 
-const closeModal = () => {
-  showModal.value = false;
-  isEditMode.value = false;
-  validationErrors.value = {};
-};
+function closeForm() {
+  if (!saving.value) form.value = null;
+}
 
-// File upload with preview
-const handleFileUpload = async (event) => {
-  if (!(isEditMode.value ? canEditEmployees.value : canCreateEmployees.value)) {
+async function pickPhoto(event) {
+  try {
+    const file = validateImageFile(getSelectedFile(event), { fieldLabel: "Photo", maxSizeMB: 5 });
+    if (!file) return;
+    form.value.avatar = file;
+    form.value.avatarPreview = await readImagePreview(file);
+  } catch (e) {
+    event.target.value = "";
+    toast.error(e?.message || "Couldn't read that photo.");
+  }
+}
+
+function validate() {
+  Object.keys(errors).forEach((k) => delete errors[k]);
+  const f = form.value;
+  for (const k of REQUIRED_FIELDS) if (!String(f[k] ?? "").trim()) errors[k] = "Required.";
+  for (const k of ["work_email", "personal_email"]) if (f[k] && !/^\S+@\S+\.\S+$/.test(String(f[k]).trim())) errors[k] = "Enter a valid email.";
+  if (f.date_of_birth && f.date_of_birth >= today) errors.date_of_birth = "Pick a day in the past.";
+  if (f.shift_start && f.shift_end && f.shift_end <= f.shift_start) errors.shift_end = "End after it starts.";
+  if (f.salary_type && !f.basic_salary) errors.basic_salary = "Enter the salary.";
+  return !Object.keys(errors).length;
+}
+
+async function save() {
+  const f = form.value;
+  if (saving.value || (f.id ? !canEdit.value : !canCreate.value)) return;
+  if (!validate()) {
+    formError.value = "Fill in the highlighted fields.";
     return;
   }
-
+  saving.value = true;
+  formError.value = "";
+  const values = {};
+  for (const k of PROFILE_KEYS) values[k] = typeof f[k] === "string" ? f[k].trim() : f[k];
+  values.rest_days = DAYS.filter((d) => f.rest_days.includes(d)).join(", ") || "None";
+  values.avatar = f.avatar;
+  if (!values.salary_type) values.basic_salary = "";
+  if (values.payment_method !== "Bank") {
+    values.bank_name = "";
+    values.account_number = "";
+  }
   try {
-    const file = validateImageFile(getSelectedFile(event), {
-      fieldLabel: "Employee avatar",
-      maxSizeMB: 5,
-    });
+    const payload = buildMultipartFormData(values, { fileFields: ["avatar"] });
+    const res = f.id ? await employeeInfoService.update(f.id, payload) : await employeeInfoService.create(payload);
+    toast.success(f.id ? "Profile saved." : "Profile added. The shop owner can see it too.");
+    form.value = null;
+    await Promise.all([load(f.id ? page.value.current_page : 1), loadStats()]);
+    const fresh = employees.value?.find((e) => e.id === (res.data?.id ?? f.id));
+    if (fresh) selected.value = fresh;
+    else if (selected.value?.id === f.id && res.data) selected.value = res.data;
+  } catch (err) {
+    const fieldErrors = err?.errors ?? {};
+    for (const [key, list] of Object.entries(fieldErrors)) errors[key] = [].concat(list)[0];
+    formError.value = Object.keys(fieldErrors).length ? "Fix the highlighted fields." : err?.message || "Couldn't save.";
+  } finally {
+    saving.value = false;
+  }
+}
 
-    if (!file) {
+// Directory and other pages link here with ?add=1, ?view=<id> or ?edit=<id>
+async function openFromQuery() {
+  if (route.query.add && canCreate.value) {
+    openForm();
+    return;
+  }
+  const viewId = route.query.view;
+  const editId = route.query.edit || route.query.id;
+  const id = viewId || editId;
+  if (!id) return;
+  let target = employees.value?.find((e) => String(e.id) === String(id) || e.employee_id === id);
+  if (!target) {
+    try {
+      target = (await employeeInfoService.getById(id))?.data;
+    } catch (_) {
       return;
     }
-
-    formData.value.avatar = file;
-    formData.value.avatarPreview = await readImagePreview(file);
-  } catch (error) {
-    clearFileInput(event.target);
-    toast.error(error.message || "Failed to read the selected employee image");
   }
+  if (!target) return;
+  if (editId && canEdit.value) openForm(target);
+  else openDetails(target);
+}
+
+const closeMenu = (e) => {
+  if (!e.target.closest?.(".pf-menu-wrap")) menuId.value = null;
+};
+const onKey = (e) => {
+  if (e.key !== "Escape") return;
+  if (deleting.value) deleting.value = null;
+  else if (form.value) closeForm();
+  else if (selected.value) selected.value = null;
+  else menuId.value = null;
 };
 
-async function saveEmployee() {
-  if (!canEditEmployees.value) {
-    toast.error("You do not have permission to save employee profiles.");
-    return;
-  }
-  try {
-    isSaving.value = true;
-    loadingMessage.value = isEditMode.value
-      ? "Updating employee..."
-      : "Creating employee...";
-    validationErrors.value = {};
-
-    const payload = buildMultipartFormData(formData.value, {
-      skipFields: ["avatarPreview", "id", "rest_days_array", "est_days"],
-      fileFields: ["avatar"],
-    });
-
-    let response;
-    if (isEditMode.value) {
-      response = await employeeInfoService.update(formData.value.id, payload);
-    } else {
-      response = await employeeInfoService.create(payload);
-    }
-
-    if (response.success) {
-      toast.success(response.message || "Employee saved successfully");
-      closeModal();
-      await loadEmployees(pagination.value.current_page);
-
-      if (
-        isEditMode.value &&
-        selectedEmployee.value?.id === formData.value.id
-      ) {
-        selectedEmployee.value = response.data;
-      }
-    }
-  } catch (error) {
-    if (error.status === 422) {
-      validationErrors.value = error.errors || {};
-
-      // Show specific validation errors in toast
-      if (error.errors && Object.keys(error.errors).length > 0) {
-        // Show first 3 validation errors in toast
-        const errorFields = Object.keys(error.errors).slice(0, 3);
-        errorFields.forEach((field) => {
-          const fieldName = field
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (l) => l.toUpperCase());
-          toast.error(`${fieldName}: ${error.errors[field][0]}`);
-        });
-
-        // If there are more than 3 errors, show a summary
-        if (Object.keys(error.errors).length > 3) {
-          toast.warning(
-            `And ${Object.keys(error.errors).length - 3} more validation error(s)`,
-          );
-        }
-      } else {
-        toast.error("Please fix the validation errors");
-      }
-    } else if (error.status === 403) {
-      toast.error(
-        error.message || "You do not have permission to perform this action",
-      );
-    } else {
-      toast.error(error.message || "Failed to save employee");
-    }
-  } finally {
-    isSaving.value = false;
-  }
-}
-
-// Helpers
-function formatDate(dateString) {
-  if (!dateString) return "N/A";
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
-
-function handleImageError(event) {
-  event.target.src = "https://i.pravatar.cc/150?img=1";
-}
-
-function sendEmail(email) {
-  window.location.href = `mailto:${email}`;
-}
-
-function callNumber(number) {
-  window.location.href = `tel:${number}`;
-}
-
-function toggleFilter(type) {
-  console.log("Filter by:", type);
-  toast.info(`Filter by ${type} - Coming soon!`);
-}
-
-// Close menu when clicking outside
-if (typeof document !== "undefined") {
-  document.addEventListener("click", () => {
-    openMenuId.value = null;
-  });
-}
+onMounted(async () => {
+  document.addEventListener("click", closeMenu);
+  document.addEventListener("keydown", onKey);
+  loadStats();
+  await load(1);
+  openFromQuery();
+});
+onBeforeUnmount(() => {
+  document.removeEventListener("click", closeMenu);
+  document.removeEventListener("keydown", onKey);
+  clearTimeout(searchTimer);
+});
 </script>
 
 <style scoped>
-.permission-banner {
-  margin: 12px 0 0;
-  padding: 12px 14px;
-  border: 1px solid #f6ad55;
-  border-radius: 10px;
-  background: #fffaf0;
-  color: #9c4221;
-  font-size: 13px;
-  line-height: 1.5;
+.pf-note {
+  margin-bottom: 16px;
 }
-
-.permission-fieldset {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
+.sp-stats {
+  margin-bottom: 18px;
 }
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: "Poppins", sans-serif;
-}
-
-.employee-profiles {
-  display: flex;
-  min-height: 100vh;
-  background: #f7fafc;
-}
-
-.profiles-content {
+.sp-stat .grow {
   flex: 1;
-  padding: 32px 40px;
-  transition: margin-right 0.3s ease;
 }
-
-.profiles-content:has(~ .employee-sidebar) {
-  margin-right: 420px;
-}
-
-/* Header */
-.page-header {
+.pf-toolbar {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-  gap: 24px;
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: #1a202c;
-  letter-spacing: -0.5px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.search-box {
-  display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
-  padding: 10px 16px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  min-width: 280px;
-  transition: all 0.2s;
-}
-
-.search-box:focus-within {
-  border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
-}
-
-.search-box svg {
-  color: #718096;
-  flex-shrink: 0;
-}
-
-.search-box input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 14px;
-  color: #1a202c;
-  font-family: "Poppins", sans-serif;
-}
-
-.search-box input::placeholder {
-  color: #a0aec0;
-}
-
-.filter-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #4a5568;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: "Poppins", sans-serif;
-}
-
-.filter-btn:hover {
-  border-color: #48bb78;
-  color: #48bb78;
-  background: #f0fff4;
-}
-
-.add-employee-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: #48bb78;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.add-employee-btn:hover {
-  background: #38a169;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(72, 187, 120, 0.35);
-}
-
-/* Table */
-.table-container {
-  background: #ffffff;
-  border-radius: 16px;
-  overflow: visible;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-
-.employee-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.employee-table thead {
-  background: #f7fafc;
-  border-bottom: 2px solid #e2e8f0;
-}
-
-.employee-table th {
-  padding: 16px 20px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 600;
-  color: #718096;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-}
-
-.employee-table tbody tr {
-  border-bottom: 1px solid #f7fafc;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.employee-table tbody tr:hover {
-  background: #f7fafc;
-}
-
-.employee-table tbody tr.selected {
-  background: #f0fff4;
-}
-
-.employee-table td {
-  padding: 16px 20px;
-  font-size: 14px;
-  color: #2d3748;
-}
-
-.name-cell {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-weight: 500;
-}
-
-.avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #e2e8f0;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-}
-
-.status-badge.regular {
-  background: #c6f6d5;
-  color: #22543d;
-}
-
-.status-badge.probationary {
-  background: #feebc8;
-  color: #7c2d12;
-}
-
-.status-badge.contractual {
-  background: #e6fffa;
-  color: #234e52;
-}
-
-.status-badge.part-time {
-  background: #fed7e2;
-  color: #702459;
-}
-
-.status-badge.large {
-  padding: 8px 16px;
-  font-size: 13px;
-  margin-top: 12px;
-}
-
-.action-cell {
-  position: relative;
-}
-
-.action-btn {
-  background: transparent;
-  border: none;
-  color: #a0aec0;
-  cursor: pointer;
-  padding: 8px;
-  display: flex;
-  align-items: center;
-  border-radius: 8px;
-  transition: all 0.2s;
-}
-
-.action-btn:hover {
-  background: #f7fafc;
-  color: #4a5568;
-}
-
-.dropdown-menu {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  margin-top: 4px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-  z-index: 100;
-  min-width: 180px;
-  overflow: hidden;
-}
-
-.dropdown-menu button {
-  display: block;
-  width: 100%;
-  padding: 12px 16px;
-  text-align: left;
-  background: transparent;
-  border: none;
-  font-size: 14px;
-  color: #2d3748;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: "Poppins", sans-serif;
-  font-weight: 500;
-}
-
-.dropdown-menu button:hover {
-  background: #f7fafc;
-}
-
-.dropdown-menu button.delete-btn {
-  color: #e53e3e;
-}
-
-.dropdown-menu button.delete-btn:hover {
-  background: #fff5f5;
-}
-
-/* Pagination */
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 20px;
-  border-top: 1px solid #f7fafc;
-}
-
-.page-btn {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: #718096;
-}
-
-.page-btn:hover {
-  border-color: #48bb78;
-  color: #48bb78;
-  background: #f0fff4;
-}
-
-.page-info {
-  font-size: 14px;
-  color: #718096;
-  font-weight: 500;
-}
-
-/* Sidebar */
-.employee-sidebar {
-  position: fixed;
-  right: 0;
-  top: 0;
-  width: 420px;
-  height: 100vh;
-  background: #ffffff;
-  border-left: 1px solid #e2e8f0;
-  overflow-y: auto;
-  z-index: 50;
-  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.06);
-}
-
-.slide-enter-active,
-.slide-leave-active {
-  transition: transform 0.3s ease;
-}
-
-.slide-enter-from,
-.slide-leave-to {
-  transform: translateX(100%);
-}
-
-.close-sidebar {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  background: #f7fafc;
-  border: none;
-  border-radius: 8px;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: #718096;
-  z-index: 10;
-}
-
-.close-sidebar:hover {
-  background: #e2e8f0;
-  color: #2d3748;
-}
-
-.sidebar-content {
-  padding: 32px 24px;
-}
-
-.employee-profile {
-  text-align: center;
-  margin-bottom: 24px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid #f7fafc;
-}
-
-.profile-avatar {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  object-fit: cover;
-  margin-bottom: 16px;
-  border: 4px solid #f7fafc;
-}
-
-.employee-profile h2 {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1a202c;
-  margin-bottom: 4px;
-}
-
-.employee-id {
-  font-size: 13px;
-  color: #718096;
-  font-weight: 500;
   margin-bottom: 8px;
 }
-
-.contact-actions {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
+.pf-toolbar .sp-search {
+  flex: 1 1 240px;
+  max-width: 340px;
 }
-
-.contact-btn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 16px 12px;
-  background: #f7fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: "Poppins", sans-serif;
-  color: #4a5568;
-}
-
-.contact-btn:hover {
-  background: #48bb78;
-  border-color: #48bb78;
-  color: white;
-  transform: translateY(-2px);
-}
-
-.contact-btn svg {
-  color: inherit;
-}
-
-.contact-btn span {
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
-  border-bottom: 2px solid #f7fafc;
-}
-
-.tabs button {
-  flex: 1;
-  padding: 12px 16px;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  font-size: 14px;
-  font-weight: 600;
-  color: #a0aec0;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: "Poppins", sans-serif;
-  margin-bottom: -2px;
-}
-
-.tabs button.active {
-  color: #48bb78;
-  border-bottom-color: #48bb78;
-}
-
-.tab-content {
-  animation: fadeIn 0.3s;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.info-section {
-  margin-bottom: 28px;
-}
-
-.info-section h3 {
-  font-size: 13px;
-  font-weight: 700;
-  color: #718096;
-  margin-bottom: 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 12px 0;
-  border-bottom: 1px solid #f7fafc;
-}
-
-.info-row:last-child {
-  border-bottom: none;
-}
-
-.info-row .label {
-  font-size: 13px;
-  color: #718096;
-  font-weight: 500;
-  flex: 0 0 40%;
-}
-
-.info-row .value {
-  font-size: 14px;
-  color: #2d3748;
-  font-weight: 500;
-  text-align: right;
-  flex: 1;
-}
-
-.info-alert {
-  display: flex;
-  gap: 12px;
-  padding: 16px;
-  background: #ebf8ff;
-  border: 1px solid #90cdf4;
-  border-radius: 10px;
-  margin-bottom: 20px;
-}
-
-.info-alert svg {
-  color: #2b6cb0;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.info-alert strong {
-  display: block;
-  color: #2c5282;
-  font-size: 14px;
-  margin-bottom: 4px;
-}
-
-.info-alert p {
-  color: #2c5282;
-  font-size: 13px;
-  margin: 0;
-  line-height: 1.5;
-}
-
-/* Salary Preview */
-.salary-preview {
-  background: #f0fff4;
-  border: 1px solid #9ae6b4;
-  border-radius: 10px;
-  padding: 16px;
-  margin-top: 20px;
-}
-
-.preview-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #22543d;
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-.preview-header svg {
-  color: #48bb78;
-}
-
-.preview-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: #22543d;
-  margin-bottom: 4px;
-}
-
-.preview-note {
-  font-size: 12px;
-  color: #2f855a;
-  font-style: italic;
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-  animation: fadeIn 0.2s;
-}
-
-.modal {
-  background-color: #ffffff;
-  border-radius: 20px;
-  width: 100%;
-  max-width: 800px;
-  max-height: 90vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  animation: slideUp 0.3s;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(30px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px 32px;
-  border-bottom: 2px solid #f7fafc;
-}
-
-.modal-header h2 {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1a202c;
-}
-
-.close-btn {
-  background: #f7fafc;
-  border: none;
-  color: #718096;
-  cursor: pointer;
-  padding: 8px;
-  display: flex;
-  align-items: center;
-  border-radius: 8px;
-  transition: all 0.2s;
-}
-
-.close-btn:hover {
-  background: #e2e8f0;
-  color: #2d3748;
-}
-
-.modal-body {
-  padding: 32px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-}
-
-.form-section {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.section-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #2d3748;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #f7fafc;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-group label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #4a5568;
-}
-
-.form-group input,
-.form-group select {
-  padding: 12px 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 14px;
-  color: #2d3748;
-  transition: all 0.2s;
-  font-family: "Poppins", sans-serif;
-}
-
-.form-group input:focus,
-.form-group select:focus {
-  outline: none;
-  border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
-}
-
-.form-group select {
-  cursor: pointer;
-  background: #ffffff;
-}
-
-.form-group-full {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  grid-column: 1 / -1;
-}
-
-.rest-days-selector {
-  position: relative;
-}
-
-.selected-days {
+.pf-filters {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  min-height: 44px;
-  padding: 8px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: #ffffff;
 }
-
-.day-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: #48bb78;
-  color: white;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
+.pf-filters .sp-select {
+  width: auto;
+  min-width: 140px;
 }
-
-.remove-day {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  border-radius: 50%;
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  transition: all 0.2s;
+.pf-sk {
+  margin: 0;
   padding: 0;
+  list-style: none;
 }
-
-.remove-day:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
-}
-
-.add-day-btn {
+.pf-sk li {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: #f7fafc;
-  border: 1px dashed #cbd5e0;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #4a5568;
-  cursor: pointer;
-  transition: all 0.2s;
+  gap: 12px;
+  padding: 12px 0;
 }
-
-.add-day-btn:hover {
-  background: #e2e8f0;
-  border-color: #48bb78;
-  color: #48bb78;
+.pf-sk .grow {
+  flex: 1;
 }
-
-.day-picker-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  margin-top: 4px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-  z-index: 100;
-  max-height: 250px;
-  overflow-y: auto;
-}
-
-.day-option {
-  display: block;
-  width: 100%;
-  padding: 12px 16px;
-  text-align: left;
-  background: transparent;
-  border: none;
-  font-size: 14px;
-  font-weight: 500;
-  color: #2d3748;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.day-option:hover {
-  background: #f7fafc;
-  color: #48bb78;
-}
-
-.field-hint {
-  font-size: 11px;
-  color: #a0aec0;
-  font-style: italic;
-  margin-top: 2px;
-}
-
-/* Image Upload */
-.image-upload {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-}
-
-no-data {
-  padding: 60px 20px;
-  text-align: center;
-}
-
-.no-data-message {
+.pf-two {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 16px;
+  min-width: 0;
 }
-
-.no-data-message p {
-  font-size: 16px;
-  color: #718096;
-  margin: 0;
+.pf-two b {
+  font-weight: 500;
+  color: var(--v-text);
 }
-
-.btn-add-first {
-  padding: 10px 20px;
-  background: #48bb78;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-add-first:hover {
-  background: #38a169;
-  transform: translateY(-1px);
-}
-
-.error-message {
-  color: #e53e3e;
+.pf-two small {
   font-size: 12px;
-  margin-top: 4px;
+  color: var(--v-muted);
 }
-
-.page-btn:disabled {
-  opacity: 0.5;
+.pf-menu-wrap {
+  position: relative;
+  display: inline-block;
+}
+.pf-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: 6px;
+  border: 1px solid var(--v-border);
+  border-radius: 12px;
+  background: var(--v-raised);
+  box-shadow: 0 12px 32px var(--v-shadow);
+}
+.pf-menu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--v-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pf-menu button :deep(svg) {
+  width: 15px;
+  height: 15px;
+  color: var(--v-muted);
+}
+.pf-menu button:hover:not(:disabled) {
+  background: var(--v-subtle);
+}
+.pf-menu button:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
-
-.image-preview {
-  width: 120px;
-  height: 120px;
-  border-radius: 16px;
-  border: 2px dashed #e2e8f0;
-  overflow: hidden;
+.pf-menu button.danger,
+.pf-menu button.danger :deep(svg) {
+  color: var(--v-red-text);
+}
+.pf-pages {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: #f7fafc;
-  flex-shrink: 0;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  margin-top: 6px;
+  border-top: 1px solid var(--v-border);
+  font-size: 12.5px;
+  color: var(--v-muted);
+}
+.pf-pages div {
+  display: flex;
+  gap: 6px;
+}
+.pf-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
 
-.image-preview img {
+/* Drawer */
+.pf-avatar-lg {
+  width: 52px;
+  height: 52px;
+  font-size: 17px;
+}
+.pf-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.pf-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.sp-drawer-head h3 {
+  overflow-wrap: anywhere;
+}
+.pf-quick {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.pf-quick a {
+  text-decoration: none;
+}
+.pf-by {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--v-faint);
+}
+.pf-seg {
+  display: flex;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  margin-bottom: 4px;
+  overflow-x: auto;
 }
-
-.placeholder {
-  color: #a0aec0;
-}
-
-.upload-actions {
+.pf-seg button {
   flex: 1;
+  white-space: nowrap;
+}
+.pf-qr {
+  margin-top: 18px;
+}
+
+/* Form */
+.pf-fieldset {
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+.st-section-title.first {
+  margin-top: 0;
+}
+.pf-photo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.pf-upload {
+  position: relative;
+  overflow: hidden;
+}
+.pf-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.pf-upload:has(input:focus-visible) {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 30%, transparent);
+}
+.pf-hours {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pf-hours .sp-input {
+  flex: 1;
+  min-width: 0;
+}
+.pf-hours > span {
+  font-size: 12.5px;
+  color: var(--v-muted);
+}
+.pf-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pf-day {
+  position: relative;
+  padding: 7px 12px;
+  border: 1px solid var(--v-border-strong);
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--v-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pf-day.on {
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
+  color: var(--v-text);
+}
+.pf-day input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.pf-day:has(input:focus-visible) {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 30%, transparent);
+}
+.pf-hint {
+  margin: -4px 0 12px;
+}
+.pf-rate {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
+}
+.pf-rate div {
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
-
-.upload-btn {
-  padding: 12px 24px;
-  background: #48bb78;
-  color: white;
-  border: none;
-  border-radius: 10px;
+.pf-rate strong {
   font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  align-self: flex-start;
-  margin-top: 40px;
 }
-
-.upload-btn:hover {
-  background: #38a169;
-  transform: translateY(-1px);
+.pf-rate small {
+  font-size: 12px;
+  opacity: 0.85;
 }
-
-.url-input {
-  padding: 12px 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 14px;
-  color: #2d3748;
-  transition: all 0.2s;
-  font-family: "Poppins", sans-serif;
-}
-
-.url-input:focus {
-  outline: none;
-  border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
-}
-
-.modal-footer {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  padding-top: 24px;
-  border-top: 2px solid #f7fafc;
-}
-
-.btn-cancel,
-.btn-submit {
-  padding: 12px 28px;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: "Poppins", sans-serif;
-}
-
-.btn-cancel {
-  background: #f7fafc;
-  border: 1px solid #e2e8f0;
-  color: #4a5568;
-}
-
-.btn-cancel:hover {
-  background: #e2e8f0;
-}
-
-.btn-submit {
-  background: #48bb78;
-  border: 1px solid #48bb78;
-  color: white;
-}
-
-.btn-submit:hover {
-  background: #38a169;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(72, 187, 120, 0.35);
-}
-
-.qr-tab {
-  padding: 0;
-}
-
-/* Adjust tabs layout for 4 buttons */
-.tabs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-}
-
-/* Responsive */
-@media (max-width: 1400px) {
-  .employee-sidebar {
-    width: 380px;
+@media (max-width: 760px) {
+  .pf-toolbar .sp-search {
+    max-width: none;
   }
-
-  .profiles-content:has(~ .employee-sidebar) {
-    margin-right: 380px;
-  }
-
-  .tabs {
-    grid-template-columns: repeat(2, 2fr);
-  }
-}
-
-@media (max-width: 1200px) {
-  .employee-sidebar {
-    width: 100%;
-    max-width: 420px;
-  }
-
-  .profiles-content:has(~ .employee-sidebar) {
-    margin-right: 0;
-  }
-}
-
-@media (max-width: 768px) {
-  .profiles-content {
-    margin-left: 0;
-    padding: 20px;
-  }
-
-  .page-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .header-actions {
-    flex-wrap: wrap;
-  }
-
-  .search-box {
-    min-width: 100%;
-  }
-
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-
-  .image-upload {
-    flex-direction: column;
+  .pf-filters,
+  .pf-filters .sp-select {
+    flex: 1 1 140px;
   }
 }
 </style>

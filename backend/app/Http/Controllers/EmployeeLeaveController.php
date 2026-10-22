@@ -2,533 +2,274 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Employee;
-use App\Models\EmployeeLeave;
 use App\Models\EmployeeInfo;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use App\Models\EmployeeLeave;
+use App\Models\LeavePolicy;
+use App\Models\OvertimeRequest;
+use App\Services\Leave\LeaveAccess;
+use App\Services\Leave\LeaveService;
+use App\Traits\ScopesOwner;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
+/**
+ * Leave & overtime management for HR (ERP) and the shop owner: requests with their history,
+ * balances, the shop's leave rules, overtime requests and the leave QR poster.
+ * Employees file from the public leave page (PublicLeaveController).
+ */
 class EmployeeLeaveController extends Controller
 {
-    /**
-     * Verify QR token and get employee details for leave request
-     */
-    public function verifyQRToken(Request $request): JsonResponse
+    use ScopesOwner;
+
+    public function __construct(private LeaveService $leave, private LeaveAccess $access) {}
+
+    /** The old public endpoints trusted a made-up QR token. POST /public/leave/verify-qr and /submit */
+    public function retired(): JsonResponse
     {
-        try {
-            $token = $request->input('token');
-            
-            if (!$token) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'QR token is required'
-                ], 400);
-            }
-
-            $decoded = base64_decode($token);
-            $data = json_decode($decoded, true);
-
-            if (!$data || !isset($data['employee_id']) || !isset($data['owner_id'])) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid QR token'
-                ], 400);
-            }
-
-            // Get employee details
-            $employee = EmployeeInfo::where('id', $data['employee_id'])
-                ->where('owner_id', $data['owner_id'])
-                ->first();
-
-            if (!$employee) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Employee not found'
-                ], 404);
-            }
-
-            $ipAddress = $request->ip();
-            $recentAttempts = DB::table('leave_request_attempts')
-                ->where('employee_id', $employee->id)
-                ->where('ip_address', $ipAddress)
-                ->where('attempted_at', '>=', now()->subMinutes(15))
-                ->count();
-
-            if ($recentAttempts >= 5) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Too many requests. Please try again in 15 minutes.'
-                ], 429);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'employee_id' => $employee->id,
-                    'owner_id' => $employee->owner_id,
-                    'employee_name' => $employee->full_name,
-                    'employee_number' => $employee->employee_id,
-                    'position' => $employee->position,
-                    'department' => $employee->department
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to verify QR token',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
-        }
+        return response()->json([
+            'success' => false,
+            'message' => 'The leave page has moved. Scan the shop\'s leave QR code again.',
+        ], 410);
     }
 
-    /**
-     * Submit leave request (PUBLIC - No authentication required)
-     */
-    public function submitLeaveRequest(Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'employee_id' => 'required|exists:employees_info,id',
-            'start_date' => 'required|date|after_or_equal:today',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'leave_type' => 'required|in:sick_leave,vacation_leave,emergency_leave,unpaid_leave,maternity_leave,paternity_leave,bereavement_leave,other',
-            'reason' => 'required|string|min:10|max:1000'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $employee = $request->user();
-        $requiredPermission = $request->input('status') === 'approved' ? 'approve' : 'reject';
-        if ($employee instanceof \App\Models\Employee
-            && ! $employee->hasModulePermission('leave_management', $requiredPermission)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Forbidden',
-            ], 403);
-        }
-
-        try {
-            DB::beginTransaction();
-
-            $employeeId = $request->employee_id;
-            $ipAddress = $request->ip();
-
-            // Resolve owner_id from EmployeeInfo directly (source of truth)
-            $employee = EmployeeInfo::find($employeeId);
-
-            if (!$employee) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Employee not found'
-                ], 404);
-            }
-
-            $ownerId = $this->resolveLeaveOwnerEmployeeId($employee);
-            $vendorOwnerId = (int) $employee->owner_id;
-            $leaveOwnerEmployeeIds = $this->resolveLeaveOwnerEmployeeIdsForVendor($vendorOwnerId);
-
-            // Rate limiting check
-            $recentAttempts = DB::table('leave_request_attempts')
-                ->where('employee_id', $employeeId)
-                ->where('ip_address', $ipAddress)
-                ->where('attempted_at', '>=', now()->subMinutes(15))
-                ->count();
-
-            if ($recentAttempts >= 5) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Too many requests. Please try again later.'
-                ], 429);
-            }
-
-            // Log attempt
-            DB::table('leave_request_attempts')->insert([
-                'employee_id' => $employeeId,
-                'ip_address' => $ipAddress,
-                'attempted_at' => now()
-            ]);
-
-            // Check for overlapping leave requests
-            $startDate = Carbon::parse($request->start_date);
-            $endDate = Carbon::parse($request->end_date);
-
-            $overlapping = EmployeeLeave::where('employee_id', $employeeId)
-                ->whereIn('owner_id', $leaveOwnerEmployeeIds)
-                ->where('status', '!=', 'rejected')
-                ->where(function ($query) use ($startDate, $endDate) {
-                    $query->whereBetween('start_date', [$startDate, $endDate])
-                        ->orWhereBetween('end_date', [$startDate, $endDate])
-                        ->orWhere(function ($q) use ($startDate, $endDate) {
-                            $q->where('start_date', '<=', $startDate)
-                              ->where('end_date', '>=', $endDate);
-                        });
-                })
-                ->exists();
-
-            if ($overlapping) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'You already have a leave request for this period'
-                ], 422);
-            }
-
-            // Calculate total days (excluding rest days)
-            $totalDays = $this->calculateLeaveDays(
-                $startDate,
-                $endDate,
-                $employee->rest_days
-            );
-
-            // Generate unique submission token
-            $submissionToken = Str::random(32);
-
-            // Create leave request
-            $leave = EmployeeLeave::create([
-                'owner_id' => $ownerId,
-                'employee_id' => $employeeId,
-                'start_date' => $startDate,
-                'end_date' => $endDate,
-                'total_days' => $totalDays,
-                'leave_type' => $request->leave_type,
-                'is_paid' => EmployeeLeave::isPaidLeaveType($request->leave_type),
-                'status' => 'pending',
-                'reason' => $request->reason,
-                'submission_token' => $submissionToken,
-                'submission_ip' => $ipAddress,
-                'submission_device' => $request->userAgent(),
-                'submitted_at' => now()
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Leave request submitted successfully',
-                'data' => [
-                    'reference_number' => $leave->id,
-                    'submission_token' => $submissionToken,
-                    'total_days' => $totalDays,
-                    'status' => 'pending'
-                ]
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to submit leave request',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
-        }
-    }
-
-    /**
-     * Get all leave requests for admin
-     */
+    /** GET /leaves?status&leave_type&employee_id&year */
     public function index(Request $request): JsonResponse
     {
-        try {
-            $vendorOwnerId = $this->resolveAuthenticatedVendorOwnerId();
-            $leaveOwnerEmployeeIds = $this->resolveLeaveOwnerEmployeeIdsForVendor($vendorOwnerId);
+        $ownerId = $this->getOwnerId();
+        $data = $request->validate([
+            'status' => 'nullable|in:pending,approved,rejected,cancelled',
+            'leave_type' => 'nullable|string|max:40',
+            'employee_id' => 'nullable|integer',
+            'year' => 'nullable|integer|min:2000|max:2100',
+        ]);
+        $leaves = $this->leave->leaves($ownerId)->with('employee')
+            ->when($data['status'] ?? null, fn ($q, $s) => $q->where('status', $s))
+            ->when($data['leave_type'] ?? null, fn ($q, $t) => $q->where('leave_type', $t))
+            ->when($data['employee_id'] ?? null, fn ($q, $id) => $q->where('employee_id', $id))
+            ->when($data['year'] ?? null, fn ($q, $y) => $q->whereYear('start_date', $y))
+            ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
+            ->orderByDesc('start_date')
+            ->limit(300)->get();
 
-            $query = $this->leaveQuery()
-                ->whereIn('owner_id', $leaveOwnerEmployeeIds)
-                ->with(['employee', 'reviewer']);
-
-            // Filters
-            if ($request->filled('employee_id')) {
-                $query->where('employee_id', $request->employee_id);
-            }
-
-            if ($request->filled('status')) {
-                $query->where('status', $request->status);
-            }
-
-            if ($request->filled('leave_type')) {
-                $query->where('leave_type', $request->leave_type);
-            }
-
-            if ($request->filled('start_date') && $request->filled('end_date')) {
-                $query->inPeriod($request->start_date, $request->end_date);
-            }
-
-            // Sort by most recent
-            $query->orderBy('submitted_at', 'desc');
-
-            // Paginate
-            $perPage = $request->input('per_page', 15);
-            $leaves = $query->paginate($perPage);
-
-            return response()->json([
-                'success' => true,
-                'data' => $leaves->items(),
-                'pagination' => [
-                    'total' => $leaves->total(),
-                    'per_page' => $leaves->perPage(),
-                    'current_page' => $leaves->currentPage(),
-                    'last_page' => $leaves->lastPage(),
-                    'from' => $leaves->firstItem(),
-                    'to' => $leaves->lastItem()
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch leave requests',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
-        }
+        return response()->json(['success' => true, 'data' => $leaves->map(fn ($l) => $this->leave->formatLeave($l, true))->values()]);
     }
 
-    /**
-     * Approve or reject leave request
-     */
+    /** GET /leaves/statistics */
+    public function getStatistics(): JsonResponse
+    {
+        $ownerId = $this->getOwnerId();
+        $month = fn () => $this->leave->leaves($ownerId)->where('status', 'approved')
+            ->whereMonth('start_date', now()->month)->whereYear('start_date', now()->year);
+
+        return response()->json(['success' => true, 'data' => [
+            'pending' => $this->leave->leaves($ownerId)->where('status', 'pending')->count(),
+            'approved_this_month' => $month()->count(),
+            'total_days_this_month' => (float) $month()->sum('total_days'),
+            'rejected' => $this->leave->leaves($ownerId)->where('status', 'rejected')->count(),
+            'on_leave_today' => $this->leave->leaves($ownerId)->where('status', 'approved')
+                ->whereDate('start_date', '<=', today())->whereDate('end_date', '>=', today())->count(),
+            'overtime_pending' => OvertimeRequest::where('owner_id', $ownerId)->where('status', 'pending')->count(),
+        ]]);
+    }
+
+    /** POST /leaves — HR or the owner files leave for someone (multipart) */
+    public function store(Request $request): JsonResponse
+    {
+        $ownerId = $this->getOwnerId();
+        $data = $request->validate([
+            'employee_id' => ['required', Rule::exists('employees_info', 'id')->where('owner_id', $ownerId)->whereNull('deleted_at')],
+            'leave_type' => 'required|string|in:' . implode(',', array_keys(LeavePolicy::TYPES)),
+            'start_date' => 'required|date',
+            'end_date' => 'required|date',
+            'reason' => 'required|string|min:5|max:1000',
+            'document' => 'nullable|file|max:10240|mimes:pdf,jpg,jpeg,png,webp,doc,docx',
+        ]);
+        $employee = EmployeeInfo::forOwner($ownerId)->findOrFail($data['employee_id']);
+        $user = $request->user();
+        $leave = $this->leave->file($ownerId, $employee, $data, $request->file('document'),
+            $user instanceof Employee ? 'hr' : 'owner', $user instanceof Employee ? $user->name : 'Shop owner');
+
+        return response()->json(['success' => true, 'message' => 'Leave filed. It still needs approval.', 'data' => $this->leave->formatLeave($leave->load('employee'), true)], 201);
+    }
+
+    /** PUT /leaves/{id}/status {status: approved|rejected, admin_notes} */
     public function updateStatus(Request $request, int $id): JsonResponse
     {
-        // reviewer_id is NOT required from client — it comes from the authenticated session.
-        $validator = Validator::make($request->all(), [
-            'status'      => 'required|in:approved,rejected',
-            'admin_notes' => 'nullable|string|max:1000',
+        $data = $request->validate(['status' => 'required|in:approved,rejected', 'admin_notes' => 'nullable|string|max:1000']);
+        $ownerId = $this->getOwnerId();
+        $leave = $this->leave->leaves($ownerId)->with('employee')->findOrFail($id);
+        $this->leave->decide($ownerId, $leave, $data['status'], $data['admin_notes'] ?? null, $request->user());
+
+        return response()->json([
+            'success' => true,
+            'message' => $data['status'] === 'approved' ? 'Leave approved.' : 'Leave rejected.',
+            'data' => $this->leave->formatLeave($leave->fresh('employee'), true),
         ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors'  => $validator->errors()
-            ], 422);
-        }
-
-        try {
-            // auth()->id() is the authenticated reviewer's ID.
-            $vendorOwnerId = $this->resolveAuthenticatedVendorOwnerId();
-            $leaveOwnerEmployeeIds = $this->resolveLeaveOwnerEmployeeIdsForVendor($vendorOwnerId);
-            $reviewerId = auth()->id();
-
-            if (!$reviewerId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Authenticated HR employee not found. Please log in again.'
-                ], 401);
-            }
-
-            // Find the leave request using the correct owner scope
-            $leave = $this->leaveQuery()
-                ->where('id', $id)
-                ->whereIn('owner_id', $leaveOwnerEmployeeIds)
-                ->first();
-
-            if (!$leave) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Leave request not found'
-                ], 404);
-            }
-
-            if ($leave->status !== 'pending') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'This leave request has already been reviewed'
-                ], 400);
-            }
-
-            // reviewer_id comes from the auth session — never from the request body
-            $leave->update([
-                'status'      => $request->status,
-                'admin_notes' => $request->admin_notes,
-                'reviewed_by' => $reviewerId,
-                'reviewed_at' => now()
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Leave request ' . $request->status . ' successfully',
-                'data'    => $leave->load(['employee', 'reviewer'])
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update leave status',
-                'error'   => config('app.debug') ? $e->getMessage() : null
-            ], 500);
-        }
     }
 
-    /**
-     * Get leave statistics for dashboard
-     */
-    public function getStatistics(Request $request): JsonResponse
+    /** POST /leaves/{id}/cancel {note} */
+    public function cancel(Request $request, int $id): JsonResponse
     {
-        try {
-            $vendorOwnerId = $this->resolveAuthenticatedVendorOwnerId();
-            $leaveOwnerEmployeeIds = $this->resolveLeaveOwnerEmployeeIdsForVendor($vendorOwnerId);
+        $data = $request->validate(['note' => 'nullable|string|max:1000']);
+        $ownerId = $this->getOwnerId();
+        $leave = $this->leave->leaves($ownerId)->findOrFail($id);
+        $user = $request->user();
+        $this->leave->cancel($ownerId, $leave, $user instanceof Employee ? $user->name : 'Shop owner', false, $data['note'] ?? null);
 
-            $stats = [
-                'pending' => $this->leaveQuery()->whereIn('owner_id', $leaveOwnerEmployeeIds)->pending()->count(),
-                'approved_this_month' => $this->leaveQuery()->whereIn('owner_id', $leaveOwnerEmployeeIds)
-                    ->approved()
-                    ->whereMonth('start_date', now()->month)
-                    ->whereYear('start_date', now()->year)
-                    ->count(),
-                'total_days_this_month' => $this->leaveQuery()->whereIn('owner_id', $leaveOwnerEmployeeIds)
-                    ->approved()
-                    ->whereMonth('start_date', now()->month)
-                    ->whereYear('start_date', now()->year)
-                    ->sum('total_days'),
-                'rejected' => $this->leaveQuery()->whereIn('owner_id', $leaveOwnerEmployeeIds)->rejected()->count()
-            ];
-
-            return response()->json([
-                'success' => true,
-                'data' => $stats
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch statistics',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
-        }
+        return response()->json(['success' => true, 'message' => 'Leave cancelled.']);
     }
 
-    /**
-     * Delete leave request
-     */
+    /** GET /leaves/{id}/document — a link valid for 5 minutes */
+    public function document(int $id): JsonResponse
+    {
+        $leave = $this->leave->leaves($this->getOwnerId())->findOrFail($id);
+
+        return response()->json(['success' => true, 'data' => ['url' => $this->leave->documentLink($leave)]]);
+    }
+
+    /** DELETE /leaves/{id} */
     public function destroy(int $id): JsonResponse
     {
-        try {
-            $vendorOwnerId = $this->resolveAuthenticatedVendorOwnerId();
-            $leaveOwnerEmployeeIds = $this->resolveLeaveOwnerEmployeeIdsForVendor($vendorOwnerId);
+        $this->leave->leaves($this->getOwnerId())->findOrFail($id)->delete();
 
-            $leave = $this->leaveQuery()
-                ->where('id', $id)
-                ->whereIn('owner_id', $leaveOwnerEmployeeIds)
-                ->first();
+        return response()->json(['success' => true, 'message' => 'Leave request deleted.']);
+    }
 
-            if (!$leave) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Leave request not found'
-                ], 404);
-            }
+    /** GET /leaves/balances?year */
+    public function balances(Request $request): JsonResponse
+    {
+        $ownerId = $this->getOwnerId();
+        $year = (int) ($request->validate(['year' => 'nullable|integer|min:2000|max:2100'])['year'] ?? now()->year);
+        $people = EmployeeInfo::forOwner($ownerId)->orderBy('first_name')->get()
+            ->filter(fn ($p) => ! in_array(strtolower((string) $p->employment_status), ['inactive', 'resigned', 'terminated'], true));
 
-            $leave->delete();
+        return response()->json(['success' => true, 'data' => [
+            'year' => $year,
+            'people' => $people->map(fn ($p) => [
+                'employee_id' => $p->id,
+                'name' => $p->full_name,
+                'position' => $p->position,
+                'balances' => $this->leave->balances($ownerId, $p, $year),
+            ])->values(),
+        ]]);
+    }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Leave request deleted successfully'
+    /** POST /leaves/balances/adjust {employee_id, leave_type, year, days, note} */
+    public function adjust(Request $request): JsonResponse
+    {
+        $ownerId = $this->getOwnerId();
+        $data = $request->validate([
+            'employee_id' => ['required', Rule::exists('employees_info', 'id')->where('owner_id', $ownerId)],
+            'leave_type' => 'required|string|in:' . implode(',', array_keys(LeavePolicy::TYPES)),
+            'year' => 'required|integer|min:2000|max:2100',
+            'days' => 'required|numeric|min:-365|max:365|not_in:0',
+            'note' => 'required|string|min:3|max:255',
+        ], ['note.required' => 'Say why, e.g. "Carried over from last year".', 'days.not_in' => 'Enter how many days to add or take away.']);
+        $employee = EmployeeInfo::forOwner($ownerId)->findOrFail($data['employee_id']);
+        $this->leave->adjustBalance($ownerId, $employee, $data['leave_type'], $data['year'], (float) $data['days'], trim($data['note']), $request->user());
+
+        return response()->json(['success' => true, 'message' => 'Balance updated.', 'data' => $this->leave->balances($ownerId, $employee, $data['year'])]);
+    }
+
+    /** GET /leaves/policies */
+    public function policies(): JsonResponse
+    {
+        return response()->json(['success' => true, 'data' => $this->leave->policies($this->getOwnerId())->map(fn ($p) => $this->leave->formatPolicy($p))->values()]);
+    }
+
+    /** PUT /leaves/policies {policies: [{leave_type, annual_days, is_paid, enabled, requires_document}]} */
+    public function savePolicies(Request $request): JsonResponse
+    {
+        $ownerId = $this->getOwnerId();
+        $data = $request->validate([
+            'policies' => 'required|array',
+            'policies.*.leave_type' => 'required|string|in:' . implode(',', array_keys(LeavePolicy::TYPES)),
+            'policies.*.annual_days' => 'nullable|numeric|min:0|max:365',
+            'policies.*.is_paid' => 'required|boolean',
+            'policies.*.enabled' => 'required|boolean',
+            'policies.*.requires_document' => 'required|boolean',
+        ]);
+        $policies = $this->leave->policies($ownerId);
+        foreach ($data['policies'] as $row) {
+            $policies[$row['leave_type']]->update([
+                'annual_days' => $row['annual_days'] ?? null,
+                'is_paid' => $row['is_paid'],
+                'enabled' => $row['enabled'],
+                'requires_document' => $row['requires_document'],
             ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete leave request',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
         }
+
+        return response()->json(['success' => true, 'message' => 'Leave rules saved. New requests follow them.']);
     }
 
-    /**
-     * Calculate leave days excluding rest days
-     */
-    private function calculateLeaveDays(Carbon $startDate, Carbon $endDate, string $restDays): int
+    /** GET /leaves/poster — the shop code the leave QR poster opens */
+    public function poster(Request $request): JsonResponse
     {
-        // Parse rest days
-        $restDaysArray = array_map('trim', array_map('strtolower', explode(',', $restDays)));
+        $ownerId = $this->getOwnerId();
+        $shop = \App\Models\User::findOrFail($ownerId);
 
-        $totalDays = 0;
-        $current = $startDate->copy();
-
-        while ($current <= $endDate) {
-            $dayName = strtolower($current->format('l'));
-            
-            // Count if not a rest day
-            if (!in_array($dayName, $restDaysArray)) {
-                $totalDays++;
-            }
-            
-            $current->addDay();
-        }
-
-        return $totalDays;
+        return response()->json(['success' => true, 'data' => ['code' => $this->access->shopCode($ownerId)] + $this->access->shopInfo($shop)]);
     }
 
-    private function resolveLeaveOwnerEmployeeId(EmployeeInfo $employee): int
+    // ── Overtime requests ──────────────────────────────────────────────────
+
+    /** GET /overtime-requests?status */
+    public function overtimeIndex(Request $request): JsonResponse
     {
-        if (!empty($employee->created_by_employee_id)) {
-            $creator = Employee::find($employee->created_by_employee_id);
-            if ($creator) {
-                return (int) $creator->id;
-            }
-        }
+        $ownerId = $this->getOwnerId();
+        $status = $request->validate(['status' => 'nullable|in:pending,approved,rejected,cancelled'])['status'] ?? null;
+        $rows = OvertimeRequest::where('owner_id', $ownerId)->with('employee')
+            ->when($status, fn ($q, $s) => $q->where('status', $s))
+            ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")->orderByDesc('date')->limit(300)->get();
 
-        $ownerEmployee = Employee::query()
-            ->where('owner_id', $employee->owner_id)
-            ->orderByRaw("
-                CASE
-                    WHEN LOWER(COALESCE(role, '')) LIKE '%hr%' THEN 0
-                    WHEN LOWER(COALESCE(department, '')) LIKE '%hr%' THEN 1
-                    ELSE 2
-                END
-            ")
-            ->orderBy('id')
-            ->first();
-
-        if (!$ownerEmployee) {
-            throw new \RuntimeException('No HR employee found for this employee record.');
-        }
-
-        return (int) $ownerEmployee->id;
+        return response()->json(['success' => true, 'data' => $rows->map(fn ($r) => $this->leave->formatOvertimeRequest($r, true))->values()]);
     }
 
-    private function resolveAuthenticatedVendorOwnerId(): int
+    /** POST /overtime-requests {employee_id, date, minutes, reason} */
+    public function overtimeStore(Request $request): JsonResponse
     {
-        $user = auth()->user();
+        $ownerId = $this->getOwnerId();
+        $data = $request->validate([
+            'employee_id' => ['required', Rule::exists('employees_info', 'id')->where('owner_id', $ownerId)->whereNull('deleted_at')],
+            'date' => 'required|date',
+            'minutes' => 'required|integer',
+            'reason' => 'required|string|min:5|max:1000',
+        ]);
+        $employee = EmployeeInfo::forOwner($ownerId)->findOrFail($data['employee_id']);
+        $user = $request->user();
+        $r = $this->leave->requestOvertime($ownerId, $employee, $data, $user instanceof Employee ? 'hr' : 'owner', $user instanceof Employee ? $user->name : 'Shop owner');
 
-        if ($user instanceof Employee) {
-            return (int) $user->owner_id;
-        }
-
-        if (!$user) {
-            throw new \RuntimeException('Unauthenticated user.');
-        }
-
-        return (int) $user->id;
+        return response()->json(['success' => true, 'message' => 'Overtime request filed. It still needs approval.', 'data' => $this->leave->formatOvertimeRequest($r->load('employee'), true)], 201);
     }
 
-    private function resolveLeaveOwnerEmployeeIdsForVendor(int $vendorOwnerId): array
+    /** PUT /overtime-requests/{id}/status {status: approved|rejected, note} */
+    public function overtimeDecide(Request $request, int $id): JsonResponse
     {
-        $employeeIds = Employee::query()
-            ->where('owner_id', $vendorOwnerId)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        if (empty($employeeIds)) {
-            throw new \RuntimeException('No employee leave owners found for this vendor.');
+        $data = $request->validate(['status' => 'required|in:approved,rejected', 'note' => 'nullable|string|max:1000']);
+        $user = $request->user();
+        if ($user instanceof Employee && ! $user->hasModulePermission('leave_management', $data['status'] === 'approved' ? 'approve' : 'reject')) {
+            return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
         }
+        $ownerId = $this->getOwnerId();
+        $r = OvertimeRequest::where('owner_id', $ownerId)->with('employee')->findOrFail($id);
+        $this->leave->decideOvertimeRequest($ownerId, $r, $data['status'], $data['note'] ?? null, $user);
 
-        return $employeeIds;
+        return response()->json(['success' => true, 'message' => $data['status'] === 'approved'
+            ? 'Overtime approved. Staying late that day is approved automatically, up to these minutes.'
+            : 'Overtime request rejected.']);
     }
 
-    private function leaveQuery(): Builder
+    /** POST /overtime-requests/{id}/cancel */
+    public function overtimeCancel(Request $request, int $id): JsonResponse
     {
-        return EmployeeLeave::query()->withoutGlobalScope('owner');
+        $ownerId = $this->getOwnerId();
+        $r = OvertimeRequest::where('owner_id', $ownerId)->findOrFail($id);
+        $user = $request->user();
+        $this->leave->cancelOvertimeRequest($ownerId, $r, $user instanceof Employee ? $user->name : 'Shop owner');
+
+        return response()->json(['success' => true, 'message' => 'Overtime request cancelled.']);
     }
 }

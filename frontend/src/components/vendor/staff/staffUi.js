@@ -9,9 +9,10 @@ const GROUP_LABEL = { HR: "People & HR", Finance: "Money", Procurement: "Stock &
 const ACTION_TEXT = {
   hr_dashboard: { view: "See the HR overview", export: "Download HR reports" },
   employees: { view: "See employee profiles", create: "Add employee profiles", edit: "Edit employee profiles", delete: "Remove employee profiles", export: "Download employee QR codes", print: "Print employee details" },
-  attendance: { view: "See attendance", create: "Time people in and out", edit: "Correct attendance", delete: "Delete attendance records" },
+  schedules: { view: "See the shift schedule", create: "Put people on shifts", edit: "Create shifts, swap and cover shifts", delete: "Remove shifts and people from shifts" },
+  attendance: { view: "See attendance", create: "Time people in and out at a shop scanner", edit: "Ask to correct attendance", delete: "Delete attendance records", approve: "Approve flagged scans and corrections" },
   payroll: { view: "See payroll", create: "Create payroll", delete: "Delete payroll", approve: "Send payroll to finance" },
-  leave_management: { view: "See leave requests", approve: "Approve leave", reject: "Decline leave", delete: "Delete leave requests" },
+  leave_management: { view: "See leave and overtime requests", create: "File leave or overtime for someone", edit: "Set leave rules, adjust balances, cancel approved leave", approve: "Approve leave and overtime requests", reject: "Decline leave and overtime requests", delete: "Delete leave requests" },
   finance_dashboard: { view: "See the finance overview" },
   funding_requests: { view: "See funding requests", approve: "Approve funding", reject: "Decline funding" },
   payroll_requests: { view: "See payroll waiting for payment", edit: "Mark payroll as paid", approve: "Approve payroll for payment", reject: "Send payroll back" },

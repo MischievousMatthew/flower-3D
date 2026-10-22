@@ -2,190 +2,50 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
+use App\Models\EmployeeAttendance;
+use App\Services\Attendance\AttendanceCalculator;
+use App\Services\Attendance\AttendanceReviewService;
 use App\Services\AttendanceService;
-use App\Services\EmployeeQRCodeService;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 use App\Traits\ScopesOwner;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
+/**
+ * ERP attendance: logs, reports, correction requests and the review queue. Time in and out
+ * happen only through the shop scanner (AttendanceKioskController).
+ */
 class AttendanceController extends Controller
 {
     use ScopesOwner;
-    protected $attendanceService;
-    protected $qrCodeService;
+
+    private const TIME = 'regex:/^([01]\d|2[0-3]):[0-5]\d$/';
 
     public function __construct(
-        AttendanceService $attendanceService,
-        EmployeeQRCodeService $qrCodeService
-    ) {
-        $this->attendanceService = $attendanceService;
-        $this->qrCodeService = $qrCodeService;
-    }
+        private AttendanceService $attendanceService,
+        private AttendanceReviewService $reviews,
+        private AttendanceCalculator $calculator,
+    ) {}
 
     /**
-     * Process QR code scan for attendance
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * The old endpoints trusted the browser's word that a face was checked.
+     * POST /attendance/scan, /attendance/time-in, /attendance/time-out
      */
-    public function scanQR(Request $request): JsonResponse
+    public function retired(): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'qr_data' => 'required|string'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid QR data',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        // Decode QR data
-        $qrData = $this->qrCodeService->decodeQRData($request->qr_data);
-
-        if (!$qrData) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid QR code format',
-                'type' => 'error'
-            ], 400);
-        }
-
-        // Get current owner ID (from authenticated user)
-        $currentOwnerId = $this->getOwnerId();
-
-        // Validate QR data
-        if (!$this->qrCodeService->validateQRData($qrData, $currentOwnerId)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'QR code does not belong to this store or is invalid',
-                'type' => 'error'
-            ], 403);
-        }
-
-        // Process attendance
-        $result = $this->attendanceService->processQRScan($qrData, $currentOwnerId);
-
-        $statusCode = $result['success'] ? 200 : 400;
-
-        return response()->json($result, $statusCode);
+        return response()->json([
+            'success' => false,
+            'message' => 'Attendance is now taken only with the shop scanner on an approved device. Reload the page to get the new scanner.',
+        ], 410);
     }
 
-    public function timeIn(Request $request): JsonResponse
-    {
-        $validationError = $this->validateFaceVerificationPayload($request);
-        if ($validationError) {
-            return $validationError;
-        }
-
-        $ownerId = $this->getOwnerId();
-        $result  = $this->attendanceService->timeIn($ownerId, $request->employee_id, $request->all());
-
-        return response()->json($result, $result['success'] ? 200 : 400);
-    }
-
-    public function timeOut(Request $request): JsonResponse
-    {
-        $validationError = $this->validateFaceVerificationPayload($request);
-        if ($validationError) {
-            return $validationError;
-        }
-
-        $ownerId = $this->getOwnerId();
-        $result  = $this->attendanceService->timeOut($ownerId, $request->employee_id, $request->all());
-
-        return response()->json($result, $result['success'] ? 200 : 400);
-    }
-
-    private function validateFaceVerificationPayload(Request $request): ?JsonResponse
-    {
-        $allowedChallenges = ['blink', 'smile', 'nod', 'move_closer', 'move_back'];
-
-        $validator = Validator::make($request->all(), [
-            'employee_id'                           => 'required|integer|exists:employees_info,id',
-            'face_verified'                         => 'required|boolean',
-            'liveness_passed'                       => 'required|boolean',
-            'match_score'                           => 'required|integer|min:70|max:100',
-            'challenges'                            => 'required|array|min:3',
-            'challenges.*'                          => ['required', 'string', Rule::in($allowedChallenges)],
-            'liveness_data'                         => 'required|array',
-            'liveness_data.frames_checked'          => 'required|integer|min:20',
-            'liveness_data.challenge_frames_checked'=> 'required|integer|min:10',
-            'liveness_data.match_frames_checked'    => 'required|integer|min:10',
-            'liveness_data.valid_match_frames'      => 'required|integer|min:10',
-            'liveness_data.suspicious_events'       => 'required|integer|min:0|max:0',
-            'liveness_data.detection_score_min'     => 'required|numeric|min:0.45|max:1',
-            'liveness_data.replay_check_passed'     => 'required|boolean',
-            'liveness_data.camera_source'           => ['required', 'string', Rule::in(['user-media-webcam'])],
-            'liveness_data.challenge_results'       => 'required|array|min:3',
-            'liveness_data.challenge_results.*.id'  => ['required', 'string', Rule::in($allowedChallenges)],
-            'liveness_data.challenge_results.*.passed'          => 'required|boolean',
-            'liveness_data.challenge_results.*.frames_observed' => 'required|integer|min:1',
-            'liveness_data.challenge_results.*.duration_ms'     => 'required|integer|min:1',
-        ]);
-
-        $validator->after(function ($validator) use ($request) {
-            if (!$request->boolean('face_verified') || !$request->boolean('liveness_passed')) {
-                $validator->errors()->add('liveness_passed', 'Liveness check failed.');
-            }
-
-            $challenges = collect($request->input('challenges', []));
-            $results = collect($request->input('liveness_data.challenge_results', []));
-            $passedIds = $results
-                ->filter(fn ($result) => !empty($result['passed']) && !empty($result['id']))
-                ->pluck('id');
-
-            if ($passedIds->count() < 3 || $passedIds->unique()->count() < 3) {
-                $validator->errors()->add('liveness_data.challenge_results', 'At least three liveness challenges must be completed.');
-            }
-
-            if (!$challenges->intersect(['blink', 'smile'])->count()) {
-                $validator->errors()->add('challenges', 'An expression challenge is required.');
-            }
-
-            if (!$challenges->intersect(['blink', 'smile', 'nod'])->count()) {
-                $validator->errors()->add('challenges', 'A facial action challenge is required.');
-            }
-
-            if ($results->contains(fn ($result) => empty($result['passed']))) {
-                $validator->errors()->add('liveness_data.challenge_results', 'All liveness challenges must pass.');
-            }
-
-            if (!$request->boolean('liveness_data.replay_check_passed')) {
-                $validator->errors()->add('liveness_data.replay_check_passed', 'Replay detection failed.');
-            }
-        });
-
-        if ($validator->fails()) {
-            $errors = $validator->errors();
-            $firstError = $errors->all()[0] ?? 'Liveness check failed';
-
-            return response()->json([
-                'success' => false,
-                'message' => $firstError,
-                'errors' => $errors,
-            ], 422);
-        }
-
-        return null;
-    }
-
-    /**
-     * Get attendance records
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
+    /** GET /attendance */
     public function index(Request $request): JsonResponse
     {
         $ownerId = $this->getOwnerId();
-
-        $filters = [
+        $records = $this->attendanceService->getAttendanceRecords($ownerId, [
             'employee_id' => $request->employee_id,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
@@ -194,10 +54,8 @@ class AttendanceController extends Controller
             'year' => $request->year,
             'status' => $request->status,
             'search' => $request->search,
-            'per_page' => $request->per_page ?? 15
-        ];
-
-        $records = $this->attendanceService->getAttendanceRecords($ownerId, $filters);
+            'per_page' => min((int) ($request->per_page ?? 15), 500),
+        ]);
 
         return response()->json([
             'success' => true,
@@ -208,166 +66,162 @@ class AttendanceController extends Controller
                 'current_page' => $records->currentPage(),
                 'last_page' => $records->lastPage(),
                 'from' => $records->firstItem(),
-                'to' => $records->lastItem()
-            ]
+                'to' => $records->lastItem(),
+            ],
         ]);
     }
 
-    /**
-     * Get attendance summary
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
+    /** GET /attendance/summary */
     public function summary(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
+        $data = $request->validate([
             'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date'
+            'end_date' => 'required|date|after_or_equal:start_date',
         ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid date range',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $ownerId = $this->getOwnerId();
-        $summary = $this->attendanceService->getAttendanceSummary(
-            $ownerId,
-            $request->start_date,
-            $request->end_date
-        );
 
         return response()->json([
             'success' => true,
-            'data' => $summary
+            'data' => $this->attendanceService->getAttendanceSummary($this->getOwnerId(), $data['start_date'], $data['end_date']),
         ]);
     }
 
-    /**
-     * Manual attendance entry (admin override)
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
+    /** GET /attendance/report?from&to&employee_id — daily log with late/undertime/absent, and per-person totals. */
+    public function report(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'from' => 'required|date',
+            'to' => 'required|date|after_or_equal:from',
+            'employee_id' => 'nullable|integer',
+        ]);
+        $from = Carbon::parse($data['from'])->startOfDay();
+        $to = Carbon::parse($data['to'])->endOfDay();
+        if ($from->diffInDays($to) > AttendanceCalculator::MAX_RANGE_DAYS) {
+            throw ValidationException::withMessages(['from' => 'Choose a range of three months or less.']);
+        }
+
+        return response()->json(['success' => true, 'data' => $this->calculator->report($this->getOwnerId(), $from, $to, $data['employee_id'] ?? null)]);
+    }
+
+    /** POST /attendance — ask to add a missing day (someone else approves it). */
     public function store(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'employee_id' => 'required|exists:employees_info,id',
-            'date' => 'required|date',
-            'time_in' => 'required|date_format:H:i',
-            'time_out' => 'nullable|date_format:H:i|after:time_in',
-            'notes' => 'nullable|string|max:500'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $ownerId = $this->getOwnerId();
-        $result = $this->attendanceService->manualAttendance(
-            $ownerId,
-            $request->employee_id,
-            $request->all()
-        );
-
-        $statusCode = $result['success'] ? 200 : 400;
-
-        return response()->json($result, $statusCode);
+        return $this->correction($request, null);
     }
 
-    /**
-     * Update attendance record
-     *
-     * @param Request $request
-     * @param int $id
-     * @return JsonResponse
-     */
+    /** PUT /attendance/{id} — ask to fix a day's times (someone else approves it). */
     public function update(Request $request, int $id): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'time_in' => 'nullable|date_format:H:i',
-            'time_out' => 'nullable|date_format:H:i',
-            'notes' => 'nullable|string|max:500'
-        ]);
+        return $this->correction($request, EmployeeAttendance::forOwner($this->getOwnerId())->findOrFail($id));
+    }
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
+    /** POST /attendance/corrections */
+    public function requestCorrection(Request $request): JsonResponse
+    {
+        return $this->correction($request, null);
+    }
 
-        $ownerId = $this->getOwnerId();
-        $attendance = \App\Models\EmployeeAttendance::where('id', $id)
-            ->where('owner_id', $ownerId)
-            ->first();
+    /** GET /attendance/review — flagged scans, corrections waiting, and blocked attempts. */
+    public function reviewQueue(): JsonResponse
+    {
+        return response()->json(['success' => true, 'data' => $this->reviews->queue($this->getOwnerId())]);
+    }
 
-        if (!$attendance) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Attendance record not found'
-            ], 404);
-        }
-
-        if ($request->has('time_in')) {
-            $attendance->time_in = $request->time_in;
-        }
-
-        if ($request->has('time_out')) {
-            $attendance->time_out = $request->time_out;
-        }
-
-        if ($request->has('notes')) {
-            $attendance->notes = $request->notes;
-        }
-
-        if ($attendance->time_in && $attendance->time_out) {
-            $attendance->calculateTotalHours();
-        }
-
-        $attendance->save();
+    /** POST /attendance/{id}/review {decision, note} */
+    public function review(Request $request, int $id): JsonResponse
+    {
+        $data = $this->validateDecision($request);
+        $record = $this->reviews->decideRecord($this->getOwnerId(), $id, $data['decision'], $data['note'] ?? null, $request->user());
 
         return response()->json([
             'success' => true,
-            'message' => 'Attendance updated successfully',
-            'data' => $attendance
+            'message' => $data['decision'] === 'approve' ? 'Approved. It now counts for payroll.' : 'Rejected. It won\'t count for payroll.',
+            'data' => $this->reviews->formatRecord($record),
         ]);
     }
 
-    /**
-     * Delete attendance record
-     *
-     * @param int $id
-     * @return JsonResponse
-     */
-    public function destroy(int $id): JsonResponse
+    /** POST /attendance/corrections/{id}/review {decision, note} */
+    public function reviewCorrection(Request $request, int $id): JsonResponse
     {
-        $ownerId = $this->getOwnerId();
-        $attendance = \App\Models\EmployeeAttendance::where('id', $id)
-            ->where('owner_id', $ownerId)
-            ->first();
-
-        if (!$attendance) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Attendance record not found'
-            ], 404);
-        }
-
-        $attendance->delete();
+        $data = $this->validateDecision($request);
+        $this->reviews->decideCorrection($this->getOwnerId(), $id, $data['decision'], $data['note'] ?? null, $request->user());
 
         return response()->json([
             'success' => true,
-            'message' => 'Attendance record deleted successfully'
+            'message' => $data['decision'] === 'approve' ? 'Correction approved and applied.' : 'Correction rejected.',
+        ]);
+    }
+
+    /** POST /attendance/{id}/overtime {decision, minutes?, note} */
+    public function overtime(Request $request, int $id): JsonResponse
+    {
+        $data = $this->validateOvertime($request);
+        $record = $this->reviews->decideOvertime($this->getOwnerId(), $id, $data['decision'], $data['minutes'] ?? null, $data['note'] ?? null, $request->user());
+
+        return response()->json(['success' => true, 'message' => $this->overtimeMessage($record)]);
+    }
+
+    public static function overtimeMessage($record): string
+    {
+        return $record->overtime_status === 'approved'
+            ? "Approved {$record->overtime_approved_minutes} minutes of overtime. It's paid at the overtime rate."
+            : 'Overtime rejected. It won\'t be paid.';
+    }
+
+    private function validateOvertime(Request $request): array
+    {
+        return $request->validate([
+            'decision' => 'required|in:approve,reject',
+            'minutes' => 'nullable|integer|min:1|max:1440',
+            'note' => 'nullable|string|max:500',
+        ]);
+    }
+
+    /** GET /attendance/{id}/evidence/{which}/{index} — a link to an evidence photo, valid for 5 minutes. */
+    public function evidence(int $id, string $which, int $index): JsonResponse
+    {
+        return response()->json(['success' => true, 'data' => ['url' => $this->reviews->evidenceLink($this->getOwnerId(), $id, $which, $index)]]);
+    }
+
+    /** DELETE /attendance/{id} */
+    public function destroy(int $id): JsonResponse
+    {
+        EmployeeAttendance::forOwner($this->getOwnerId())->findOrFail($id)->delete();
+
+        return response()->json(['success' => true, 'message' => 'Attendance record deleted.']);
+    }
+
+    private function correction(Request $request, ?EmployeeAttendance $record): JsonResponse
+    {
+        $ownerId = $this->getOwnerId();
+        $data = $request->validate([
+            'employee_id' => [$record ? 'nullable' : 'required', Rule::exists('employees_info', 'id')->where('owner_id', $ownerId)->whereNull('deleted_at')],
+            'date' => [$record ? 'nullable' : 'required', 'date', 'before_or_equal:today'],
+            'time_in' => ['required', self::TIME],
+            'time_out' => ['nullable', self::TIME],
+            'reason' => 'required|string|min:5|max:500',
+        ], ['reason.required' => 'Say why the times need fixing.', 'reason.min' => 'Say a bit more about why.']);
+        if ($record) {
+            $data['employee_id'] = $record->employee_id;
+            $data['date'] = Carbon::parse($record->attendance_date)->toDateString();
+        }
+        if (! empty($data['time_out']) && $data['time_out'] <= $data['time_in']) {
+            throw ValidationException::withMessages(['time_out' => 'Time out must be after time in.']);
+        }
+
+        $correction = $this->reviews->requestCorrection($ownerId, $data, $request->user());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sent for approval. The shop owner or someone with approval access will review it.',
+            'data' => $this->reviews->formatCorrection($correction->load('employee')),
+        ], 201);
+    }
+
+    private function validateDecision(Request $request): array
+    {
+        return $request->validate([
+            'decision' => 'required|in:approve,reject',
+            'note' => 'nullable|string|max:500',
         ]);
     }
 }

@@ -12,6 +12,8 @@ use Illuminate\Database\QueryException;
 use App\Helpers\CloudinaryHelper;
 use Illuminate\Support\Facades\Validator;
 use App\Models\Employee;
+use App\Models\SalaryRecord;
+use App\Services\Payroll\PayAccess;
 
 use App\Traits\ScopesOwner;
 
@@ -33,7 +35,7 @@ class EmployeeInfoController extends Controller
                 'department' => $user->department ?? null,
             ]);
 
-            $query = EmployeeInfo::forOwner($ownerId);
+            $query = EmployeeInfo::forOwner($ownerId)->with('createdBy:id,name')->withCount('documents');
 
             if ($request->filled('search')) {
                 $query->search($request->search);
@@ -62,7 +64,7 @@ class EmployeeInfoController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $employees->items(),
+                'data' => PayAccess::reveal($request->user(), $employees->items()),
                 'pagination' => [
                     'total' => $employees->total(),
                     'per_page' => $employees->perPage(),
@@ -204,18 +206,7 @@ class EmployeeInfoController extends Controller
             $ownerId = $this->getOwnerId();
             $creatorEmployeeId = $this->resolveCreatorEmployeeId($user, $ownerId);
 
-            $userDepartment = strtolower(trim($user->department ?? ''));
-            $allowedDepartments = ['hr', 'human resources'];
-            
-            $hasHRAccess = false;
-            foreach ($allowedDepartments as $dept) {
-                if (str_contains($userDepartment, $dept) || str_contains($dept, $userDepartment)) {
-                    $hasHRAccess = true;
-                    break;
-                }
-            }
-            
-            if (!$hasHRAccess) {
+            if (!$this->canManageProfiles($user)) {
                 Log::warning('HR Access Denied:', [
                     'user_department' => $user->department,
                     'allowed_departments' => $allowedDepartments,
@@ -310,15 +301,19 @@ class EmployeeInfoController extends Controller
                 $employeeInfoData['created_by_employee_id'] = $creatorEmployeeId;
             }
 
+            if (! PayAccess::canEdit($user)) {
+                $employeeInfoData = array_diff_key($employeeInfoData, array_flip(PayAccess::FIELDS));
+            }
             $employeeInfoData = $this->filterExistingEmployeeInfoColumns($employeeInfoData);
             $employeeInfo = EmployeeInfo::create($employeeInfoData);
+            $this->recordSalary($employeeInfo, $user, 'Starting pay');
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Employee record created successfully',
-                'data' => $employeeInfo
+                'data' => PayAccess::reveal($request->user(), $employeeInfo)
             ], 201);
 
         } catch (QueryException $e) {
@@ -379,11 +374,11 @@ class EmployeeInfoController extends Controller
     {
         try {
             $ownerId = $this->getOwnerId();
-            $employeeInfo = EmployeeInfo::forOwner($ownerId)->findOrFail($id);
+            $employeeInfo = EmployeeInfo::forOwner($ownerId)->with('createdBy:id,name')->withCount('documents')->findOrFail($id);
 
             return response()->json([
                 'success' => true,
-                'data' => $employeeInfo
+                'data' => PayAccess::reveal($request->user(), $employeeInfo)
             ]);
 
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -492,19 +487,8 @@ class EmployeeInfoController extends Controller
 
             $ownerId = $this->getOwnerId();
             $user = $request->user();
-            $creatorEmployeeId = $this->resolveCreatorEmployeeId($user, $ownerId);
-            $userDepartment = strtolower(trim($user->department ?? ''));
-            $allowedDepartments = ['hr', 'human resources'];
-            
-            $hasHRAccess = false;
-            foreach ($allowedDepartments as $dept) {
-                if (str_contains($userDepartment, $dept) || str_contains($dept, $userDepartment)) {
-                    $hasHRAccess = true;
-                    break;
-                }
-            }
-            
-            if (!$hasHRAccess) {
+
+            if (!$this->canManageProfiles($user)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Only HR department staff can update employee records'
@@ -581,13 +565,16 @@ class EmployeeInfoController extends Controller
                 $updateData['avatar'] = $avatarPath;
             }
 
-            if (Schema::hasColumn('employees_info', 'created_by_employee_id') && $creatorEmployeeId !== null) {
-                $updateData['created_by_employee_id'] = $creatorEmployeeId;
+            if (! PayAccess::canEdit($user)) {
+                $updateData = array_diff_key($updateData, array_flip(PayAccess::FIELDS));
             }
-
+            $payBefore = [$employeeInfo->basic_salary, $employeeInfo->salary_type];
             $updateData = $this->filterExistingEmployeeInfoColumns($updateData);
 
             $employeeInfo->update($updateData);
+            if ([$employeeInfo->basic_salary, $employeeInfo->salary_type] != $payBefore) {
+                $this->recordSalary($employeeInfo, $user, 'Pay changed');
+            }
 
             if (
                 $avatarPath &&
@@ -603,7 +590,7 @@ class EmployeeInfoController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Employee record updated successfully',
-                'data' => $employeeInfo
+                'data' => PayAccess::reveal($request->user(), $employeeInfo)
             ]);
 
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -694,7 +681,7 @@ class EmployeeInfoController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Employment status updated successfully',
-                'data' => $employeeInfo
+                'data' => PayAccess::reveal($request->user(), $employeeInfo)
             ]);
 
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -783,25 +770,32 @@ class EmployeeInfoController extends Controller
         );
     }
 
+    /** Keep a history of pay rates (only when there is pay to record) */
+    private function recordSalary(EmployeeInfo $employee, $user, string $note): void
+    {
+        if (! $employee->basic_salary || ! Schema::hasTable('salary_records')) {
+            return;
+        }
+        SalaryRecord::create([
+            'owner_id' => $employee->owner_id,
+            'employee_info_id' => $employee->id,
+            'basic_salary' => $employee->basic_salary,
+            'salary_type' => $employee->salary_type,
+            'effective_from' => now()->toDateString(),
+            'changed_by' => $user instanceof Employee ? $user->name : 'Shop owner',
+            'note' => $note,
+        ]);
+    }
+
+    private function canManageProfiles($user): bool
+    {
+        return EmployeeInfo::canBeManagedBy($user);
+    }
+
+    /** The HR employee who adds a profile; null when the shop owner adds it from the vendor portal. */
     private function resolveCreatorEmployeeId($user, int $ownerId): ?int
     {
-        if ($user instanceof Employee) {
-            return $user->id;
-        }
-
-        if (!$user) {
-            return null;
-        }
-
-        $employeeId = Employee::withoutGlobalScope('owner')
-            ->where('owner_id', $ownerId)
-            ->where(function ($query) use ($user) {
-                $query->where('email', $user->email)
-                    ->orWhere('username', $user->username ?? null);
-            })
-            ->value('id');
-
-        return $employeeId ? (int) $employeeId : null;
+        return $user instanceof Employee ? $user->id : null;
     }
 
     private function isEmploymentStatusConstraintViolation(QueryException $e): bool

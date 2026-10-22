@@ -38,6 +38,8 @@ final class SubscriptionPlans
         'sc_dashboard' => 'supply_chain',
         'sc_orders' => 'orders',
         'order_scan' => 'scanning',
+        // The ERP shift planner is the same feature as the vendor's Staff → Schedules
+        'schedules' => 'staff',
     ];
 
     /**

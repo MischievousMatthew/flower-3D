@@ -21,6 +21,7 @@ export const STAFF_PERMISSION_MODULES = [
   { key: "hr", label: "HR", group: "ERP", permissionModule: "hr_dashboard", subscriptionModule: SUB.HR },
   { key: "employees", label: "Employees", group: "ERP", permissionModule: "employees", subscriptionModule: SUB.EMPLOYEES },
   { key: "attendance", label: "Attendance", group: "ERP", permissionModule: "attendance", subscriptionModule: SUB.ATTENDANCE },
+  { key: "schedules", label: "Schedules", group: "ERP", permissionModule: "schedules", subscriptionModule: SUB.STAFF },
   { key: "payroll", label: "Payroll", group: "ERP", permissionModule: "payroll", subscriptionModule: SUB.PAYROLL },
   { key: "leave", label: "Leave", group: "ERP", permissionModule: "leave_management", subscriptionModule: SUB.LEAVE },
 ];

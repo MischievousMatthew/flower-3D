@@ -1,5 +1,5 @@
 <template>
-  <ShopLayout section="staff" title="Attendance" subtitle="Time-in and time-out records from the ERP scanner. Late and missing time-outs are flagged against each person's schedule.">
+  <ShopLayout section="staff" title="Attendance" subtitle="Time-in and time-out records from the shop scanner. Late, early leaves, missing time-outs and absences are flagged against each person's schedule.">
     <template #actions>
       <button type="button" class="sp-btn sp-btn-primary" :disabled="!data" @click="openForm()"><span v-html="ICONS.plus"></span>Add record</button>
     </template>
@@ -27,12 +27,27 @@
           <span class="sp-stat-icon tone-amber" v-html="ICONS.alert"></span>
           <div><strong>{{ s.late }}</strong><span>Late in this period</span></div>
         </button>
+        <button type="button" class="sp-stat" :class="{ on: flag === 'undertime' }" @click="flag = flag === 'undertime' ? '' : 'undertime'">
+          <span class="sp-stat-icon tone-violet" v-html="ICONS.logout"></span>
+          <div><strong>{{ s.undertime ?? 0 }}</strong><span>Left early</span></div>
+        </button>
         <button type="button" class="sp-stat" :class="{ on: flag === 'missing_out' }" @click="flag = flag === 'missing_out' ? '' : 'missing_out'">
           <span class="sp-stat-icon tone-red" v-html="ICONS.minus"></span>
           <div><strong>{{ s.missing_out }}</strong><span>No time-out</span></div>
         </button>
+        <div class="sp-stat">
+          <span class="sp-stat-icon tone-red" v-html="ICONS.user"></span>
+          <div><strong>{{ s.absent ?? "—" }}</strong><span>Absences</span></div>
+        </div>
       </template>
     </section>
+
+    <router-link v-if="data && (s.needs_review || s.overtime_pending)" :to="{ name: 'VendorStaffAttendanceReview' }" class="sp-banner info at-note at-review">
+      <span v-html="ICONS.eye"></span>
+      {{ [s.needs_review ? `${s.needs_review} ${s.needs_review === 1 ? "scan needs" : "scans need"} review` : "", s.overtime_pending ? `${s.overtime_pending} overtime ${s.overtime_pending === 1 ? "entry is" : "entries are"} waiting for approval` : ""].filter(Boolean).join(" · ") }}
+      — nothing counts for pay until it's approved.
+      <b>Review now</b>
+    </router-link>
 
     <p v-if="data && s.not_in_yet" class="sp-banner warn at-note">
       <span v-html="ICONS.user"></span>{{ s.not_in_yet }} {{ s.not_in_yet === 1 ? "person who works today hasn't" : "people who work today haven't" }} timed in yet.
@@ -91,7 +106,13 @@
                 <span v-else-if="r.status === 'missing_out'" class="sp-chip red">No time-out</span>
                 <span v-if="r.late_minutes" class="sp-chip amber">{{ lateText(r.late_minutes) }}</span>
                 <span v-else-if="r.late_minutes === 0" class="sp-chip green">On time</span>
+                <span v-if="r.undertime_minutes" class="sp-chip violet">Left {{ r.undertime_minutes }}m early</span>
+                <span v-if="r.overtime_status === 'pending'" class="sp-chip violet">{{ r.overtime_minutes }}m overtime · waiting</span>
+                <span v-else-if="r.overtime_status === 'approved'" class="sp-chip green">{{ r.overtime_approved_minutes }}m overtime</span>
+                <span v-if="r.review_status === 'pending'" class="sp-chip amber" :title="r.review_reasons.join(' ')">Needs review</span>
+                <span v-else-if="r.review_status === 'rejected'" class="sp-chip red">Rejected</span>
                 <span v-if="r.verified" class="sp-chip slate" title="Their face was checked when they scanned">Face checked</span>
+                <span v-if="r.source === 'correction'" class="sp-chip blue">Corrected</span>
                 <span v-if="r.by_owner" class="sp-chip violet">Edited by you</span>
               </div>
               <button type="button" class="sp-icon-btn" :aria-label="`Edit ${r.employee}'s attendance on ${dayLabel(r.date)}`" @click="openForm(r)"><span v-html="ICONS.edit"></span></button>
@@ -101,6 +122,9 @@
         </section>
       </div>
     </section>
+
+    <h2 class="at-section">Summary by person</h2>
+    <AttendanceReport :fetch="fetchReport" />
 
     <!-- Add / correct -->
     <Teleport to="body">
@@ -146,7 +170,7 @@
                 <input v-model="form.note" class="sp-input" maxlength="200" placeholder="e.g. Forgot to scan out" />
               </label>
             </div>
-            <p class="sp-hint">The record is marked as edited by you.</p>
+            <p class="sp-hint">The record is marked as edited by you.{{ form.id && form.pending ? " Saving also approves this flagged scan." : "" }}</p>
             <p v-if="formError" class="sp-error">{{ formError }}</p>
             <div class="sp-modal-foot">
               <button type="button" class="sp-btn sp-btn-ghost" @click="closeForm">Cancel</button>
@@ -164,6 +188,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
+import AttendanceReport from "../../../components/hr/attendance/AttendanceReport.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { ymd } from "../../../components/vendor/finance/financeUi";
@@ -194,8 +219,13 @@ const saving = ref(false);
 
 const s = computed(() => data.value?.stats ?? {});
 const visible = computed(() =>
-  (data.value?.records ?? []).filter((r) => (flag.value === "late" ? r.late_minutes > 0 : flag.value === "missing_out" ? r.status === "missing_out" : true)),
+  (data.value?.records ?? []).filter((r) =>
+    flag.value === "late" ? r.late_minutes > 0
+    : flag.value === "undertime" ? r.undertime_minutes > 0
+    : flag.value === "missing_out" ? r.status === "missing_out"
+    : true),
 );
+const fetchReport = async (from, to) => (await api.get("vendor/staff/attendance/report", { params: { from, to } })).data.data;
 const totalHours = computed(() => visible.value.reduce((n, r) => n + (r.hours ?? 0), 0));
 const byDay = computed(() => {
   const days = new Map();
@@ -264,7 +294,7 @@ function openForm(r = null) {
   Object.keys(errors).forEach((k) => delete errors[k]);
   formError.value = "";
   form.value = r
-    ? { id: r.id, employee: r.employee, date: r.date, time_in: r.time_in ?? "", time_out: r.time_out ?? "", note: "" }
+    ? { id: r.id, employee: r.employee, date: r.date, time_in: r.time_in ?? "", time_out: r.time_out ?? "", note: "", pending: r.review_status === "pending" }
     : { id: null, employee_id: person.value || null, date: today, time_in: "08:00", time_out: "", note: "" };
 }
 function closeForm() {
@@ -309,6 +339,20 @@ onMounted(() => {
 <style scoped>
 .at-note {
   margin: -4px 0 16px;
+}
+.at-review {
+  display: flex;
+  text-decoration: none;
+}
+.at-review b {
+  margin-left: auto;
+  font-weight: 600;
+}
+.at-section {
+  margin: 28px 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--v-text);
 }
 .at-toolbar {
   display: flex;

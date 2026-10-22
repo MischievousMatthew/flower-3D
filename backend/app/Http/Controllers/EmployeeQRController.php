@@ -7,10 +7,37 @@ use App\Models\EmployeeInfo;
 use App\Services\EmployeeQRCodeService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use App\Traits\ScopesOwner;
 
 class EmployeeQRController extends Controller
 {
+    use ScopesOwner;
+
     protected $qrCodeService;
+
+    /** GET /employees/{employeeId}/qr-code/payload — the signed text the ERP draws as a QR code. */
+    public function payload(int $employeeId): JsonResponse
+    {
+        $employee = EmployeeInfo::forOwner($this->getOwnerId())->findOrFail($employeeId);
+
+        return response()->json([
+            'success' => true,
+            'data' => ['qr_data' => $this->qrCodeService->payload($employee), 'version' => (int) ($employee->qr_version ?? 1)],
+        ]);
+    }
+
+    /** POST /employees/{employeeId}/qr-code/reissue — a new code; every older copy stops working. */
+    public function reissue(int $employeeId): JsonResponse
+    {
+        $employee = EmployeeInfo::forOwner($this->getOwnerId())->findOrFail($employeeId);
+        $employee->forceFill(['qr_version' => (int) ($employee->qr_version ?? 1) + 1])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'New QR code made. Older copies no longer work.',
+            'data' => ['qr_data' => $this->qrCodeService->payload($employee), 'version' => (int) $employee->qr_version],
+        ]);
+    }
 
     public function __construct(EmployeeQRCodeService $qrCodeService)
     {
@@ -25,7 +52,7 @@ class EmployeeQRController extends Controller
      */
     public function generate(int $employeeId): JsonResponse
     {
-        $ownerId = auth()->user()->id;
+        $ownerId = $this->getOwnerId();
         
         $employee = EmployeeInfo::where('id', $employeeId)
             ->where('owner_id', $ownerId)
@@ -55,7 +82,7 @@ class EmployeeQRController extends Controller
      */
     public function getSVG(int $employeeId)
     {
-        $ownerId = auth()->user()->id;
+        $ownerId = $this->getOwnerId();
         
         $employee = EmployeeInfo::where('id', $employeeId)
             ->where('owner_id', $ownerId)
@@ -82,7 +109,7 @@ class EmployeeQRController extends Controller
      */
     public function getBase64(int $employeeId): JsonResponse
     {
-        $ownerId = auth()->user()->id;
+        $ownerId = $this->getOwnerId();
         
         $employee = EmployeeInfo::where('id', $employeeId)
             ->where('owner_id', $ownerId)
@@ -113,7 +140,7 @@ class EmployeeQRController extends Controller
      */
     public function download(int $employeeId)
     {
-        $ownerId = auth()->user()->id;
+        $ownerId = $this->getOwnerId();
         
         $employee = EmployeeInfo::where('id', $employeeId)
             ->where('owner_id', $ownerId)
@@ -126,12 +153,7 @@ class EmployeeQRController extends Controller
             ], 404);
         }
 
-        $qrData = json_encode([
-            'owner_id' => $employee->owner_id,
-            'employee_id' => $employee->id,
-            'employee_code' => $employee->employee_id,
-            'type' => 'employee_attendance'
-        ]);
+        $qrData = $this->qrCodeService->payload($employee);
 
         $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')
             ->size(300)

@@ -21,6 +21,19 @@ class Payroll extends Model
         'finance_notes',
         'actual_work_amount',
         'paid_leave_amount',
+        'overtime_hours',
+        'overtime_amount',
+        'allowances_amount',
+        'bonuses_amount',
+        'other_deductions_amount',
+        'contributions_share',
+        'late_minutes',
+        'undertime_minutes',
+        'created_by_name',
+        'created_by_employee_id',
+        'approved_by_name',
+        'approved_at',
+        'paid_by_name',
         // Government contributions
         'include_contributions',
         'sss_contribution',
@@ -43,7 +56,14 @@ class Payroll extends Model
         'pagibig_contribution'        => 'decimal:2',
         'actual_work_amount'         => 'decimal:2',
         'paid_leave_amount'          => 'decimal:2',
+        'overtime_hours'             => 'decimal:2',
+        'overtime_amount'            => 'decimal:2',
         'include_contributions'       => 'boolean',
+        'allowances_amount'           => 'decimal:2',
+        'bonuses_amount'              => 'decimal:2',
+        'other_deductions_amount'     => 'decimal:2',
+        'contributions_share'         => 'float',
+        'approved_at'                 => 'datetime',
         'paid_at'                     => 'datetime',
         'created_at'                  => 'datetime',
         'updated_at'                  => 'datetime',
@@ -59,6 +79,11 @@ class Payroll extends Model
     public function employee()
     {
         return $this->belongsTo(EmployeeInfo::class, 'employee_id');
+    }
+
+    public function items()
+    {
+        return $this->hasMany(PayrollItem::class);
     }
 
     // ─── Scopes ───────────────────────────────────────────────────────────────
