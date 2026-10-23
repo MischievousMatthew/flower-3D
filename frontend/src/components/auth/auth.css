@@ -3,7 +3,7 @@
 .af-form {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 .af-field {
   display: flex;
@@ -20,7 +20,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--ink);
 }
@@ -30,12 +30,12 @@
 }
 .af-input {
   width: 100%;
-  height: 50px;
-  padding: 0 16px;
+  height: 58px;
+  padding: 0 18px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
   background: #fff;
-  font: 400 15px/1 var(--font-sans);
+  font: 400 16px/1 var(--font-sans);
   color: var(--ink);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -62,7 +62,7 @@
 .af-note {
   display: block;
   margin: 0;
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.45;
   color: var(--ink-soft);
 }
@@ -91,12 +91,12 @@
   justify-content: center;
   gap: 10px;
   width: 100%;
-  height: 52px;
+  height: 58px;
   padding: 0 22px;
   border: 0;
   border-radius: 999px;
   background: var(--espresso);
-  font: 500 15px/1 var(--font-sans);
+  font: 500 16px/1 var(--font-sans);
   color: #f7f2ea;
   cursor: pointer;
   transition: background 0.15s, transform 0.15s;
@@ -164,8 +164,8 @@
   cursor: default;
 }
 .af-foot {
-  margin: 26px 0 0;
-  font-size: 14px;
+  margin: 28px 0 0;
+  font-size: 15px;
   color: var(--ink-soft);
 }
 .af-check {

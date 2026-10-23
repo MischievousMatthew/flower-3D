@@ -105,11 +105,11 @@ defineExpose({ focus: () => boxes[0]?.focus() });
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
-  max-width: 380px;
+  max-width: 440px;
 }
 .cb-box {
   width: 100%;
-  height: 58px;
+  height: 64px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: #fff;

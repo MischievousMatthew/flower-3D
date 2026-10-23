@@ -17,7 +17,7 @@
         </li>
       </ol>
 
-      <AuthNotice v-if="notice" class="rg-notice" :tone="notice.tone" :title="notice.title" :body="notice.body">
+      <AuthNotice v-if="notice" class="rg-notice" :error="!['success', 'info'].includes(notice.tone)" :tone="notice.tone" :title="notice.title" :body="notice.body">
         <router-link v-if="notice.login" :to="{ name: 'Login', query: { u: form.email } }" class="af-link">Sign in instead</router-link>
         <router-link v-if="notice.login" :to="{ name: 'ForgotPassword', query: { u: form.email } }" class="af-link">Reset your password</router-link>
       </AuthNotice>
@@ -84,6 +84,7 @@
             <span class="af-label">6-digit code</span>
             <CodeBoxes ref="boxes" v-model="form.otp" :invalid="!!errors.otp" @update:model-value="errors.otp = ''" @complete="next" />
             <p v-if="errors.otp" class="af-note bad" role="alert">{{ errors.otp }}</p>
+            <CodeTimer v-else-if="codeUntil" :until="codeUntil" />
             <p class="af-note">
               We sent it to {{ form.email }}. Not there? Check spam, or
               <button type="button" class="af-plain" :disabled="sending || resendIn > 0" @click="sendCode">{{ resendIn > 0 ? `send another in ${resendIn}s` : "send another" }}</button>.
@@ -97,6 +98,7 @@
 
       <!-- Step 3: password -->
       <form v-else class="af-form" novalidate @submit.prevent="submit">
+        <CodeTimer v-if="codeUntil" :until="codeUntil" class="rg-step-timer" />
         <div class="af-field">
           <label class="af-label" for="rg-pass">Password</label>
           <PasswordField id="rg-pass" ref="passInput" v-model="form.password" autocomplete="new-password" :invalid="!!errors.password" @update:model-value="errors.password = ''" />
@@ -125,6 +127,7 @@ import AuthNotice from "../../components/auth/AuthNotice.vue";
 import PasswordField from "../../components/auth/PasswordField.vue";
 import PasswordRules from "../../components/auth/PasswordRules.vue";
 import CodeBoxes from "../../components/auth/CodeBoxes.vue";
+import CodeTimer from "../../components/auth/CodeTimer.vue";
 import { useAuth } from "../../composables/useAuth";
 import { usePlatformStatus } from "../../composables/usePlatformStatus";
 import { passwordOk } from "../../utils/passwordRules";
@@ -147,6 +150,8 @@ const checking = ref(false);
 const sending = ref(false);
 const codeSent = ref(false);
 const resendIn = ref(0);
+// When the emailed code stops working
+const codeUntil = ref(0);
 const usernameFree = ref(false);
 const firstInput = ref(null);
 const emailInput = ref(null);
@@ -215,6 +220,11 @@ async function next() {
       errors.otp = "Enter all 6 digits from the email.";
       return;
     }
+    if (codeUntil.value && Date.now() > codeUntil.value) {
+      errors.otp = "This code has expired. Send a new one.";
+      form.otp = "";
+      return;
+    }
     step.value = 3;
   }
 }
@@ -233,6 +243,7 @@ async function sendCode() {
     codeSent.value = true;
     form.otp = "";
     countdown(data.retry_after || 60);
+    codeUntil.value = Date.now() + (data.expires_in || 180) * 1000;
     nextTick(() => boxes.value?.focus());
   } catch (e) {
     const res = e.response;
@@ -253,6 +264,7 @@ async function sendCode() {
 
 function changeEmail() {
   codeSent.value = false;
+  codeUntil.value = 0;
   form.otp = "";
   clearInterval(timer);
   resendIn.value = 0;
@@ -264,6 +276,14 @@ async function submit() {
   if (!passwordOk(form.password)) errors.password = "Your password needs every item on the list.";
   if (form.password_confirmation !== form.password) errors.password_confirmation = "These don't match yet.";
   if (Object.keys(errors).length) return;
+  // The code ran out while choosing a password: back for a new one
+  if (codeUntil.value && Date.now() > codeUntil.value) {
+    form.otp = "";
+    step.value = 2;
+    await nextTick();
+    errors.otp = "This code has expired. Send a new one.";
+    return;
+  }
 
   const result = await register(form);
   if (result.success) return; // register() takes them to the shop
@@ -321,6 +341,9 @@ onBeforeUnmount(() => {
 }
 .rg-steps .on .rg-bar {
   background: linear-gradient(90deg, var(--rosewood-dark) 50%, var(--line) 50%);
+}
+.rg-step-timer {
+  margin: -8px 0 0;
 }
 .rg-notice {
   margin-bottom: 22px;

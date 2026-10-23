@@ -1,5 +1,5 @@
 // Sign-in problems: what went wrong with the request, and how the login page
-// explains it — a calm notice with a title, what to do next and, when waiting
+// explains it — a short calm note with what to do next and, when waiting
 // is the fix, a countdown. No vague "Login failed".
 
 /** What went wrong with a sign-in request (an axios error) */
@@ -19,52 +19,40 @@ export function loginProblem(err) {
 }
 
 /**
- * The notice for a failed sign-in.
+ * The note for a failed sign-in. Kept to a sentence or two so it fits the
+ * login form's fixed message space.
  * tone: "info" (neutral), "warn" (amber), "lock" (waiting), "offline"
  * field: which input to point at, if any
- * actions: ["forgot", "retry", "support", "register"]
+ * actions: ["forgot", "retry", "support"]
  */
 export function explainLoginProblem(result = {}) {
   const left = result.attemptsLeft;
+  const counted = left !== null && left !== undefined && left <= 3;
   switch (result.code) {
     case "invalid_credentials":
       return {
-        tone: left !== null && left !== undefined && left <= 2 ? "warn" : "info",
+        tone: counted && left <= 2 ? "warn" : "info",
         title: "That didn't match",
-        body:
-          left !== null && left !== undefined && left <= 3
-            ? `Check your username and password. ${left} ${left === 1 ? "try" : "tries"} left before sign-in pauses for a few minutes.`
-            : "Check your username (or email) and password, then try again. Passwords are case-sensitive.",
+        body: counted ? `Check your username and password. ${left} ${left === 1 ? "try" : "tries"} left.` : "Check your username and password.",
         field: "password",
         actions: ["forgot"],
       };
     case "account_locked":
-      return {
-        tone: "lock",
-        title: "Sign-in paused for your safety",
-        body: "There were too many wrong passwords. You can try again when the timer ends, or reset your password now to get back in straight away.",
-        countdown: result.retryAfter || null,
-        actions: ["forgot"],
-      };
+      return { tone: "lock", title: "Sign-in paused", body: "Too many wrong passwords.", countdown: result.retryAfter || null, actions: ["forgot"] };
     case "account_suspended":
-      return { tone: "warn", title: "This account is on hold", body: result.error || "Your account has been suspended.", actions: ["support"] };
+      return { tone: "warn", title: "Account on hold", body: result.error || "Your account has been suspended.", actions: ["support"] };
     case "account_inactive":
       return { tone: "info", title: "Staff sign-in is off", body: result.error || "Ask the shop owner to turn your account back on." };
     case "account_unverified":
-      return { tone: "info", title: "Verify your email first", body: result.error || "Open the verification link we emailed you, then sign in again.", actions: ["support"] };
+      return { tone: "info", title: "Verify your email first", body: "Open the link we emailed you, then sign in.", actions: ["support"] };
     case "offline":
-      return { tone: "offline", title: "You're offline", body: "Connect to the internet, then try again. We'll keep what you typed.", actions: ["retry"] };
+      return { tone: "offline", title: "You're offline", body: "Reconnect, then try again.", actions: ["retry"] };
     case "unreachable":
-      return {
-        tone: "offline",
-        title: "BloomCraft didn't answer",
-        body: "The server may still be waking up or your connection dropped. Give it a moment, then try again.",
-        actions: ["retry"],
-      };
+      return { tone: "offline", title: "BloomCraft didn't answer", body: "The server may be waking up.", actions: ["retry"] };
     case "too_many_requests":
-      return { tone: "lock", title: "Slow down a little", body: "Too many sign-in tries in a short time. Wait a moment, then try again.", countdown: result.retryAfter || 60 };
+      return { tone: "lock", title: "Slow down a little", body: "Too many tries in a short time.", countdown: result.retryAfter || 60 };
     default:
-      return { tone: "info", title: "We couldn't sign you in", body: result.error || "Something went wrong. Please try again.", actions: ["retry"] };
+      return { tone: "info", title: "We couldn't sign you in", body: result.error || "Please try again.", actions: ["retry"] };
   }
 }
 

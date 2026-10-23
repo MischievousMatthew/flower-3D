@@ -167,7 +167,7 @@ class LoginTroublesTest extends TestCase
         $this->customer();
 
         $this->postJson('/api/auth/send-otp', ['email' => 'ana@example.com'])->assertStatus(422)->assertJsonValidationErrors('email');
-        $this->postJson('/api/auth/send-otp', ['email' => 'new@example.com'])->assertOk()->assertJson(['retry_after' => 60]);
+        $this->postJson('/api/auth/send-otp', ['email' => 'new@example.com'])->assertOk()->assertJson(['retry_after' => 60, 'expires_in' => 180]);
         $this->postJson('/api/auth/send-otp', ['email' => 'new@example.com'])->assertStatus(429)->assertJsonStructure(['message', 'retry_after']);
     }
 
@@ -204,6 +204,18 @@ class LoginTroublesTest extends TestCase
 
         $this->assertTrue(Hash::check('Brand-new1', $user->fresh()->password));
         $this->login('Brand-new1')->assertOk()->assertJsonStructure(['token']);
+    }
+
+    public function test_a_code_stops_working_after_three_minutes(): void
+    {
+        Http::fake(['api.brevo.com/*' => Http::response(['messageId' => '1'], 201)]);
+        $this->customer();
+        $this->postJson('/api/auth/password/forgot', ['identifier' => 'ana'])->assertOk()->assertJson(['expires_in' => 180]);
+        $code = $this->emailedCode();
+
+        $this->travel(181)->seconds();
+        $this->postJson('/api/auth/password/reset', ['identifier' => 'ana', 'otp' => $code, 'password' => 'Brand-new1', 'password_confirmation' => 'Brand-new1'])
+            ->assertStatus(422)->assertJsonPath('errors.otp.0', 'That code has expired. Ask for a new one.');
     }
 
     public function test_forgot_password_answers_the_same_for_unknown_accounts(): void

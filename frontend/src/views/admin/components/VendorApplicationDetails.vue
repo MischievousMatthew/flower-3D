@@ -79,9 +79,15 @@
     <section class="card">
       <span class="card-label">Business registration</span>
       <dl class="facts">
-        <dt>DTI no.</dt><dd>{{ app.dti_number || "—" }}</dd>
-        <dt>SEC no.</dt><dd>{{ app.sec_number || "—" }}</dd>
+        <dt>Structure</dt><dd>{{ app.formatted_business_type || "—" }}</dd>
+        <dt>Registered name</dt><dd>{{ app.registered_business_name || "—" }}</dd>
+        <template v-if="app.dti_number || !app.sec_number && !app.cda_number"><dt>DTI no.</dt><dd>{{ app.dti_number || "—" }}</dd></template>
+        <template v-if="app.sec_number"><dt>SEC no.</dt><dd>{{ app.sec_number }}</dd></template>
+        <template v-if="app.cda_number"><dt>CDA no.</dt><dd>{{ app.cda_number }}</dd></template>
         <dt>BIR / TIN</dt><dd>{{ app.bir_tin || "—" }}</dd>
+        <dt>Permit valid until</dt>
+        <dd :class="{ expired: permitExpired }">{{ app.mayor_permit_valid_until ? formatDateTime(app.mayor_permit_valid_until).split(",")[0] : "—" }}<template v-if="permitExpired"> (expired)</template></dd>
+        <dt>ID type</dt><dd>{{ ID_TYPES[app.government_id_type] || app.government_id_type || "—" }}</dd>
       </dl>
     </section>
 
@@ -175,10 +181,14 @@ const documents = computed(() => [
   { key: "gov", label: "Government ID", url: props.app.government_id_url, number: props.app.government_id_number },
   { key: "selfie", label: "Selfie with ID", url: props.app.selfie_with_id_url },
   { key: "address", label: "Proof of address", url: props.app.proof_of_address_url },
+  { key: "registration", label: "DTI / SEC / CDA certificate", url: props.app.business_registration_url },
+  { key: "bir", label: "BIR Form 2303", url: props.app.bir_certificate_url, number: props.app.bir_tin },
   { key: "barangay", label: "Barangay clearance", url: props.app.barangay_clearance_url, number: props.app.barangay_clearance_number },
   { key: "mayor", label: "Mayor's permit", url: props.app.mayor_permit_url, number: props.app.mayor_permit_number },
   { key: "logo", label: "Store logo", url: props.app.store_logo_url },
 ]);
+const ID_TYPES = { philsys: "PhilSys National ID", passport: "Passport", drivers_license: "Driver's License", umid: "UMID", sss: "SSS ID", prc: "PRC ID", postal: "Postal ID", voters: "Voter's ID", philhealth: "PhilHealth ID", tin_id: "TIN ID", senior: "Senior Citizen ID", pwd: "PWD ID" };
+const permitExpired = computed(() => !!props.app.mayor_permit_valid_until && new Date(`${props.app.mayor_permit_valid_until}T23:59:59`) < new Date());
 const uploadedCount = computed(() => documents.value.filter((d) => d.url).length);
 const portfolio = computed(() => props.app.portfolio_photos_urls ?? []);
 
@@ -477,5 +487,9 @@ const formatDateTime = (v) =>
   .facts dd {
     margin-bottom: 8px;
   }
+}
+.expired {
+  color: #b4413a;
+  font-weight: 600;
 }
 </style>

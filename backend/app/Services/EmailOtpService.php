@@ -20,7 +20,9 @@ class EmailOtpService
     public const PURPOSE_SIGNIN = 'signin';
     public const PURPOSE_VERIFY = 'verify';
 
-    private const OTP_EXPIRY_MINUTES = 10;
+    /** How long a code works; the pages count this down */
+    public const OTP_EXPIRY_MINUTES = 3;
+    public const EXPIRES_IN_SECONDS = self::OTP_EXPIRY_MINUTES * 60;
     private const MAX_ATTEMPTS = 5;
     private const COOLDOWN_SECONDS = 60;
     private const MAX_PER_HOUR = 5;

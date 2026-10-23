@@ -28,6 +28,8 @@ class VendorApplication extends Model
         'proof_of_address_path', 'dti_number', 'sec_number',
         'barangay_clearance_number', 'barangay_clearance_path',
         'mayor_permit_number', 'mayor_permit_path', 'bir_tin',
+        'registered_business_name', 'cda_number', 'business_registration_path', 'bir_certificate_path',
+        'mayor_permit_valid_until', 'government_id_type',
         'payout_method', 'account_holder_name', 'account_number',
         'bank_name', 'billing_address', 'product_types', 'price_min',
         'price_max', 'same_day_delivery', 'cutoff_times',
@@ -55,6 +57,7 @@ class VendorApplication extends Model
         'price_max'                   => 'decimal:2',
         'submitted_at'                => 'datetime',
         'reviewed_at'                 => 'datetime',
+        'mayor_permit_valid_until'    => 'date:Y-m-d',
         'payment_details_completed'   => 'boolean',
         'product_details_completed'   => 'boolean',
         'delivery_details_completed'  => 'boolean',
@@ -67,6 +70,8 @@ class VendorApplication extends Model
         'proof_of_address_url',
         'barangay_clearance_url',
         'mayor_permit_url',
+        'business_registration_url',
+        'bir_certificate_url',
         'store_logo_url',
         'store_cover_url',
         'profile_photo_url',
@@ -338,6 +343,16 @@ class VendorApplication extends Model
         return Attribute::make(get: fn () => $this->resolvePathUrl($this->mayor_permit_path));
     }
 
+    protected function businessRegistrationUrl(): Attribute
+    {
+        return Attribute::make(get: fn () => $this->resolvePathUrl($this->business_registration_path));
+    }
+
+    protected function birCertificateUrl(): Attribute
+    {
+        return Attribute::make(get: fn () => $this->resolvePathUrl($this->bir_certificate_path));
+    }
+
     protected function storeLogoUrl(): Attribute
     {
         return Attribute::make(get: fn () => $this->resolveLogoUrl($this->store_logo_path));
@@ -375,9 +390,10 @@ class VendorApplication extends Model
     {
         return Attribute::make(
             get: fn () => [
-                'individual'  => 'Sole Proprietor',
-                'partnership' => 'Partnership',
-                'corporation' => 'Corporation',
+                'individual'  => 'Sole Proprietor (DTI)',
+                'partnership' => 'Partnership (SEC)',
+                'corporation' => 'Corporation (SEC)',
+                'cooperative' => 'Cooperative (CDA)',
             ][$this->business_type] ?? $this->business_type
         );
     }

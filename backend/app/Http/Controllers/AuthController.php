@@ -60,7 +60,7 @@ class AuthController extends Controller
             return response()->json(['success' => false, 'message' => "We couldn't send the email right now. Please try again in a few minutes."], 503);
         }
 
-        return response()->json(['success' => true, 'message' => $sent, 'retry_after' => 60]);
+        return response()->json(['success' => true, 'message' => $sent, 'retry_after' => 60, 'expires_in' => EmailOtpService::EXPIRES_IN_SECONDS]);
     }
 
     /**
@@ -97,6 +97,7 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'If an account matches, we emailed it a 6-digit code. It can take a minute to arrive — check your spam folder too.',
             'retry_after' => 60,
+            'expires_in' => EmailOtpService::EXPIRES_IN_SECONDS,
         ]);
 
         if (! $user || ! $user->email) {
@@ -369,6 +370,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'masked_email' => $this->maskEmail($challenge->user->email),
+            'expires_in' => EmailOtpService::EXPIRES_IN_SECONDS,
         ]);
     }
 

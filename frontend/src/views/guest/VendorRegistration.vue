@@ -21,8 +21,13 @@
       body="Please check back soon. If you already applied, we'll email you about your application."
     />
 
+    <AuthNotice v-if="resumed && !formProblem" class="vr-problem" tone="success" title="Welcome back" body="We kept what you entered on this device, so you can carry on where you left off. Documents may need to be added again.">
+      <button type="button" class="af-plain" @click="resumed = false">Continue</button>
+      <button type="button" class="af-plain" @click="startOver">Start over</button>
+    </AuthNotice>
+
     <!-- Problems with the form: explained here, in words, never a red pop-up -->
-    <AuthNotice v-if="formProblem" ref="problemBox" class="vr-problem" :tone="formProblem.tone" :title="formProblem.title" :body="formProblem.body">
+    <AuthNotice v-if="formProblem" ref="problemBox" class="vr-problem" error :tone="formProblem.tone" :title="formProblem.title" :body="formProblem.body">
       <button v-if="formProblem.goTo" type="button" class="af-plain" @click="jumpToProblem">Show me</button>
     </AuthNotice>
 
@@ -84,17 +89,20 @@
         </div>
 
         <div class="input-group">
-          <label class="input-label">Business Type *</label>
+          <label class="input-label">How is your business registered? *</label>
           <select
             v-model="formData.businessType"
+            name="businessType"
             class="form-input"
             :class="{ error: errors.businessType }"
           >
-            <option value="">Select business type</option>
-            <option value="individual">Individual / Sole Proprietor</option>
-            <option value="partnership">Partnership</option>
-            <option value="corporation">Corporation</option>
+            <option value="">Choose your business structure</option>
+            <option value="individual">Sole proprietorship (registered with DTI)</option>
+            <option value="partnership">Partnership (registered with SEC)</option>
+            <option value="corporation">Corporation or One Person Corporation (SEC)</option>
+            <option value="cooperative">Cooperative (registered with CDA)</option>
           </select>
+          <p class="hint-text">This decides which registration certificate we ask for in the Business step.</p>
           <div v-if="errors.businessType" class="error-message">
             {{ errors.businessType }}
           </div>
@@ -283,7 +291,9 @@
           <input
             v-model="formData.contactNumber"
             type="tel"
-            placeholder="+63 912 345 6789"
+            name="contactNumber"
+            inputmode="tel"
+            placeholder="0917 123 4567"
             class="form-input"
             :class="{ error: errors.contactNumber }"
           />
@@ -311,11 +321,21 @@
         </div>
 
         <div class="input-group">
-          <label class="input-label">Government-Issued ID *</label>
+          <label class="input-label">Type of government ID *</label>
+          <select v-model="formData.governmentIdType" name="governmentIdType" class="form-input" :class="{ error: errors.governmentIdType }">
+            <option value="">Choose your ID</option>
+            <option v-for="(label, key) in GOVERNMENT_IDS" :key="key" :value="key">{{ label }}</option>
+          </select>
+          <div v-if="errors.governmentIdType" class="error-message">{{ errors.governmentIdType }}</div>
+        </div>
+
+        <div class="input-group">
+          <label class="input-label">ID number and photo *</label>
           <input
             v-model="formData.governmentIdNumber"
             type="text"
-            placeholder="Enter ID Number"
+            name="governmentIdNumber"
+            placeholder="As printed on the ID"
             class="form-input id-number-input"
             :class="{ error: errors.governmentIdNumber }"
           />
@@ -531,218 +551,119 @@
 
       <!-- Step 3: Business Registration (UNCHANGED) -->
       <div v-if="currentStep === 3" class="form-step">
-        <h2 class="step-title">Business Registration</h2>
+        <h2 class="step-title">Business registration</h2>
         <p class="subtitle-text">
-          If available, please provide your business registration details
+          The documents a {{ registration.who }} in the Philippines operates with. Upload clear photos or PDFs of the originals; our team checks them before your shop opens.
         </p>
 
+        <h3 class="section-title">{{ registration.agency }} registration</h3>
         <div class="input-group">
-          <label class="input-label">DTI Registration Number *</label>
-          <input
-            v-model="formData.dtiNumber"
-            type="text"
-            placeholder="Enter DTI number"
-            class="form-input"
-            :class="{ error: errors.dtiNumber }"
+          <label class="input-label">Registered business name *</label>
+          <input v-model="formData.registeredBusinessName" name="registeredBusinessName" type="text" class="form-input" :class="{ error: errors.registeredBusinessName }" placeholder="Exactly as printed on your certificate" />
+          <p class="hint-text">It can be different from your store name.</p>
+          <div v-if="errors.registeredBusinessName" class="error-message">{{ errors.registeredBusinessName }}</div>
+        </div>
+        <div class="input-group">
+          <label class="input-label">{{ registration.numberLabel }} *</label>
+          <input v-model="formData[registration.field]" :name="registration.field" type="text" class="form-input" :class="{ error: errors[registration.field] }" :placeholder="registration.example" />
+          <div v-if="errors[registration.field]" class="error-message">{{ errors[registration.field] }}</div>
+        </div>
+        <div class="input-group">
+          <label class="input-label">{{ registration.certificate }} *</label>
+          <DocDrop
+            field="business_registration"
+            label="your registration certificate"
+            :info="fileInfo.business_registration"
+            :over="!!dragOver.business_registration"
+            :error="errors.business_registration"
+            @change="handleFileUpload($event, 'business_registration')"
+            @drop="handleDrop($event, 'business_registration')"
+            @dragenter="handleDragEnter($event, 'business_registration')"
+            @dragover="handleDragOver($event, 'business_registration')"
+            @dragleave="handleDragLeave($event, 'business_registration')"
+            @remove="removeFile('business_registration')"
           />
-          <div v-if="errors.dtiNumber" class="error-message">
-            {{ errors.dtiNumber }}
-          </div>
         </div>
 
+        <h3 class="section-title">BIR (taxes)</h3>
         <div class="input-group">
-          <label class="input-label">SEC Registration Number *</label>
-          <input
-            v-model="formData.secNumber"
-            type="text"
-            placeholder="Enter SEC number"
-            class="form-input"
-            :class="{ error: errors.secNumber }"
+          <label class="input-label">Taxpayer Identification Number (TIN) *</label>
+          <input :value="formData.birTin" name="birTin" type="text" inputmode="numeric" class="form-input" :class="{ error: errors.birTin }" placeholder="123-456-789-00000" @input="formData.birTin = formatTin($event.target.value); $event.target.value = formData.birTin" />
+          <p class="hint-text">9 digits, plus the branch code if your 2303 shows one.</p>
+          <div v-if="errors.birTin" class="error-message">{{ errors.birTin }}</div>
+        </div>
+        <div class="input-group">
+          <label class="input-label">BIR Certificate of Registration (Form 2303) *</label>
+          <DocDrop
+            field="bir_certificate"
+            label="BIR Form 2303"
+            :info="fileInfo.bir_certificate"
+            :over="!!dragOver.bir_certificate"
+            :error="errors.bir_certificate"
+            @change="handleFileUpload($event, 'bir_certificate')"
+            @drop="handleDrop($event, 'bir_certificate')"
+            @dragenter="handleDragEnter($event, 'bir_certificate')"
+            @dragover="handleDragOver($event, 'bir_certificate')"
+            @dragleave="handleDragLeave($event, 'bir_certificate')"
+            @remove="removeFile('bir_certificate')"
           />
-          <div v-if="errors.secNumber" class="error-message">
-            {{ errors.secNumber }}
-          </div>
         </div>
 
-        <div class="input-group">
-          <label class="input-label">Barangay Clearance Number *</label>
-          <input
-            v-model="formData.barangayClearanceNumber"
-            type="text"
-            placeholder="Enter Barangay Clearance Number"
-            class="form-input"
-            :class="{ error: errors.barangayClearanceNumber }"
-          />
-          <div v-if="errors.barangayClearanceNumber" class="error-message">
-            {{ errors.barangayClearanceNumber }}
+        <h3 class="section-title">Mayor's / Business Permit</h3>
+        <div class="field-row">
+          <div class="input-group">
+            <label class="input-label">Permit number *</label>
+            <input v-model="formData.mayorPermitNumber" name="mayorPermitNumber" type="text" class="form-input" :class="{ error: errors.mayorPermitNumber }" placeholder="As printed on the permit" />
+            <div v-if="errors.mayorPermitNumber" class="error-message">{{ errors.mayorPermitNumber }}</div>
           </div>
-          <div class="file-upload-container">
-            <div
-              class="file-drop-zone"
-              @click="$refs.barangay_clearanceInput.click()"
-              @dragenter.prevent="handleDragEnter($event, 'barangay_clearance')"
-              @dragover.prevent="handleDragOver($event, 'barangay_clearance')"
-              @dragleave.prevent="handleDragLeave($event, 'barangay_clearance')"
-              @drop.prevent="handleDrop($event, 'barangay_clearance')"
-              :class="{
-                'drag-over': dragOver.barangay_clearance,
-                'has-file': fileInfo.barangay_clearance,
-              }"
-            >
-              <div
-                v-if="!fileInfo.barangay_clearance"
-                class="upload-placeholder"
-              >
-                <svg class="upload-icon" viewBox="0 0 24 24">
-                  <path
-                    d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"
-                  />
-                </svg>
-                <p class="upload-text">Drop file here or click to upload</p>
-                <p class="upload-hint">
-                  Max size: 10MB • Formats: JPG, PNG, PDF
-                </p>
-              </div>
-              <div v-else class="file-preview">
-                <div class="preview-icon">
-                  <img v-if="isImage(fileInfo.barangay_clearance.type) && fileInfo.barangay_clearance.url" :src="fileInfo.barangay_clearance.url" :alt="fileInfo.barangay_clearance.name" class="file-thumbnail" />
-                  <span v-if="isImage(fileInfo.barangay_clearance.type)"
-                    >🏛️</span
-                  >
-                  <span v-else>📄</span>
-                </div>
-                <div class="file-details">
-                  <div class="file-name">
-                    {{ fileInfo.barangay_clearance.name }}
-                  </div>
-                  <div class="file-meta">
-                    <span class="file-size">{{
-                      formatFileSize(fileInfo.barangay_clearance.size)
-                    }}</span>
-                    <span class="file-type">{{
-                      getFileType(fileInfo.barangay_clearance.type)
-                    }}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  @click.stop="removeFile('barangay_clearance')"
-                  class="remove-file-btn"
-                  title="Remove file"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-            <input
-              type="file"
-              @change="handleFileUpload($event, 'barangay_clearance')"
-              accept=".jpg,.jpeg,.png,.pdf,image/*"
-              class="file-input-hidden"
-              ref="barangay_clearanceInput"
-              :class="{ error: errors.barangay_clearance }"
-            />
-          </div>
-          <div v-if="errors.barangay_clearance" class="error-message">
-            {{ errors.barangay_clearance }}
+          <div class="input-group">
+            <label class="input-label">Valid until *</label>
+            <input v-model="formData.mayorPermitValidUntil" name="mayorPermitValidUntil" type="date" class="form-input" :class="{ error: errors.mayorPermitValidUntil }" :min="todayYmd" />
+            <div v-if="errors.mayorPermitValidUntil" class="error-message">{{ errors.mayorPermitValidUntil }}</div>
           </div>
         </div>
-
+        <p class="hint-text permit-hint">Business permits are renewed every January at your city or municipal hall.</p>
         <div class="input-group">
-          <label class="input-label">Mayor's Permit Number *</label>
-          <input
-            v-model="formData.mayorPermitNumber"
-            type="text"
-            placeholder="Enter Mayor's Permit Number"
-            class="form-input"
-            :class="{ error: errors.mayorPermitNumber }"
+          <DocDrop
+            field="mayor_permit"
+            label="your business permit"
+            :info="fileInfo.mayor_permit"
+            :over="!!dragOver.mayor_permit"
+            :error="errors.mayor_permit"
+            @change="handleFileUpload($event, 'mayor_permit')"
+            @drop="handleDrop($event, 'mayor_permit')"
+            @dragenter="handleDragEnter($event, 'mayor_permit')"
+            @dragover="handleDragOver($event, 'mayor_permit')"
+            @dragleave="handleDragLeave($event, 'mayor_permit')"
+            @remove="removeFile('mayor_permit')"
           />
-          <div v-if="errors.mayorPermitNumber" class="error-message">
-            {{ errors.mayorPermitNumber }}
-          </div>
-          <div class="file-upload-container">
-            <div
-              class="file-drop-zone"
-              @click="$refs.mayor_permitInput.click()"
-              @dragenter.prevent="handleDragEnter($event, 'mayor_permit')"
-              @dragover.prevent="handleDragOver($event, 'mayor_permit')"
-              @dragleave.prevent="handleDragLeave($event, 'mayor_permit')"
-              @drop.prevent="handleDrop($event, 'mayor_permit')"
-              :class="{
-                'drag-over': dragOver.mayor_permit,
-                'has-file': fileInfo.mayor_permit,
-              }"
-            >
-              <div v-if="!fileInfo.mayor_permit" class="upload-placeholder">
-                <svg class="upload-icon" viewBox="0 0 24 24">
-                  <path
-                    d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"
-                  />
-                </svg>
-                <p class="upload-text">Drop file here or click to upload</p>
-                <p class="upload-hint">
-                  Max size: 10MB • Formats: JPG, PNG, PDF
-                </p>
-              </div>
-              <div v-else class="file-preview">
-                <div class="preview-icon">
-                  <img v-if="isImage(fileInfo.mayor_permit.type) && fileInfo.mayor_permit.url" :src="fileInfo.mayor_permit.url" :alt="fileInfo.mayor_permit.name" class="file-thumbnail" />
-                  <span v-if="isImage(fileInfo.mayor_permit.type)">🏢</span>
-                  <span v-else>📄</span>
-                </div>
-                <div class="file-details">
-                  <div class="file-name">{{ fileInfo.mayor_permit.name }}</div>
-                  <div class="file-meta">
-                    <span class="file-size">{{
-                      formatFileSize(fileInfo.mayor_permit.size)
-                    }}</span>
-                    <span class="file-type">{{
-                      getFileType(fileInfo.mayor_permit.type)
-                    }}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  @click.stop="removeFile('mayor_permit')"
-                  class="remove-file-btn"
-                  title="Remove file"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-            <input
-              type="file"
-              @change="handleFileUpload($event, 'mayor_permit')"
-              accept=".jpg,.jpeg,.png,.pdf,image/*"
-              class="file-input-hidden"
-              ref="mayor_permitInput"
-              :class="{ error: errors.mayor_permit }"
-            />
-          </div>
-          <div v-if="errors.mayor_permit" class="error-message">
-            {{ errors.mayor_permit }}
-          </div>
         </div>
 
+        <h3 class="section-title">Barangay Business Clearance</h3>
         <div class="input-group">
-          <label class="input-label">BIR Registration / TIN *</label>
-          <input
-            v-model="formData.birTin"
-            type="text"
-            placeholder="Enter TIN"
-            class="form-input"
-            :class="{ error: errors.birTin }"
+          <label class="input-label">Clearance number *</label>
+          <input v-model="formData.barangayClearanceNumber" name="barangayClearanceNumber" type="text" class="form-input" :class="{ error: errors.barangayClearanceNumber }" placeholder="As printed on the clearance" />
+          <div v-if="errors.barangayClearanceNumber" class="error-message">{{ errors.barangayClearanceNumber }}</div>
+        </div>
+        <div class="input-group">
+          <DocDrop
+            field="barangay_clearance"
+            label="your barangay clearance"
+            :info="fileInfo.barangay_clearance"
+            :over="!!dragOver.barangay_clearance"
+            :error="errors.barangay_clearance"
+            @change="handleFileUpload($event, 'barangay_clearance')"
+            @drop="handleDrop($event, 'barangay_clearance')"
+            @dragenter="handleDragEnter($event, 'barangay_clearance')"
+            @dragover="handleDragOver($event, 'barangay_clearance')"
+            @dragleave="handleDragLeave($event, 'barangay_clearance')"
+            @remove="removeFile('barangay_clearance')"
           />
-          <div v-if="errors.birTin" class="error-message">
-            {{ errors.birTin }}
-          </div>
         </div>
 
         <div class="info-box">
           <p>
-            💡 Providing business registration documents helps build trust with
-            customers and may unlock additional features.
+            Missing one? You can save your progress on this device and finish later. Every document stays private — only the BloomCraft review team sees them.
           </p>
         </div>
       </div>
@@ -1039,6 +960,9 @@
         <div class="review-section">
           <h3 class="review-section-title">Verification Documents</h3>
           <div class="review-item">
+            <strong>ID type:</strong> {{ GOVERNMENT_IDS[formData.governmentIdType] || "Not provided" }}
+          </div>
+          <div class="review-item">
             <strong>Government ID No:</strong>
             {{ formData.governmentIdNumber || "Not provided" }}
           </div>
@@ -1079,11 +1003,20 @@
           "
         >
           <h3 class="review-section-title">Business Registration</h3>
-          <div class="review-item" v-if="formData.dtiNumber">
-            <strong>DTI Number:</strong> {{ formData.dtiNumber }}
+          <div class="review-item">
+            <strong>Registered name:</strong> {{ formData.registeredBusinessName }}
           </div>
-          <div class="review-item" v-if="formData.secNumber">
-            <strong>SEC Number:</strong> {{ formData.secNumber }}
+          <div class="review-item">
+            <strong>{{ registration.numberLabel }}:</strong> {{ formData[registration.field] }}
+          </div>
+          <div class="review-item" v-if="fileInfo.business_registration">
+            <strong>{{ registration.certificate }}:</strong> {{ fileInfo.business_registration.name }}
+          </div>
+          <div class="review-item" v-if="fileInfo.bir_certificate">
+            <strong>BIR Form 2303:</strong> {{ fileInfo.bir_certificate.name }}
+          </div>
+          <div class="review-item" v-if="formData.mayorPermitValidUntil">
+            <strong>Permit valid until:</strong> {{ formData.mayorPermitValidUntil }}
           </div>
           <div class="review-item" v-if="formData.barangayClearanceNumber">
             <strong>Barangay Clearance No:</strong>
@@ -1237,6 +1170,7 @@ import api from "../../plugins/axios";
 import { usePlatformStatus } from "../../composables/usePlatformStatus";
 import AuthShell from "../../components/auth/AuthShell.vue";
 import AuthNotice from "../../components/auth/AuthNotice.vue";
+import DocDrop from "../../components/vendor/register/DocDrop.vue";
 import { toast } from "vue3-toastify";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -1250,6 +1184,12 @@ const router = useRouter();
 // Problems are explained in a notice at the top of the form (and scrolled to),
 // with a "Show me" that jumps to the field — instead of red pop-ups
 const formProblem = ref(null);
+const resumed = ref(false);
+const startOver = () => {
+  clearProgress();
+  resumed.value = false;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
 const problemBox = ref(null);
 let problemField = null;
 const explain = (title, body, { tone = "warn", field = null } = {}) => {
@@ -1292,11 +1232,15 @@ const formData = reactive({
   position: "",
   contactNumber: "",
   email: "",
+  governmentIdType: "",
   governmentIdNumber: "",
 
-  // Step 3
+  // Step 3 — one of DTI / SEC / CDA, by business structure
+  registeredBusinessName: "",
   dtiNumber: "",
   secNumber: "",
+  cdaNumber: "",
+  mayorPermitValidUntil: "",
   barangayClearanceNumber: "",
   mayorPermitNumber: "",
   birTin: "",
@@ -1311,6 +1255,44 @@ const formData = reactive({
   // Step 5
   confirmAccuracy: false,
 });
+
+// Valid government IDs in the Philippines (same list as the server)
+const GOVERNMENT_IDS = {
+  philsys: "PhilSys National ID",
+  passport: "Passport",
+  drivers_license: "Driver's License",
+  umid: "UMID",
+  sss: "SSS ID",
+  prc: "PRC ID",
+  postal: "Postal ID",
+  voters: "Voter's ID",
+  philhealth: "PhilHealth ID",
+  tin_id: "TIN ID",
+  senior: "Senior Citizen ID",
+  pwd: "PWD ID",
+};
+
+// Which registration the business has, from its structure
+const REGISTRATIONS = {
+  individual: { who: "sole proprietorship", agency: "DTI", field: "dtiNumber", numberLabel: "DTI Business Name registration number", certificate: "DTI Certificate of Business Name Registration", example: "e.g. 3456789" },
+  partnership: { who: "partnership", agency: "SEC", field: "secNumber", numberLabel: "SEC registration number", certificate: "SEC Certificate of Registration", example: "e.g. PG201912345" },
+  corporation: { who: "corporation", agency: "SEC", field: "secNumber", numberLabel: "SEC registration number", certificate: "SEC Certificate of Incorporation", example: "e.g. CS201912345" },
+  cooperative: { who: "cooperative", agency: "CDA", field: "cdaNumber", numberLabel: "CDA registration number", certificate: "CDA Certificate of Registration", example: "e.g. 9520-1234567" },
+};
+const registration = computed(() => REGISTRATIONS[formData.businessType] ?? REGISTRATIONS.individual);
+const todayYmd = new Date().toLocaleDateString("en-CA");
+
+// 123456789 → 123-456-789; a branch code follows after another dash
+const formatTin = (value) => {
+  const d = String(value).replace(/\D/g, "").slice(0, 14);
+  return [d.slice(0, 3), d.slice(3, 6), d.slice(6, 9), d.slice(9)].filter(Boolean).join("-");
+};
+const tinOk = (value) => /^\d{9}(\d{3}|\d{5})?$/.test(String(value).replace(/-/g, ""));
+// Mobile (09XX… / +63 9XX…) or landline with area code
+const phoneOk = (value) => {
+  const d = String(value).replace(/[^\d+]/g, "");
+  return /^(\+?63|0)9\d{9}$/.test(d) || /^(\+?63|0)\d{8,10}$/.test(d);
+};
 
 const steps = [
   { number: 1, title: "Store" },
@@ -1611,6 +1593,8 @@ const fileObjects = reactive({
   proof_of_address: null,
   barangay_clearance: null,
   mayor_permit: null,
+  business_registration: null,
+  bir_certificate: null,
   store_logo: null,
   portfolio_photos: [],
 });
@@ -1665,6 +1649,7 @@ const getStepForErrorField = (field) => {
       "email",
       "governmentId",
       "governmentIdNumber",
+      "governmentIdType",
       "selfieWithId",
       "proofOfAddress",
       "government_id",
@@ -1679,6 +1664,13 @@ const getStepForErrorField = (field) => {
     [
       "dtiNumber",
       "secNumber",
+      "cdaNumber",
+      "registeredBusinessName",
+      "mayorPermitValidUntil",
+      "businessRegistration",
+      "business_registration",
+      "birCertificate",
+      "bir_certificate",
       "birTin",
       "barangayClearanceNumber",
       "mayorPermitNumber",
@@ -2015,6 +2007,8 @@ const validateFile = (file, fieldName) => {
     proof_of_address: 5 * 1024 * 1024,
     barangay_clearance: 10 * 1024 * 1024,
     mayor_permit: 10 * 1024 * 1024,
+    business_registration: 10 * 1024 * 1024,
+    bir_certificate: 10 * 1024 * 1024,
     store_logo: 2 * 1024 * 1024,
     portfolio_photos: 5 * 1024 * 1024,
   };
@@ -2144,9 +2138,10 @@ const formatFileSize = (bytes) => {
 
 const formatBusinessType = (type) => {
   const types = {
-    individual: "Individual / Sole Proprietor",
-    partnership: "Partnership",
-    corporation: "Corporation",
+    individual: "Sole proprietorship (DTI)",
+    partnership: "Partnership (SEC)",
+    corporation: "Corporation (SEC)",
+    cooperative: "Cooperative (CDA)",
   };
   return types[type] || type;
 };
@@ -2233,6 +2228,13 @@ const validateStep = (step) => {
       if (!formData.contactNumber.trim()) {
         errors.contactNumber = "Contact number is required";
         isValid = false;
+      } else if (!phoneOk(formData.contactNumber)) {
+        errors.contactNumber = "Enter a Philippine number, like 0917 123 4567 or (046) 123 4567.";
+        isValid = false;
+      }
+      if (!formData.governmentIdType) {
+        errors.governmentIdType = "Choose the type of government ID";
+        isValid = false;
       }
       if (!formData.email.trim()) {
         errors.email = "Email is required";
@@ -2259,37 +2261,28 @@ const validateStep = (step) => {
       }
       break;
 
-    case 3:
-      if (!formData.dtiNumber.trim()) {
-        errors.dtiNumber = "DTI number is required";
-        isValid = false;
-      }
-      if (!formData.secNumber.trim()) {
-        errors.secNumber = "SEC number is required";
-        isValid = false;
-      }
-      if (!formData.barangayClearanceNumber.trim()) {
-        errors.barangayClearanceNumber =
-          "Barangay Clearance number is required";
-        isValid = false;
-      }
-      if (!hasSelectedFile("barangay_clearance")) {
-        errors.barangay_clearance = "Barangay Clearance document is required";
-        isValid = false;
-      }
-      if (!formData.mayorPermitNumber.trim()) {
-        errors.mayorPermitNumber = "Mayor's Permit number is required";
-        isValid = false;
-      }
-      if (!hasSelectedFile("mayor_permit")) {
-        errors.mayor_permit = "Mayor's Permit document is required";
-        isValid = false;
-      }
-      if (!formData.birTin.trim()) {
-        errors.birTin = "BIR Registration / TIN is required";
-        isValid = false;
-      }
+    case 3: {
+      const reg = registration.value;
+      const need = (ok, key, message) => {
+        if (!ok) {
+          errors[key] = message;
+          isValid = false;
+        }
+      };
+      need(formData.registeredBusinessName.trim(), "registeredBusinessName", "Enter the business name exactly as it appears on your certificate");
+      need(String(formData[reg.field]).trim(), reg.field, `${reg.numberLabel} is required`);
+      need(hasSelectedFile("business_registration"), "business_registration", `Upload your ${reg.certificate}`);
+      need(formData.birTin.trim(), "birTin", "TIN is required");
+      if (formData.birTin.trim()) need(tinOk(formData.birTin), "birTin", "Use your 9-digit TIN, with or without the branch code");
+      need(hasSelectedFile("bir_certificate"), "bir_certificate", "Upload your BIR Certificate of Registration (Form 2303)");
+      need(formData.mayorPermitNumber.trim(), "mayorPermitNumber", "Permit number is required");
+      need(formData.mayorPermitValidUntil, "mayorPermitValidUntil", "Enter the date the permit is valid until");
+      if (formData.mayorPermitValidUntil) need(formData.mayorPermitValidUntil >= todayYmd, "mayorPermitValidUntil", "This permit has expired. Renew it, then upload the new one");
+      need(hasSelectedFile("mayor_permit"), "mayor_permit", "Upload your Mayor's / Business Permit");
+      need(formData.barangayClearanceNumber.trim(), "barangayClearanceNumber", "Clearance number is required");
+      need(hasSelectedFile("barangay_clearance"), "barangay_clearance", "Upload your Barangay Business Clearance");
       break;
+    }
 
     case 4:
       if (!formData.acceptTerms) {
@@ -2430,14 +2423,9 @@ const loadProgress = () => {
           }];
         }
 
-        if (currentStep.value > 1) {
-          const shouldContinue = confirm(
-            "We found a previously saved application. Do you want to continue where you left off?",
-          );
-          if (!shouldContinue) {
-            clearProgress();
-            currentStep.value = 1;
-          }
+        // Picked up where they left off; the note offers a fresh start
+        if (currentStep.value > 1 || Object.values(parsed.formData || {}).some((v) => v)) {
+          resumed.value = true;
         }
       } else {
         clearProgress();
@@ -2496,6 +2484,8 @@ const handleSubmit = async () => {
     ["proof_of_address", "Proof of Address"],
     ["barangay_clearance", "Barangay Clearance"],
     ["mayor_permit", "Mayor's Permit"],
+    ["business_registration", "registration certificate"],
+    ["bir_certificate", "BIR Form 2303"],
   ];
 
   const staleUpload = requiredUploadFields.find(
@@ -2587,6 +2577,14 @@ const handleSubmit = async () => {
     }
     if (fileObjects.mayor_permit && fileObjects.mayor_permit instanceof File) {
       submitData.append("mayor_permit", fileObjects.mayor_permit);
+    }
+    for (const field of ["business_registration", "bir_certificate"]) {
+      if (fileObjects[field] instanceof File) submitData.append(field, fileObjects[field]);
+    }
+    // Only the registration number that matches the business structure
+    const kept = toSnakeCase(registration.value.field);
+    for (const key of ["dti_number", "sec_number", "cda_number"]) {
+      if (key !== kept) submitData.delete(key);
     }
     if (fileObjects.store_logo && fileObjects.store_logo instanceof File) {
       submitData.append("store_logo", fileObjects.store_logo);
@@ -3915,6 +3913,41 @@ textarea.form-input {
   .action-btn.secondary {
     width: 100%;
     margin: 0;
+  }
+}
+.form-step .section-title {
+  margin: 34px 0 16px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--ink);
+}
+.form-step .subtitle-text {
+  margin: -10px 0 8px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  text-align: left;
+  color: var(--ink-soft);
+}
+.form-step .hint-text {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+.permit-hint {
+  margin: -8px 0 14px;
+}
+@media (max-width: 640px) {
+  .field-row {
+    grid-template-columns: 1fr;
   }
 }
 </style>

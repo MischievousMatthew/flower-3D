@@ -12,6 +12,35 @@ use App\Helpers\CloudinaryHelper;
 
 class VendorController extends Controller
 {
+    /** Valid government IDs in the Philippines */
+    public const GOVERNMENT_IDS = [
+        'philsys' => 'PhilSys National ID',
+        'passport' => 'Passport',
+        'drivers_license' => "Driver's License",
+        'umid' => 'UMID',
+        'sss' => 'SSS ID',
+        'prc' => 'PRC ID',
+        'postal' => 'Postal ID',
+        'voters' => "Voter's ID",
+        'philhealth' => 'PhilHealth ID',
+        'tin_id' => 'TIN ID',
+        'senior' => 'Senior Citizen ID',
+        'pwd' => 'PWD ID',
+    ];
+
+    /** Philippine mobile (09XX XXX XXXX / +63 9XX…) or landline (area code + 7–8 digits) */
+    private static function phonePattern(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) {
+            $digits = preg_replace('/[^\d+]/', '', (string) $value);
+            $mobile = preg_match('/^(\+?63|0)9\d{9}$/', $digits);
+            $landline = preg_match('/^(\+?63|0)\d{8,10}$/', $digits);
+            if (! $mobile && ! $landline) {
+                $fail('Enter a Philippine number, like 0917 123 4567 or (046) 123 4567.');
+            }
+        };
+    }
+
     public function register(Request $request)
     {
         // Never log the application itself: it holds ID and bank account numbers
@@ -27,7 +56,8 @@ class VendorController extends Controller
         $validator = Validator::make($request->all(), [
             'store_name'                => 'required|string|max:255',
             'store_description'         => 'required|string',
-            'business_type'             => 'required|in:individual,partnership,corporation',
+            'business_type'             => 'required|in:individual,partnership,corporation,cooperative',
+            'registered_business_name'  => 'required|string|max:255',
             'store_address'             => 'required|string',
             'physical_store_address'    => 'required|string',
             'store_latitude'            => 'required|numeric|between:14,15',
@@ -37,7 +67,7 @@ class VendorController extends Controller
             'operating_schedules'       => 'required|string',
             'owner_name'                => 'required|string|max:255',
             'position'                  => 'required|string|max:255',
-            'contact_number'            => 'required|string|max:20',
+            'contact_number'            => ['required', 'string', 'max:20', self::phonePattern()],
             'email'                     => [
                 'required',
                 'email',
@@ -45,17 +75,24 @@ class VendorController extends Controller
                     return $query->whereIn('status', ['pending', 'approved', 'under_review']);
                 }),
             ],
+            'government_id_type'        => 'required|in:' . implode(',', array_keys(self::GOVERNMENT_IDS)),
             'government_id_number'      => 'required|string|max:255',
             'government_id'             => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
             'selfie_with_id'            => 'required|file|mimes:jpg,jpeg,png|max:5120',
             'proof_of_address'          => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
-            'dti_number'                => 'required|string|max:255',
-            'sec_number'                => 'required|string|max:255',
+            // One registration, depending on how the business is set up
+            'dti_number'                => ['required_if:business_type,individual', 'nullable', 'string', 'max:40', 'regex:/^[A-Za-z0-9-]{5,40}$/'],
+            'sec_number'                => ['required_if:business_type,partnership,corporation', 'nullable', 'string', 'max:40', 'regex:/^[A-Za-z0-9-]{5,40}$/'],
+            'cda_number'                => ['required_if:business_type,cooperative', 'nullable', 'string', 'max:40', 'regex:/^[A-Za-z0-9-]{5,40}$/'],
+            'business_registration'     => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'barangay_clearance_number' => 'required|string|max:255',
             'barangay_clearance'        => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'mayor_permit_number'       => 'required|string|max:255',
             'mayor_permit'              => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
-            'bir_tin'                   => 'required|string|max:255',
+            'mayor_permit_valid_until'  => 'required|date|after_or_equal:today',
+            // 9-digit TIN, plus a 3- or 5-digit branch code
+            'bir_tin'                   => ['required', 'string', 'max:20', 'regex:/^\d{3}-?\d{3}-?\d{3}(-?\d{3}|-?\d{5})?$/'],
+            'bir_certificate'           => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
             'accept_terms'              => 'required|in:1,true,on,accepted',
             'accept_vendor_agreement'   => 'required|in:1,true,on,accepted',
             'accept_data_privacy'       => 'required|in:1,true,on,accepted',
@@ -76,8 +113,19 @@ class VendorController extends Controller
             'government_id.required'          => 'Government ID is required.',
             'selfie_with_id.required'         => 'Selfie with ID is required.',
             'proof_of_address.required'       => 'Proof of address is required.',
-            'dti_number.required'             => 'DTI number is required.',
-            'sec_number.required'             => 'SEC number is required.',
+            'registered_business_name.required' => 'Enter the business name exactly as it appears on your DTI, SEC or CDA certificate.',
+            'government_id_type.required'     => 'Choose the type of government ID.',
+            'dti_number.required_if'          => 'Sole proprietors need their DTI Business Name registration number.',
+            'sec_number.required_if'          => 'Partnerships and corporations need their SEC registration number.',
+            'cda_number.required_if'          => 'Cooperatives need their CDA registration number.',
+            'dti_number.regex'                => 'Use only letters, numbers and dashes, as printed on the certificate.',
+            'sec_number.regex'                => 'Use only letters, numbers and dashes, as printed on the certificate.',
+            'cda_number.regex'                => 'Use only letters, numbers and dashes, as printed on the certificate.',
+            'business_registration.required'  => 'Upload your DTI, SEC or CDA registration certificate.',
+            'mayor_permit_valid_until.required' => "Enter the date your Mayor's / Business Permit is valid until.",
+            'mayor_permit_valid_until.after_or_equal' => 'This permit has expired. Renew it at your city or municipal hall, then upload the new one.',
+            'bir_tin.regex'                   => 'Use your 9-digit TIN, with or without the branch code (e.g. 123-456-789-00000).',
+            'bir_certificate.required'        => 'Upload your BIR Certificate of Registration (Form 2303).',
             'barangay_clearance_number.required' => 'Barangay Clearance Number is required.',
             'barangay_clearance.required'     => 'Barangay Clearance document is required.',
             'mayor_permit_number.required'    => 'Mayor\'s Permit Number is required.',
@@ -121,7 +169,9 @@ class VendorController extends Controller
             $app->position        = $request->position;
             $app->contact_number  = $request->contact_number;
             $app->email           = $request->email;
+            $app->government_id_type   = $request->government_id_type;
             $app->government_id_number = $request->government_id_number;
+            $app->registered_business_name = trim($request->registered_business_name);
 
             // ── Upload documents to Cloudinary (store full secure URL) ─────
             // These are permanent documents — we store the URL directly.
@@ -153,8 +203,11 @@ class VendorController extends Controller
                 $app->proof_of_address_path = $result['secure_url'];
             }
 
-            $app->dti_number                = $request->dti_number;
-            $app->sec_number                = $request->sec_number;
+            // Only the registration that matches the business structure is kept
+            $app->dti_number                = $request->business_type === 'individual' ? $request->dti_number : null;
+            $app->sec_number                = in_array($request->business_type, ['partnership', 'corporation'], true) ? $request->sec_number : null;
+            $app->cda_number                = $request->business_type === 'cooperative' ? $request->cda_number : null;
+            $app->mayor_permit_valid_until  = $request->mayor_permit_valid_until;
             $app->barangay_clearance_number = $request->barangay_clearance_number;
             $app->mayor_permit_number       = $request->mayor_permit_number;
             $app->bir_tin                   = $request->bir_tin;
@@ -175,6 +228,17 @@ class VendorController extends Controller
                     'public_id'     => 'vendor-applications/permits/mayor_' . $applicationId,
                 ]);
                 $app->mayor_permit_path = $result['secure_url'];
+            }
+
+            foreach (['business_registration' => 'registration', 'bir_certificate' => 'bir'] as $input => $folder) {
+                if ($request->hasFile($input)) {
+                    $result = CloudinaryHelper::upload($request->file($input)->getRealPath(), [
+                        'folder'        => "vendor-applications/{$folder}",
+                        'resource_type' => 'auto',
+                        'public_id'     => "vendor-applications/{$folder}/{$input}_{$applicationId}",
+                    ]);
+                    $app->{$input . '_path'} = $result['secure_url'];
+                }
             }
 
             // ── Store logo: store public_id so it can be replaced later ───

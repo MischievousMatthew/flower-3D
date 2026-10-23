@@ -14,6 +14,7 @@ test("the last tries are counted and get more attention", () => {
   const n = explainLoginProblem({ code: "invalid_credentials", attemptsLeft: 1 });
   assert.equal(n.tone, "warn");
   assert.match(n.body, /1 try left/);
+  assert.ok(n.body.length < 70, "fits the message space");
 });
 
 test("a lock shows a countdown and a way out", () => {

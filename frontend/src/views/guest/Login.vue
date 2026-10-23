@@ -7,11 +7,16 @@
       New to BloomCraft? <router-link to="/guest/register" class="af-link">Create an account</router-link>
     </template>
 
-    <AuthNotice v-if="notice" class="lg-notice" :tone="notice.tone" :title="notice.title" :body="notice.body" :countdown="notice.countdown || 0" @done="lockEnded">
-      <router-link v-if="notice.actions?.includes('forgot')" :to="{ name: 'ForgotPassword', query: { u: form.username || undefined } }" class="af-link">Reset your password</router-link>
-      <button v-if="notice.actions?.includes('retry')" type="button" class="af-plain" :disabled="loading" @click="twoFactorRequired ? completeTwoFactorLogin() : handleLogin()">Try again</button>
-      <a v-if="notice.actions?.includes('support') && supportEmail" :href="`mailto:${supportEmail}`" class="af-link">Contact support</a>
-    </AuthNotice>
+    <!-- Messages appear in space that's always kept, so the form never moves -->
+    <div class="lg-slot">
+      <Transition name="lg-fade">
+        <AuthNotice v-if="notice" compact :error="notice.tone !== 'success'" :tone="notice.tone" :title="notice.title" :body="notice.body" :countdown="notice.countdown || 0" @done="lockEnded">
+          <router-link v-if="notice.actions?.includes('forgot')" :to="{ name: 'ForgotPassword', query: { u: form.username || undefined } }" class="af-link">Reset password</router-link>
+          <button v-if="notice.actions?.includes('retry')" type="button" class="af-plain" :disabled="loading" @click="twoFactorRequired ? completeTwoFactorLogin() : handleLogin()">Try again</button>
+          <a v-if="notice.actions?.includes('support') && supportEmail" :href="`mailto:${supportEmail}`" class="af-link">Contact support</a>
+        </AuthNotice>
+      </Transition>
+    </div>
 
     <!-- Username and password -->
     <form v-if="!twoFactorRequired" class="af-form" novalidate @submit.prevent="handleLogin()">
@@ -70,6 +75,7 @@
         @complete="completeTwoFactorLogin"
       />
       <p v-if="codeError" class="af-note bad" role="alert">{{ codeError }}</p>
+      <CodeTimer v-else-if="twoFactorMethod === 'otp' && codeUntil" :until="codeUntil" />
       <button type="button" class="af-btn" :class="{ busy: loading }" :disabled="loading || twoFactorCode.length !== 6" @click="completeTwoFactorLogin">
         {{ loading ? "Checking…" : "Continue" }}
       </button>
@@ -112,6 +118,7 @@ import AuthShell from "../../components/auth/AuthShell.vue";
 import AuthNotice from "../../components/auth/AuthNotice.vue";
 import PasswordField from "../../components/auth/PasswordField.vue";
 import CodeBoxes from "../../components/auth/CodeBoxes.vue";
+import CodeTimer from "../../components/auth/CodeTimer.vue";
 import { useAuth } from "../../composables/useAuth";
 import { useSiteContent } from "../../composables/useSiteContent";
 import { explainLoginProblem } from "../../utils/loginProblems";
@@ -140,12 +147,13 @@ const maskedEmail = ref("");
 const codeError = ref("");
 const sendingCode = ref(false);
 const resendIn = ref(0);
+const codeUntil = ref(0);
 const codeBoxes = ref(null);
 let resendTimer = null;
 const twoFactorLead = computed(() =>
   twoFactorMethod.value === "passkey"
     ? "Your account has two-step sign-in. Enter the six-digit passkey you chose."
-    : `We emailed a six-digit code to ${maskedEmail.value || "your email"}. It expires in 10 minutes.`,
+    : `We emailed a six-digit code to ${maskedEmail.value || "your email"}.`,
 );
 
 const sessionActiveOpen = ref(false);
@@ -174,7 +182,7 @@ const show = (result) => {
 };
 const lockEnded = () => {
   locked.value = false;
-  notice.value = { tone: "success", title: "You can try again now", body: "Take your time with the password, or reset it if you're not sure." , actions: ["forgot"] };
+  notice.value = { tone: "success", title: "You can try again now", body: "Take your time with the password.", actions: ["forgot"] };
 };
 
 const handleLogin = async (options = {}) => {
@@ -232,6 +240,7 @@ const requestLoginOtp = async () => {
     twoFactorMethod.value = "otp";
     twoFactorCode.value = "";
     startResend(60);
+    codeUntil.value = Date.now() + (data.expires_in || 180) * 1000;
     nextTick(() => codeBoxes.value?.focus());
   } catch (error) {
     if (!error.response) show({ code: "unreachable" });
@@ -245,11 +254,16 @@ const requestLoginOtp = async () => {
 // The verification step lasts five minutes; after that, sign in again
 const expiredChallenge = () => {
   cancelTwoFactorLogin();
-  notice.value = { tone: "info", title: "That verification step timed out", body: "For your safety it only lasts a few minutes. Sign in again to get a new one." };
+  notice.value = { tone: "info", title: "That step timed out", body: "Sign in again to get a new one." };
 };
 
 const completeTwoFactorLogin = async () => {
   if (twoFactorCode.value.length !== 6 || loading.value) return;
+  if (twoFactorMethod.value === "otp" && codeUntil.value && Date.now() > codeUntil.value) {
+    codeError.value = "This code has expired. Send a new one.";
+    twoFactorCode.value = "";
+    return;
+  }
   codeError.value = "";
   notice.value = null;
   const result = await withSlowHint(() => finishTwoFactorLogin(twoFactorChallengeToken.value, twoFactorCode.value, twoFactorMethod.value));
@@ -257,7 +271,7 @@ const completeTwoFactorLogin = async () => {
   if (/verification has expired/i.test(result.error || "")) return expiredChallenge();
   if (/too many wrong passkeys/i.test(result.error || "")) {
     cancelTwoFactorLogin();
-    notice.value = { tone: "lock", title: "Passkey locked for this sign-in", body: result.error, actions: ["forgot"] };
+    notice.value = { tone: "lock", title: "Too many wrong passkeys", body: "Sign in again and choose to email yourself a code.", actions: ["forgot"] };
     return;
   }
   codeError.value = result.error || "That code didn't work. Check it and try again.";
@@ -273,6 +287,7 @@ const cancelTwoFactorLogin = () => {
   codeError.value = "";
   clearInterval(resendTimer);
   resendIn.value = 0;
+  codeUntil.value = 0;
 };
 
 // Losing the connection is shown as it happens, and cleared when it's back
@@ -287,7 +302,7 @@ onMounted(() => {
   if (navigator.onLine === false) goneOffline();
 
   if (route.query.reset === "1") {
-    notice.value = { tone: "success", title: "Password changed", body: "Sign in with your new password. Every other device was signed out." };
+    notice.value = { tone: "success", title: "Password changed", body: "Sign in with your new password." };
   }
   // Shown after being signed out, e.g. when a store is suspended
   try {
@@ -327,8 +342,22 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.lg-notice {
-  margin-bottom: 22px;
+.lg-slot {
+  position: relative;
+  min-height: 70px;
+  margin-bottom: 14px;
+}
+.lg-fade-enter-active,
+.lg-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.lg-fade-enter-from,
+.lg-fade-leave-to {
+  opacity: 0;
+}
+.lg-fade-leave-active {
+  position: absolute;
+  inset: 0 0 auto;
 }
 .lg-forgot {
   font-size: 13px;

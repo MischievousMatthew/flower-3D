@@ -4,7 +4,7 @@
       Remembered it? <router-link :to="{ name: 'Login', query: { u: identifier || undefined } }" class="af-link">Sign in</router-link>
     </template>
 
-    <AuthNotice v-if="notice" class="fp-notice" :tone="notice.tone" :title="notice.title" :body="notice.body" />
+    <AuthNotice v-if="notice" class="fp-notice" :error="notice.tone !== 'success'" :tone="notice.tone" :title="notice.title" :body="notice.body" />
 
     <!-- Step 1: who are you -->
     <form v-if="step === 1" class="af-form" novalidate @submit.prevent="sendCode">
@@ -37,6 +37,7 @@
         <span class="af-label">6-digit code</span>
         <CodeBoxes ref="boxes" v-model="otp" :invalid="!!errors.otp" :disabled="saving" @update:model-value="errors.otp = ''" @complete="focusPassword" />
         <p v-if="errors.otp" class="af-note bad" role="alert">{{ errors.otp }}</p>
+        <CodeTimer v-else-if="codeUntil" :until="codeUntil" />
         <p class="af-note">
           Didn't get it? Check spam, or
           <button type="button" class="af-plain" :disabled="sending || resendIn > 0" @click="sendCode">{{ resendIn > 0 ? `send another in ${resendIn}s` : "send another" }}</button>.
@@ -70,6 +71,7 @@ import AuthNotice from "../../components/auth/AuthNotice.vue";
 import PasswordField from "../../components/auth/PasswordField.vue";
 import PasswordRules from "../../components/auth/PasswordRules.vue";
 import CodeBoxes from "../../components/auth/CodeBoxes.vue";
+import CodeTimer from "../../components/auth/CodeTimer.vue";
 import { passwordOk } from "../../utils/passwordRules";
 import api from "../../plugins/axios";
 
@@ -87,6 +89,7 @@ const notice = ref(null);
 const sending = ref(false);
 const saving = ref(false);
 const resendIn = ref(0);
+const codeUntil = ref(0);
 const idInput = ref(null);
 const passInput = ref(null);
 const boxes = ref(null);
@@ -121,6 +124,7 @@ async function sendCode() {
     notice.value = { tone: "success", title: "Check your email", body: data.message };
     step.value = 2;
     countdown(data.retry_after || 60);
+    codeUntil.value = Date.now() + (data.expires_in || 180) * 1000;
     nextTick(() => boxes.value?.focus());
   } catch (e) {
     if (!e.response) notice.value = unreachable;
@@ -136,7 +140,7 @@ function focusPassword() {
 }
 
 async function reset() {
-  errors.otp = otp.value.length === 6 ? "" : "Enter all 6 digits from the email.";
+  errors.otp = otp.value.length !== 6 ? "Enter all 6 digits from the email." : codeUntil.value && Date.now() > codeUntil.value ? "This code has expired. Send a new one." : "";
   errors.password = passwordOk(password.value) ? "" : "Your new password needs every item on the list.";
   errors.confirm = confirm.value === password.value ? "" : "These don't match yet.";
   if (errors.otp || errors.password || errors.confirm) return;

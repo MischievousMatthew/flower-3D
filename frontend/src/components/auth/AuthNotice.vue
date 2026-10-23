@@ -1,7 +1,13 @@
 <template>
-  <div class="an" :class="tone" :role="tone === 'info' ? 'status' : 'alert'" aria-live="polite">
+  <div class="an" :class="[tone, { compact, error }]" :role="tone === 'info' ? 'status' : 'alert'" aria-live="polite">
     <span class="an-icon" aria-hidden="true" v-html="ICONS[tone] ?? ICONS.info"></span>
-    <div class="an-body">
+    <!-- Compact: one short paragraph with the action at the end -->
+    <p v-if="compact" class="an-line">
+      <b>{{ title }}.</b>
+      {{ body }}<template v-if="left > 0"> Try again in <b class="an-num">{{ formatWait(left) }}</b>.</template>
+      <span v-if="$slots.default" class="an-actions"><slot /></span>
+    </p>
+    <div v-else class="an-body">
       <p class="an-title">{{ title }}</p>
       <p v-if="body" class="an-text">{{ body }}</p>
       <p v-if="left > 0" class="an-wait">You can try again in <b>{{ formatWait(left) }}</b></p>
@@ -22,6 +28,10 @@ const props = defineProps({
   title: { type: String, required: true },
   body: { type: String, default: "" },
   countdown: { type: Number, default: 0 },
+  // A small one-paragraph version, for forms where space is fixed
+  compact: { type: Boolean, default: false },
+  // Something went wrong (not just information): a red outline
+  error: { type: Boolean, default: false },
 });
 const emit = defineEmits(["done"]);
 
@@ -111,6 +121,45 @@ const ICONS = {
   gap: 8px 18px;
   margin-top: 10px;
   font-size: 14px;
+}
+/* Drawn inside the note, so its size never changes */
+.error {
+  box-shadow: inset 0 0 0 1.5px #d64545;
+}
+.compact {
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+}
+.compact .an-icon {
+  width: 24px;
+  height: 24px;
+}
+.compact .an-icon :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
+.an-line {
+  margin: 2px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.an-line > b {
+  font-weight: 500;
+  color: var(--ink);
+}
+.an-line .an-num {
+  font-variant-numeric: tabular-nums;
+}
+.an-line .an-actions {
+  display: inline;
+  margin: 0 0 0 6px;
+  font-size: 13px;
+}
+.an-line .an-actions > * + * {
+  margin-left: 12px;
 }
 .warn {
   background: #f6eedd;

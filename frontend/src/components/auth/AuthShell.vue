@@ -5,22 +5,16 @@
         <img src="/bloomcraft-darkmode-removebg.png" alt="" width="34" height="34" />
         <span>BloomCraft</span>
       </router-link>
-      <svg class="as-bloom" :class="{ draw: !reduced }" viewBox="0 0 320 420" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round">
-        <g transform="translate(160 150)">
-          <path v-for="(p, i) in PETALS" :key="i" :d="p.d" :transform="`rotate(${p.r})`" :style="{ '--i': i }" />
-          <circle r="7" style="--i: 14" />
-          <circle r="2.5" style="--i: 15" />
-        </g>
-        <path d="M160 214 C 158 270, 166 330, 156 410" style="--i: 16" />
-        <path d="M160 300 C 190 280, 222 284, 240 300 C 214 318, 184 316, 160 300 Z" style="--i: 17" />
-        <path d="M160 300 L 222 298" style="--i: 18" />
-        <path d="M158 350 C 128 334, 98 340, 82 356 C 110 370, 138 366, 158 350 Z" style="--i: 19" />
-        <path d="M158 350 L 100 354" style="--i: 20" />
+      <svg :key="flower.key" class="as-bloom" :class="{ draw: !reduced }" viewBox="0 0 320 420" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round">
+        <template v-for="(s, i) in flower.shapes" :key="i">
+          <path v-if="s.d" :d="s.d" :transform="s.transform" :style="{ '--i': i }" />
+          <circle v-else :cx="s.cx" :cy="s.cy" :r="s.r" :style="{ '--i': i }" />
+        </template>
       </svg>
       <figcaption class="as-caption">
         <slot name="caption">
-          <i>Rosa</i> “Petal &amp; Stem”<br />
-          hand-tied by a local florist, delivered the morning it's made.
+          <i>{{ flower.latin }}</i> “{{ flower.name }}”<br />
+          {{ flower.line }}
         </slot>
       </figcaption>
     </aside>
@@ -51,6 +45,7 @@
 // the right, in the landing page's ivory and Cormorant style.
 import "../../styles/bloomcraft.css";
 import "./auth.css";
+import { pickFlower } from "./flowers";
 
 defineProps({
   title: { type: String, required: true },
@@ -61,13 +56,8 @@ defineProps({
 
 const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-// Twelve petals in three rings, each a little smaller and turned
-const petal = (len, w) => `M0 0 C ${w} ${-len * 0.35}, ${w * 0.8} ${-len * 0.85}, 0 ${-len} C ${-w * 0.8} ${-len * 0.85}, ${-w} ${-len * 0.35}, 0 0 Z`;
-const PETALS = [
-  ...[0, 72, 144, 216, 288].map((r) => ({ r, d: petal(96, 46) })),
-  ...[36, 108, 180, 252, 324].map((r) => ({ r, d: petal(70, 34) })),
-  ...[0, 120, 240].map((r) => ({ r: r + 18, d: petal(40, 20) })),
-];
+// A different flower each visit: tulip, sunflower, rose or daisy
+const flower = pickFlower();
 </script>
 
 <style scoped>
@@ -115,7 +105,7 @@ const PETALS = [
   stroke-dasharray: 700;
   stroke-dashoffset: 700;
   animation: as-draw 1.6s cubic-bezier(0.6, 0, 0.2, 1) forwards;
-  animation-delay: calc(var(--i) * 70ms);
+  animation-delay: calc(min(var(--i), 30) * 45ms);
 }
 @keyframes as-draw {
   to {
@@ -169,7 +159,7 @@ const PETALS = [
 }
 .as-col {
   width: 100%;
-  max-width: 420px;
+  max-width: 500px;
   margin: auto 0;
   padding-top: 40px;
 }
@@ -180,13 +170,13 @@ const PETALS = [
   display: none;
 }
 .as-title {
-  margin: 0 0 10px;
-  font-size: clamp(38px, 4vw, 48px);
+  margin: 0 0 12px;
+  font-size: clamp(42px, 4.4vw, 58px);
 }
 .as-lead {
-  margin: 0 0 32px;
+  margin: 0 0 34px;
   max-width: 46ch;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.65;
   color: var(--ink-soft);
 }
