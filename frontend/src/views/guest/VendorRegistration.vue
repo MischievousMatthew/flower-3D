@@ -31,1126 +31,413 @@
       <button v-if="formProblem.goTo" type="button" class="af-plain" @click="jumpToProblem">Show me</button>
     </AuthNotice>
 
+    <!-- Sent: a full page that says what happens next -->
+    <section v-if="showApplicationModal" class="vr-done" aria-live="polite">
+      <span class="vr-done-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9" /></svg>
+      </span>
+      <h2>Application sent</h2>
+      <p class="vr-done-lead">Thank you{{ formData.ownerName ? `, ${formData.ownerName.split(" ")[0]}` : "" }}. We've emailed a copy to {{ formData.email || "you" }}.</p>
+      <div class="vr-id">
+        <span>Application ID</span>
+        <b>{{ applicationId }}</b>
+        <button type="button" class="af-plain" @click="copyApplicationId">{{ copied ? "Copied" : "Copy" }}</button>
+      </div>
+      <ol class="vr-next" aria-label="What happens next">
+        <li><b>We check your documents</b><span>Usually within two working days.</span></li>
+        <li><b>You get an email with the decision</b><span>If something needs fixing, the email says exactly what to send again.</span></li>
+        <li>
+          <b>Sign in and open your shop</b>
+          <span v-if="pendingPlanName">We'll take you straight to checkout for the {{ pendingPlanName }} plan.</span>
+          <span v-else>Add your products and your storefront goes live.</span>
+        </li>
+      </ol>
+      <button type="button" class="af-btn vr-done-btn" @click="closeModal">Back to BloomCraft</button>
+    </section>
+
     <!-- Kept on the page (not removed) so the store map can still set itself up -->
-    <div v-show="platform.vendor_applications_open">
-    <!-- Progress Steps -->
-    <div class="steps-indicator">
-      <template v-for="(step, index) in steps" :key="step.number">
-        <div
-          class="step"
-          :class="{
-            active: currentStep >= step.number,
-            completed: currentStep > step.number,
-          }"
-        >
-          <div class="step-number">{{ step.number }}</div>
-          <span class="step-label">{{ step.title }}</span>
-        </div>
-        <div
-          v-if="index < steps.length - 1"
-          class="step-line"
-          :class="{ active: currentStep > step.number }"
-        ></div>
-      </template>
-    </div>
+    <div v-show="platform.vendor_applications_open && !showApplicationModal" class="vr">
+      <!-- Where you are: finished steps can be reopened -->
+      <ol class="vr-steps" aria-label="Application steps">
+        <li v-for="step in steps" :key="step.number" :class="{ on: currentStep === step.number, done: currentStep > step.number }" :aria-current="currentStep === step.number ? 'step' : undefined">
+          <button type="button" :disabled="step.number >= currentStep" @click="goToStep(step.number)">
+            <span class="vr-dot" aria-hidden="true">
+              <svg v-if="currentStep > step.number" viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9" /></svg>
+              <template v-else>{{ step.number }}</template>
+            </span>
+            <span class="vr-step-name">{{ step.title }}</span>
+          </button>
+        </li>
+      </ol>
 
-    <!-- Form Content -->
-    <div class="form-content">
-      <!-- Step 1: Store Information -->
-      <div v-if="currentStep === 1" class="form-step">
-        <h2 class="step-title">Store Information</h2>
+      <!-- ── Step 1: the shop ─────────────────────────────────────────── -->
+      <div v-show="currentStep === 1" class="vr-step">
+        <header class="vr-head">
+          <h2>Your shop</h2>
+          <p>What customers will see, and where and when you deliver.</p>
+        </header>
 
-        <div class="input-group">
-          <label class="input-label">Store / Shop Name *</label>
-          <input
-            v-model="formData.storeName"
-            type="text"
-            placeholder="Enter your store name"
-            class="form-input"
-            :class="{ error: errors.storeName }"
-          />
-          <div v-if="errors.storeName" class="error-message">
-            {{ errors.storeName }}
+        <section class="vr-card">
+          <h3>About the shop</h3>
+          <div class="vr-field">
+            <label class="vr-label" for="vr-store">Shop name</label>
+            <input id="vr-store" v-model="formData.storeName" name="storeName" type="text" class="vr-input" :class="{ error: errors.storeName }" placeholder="e.g. Petal & Stem Flower Studio" maxlength="255" />
+            <p v-if="errors.storeName" class="vr-error">{{ errors.storeName }}</p>
           </div>
-        </div>
-
-        <div class="input-group">
-          <label class="input-label">Store Description *</label>
-          <textarea
-            v-model="formData.storeDescription"
-            placeholder="Describe your store and what makes it special"
-            rows="4"
-            class="form-input"
-            :class="{ error: errors.storeDescription }"
-          />
-          <div v-if="errors.storeDescription" class="error-message">
-            {{ errors.storeDescription }}
+          <div class="vr-field">
+            <label class="vr-label" for="vr-desc">Describe your shop <small>{{ formData.storeDescription.length }}/1000</small></label>
+            <textarea id="vr-desc" v-model="formData.storeDescription" name="storeDescription" rows="4" maxlength="1000" class="vr-input" :class="{ error: errors.storeDescription }" placeholder="The flowers you love working with, how you arrange them, how you deliver…"></textarea>
+            <p v-if="errors.storeDescription" class="vr-error">{{ errors.storeDescription }}</p>
           </div>
-        </div>
+        </section>
 
-        <div class="input-group">
-          <label class="input-label">How is your business registered? *</label>
-          <select
-            v-model="formData.businessType"
-            name="businessType"
-            class="form-input"
-            :class="{ error: errors.businessType }"
-          >
-            <option value="">Choose your business structure</option>
-            <option value="individual">Sole proprietorship (registered with DTI)</option>
-            <option value="partnership">Partnership (registered with SEC)</option>
-            <option value="corporation">Corporation or One Person Corporation (SEC)</option>
-            <option value="cooperative">Cooperative (registered with CDA)</option>
-          </select>
-          <p class="hint-text">This decides which registration certificate we ask for in the Business step.</p>
-          <div v-if="errors.businessType" class="error-message">
-            {{ errors.businessType }}
-          </div>
-        </div>
-
-        <!-- CHANGED: Physical Store Address — Dropdown Only -->
-        <div class="input-group">
-          <label class="input-label">Physical Store Address *</label>
-          <input
-            v-model="formData.storeAddress"
-            list="cavite-addresses"
-            type="text"
-            placeholder="Pin your store on the map, then edit the address if needed"
-            class="form-input"
-            :class="{ error: errors.storeAddress }"
-          />
-          <datalist id="cavite-addresses">
-            <option v-for="location in caviteLocations" :key="location" :value="location" />
-          </datalist>
-          <div class="store-location-map" :class="{ 'map-loading': mapLoading }">
-            <div ref="storeLocationMap" class="store-location-map-canvas"></div>
-            <p v-if="mapLoading" class="map-status">Loading the Cavite boundary…</p>
-          </div>
-          <p class="hint-text">
-            Place or drag the pin within Cavite. You may edit the address text without changing the pin.
-          </p>
-          <div v-if="errors.storeAddress" class="error-message">
-            {{ errors.storeAddress }}
-          </div>
-        </div>
-
-        <!-- CHANGED: Service Areas — Restricted Checkbox Selection -->
-        <div class="input-group">
-          <label class="input-label">Service Areas *</label>
-          <div
-            class="service-areas-container"
-            :class="{ 'container-error': errors.serviceAreas }"
-          >
-            <label
-              v-for="area in serviceAreaOptions"
-              :key="area.value"
-              class="service-area-option"
-            >
-              <input
-                type="checkbox"
-                :value="area.value"
-                v-model="selectedServiceAreas"
-                class="checkbox-input"
-              />
-              <span class="service-area-label">{{ area.label }}</span>
+        <section class="vr-card">
+          <h3>How your business is registered</h3>
+          <p class="vr-sub">This decides which certificate we ask for later.</p>
+          <div class="vr-choices" role="radiogroup" aria-label="Business structure">
+            <label v-for="(r, key) in REGISTRATIONS" :key="key" class="vr-choice" :class="{ on: formData.businessType === key }">
+              <input v-model="formData.businessType" type="radio" name="businessType" :value="key" />
+              <span class="vr-badge">{{ r.agency }}</span>
+              <b>{{ STRUCTURE_LABELS[key].title }}</b>
+              <small>{{ STRUCTURE_LABELS[key].hint }}</small>
             </label>
           </div>
-          <p class="hint-text">Select one or both service regions.</p>
-          <div v-if="errors.serviceAreas" class="error-message">
-            {{ errors.serviceAreas }}
-          </div>
-        </div>
+          <p v-if="errors.businessType" class="vr-error">{{ errors.businessType }}</p>
+        </section>
 
-        <!-- CHANGED: Operating Hours — Day Checkboxes + Time Inputs -->
-        <div class="input-group">
-          <label class="input-label">Operating Hours *</label>
-          <div
-            class="operating-hours-container"
-            :class="{ 'container-error': errors.operatingHours }"
-          >
-            <div v-for="(schedule, scheduleIndex) in operatingSchedules" :key="schedule.id" class="schedule-card">
-            <div class="schedule-heading"><strong>Schedule {{ scheduleIndex + 1 }}</strong><button v-if="operatingSchedules.length > 1" type="button" class="schedule-remove" @click="removeSchedule(scheduleIndex)">Remove</button></div>
-            <p class="oh-section-label">Days</p>
-            <div class="days-grid">
-              <label
-                v-for="day in daysOfWeek"
-                :key="day"
-                class="day-checkbox-label"
-                :class="{ selected: schedule.days.includes(day), disabled: isDayAssignedElsewhere(day, scheduleIndex) }"
-              >
-                <input
-                  type="checkbox"
-                  :value="day"
-                  v-model="schedule.days"
-                  :disabled="isDayAssignedElsewhere(day, scheduleIndex)"
-                  class="day-checkbox-hidden"
-                />
-                <span>{{ day.substring(0, 3) }}</span>
+        <section class="vr-card">
+          <h3>Where your shop is</h3>
+          <div class="vr-field">
+            <label class="vr-label" for="vr-address">Store address</label>
+            <input id="vr-address" v-model="formData.storeAddress" name="storeAddress" list="cavite-addresses" type="text" class="vr-input" :class="{ error: errors.storeAddress }" placeholder="Pin your shop on the map, then edit the address if needed" />
+            <datalist id="cavite-addresses">
+              <option v-for="location in caviteLocations" :key="location" :value="location" />
+            </datalist>
+          </div>
+          <div class="store-location-map" :class="{ 'map-loading': mapLoading }">
+            <div ref="storeLocationMap" class="store-location-map-canvas"></div>
+            <p v-if="mapLoading" class="map-status">Loading the map of Cavite…</p>
+          </div>
+          <p class="vr-hint">Click or drag the pin onto your shop. It has to be inside Cavite; you can still edit the address text.</p>
+          <p v-if="errors.storeAddress" class="vr-error">{{ errors.storeAddress }}</p>
+        </section>
+
+        <section class="vr-card">
+          <h3>Where you deliver</h3>
+          <div class="vr-chips" :class="{ error: errors.serviceAreas }">
+            <label v-for="area in serviceAreaOptions" :key="area.value" class="vr-chip" :class="{ on: selectedServiceAreas.includes(area.value) }">
+              <input v-model="selectedServiceAreas" type="checkbox" :value="area.value" />
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9" /></svg>{{ area.label }}
+            </label>
+          </div>
+          <p v-if="errors.serviceAreas" class="vr-error">{{ errors.serviceAreas }}</p>
+        </section>
+
+        <section class="vr-card">
+          <h3>Opening hours</h3>
+          <p class="vr-sub">Different hours on some days? Add another schedule.</p>
+          <div v-for="(schedule, scheduleIndex) in operatingSchedules" :key="schedule.id" class="vr-schedule">
+            <div class="vr-schedule-head">
+              <b>{{ operatingSchedules.length > 1 ? `Schedule ${scheduleIndex + 1}` : "Your hours" }}</b>
+              <span v-if="schedule.days.length && schedule.opening_time && schedule.closing_time" class="vr-schedule-sum">{{ formatDays(schedule.days) }}, {{ formatTime(schedule.opening_time) }}–{{ formatTime(schedule.closing_time) }}</span>
+              <button v-if="operatingSchedules.length > 1" type="button" class="af-plain vr-small" @click="removeSchedule(scheduleIndex)">Remove</button>
+            </div>
+            <div class="vr-days">
+              <label v-for="day in daysOfWeek" :key="day" class="vr-day" :class="{ on: schedule.days.includes(day), off: isDayAssignedElsewhere(day, scheduleIndex) }" :title="isDayAssignedElsewhere(day, scheduleIndex) ? 'Already in another schedule' : day">
+                <input v-model="schedule.days" type="checkbox" :value="day" :disabled="isDayAssignedElsewhere(day, scheduleIndex)" />{{ day.substring(0, 3) }}
               </label>
             </div>
-
-            <!-- Quick Select Shortcuts -->
-            <div class="day-shortcuts">
-              <button
-                type="button"
-                class="shortcut-btn"
-                @click="selectWeekdays(scheduleIndex)"
-              >
-                Mon–Fri
-              </button>
-              <button
-                type="button"
-                class="shortcut-btn"
-                @click="selectWeekends(scheduleIndex)"
-              >
-                Sat–Sun
-              </button>
-              <button type="button" class="shortcut-btn" @click="selectAllDays(scheduleIndex)">
-                Everyday
-              </button>
-              <button
-                type="button"
-                class="shortcut-btn shortcut-clear"
-                @click="clearDays(scheduleIndex)"
-              >
-                Clear
-              </button>
+            <div class="vr-quick">
+              <button type="button" @click="selectWeekdays(scheduleIndex)">Weekdays</button>
+              <button type="button" @click="selectWeekends(scheduleIndex)">Weekends</button>
+              <button type="button" @click="selectAllDays(scheduleIndex)">Every day</button>
+              <button type="button" @click="clearDays(scheduleIndex)">Clear</button>
             </div>
-
-            <!-- Time Range -->
-            <p class="oh-section-label" style="margin-top: 16px">
-              Hours
-            </p>
-            <div class="time-range-row">
-              <div class="time-field">
-                <label class="time-label">Opening Time</label>
-                <input
-                  type="time"
-                  v-model="schedule.opening_time"
-                  class="form-input time-input"
-                />
+            <div class="vr-grid">
+              <div class="vr-field">
+                <label class="vr-label">Opens</label>
+                <input v-model="schedule.opening_time" type="time" class="vr-input" />
               </div>
-              <span class="time-separator">–</span>
-              <div class="time-field">
-                <label class="time-label">Closing Time</label>
-                <input
-                  type="time"
-                  v-model="schedule.closing_time"
-                  class="form-input time-input"
-                />
+              <div class="vr-field">
+                <label class="vr-label">Closes</label>
+                <input v-model="schedule.closing_time" type="time" class="vr-input" />
               </div>
             </div>
-
-            <div v-if="schedule.days.length && schedule.opening_time && schedule.closing_time" class="hours-preview">
-              <span class="preview-icon">🕐</span>
-              <span>{{ formatDays(schedule.days) }}: {{ formatTime(schedule.opening_time) }} – {{ formatTime(schedule.closing_time) }}</span>
-            </div>
-            </div>
-            <button v-if="operatingSchedules.length < 7" type="button" class="shortcut-btn add-schedule-btn" @click="addSchedule">+ Add Schedule</button>
           </div>
-          <div v-if="errors.operatingHours || errors.operating_schedules" class="error-message">
-            {{ errors.operatingHours || errors.operating_schedules }}
-          </div>
-        </div>
+          <button v-if="operatingSchedules.length < 7" type="button" class="vr-add" @click="addSchedule">+ Add another schedule</button>
+          <p v-if="errors.operatingHours || errors.operating_schedules" class="vr-error">{{ errors.operatingHours || errors.operating_schedules }}</p>
+        </section>
       </div>
 
-      <!-- Step 2: Owner Information & Verification (UNCHANGED) -->
-      <div v-if="currentStep === 2" class="form-step">
-        <h2 class="step-title">Owner Information & Verification</h2>
+      <!-- ── Step 2: the owner ────────────────────────────────────────── -->
+      <div v-if="currentStep === 2" class="vr-step">
+        <header class="vr-head">
+          <h2>About you</h2>
+          <p>The person responsible for the shop. We use this to confirm it's really you.</p>
+        </header>
 
-        <div class="input-group">
-          <label class="input-label">Owner's Full Name *</label>
-          <input
-            v-model="formData.ownerName"
-            type="text"
-            placeholder="Enter full name"
-            class="form-input"
-            :class="{ error: errors.ownerName }"
-          />
-          <div v-if="errors.ownerName" class="error-message">
-            {{ errors.ownerName }}
-          </div>
-        </div>
-
-        <div class="input-group">
-          <label class="input-label">Position / Role *</label>
-          <input
-            v-model="formData.position"
-            type="text"
-            placeholder="e.g., Owner, Manager, CEO"
-            class="form-input"
-            :class="{ error: errors.position }"
-          />
-          <div v-if="errors.position" class="error-message">
-            {{ errors.position }}
-          </div>
-        </div>
-
-        <div class="input-group">
-          <label class="input-label">Contact Number *</label>
-          <input
-            v-model="formData.contactNumber"
-            type="tel"
-            name="contactNumber"
-            inputmode="tel"
-            placeholder="0917 123 4567"
-            class="form-input"
-            :class="{ error: errors.contactNumber }"
-          />
-          <div v-if="errors.contactNumber" class="error-message">
-            {{ errors.contactNumber }}
-          </div>
-        </div>
-
-        <div class="input-group">
-          <label class="input-label">Email Address *</label>
-          <input
-            v-model="formData.email"
-            type="email"
-            placeholder="your.email@example.com"
-            class="form-input"
-            :class="{ error: errors.email }"
-          />
-          <div v-if="errors.email" class="error-message">
-            {{ errors.email }}
-          </div>
-        </div>
-
-        <div class="section-divider">
-          <h3 class="section-title">Identity Verification</h3>
-        </div>
-
-        <div class="input-group">
-          <label class="input-label">Type of government ID *</label>
-          <select v-model="formData.governmentIdType" name="governmentIdType" class="form-input" :class="{ error: errors.governmentIdType }">
-            <option value="">Choose your ID</option>
-            <option v-for="(label, key) in GOVERNMENT_IDS" :key="key" :value="key">{{ label }}</option>
-          </select>
-          <div v-if="errors.governmentIdType" class="error-message">{{ errors.governmentIdType }}</div>
-        </div>
-
-        <div class="input-group">
-          <label class="input-label">ID number and photo *</label>
-          <input
-            v-model="formData.governmentIdNumber"
-            type="text"
-            name="governmentIdNumber"
-            placeholder="As printed on the ID"
-            class="form-input id-number-input"
-            :class="{ error: errors.governmentIdNumber }"
-          />
-          <div v-if="errors.governmentIdNumber" class="error-message">
-            {{ errors.governmentIdNumber }}
-          </div>
-          <div class="file-upload-container">
-            <div
-              class="file-drop-zone"
-              @click="$refs.government_idInput.click()"
-              @dragenter.prevent="handleDragEnter($event, 'government_id')"
-              @dragover.prevent="handleDragOver($event, 'government_id')"
-              @dragleave.prevent="handleDragLeave($event, 'government_id')"
-              @drop.prevent="handleDrop($event, 'government_id')"
-              :class="{
-                'drag-over': dragOver.government_id,
-                'has-file': fileInfo.government_id,
-              }"
-            >
-              <div v-if="!fileInfo.government_id" class="upload-placeholder">
-                <svg class="upload-icon" viewBox="0 0 24 24">
-                  <path
-                    d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"
-                  />
-                </svg>
-                <p class="upload-text">Drop file here or click to upload</p>
-                <p class="upload-hint">
-                  Max size: 5MB • Formats: JPG, PNG, PDF
-                </p>
-              </div>
-              <div v-else class="file-preview">
-                <div class="preview-icon">
-                  <img v-if="isImage(fileInfo.government_id.type) && fileInfo.government_id.url" :src="fileInfo.government_id.url" :alt="fileInfo.government_id.name" class="file-thumbnail" />
-                  <span v-if="isImage(fileInfo.government_id.type)">🖼️</span>
-                  <span v-else>📄</span>
-                </div>
-                <div class="file-details">
-                  <div class="file-name">{{ fileInfo.government_id.name }}</div>
-                  <div class="file-meta">
-                    <span class="file-size">{{
-                      formatFileSize(fileInfo.government_id.size)
-                    }}</span>
-                    <span class="file-type">{{
-                      getFileType(fileInfo.government_id.type)
-                    }}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  @click.stop="removeFile('government_id')"
-                  class="remove-file-btn"
-                  title="Remove file"
-                >
-                  ×
-                </button>
-              </div>
+        <section class="vr-card">
+          <h3>Owner</h3>
+          <div class="vr-grid">
+            <div class="vr-field">
+              <label class="vr-label" for="vr-owner">Full name</label>
+              <input id="vr-owner" v-model="formData.ownerName" name="ownerName" type="text" autocomplete="name" class="vr-input" :class="{ error: errors.ownerName }" placeholder="As shown on your ID" />
+              <p v-if="errors.ownerName" class="vr-error">{{ errors.ownerName }}</p>
             </div>
-            <input
-              type="file"
-              @change="handleFileUpload($event, 'government_id')"
-              accept=".jpg,.jpeg,.png,.pdf,image/*"
-              class="file-input-hidden"
-              ref="government_idInput"
-              :class="{ error: errors.government_id }"
-            />
-          </div>
-          <p class="hint-text">
-            Accepted: Driver's License, Passport, National ID
-          </p>
-          <div v-if="errors.government_id" class="error-message">
-            {{ errors.government_id }}
-          </div>
-        </div>
-
-        <div class="input-group">
-          <label class="input-label">Selfie with Government ID *</label>
-          <div class="file-upload-container">
-            <div
-              class="file-drop-zone"
-              @click="$refs.selfie_with_idInput.click()"
-              @dragenter.prevent="handleDragEnter($event, 'selfie_with_id')"
-              @dragover.prevent="handleDragOver($event, 'selfie_with_id')"
-              @dragleave.prevent="handleDragLeave($event, 'selfie_with_id')"
-              @drop.prevent="handleDrop($event, 'selfie_with_id')"
-              :class="{
-                'drag-over': dragOver.selfie_with_id,
-                'has-file': fileInfo.selfie_with_id,
-              }"
-            >
-              <div v-if="!fileInfo.selfie_with_id" class="upload-placeholder">
-                <svg class="upload-icon" viewBox="0 0 24 24">
-                  <path
-                    d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"
-                  />
-                </svg>
-                <p class="upload-text">Drop photo here or click to upload</p>
-                <p class="upload-hint">Max size: 5MB • Formats: JPG, PNG</p>
-              </div>
-              <div v-else class="file-preview">
-                <div class="preview-icon">
-                  <img v-if="fileInfo.selfie_with_id.url" :src="fileInfo.selfie_with_id.url" :alt="fileInfo.selfie_with_id.name" class="file-thumbnail" />
-                  <span>📸</span>
-                </div>
-                <div class="file-details">
-                  <div class="file-name">
-                    {{ fileInfo.selfie_with_id.name }}
-                  </div>
-                  <div class="file-meta">
-                    <span class="file-size">{{
-                      formatFileSize(fileInfo.selfie_with_id.size)
-                    }}</span>
-                    <span class="file-type">{{
-                      getFileType(fileInfo.selfie_with_id.type)
-                    }}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  @click.stop="removeFile('selfie_with_id')"
-                  class="remove-file-btn"
-                  title="Remove file"
-                >
-                  ×
-                </button>
-              </div>
+            <div class="vr-field">
+              <label class="vr-label" for="vr-position">Role in the business</label>
+              <input id="vr-position" v-model="formData.position" name="position" type="text" class="vr-input" :class="{ error: errors.position }" placeholder="Owner, manager, president…" />
+              <p v-if="errors.position" class="vr-error">{{ errors.position }}</p>
             </div>
-            <input
-              type="file"
-              @change="handleFileUpload($event, 'selfie_with_id')"
-              accept=".jpg,.jpeg,.png,image/*"
-              class="file-input-hidden"
-              ref="selfie_with_idInput"
-              :class="{ error: errors.selfie_with_id }"
-            />
-          </div>
-          <div v-if="errors.selfie_with_id" class="error-message">
-            {{ errors.selfie_with_id }}
-          </div>
-        </div>
-
-        <div class="input-group">
-          <label class="input-label">Proof of Address *</label>
-          <div class="file-upload-container">
-            <div
-              class="file-drop-zone"
-              @click="$refs.proof_of_addressInput.click()"
-              @dragenter.prevent="handleDragEnter($event, 'proof_of_address')"
-              @dragover.prevent="handleDragOver($event, 'proof_of_address')"
-              @dragleave.prevent="handleDragLeave($event, 'proof_of_address')"
-              @drop.prevent="handleDrop($event, 'proof_of_address')"
-              :class="{
-                'drag-over': dragOver.proof_of_address,
-                'has-file': fileInfo.proof_of_address,
-              }"
-            >
-              <div v-if="!fileInfo.proof_of_address" class="upload-placeholder">
-                <svg class="upload-icon" viewBox="0 0 24 24">
-                  <path
-                    d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"
-                  />
-                </svg>
-                <p class="upload-text">Drop file here or click to upload</p>
-                <p class="upload-hint">
-                  Max size: 5MB • Formats: JPG, PNG, PDF
-                </p>
-              </div>
-              <div v-else class="file-preview">
-                <div class="preview-icon">
-                  <img v-if="isImage(fileInfo.proof_of_address.type) && fileInfo.proof_of_address.url" :src="fileInfo.proof_of_address.url" :alt="fileInfo.proof_of_address.name" class="file-thumbnail" />
-                  <span v-if="isImage(fileInfo.proof_of_address.type)">🏠</span>
-                  <span v-else>📄</span>
-                </div>
-                <div class="file-details">
-                  <div class="file-name">
-                    {{ fileInfo.proof_of_address.name }}
-                  </div>
-                  <div class="file-meta">
-                    <span class="file-size">{{
-                      formatFileSize(fileInfo.proof_of_address.size)
-                    }}</span>
-                    <span class="file-type">{{
-                      getFileType(fileInfo.proof_of_address.type)
-                    }}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  @click.stop="removeFile('proof_of_address')"
-                  class="remove-file-btn"
-                  title="Remove file"
-                >
-                  ×
-                </button>
-              </div>
+            <div class="vr-field">
+              <label class="vr-label" for="vr-phone">Mobile or landline</label>
+              <input id="vr-phone" v-model="formData.contactNumber" name="contactNumber" type="tel" inputmode="tel" autocomplete="tel" class="vr-input" :class="{ error: errors.contactNumber }" placeholder="0917 123 4567" />
+              <p v-if="errors.contactNumber" class="vr-error">{{ errors.contactNumber }}</p>
             </div>
-            <input
-              type="file"
-              @change="handleFileUpload($event, 'proof_of_address')"
-              accept=".jpg,.jpeg,.png,.pdf,image/*"
-              class="file-input-hidden"
-              ref="proof_of_addressInput"
-              :class="{ error: errors.proof_of_address }"
-            />
+            <div class="vr-field">
+              <label class="vr-label" for="vr-email">Email</label>
+              <input id="vr-email" v-model="formData.email" name="email" type="email" autocomplete="email" class="vr-input" :class="{ error: errors.email }" placeholder="you@yourshop.com" />
+              <p v-if="errors.email" class="vr-error">{{ errors.email }}</p>
+            </div>
           </div>
-          <p class="hint-text">
-            Utility Bill, Barangay Certificate, or Lease Contract
-          </p>
-          <div v-if="errors.proof_of_address" class="error-message">
-            {{ errors.proof_of_address }}
+          <p class="vr-hint">Your sign-in details are sent to this email once you're approved.</p>
+        </section>
+
+        <section class="vr-card">
+          <h3>Identity</h3>
+          <div class="vr-grid">
+            <div class="vr-field">
+              <label class="vr-label" for="vr-idtype">Government ID</label>
+              <select id="vr-idtype" v-model="formData.governmentIdType" name="governmentIdType" class="vr-input" :class="{ error: errors.governmentIdType }">
+                <option value="">Choose your ID</option>
+                <option v-for="(label, key) in GOVERNMENT_IDS" :key="key" :value="key">{{ label }}</option>
+              </select>
+              <p v-if="errors.governmentIdType" class="vr-error">{{ errors.governmentIdType }}</p>
+            </div>
+            <div class="vr-field">
+              <label class="vr-label" for="vr-idno">ID number</label>
+              <input id="vr-idno" v-model="formData.governmentIdNumber" name="governmentIdNumber" type="text" class="vr-input" :class="{ error: errors.governmentIdNumber }" placeholder="As printed on the ID" />
+              <p v-if="errors.governmentIdNumber" class="vr-error">{{ errors.governmentIdNumber }}</p>
+            </div>
           </div>
-        </div>
+          <div class="vr-docs">
+            <div class="vr-doc">
+              <span class="vr-label">Photo of the ID</span>
+              <DocDrop field="government_id" label="ID photo" hint="All four corners visible, no glare" :info="fileInfo.government_id" :over="!!dragOver.government_id" :error="errors.government_id" @change="handleFileUpload($event, 'government_id')" @drop="handleDrop($event, 'government_id')" @dragenter="handleDragEnter($event, 'government_id')" @dragover="handleDragOver($event, 'government_id')" @dragleave="handleDragLeave($event, 'government_id')" @remove="removeFile('government_id')" />
+            </div>
+            <div class="vr-doc">
+              <span class="vr-label">Selfie holding the ID</span>
+              <DocDrop field="selfie_with_id" label="selfie" hint="Your face and the ID both clear" accept=".jpg,.jpeg,.png,image/*" :info="fileInfo.selfie_with_id" :over="!!dragOver.selfie_with_id" :error="errors.selfie_with_id" @change="handleFileUpload($event, 'selfie_with_id')" @drop="handleDrop($event, 'selfie_with_id')" @dragenter="handleDragEnter($event, 'selfie_with_id')" @dragover="handleDragOver($event, 'selfie_with_id')" @dragleave="handleDragLeave($event, 'selfie_with_id')" @remove="removeFile('selfie_with_id')" />
+            </div>
+            <div class="vr-doc">
+              <span class="vr-label">Proof of address</span>
+              <DocDrop field="proof_of_address" label="proof of address" hint="Utility bill, barangay certificate or lease" :info="fileInfo.proof_of_address" :over="!!dragOver.proof_of_address" :error="errors.proof_of_address" @change="handleFileUpload($event, 'proof_of_address')" @drop="handleDrop($event, 'proof_of_address')" @dragenter="handleDragEnter($event, 'proof_of_address')" @dragover="handleDragOver($event, 'proof_of_address')" @dragleave="handleDragLeave($event, 'proof_of_address')" @remove="removeFile('proof_of_address')" />
+            </div>
+          </div>
+        </section>
       </div>
 
-      <!-- Step 3: Business Registration (UNCHANGED) -->
-      <div v-if="currentStep === 3" class="form-step">
-        <h2 class="step-title">Business registration</h2>
-        <p class="subtitle-text">
-          The documents a {{ registration.who }} in the Philippines operates with. Upload clear photos or PDFs of the originals; our team checks them before your shop opens.
-        </p>
+      <!-- ── Step 3: business documents ───────────────────────────────── -->
+      <div v-if="currentStep === 3" class="vr-step">
+        <header class="vr-head">
+          <h2>Business documents</h2>
+          <p>What a {{ registration.who }} in the Philippines operates with. Clear photos or PDFs of the originals; only our review team sees them.</p>
+        </header>
 
-        <h3 class="section-title">{{ registration.agency }} registration</h3>
-        <div class="input-group">
-          <label class="input-label">Registered business name *</label>
-          <input v-model="formData.registeredBusinessName" name="registeredBusinessName" type="text" class="form-input" :class="{ error: errors.registeredBusinessName }" placeholder="Exactly as printed on your certificate" />
-          <p class="hint-text">It can be different from your store name.</p>
-          <div v-if="errors.registeredBusinessName" class="error-message">{{ errors.registeredBusinessName }}</div>
-        </div>
-        <div class="input-group">
-          <label class="input-label">{{ registration.numberLabel }} *</label>
-          <input v-model="formData[registration.field]" :name="registration.field" type="text" class="form-input" :class="{ error: errors[registration.field] }" :placeholder="registration.example" />
-          <div v-if="errors[registration.field]" class="error-message">{{ errors[registration.field] }}</div>
-        </div>
-        <div class="input-group">
-          <label class="input-label">{{ registration.certificate }} *</label>
-          <DocDrop
-            field="business_registration"
-            label="your registration certificate"
-            :info="fileInfo.business_registration"
-            :over="!!dragOver.business_registration"
-            :error="errors.business_registration"
-            @change="handleFileUpload($event, 'business_registration')"
-            @drop="handleDrop($event, 'business_registration')"
-            @dragenter="handleDragEnter($event, 'business_registration')"
-            @dragover="handleDragOver($event, 'business_registration')"
-            @dragleave="handleDragLeave($event, 'business_registration')"
-            @remove="removeFile('business_registration')"
-          />
-        </div>
-
-        <h3 class="section-title">BIR (taxes)</h3>
-        <div class="input-group">
-          <label class="input-label">Taxpayer Identification Number (TIN) *</label>
-          <input :value="formData.birTin" name="birTin" type="text" inputmode="numeric" class="form-input" :class="{ error: errors.birTin }" placeholder="123-456-789-00000" @input="formData.birTin = formatTin($event.target.value); $event.target.value = formData.birTin" />
-          <p class="hint-text">9 digits, plus the branch code if your 2303 shows one.</p>
-          <div v-if="errors.birTin" class="error-message">{{ errors.birTin }}</div>
-        </div>
-        <div class="input-group">
-          <label class="input-label">BIR Certificate of Registration (Form 2303) *</label>
-          <DocDrop
-            field="bir_certificate"
-            label="BIR Form 2303"
-            :info="fileInfo.bir_certificate"
-            :over="!!dragOver.bir_certificate"
-            :error="errors.bir_certificate"
-            @change="handleFileUpload($event, 'bir_certificate')"
-            @drop="handleDrop($event, 'bir_certificate')"
-            @dragenter="handleDragEnter($event, 'bir_certificate')"
-            @dragover="handleDragOver($event, 'bir_certificate')"
-            @dragleave="handleDragLeave($event, 'bir_certificate')"
-            @remove="removeFile('bir_certificate')"
-          />
-        </div>
-
-        <h3 class="section-title">Mayor's / Business Permit</h3>
-        <div class="field-row">
-          <div class="input-group">
-            <label class="input-label">Permit number *</label>
-            <input v-model="formData.mayorPermitNumber" name="mayorPermitNumber" type="text" class="form-input" :class="{ error: errors.mayorPermitNumber }" placeholder="As printed on the permit" />
-            <div v-if="errors.mayorPermitNumber" class="error-message">{{ errors.mayorPermitNumber }}</div>
-          </div>
-          <div class="input-group">
-            <label class="input-label">Valid until *</label>
-            <input v-model="formData.mayorPermitValidUntil" name="mayorPermitValidUntil" type="date" class="form-input" :class="{ error: errors.mayorPermitValidUntil }" :min="todayYmd" />
-            <div v-if="errors.mayorPermitValidUntil" class="error-message">{{ errors.mayorPermitValidUntil }}</div>
-          </div>
-        </div>
-        <p class="hint-text permit-hint">Business permits are renewed every January at your city or municipal hall.</p>
-        <div class="input-group">
-          <DocDrop
-            field="mayor_permit"
-            label="your business permit"
-            :info="fileInfo.mayor_permit"
-            :over="!!dragOver.mayor_permit"
-            :error="errors.mayor_permit"
-            @change="handleFileUpload($event, 'mayor_permit')"
-            @drop="handleDrop($event, 'mayor_permit')"
-            @dragenter="handleDragEnter($event, 'mayor_permit')"
-            @dragover="handleDragOver($event, 'mayor_permit')"
-            @dragleave="handleDragLeave($event, 'mayor_permit')"
-            @remove="removeFile('mayor_permit')"
-          />
-        </div>
-
-        <h3 class="section-title">Barangay Business Clearance</h3>
-        <div class="input-group">
-          <label class="input-label">Clearance number *</label>
-          <input v-model="formData.barangayClearanceNumber" name="barangayClearanceNumber" type="text" class="form-input" :class="{ error: errors.barangayClearanceNumber }" placeholder="As printed on the clearance" />
-          <div v-if="errors.barangayClearanceNumber" class="error-message">{{ errors.barangayClearanceNumber }}</div>
-        </div>
-        <div class="input-group">
-          <DocDrop
-            field="barangay_clearance"
-            label="your barangay clearance"
-            :info="fileInfo.barangay_clearance"
-            :over="!!dragOver.barangay_clearance"
-            :error="errors.barangay_clearance"
-            @change="handleFileUpload($event, 'barangay_clearance')"
-            @drop="handleDrop($event, 'barangay_clearance')"
-            @dragenter="handleDragEnter($event, 'barangay_clearance')"
-            @dragover="handleDragOver($event, 'barangay_clearance')"
-            @dragleave="handleDragLeave($event, 'barangay_clearance')"
-            @remove="removeFile('barangay_clearance')"
-          />
-        </div>
-
-        <div class="info-box">
-          <p>
-            Missing one? You can save your progress on this device and finish later. Every document stays private — only the BloomCraft review team sees them.
-          </p>
-        </div>
-      </div>
-
-      <!-- Step 4: Legal & Optional Info (UNCHANGED) -->
-      <div v-if="currentStep === 4" class="form-step">
-        <h2 class="step-title">Legal Agreements & Optional Info</h2>
-
-        <div class="legal-box">
-          <label class="legal-label">
-            <input
-              v-model="formData.acceptTerms"
-              type="checkbox"
-              class="checkbox-input"
-              :class="{ error: errors.acceptTerms }"
-            />
-            <span
-              >I accept the
-              <a href="#" @click.prevent="showModal('terms')" class="link"
-                >Terms & Conditions</a
-              >
-              *</span
-            >
-          </label>
-          <div v-if="errors.acceptTerms" class="error-message">
-            {{ errors.acceptTerms }}
-          </div>
-
-          <label class="legal-label">
-            <input
-              v-model="formData.acceptVendorAgreement"
-              type="checkbox"
-              class="checkbox-input"
-              :class="{ error: errors.acceptVendorAgreement }"
-            />
-            <span
-              >I accept the
-              <a
-                href="#"
-                @click.prevent="showModal('vendorAgreement')"
-                class="link"
-                >Vendor Agreement</a
-              >
-              *</span
-            >
-          </label>
-          <div v-if="errors.acceptVendorAgreement" class="error-message">
-            {{ errors.acceptVendorAgreement }}
-          </div>
-
-          <label class="legal-label">
-            <input
-              v-model="formData.acceptDataPrivacy"
-              type="checkbox"
-              class="checkbox-input"
-              :class="{ error: errors.acceptDataPrivacy }"
-            />
-            <span
-              >I consent to the
-              <a href="#" @click.prevent="showModal('privacy')" class="link"
-                >Data Privacy Policy</a
-              >
-              *</span
-            >
-          </label>
-          <div v-if="errors.acceptDataPrivacy" class="error-message">
-            {{ errors.acceptDataPrivacy }}
-          </div>
-        </div>
-
-        <div class="section-divider">
-          <h3 class="section-title">Optional Information</h3>
-        </div>
-
-        <div class="input-group">
-          <label class="input-label">Store Logo</label>
-          <div class="file-upload-container">
-            <div
-              class="file-drop-zone"
-              @click="$refs.store_logoInput.click()"
-              @dragenter.prevent="handleDragEnter($event, 'store_logo')"
-              @dragover.prevent="handleDragOver($event, 'store_logo')"
-              @dragleave.prevent="handleDragLeave($event, 'store_logo')"
-              @drop.prevent="handleDrop($event, 'store_logo')"
-              :class="{
-                'drag-over': dragOver.store_logo,
-                'has-file': fileInfo.store_logo,
-              }"
-            >
-              <div v-if="!fileInfo.store_logo" class="upload-placeholder">
-                <svg class="upload-icon" viewBox="0 0 24 24">
-                  <path
-                    d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"
-                  />
-                </svg>
-                <p class="upload-text">Drop logo here or click to upload</p>
-                <p class="upload-hint">Max size: 2MB • Formats: JPG, PNG</p>
-              </div>
-              <div v-else class="file-preview">
-                <div class="preview-icon">
-                  <img v-if="fileInfo.store_logo.url" :src="fileInfo.store_logo.url" :alt="fileInfo.store_logo.name" class="file-thumbnail" />
-                  <span>🏪</span>
-                </div>
-                <div class="file-details">
-                  <div class="file-name">{{ fileInfo.store_logo.name }}</div>
-                  <div class="file-meta">
-                    <span class="file-size">{{
-                      formatFileSize(fileInfo.store_logo.size)
-                    }}</span>
-                    <span class="file-type">{{
-                      getFileType(fileInfo.store_logo.type)
-                    }}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  @click.stop="removeFile('store_logo')"
-                  class="remove-file-btn"
-                  title="Remove file"
-                >
-                  ×
-                </button>
-              </div>
+        <section class="vr-card">
+          <h3><span class="vr-badge">{{ registration.agency }}</span> Registration</h3>
+          <div class="vr-grid">
+            <div class="vr-field">
+              <label class="vr-label" for="vr-regname">Registered business name</label>
+              <input id="vr-regname" v-model="formData.registeredBusinessName" name="registeredBusinessName" type="text" class="vr-input" :class="{ error: errors.registeredBusinessName }" placeholder="Exactly as on the certificate" />
+              <p v-if="errors.registeredBusinessName" class="vr-error">{{ errors.registeredBusinessName }}</p>
+              <p v-else class="vr-hint">Can be different from your shop name.</p>
             </div>
-            <input
-              type="file"
-              @change="handleFileUpload($event, 'store_logo')"
-              accept=".jpg,.jpeg,.png,image/*"
-              class="file-input-hidden"
-              ref="store_logoInput"
-            />
-          </div>
-        </div>
-
-        <div class="input-group">
-          <label class="input-label">Portfolio / Sample Photos</label>
-          <div class="file-upload-container">
-            <div
-              class="file-drop-zone"
-              @click="$refs.portfolio_photosInput.click()"
-              @dragenter.prevent="handleDragEnter($event, 'portfolio_photos')"
-              @dragover.prevent="handleDragOver($event, 'portfolio_photos')"
-              @dragleave.prevent="handleDragLeave($event, 'portfolio_photos')"
-              @drop.prevent="handleDrop($event, 'portfolio_photos')"
-              :class="{
-                'drag-over': dragOver.portfolio_photos,
-                'has-file':
-                  fileInfo.portfolio_photos &&
-                  fileInfo.portfolio_photos.length > 0,
-              }"
-            >
-              <div
-                v-if="
-                  !fileInfo.portfolio_photos ||
-                  fileInfo.portfolio_photos.length === 0
-                "
-                class="upload-placeholder"
-              >
-                <svg class="upload-icon" viewBox="0 0 24 24">
-                  <path
-                    d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"
-                  />
-                </svg>
-                <p class="upload-text">Drop photos here or click to upload</p>
-                <p class="upload-hint">
-                  Max size: 5MB each • Formats: JPG, PNG
-                </p>
-              </div>
-              <div v-else class="file-preview multiple">
-                <div class="preview-icon">
-                  <span>🖼️</span>
-                </div>
-                <div class="file-details">
-                  <div class="file-name">
-                    {{ fileInfo.portfolio_photos.length }} photo(s) selected
-                  </div>
-                  <div class="file-meta">
-                    <span class="file-size"
-                      >{{
-                        formatFileSize(
-                          fileInfo.portfolio_photos.reduce(
-                            (sum, file) => sum + file.size,
-                            0,
-                          ),
-                        )
-                      }}
-                      total</span
-                    >
-                  </div>
-                  <div class="file-list">
-                    <div
-                      v-for="(file, index) in fileInfo.portfolio_photos"
-                      :key="index"
-                      class="file-item"
-                    >
-                      <img v-if="file.url" :src="file.url" :alt="file.name" class="file-list-thumbnail" />
-                      <span class="file-item-name">{{ file.name }}</span>
-                      <span class="file-item-size">{{
-                        formatFileSize(file.size)
-                      }}</span>
-                      <button
-                        type="button"
-                        @click.stop="removePortfolioFile(index)"
-                        class="remove-file-item"
-                        title="Remove file"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  @click.stop="removeFile('portfolio_photos')"
-                  class="remove-file-btn"
-                  title="Remove all files"
-                >
-                  ×
-                </button>
-              </div>
+            <div class="vr-field">
+              <label class="vr-label" for="vr-regno">{{ registration.numberLabel }}</label>
+              <input id="vr-regno" v-model="formData[registration.field]" :name="registration.field" type="text" class="vr-input" :class="{ error: errors[registration.field] }" :placeholder="registration.example" />
+              <p v-if="errors[registration.field]" class="vr-error">{{ errors[registration.field] }}</p>
             </div>
-            <input
-              type="file"
-              @change="handleFileUpload($event, 'portfolio_photos')"
-              accept=".jpg,.jpeg,.png,image/*"
-              class="file-input-hidden"
-              ref="portfolio_photosInput"
-              multiple
-            />
           </div>
-        </div>
+          <div class="vr-field">
+            <span class="vr-label">{{ registration.certificate }}</span>
+            <DocDrop field="business_registration" label="your certificate" :info="fileInfo.business_registration" :over="!!dragOver.business_registration" :error="errors.business_registration" @change="handleFileUpload($event, 'business_registration')" @drop="handleDrop($event, 'business_registration')" @dragenter="handleDragEnter($event, 'business_registration')" @dragover="handleDragOver($event, 'business_registration')" @dragleave="handleDragLeave($event, 'business_registration')" @remove="removeFile('business_registration')" />
+          </div>
+        </section>
 
-        <div class="input-group">
-          <label class="input-label">Facebook Page Link</label>
-          <input
-            v-model="formData.facebookPage"
-            type="url"
-            placeholder="https://facebook.com/yourpage"
-            class="form-input"
-          />
-        </div>
+        <section class="vr-card">
+          <h3><span class="vr-badge">BIR</span> Taxes</h3>
+          <div class="vr-field">
+            <label class="vr-label" for="vr-tin">Taxpayer Identification Number (TIN)</label>
+            <input id="vr-tin" :value="formData.birTin" name="birTin" type="text" inputmode="numeric" class="vr-input vr-narrow" :class="{ error: errors.birTin }" placeholder="123-456-789-00000" @input="formData.birTin = formatTin($event.target.value); $event.target.value = formData.birTin" />
+            <p v-if="errors.birTin" class="vr-error">{{ errors.birTin }}</p>
+            <p v-else class="vr-hint">9 digits, plus the branch code if your 2303 shows one.</p>
+          </div>
+          <div class="vr-field">
+            <span class="vr-label">Certificate of Registration (BIR Form 2303)</span>
+            <DocDrop field="bir_certificate" label="BIR Form 2303" :info="fileInfo.bir_certificate" :over="!!dragOver.bir_certificate" :error="errors.bir_certificate" @change="handleFileUpload($event, 'bir_certificate')" @drop="handleDrop($event, 'bir_certificate')" @dragenter="handleDragEnter($event, 'bir_certificate')" @dragover="handleDragOver($event, 'bir_certificate')" @dragleave="handleDragLeave($event, 'bir_certificate')" @remove="removeFile('bir_certificate')" />
+          </div>
+        </section>
 
-        <div class="input-group">
-          <label class="input-label">Instagram Page Link</label>
-          <input
-            v-model="formData.instagramPage"
-            type="url"
-            placeholder="https://instagram.com/yourpage"
-            class="form-input"
-          />
-        </div>
+        <section class="vr-card">
+          <h3><span class="vr-badge">LGU</span> Mayor's / Business Permit</h3>
+          <div class="vr-grid">
+            <div class="vr-field">
+              <label class="vr-label" for="vr-permit">Permit number</label>
+              <input id="vr-permit" v-model="formData.mayorPermitNumber" name="mayorPermitNumber" type="text" class="vr-input" :class="{ error: errors.mayorPermitNumber }" placeholder="As printed on the permit" />
+              <p v-if="errors.mayorPermitNumber" class="vr-error">{{ errors.mayorPermitNumber }}</p>
+            </div>
+            <div class="vr-field">
+              <label class="vr-label" for="vr-valid">Valid until</label>
+              <input id="vr-valid" v-model="formData.mayorPermitValidUntil" name="mayorPermitValidUntil" type="date" class="vr-input" :class="{ error: errors.mayorPermitValidUntil }" :min="todayYmd" />
+              <p v-if="errors.mayorPermitValidUntil" class="vr-error">{{ errors.mayorPermitValidUntil }}</p>
+              <p v-else class="vr-hint">Permits are renewed every January.</p>
+            </div>
+          </div>
+          <DocDrop field="mayor_permit" label="your business permit" :info="fileInfo.mayor_permit" :over="!!dragOver.mayor_permit" :error="errors.mayor_permit" @change="handleFileUpload($event, 'mayor_permit')" @drop="handleDrop($event, 'mayor_permit')" @dragenter="handleDragEnter($event, 'mayor_permit')" @dragover="handleDragOver($event, 'mayor_permit')" @dragleave="handleDragLeave($event, 'mayor_permit')" @remove="removeFile('mayor_permit')" />
+        </section>
+
+        <section class="vr-card">
+          <h3><span class="vr-badge">Barangay</span> Business Clearance</h3>
+          <div class="vr-field">
+            <label class="vr-label" for="vr-brgy">Clearance number</label>
+            <input id="vr-brgy" v-model="formData.barangayClearanceNumber" name="barangayClearanceNumber" type="text" class="vr-input vr-narrow" :class="{ error: errors.barangayClearanceNumber }" placeholder="As printed on the clearance" />
+            <p v-if="errors.barangayClearanceNumber" class="vr-error">{{ errors.barangayClearanceNumber }}</p>
+          </div>
+          <DocDrop field="barangay_clearance" label="your barangay clearance" :info="fileInfo.barangay_clearance" :over="!!dragOver.barangay_clearance" :error="errors.barangay_clearance" @change="handleFileUpload($event, 'barangay_clearance')" @drop="handleDrop($event, 'barangay_clearance')" @dragenter="handleDragEnter($event, 'barangay_clearance')" @dragover="handleDragOver($event, 'barangay_clearance')" @dragleave="handleDragLeave($event, 'barangay_clearance')" @remove="removeFile('barangay_clearance')" />
+        </section>
       </div>
 
-      <!-- Step 5: Review & Confirm (UNCHANGED) -->
-      <div v-if="currentStep === 5" class="form-step review-step">
-        <h2 class="step-title">Review Your Application</h2>
-        <p class="subtitle-text">
-          Please review all information before submitting
-        </p>
+      <!-- ── Step 4: agreements and extras ────────────────────────────── -->
+      <div v-if="currentStep === 4" class="vr-step">
+        <header class="vr-head">
+          <h2>Agreements and extras</h2>
+          <p>Read and accept the three agreements. The rest is optional but helps customers find you.</p>
+        </header>
 
-        <div class="review-section">
-          <h3 class="review-section-title">Store Information</h3>
-          <div class="review-item">
-            <strong>Store Name:</strong> {{ formData.storeName }}
+        <section class="vr-card">
+          <h3>Agreements</h3>
+          <div v-for="a in AGREEMENTS" :key="a.key" class="vr-agree" :class="{ on: formData[a.field], error: errors[a.field] }">
+            <div class="vr-agree-text">
+              <b>{{ a.title }}</b>
+              <small>{{ a.summary }}</small>
+              <button type="button" class="af-plain vr-small" @click="showModal(a.modal)">Read it</button>
+            </div>
+            <label class="vr-switch">
+              <input v-model="formData[a.field]" type="checkbox" :name="a.field" />
+              <span aria-hidden="true"></span>
+              <em>{{ formData[a.field] ? "Accepted" : "I agree" }}</em>
+            </label>
+            <p v-if="errors[a.field]" class="vr-error vr-agree-error">{{ errors[a.field] }}</p>
           </div>
-          <div class="review-item">
-            <strong>Business Type:</strong>
-            {{ formatBusinessType(formData.businessType) }}
-          </div>
-          <div class="review-item">
-            <strong>Store Address:</strong> {{ formData.storeAddress }}
-          </div>
-          <div class="review-item">
-            <strong>Service Areas:</strong> {{ formData.serviceAreas }}
-          </div>
-          <div class="review-item">
-            <strong>Operating Hours:</strong> {{ formData.operatingHours }}
-          </div>
-        </div>
+        </section>
 
-        <div class="review-section">
-          <h3 class="review-section-title">Owner Information</h3>
-          <div class="review-item">
-            <strong>Owner Name:</strong> {{ formData.ownerName }}
+        <section class="vr-card">
+          <h3>Make your shop shine <small>optional</small></h3>
+          <div class="vr-docs two">
+            <div class="vr-doc">
+              <span class="vr-label">Logo</span>
+              <DocDrop field="store_logo" label="your logo" hint="Square works best · up to 2 MB" accept=".jpg,.jpeg,.png,image/*" :info="fileInfo.store_logo" :over="!!dragOver.store_logo" :error="errors.store_logo" @change="handleFileUpload($event, 'store_logo')" @drop="handleDrop($event, 'store_logo')" @dragenter="handleDragEnter($event, 'store_logo')" @dragover="handleDragOver($event, 'store_logo')" @dragleave="handleDragLeave($event, 'store_logo')" @remove="removeFile('store_logo')" />
+            </div>
+            <div class="vr-doc">
+              <span class="vr-label">Sample work</span>
+              <div class="vr-gallery">
+                <figure v-for="(file, index) in fileInfo.portfolio_photos || []" :key="index">
+                  <img v-if="file.url" :src="file.url" :alt="file.name" />
+                  <button type="button" :aria-label="`Remove ${file.name}`" @click="removePortfolioFile(index)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+                  </button>
+                </figure>
+                <label class="vr-gallery-add" @dragover.prevent @drop.prevent="handleDrop($event, 'portfolio_photos')">
+                  <input ref="portfolio_photosInput" type="file" multiple accept=".jpg,.jpeg,.png,image/*" @change="handleFileUpload($event, 'portfolio_photos')" />
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                  <span>Add photos</span>
+                </label>
+              </div>
+              <p class="vr-hint">Bouquets you've made. They show on your storefront.</p>
+            </div>
           </div>
-          <div class="review-item">
-            <strong>Contact:</strong> {{ formData.contactNumber }}
+          <div class="vr-grid">
+            <div class="vr-field">
+              <label class="vr-label" for="vr-fb">Facebook page</label>
+              <input id="vr-fb" v-model="formData.facebookPage" name="facebookPage" type="url" class="vr-input" :class="{ error: errors.facebookPage }" placeholder="https://facebook.com/yourshop" />
+              <p v-if="errors.facebookPage" class="vr-error">{{ errors.facebookPage }}</p>
+            </div>
+            <div class="vr-field">
+              <label class="vr-label" for="vr-ig">Instagram</label>
+              <input id="vr-ig" v-model="formData.instagramPage" name="instagramPage" type="url" class="vr-input" :class="{ error: errors.instagramPage }" placeholder="https://instagram.com/yourshop" />
+              <p v-if="errors.instagramPage" class="vr-error">{{ errors.instagramPage }}</p>
+            </div>
           </div>
-          <div class="review-item">
-            <strong>Email:</strong> {{ formData.email }}
-          </div>
-        </div>
-
-        <div class="review-section">
-          <h3 class="review-section-title">Verification Documents</h3>
-          <div class="review-item">
-            <strong>ID type:</strong> {{ GOVERNMENT_IDS[formData.governmentIdType] || "Not provided" }}
-          </div>
-          <div class="review-item">
-            <strong>Government ID No:</strong>
-            {{ formData.governmentIdNumber || "Not provided" }}
-          </div>
-          <div class="review-item">
-            <strong>Government ID:</strong>
-            {{
-              fileInfo.government_id
-                ? fileInfo.government_id.name
-                : "Not uploaded"
-            }}
-          </div>
-          <div class="review-item">
-            <strong>Selfie with ID:</strong>
-            {{
-              fileInfo.selfie_with_id
-                ? fileInfo.selfie_with_id.name
-                : "Not uploaded"
-            }}
-          </div>
-          <div class="review-item">
-            <strong>Proof of Address:</strong>
-            {{
-              fileInfo.proof_of_address
-                ? fileInfo.proof_of_address.name
-                : "Not uploaded"
-            }}
-          </div>
-        </div>
-
-        <div
-          class="review-section"
-          v-if="
-            formData.dtiNumber ||
-            formData.secNumber ||
-            formData.birTin ||
-            fileInfo.barangay_clearance ||
-            fileInfo.mayor_permit
-          "
-        >
-          <h3 class="review-section-title">Business Registration</h3>
-          <div class="review-item">
-            <strong>Registered name:</strong> {{ formData.registeredBusinessName }}
-          </div>
-          <div class="review-item">
-            <strong>{{ registration.numberLabel }}:</strong> {{ formData[registration.field] }}
-          </div>
-          <div class="review-item" v-if="fileInfo.business_registration">
-            <strong>{{ registration.certificate }}:</strong> {{ fileInfo.business_registration.name }}
-          </div>
-          <div class="review-item" v-if="fileInfo.bir_certificate">
-            <strong>BIR Form 2303:</strong> {{ fileInfo.bir_certificate.name }}
-          </div>
-          <div class="review-item" v-if="formData.mayorPermitValidUntil">
-            <strong>Permit valid until:</strong> {{ formData.mayorPermitValidUntil }}
-          </div>
-          <div class="review-item" v-if="formData.barangayClearanceNumber">
-            <strong>Barangay Clearance No:</strong>
-            {{ formData.barangayClearanceNumber }}
-          </div>
-          <div class="review-item" v-if="fileInfo.barangay_clearance">
-            <strong>Barangay Clearance:</strong>
-            {{ fileInfo.barangay_clearance.name }}
-          </div>
-          <div class="review-item" v-if="formData.mayorPermitNumber">
-            <strong>Mayor's Permit No:</strong>
-            {{ formData.mayorPermitNumber }}
-          </div>
-          <div class="review-item" v-if="fileInfo.mayor_permit">
-            <strong>Mayor's Permit:</strong> {{ fileInfo.mayor_permit.name }}
-          </div>
-          <div class="review-item" v-if="formData.birTin">
-            <strong>TIN:</strong> {{ formData.birTin }}
-          </div>
-        </div>
-
-        <div
-          class="review-section"
-          v-if="
-            fileInfo.store_logo ||
-            (fileInfo.portfolio_photos &&
-              fileInfo.portfolio_photos.length > 0) ||
-            formData.facebookPage ||
-            formData.instagramPage
-          "
-        >
-          <h3 class="review-section-title">Additional Information</h3>
-          <div class="review-item" v-if="fileInfo.store_logo">
-            <strong>Store Logo:</strong> {{ fileInfo.store_logo.name }}
-          </div>
-          <div
-            class="review-item"
-            v-if="
-              fileInfo.portfolio_photos && fileInfo.portfolio_photos.length > 0
-            "
-          >
-            <strong>Portfolio Photos:</strong>
-            {{ fileInfo.portfolio_photos.length }} file(s)
-          </div>
-          <div class="review-item" v-if="formData.facebookPage">
-            <strong>Facebook:</strong> {{ formData.facebookPage }}
-          </div>
-          <div class="review-item" v-if="formData.instagramPage">
-            <strong>Instagram:</strong> {{ formData.instagramPage }}
-          </div>
-        </div>
-
-        <div class="legal-box">
-          <label class="legal-label">
-            <input
-              v-model="formData.confirmAccuracy"
-              type="checkbox"
-              class="checkbox-input"
-              :class="{ error: errors.confirmAccuracy }"
-            />
-            <span
-              >I confirm that all information provided is accurate and complete
-              *</span
-            >
-          </label>
-          <div v-if="errors.confirmAccuracy" class="error-message">
-            {{ errors.confirmAccuracy }}
-          </div>
-        </div>
+        </section>
       </div>
 
-      <!-- Navigation Buttons -->
-      <div class="button-group">
-        <button v-if="currentStep > 1" type="button" class="action-btn secondary" :disabled="isSubmitting" @click="prevStep">Back</button>
-        <button
-          v-if="currentStep < totalSteps"
-          @click="nextStep"
-          type="button"
-          class="action-btn"
-          :disabled="isSubmitting"
-        >
-          {{ currentStep === 4 ? "Review Application" : "Next" }}
+      <!-- ── Step 5: review ───────────────────────────────────────────── -->
+      <div v-if="currentStep === 5" class="vr-step">
+        <header class="vr-head">
+          <h2>Check and send</h2>
+          <p>Make sure everything is right. You can change anything before you send it.</p>
+        </header>
+
+        <section v-for="part in reviewParts" :key="part.step" class="vr-card vr-review">
+          <div class="vr-review-head">
+            <h3>{{ part.title }}</h3>
+            <button type="button" class="af-plain vr-small" @click="goToStep(part.step)">Edit</button>
+          </div>
+          <dl>
+            <template v-for="row in part.rows" :key="row[0]">
+              <dt>{{ row[0] }}</dt>
+              <dd :class="{ missing: !row[1] }">{{ row[1] || "Not provided" }}</dd>
+            </template>
+          </dl>
+        </section>
+
+        <section class="vr-card">
+          <h3>Documents</h3>
+          <ul class="vr-checklist">
+            <li v-for="doc in reviewDocs" :key="doc.field" :class="{ ok: doc.ok }">
+              <svg v-if="doc.ok" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9" /></svg>
+              <svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /></svg>
+              <span>{{ doc.label }}</span>
+              <small>{{ doc.ok ? doc.name : "Missing" }}</small>
+            </li>
+          </ul>
+        </section>
+
+        <label class="vr-confirm" :class="{ on: formData.confirmAccuracy, error: errors.confirmAccuracy }">
+          <input v-model="formData.confirmAccuracy" type="checkbox" name="confirmAccuracy" />
+          <span>I confirm that everything in this application is true and complete, and that the documents are mine to share.</span>
+        </label>
+        <p v-if="errors.confirmAccuracy" class="vr-error">{{ errors.confirmAccuracy }}</p>
+      </div>
+
+      <!-- Moving between steps -->
+      <footer class="vr-nav">
+        <button v-if="currentStep > 1" type="button" class="af-btn ghost" :disabled="isSubmitting" @click="prevStep">Back</button>
+        <span class="vr-saved">Step {{ currentStep }} of {{ totalSteps }}. Saved on this device.</span>
+        <button v-if="currentStep < totalSteps" type="button" class="af-btn" :disabled="isSubmitting" @click="nextStep">
+          {{ currentStep === 4 ? "Review application" : "Continue" }}
         </button>
-
-        <button
-          v-else
-          @click="handleSubmit"
-          type="button"
-          class="action-btn submit-btn"
-          :disabled="isSubmitting"
-        >
-          <span v-if="isSubmitting">Submitting...</span>
-          <span v-else>Submit Registration</span>
+        <button v-else type="button" class="af-btn" :class="{ busy: isSubmitting }" :disabled="isSubmitting" @click="handleSubmit">
+          {{ isSubmitting ? "Sending your application…" : "Send application" }}
         </button>
-      </div>
+      </footer>
+    </div>
 
-      <!-- Progress Text -->
-      <div class="progress-text">
-        <p>Step {{ currentStep }} of {{ totalSteps }}</p>
-      </div>
-
-      <!-- Legal Modals -->
-      <div v-if="activeModal" class="modal-overlay" @click="closeActiveModal">
-        <div class="modal legal-modal" @click.stop>
-          <button @click="closeActiveModal" class="close-modal">×</button>
-          <div class="modal-content" v-html="modalContent"></div>
-          <div class="modal-actions">
-            <button @click="closeActiveModal" class="action-btn">Close</button>
+    <!-- The full agreement, to read -->
+    <Teleport to="body">
+      <div v-if="activeModal" class="bc-theme vr-modal-back" @click.self="closeActiveModal">
+        <div class="vr-modal" role="dialog" aria-modal="true" @keydown.esc="closeActiveModal">
+          <button type="button" class="vr-modal-x" aria-label="Close" @click="closeActiveModal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+          <div class="vr-modal-body" v-html="modalContent"></div>
+          <div class="vr-modal-foot">
+            <button type="button" class="af-btn" @click="closeActiveModal">Done reading</button>
           </div>
         </div>
       </div>
-
-      <!-- Application Success Modal -->
-      <div v-if="showApplicationModal" class="modal-overlay">
-        <div class="modal">
-          <h3>Application Submitted Successfully!</h3>
-          <p>
-            Your application ID: <strong>{{ applicationId }}</strong>
-          </p>
-          <p>Please save this ID for future reference.</p>
-          <p>You will receive an email confirmation shortly.</p>
-          <p v-if="pendingPlanName">
-            After approval, log in and we'll take you straight to checkout for
-            the <strong>{{ pendingPlanName }}</strong> plan.
-          </p>
-          <div class="modal-actions">
-            <button @click="closeModal" class="action-btn secondary">
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    </div>
+    </Teleport>
   </AuthShell>
 </template>
 
@@ -1295,12 +582,68 @@ const phoneOk = (value) => {
 };
 
 const steps = [
-  { number: 1, title: "Store" },
-  { number: 2, title: "Owner" },
-  { number: 3, title: "Business" },
-  { number: 4, title: "Legal" },
+  { number: 1, title: "Your shop" },
+  { number: 2, title: "About you" },
+  { number: 3, title: "Documents" },
+  { number: 4, title: "Agreements" },
   { number: 5, title: "Review" },
 ];
+
+// The four ways a business can be registered, as cards
+const STRUCTURE_LABELS = {
+  individual: { title: "Sole proprietorship", hint: "One owner, registered with DTI" },
+  partnership: { title: "Partnership", hint: "Two or more partners, registered with SEC" },
+  corporation: { title: "Corporation", hint: "Including One Person Corporations, SEC" },
+  cooperative: { title: "Cooperative", hint: "Member-owned, registered with CDA" },
+};
+
+const AGREEMENTS = [
+  { key: "terms", field: "acceptTerms", modal: "terms", title: "Terms and Conditions", summary: "How selling on BloomCraft works: listings, orders, payouts and fees." },
+  { key: "vendor", field: "acceptVendorAgreement", modal: "vendorAgreement", title: "Vendor Agreement", summary: "Your responsibilities for quality, delivery and customer care." },
+  { key: "privacy", field: "acceptDataPrivacy", modal: "privacy", title: "Data Privacy Policy", summary: "How we keep your documents and your customers' data safe (RA 10173)." },
+];
+
+// Review: one card per step, with "Edit" going back to it
+const reviewParts = computed(() => {
+  const reg = registration.value;
+  const agreed = AGREEMENTS.filter((a) => formData[a.field]).length;
+  return [
+    { step: 1, title: "Your shop", rows: [["Shop name", formData.storeName], ["Structure", formData.businessType ? formatBusinessType(formData.businessType) : ""], ["Address", formData.storeAddress], ["Delivers to", formData.serviceAreas], ["Hours", formData.operatingHours]] },
+    { step: 2, title: "About you", rows: [["Owner", [formData.ownerName, formData.position].filter(Boolean).join(", ")], ["Phone", formData.contactNumber], ["Email", formData.email], ["ID", [GOVERNMENT_IDS[formData.governmentIdType], formData.governmentIdNumber].filter(Boolean).join(" ")]] },
+    { step: 3, title: "Documents", rows: [["Registered name", formData.registeredBusinessName], [reg.numberLabel, formData[reg.field]], ["TIN", formData.birTin], ["Business permit", [formData.mayorPermitNumber, formData.mayorPermitValidUntil && `valid until ${formData.mayorPermitValidUntil}`].filter(Boolean).join(", ")], ["Barangay clearance", formData.barangayClearanceNumber]] },
+    { step: 4, title: "Agreements and extras", rows: [["Agreements", agreed === AGREEMENTS.length ? "All three accepted" : agreed ? `${agreed} of 3 accepted` : ""], ["Facebook", formData.facebookPage || "—"], ["Instagram", formData.instagramPage || "—"]] },
+  ];
+});
+const reviewDocs = computed(() =>
+  [
+    ["government_id", "Government ID"],
+    ["selfie_with_id", "Selfie with ID"],
+    ["proof_of_address", "Proof of address"],
+    ["business_registration", registration.value.certificate],
+    ["bir_certificate", "BIR Form 2303"],
+    ["mayor_permit", "Mayor's / Business Permit"],
+    ["barangay_clearance", "Barangay Business Clearance"],
+  ].map(([field, label]) => ({ field, label, ok: hasSelectedFile(field), name: fileInfo[field]?.name })),
+);
+
+// Finished steps can be reopened from the step list or the review
+const goToStep = (step) => {
+  if (step >= currentStep.value) return;
+  currentStep.value = step;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  saveProgress();
+};
+
+const copied = ref(false);
+const copyApplicationId = async () => {
+  try {
+    await navigator.clipboard.writeText(String(applicationId.value));
+    copied.value = true;
+    setTimeout(() => (copied.value = false), 2000);
+  } catch (_) {
+    // clipboard blocked: the ID is on screen to copy by hand
+  }
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NEW: Cavite location data (cities and municipalities)
@@ -2334,6 +1677,12 @@ const nextStep = () => {
 };
 
 watch(currentStep, (step) => {
+  if (step === 1) {
+    nextTick(() => {
+      mapInstance?.invalidateSize();
+      if (mapInstance && caviteBoundaryLayer && formData.storeLatitude === null) mapInstance.fitBounds(caviteBoundaryLayer.getBounds(), { padding: [12, 12] });
+    });
+  }
   if (formProblem.value && formProblem.value.step !== step) formProblem.value = null;
 });
 
@@ -2341,7 +1690,6 @@ const prevStep = () => {
   if (currentStep.value > 1) {
     currentStep.value--;
     window.scrollTo({ top: 0, behavior: "smooth" });
-    if (currentStep.value === 1) initialiseStoreLocationMap();
     saveProgress();
   }
 };
@@ -2695,1259 +2043,987 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.closed-notice {
-  max-width: 440px;
-  margin: 8px auto 0;
-  padding: 28px 24px;
-  border: 1px solid rgba(30, 27, 24, 0.12);
-  border-radius: 14px;
-  background: #faf8f4;
-  text-align: center;
+/* ── Vendor application (inside AuthShell) ────────────────────────────── */
+.vr-problem {
+  margin-bottom: 22px;
 }
 
-.closed-notice h2 {
-  margin: 0 0 8px;
-  font-size: 20px;
+/* Steps: numbered, because it is a sequence; finished ones reopen */
+.vr-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 30px;
+  padding: 0;
+  list-style: none;
 }
-
-.closed-notice p {
-  margin: 0 0 16px;
-  color: #6e6761;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-/* ─── All original styles (unchanged) ──────────────────────────────────────── */
-.register-container {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: #ffffff;
-  padding: 40px 20px;
-  position: relative;
-}
-
-.logo {
-  text-decoration: none;
-  position: absolute;
-  top: 32px;
-  left: 32px;
-  font-size: 32px;
-  animation: bounce 2s ease-in-out infinite;
-}
-
-@keyframes bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
-}
-
-.back-btn {
-  position: absolute;
-  top: 32px;
-  right: 32px;
-  background: none;
-  border: none;
-  color: #4a433d;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 8px 12px;
-  transition: all 0.2s;
-}
-
-.back-btn:hover {
-  color: var(--ink);
-  transform: translateX(-4px);
-}
-
-.header {
-  text-align: center;
-  margin-bottom: 48px;
-}
-
-.title {
-  font-size: 32px;
-  font-weight: 400;
-  color: var(--ink);
-  margin-bottom: 12px;
-  letter-spacing: -0.5px;
-}
-
-.subtitle {
-  font-size: 14px;
-  color: var(--ink-soft);
-  font-weight: 400;
-}
-
-.link {
-  color: var(--ink);
-  text-decoration: underline;
-  font-weight: 400;
-  transition: color 0.2s;
-}
-
-.link:hover {
-  color: var(--espresso);
-}
-
-.steps-indicator {
+.vr-steps button {
   display: flex;
   align-items: center;
-  justify-content: center;
-  margin-bottom: 48px;
-  max-width: 900px;
+  gap: 10px;
   width: 100%;
-  padding: 0 20px;
+  padding: 10px 10px 12px;
+  border: 0;
+  border-bottom: 3px solid var(--line);
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--ink-soft);
+  cursor: pointer;
 }
-
-.step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
+.vr-steps button:disabled {
+  cursor: default;
 }
-
-.step-number {
-  width: 32px;
-  height: 32px;
+.vr-steps button:not(:disabled):hover .vr-step-name {
+  color: var(--rosewood-dark);
+}
+.vr-steps .on button {
+  border-color: var(--rosewood-dark);
+  color: var(--ink);
+}
+.vr-steps .done button {
+  border-color: rgba(142, 68, 58, 0.45);
+}
+.vr-dot {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
   border-radius: 50%;
-  background: var(--line);
-  color: #a39b93;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 500;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+.vr-steps .on .vr-dot {
+  border-color: var(--espresso);
+  background: var(--espresso);
+  color: #f7f2ea;
+}
+.vr-steps .done .vr-dot {
+  border-color: rgba(142, 68, 58, 0.45);
+  color: var(--rosewood-dark);
+}
+.vr-dot svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.vr-step-name {
+  min-width: 0;
+  overflow: hidden;
   font-size: 14px;
-  transition: all 0.3s ease;
-}
-
-.step.active .step-number {
-  background: var(--ink);
-  color: white;
-}
-.step.completed .step-number {
-  background: #3f7a55;
-  color: white;
-}
-
-.step-label {
-  font-size: 11px;
-  color: #a39b93;
-  font-weight: 400;
+  font-weight: 500;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.step.active .step-label {
-  color: var(--ink);
-  font-weight: 500;
+/* Step header */
+.vr-head {
+  margin-bottom: 18px;
 }
-
-.step-line {
-  flex: 1;
-  height: 1px;
-  background: var(--line);
-  margin: 0 12px;
-  transition: all 0.3s ease;
-  min-width: 20px;
-  max-width: 60px;
+.vr-head h2 {
+  margin: 0 0 6px;
+  font-size: 36px;
 }
-
-.step-line.active {
-  background: #3f7a55;
-}
-
-.form-content {
-  width: 100%;
-  max-width: 600px;
-}
-
-.form-step {
-  animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.step-title {
-  font-size: 20px;
-  font-weight: 400;
-  color: var(--ink);
-  margin-bottom: 8px;
-  text-align: center;
-}
-
-.subtitle-text {
-  font-size: 13px;
+.vr-head p {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 15px;
+  line-height: 1.6;
   color: var(--ink-soft);
-  text-align: center;
-  margin-bottom: 24px;
 }
 
-.section-divider {
-  margin: 32px 0 24px 0;
-  padding-top: 24px;
-  border-top: 1px solid var(--line);
+/* Cards */
+.vr-card {
+  margin-bottom: 16px;
+  padding: 24px 26px;
+  border: 1px solid var(--line-soft);
+  border-radius: 20px;
+  background: #fff;
 }
-
-.section-title {
-  font-size: 16px;
-  font-weight: 500;
+.vr-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.3;
   color: var(--ink);
+}
+.vr-card h3 small {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+.vr-sub {
+  margin: -10px 0 16px;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+.vr-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 42px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: #f4e7e2;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--rosewood-dark);
+}
+
+/* Fields */
+.vr-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px 18px;
+}
+.vr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
   margin-bottom: 16px;
 }
-
-.input-group {
-  margin-bottom: 20px;
+.vr-grid .vr-field {
+  margin-bottom: 0;
 }
-
-.input-label {
-  display: block;
-  font-size: 14px;
+.vr-grid + .vr-field,
+.vr-grid + .vr-docs,
+.vr-grid + .dd,
+.vr-field + .dd,
+.vr-docs + .vr-grid {
+  margin-top: 16px;
+}
+.vr-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.vr-label small {
   font-weight: 400;
-  color: var(--ink);
-  margin-bottom: 8px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
 }
-
-.form-input {
+.vr-input {
   width: 100%;
-  padding: 12px 16px;
+  min-height: 54px;
+  padding: 0 16px;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  font-size: 15px;
+  border-radius: 14px;
+  background: var(--paper);
+  font: 400 15.5px/1.4 var(--font-sans);
   color: var(--ink);
-  background: #ffffff;
-  transition: all 0.2s ease;
-  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
-
-.form-input:focus {
-  outline: none;
+textarea.vr-input {
+  padding: 14px 16px;
+  resize: vertical;
+}
+select.vr-input {
+  cursor: pointer;
+}
+.vr-input:hover {
   border-color: rgba(30, 27, 24, 0.22);
 }
-
-.form-input::placeholder {
-  color: rgba(30, 27, 24, 0.22);
-}
-.form-input.error {
+.vr-input:focus {
+  outline: none;
   border-color: var(--rosewood-dark);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(142, 68, 58, 0.12);
 }
-
-.id-number-input {
-  margin-bottom: 12px;
-}
-textarea.form-input {
-  resize: vertical;
-  min-height: 80px;
-}
-
-.file-upload-container {
-  position: relative;
-  margin-top: 8px;
-}
-
-.file-drop-zone {
-  border: 2px dashed var(--line);
-  border-radius: 8px;
-  padding: 32px;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background: var(--paper);
-  position: relative;
-  overflow: hidden;
-}
-
-.file-drop-zone.drag-over {
-  border-color: #3f7a55;
-  background: rgba(32, 115, 77, 0.05);
-}
-.file-drop-zone.has-file {
-  border-color: #3f7a55;
-  background: rgba(32, 115, 77, 0.05);
-}
-
-.upload-icon {
-  width: 48px;
-  height: 48px;
-  fill: rgba(30, 27, 24, 0.22);
-  margin-bottom: 12px;
-}
-
-.upload-text {
-  font-size: 16px;
-  color: #4a433d;
-  margin-bottom: 4px;
-  font-weight: 500;
-}
-.upload-hint {
-  font-size: 12px;
-  color: #a39b93;
-}
-
-.file-input-hidden {
-  display: none;
-}
-
-.file-preview {
-  display: flex;
-  align-items: center;
-  padding: 12px;
-  background: white;
-  border-radius: 6px;
-  border: 1px solid var(--line);
-  animation: slideIn 0.3s ease;
-}
-
-.file-preview.multiple {
-  flex-direction: column;
-  align-items: stretch;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.preview-icon {
-  font-size: 24px;
-  margin-right: 12px;
-  flex-shrink: 0;
-}
-.file-thumbnail { width: 56px; height: 56px; display: block; border-radius: 6px; object-fit: cover; }
-.preview-icon:has(.file-thumbnail) { font-size: 0; }
-.file-preview.multiple .preview-icon {
-  margin-right: 0;
-  margin-bottom: 12px;
-  text-align: center;
-}
-
-.file-details {
-  flex: 1;
-  min-width: 0;
-}
-
-.file-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--ink);
-  margin-bottom: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.file-preview.multiple .file-name {
-  text-align: center;
-}
-
-.file-meta {
-  display: flex;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--ink-soft);
-  margin-bottom: 8px;
-}
-.file-preview.multiple .file-meta {
-  justify-content: center;
-}
-
-.remove-file-btn {
-  background: none;
-  border: none;
-  color: var(--rosewood-dark);
-  cursor: pointer;
-  font-size: 24px;
-  line-height: 1;
-  padding: 4px 8px;
-  margin-left: 8px;
-  transition: all 0.2s;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-
-.file-preview.multiple .remove-file-btn {
-  margin-left: 0;
-  margin-top: 12px;
-  align-self: center;
-}
-.remove-file-btn:hover {
-  background: #fffaf8;
-  color: var(--rosewood-dark);
-}
-
-.file-list {
-  margin-top: 8px;
-  max-height: 100px;
-  overflow-y: auto;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 4px;
-}
-
-.file-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 8px;
-  font-size: 12px;
-  border-bottom: 1px solid var(--ivory);
-}
-.file-list-thumbnail { width: 32px; height: 32px; margin-right: 8px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
-
-.file-item:last-child {
-  border-bottom: none;
-}
-.file-item-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-right: 8px;
-}
-.file-item-size {
-  color: var(--ink-soft);
-  font-size: 11px;
-  margin-right: 8px;
-}
-
-.remove-file-item {
-  background: none;
-  border: none;
-  color: var(--rosewood-dark);
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-  padding: 2px 6px;
-  transition: all 0.2s;
-  border-radius: 3px;
-}
-
-.remove-file-item:hover {
+.vr-input.error {
+  border-color: rgba(214, 69, 69, 0.7);
   background: #fffaf8;
 }
-
-.hint-text {
-  font-size: 12px;
-  color: #a39b93;
-  margin-top: 6px;
+.vr-narrow {
+  max-width: 340px;
 }
-.error-message {
-  color: var(--rosewood-dark);
-  font-size: 12px;
-  margin-top: 4px;
-}
-
-.info-box {
-  padding: 16px;
-  background: var(--ivory);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  margin-top: 16px;
-}
-
-.info-box p {
-  font-size: 13px;
-  color: #4a433d;
+.vr-hint {
   margin: 0;
+  font-size: 13px;
   line-height: 1.5;
+  color: var(--ink-soft);
+}
+.vr-error {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #b4413a;
+}
+.vr-small {
+  font-size: 13.5px;
 }
 
-.legal-box {
-  padding: 20px;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 6px;
+/* Business structure cards */
+.vr-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.vr-choice {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-
-.legal-label {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--ink);
-}
-.legal-label input {
-  margin-top: 2px;
-}
-
-.checkbox-input {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: var(--ink);
-}
-.checkbox-input.error {
-  outline: 2px solid var(--rosewood-dark);
-  border-radius: 2px;
-}
-
-.review-step .review-section {
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--line);
-}
-.review-section:last-child {
-  border-bottom: none;
-}
-.review-section-title {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--ink);
-  margin-bottom: 12px;
-}
-.review-item {
-  margin-bottom: 8px;
-  font-size: 14px;
-  line-height: 1.5;
-}
-.review-item strong {
-  font-weight: 500;
-  color: var(--ink);
-  margin-right: 8px;
-}
-
-.button-group {
-  display: flex;
-  gap: 12px;
-  margin-top: 32px;
-}
-
-.action-btn {
-  flex: 1;
-  padding: 14px 32px;
-  background: var(--ink);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.action-btn:hover:not(:disabled) {
-  background: var(--espresso);
-}
-.action-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-.action-btn.secondary {
-  background: var(--ink-soft);
-}
-.action-btn.secondary:hover:not(:disabled) {
-  background: #4a433d;
-}
-
-.submit-btn {
-  background: #3f7a55;
-}
-.submit-btn:hover:not(:disabled) {
-  background: #2f5f41;
-}
-
-.progress-text {
-  text-align: center;
-  margin-top: 24px;
-}
-.progress-text p {
-  font-size: 13px;
-  color: #a39b93;
-}
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  animation: fadeIn 0.3s ease-out;
-  padding: 20px;
-}
-
-.modal {
-  background: white;
-  border-radius: 8px;
-  padding: 32px;
-  max-width: 400px;
-  width: 90%;
-  animation: slideUp 0.3s ease-out;
-  position: relative;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.legal-modal {
-  max-width: 700px;
-}
-
-.modal-content {
-  max-height: 60vh;
-  overflow-y: auto;
-  padding-right: 10px;
-}
-.modal-content h2 {
-  margin-top: 0;
-  margin-bottom: 16px;
-  color: var(--ink);
-  font-size: 24px;
-}
-.modal-content h3 {
-  margin-top: 20px;
-  margin-bottom: 12px;
-  color: var(--ink);
-  font-size: 18px;
-}
-.modal-content p,
-.modal-content ul,
-.modal-content li {
-  margin-bottom: 12px;
-  color: #4a433d;
-  line-height: 1.6;
-}
-.modal-content ul {
-  padding-left: 20px;
-}
-
-.close-modal {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  background: none;
-  border: none;
-  color: var(--ink-soft);
-  font-size: 32px;
-  cursor: pointer;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s;
-  line-height: 1;
-}
-
-.close-modal:hover {
-  background: var(--paper);
-  color: var(--ink);
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.modal h3 {
-  margin-top: 0;
-  margin-bottom: 16px;
-  color: var(--ink);
-}
-.modal p {
-  margin-bottom: 12px;
-  color: #4a433d;
-}
-.modal-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-}
-.modal-actions .action-btn {
-  flex: 1;
-}
-
-/* ─── NEW styles: Service Areas checkboxes ──────────────────────────────────── */
-.service-areas-container {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 4px 0;
-  background: #ffffff;
-  transition: border-color 0.2s;
-}
-
-.service-areas-container.container-error {
-  border-color: var(--rosewood-dark);
-}
-
-.service-area-option {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  cursor: pointer;
-  transition: background 0.15s;
-  border-bottom: 1px solid var(--ivory);
-}
-
-.service-area-option:last-child {
-  border-bottom: none;
-}
-
-.service-area-option:hover {
-  background: var(--paper);
-}
-
-.service-area-option input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: #3f7a55;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.service-area-label {
-  font-size: 14px;
-  color: var(--ink);
-  user-select: none;
-}
-
-/* ─── NEW styles: Operating Hours ───────────────────────────────────────────── */
-.operating-hours-container {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 16px;
-  background: var(--paper);
-  transition: border-color 0.2s;
-}
-
-.operating-hours-container.container-error {
-  border-color: var(--rosewood-dark);
-}
-
-.oh-section-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--ink-soft);
-  margin-bottom: 10px;
-}
-
-/* Days grid */
-.days-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.day-checkbox-label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 40px;
+  gap: 4px;
+  padding: 16px 18px;
   border: 1.5px solid var(--line);
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink-soft);
+  border-radius: 16px;
+  background: var(--paper);
   cursor: pointer;
-  user-select: none;
-  transition: all 0.15s ease;
-  background: #ffffff;
+  transition: border-color 0.15s, background 0.15s;
 }
-
-.day-checkbox-label:hover {
-  border-color: #3f7a55;
-  color: #3f7a55;
-  background: rgba(32, 115, 77, 0.04);
+.vr-choice:hover {
+  border-color: rgba(30, 27, 24, 0.25);
 }
-
-.day-checkbox-label.selected {
-  border-color: #3f7a55;
-  background: #3f7a55;
-  color: #ffffff;
+.vr-choice.on {
+  border-color: var(--rosewood-dark);
+  background: #fdf6f3;
 }
-
-.day-checkbox-label.disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-  background: var(--ivory);
-}
-
-.day-checkbox-label.disabled:hover {
-  border-color: var(--line);
-  color: var(--ink-soft);
-  background: var(--ivory);
-}
-
-.day-checkbox-hidden {
+.vr-choice input {
   position: absolute;
   opacity: 0;
-  width: 0;
-  height: 0;
   pointer-events: none;
 }
-
-/* Quick-select shortcuts */
-.day-shortcuts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 4px;
+.vr-choice:has(input:focus-visible) {
+  box-shadow: 0 0 0 3px rgba(142, 68, 58, 0.3);
 }
-
-.shortcut-btn {
-  padding: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  font-size: 12px;
-  color: #4a433d;
-  background: #ffffff;
-  cursor: pointer;
-  transition: all 0.15s;
-  font-family: inherit;
+.vr-choice .vr-badge {
+  align-self: flex-start;
+  margin-bottom: 6px;
 }
-
-.shortcut-btn:hover {
-  border-color: #3f7a55;
-  color: #3f7a55;
-  background: rgba(32, 115, 77, 0.05);
-}
-
-.shortcut-clear {
-  color: var(--rosewood-dark);
-  border-color: rgba(142, 68, 58, 0.18);
-}
-
-.shortcut-clear:hover {
-  border-color: var(--rosewood-dark);
-  background: #fffaf8;
-  color: var(--rosewood-dark);
-}
-
-.schedule-card + .schedule-card {
-  border-top: 1px solid var(--line);
-  margin-top: 18px;
-  padding-top: 18px;
-}
-
-.schedule-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.vr-choice b {
+  font-size: 15px;
+  font-weight: 600;
   color: var(--ink);
-  margin-bottom: 12px;
 }
-
-.schedule-remove {
-  border: 0;
-  background: transparent;
-  color: var(--rosewood-dark);
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-}
-
-.add-schedule-btn {
-  margin-top: 16px;
-}
-
-/* Time range */
-.time-range-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-}
-
-.time-field {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.time-label {
-  font-size: 12px;
+.vr-choice small {
+  font-size: 13px;
   color: var(--ink-soft);
 }
 
-.time-input {
-  padding: 10px 12px;
-  font-size: 14px;
-}
-
-.time-separator {
-  font-size: 18px;
-  color: #a39b93;
-  padding-bottom: 10px;
-  flex-shrink: 0;
-}
-
-/* Live preview */
-.hours-preview {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 14px;
-  padding: 10px 14px;
-  background: rgba(32, 115, 77, 0.08);
-  border: 1px solid rgba(32, 115, 77, 0.2);
-  border-radius: 6px;
-  font-size: 13px;
-  color: #2f5f41;
-  font-weight: 500;
-  animation: fadeIn 0.2s ease;
-}
-
-/* ─── Responsive (unchanged + minor additions) ──────────────────────────────── */
-@media (max-width: 768px) {
-  .steps-indicator {
-    padding: 0 10px;
-  }
-  .step-label {
-    font-size: 9px;
-  }
-  .step-number {
-    width: 28px;
-    height: 28px;
-    font-size: 12px;
-  }
-  .step-line {
-    margin: 0 8px;
-    min-width: 15px;
-    max-width: 40px;
-  }
-  .modal {
-    padding: 24px;
-  }
-  .time-range-row {
-    flex-direction: column;
-    gap: 8px;
-  }
-  .time-separator {
-    display: none;
-  }
-}
-
-@media (max-width: 640px) {
-  .logo {
-    top: 20px;
-    left: 20px;
-    font-size: 28px;
-  }
-  .back-btn {
-    top: 20px;
-    right: 20px;
-  }
-  .title {
-    font-size: 28px;
-  }
-  .form-content {
-    max-width: 100%;
-  }
-  .file-drop-zone {
-    padding: 24px 16px;
-  }
-  .button-group {
-    flex-direction: column;
-  }
-  .step-label {
-    font-size: 8px;
-  }
-  .step-number {
-    width: 26px;
-    height: 26px;
-    font-size: 11px;
-  }
-  .step-line {
-    margin: 0 6px;
-    min-width: 10px;
-    max-width: 30px;
-  }
-  .modal-actions {
-    flex-direction: column;
-  }
-  .days-grid {
-    gap: 6px;
-  }
-  .day-checkbox-label {
-    width: 42px;
-    height: 36px;
-    font-size: 12px;
-  }
-}
-
-@media (max-width: 480px) {
-  .register-container {
-    padding: 20px 16px;
-  }
-  .header {
-    margin-bottom: 32px;
-  }
-  .steps-indicator {
-    margin-bottom: 32px;
-  }
-.form-input,
-.file-drop-zone {
-    padding: 10px 14px;
-  }
-  .action-btn {
-    padding: 12px 24px;
-  }
-}
-
+/* Map */
 .store-location-map {
   position: relative;
   height: 300px;
-  margin-top: 10px;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 16px;
   background: var(--paper);
 }
-
+.store-location-map + .vr-hint {
+  margin-top: 10px;
+}
 .store-location-map-canvas {
   width: 100%;
   height: 100%;
 }
-
 .map-status {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   margin: 0;
-  color: #4a433d;
+  background: rgba(250, 248, 244, 0.88);
   font-size: 13px;
-  background: rgba(247, 250, 252, 0.88);
+  color: var(--ink-soft);
   pointer-events: none;
 }
 
-/* ── BloomCraft look (inside AuthShell) ───────────────────────────────── */
-.vr-problem {
-  margin-bottom: 22px;
+/* Chips (delivery areas) */
+.vr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
-.steps-indicator {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+.vr-chip {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
-  margin: 0 0 36px;
-  padding: 0;
+  height: 46px;
+  padding: 0 18px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
 }
-.steps-indicator .step-line {
+.vr-chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.vr-chip svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.25;
+}
+.vr-chip.on {
+  border-color: var(--rosewood-dark);
+  background: #fdf6f3;
+  color: var(--rosewood-dark);
+}
+.vr-chip.on svg {
+  opacity: 1;
+}
+.vr-chip:has(input:focus-visible),
+.vr-day:has(input:focus-visible) {
+  box-shadow: 0 0 0 3px rgba(142, 68, 58, 0.3);
+}
+
+/* Opening hours */
+.vr-schedule {
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--paper);
+}
+.vr-schedule + .vr-schedule {
+  margin-top: 12px;
+}
+.vr-schedule-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.vr-schedule-head b {
+  font-weight: 600;
+  color: var(--ink);
+}
+.vr-schedule-sum {
+  flex: 1;
+  color: var(--ink-soft);
+}
+.vr-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+.vr-day {
+  display: grid;
+  place-items: center;
+  height: 44px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+}
+.vr-day input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.vr-day.on {
+  border-color: var(--espresso);
+  background: var(--espresso);
+  color: #f7f2ea;
+}
+.vr-day.off {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.vr-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 14px;
+}
+.vr-quick button,
+.vr-add {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font: 500 12.5px/1 var(--font-sans);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.vr-quick button:hover,
+.vr-add:hover {
+  border-color: var(--rosewood-dark);
+  color: var(--rosewood-dark);
+}
+.vr-add {
+  margin-top: 12px;
+  height: 38px;
+  padding: 0 16px;
+  font-size: 13.5px;
+}
+
+/* Document tiles */
+.vr-docs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.vr-docs.two {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.vr-doc {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.vr-docs :deep(.dd-zone) {
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 132px;
+}
+.vr-docs :deep(.dd-zone.has) {
+  flex-direction: row;
+  align-items: center;
+  min-height: 72px;
+}
+
+/* Sample photos */
+.vr-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px;
+}
+.vr-gallery figure {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--ivory);
+}
+.vr-gallery img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.vr-gallery figure button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(27, 22, 18, 0.7);
+  color: #fff;
+  cursor: pointer;
+}
+.vr-gallery svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+.vr-gallery-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  aspect-ratio: 1;
+  border: 1.5px dashed rgba(30, 27, 24, 0.2);
+  border-radius: 12px;
+  background: var(--paper);
+  font-size: 12px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.vr-gallery-add:hover {
+  border-color: var(--rosewood-dark);
+  color: var(--rosewood-dark);
+}
+.vr-gallery-add input {
   display: none;
 }
-.steps-indicator .step {
+.vr-gallery-add svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.8;
+}
+
+/* Agreements */
+.vr-agree {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 18px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+.vr-agree + .vr-agree {
+  margin-top: 10px;
+}
+.vr-agree.on {
+  border-color: rgba(63, 122, 85, 0.45);
+  background: #f4f9f5;
+}
+.vr-agree.error {
+  border-color: rgba(214, 69, 69, 0.6);
+}
+.vr-agree-text {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
-  min-width: 0;
+  gap: 2px;
 }
-.steps-indicator .step-number {
-  width: 100%;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--line);
-  font-size: 0;
-  color: transparent;
-  transition: background 0.3s;
-}
-.steps-indicator .step.active .step-number {
-  background: var(--rosewood-dark);
-}
-.steps-indicator .step-label {
-  font-size: 13px;
-  color: var(--ink-soft);
-}
-.steps-indicator .step.active .step-label {
-  color: var(--ink);
-  font-weight: 500;
-}
-.form-content {
-  max-width: none;
-}
-.step-title {
-  margin: 0 0 22px;
-  font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 500;
-  text-align: left;
-  color: var(--ink);
-}
-.input-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--ink);
-}
-.form-input {
-  width: 100%;
-  min-height: 50px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #fff;
-  font-family: var(--font-sans);
+.vr-agree-text b {
   font-size: 15px;
-  color: var(--ink);
-}
-.form-input:focus {
-  outline: none;
-  border-color: var(--rosewood-dark);
-  box-shadow: 0 0 0 4px rgba(142, 68, 58, 0.12);
-}
-.form-input.error {
-  border-color: rgba(142, 68, 58, 0.55);
-  background: #fffaf8;
-}
-.error-message {
-  margin-top: 6px;
-  padding: 0;
-  border: 0;
-  background: none;
-  font-size: 13px;
-  color: var(--rosewood-dark);
-}
-.file-drop-zone {
-  border: 1.5px dashed rgba(30, 27, 24, 0.2);
-  border-radius: 16px;
-  background: var(--paper);
-}
-.file-drop-zone:hover {
-  border-color: var(--rosewood-dark);
-  background: #fff;
-}
-.info-box,
-.legal-box,
-.review-section {
-  border: 0;
-  border-radius: 16px;
-  background: var(--ivory);
-}
-.button-group {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 32px;
-}
-.action-btn {
-  width: auto;
-  min-width: 160px;
-  height: 52px;
-  padding: 0 28px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--espresso);
-  font-family: var(--font-sans);
-  font-size: 15px;
-  font-weight: 500;
-  color: #f7f2ea;
-}
-.action-btn:hover:not(:disabled) {
-  background: #3a2f27;
-}
-.action-btn.secondary {
-  margin-right: auto;
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink);
-}
-.action-btn.secondary:hover:not(:disabled) {
-  background: var(--ivory);
-}
-.progress-text p {
-  text-align: right;
-  font-size: 13px;
-  color: var(--ink-soft);
-}
-.day-checkbox-label.selected,
-.service-area-option:has(input:checked) {
-  border-color: var(--rosewood-dark);
-  background: rgba(142, 68, 58, 0.08);
-  color: var(--rosewood-dark);
-}
-.modal {
-  border-radius: 22px;
-  background: var(--paper);
-}
-@media (max-width: 640px) {
-  .steps-indicator .step-label {
-    font-size: 11px;
-  }
-  .button-group {
-    flex-direction: column-reverse;
-  }
-  .action-btn,
-  .action-btn.secondary {
-    width: 100%;
-    margin: 0;
-  }
-}
-.form-step .section-title {
-  margin: 34px 0 16px;
-  padding-top: 22px;
-  border-top: 1px solid var(--line);
-  font-family: var(--font-sans);
-  font-size: 17px;
   font-weight: 600;
-  text-align: left;
   color: var(--ink);
 }
-.form-step .subtitle-text {
-  margin: -10px 0 8px;
-  font-size: 14.5px;
-  line-height: 1.6;
-  text-align: left;
-  color: var(--ink-soft);
-}
-.form-step .hint-text {
-  margin-top: 6px;
+.vr-agree-text small {
   font-size: 13px;
   color: var(--ink-soft);
 }
-.field-row {
+.vr-agree-error {
+  grid-column: 1 / -1;
+}
+.vr-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.vr-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.vr-switch span {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(30, 27, 24, 0.2);
+  transition: background 0.2s;
+}
+.vr-switch span::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+.vr-switch input:checked + span {
+  background: #3f7a55;
+}
+.vr-switch input:checked + span::after {
+  transform: translateX(20px);
+}
+.vr-switch input:focus-visible + span {
+  box-shadow: 0 0 0 3px rgba(142, 68, 58, 0.3);
+}
+.vr-switch em {
+  min-width: 64px;
+  font-size: 13.5px;
+  font-style: normal;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* Review */
+.vr-review-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.vr-review-head h3 {
+  margin: 0;
+}
+.vr-review dl {
+  display: grid;
+  grid-template-columns: minmax(130px, 34%) minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 14px;
+}
+.vr-review dt {
+  color: var(--ink-soft);
+}
+.vr-review dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+.vr-review dd.missing {
+  color: #b4413a;
+}
+.vr-checklist {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.permit-hint {
-  margin: -8px 0 14px;
+.vr-checklist li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  column-gap: 8px;
+  font-size: 14px;
+  color: #b4413a;
+}
+.vr-checklist li.ok {
+  color: var(--ink);
+}
+.vr-checklist svg {
+  grid-row: span 2;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.vr-checklist li.ok svg {
+  color: #3f7a55;
+}
+.vr-checklist small {
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vr-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 4px 0 8px;
+  padding: 16px 18px;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--ink);
+  cursor: pointer;
+}
+.vr-confirm.on {
+  border-color: rgba(63, 122, 85, 0.45);
+  background: #f4f9f5;
+}
+.vr-confirm.error {
+  border-color: rgba(214, 69, 69, 0.6);
+}
+.vr-confirm input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  accent-color: #3f7a55;
+}
+
+/* Moving between steps */
+.vr-nav {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+.vr-nav .af-btn {
+  width: auto;
+  min-width: 150px;
+  padding: 0 20px;
+  white-space: nowrap;
+}
+.vr-saved {
+  flex: 1;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.vr-nav .af-btn:first-child:not(.ghost) {
+  margin-left: auto;
+}
+
+/* Sent */
+.vr-done {
+  max-width: 560px;
+  padding: 10px 0 20px;
+}
+.vr-done-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 20px;
+  border-radius: 50%;
+  background: #e6efe7;
+  color: #3f7a55;
+}
+.vr-done-mark svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.vr-done h2 {
+  margin: 0 0 8px;
+  font-size: 44px;
+}
+.vr-done-lead {
+  margin: 0 0 22px;
+  font-size: 15.5px;
+  color: var(--ink-soft);
+}
+.vr-id {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  margin-bottom: 26px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid var(--line-soft);
+}
+.vr-id span {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.vr-id b {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+.vr-next {
+  margin: 0 0 30px;
+  padding: 0;
+  list-style: none;
+  counter-reset: next;
+}
+.vr-next li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 0 18px 40px;
+  counter-increment: next;
+}
+.vr-next li::before {
+  content: counter(next);
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--espresso);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #f7f2ea;
+}
+.vr-next li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 30px;
+  bottom: 4px;
+  left: 12px;
+  width: 2px;
+  background: var(--line);
+}
+.vr-next b {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.vr-next span {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+.vr-done-btn {
+  width: auto;
+  padding: 0 30px;
+}
+
+/* Reading an agreement */
+.vr-modal-back {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(27, 22, 18, 0.5);
+  backdrop-filter: blur(4px);
+}
+.vr-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(720px, 100%);
+  max-height: 86vh;
+  border-radius: 22px;
+  background: var(--paper);
+  box-shadow: 0 40px 80px -30px rgba(27, 22, 18, 0.6);
+}
+.vr-modal-x {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.vr-modal-x:hover {
+  background: var(--ivory);
+  color: var(--ink);
+}
+.vr-modal-x svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.vr-modal-body {
+  padding: 30px 34px 10px;
+  overflow-y: auto;
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: #4a433d;
+}
+.vr-modal-body :deep(h2) {
+  margin: 0 0 14px;
+  font-size: 30px;
+}
+.vr-modal-body :deep(h3) {
+  margin: 22px 0 8px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.vr-modal-body :deep(ul) {
+  padding-left: 20px;
+}
+.vr-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px 34px 24px;
+  border-top: 1px solid var(--line);
+}
+.vr-modal-foot .af-btn {
+  width: auto;
+  padding: 0 26px;
+}
+
+@media (max-width: 1100px) {
+  .vr-docs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .vr-docs :deep(.dd-zone) {
+    flex-direction: row;
+    align-items: center;
+    min-height: 72px;
+  }
+  .vr-step-name {
+    font-size: 12.5px;
+  }
 }
 @media (max-width: 640px) {
-  .field-row {
-    grid-template-columns: 1fr;
+  .vr-card {
+    padding: 18px 16px;
+    border-radius: 16px;
+  }
+  .vr-grid,
+  .vr-choices,
+  .vr-docs.two,
+  .vr-checklist {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .vr-steps button {
+    justify-content: center;
+    padding: 8px 2px 10px;
+  }
+  .vr-step-name {
+    display: none;
+  }
+  .vr-steps .on .vr-step-name {
+    display: none;
+  }
+  .vr-head h2 {
+    font-size: 30px;
+  }
+  .vr-days {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .vr-agree {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .vr-review dl {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .vr-review dd {
+    margin-bottom: 8px;
+  }
+  .vr-nav {
+    flex-wrap: wrap;
+  }
+  .vr-saved {
+    order: -1;
+    flex-basis: 100%;
+  }
+  .vr-nav .af-btn {
+    flex: 1;
+    min-width: 0;
   }
 }
 </style>

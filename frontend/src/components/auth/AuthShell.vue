@@ -61,21 +61,26 @@ const flower = pickFlower();
 </script>
 
 <style scoped>
+/* The panel is pinned to the left of the window, so the flower stays put
+   however far the form scrolls; the form sits beside it */
 .as {
+  --art-w: max(340px, 41.667vw);
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: minmax(340px, 5fr) 7fr;
+  padding-left: var(--art-w);
   background: var(--paper);
 }
 .as.wide {
-  grid-template-columns: minmax(300px, 4fr) 9fr;
+  --art-w: max(300px, 30.77vw);
 }
 
 /* Specimen panel */
 .as-art {
-  position: sticky;
+  position: fixed;
   top: 0;
-  height: 100vh;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  width: var(--art-w);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -127,6 +132,7 @@ const flower = pickFlower();
 .as-main {
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
   min-width: 0;
   padding: 28px clamp(20px, 6vw, 88px) 56px;
 }
@@ -184,7 +190,7 @@ const flower = pickFlower();
 @media (max-width: 960px) {
   .as,
   .as.wide {
-    grid-template-columns: 1fr;
+    padding-left: 0;
   }
   .as-art {
     display: none;
