@@ -17,6 +17,7 @@ import { useAdminAccess } from "./useAdminAccess";
 import { readPendingPlan } from "../constants/subscriptionPlans";
 import { getDeviceId } from "../utils/deviceId";
 import { clearSessionReplaced } from "../utils/sessionReplaced";
+import { loginProblem } from "../utils/loginProblems";
 
 const user = ref(null);
 const loading = ref(false);
@@ -144,7 +145,7 @@ export function useAuth() {
       }
 
       error.value = errorMessage;
-      return { success: false, error: errorMessage, isEmployeeError: true, status: err?.response?.status, code: err?.response?.data?.code ?? null };
+      return { success: false, error: errorMessage, isEmployeeError: true, ...loginProblem(err) };
     } finally {
       loading.value = false;
     }
@@ -210,7 +211,7 @@ export function useAuth() {
       }
 
       error.value = errorMessage;
-      return { success: false, error: errorMessage, isEmployeeError: false, status: err?.response?.status, code: err?.response?.data?.code ?? null };
+      return { success: false, error: errorMessage, isEmployeeError: false, ...loginProblem(err) };
     } finally {
       loading.value = false;
     }
@@ -225,9 +226,10 @@ export function useAuth() {
       loginContext,
     });
     if (employeeResult.success) return employeeResult;
-    // A staff account that exists but can't sign in (store suspended, too many tries)
+    // A staff account that exists but can't sign in (store suspended, turned off,
+    // too many tries), or no answer at all: the customer sign-in would fail the same way
     if (employeeResult.code || employeeResult.status === 403) {
-      return { success: false, error: employeeResult.error, code: employeeResult.code };
+      return { success: false, ...employeeResult };
     }
 
     const userResult = await login({
@@ -236,18 +238,13 @@ export function useAuth() {
     });
     if (userResult.success) return userResult;
     if (userResult.requiresTwoFactor) return userResult;
-    // Suspended, locked or unverified: say so instead of "wrong password"
-    if (userResult.code) {
-      return { success: false, error: userResult.error, code: userResult.code };
-    }
+    // Wrong password, locked, suspended or unverified: the code says which
+    if (userResult.code) return { success: false, ...userResult };
     if (!userResult.status || userResult.status >= 500) {
-      return { success: false, error: "We couldn't reach BloomCraft. Check your connection and try again." };
+      return { success: false, code: "unreachable", error: "We couldn't reach BloomCraft. Check your connection and try again." };
     }
 
-    return {
-      success: false,
-      error: "Invalid username or password. Please check your credentials.",
-    };
+    return { success: false, code: "invalid_credentials", error: "That username or password doesn't match our records." };
   };
 
   const completeTwoFactorLogin = async (challengeToken, code, method) => {

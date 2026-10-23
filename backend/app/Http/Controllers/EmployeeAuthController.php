@@ -33,22 +33,34 @@ class EmployeeAuthController extends Controller
 
             $guard = app(LoginGuard::class);
             $identifier = LoginGuard::identifier($request->username);
-            if ($minutes = $guard->lockedFor($identifier)) {
+            if ($seconds = $guard->lockedSeconds($identifier)) {
                 $guard->recordFailure($request, $identifier, 'locked', null, 'employee');
-                return response()->json(['success' => false, 'code' => 'account_locked', 'message' => LoginGuard::lockedMessage($minutes)], 429);
+                return response()->json(['success' => false, 'code' => 'account_locked', 'message' => LoginGuard::lockedMessage(max(1, (int) ceil($seconds / 60))), 'retry_after' => $seconds], 429);
             }
 
-            $employee = Employee::where('username', $request->username)
-                ->orWhere('email', $request->username)
-                ->where('status', 'Active')
-                ->first();
+            $employee = Employee::where(fn ($q) => $q->where('username', $request->username)->orWhere('email', $request->username))->first();
 
-            if (!$employee || !Hash::check($request->password, $employee->password)) {
-                $guard->recordFailure($request, $identifier, $employee ? 'wrong_password' : 'unknown_account', null, 'employee');
+            // No staff account by that name: the login form tries the customer
+            // and vendor sign-in next, which records the attempt
+            if (!$employee) {
+                return response()->json(['success' => false, 'message' => 'Invalid credentials'], 401);
+            }
+            if (!Hash::check($request->password, $employee->password)) {
+                $guard->recordFailure($request, $identifier, 'wrong_password', null, 'employee');
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid credentials or account inactive',
+                    'message' => 'Invalid credentials',
                 ], 401);
+            }
+            // Told only after the right password, so it reveals nothing to a stranger
+            if ($employee->status !== 'Active') {
+                return response()->json([
+                    'success' => false,
+                    'code' => 'account_inactive',
+                    'message' => $employee->status === 'On Leave'
+                        ? "You're marked as on leave, so ERP sign-in is paused. Ask the shop owner if you need access."
+                        : 'Your staff account is turned off. Ask the shop owner to turn it back on.',
+                ], 403);
             }
 
             if (AccountSuspensionService::isBlocked($employee)) {

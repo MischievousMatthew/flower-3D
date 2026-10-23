@@ -1,35 +1,30 @@
 <!-- VendorRegistration.vue -->
 <template>
-  <div class="register-container">
-    <!-- Logo -->
-    <router-link to="/" class="logo"
-      ><img
-        src="../../../public/bloomcraft-blankBg.png"
-        alt="Bloomcraft Logo"
-        width="60"
-        height="60"
-    /></router-link>
-
-    <!-- Back Button -->
-    <button v-if="currentStep > 1" @click="prevStep" class="back-btn">
-      ← Back
-    </button>
-
-    <!-- Header -->
-    <div class="header">
-      <h1 class="title">Become a Vendor</h1>
-      <p class="subtitle">
-        Already registered?
-        <router-link to="/guest/login" class="link">Log in</router-link>
-      </p>
-    </div>
+  <AuthShell
+    wide
+    title="Sell with BloomCraft"
+    lead="Tell us about your flower shop. Our team reviews every application, usually within two working days, and emails you when your storefront is ready."
+  >
+    <template #top>
+      Already a vendor? <router-link to="/guest/login" class="af-link">Sign in</router-link>
+    </template>
+    <template #caption>
+      <i>Your shop</i>, open online:<br />
+      a storefront, 3D bouquets, orders, deliveries and your whole team in one place.
+    </template>
 
     <!-- Applications closed by an admin (Security → Platform settings) -->
-    <div v-if="!platform.vendor_applications_open" class="closed-notice" role="status">
-      <h2>Vendor applications are closed</h2>
-      <p>We're not taking new store applications right now. Please check back soon.</p>
-      <router-link to="/" class="link">Back to the shop</router-link>
-    </div>
+    <AuthNotice
+      v-if="!platform.vendor_applications_open"
+      tone="info"
+      title="We're not taking new store applications right now"
+      body="Please check back soon. If you already applied, we'll email you about your application."
+    />
+
+    <!-- Problems with the form: explained here, in words, never a red pop-up -->
+    <AuthNotice v-if="formProblem" ref="problemBox" class="vr-problem" :tone="formProblem.tone" :title="formProblem.title" :body="formProblem.body">
+      <button v-if="formProblem.goTo" type="button" class="af-plain" @click="jumpToProblem">Show me</button>
+    </AuthNotice>
 
     <!-- Kept on the page (not removed) so the store map can still set itself up -->
     <div v-show="platform.vendor_applications_open">
@@ -167,7 +162,7 @@
           >
             <div v-for="(schedule, scheduleIndex) in operatingSchedules" :key="schedule.id" class="schedule-card">
             <div class="schedule-heading"><strong>Schedule {{ scheduleIndex + 1 }}</strong><button v-if="operatingSchedules.length > 1" type="button" class="schedule-remove" @click="removeSchedule(scheduleIndex)">Remove</button></div>
-            <p class="oh-section-label">Select operating days:</p>
+            <p class="oh-section-label">Days</p>
             <div class="days-grid">
               <label
                 v-for="day in daysOfWeek"
@@ -216,7 +211,7 @@
 
             <!-- Time Range -->
             <p class="oh-section-label" style="margin-top: 16px">
-              Set opening and closing times:
+              Hours
             </p>
             <div class="time-range-row">
               <div class="time-field">
@@ -1162,6 +1157,7 @@
 
       <!-- Navigation Buttons -->
       <div class="button-group">
+        <button v-if="currentStep > 1" type="button" class="action-btn secondary" :disabled="isSubmitting" @click="prevStep">Back</button>
         <button
           v-if="currentStep < totalSteps"
           @click="nextStep"
@@ -1222,7 +1218,7 @@
       </div>
     </div>
     </div>
-  </div>
+  </AuthShell>
 </template>
 
 <script setup>
@@ -1234,10 +1230,13 @@ import {
   nextTick,
   computed,
   watchEffect,
+  watch,
 } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../plugins/axios";
 import { usePlatformStatus } from "../../composables/usePlatformStatus";
+import AuthShell from "../../components/auth/AuthShell.vue";
+import AuthNotice from "../../components/auth/AuthNotice.vue";
 import { toast } from "vue3-toastify";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -1247,6 +1246,22 @@ import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { findPlan, readPendingPlan } from "../../constants/subscriptionPlans";
 
 const router = useRouter();
+
+// Problems are explained in a notice at the top of the form (and scrolled to),
+// with a "Show me" that jumps to the field — instead of red pop-ups
+const formProblem = ref(null);
+const problemBox = ref(null);
+let problemField = null;
+const explain = (title, body, { tone = "warn", field = null } = {}) => {
+  formProblem.value = { tone, title, body, goTo: !!field, step: currentStep.value };
+  problemField = field;
+  nextTick(() => problemBox.value?.$el?.scrollIntoView({ behavior: "smooth", block: "center" }));
+};
+const jumpToProblem = () => {
+  const el = (problemField && document.querySelector(`[name="${problemField}"]`)) || document.querySelector(".input-group .error-message");
+  el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  el?.focus?.({ preventScroll: true });
+};
 const currentStep = ref(1);
 const totalSteps = 5;
 const isSubmitting = ref(false);
@@ -1410,7 +1425,7 @@ const restoreMarker = () => {
 const setStorePin = async (latLng) => {
   if (!isInsideCavite(latLng)) {
     restoreMarker();
-    toast.error("Please select a physical store location inside Cavite only.");
+    explain("Pin your store inside Cavite", "BloomCraft serves shops in Cavite for now. Move the pin onto your shop's location in Cavite.", { tone: "info", field: "storeAddress" });
     return;
   }
 
@@ -1428,7 +1443,7 @@ const setStorePin = async (latLng) => {
     }
   } catch (error) {
     restoreMarker();
-    toast.error(error.message || "Unable to use that location.");
+    explain("We couldn't use that spot", error.message || "Try placing the pin again, a little closer to your shop.", { tone: "info", field: "storeAddress" });
   }
 };
 
@@ -1466,7 +1481,7 @@ const initialiseStoreLocationMap = async () => {
       }
     }
   } catch (error) {
-    toast.error(error.message || "Unable to load the Cavite map.");
+    explain("The map didn't load", `${error.message || "Your connection may have dropped."} You can still type your shop's address.`, { tone: "offline" });
   } finally {
     mapLoading.value = false;
   }
@@ -1942,7 +1957,7 @@ const handleFileUpload = async (event, fieldName) => {
       const file = files[0];
       const validation = validateFile(file, fieldName);
       if (!validation.valid) {
-        toast.error(validation.message);
+        explain("That file can't be used", validation.message, { tone: "info", field: fieldName });
         event.target.value = "";
         return;
       }
@@ -1971,7 +1986,7 @@ const handleFileUpload = async (event, fieldName) => {
             url: URL.createObjectURL(file),
           });
         } else {
-          toast.error(`File "${file.name}" rejected: ${validation.message}`);
+          explain(`"${file.name}" can't be used`, validation.message, { tone: "info", field: fieldName });
         }
       }
 
@@ -1989,7 +2004,7 @@ const handleFileUpload = async (event, fieldName) => {
     saveProgress();
   } catch (error) {
     console.error("Error uploading file:", error);
-    toast.error("Error uploading file. Please try again.");
+    explain("The file didn't attach", "Please choose it again. If it keeps happening, try a smaller photo or a PDF.", { tone: "info" });
   }
 };
 
@@ -2314,25 +2329,20 @@ const nextStep = () => {
       saveProgress();
     }
   } else {
-    // NEW: toast notification for validation errors
     const errorCount = Object.keys(errors).length;
-    toast.error(
-      errorCount === 1
-        ? "Please fill in the required field to proceed."
-        : `Please fill in all ${errorCount} required fields to proceed.`,
-      { autoClose: 3500 },
-    );
-
     const firstErrorKey = Object.keys(errors)[0];
-    if (firstErrorKey) {
-      const element =
-        document.querySelector(`[name="${firstErrorKey}"]`) ||
-        document.querySelector(".input-group .error-message");
-      if (element)
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+    explain(
+      errorCount === 1 ? "One detail is still needed" : `${errorCount} details are still needed`,
+      errorCount === 1 ? errors[firstErrorKey] : "They're marked below each field. Fill them in to continue — your progress is saved on this device.",
+      { tone: "info", field: firstErrorKey },
+    );
+    nextTick(jumpToProblem);
   }
 };
+
+watch(currentStep, (step) => {
+  if (formProblem.value && formProblem.value.step !== step) formProblem.value = null;
+});
 
 const prevStep = () => {
   if (currentStep.value > 1) {
@@ -2476,12 +2486,7 @@ const clearProgress = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 const handleSubmit = async () => {
   if (!validateStep(5)) {
-    toast.error(
-      "Please confirm the accuracy of your application before submitting.",
-      {
-        autoClose: 3500,
-      },
-    );
+    explain("One last check", "Tick the box confirming your details are accurate, then submit.", { tone: "info", field: "confirmAccuracy" });
     return;
   }
 
@@ -2512,9 +2517,7 @@ const handleSubmit = async () => {
       `${label} needs to be uploaded again before submitting.`;
     errors[toCamelCase(fieldName)] = errors[fieldName];
     window.scrollTo({ top: 0, behavior: "smooth" });
-    toast.error(`${label} needs to be uploaded again before submitting.`, {
-      autoClose: 5000,
-    });
+    explain(`Add your ${label} again`, "Files can't be kept after the page reloads, so please choose this one again before you submit.", { tone: "info", field: fieldName });
     return;
   }
 
@@ -2623,15 +2626,9 @@ const handleSubmit = async () => {
     } else {
       if (data.errors) {
         const firstMessage = applyBackendErrors(data.errors);
-        if (firstMessage) {
-          toast.error(firstMessage, {
-            autoClose: 4500,
-          });
-        }
+        if (firstMessage) explain("A few details need another look", firstMessage, { field: Object.keys(data.errors)[0] });
       } else {
-        toast.error(data.message || "Registration failed. Please try again.", {
-          autoClose: 4000,
-        });
+        explain("We couldn't send your application", data.message || "Please try again in a moment. Nothing you entered was lost.");
       }
     }
   } catch (error) {
@@ -2642,18 +2639,11 @@ const handleSubmit = async () => {
 
     if (responseData?.errors) {
       const firstMessage = applyBackendErrors(responseData.errors);
-      toast.error(
-        firstMessage ||
-          responseData.message ||
-          "Please fix the highlighted fields and try again.",
-        { autoClose: 5000 },
-      );
+      explain("A few details need another look", firstMessage || responseData.message || "They're marked on the form.", { field: Object.keys(responseData.errors)[0] });
+    } else if (!error?.response) {
+      explain("BloomCraft didn't answer", "Your connection dropped or the server is waking up. Wait a moment and submit again — nothing you entered was lost.", { tone: "offline" });
     } else {
-      toast.error(
-        responseData?.message ||
-          "An error occurred during registration. Please check your connection and try again.",
-        { autoClose: 4000 },
-      );
+      explain("We couldn't send your application", responseData?.message || "Please try again in a moment. Nothing you entered was lost.");
     }
   } finally {
     isSubmitting.value = false;
@@ -2766,7 +2756,7 @@ onUnmounted(() => {
   right: 32px;
   background: none;
   border: none;
-  color: #4a5568;
+  color: #4a433d;
   font-size: 15px;
   font-weight: 500;
   cursor: pointer;
@@ -2775,7 +2765,7 @@ onUnmounted(() => {
 }
 
 .back-btn:hover {
-  color: #2d3748;
+  color: var(--ink);
   transform: translateX(-4px);
 }
 
@@ -2787,26 +2777,26 @@ onUnmounted(() => {
 .title {
   font-size: 32px;
   font-weight: 400;
-  color: #2d3748;
+  color: var(--ink);
   margin-bottom: 12px;
   letter-spacing: -0.5px;
 }
 
 .subtitle {
   font-size: 14px;
-  color: #718096;
+  color: var(--ink-soft);
   font-weight: 400;
 }
 
 .link {
-  color: #2d3748;
+  color: var(--ink);
   text-decoration: underline;
   font-weight: 400;
   transition: color 0.2s;
 }
 
 .link:hover {
-  color: #000000;
+  color: var(--espresso);
 }
 
 .steps-indicator {
@@ -2831,8 +2821,8 @@ onUnmounted(() => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #e2e8f0;
-  color: #a0aec0;
+  background: var(--line);
+  color: #a39b93;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2842,30 +2832,30 @@ onUnmounted(() => {
 }
 
 .step.active .step-number {
-  background: #2d3748;
+  background: var(--ink);
   color: white;
 }
 .step.completed .step-number {
-  background: #20734d;
+  background: #3f7a55;
   color: white;
 }
 
 .step-label {
   font-size: 11px;
-  color: #a0aec0;
+  color: #a39b93;
   font-weight: 400;
   white-space: nowrap;
 }
 
 .step.active .step-label {
-  color: #2d3748;
+  color: var(--ink);
   font-weight: 500;
 }
 
 .step-line {
   flex: 1;
   height: 1px;
-  background: #e2e8f0;
+  background: var(--line);
   margin: 0 12px;
   transition: all 0.3s ease;
   min-width: 20px;
@@ -2873,7 +2863,7 @@ onUnmounted(() => {
 }
 
 .step-line.active {
-  background: #20734d;
+  background: #3f7a55;
 }
 
 .form-content {
@@ -2899,14 +2889,14 @@ onUnmounted(() => {
 .step-title {
   font-size: 20px;
   font-weight: 400;
-  color: #2d3748;
+  color: var(--ink);
   margin-bottom: 8px;
   text-align: center;
 }
 
 .subtitle-text {
   font-size: 13px;
-  color: #718096;
+  color: var(--ink-soft);
   text-align: center;
   margin-bottom: 24px;
 }
@@ -2914,13 +2904,13 @@ onUnmounted(() => {
 .section-divider {
   margin: 32px 0 24px 0;
   padding-top: 24px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--line);
 }
 
 .section-title {
   font-size: 16px;
   font-weight: 500;
-  color: #2d3748;
+  color: var(--ink);
   margin-bottom: 16px;
 }
 
@@ -2932,17 +2922,17 @@ onUnmounted(() => {
   display: block;
   font-size: 14px;
   font-weight: 400;
-  color: #2d3748;
+  color: var(--ink);
   margin-bottom: 8px;
 }
 
 .form-input {
   width: 100%;
   padding: 12px 16px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line);
   border-radius: 6px;
   font-size: 15px;
-  color: #2d3748;
+  color: var(--ink);
   background: #ffffff;
   transition: all 0.2s ease;
   font-family: inherit;
@@ -2950,14 +2940,14 @@ onUnmounted(() => {
 
 .form-input:focus {
   outline: none;
-  border-color: #cbd5e0;
+  border-color: rgba(30, 27, 24, 0.22);
 }
 
 .form-input::placeholder {
-  color: #cbd5e0;
+  color: rgba(30, 27, 24, 0.22);
 }
 .form-input.error {
-  border-color: #e53e3e;
+  border-color: var(--rosewood-dark);
 }
 
 .id-number-input {
@@ -2974,42 +2964,42 @@ textarea.form-input {
 }
 
 .file-drop-zone {
-  border: 2px dashed #e2e8f0;
+  border: 2px dashed var(--line);
   border-radius: 8px;
   padding: 32px;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
-  background: #f8fafc;
+  background: var(--paper);
   position: relative;
   overflow: hidden;
 }
 
 .file-drop-zone.drag-over {
-  border-color: #20734d;
+  border-color: #3f7a55;
   background: rgba(32, 115, 77, 0.05);
 }
 .file-drop-zone.has-file {
-  border-color: #20734d;
+  border-color: #3f7a55;
   background: rgba(32, 115, 77, 0.05);
 }
 
 .upload-icon {
   width: 48px;
   height: 48px;
-  fill: #cbd5e0;
+  fill: rgba(30, 27, 24, 0.22);
   margin-bottom: 12px;
 }
 
 .upload-text {
   font-size: 16px;
-  color: #4a5568;
+  color: #4a433d;
   margin-bottom: 4px;
   font-weight: 500;
 }
 .upload-hint {
   font-size: 12px;
-  color: #a0aec0;
+  color: #a39b93;
 }
 
 .file-input-hidden {
@@ -3022,7 +3012,7 @@ textarea.form-input {
   padding: 12px;
   background: white;
   border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line);
   animation: slideIn 0.3s ease;
 }
 
@@ -3063,7 +3053,7 @@ textarea.form-input {
 .file-name {
   font-size: 14px;
   font-weight: 500;
-  color: #2d3748;
+  color: var(--ink);
   margin-bottom: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3078,7 +3068,7 @@ textarea.form-input {
   display: flex;
   gap: 12px;
   font-size: 12px;
-  color: #718096;
+  color: var(--ink-soft);
   margin-bottom: 8px;
 }
 .file-preview.multiple .file-meta {
@@ -3088,7 +3078,7 @@ textarea.form-input {
 .remove-file-btn {
   background: none;
   border: none;
-  color: #e53e3e;
+  color: var(--rosewood-dark);
   cursor: pointer;
   font-size: 24px;
   line-height: 1;
@@ -3110,15 +3100,15 @@ textarea.form-input {
   align-self: center;
 }
 .remove-file-btn:hover {
-  background: #fff5f5;
-  color: #c53030;
+  background: #fffaf8;
+  color: var(--rosewood-dark);
 }
 
 .file-list {
   margin-top: 8px;
   max-height: 100px;
   overflow-y: auto;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 4px;
 }
@@ -3129,7 +3119,7 @@ textarea.form-input {
   justify-content: space-between;
   padding: 4px 8px;
   font-size: 12px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--ivory);
 }
 .file-list-thumbnail { width: 32px; height: 32px; margin-right: 8px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
 
@@ -3144,7 +3134,7 @@ textarea.form-input {
   margin-right: 8px;
 }
 .file-item-size {
-  color: #718096;
+  color: var(--ink-soft);
   font-size: 11px;
   margin-right: 8px;
 }
@@ -3152,7 +3142,7 @@ textarea.form-input {
 .remove-file-item {
   background: none;
   border: none;
-  color: #e53e3e;
+  color: var(--rosewood-dark);
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
@@ -3162,39 +3152,39 @@ textarea.form-input {
 }
 
 .remove-file-item:hover {
-  background: #fff5f5;
+  background: #fffaf8;
 }
 
 .hint-text {
   font-size: 12px;
-  color: #a0aec0;
+  color: #a39b93;
   margin-top: 6px;
 }
 .error-message {
-  color: #e53e3e;
+  color: var(--rosewood-dark);
   font-size: 12px;
   margin-top: 4px;
 }
 
 .info-box {
   padding: 16px;
-  background: #edf2f7;
-  border: 1px solid #e2e8f0;
+  background: var(--ivory);
+  border: 1px solid var(--line);
   border-radius: 6px;
   margin-top: 16px;
 }
 
 .info-box p {
   font-size: 13px;
-  color: #4a5568;
+  color: #4a433d;
   margin: 0;
   line-height: 1.5;
 }
 
 .legal-box {
   padding: 20px;
-  background: #f7fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--paper);
+  border: 1px solid var(--line);
   border-radius: 6px;
   display: flex;
   flex-direction: column;
@@ -3207,7 +3197,7 @@ textarea.form-input {
   gap: 10px;
   cursor: pointer;
   font-size: 13px;
-  color: #2d3748;
+  color: var(--ink);
 }
 .legal-label input {
   margin-top: 2px;
@@ -3217,17 +3207,17 @@ textarea.form-input {
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: #2d3748;
+  accent-color: var(--ink);
 }
 .checkbox-input.error {
-  outline: 2px solid #e53e3e;
+  outline: 2px solid var(--rosewood-dark);
   border-radius: 2px;
 }
 
 .review-step .review-section {
   margin-bottom: 24px;
   padding-bottom: 16px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--line);
 }
 .review-section:last-child {
   border-bottom: none;
@@ -3235,7 +3225,7 @@ textarea.form-input {
 .review-section-title {
   font-size: 16px;
   font-weight: 500;
-  color: #2d3748;
+  color: var(--ink);
   margin-bottom: 12px;
 }
 .review-item {
@@ -3245,7 +3235,7 @@ textarea.form-input {
 }
 .review-item strong {
   font-weight: 500;
-  color: #2d3748;
+  color: var(--ink);
   margin-right: 8px;
 }
 
@@ -3258,7 +3248,7 @@ textarea.form-input {
 .action-btn {
   flex: 1;
   padding: 14px 32px;
-  background: #2d3748;
+  background: var(--ink);
   color: white;
   border: none;
   border-radius: 6px;
@@ -3269,24 +3259,24 @@ textarea.form-input {
 }
 
 .action-btn:hover:not(:disabled) {
-  background: #1a202c;
+  background: var(--espresso);
 }
 .action-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 .action-btn.secondary {
-  background: #718096;
+  background: var(--ink-soft);
 }
 .action-btn.secondary:hover:not(:disabled) {
-  background: #4a5568;
+  background: #4a433d;
 }
 
 .submit-btn {
-  background: #20734d;
+  background: #3f7a55;
 }
 .submit-btn:hover:not(:disabled) {
-  background: #1a5a3b;
+  background: #2f5f41;
 }
 
 .progress-text {
@@ -3295,7 +3285,7 @@ textarea.form-input {
 }
 .progress-text p {
   font-size: 13px;
-  color: #a0aec0;
+  color: #a39b93;
 }
 
 .modal-overlay {
@@ -3337,20 +3327,20 @@ textarea.form-input {
 .modal-content h2 {
   margin-top: 0;
   margin-bottom: 16px;
-  color: #2d3748;
+  color: var(--ink);
   font-size: 24px;
 }
 .modal-content h3 {
   margin-top: 20px;
   margin-bottom: 12px;
-  color: #2d3748;
+  color: var(--ink);
   font-size: 18px;
 }
 .modal-content p,
 .modal-content ul,
 .modal-content li {
   margin-bottom: 12px;
-  color: #4a5568;
+  color: #4a433d;
   line-height: 1.6;
 }
 .modal-content ul {
@@ -3363,7 +3353,7 @@ textarea.form-input {
   right: 16px;
   background: none;
   border: none;
-  color: #718096;
+  color: var(--ink-soft);
   font-size: 32px;
   cursor: pointer;
   width: 32px;
@@ -3377,8 +3367,8 @@ textarea.form-input {
 }
 
 .close-modal:hover {
-  background: #f7fafc;
-  color: #2d3748;
+  background: var(--paper);
+  color: var(--ink);
 }
 
 @keyframes slideUp {
@@ -3395,11 +3385,11 @@ textarea.form-input {
 .modal h3 {
   margin-top: 0;
   margin-bottom: 16px;
-  color: #2d3748;
+  color: var(--ink);
 }
 .modal p {
   margin-bottom: 12px;
-  color: #4a5568;
+  color: #4a433d;
 }
 .modal-actions {
   display: flex;
@@ -3412,7 +3402,7 @@ textarea.form-input {
 
 /* ─── NEW styles: Service Areas checkboxes ──────────────────────────────────── */
 .service-areas-container {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line);
   border-radius: 6px;
   padding: 4px 0;
   background: #ffffff;
@@ -3420,7 +3410,7 @@ textarea.form-input {
 }
 
 .service-areas-container.container-error {
-  border-color: #e53e3e;
+  border-color: var(--rosewood-dark);
 }
 
 .service-area-option {
@@ -3430,7 +3420,7 @@ textarea.form-input {
   padding: 12px 16px;
   cursor: pointer;
   transition: background 0.15s;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--ivory);
 }
 
 .service-area-option:last-child {
@@ -3438,42 +3428,40 @@ textarea.form-input {
 }
 
 .service-area-option:hover {
-  background: #f7fafc;
+  background: var(--paper);
 }
 
 .service-area-option input[type="checkbox"] {
   width: 16px;
   height: 16px;
-  accent-color: #20734d;
+  accent-color: #3f7a55;
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .service-area-label {
   font-size: 14px;
-  color: #2d3748;
+  color: var(--ink);
   user-select: none;
 }
 
 /* ─── NEW styles: Operating Hours ───────────────────────────────────────────── */
 .operating-hours-container {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line);
   border-radius: 6px;
   padding: 16px;
-  background: #fafafa;
+  background: var(--paper);
   transition: border-color 0.2s;
 }
 
 .operating-hours-container.container-error {
-  border-color: #e53e3e;
+  border-color: var(--rosewood-dark);
 }
 
 .oh-section-label {
   font-size: 12px;
   font-weight: 500;
-  color: #718096;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  color: var(--ink-soft);
   margin-bottom: 10px;
 }
 
@@ -3491,11 +3479,11 @@ textarea.form-input {
   justify-content: center;
   width: 48px;
   height: 40px;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid var(--line);
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
-  color: #718096;
+  color: var(--ink-soft);
   cursor: pointer;
   user-select: none;
   transition: all 0.15s ease;
@@ -3503,27 +3491,27 @@ textarea.form-input {
 }
 
 .day-checkbox-label:hover {
-  border-color: #20734d;
-  color: #20734d;
+  border-color: #3f7a55;
+  color: #3f7a55;
   background: rgba(32, 115, 77, 0.04);
 }
 
 .day-checkbox-label.selected {
-  border-color: #20734d;
-  background: #20734d;
+  border-color: #3f7a55;
+  background: #3f7a55;
   color: #ffffff;
 }
 
 .day-checkbox-label.disabled {
   cursor: not-allowed;
   opacity: 0.45;
-  background: #edf2f7;
+  background: var(--ivory);
 }
 
 .day-checkbox-label.disabled:hover {
-  border-color: #e2e8f0;
-  color: #718096;
-  background: #edf2f7;
+  border-color: var(--line);
+  color: var(--ink-soft);
+  background: var(--ivory);
 }
 
 .day-checkbox-hidden {
@@ -3544,10 +3532,10 @@ textarea.form-input {
 
 .shortcut-btn {
   padding: 4px 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line);
   border-radius: 20px;
   font-size: 12px;
-  color: #4a5568;
+  color: #4a433d;
   background: #ffffff;
   cursor: pointer;
   transition: all 0.15s;
@@ -3555,24 +3543,24 @@ textarea.form-input {
 }
 
 .shortcut-btn:hover {
-  border-color: #20734d;
-  color: #20734d;
+  border-color: #3f7a55;
+  color: #3f7a55;
   background: rgba(32, 115, 77, 0.05);
 }
 
 .shortcut-clear {
-  color: #e53e3e;
-  border-color: #fed7d7;
+  color: var(--rosewood-dark);
+  border-color: rgba(142, 68, 58, 0.18);
 }
 
 .shortcut-clear:hover {
-  border-color: #e53e3e;
-  background: #fff5f5;
-  color: #c53030;
+  border-color: var(--rosewood-dark);
+  background: #fffaf8;
+  color: var(--rosewood-dark);
 }
 
 .schedule-card + .schedule-card {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--line);
   margin-top: 18px;
   padding-top: 18px;
 }
@@ -3581,14 +3569,14 @@ textarea.form-input {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: #2d3748;
+  color: var(--ink);
   margin-bottom: 12px;
 }
 
 .schedule-remove {
   border: 0;
   background: transparent;
-  color: #c53030;
+  color: var(--rosewood-dark);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
@@ -3614,7 +3602,7 @@ textarea.form-input {
 
 .time-label {
   font-size: 12px;
-  color: #718096;
+  color: var(--ink-soft);
 }
 
 .time-input {
@@ -3624,7 +3612,7 @@ textarea.form-input {
 
 .time-separator {
   font-size: 18px;
-  color: #a0aec0;
+  color: #a39b93;
   padding-bottom: 10px;
   flex-shrink: 0;
 }
@@ -3640,7 +3628,7 @@ textarea.form-input {
   border: 1px solid rgba(32, 115, 77, 0.2);
   border-radius: 6px;
   font-size: 13px;
-  color: #1a5a3b;
+  color: #2f5f41;
   font-weight: 500;
   animation: fadeIn 0.2s ease;
 }
@@ -3747,9 +3735,9 @@ textarea.form-input {
   height: 300px;
   margin-top: 10px;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: #f7fafc;
+  background: var(--paper);
 }
 
 .store-location-map-canvas {
@@ -3764,9 +3752,169 @@ textarea.form-input {
   align-items: center;
   justify-content: center;
   margin: 0;
-  color: #4a5568;
+  color: #4a433d;
   font-size: 13px;
   background: rgba(247, 250, 252, 0.88);
   pointer-events: none;
+}
+
+/* ── BloomCraft look (inside AuthShell) ───────────────────────────────── */
+.vr-problem {
+  margin-bottom: 22px;
+}
+.steps-indicator {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 36px;
+  padding: 0;
+}
+.steps-indicator .step-line {
+  display: none;
+}
+.steps-indicator .step {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.steps-indicator .step-number {
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line);
+  font-size: 0;
+  color: transparent;
+  transition: background 0.3s;
+}
+.steps-indicator .step.active .step-number {
+  background: var(--rosewood-dark);
+}
+.steps-indicator .step-label {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.steps-indicator .step.active .step-label {
+  color: var(--ink);
+  font-weight: 500;
+}
+.form-content {
+  max-width: none;
+}
+.step-title {
+  margin: 0 0 22px;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--ink);
+}
+.input-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.form-input {
+  width: 100%;
+  min-height: 50px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--ink);
+}
+.form-input:focus {
+  outline: none;
+  border-color: var(--rosewood-dark);
+  box-shadow: 0 0 0 4px rgba(142, 68, 58, 0.12);
+}
+.form-input.error {
+  border-color: rgba(142, 68, 58, 0.55);
+  background: #fffaf8;
+}
+.error-message {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  color: var(--rosewood-dark);
+}
+.file-drop-zone {
+  border: 1.5px dashed rgba(30, 27, 24, 0.2);
+  border-radius: 16px;
+  background: var(--paper);
+}
+.file-drop-zone:hover {
+  border-color: var(--rosewood-dark);
+  background: #fff;
+}
+.info-box,
+.legal-box,
+.review-section {
+  border: 0;
+  border-radius: 16px;
+  background: var(--ivory);
+}
+.button-group {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 32px;
+}
+.action-btn {
+  width: auto;
+  min-width: 160px;
+  height: 52px;
+  padding: 0 28px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--espresso);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 500;
+  color: #f7f2ea;
+}
+.action-btn:hover:not(:disabled) {
+  background: #3a2f27;
+}
+.action-btn.secondary {
+  margin-right: auto;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+}
+.action-btn.secondary:hover:not(:disabled) {
+  background: var(--ivory);
+}
+.progress-text p {
+  text-align: right;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.day-checkbox-label.selected,
+.service-area-option:has(input:checked) {
+  border-color: var(--rosewood-dark);
+  background: rgba(142, 68, 58, 0.08);
+  color: var(--rosewood-dark);
+}
+.modal {
+  border-radius: 22px;
+  background: var(--paper);
+}
+@media (max-width: 640px) {
+  .steps-indicator .step-label {
+    font-size: 11px;
+  }
+  .button-group {
+    flex-direction: column-reverse;
+  }
+  .action-btn,
+  .action-btn.secondary {
+    width: 100%;
+    margin: 0;
+  }
 }
 </style>

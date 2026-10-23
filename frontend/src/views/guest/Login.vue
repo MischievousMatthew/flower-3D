@@ -1,734 +1,384 @@
 <template>
-  <div class="login-container">
-    <!-- Logo -->
-    <router-link to="/" class="logo"
-      ><img
-        src="../../../public/bloomcraft-blankBg.png"
-        alt="Bloomcraft Logo"
-        width="60"
-        height="60"
-    /></router-link>
+  <AuthShell
+    :title="twoFactorRequired ? (twoFactorMethod === 'passkey' ? 'Enter your passkey' : 'Check your email') : 'Welcome back'"
+    :lead="twoFactorRequired ? twoFactorLead : 'Sign in to order flowers, run your shop, or open the ERP. Staff accounts use the same form.'"
+  >
+    <template #top>
+      New to BloomCraft? <router-link to="/guest/register" class="af-link">Create an account</router-link>
+    </template>
 
-    <!-- Header -->
-    <div class="header">
-      <h1 class="title">Welcome back</h1>
-      <p class="subtitle">
-        Don't have an account?
-        <router-link to="/guest/register" class="link">Sign up</router-link>
-      </p>
-    </div>
+    <AuthNotice v-if="notice" class="lg-notice" :tone="notice.tone" :title="notice.title" :body="notice.body" :countdown="notice.countdown || 0" @done="lockEnded">
+      <router-link v-if="notice.actions?.includes('forgot')" :to="{ name: 'ForgotPassword', query: { u: form.username || undefined } }" class="af-link">Reset your password</router-link>
+      <button v-if="notice.actions?.includes('retry')" type="button" class="af-plain" :disabled="loading" @click="twoFactorRequired ? completeTwoFactorLogin() : handleLogin()">Try again</button>
+      <a v-if="notice.actions?.includes('support') && supportEmail" :href="`mailto:${supportEmail}`" class="af-link">Contact support</a>
+    </AuthNotice>
 
-    <!-- Form Content -->
-    <div class="form-content">
-      <div v-if="errorMessage" class="alert-error">
-        {{ errorMessage }}
+    <!-- Username and password -->
+    <form v-if="!twoFactorRequired" class="af-form" novalidate @submit.prevent="handleLogin()">
+      <div class="af-field">
+        <label class="af-label" for="lg-user">Username or email</label>
+        <input
+          id="lg-user"
+          ref="userInput"
+          v-model.trim="form.username"
+          class="af-input"
+          type="text"
+          autocomplete="username"
+          autocapitalize="none"
+          spellcheck="false"
+          :aria-invalid="fieldError.username ? 'true' : 'false'"
+          aria-describedby="lg-user-note"
+          @input="fieldError.username = ''"
+        />
+        <p v-if="fieldError.username" id="lg-user-note" class="af-note bad">{{ fieldError.username }}</p>
       </div>
-      <form v-if="!twoFactorRequired" @submit.prevent="handleLogin" class="login-form">
-        <!-- Username Input -->
-        <div class="input-group">
-          <label class="input-label">Username</label>
-          <input
-            v-model="form.username"
-            type="text"
-            required
-            placeholder="Enter your username"
-            autocomplete="username"
-            class="form-input"
-            :class="{ 'input-error': errors.username }"
-          />
-          <span v-if="errors.username" class="error-msg">{{
-            errors.username
-          }}</span>
-        </div>
 
-        <!-- Password Input -->
-        <div class="input-group">
-          <label class="input-label">Password</label>
-          <div class="password-field">
-            <input
-              v-model="form.password"
-              :type="showPassword ? 'text' : 'password'"
-              required
-              placeholder="Enter your password"
-              autocomplete="current-password"
-              class="form-input"
-              :class="{ 'input-error': errors.password }"
-            />
-            <button
-              type="button"
-              @click="showPassword = !showPassword"
-              class="toggle-password"
-              tabindex="-1"
-            >
-              {{ showPassword ? "😌" : "🫣" }}
-            </button>
-          </div>
-          <span v-if="errors.password" class="error-msg">{{
-            errors.password
-          }}</span>
-        </div>
+      <div class="af-field">
+        <label class="af-label" for="lg-pass">
+          Password
+          <router-link :to="{ name: 'ForgotPassword', query: { u: form.username || undefined } }" class="af-link lg-forgot">Forgot it?</router-link>
+        </label>
+        <PasswordField
+          id="lg-pass"
+          ref="passInput"
+          v-model="form.password"
+          :invalid="!!fieldError.password || notice?.field === 'password'"
+          describedby="lg-pass-note"
+          @update:model-value="fieldError.password = ''"
+        />
+        <p v-if="fieldError.password" id="lg-pass-note" class="af-note bad">{{ fieldError.password }}</p>
+      </div>
 
-        <!-- Login Button -->
-        <button type="submit" :disabled="loading" class="login-btn">
-          <span v-if="loading">Signing in...</span>
-          <span v-else>Log in</span>
-        </button>
-      </form>
+      <button type="submit" class="af-btn" :class="{ busy: loading }" :disabled="loading || locked">
+        {{ loading ? (slow ? "Waking up BloomCraft…" : "Signing in…") : locked ? "Sign-in paused" : "Sign in" }}
+      </button>
+      <p v-if="loading && slow" class="af-note lg-slow" role="status">
+        Our server naps when nobody's around, so the first sign-in of the day can take up to a minute. Keep this page open.
+      </p>
+    </form>
 
-      <section v-else class="two-factor-login">
-        <h2>{{ twoFactorMethod === "passkey" ? "Verify your passkey" : "Verify your email" }}</h2>
-        <p v-if="twoFactorMethod === 'passkey'">Enter your six-digit security passkey to continue.</p>
-        <p v-else>Code was sent to {{ maskedEmail }}</p>
-        <div class="code-boxes" @paste.prevent="pasteCode">
-          <input
-            v-for="(_, index) in twoFactorCode"
-            :key="index"
-            :ref="(element) => setCodeInput(element, index)"
-            v-model="twoFactorCode[index]"
-            class="code-box"
-            :type="twoFactorMethod === 'passkey' ? 'password' : 'text'"
-            inputmode="numeric"
-            maxlength="1"
-            :autocomplete="twoFactorMethod === 'otp' ? 'one-time-code' : 'off'"
-            @input="advanceCode(index)"
-            @keydown.backspace="retreatCode($event, index)"
-          />
-        </div>
-        <button class="login-btn" :disabled="loading || !isCompleteTwoFactorCode" @click="completeTwoFactorLogin">
-          {{ loading ? "Verifying..." : "Continue" }}
+    <!-- Two-step verification -->
+    <section v-else class="af-form">
+      <CodeBoxes
+        ref="codeBoxes"
+        v-model="twoFactorCode"
+        :masked="twoFactorMethod === 'passkey'"
+        :invalid="!!codeError"
+        :disabled="loading"
+        :label="twoFactorMethod === 'passkey' ? 'Six-digit passkey' : 'Six-digit email code'"
+        @update:model-value="codeError = ''"
+        @complete="completeTwoFactorLogin"
+      />
+      <p v-if="codeError" class="af-note bad" role="alert">{{ codeError }}</p>
+      <button type="button" class="af-btn" :class="{ busy: loading }" :disabled="loading || twoFactorCode.length !== 6" @click="completeTwoFactorLogin">
+        {{ loading ? "Checking…" : "Continue" }}
+      </button>
+      <div class="lg-alt">
+        <button v-if="twoFactorMethod === 'passkey'" type="button" class="af-plain" :disabled="loading || sendingCode" @click="requestLoginOtp">
+          {{ sendingCode ? "Sending a code…" : "Forgot your passkey? Email me a code" }}
         </button>
-        <button v-if="twoFactorMethod === 'passkey'" class="try-another-way" :disabled="loading" @click="requestLoginOtp">
-          Try another way
+        <button v-else type="button" class="af-plain" :disabled="loading || sendingCode || resendIn > 0" @click="requestLoginOtp">
+          {{ resendIn > 0 ? `Send a new code in ${resendIn}s` : "Send a new code" }}
         </button>
-        <button class="try-another-way" :disabled="loading" @click="cancelTwoFactorLogin">Cancel</button>
-      </section>
-    </div>
+        <button type="button" class="af-plain lg-muted" :disabled="loading" @click="cancelTwoFactorLogin">Use a different account</button>
+      </div>
+    </section>
+
+    <p v-if="!twoFactorRequired" class="af-foot">
+      Selling flowers? <router-link to="/guest/vendor_register" class="af-link">Apply as a vendor</router-link>
+    </p>
 
     <!-- The account is in use on another browser: ask before signing in here -->
-    <div v-if="sessionActiveOpen" class="session-backdrop" @click.self="sessionActiveOpen = false">
-      <div
-        class="session-modal"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="session-title"
-        aria-describedby="session-copy"
-        @keydown.esc="sessionActiveOpen = false"
-      >
-        <span class="session-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="13" height="10" rx="1.5" /><path d="M7 18h5M9.5 14v4" /><rect x="15" y="9" width="6" height="11" rx="1.2" /><path d="M17.5 17.5h1" /></svg>
-        </span>
-        <h2 id="session-title">Already logged in</h2>
-        <p id="session-copy" class="session-copy">This account is already logged in on another device or browser. If you continue, it will be signed out there.</p>
-        <button ref="continueButton" type="button" class="login-btn" :disabled="loading" @click="continueHere">
-          {{ loading ? "Signing in..." : "Continue logging in" }}
-        </button>
-        <button type="button" class="try-another-way" :disabled="loading" @click="sessionActiveOpen = false">Cancel</button>
-        <p class="session-note">Not you? Someone else may know your password. Log in and change it right away.</p>
+    <Teleport to="body">
+      <div v-if="sessionActiveOpen" class="bc-theme lg-backdrop" @click.self="sessionActiveOpen = false">
+        <div class="lg-modal" role="alertdialog" aria-modal="true" aria-labelledby="lg-session-title" aria-describedby="lg-session-copy" @keydown.esc="sessionActiveOpen = false">
+          <h2 id="lg-session-title">You're signed in somewhere else</h2>
+          <p id="lg-session-copy">This account is open on another device or browser. If you continue here, it will be signed out there.</p>
+          <button ref="continueButton" type="button" class="af-btn" :class="{ busy: loading }" :disabled="loading" @click="continueHere">
+            {{ loading ? "Signing in…" : "Sign in here instead" }}
+          </button>
+          <button type="button" class="af-btn ghost" :disabled="loading" @click="sessionActiveOpen = false">Cancel</button>
+          <p class="lg-modal-note">Not you? Someone may know your password. Sign in and <router-link :to="{ name: 'ForgotPassword', query: { u: form.username || undefined } }" class="af-link">change it</router-link> right away.</p>
+        </div>
       </div>
-    </div>
-  </div>
+    </Teleport>
+  </AuthShell>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, nextTick } from "vue";
-import { useRouter } from "vue-router";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import AuthShell from "../../components/auth/AuthShell.vue";
+import AuthNotice from "../../components/auth/AuthNotice.vue";
+import PasswordField from "../../components/auth/PasswordField.vue";
+import CodeBoxes from "../../components/auth/CodeBoxes.vue";
 import { useAuth } from "../../composables/useAuth";
+import { useSiteContent } from "../../composables/useSiteContent";
+import { explainLoginProblem } from "../../utils/loginProblems";
 import api from "../../plugins/axios";
-import {
-  hasStoredAuthSession,
-  getPreferredAuthToken,
-  getPreferredUserType,
-} from "../../utils/authSession";
+import { hasStoredAuthSession, getPreferredAuthToken, getPreferredUserType } from "../../utils/authSession";
 
+const route = useRoute();
 const router = useRouter();
 const { combinedLogin, completeTwoFactorLogin: finishTwoFactorLogin, loading } = useAuth();
+const { site } = useSiteContent();
+const supportEmail = computed(() => site.settings?.contact_email || "");
 
-const form = reactive({
-  username: "",
-  password: "",
-});
+const form = reactive({ username: typeof route.query.u === "string" ? route.query.u : "", password: "" });
+const fieldError = reactive({ username: "", password: "" });
+const notice = ref(null);
+const locked = ref(false);
+const slow = ref(false);
+const userInput = ref(null);
+const passInput = ref(null);
 
-const errors = ref({});
-const errorMessage = ref("");
-const showPassword = ref(false);
 const twoFactorRequired = ref(false);
 const twoFactorMethod = ref("passkey");
 const twoFactorChallengeToken = ref("");
-const twoFactorCode = ref(Array(6).fill(""));
+const twoFactorCode = ref("");
 const maskedEmail = ref("");
-const codeInputs = [];
-const isCompleteTwoFactorCode = computed(() => /^\d{6}$/.test(twoFactorCode.value.join("")));
+const codeError = ref("");
+const sendingCode = ref(false);
+const resendIn = ref(0);
+const codeBoxes = ref(null);
+let resendTimer = null;
+const twoFactorLead = computed(() =>
+  twoFactorMethod.value === "passkey"
+    ? "Your account has two-step sign-in. Enter the six-digit passkey you chose."
+    : `We emailed a six-digit code to ${maskedEmail.value || "your email"}. It expires in 10 minutes.`,
+);
 
 const sessionActiveOpen = ref(false);
 const continueButton = ref(null);
 
-// "Continue logging in": sign in here and end the session on the other browser
-const continueHere = async () => {
-  await handleLogin({ continueHere: true });
-  sessionActiveOpen.value = false;
+// Slow first sign-in: the free server sleeps when idle and takes a while to wake
+let slowTimer = null;
+const withSlowHint = async (work) => {
+  slow.value = false;
+  clearTimeout(slowTimer);
+  slowTimer = setTimeout(() => (slow.value = true), 5000);
+  try {
+    return await work();
+  } finally {
+    clearTimeout(slowTimer);
+    slow.value = false;
+  }
+};
+
+const show = (result) => {
+  notice.value = explainLoginProblem(result);
+  locked.value = notice.value.tone === "lock" && !!notice.value.countdown;
+  if (notice.value.field === "password") {
+    nextTick(() => passInput.value?.focus());
+  }
+};
+const lockEnded = () => {
+  locked.value = false;
+  notice.value = { tone: "success", title: "You can try again now", body: "Take your time with the password, or reset it if you're not sure." , actions: ["forgot"] };
 };
 
 const handleLogin = async (options = {}) => {
-  errors.value = {};
-  errorMessage.value = "";
+  fieldError.username = form.username ? "" : "Enter your username or email.";
+  fieldError.password = form.password ? "" : "Enter your password.";
+  if (fieldError.username || fieldError.password) {
+    nextTick(() => (fieldError.username ? userInput.value : passInput.value)?.focus());
+    return;
+  }
+  if (locked.value) return;
+  notice.value = null;
 
   try {
-    const result = await combinedLogin({ ...form, continueHere: options.continueHere === true });
-
+    const result = await withSlowHint(() => combinedLogin({ ...form, continueHere: options.continueHere === true }));
     if (result.requiresTwoFactor) {
       twoFactorChallengeToken.value = result.challengeToken;
-      twoFactorRequired.value = true;
       twoFactorMethod.value = "passkey";
-      twoFactorCode.value = Array(6).fill("");
+      twoFactorCode.value = "";
+      twoFactorRequired.value = true;
+      nextTick(() => codeBoxes.value?.focus());
       return;
     }
-
-    // Signed in on another browser: ask first (see the modal)
+    // Signed in on another browser: ask first
     if (result.code === "session_active") {
       sessionActiveOpen.value = true;
       nextTick(() => continueButton.value?.focus());
       return;
     }
-
-    if (!result.success) {
-      if (result.errors) {
-        errors.value = result.errors;
-      } else {
-        errorMessage.value = result.error || "Login failed";
-      }
-    }
+    if (!result.success) show(result);
   } catch (error) {
-    console.error("Login error:", error);
-    errorMessage.value = "An error occurred. Please try again.";
+    show({ code: "unreachable" });
   }
 };
 
-const setCodeInput = (element, index) => {
-  if (element) codeInputs[index] = element;
+const continueHere = async () => {
+  await handleLogin({ continueHere: true });
+  sessionActiveOpen.value = false;
 };
 
-const advanceCode = (index) => {
-  twoFactorCode.value[index] = twoFactorCode.value[index].replace(/\D/g, "").slice(-1);
-  if (twoFactorCode.value[index] && index < 5) codeInputs[index + 1]?.focus();
-};
-
-const retreatCode = (event, index) => {
-  if (!twoFactorCode.value[index] && index > 0) {
-    event.preventDefault();
-    codeInputs[index - 1]?.focus();
-  }
-};
-
-const pasteCode = (event) => {
-  const digits = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-  if (!digits) return;
-  digits.split("").forEach((digit, index) => { twoFactorCode.value[index] = digit; });
-  codeInputs[Math.min(digits.length, 6) - 1]?.focus();
+const startResend = (seconds = 60) => {
+  resendIn.value = seconds;
+  clearInterval(resendTimer);
+  resendTimer = setInterval(() => {
+    if (--resendIn.value <= 0) clearInterval(resendTimer);
+  }, 1000);
 };
 
 const requestLoginOtp = async () => {
-  errorMessage.value = "";
+  notice.value = null;
+  codeError.value = "";
+  sendingCode.value = true;
   try {
-    const { data } = await api.post("/auth/two-factor/send-otp", {
-      challenge_token: twoFactorChallengeToken.value,
-    });
+    const { data } = await api.post("/auth/two-factor/send-otp", { challenge_token: twoFactorChallengeToken.value });
     maskedEmail.value = data.masked_email;
     twoFactorMethod.value = "otp";
-    twoFactorCode.value = Array(6).fill("");
+    twoFactorCode.value = "";
+    startResend(60);
+    nextTick(() => codeBoxes.value?.focus());
   } catch (error) {
-    errorMessage.value = error.response?.data?.errors?.otp?.[0] || "Unable to send a verification code.";
+    if (!error.response) show({ code: "unreachable" });
+    else if (error.response.data?.errors?.two_factor) expiredChallenge();
+    else codeError.value = error.response.data?.errors?.otp?.[0] || error.response.data?.message || "We couldn't send a code. Try again in a minute.";
+  } finally {
+    sendingCode.value = false;
   }
 };
 
+// The verification step lasts five minutes; after that, sign in again
+const expiredChallenge = () => {
+  cancelTwoFactorLogin();
+  notice.value = { tone: "info", title: "That verification step timed out", body: "For your safety it only lasts a few minutes. Sign in again to get a new one." };
+};
+
 const completeTwoFactorLogin = async () => {
-  if (!isCompleteTwoFactorCode.value) return;
-  const result = await finishTwoFactorLogin(
-    twoFactorChallengeToken.value,
-    twoFactorCode.value.join(""),
-    twoFactorMethod.value,
-  );
-  if (!result.success) errorMessage.value = result.error;
+  if (twoFactorCode.value.length !== 6 || loading.value) return;
+  codeError.value = "";
+  notice.value = null;
+  const result = await withSlowHint(() => finishTwoFactorLogin(twoFactorChallengeToken.value, twoFactorCode.value, twoFactorMethod.value));
+  if (result.success) return;
+  if (/verification has expired/i.test(result.error || "")) return expiredChallenge();
+  if (/too many wrong passkeys/i.test(result.error || "")) {
+    cancelTwoFactorLogin();
+    notice.value = { tone: "lock", title: "Passkey locked for this sign-in", body: result.error, actions: ["forgot"] };
+    return;
+  }
+  codeError.value = result.error || "That code didn't work. Check it and try again.";
+  twoFactorCode.value = "";
+  nextTick(() => codeBoxes.value?.focus());
 };
 
 const cancelTwoFactorLogin = () => {
   twoFactorRequired.value = false;
   twoFactorChallengeToken.value = "";
-  twoFactorCode.value = Array(6).fill("");
+  twoFactorCode.value = "";
   twoFactorMethod.value = "passkey";
+  codeError.value = "";
+  clearInterval(resendTimer);
+  resendIn.value = 0;
+};
+
+// Losing the connection is shown as it happens, and cleared when it's back
+const goneOffline = () => show({ code: "offline" });
+const backOnline = () => {
+  if (notice.value?.tone === "offline") notice.value = { tone: "success", title: "You're back online", body: "Go ahead and sign in." };
 };
 
 onMounted(() => {
+  window.addEventListener("offline", goneOffline);
+  window.addEventListener("online", backOnline);
+  if (navigator.onLine === false) goneOffline();
+
+  if (route.query.reset === "1") {
+    notice.value = { tone: "success", title: "Password changed", body: "Sign in with your new password. Every other device was signed out." };
+  }
   // Shown after being signed out, e.g. when a store is suspended
   try {
-    const notice = sessionStorage.getItem("auth_notice");
-    if (notice) {
-      errorMessage.value = notice;
+    const message = sessionStorage.getItem("auth_notice");
+    if (message) {
+      notice.value = { tone: "warn", title: "You were signed out", body: message, actions: ["support"] };
       sessionStorage.removeItem("auth_notice");
     }
   } catch {
     // storage unavailable
   }
+  nextTick(() => (form.username ? passInput.value : userInput.value)?.focus());
 
-  // Check if user is already logged in
+  // Already signed in: go straight on
   const token = getPreferredAuthToken(window.location.pathname);
   const userType = getPreferredUserType(window.location.pathname);
   const storedUser = localStorage.getItem("user");
-
   if (hasStoredAuthSession(window.location.pathname) && token && storedUser) {
     try {
       const userData = JSON.parse(storedUser);
-      if (userType === "employee") {
-        router.push(userData.default_route || "/erp");
-        return;
-      }
-
-      // Redirect based on role
-      if (userData.role === "admin") {
-        router.push("/admin/dashboard");
-      } else if (userData.role === "vendor") {
-        router.push("/vendor/products");
-      } else {
-        router.push("/shop");
-      }
+      if (userType === "employee") router.push(userData.default_route || "/erp");
+      else if (userData.role === "admin") router.push("/admin/dashboard");
+      else if (userData.role === "vendor") router.push("/vendor/products");
+      else router.push("/shop");
     } catch (e) {
       console.error("Error parsing stored user:", e);
     }
   }
 });
+
+onBeforeUnmount(() => {
+  window.removeEventListener("offline", goneOffline);
+  window.removeEventListener("online", backOnline);
+  clearTimeout(slowTimer);
+  clearInterval(resendTimer);
+});
 </script>
 
 <style scoped>
-.login-container {
-  min-height: 85vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: #ffffff;
-  padding: 40px 20px;
-  position: relative;
+.lg-notice {
+  margin-bottom: 22px;
 }
-
-.logo {
-  text-decoration: none;
-  position: absolute;
-  top: 32px;
-  left: 32px;
-  font-size: 32px;
-  animation: bounce 2s ease-in-out infinite;
-}
-
-@keyframes bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
-}
-
-.header {
-  text-align: center;
-  margin-bottom: 48px;
-}
-
-.title {
-  font-size: 32px;
-  font-weight: 400;
-  color: #2d3748;
-  margin-bottom: 12px;
-  letter-spacing: -0.5px;
-}
-
-.subtitle {
-  font-size: 14px;
-  color: #718096;
-  font-weight: 400;
-}
-
-.link {
-  color: #2d3748;
-  text-decoration: underline;
-  font-weight: 400;
-  transition: color 0.2s;
-}
-
-.link:hover {
-  color: #000000;
-}
-
-.form-content {
-  width: 100%;
-  max-width: 400px;
-}
-
-.login-form {
-  width: 100%;
-}
-
-.two-factor-login {
-  text-align: center;
-}
-
-.two-factor-login h2 {
-  color: #2d3748;
-  font-size: 22px;
-  font-weight: 500;
-  margin: 0 0 10px;
-}
-
-.two-factor-login p {
-  color: #718096;
-  font-size: 14px;
-  margin: 0 0 24px;
-}
-
-.code-boxes {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin-bottom: 20px;
-}
-
-.code-box {
-  border: 1px solid #cbd5e0;
-  border-radius: 6px;
-  box-sizing: border-box;
-  font-size: 20px;
-  height: 48px;
-  text-align: center;
-  width: 44px;
-}
-
-.code-box:focus {
-  border-color: #2d3748;
-  outline: none;
-}
-
-.try-another-way {
-  background: transparent;
-  border: 0;
-  color: #4a5568;
-  cursor: pointer;
-  display: block;
-  font-size: 14px;
-  margin: 16px auto 0;
-  text-decoration: underline;
-}
-
-.try-another-way:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.alert-error {
-  padding: 12px 16px;
-  background: #fee2e2;
-  color: #dc2626;
-  border: 1px solid #fca5a5;
-  border-radius: 8px;
-  margin-bottom: 24px;
-  font-size: 14px;
-  text-align: center;
-}
-
-.input-group {
-  margin-bottom: 20px;
-}
-
-.input-label {
-  display: block;
-  font-size: 14px;
-  font-weight: 400;
-  color: #2d3748;
-  margin-bottom: 8px;
-}
-
-.form-input {
-  width: 90%;
-  padding: 12px 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 15px;
-  color: #2d3748;
-  background: #ffffff;
-  transition: all 0.2s ease;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: #cbd5e0;
-}
-
-.form-input::placeholder {
-  color: #cbd5e0;
-}
-
-.password-field {
-  position: relative;
-}
-
-.toggle-password {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 18px;
-  opacity: 0.5;
-  transition: opacity 0.2s;
-  padding: 4px;
-}
-
-.toggle-password:hover {
-  opacity: 0.8;
-}
-
-.input-error {
-  border-color: #f56565 !important;
-}
-
-.error-msg {
-  display: block;
-  color: #e53e3e;
-  font-size: 13px;
-  margin-top: 6px;
-}
-
-.login-btn {
-  width: 100%;
-  padding: 14px;
-  background: #2d3748;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.login-btn:hover:not(:disabled) {
-  background: #1a202c;
-}
-
-.login-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.login-type-indicator {
-  margin-bottom: 20px;
-  padding: 10px 15px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 8px;
-  text-align: center;
-}
-
-.employee-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.employee-badge svg {
-  fill: white;
-}
-
-.login-type-toggle {
-  text-align: center;
-  margin: 20px 0;
-}
-
-.toggle-link {
-  background: none;
-  border: none;
-  color: #667eea;
-  font-size: 14px;
-  cursor: pointer;
-  text-decoration: underline;
-  padding: 0;
-}
-
-.toggle-link:hover {
-  color: #5568d3;
-}
-
-.loading-spinner {
-  animation: spin 1s linear infinite;
-  display: inline-block;
-  margin-right: 8px;
-  vertical-align: middle;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-.divider {
-  position: relative;
-  text-align: center;
-  margin: 32px 0;
-}
-
-.divider::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  width: 100%;
-  height: 1px;
-  background: #e2e8f0;
-}
-
-.divider-text {
-  position: relative;
-  background: white;
-  padding: 0 16px;
-  color: #a0aec0;
+.lg-forgot {
   font-size: 13px;
   font-weight: 400;
 }
-
-.social-buttons {
+.lg-slow {
+  margin-top: -6px;
+}
+.lg-alt {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 12px;
-}
-
-.social-btn {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
   font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  background: white;
-  color: #2d3748;
 }
-
-.social-btn:hover {
-  background: #f7fafc;
-  border-color: #cbd5e0;
+.lg-muted {
+  color: var(--ink-soft);
 }
-
-.facebook-btn {
-  color: #1877f2;
-}
-
-.google-btn {
-  color: #2d3748;
-}
-
-/* Responsive */
-@media (max-width: 640px) {
-  .logo {
-    top: 20px;
-    left: 20px;
-    font-size: 28px;
-  }
-
-  .title {
-    font-size: 28px;
-  }
-
-  .form-content {
-    max-width: 100%;
-  }
-}
-
-/* "Already logged in on another device" */
-.session-backdrop {
+.lg-backdrop {
   position: fixed;
   inset: 0;
   z-index: 1000;
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgba(30, 27, 24, 0.45);
+  background: rgba(27, 22, 18, 0.5);
   backdrop-filter: blur(4px);
 }
-
-.session-modal {
-  display: grid;
-  justify-items: center;
+.lg-modal {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  width: min(420px, 100%);
+  width: min(440px, 100%);
   padding: 30px 28px 24px;
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 30px 70px -20px rgba(30, 27, 24, 0.45);
-  text-align: center;
+  border-radius: 22px;
+  background: var(--paper);
+  box-shadow: 0 40px 80px -30px rgba(27, 22, 18, 0.6);
 }
-
-.session-modal .login-btn,
-.session-modal .try-another-way {
-  width: 100%;
+.lg-modal h2 {
   margin: 0;
+  font-size: 30px;
 }
-
-.session-icon {
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: rgba(184, 101, 88, 0.12);
-  color: #8e443a;
-}
-
-.session-icon svg {
-  width: 24px;
-  height: 24px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.session-modal h2 {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 600;
-}
-
-.session-copy {
+.lg-modal p {
   margin: 0 0 6px;
   font-size: 14px;
   line-height: 1.6;
-  color: #4b5563;
+  color: var(--ink-soft);
 }
-
-.session-note {
-  margin: 4px 0 0;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(184, 101, 88, 0.08);
-  font-size: 12.5px;
-  line-height: 1.55;
-  color: #8e443a;
+.lg-modal .lg-modal-note {
+  margin: 6px 0 0;
+  font-size: 13px;
 }
 </style>

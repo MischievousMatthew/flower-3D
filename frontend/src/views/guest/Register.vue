@@ -1,790 +1,341 @@
 <template>
-  <div class="register-container">
-    <!-- Logo -->
-    <router-link to="/" class="logo">
-      <img
-        src="../../../public/bloomcraft-blankBg.png"
-        alt="Bloomcraft Logo"
-        width="60"
-        height="60"
-      />
-    </router-link>
-
-    <!-- Back Button -->
-    <button v-if="currentStep > 1" @click="previousStep" class="back-btn">
-      ← Back
-    </button>
-
-    <!-- Header -->
-    <div class="header">
-      <h1 class="title">Create an account</h1>
-      <p class="subtitle">
-        Already have an account?
-        <router-link to="/guest/login" class="link">Log in</router-link>
-      </p>
-    </div>
+  <AuthShell :title="platform.registrations_open ? STEPS[step - 1].title : 'Sign-ups are paused'" :lead="platform.registrations_open ? STEPS[step - 1].lead : ''">
+    <template #top>
+      Have an account? <router-link to="/guest/login" class="af-link">Sign in</router-link>
+    </template>
 
     <!-- Sign-ups closed by an admin (Security → Platform settings) -->
-    <div v-if="!platform.registrations_open" class="closed-notice" role="status">
-      <h2>Sign-ups are paused</h2>
-      <p>We're not taking new customer accounts right now. Please check back soon.</p>
-      <router-link to="/" class="link">Back to the shop</router-link>
-    </div>
+    <template v-if="!platform.registrations_open">
+      <AuthNotice tone="info" title="We're not taking new customer accounts right now" body="Please check back soon. If you already have an account, you can still sign in." />
+      <router-link to="/" class="af-btn ghost rg-home">Back to BloomCraft</router-link>
+    </template>
 
     <template v-else>
-    <!-- Progress Steps -->
-    <div class="steps-indicator">
-      <div
-        class="step"
-        :class="{ active: currentStep >= 1, completed: currentStep > 1 }"
-      >
-        <div class="step-number">1</div>
-        <span class="step-label">Personal Info</span>
-      </div>
-      <div class="step-line" :class="{ active: currentStep >= 2 }"></div>
-      <div
-        class="step"
-        :class="{ active: currentStep >= 2, completed: currentStep > 2 }"
-      >
-        <div class="step-number">2</div>
-        <span class="step-label">Email & OTP</span>
-      </div>
-      <div class="step-line" :class="{ active: currentStep >= 3 }"></div>
-      <div class="step" :class="{ active: currentStep >= 3 }">
-        <div class="step-number">3</div>
-        <span class="step-label">Create Password</span>
-      </div>
-    </div>
+      <ol class="rg-steps" aria-label="Sign-up steps">
+        <li v-for="(s, i) in STEPS" :key="s.short" :class="{ on: step === i + 1, done: step > i + 1 }" :aria-current="step === i + 1 ? 'step' : undefined">
+          <span class="rg-bar"></span>{{ s.short }}
+        </li>
+      </ol>
 
-    <!-- Form Content -->
-    <div class="form-content">
-      <!-- Error Alert -->
-      <div v-if="errorMessage" class="alert-error">
-        {{ errorMessage }}
-      </div>
+      <AuthNotice v-if="notice" class="rg-notice" :tone="notice.tone" :title="notice.title" :body="notice.body">
+        <router-link v-if="notice.login" :to="{ name: 'Login', query: { u: form.email } }" class="af-link">Sign in instead</router-link>
+        <router-link v-if="notice.login" :to="{ name: 'ForgotPassword', query: { u: form.email } }" class="af-link">Reset your password</router-link>
+      </AuthNotice>
 
-      <form @submit.prevent="handleNext" class="register-form">
-        <!-- Step 1: Personal Information -->
-        <div v-show="currentStep === 1" class="form-step">
-          <h2 class="step-title">What's your name?</h2>
-
-          <div class="input-group">
-            <label class="input-label">First Name</label>
-            <input
-              v-model="form.name"
-              type="text"
-              :required="currentStep === 1"
-              placeholder="Enter your first name"
-              class="form-input"
-              :class="{ 'input-error': errors.name }"
-            />
-            <span v-if="errors.name" class="error-msg">{{ errors.name }}</span>
+      <!-- Step 1: name -->
+      <form v-if="step === 1" class="af-form" novalidate @submit.prevent="next">
+        <div class="af-row">
+          <div class="af-field">
+            <label class="af-label" for="rg-first">First name</label>
+            <input id="rg-first" ref="firstInput" v-model.trim="form.name" class="af-input" autocomplete="given-name" :aria-invalid="!!errors.name" @input="errors.name = ''" />
+            <p v-if="errors.name" class="af-note bad">{{ errors.name }}</p>
           </div>
-
-          <div class="input-group">
-            <label class="input-label">Last Name</label>
-            <input
-              v-model="form.surname"
-              type="text"
-              :required="currentStep === 1"
-              placeholder="Enter your last name"
-              class="form-input"
-              :class="{ 'input-error': errors.surname }"
-            />
-            <span v-if="errors.surname" class="error-msg">{{
-              errors.surname
-            }}</span>
-          </div>
-
-          <div class="input-group">
-            <label class="input-label">Username</label>
-            <input
-              v-model="form.username"
-              type="text"
-              :required="currentStep === 1"
-              placeholder="Choose a username"
-              class="form-input"
-              :class="{ 'input-error': errors.username }"
-            />
-            <span v-if="errors.username" class="error-msg">{{
-              errors.username
-            }}</span>
+          <div class="af-field">
+            <label class="af-label" for="rg-last">Last name</label>
+            <input id="rg-last" v-model.trim="form.surname" class="af-input" autocomplete="family-name" :aria-invalid="!!errors.surname" @input="errors.surname = ''" />
+            <p v-if="errors.surname" class="af-note bad">{{ errors.surname }}</p>
           </div>
         </div>
-
-        <!-- Step 2: Email & OTP -->
-        <div v-show="currentStep === 2" class="form-step">
-          <h2 class="step-title">Verify your email address</h2>
-
-          <div class="input-group">
-            <label class="input-label">Email Address</label>
-            <input
-              v-model="form.email"
-              type="email"
-              placeholder="Enter your email address"
-              :required="currentStep === 2"
-              class="form-input"
-              :class="{ 'input-error': errors.email }"
-              :disabled="otpSent"
-            />
-            <span v-if="errors.email" class="error-msg">{{
-              errors.email
-            }}</span>
-          </div>
-
-          <button
-            type="button"
-            @click="handleSendOtp"
-            :disabled="!canResend || otpLoading || !form.email"
-            class="otp-btn"
-          >
-            <span v-if="otpLoading">Sending...</span>
-            <span v-else-if="!canResend">Resend in {{ cooldown }}s</span>
-            <span v-else>{{ otpSent ? "Resend OTP" : "Send OTP Code" }}</span>
-          </button>
-
-          <!-- OTP field only shown after OTP is sent -->
-          <div v-if="otpSent" class="input-group">
-            <label class="input-label">Enter OTP Code</label>
-            <p class="hint-text" style="margin-bottom: 10px">
-              We sent a 6-digit code to <strong>{{ form.email }}</strong>
-            </p>
-            <input
-              v-model="form.otp"
-              type="text"
-              maxlength="6"
-              placeholder="000000"
-              :required="currentStep === 2"
-              class="form-input otp-input"
-              :class="{ 'input-error': errors.otp }"
-              autocomplete="one-time-code"
-            />
-            <span v-if="errors.otp" class="error-msg">{{ errors.otp }}</span>
-          </div>
-
-          <!-- Change email link -->
-          <p v-if="otpSent" class="change-email-link">
-            Wrong email?
-            <button type="button" @click="resetEmail" class="link-btn">
-              Change it
-            </button>
-          </p>
+        <div class="af-field">
+          <label class="af-label" for="rg-user">Username</label>
+          <input
+            id="rg-user"
+            v-model.trim="form.username"
+            class="af-input"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            maxlength="40"
+            :aria-invalid="!!errors.username"
+            @input="onUsername"
+            @blur="checkUsername"
+          />
+          <p v-if="errors.username" class="af-note bad">{{ errors.username }}</p>
+          <p v-else-if="usernameFree" class="af-note good"><svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9" /></svg>@{{ form.username }} is yours if you want it</p>
+          <p v-else class="af-note">Letters, numbers, - and _. You can sign in with this or your email.</p>
         </div>
-
-        <!-- Step 3: Create Password -->
-        <div v-show="currentStep === 3" class="form-step">
-          <h2 class="step-title">Create your password</h2>
-
-          <div class="input-group">
-            <label class="input-label">Password</label>
-            <input
-              v-model="form.password"
-              type="password"
-              :required="currentStep === 3"
-              minlength="8"
-              placeholder="Minimum 8 characters"
-              class="form-input"
-              :class="{ 'input-error': errors.password }"
-            />
-            <div class="password-requirements" aria-live="polite">
-              <div class="password-strength-track" aria-hidden="true"><span :class="passwordStrength.level" :style="{ width: `${passwordStrength.percent}%` }"></span></div>
-              <div class="password-strength-label"><span>Password strength</span><strong :class="passwordStrength.level">{{ passwordStrength.label }}</strong></div>
-              <ul>
-                <li :class="{ met: passwordChecks.length }"><span>{{ passwordChecks.length ? '✓' : '○' }}</span> At least 8 characters</li>
-                <li :class="{ met: passwordChecks.uppercase }"><span>{{ passwordChecks.uppercase ? '✓' : '○' }}</span> 1 uppercase letter</li>
-                <li :class="{ met: passwordChecks.lowercase }"><span>{{ passwordChecks.lowercase ? '✓' : '○' }}</span> 1 lowercase letter</li>
-                <li :class="{ met: passwordChecks.number }"><span>{{ passwordChecks.number ? '✓' : '○' }}</span> 1 number</li>
-              </ul>
-            </div>
-            <span v-if="errors.password" class="error-msg">{{
-              errors.password
-            }}</span>
-          </div>
-
-          <div class="input-group">
-            <label class="input-label">Confirm Password</label>
-            <input
-              v-model="form.password_confirmation"
-              type="password"
-              :required="currentStep === 3"
-              placeholder="Re-enter your password"
-              class="form-input"
-              :class="{ 'input-error': errors.password_confirmation }"
-            />
-            <span v-if="errors.password_confirmation" class="error-msg">
-              {{ errors.password_confirmation }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Action Button -->
-        <button v-if="currentStep < 3" type="submit" class="action-btn">
-          Next
-        </button>
-
-        <button
-          v-else
-          type="button"
-          @click="handleRegister"
-          :disabled="loading"
-          class="action-btn"
-        >
-          <span v-if="loading">Creating Account...</span>
-          <span v-else>Create Account</span>
-        </button>
+        <button type="submit" class="af-btn" :class="{ busy: checking }" :disabled="checking">{{ checking ? "Checking…" : "Continue" }}</button>
       </form>
-    </div>
+
+      <!-- Step 2: email + code -->
+      <form v-else-if="step === 2" class="af-form" novalidate @submit.prevent="next">
+        <div class="af-field">
+          <label class="af-label" for="rg-email">
+            Email
+            <button v-if="codeSent" type="button" class="af-plain rg-small" @click="changeEmail">Change</button>
+          </label>
+          <input
+            id="rg-email"
+            ref="emailInput"
+            v-model.trim="form.email"
+            class="af-input"
+            type="email"
+            autocomplete="email"
+            inputmode="email"
+            :disabled="codeSent"
+            :aria-invalid="!!errors.email"
+            @input="errors.email = ''"
+          />
+          <p v-if="errors.email" class="af-note bad">{{ errors.email }}</p>
+        </div>
+
+        <template v-if="codeSent">
+          <div class="af-field">
+            <span class="af-label">6-digit code</span>
+            <CodeBoxes ref="boxes" v-model="form.otp" :invalid="!!errors.otp" @update:model-value="errors.otp = ''" @complete="next" />
+            <p v-if="errors.otp" class="af-note bad" role="alert">{{ errors.otp }}</p>
+            <p class="af-note">
+              We sent it to {{ form.email }}. Not there? Check spam, or
+              <button type="button" class="af-plain" :disabled="sending || resendIn > 0" @click="sendCode">{{ resendIn > 0 ? `send another in ${resendIn}s` : "send another" }}</button>.
+            </p>
+          </div>
+          <button type="submit" class="af-btn">Continue</button>
+        </template>
+        <button v-else type="button" class="af-btn" :class="{ busy: sending }" :disabled="sending" @click="sendCode">{{ sending ? "Sending the code…" : "Email me a code" }}</button>
+        <button type="button" class="af-plain rg-back" @click="step = 1">Back</button>
+      </form>
+
+      <!-- Step 3: password -->
+      <form v-else class="af-form" novalidate @submit.prevent="submit">
+        <div class="af-field">
+          <label class="af-label" for="rg-pass">Password</label>
+          <PasswordField id="rg-pass" ref="passInput" v-model="form.password" autocomplete="new-password" :invalid="!!errors.password" @update:model-value="errors.password = ''" />
+          <PasswordRules :password="form.password" />
+          <p v-if="errors.password" class="af-note bad">{{ errors.password }}</p>
+        </div>
+        <div class="af-field">
+          <label class="af-label" for="rg-confirm">Type it again</label>
+          <PasswordField id="rg-confirm" v-model="form.password_confirmation" autocomplete="new-password" :invalid="!!errors.password_confirmation" @update:model-value="errors.password_confirmation = ''" />
+          <p v-if="errors.password_confirmation" class="af-note bad">{{ errors.password_confirmation }}</p>
+          <p v-else-if="form.password_confirmation && form.password_confirmation === form.password" class="af-note good"><svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9" /></svg>Passwords match</p>
+        </div>
+        <button type="submit" class="af-btn" :class="{ busy: loading }" :disabled="loading">{{ loading ? "Creating your account…" : "Create account" }}</button>
+        <button type="button" class="af-plain rg-back" :disabled="loading" @click="step = 2">Back</button>
+      </form>
+
+      <p class="af-foot">Selling flowers? <router-link to="/guest/vendor_register" class="af-link">Apply as a vendor</router-link> instead.</p>
     </template>
-  </div>
+  </AuthShell>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import AuthShell from "../../components/auth/AuthShell.vue";
+import AuthNotice from "../../components/auth/AuthNotice.vue";
+import PasswordField from "../../components/auth/PasswordField.vue";
+import PasswordRules from "../../components/auth/PasswordRules.vue";
+import CodeBoxes from "../../components/auth/CodeBoxes.vue";
 import { useAuth } from "../../composables/useAuth";
 import { usePlatformStatus } from "../../composables/usePlatformStatus";
+import { passwordOk } from "../../utils/passwordRules";
 import api from "../../plugins/axios";
 
-const router = useRouter();
+const STEPS = [
+  { short: "Your name", title: "Create your account", lead: "Order bouquets from local florists, or design your own in 3D." },
+  { short: "Your email", title: "Confirm your email", lead: "We'll email a 6-digit code to make sure the address is yours." },
+  { short: "Password", title: "Choose a password", lead: "Almost done. You'll sign in with your username or email and this password." },
+];
+
 const { register, loading } = useAuth();
 const { status: platform, refresh: refreshPlatform } = usePlatformStatus();
-onMounted(refreshPlatform);
 
-const currentStep = ref(1);
-const otpLoading = ref(false);
-const otpSent = ref(false);
-const cooldown = ref(0);
-let cooldownTimer = null;
+const step = ref(1);
+const form = reactive({ name: "", surname: "", username: "", email: "", otp: "", password: "", password_confirmation: "" });
+const errors = reactive({});
+const notice = ref(null);
+const checking = ref(false);
+const sending = ref(false);
+const codeSent = ref(false);
+const resendIn = ref(0);
+const usernameFree = ref(false);
+const firstInput = ref(null);
+const emailInput = ref(null);
+const passInput = ref(null);
+const boxes = ref(null);
+let timer = null;
 
-const form = reactive({
-  name: "",
-  surname: "",
-  username: "",
-  email: "",
-  otp: "",
-  password: "",
-  password_confirmation: "",
+const unreachable = { tone: "offline", title: "BloomCraft didn't answer", body: "The server may still be waking up or your connection dropped. Wait a moment, then try again." };
+const FIELD_STEP = { name: 1, surname: 1, username: 1, email: 2, otp: 2, password: 3, password_confirmation: 3 };
+
+watch(step, (s) => {
+  notice.value = null;
+  nextTick(() => (s === 1 ? firstInput : s === 2 ? (codeSent.value ? boxes : emailInput) : passInput).value?.focus());
 });
 
-const errors = ref({});
-const errorMessage = ref("");
-
-// ── cooldown timer ───────────────────────────────────────────
-function startCooldown(seconds = 60) {
-  cooldown.value = seconds;
-  clearInterval(cooldownTimer);
-  cooldownTimer = setInterval(() => {
-    if (--cooldown.value <= 0) clearInterval(cooldownTimer);
+function countdown(seconds) {
+  resendIn.value = seconds;
+  clearInterval(timer);
+  timer = setInterval(() => {
+    if (--resendIn.value <= 0) clearInterval(timer);
   }, 1000);
 }
 
-const canResend = computed(() => cooldown.value === 0);
-const passwordChecks = computed(() => ({
-  length: form.password.length >= 8,
-  uppercase: /[A-Z]/.test(form.password),
-  lowercase: /[a-z]/.test(form.password),
-  number: /\d/.test(form.password),
-}));
-const passwordStrength = computed(() => {
-  const passed = Object.values(passwordChecks.value).filter(Boolean).length;
-  if (!form.password) return { percent: 0, label: 'Enter a password', level: 'empty' };
-  if (passed <= 2) return { percent: 45, label: 'Weak', level: 'weak' };
-  if (passed === 3) return { percent: 72, label: 'Fair', level: 'fair' };
-  return { percent: 100, label: 'Strong', level: 'strong' };
-});
-
-// ── reset email (let user correct it) ───────────────────────
-function resetEmail() {
-  otpSent.value = false;
-  form.otp = "";
-  errors.value = {};
-  errorMessage.value = "";
-  clearInterval(cooldownTimer);
-  cooldown.value = 0;
+// Username: format first, then ask the server whether it's free
+let usernameTimer = null;
+function onUsername() {
+  errors.username = "";
+  usernameFree.value = false;
+  clearTimeout(usernameTimer);
+  usernameTimer = setTimeout(checkUsername, 600);
+}
+async function checkUsername() {
+  clearTimeout(usernameTimer);
+  const u = form.username;
+  if (!u) return true;
+  if (!/^[A-Za-z0-9_-]+$/.test(u)) {
+    errors.username = "Use only letters, numbers, - and _ (no spaces).";
+    return false;
+  }
+  try {
+    const { data } = await api.post("/auth/check-availability", { username: u });
+    if (u !== form.username) return true;
+    usernameFree.value = data.available?.username === true;
+    if (data.available?.username === false) errors.username = `@${u} is taken. Try adding a number or your last name.`;
+    return data.available?.username !== false;
+  } catch {
+    return true; // the final step checks again
+  }
 }
 
-// ── send OTP ─────────────────────────────────────────────────
-async function handleSendOtp() {
-  errors.value = {};
-  errorMessage.value = "";
-
-  if (!form.email) {
-    errors.value.email = "Email address is required.";
+async function next() {
+  Object.keys(errors).forEach((k) => delete errors[k]);
+  if (step.value === 1) {
+    if (!form.name) errors.name = "Enter your first name.";
+    if (!form.surname) errors.surname = "Enter your last name.";
+    if (!form.username) errors.username = "Choose a username.";
+    if (Object.keys(errors).length) return;
+    checking.value = true;
+    const ok = await checkUsername();
+    checking.value = false;
+    if (ok && !errors.username) step.value = 2;
     return;
   }
-
-  otpLoading.value = true;
-  try {
-    await api.post("/auth/send-otp", { email: form.email });
-    otpSent.value = true;
-    startCooldown(60);
-  } catch (err) {
-    console.log("422 details:", err.response?.data); // ← ADD THIS
-    // Sign-ups were closed while the form was open
-    if (err.response?.status === 403) refreshPlatform();
-    if (err.response?.data?.errors?.email) {
-      errors.value.email = err.response.data.errors.email[0];
-    } else {
-      errorMessage.value =
-        err.response?.data?.message ?? "Failed to send OTP. Please try again.";
-    }
-  } finally {
-    otpLoading.value = false;
-  }
-}
-
-// ── step validation ──────────────────────────────────────────
-function validateStep() {
-  errors.value = {};
-  errorMessage.value = "";
-
-  if (currentStep.value === 1) {
-    if (!form.name) errors.value.name = "First name is required.";
-    if (!form.surname) errors.value.surname = "Last name is required.";
-    if (!form.username) errors.value.username = "Username is required.";
-    return Object.keys(errors.value).length === 0;
-  }
-
-  if (currentStep.value === 2) {
-    if (!form.email) {
-      errors.value.email = "Email address is required.";
-      return false;
-    }
-    if (!otpSent.value) {
-      errorMessage.value = "Please send the OTP code to your email first.";
-      return false;
-    }
-    if (!form.otp) {
-      errors.value.otp = "Please enter the OTP code.";
-      return false;
-    }
+  if (step.value === 2) {
     if (form.otp.length !== 6) {
-      errors.value.otp = "OTP must be 6 digits.";
-      return false;
+      errors.otp = "Enter all 6 digits from the email.";
+      return;
     }
-    return true;
-  }
-
-  if (currentStep.value === 3) {
-    if (!form.password) {
-      errors.value.password = "Password is required.";
-      return false;
-    }
-    if (!Object.values(passwordChecks.value).every(Boolean)) {
-      errors.value.password = "Password must contain at least 8 characters, an uppercase letter, a lowercase letter, and a number.";
-      return false;
-    }
-    if (form.password !== form.password_confirmation) {
-      errors.value.password_confirmation = "Passwords do not match.";
-      return false;
-    }
-    return true;
-  }
-
-  return true;
-}
-
-function handleNext() {
-  if (validateStep() && currentStep.value < 3) currentStep.value++;
-}
-
-function previousStep() {
-  if (currentStep.value > 1) {
-    currentStep.value--;
-    errors.value = {};
-    errorMessage.value = "";
+    step.value = 3;
   }
 }
 
-// ── final register ───────────────────────────────────────────
-async function handleRegister() {
-  if (!validateStep()) return;
-
+async function sendCode() {
+  errors.email = "";
+  notice.value = null;
+  if (!/^\S+@\S+\.\S+$/.test(form.email)) {
+    errors.email = "Enter a valid email, like name@example.com.";
+    emailInput.value?.focus();
+    return;
+  }
+  sending.value = true;
   try {
-    const result = await register(form);
-    if (result.success) {
-      router.push("/shop");
-    } else {
-      if (result.errors) {
-        errors.value = Object.fromEntries(
-          Object.entries(result.errors).map(([k, v]) => [k, v[0]]),
-        );
-      }
-      errorMessage.value =
-        result.error ?? "Registration failed. Please try again.";
-    }
-  } catch {
-    errorMessage.value = "Failed to create account. Please try again.";
+    const { data } = await api.post("/auth/send-otp", { email: form.email });
+    codeSent.value = true;
+    form.otp = "";
+    countdown(data.retry_after || 60);
+    nextTick(() => boxes.value?.focus());
+  } catch (e) {
+    const res = e.response;
+    if (!res) notice.value = unreachable;
+    else if (res.status === 403) refreshPlatform();
+    else if (res.data?.errors?.email) {
+      errors.email = res.data.errors.email[0];
+      if (/already has an account/i.test(errors.email)) notice.value = { tone: "info", title: "You already have an account", body: "This email is registered. Sign in, or reset your password if you can't remember it.", login: true };
+    } else if (res.status === 429) {
+      codeSent.value = true;
+      countdown(res.data?.retry_after || 60);
+      notice.value = { tone: "lock", title: "A code is already on its way", body: res.data?.message || "Wait a moment before asking for another." };
+    } else notice.value = { tone: "warn", title: "We couldn't send the email", body: res.data?.message || "Please try again in a few minutes." };
+  } finally {
+    sending.value = false;
   }
 }
+
+function changeEmail() {
+  codeSent.value = false;
+  form.otp = "";
+  clearInterval(timer);
+  resendIn.value = 0;
+  nextTick(() => emailInput.value?.focus());
+}
+
+async function submit() {
+  Object.keys(errors).forEach((k) => delete errors[k]);
+  if (!passwordOk(form.password)) errors.password = "Your password needs every item on the list.";
+  if (form.password_confirmation !== form.password) errors.password_confirmation = "These don't match yet.";
+  if (Object.keys(errors).length) return;
+
+  const result = await register(form);
+  if (result.success) return; // register() takes them to the shop
+
+  const list = result.errors ?? {};
+  for (const [k, v] of Object.entries(list)) errors[k] = Array.isArray(v) ? v[0] : v;
+  const first = Object.keys(list).map((k) => FIELD_STEP[k]).filter(Boolean).sort()[0];
+  if (first && first !== step.value) {
+    // A wrong or expired code needs a fresh one
+    if (list.otp) form.otp = "";
+    const kept = { ...errors };
+    step.value = first;
+    await nextTick();
+    Object.assign(errors, kept);
+  } else if (!Object.keys(list).length) {
+    notice.value = result.error && !/registration failed/i.test(result.error) ? { tone: "warn", title: "We couldn't create your account", body: result.error } : unreachable;
+  }
+}
+
+onMounted(() => {
+  refreshPlatform();
+  nextTick(() => firstInput.value?.focus());
+});
+onBeforeUnmount(() => {
+  clearInterval(timer);
+  clearTimeout(usernameTimer);
+});
 </script>
 
 <style scoped>
-.register-container {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: #ffffff;
-  padding: 40px 20px;
-  position: relative;
-}
-
-.logo {
-  text-decoration: none;
-  position: absolute;
-  top: 32px;
-  left: 32px;
-  animation: bounce 2s ease-in-out infinite;
-}
-
-@keyframes bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
-}
-
-.back-btn {
-  position: absolute;
-  top: 32px;
-  right: 32px;
-  background: none;
-  border: none;
-  color: #4a5568;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 8px 12px;
-  transition: all 0.2s;
-}
-
-.back-btn:hover {
-  color: #2d3748;
-  transform: translateX(-4px);
-}
-
-.header {
-  text-align: center;
-  margin-bottom: 48px;
-}
-
-.title {
-  font-size: 32px;
-  font-weight: 400;
-  color: #2d3748;
-  margin-bottom: 12px;
-  letter-spacing: -0.5px;
-}
-
-.subtitle {
-  font-size: 14px;
-  color: #718096;
-}
-
-.link {
-  color: #2d3748;
-  text-decoration: underline;
-  transition: color 0.2s;
-}
-
-.link:hover {
-  color: #000000;
-}
-
-.steps-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 48px;
-  max-width: 500px;
-  width: 100%;
-}
-
-.step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-}
-
-.step-number {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #e2e8f0;
-  color: #a0aec0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 500;
-  font-size: 14px;
-  transition: all 0.3s ease;
-}
-
-.step.active .step-number {
-  background: #2d3748;
-  color: white;
-}
-.step.completed .step-number {
-  background: #20734d;
-  color: white;
-}
-
-.step-label {
-  font-size: 11px;
-  color: #a0aec0;
-  white-space: nowrap;
-}
-
-.step.active .step-label {
-  color: #2d3748;
-  font-weight: 500;
-}
-
-.step-line {
-  flex: 1;
-  height: 1px;
-  background: #e2e8f0;
-  margin: 0 12px;
-  transition: all 0.3s ease;
-  min-width: 40px;
-  max-width: 100px;
-}
-
-.step-line.active {
-  background: #cbd5e0;
-}
-
-.form-content {
-  width: 100%;
-  max-width: 480px;
-}
-
-.closed-notice {
-  max-width: 420px;
-  margin: 8px auto 0;
-  padding: 28px 24px;
-  border: 1px solid rgba(30, 27, 24, 0.12);
-  border-radius: 14px;
-  background: #faf8f4;
-  text-align: center;
-}
-
-.closed-notice h2 {
-  margin: 0 0 8px;
-  font-size: 20px;
-}
-
-.closed-notice p {
-  margin: 0 0 16px;
-  color: #6e6761;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.alert-error {
-  padding: 12px 16px;
-  background: #fee2e2;
-  color: #dc2626;
-  border: 1px solid #fca5a5;
-  border-radius: 8px;
-  margin-bottom: 24px;
-  font-size: 14px;
-  text-align: center;
-}
-
-.register-form {
-  width: 100%;
-}
-
-.form-step {
-  animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.step-title {
-  font-size: 18px;
-  font-weight: 400;
-  color: #2d3748;
-  margin-bottom: 24px;
-  text-align: center;
-}
-
-.input-group {
-  margin-bottom: 20px;
-}
-
-.input-label {
-  display: block;
-  font-size: 14px;
-  color: #2d3748;
-  margin-bottom: 8px;
-}
-
-.form-input {
-  width: 100%;
-  padding: 12px 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 15px;
-  color: #2d3748;
-  background: #ffffff;
-  transition: all 0.2s ease;
-  box-sizing: border-box;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: #cbd5e0;
-}
-
-.form-input::placeholder {
-  color: #cbd5e0;
-}
-
-.form-input:disabled {
-  background: #f7fafc;
-  color: #a0aec0;
-  cursor: not-allowed;
-}
-
-.otp-input {
-  font-size: 24px;
-  letter-spacing: 10px;
-  text-align: center;
-  font-weight: 500;
-}
-
-.input-error {
-  border-color: #f56565 !important;
-}
-
-.error-msg {
-  display: block;
-  color: #e53e3e;
-  font-size: 13px;
-  margin-top: 6px;
-}
-
-.hint-text {
-  font-size: 12px;
-  color: #a0aec0;
-  margin-top: 6px;
-}
-
-.password-requirements { margin-top: 10px; font-size: 12px; color: #718096; }
-.password-strength-track { height: 6px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
-.password-strength-track span { display: block; height: 100%; border-radius: inherit; transition: width .2s ease, background .2s ease; }
-.password-strength-track .empty { background: #cbd5e0; }.password-strength-track .weak { background: #ef4444; }.password-strength-track .fair { background: #f59e0b; }.password-strength-track .strong { background: #16a34a; }
-.password-strength-label { display: flex; justify-content: space-between; margin-top: 7px; }.password-strength-label strong.empty { color: #718096; }.password-strength-label strong.weak { color: #dc2626; }.password-strength-label strong.fair { color: #d97706; }.password-strength-label strong.strong { color: #15803d; }
-.password-requirements ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 12px; margin: 10px 0 0; padding: 0; list-style: none; }.password-requirements li { color: #718096; }.password-requirements li span { display: inline-block; width: 14px; }.password-requirements li.met { color: #15803d; font-weight: 600; }
-
-.otp-btn {
-  width: 100%;
-  padding: 12px;
-  background: #f7fafc;
-  color: #2d3748;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-bottom: 20px;
-}
-
-.otp-btn:hover:not(:disabled) {
-  background: #edf2f7;
-  border-color: #cbd5e0;
-}
-
-.otp-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.change-email-link {
-  text-align: center;
-  font-size: 13px;
-  color: #718096;
-  margin-top: 12px;
-}
-
-.link-btn {
-  background: none;
-  border: none;
-  color: #2d3748;
-  font-size: 13px;
-  text-decoration: underline;
-  cursor: pointer;
+.rg-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: -8px 0 28px;
   padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--ink-soft);
 }
-
-.link-btn:hover {
-  color: #000000;
+.rg-bar {
+  display: block;
+  height: 3px;
+  margin-bottom: 8px;
+  border-radius: 2px;
+  background: var(--line);
+  transition: background 0.3s;
 }
-
-.action-btn {
-  width: 100%;
-  padding: 14px;
-  background: #2d3748;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 15px;
+.rg-steps .done .rg-bar {
+  background: var(--rosewood-dark);
+}
+.rg-steps .on {
+  color: var(--ink);
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-top: 24px;
 }
-
-.action-btn:hover:not(:disabled) {
-  background: #1a202c;
+.rg-steps .on .rg-bar {
+  background: linear-gradient(90deg, var(--rosewood-dark) 50%, var(--line) 50%);
 }
-.action-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.rg-notice {
+  margin-bottom: 22px;
 }
-
-@media (max-width: 640px) {
-  .logo {
-    top: 20px;
-    left: 20px;
-  }
-  .back-btn {
-    top: 20px;
-    right: 20px;
-  }
-  .title {
-    font-size: 28px;
-  }
-  .step-label {
-    font-size: 10px;
-  }
-  .step-number {
-    width: 28px;
-    height: 28px;
-    font-size: 12px;
-  }
-  .step-line {
-    margin: 0 8px;
-    min-width: 20px;
-  }
+.rg-small {
+  font-size: 13px;
+  font-weight: 400;
+}
+.rg-back {
+  align-self: flex-start;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+.rg-home {
+  margin-top: 20px;
+  text-decoration: none;
 }
 </style>

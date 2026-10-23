@@ -89,7 +89,10 @@ use App\Http\Controllers\VendorBouquetPresetController;
 // ============================================================
 
 Route::prefix('auth')->group(function () {
-    Route::post('/send-otp',     [AuthController::class, 'sendOtp']);
+    Route::post('/send-otp',     [AuthController::class, 'sendOtp'])->middleware('throttle:6,1');
+    Route::post('/check-availability', [AuthController::class, 'checkAvailability'])->middleware('throttle:30,1');
+    Route::post('/password/forgot', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
+    Route::post('/password/reset',  [AuthController::class, 'resetPassword'])->middleware('throttle:10,1');
     Route::post('/register',     [AuthController::class, 'register']);
     Route::post('/login',        [AuthController::class, 'login']);
     Route::post('/two-factor/verify-passkey', [AuthController::class, 'verifyTwoFactorPasskey']);

@@ -210,7 +210,7 @@ class ProfileController extends Controller
         );
 
         try {
-            EmailOtpService::send($user->email, $request->ip());
+            EmailOtpService::send($user->email, $request->ip(), EmailOtpService::PURPOSE_VERIFY);
         } catch (\Throwable $e) {
             $challenge->delete();
             throw ValidationException::withMessages([

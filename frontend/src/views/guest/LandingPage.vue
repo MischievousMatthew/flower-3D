@@ -69,14 +69,14 @@
           to="/guest/login"
           class="bc-nav-menu-only"
           @click="closeMobileMenu"
-          >Login</router-link
+          >Sign in</router-link
         >
       </div>
       <div class="nav-buttons">
         <template v-if="!isAuthenticated">
-          <router-link to="/guest/login" class="btn-login bc-nav-login">Login</router-link>
+          <router-link to="/guest/login" class="btn-login bc-nav-login">Sign in</router-link>
           <router-link to="/guest/register" class="btn-register bc-nav-register"
-            >Register</router-link
+            >Create account</router-link
           >
         </template>
         <button
@@ -521,8 +521,8 @@
           <div class="footer-section">
             <h4>Get Started</h4>
             <ul>
-              <li><router-link to="/guest/register">Sign Up</router-link></li>
-              <li><router-link to="/guest/login">Login</router-link></li>
+              <li><router-link to="/guest/register">Create account</router-link></li>
+              <li><router-link to="/guest/login">Sign in</router-link></li>
               <li id="register-vendor">
                 <router-link to="/guest/vendor_register"
                   >Become a Vendor</router-link
@@ -1076,10 +1076,22 @@ function setupJourney() {
   if (!bouquet) return;
 
   const isMobile = window.innerWidth < 968;
-  const scale = isMobile ? 0.62 : 0.95;
+  let scale = isMobile ? 0.62 : 0.95;
   // Where the bouquet sits on screen in the hero and during the story.
   let heroSx = isMobile ? 0 : 0.42;
   let heroSy = isMobile ? -0.56 : 0;
+  // Phones: centre the bouquet in the space under the buttons (and shrink it
+  // when that space is short) so it never sits on top of "How it works"
+  const actions = isMobile ? heroSection.value?.querySelector(".hero-actions") : null;
+  if (actions) {
+    const top = actions.getBoundingClientRect().bottom + window.scrollY + 28;
+    // Short phones: let it start just under the buttons and run past the fold
+    const centerY = top + Math.max((window.innerHeight - top) / 2, window.innerHeight * 0.17);
+    const room = Math.max(0, window.innerHeight - top) / window.innerHeight;
+    heroSy = Math.min(-0.3, 1 - (centerY / window.innerHeight) * 2);
+    scale = Math.min(0.62, Math.max(0.42, room * 1.3));
+    heroSection.value.style.setProperty("--halo-top", `${centerY}px`);
+  }
   // On wide screens, aim at the middle of the gold halo so the bouquet sits
   // centred in its circle at any window size (the canvas fills the viewport).
   const halo = heroSection.value?.querySelector(".hero-halo");
@@ -2135,16 +2147,24 @@ onBeforeUnmount(() => {
   list-style: none;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 0;
+  gap: 8px 22px;
   margin-bottom: 36px;
   color: var(--ink-soft);
   font-size: 14px;
 }
 
-.story-features li + li::before {
-  content: "·";
-  margin: 0 14px;
-  color: var(--rosewood);
+.story-features li {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.story-features li::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--rosewood);
 }
 
 .story-progress-wrap {
@@ -2677,7 +2697,7 @@ onBeforeUnmount(() => {
   }
 
   .hero-halo {
-    top: 72%;
+    top: var(--halo-top, 72%);
     right: 50%;
     width: 86vw;
     transform: translate(50%, -50%);
@@ -2875,6 +2895,17 @@ onBeforeUnmount(() => {
 
   .hero-actions {
     gap: 24px;
+  }
+
+  .bc-nav-register {
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 370px) {
+  /* The logo alone leaves room for "Create account" */
+  .bc-logo-text {
+    display: none;
   }
 
   .cta-panel h2 {

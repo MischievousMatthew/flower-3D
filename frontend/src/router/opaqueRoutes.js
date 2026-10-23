@@ -126,6 +126,14 @@ export const opaqueRouteTokens = Object.freeze({
   AdminSettings: "OpuQ5BbQ9RdDvJrdDESPfS_q-h1b3uFDK6lk5FwSGgc",
   AdminHealth: "fyfL2JkE0--iisB4Y4VS4YGMX_StDSmFzqceX7M9z_E",
   VendorPhotoTo3D: "OjyXmOdTfM6_J73H4N93hsfexqMvZkGX1_Ok2k6CHi4",
+  VendorStaffAttendanceReview: "XAUDrlV5C49_Wyx0icM9lfJSx5gudjr9Cjh5kSYIJTo",
+  VendorStaffAttendanceDevices: "zfgRPCfZXmIdiyBJHnL0-68242xb90MkxNNt8glAig0",
+  VendorStaffLeave: "B4SBHcx2D0xik5y-Vf7VfKlIu5m8Lu1jN-bPjw_L92Q",
+  VendorStaffPlanner: "xTKSntIK7nl1fZ-64z6pHn8xjtsAVUtm-8WYZcXHzBg",
+  ShiftSchedules: "ME3WXfEhNHbdTlis8W4yDjSgLXG-SCNBJknLwDWFIJE",
+  AttendanceReview: "14RjsJvR0RShsslTh64zGkRLYL6R8dpaYVtf2qicgFs",
+  AttendanceReports: "I9Net_mIgqCuh-RYMN0MRK0HByxoTd9_nzCr6XeEAtw",
+  ForgotPassword: "bz9x6ogi_KeQ7EIFLF3t9VgJI2GttDgdOP2mMQCyrXw",
 });
 
 export const opaquePathFor = (name, parameterPath = "") => {

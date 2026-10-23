@@ -11,6 +11,8 @@ use App\Services\LoginGuard;
 use App\Support\PlatformSettings;
 use App\Support\SingleSession;
 use App\Services\EmailOtpService;
+use App\Services\OtpProblem;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -38,28 +40,124 @@ class AuthController extends Controller
             'email' => 'required|email|max:255',
         ]);
 
-        try {
-            EmailOtpService::send(
-                email: $request->email,
-                ip:    $request->ip(),
-            );
-
-            return response()->json([
-                'message' => 'OTP sent to your email address.'
-            ]);
-
-        } catch (\Throwable $e) {
-
-            Log::error('SEND OTP ERROR', [
-                'message' => $e->getMessage(),
-                'trace'   => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'message' => 'Failed to send OTP',
-                'error'   => $e->getMessage(), // 👈 TEMP DEBUG
-            ], 500);
+        if (User::whereRaw('lower(email) = ?', [strtolower(trim($request->email))])->exists()) {
+            throw ValidationException::withMessages(['email' => 'This email already has an account. Log in instead, or reset your password if you forgot it.']);
         }
+
+        return $this->sendCode($request->email, $request->ip(), EmailOtpService::PURPOSE_SIGNUP, 'We sent a 6-digit code to your email.');
+    }
+
+    /** Sends a code and answers with a message the page can show as-is */
+    private function sendCode(string $email, string $ip, string $purpose, string $sent)
+    {
+        try {
+            EmailOtpService::send($email, $ip, $purpose);
+        } catch (OtpProblem $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage(), 'retry_after' => $e->retryAfter], $e->status);
+        } catch (\Throwable $e) {
+            Log::error('Sending a code failed', ['purpose' => $purpose, 'message' => $e->getMessage()]);
+
+            return response()->json(['success' => false, 'message' => "We couldn't send the email right now. Please try again in a few minutes."], 503);
+        }
+
+        return response()->json(['success' => true, 'message' => $sent, 'retry_after' => 60]);
+    }
+
+    /**
+     * POST /auth/check-availability {username?, email?}
+     * Lets the sign-up form say "taken" on the step where it's typed, not at the end.
+     */
+    public function checkAvailability(Request $request)
+    {
+        $data = $request->validate([
+            'username' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255',
+        ]);
+        $out = [];
+        if (! empty($data['username'])) {
+            $out['username'] = ! User::whereRaw('lower(username) = ?', [mb_strtolower(trim($data['username']))])->exists();
+        }
+        if (! empty($data['email'])) {
+            $out['email'] = ! User::whereRaw('lower(email) = ?', [mb_strtolower(trim($data['email']))])->exists();
+        }
+
+        return response()->json(['success' => true, 'available' => $out]);
+    }
+
+    /**
+     * POST /auth/password/forgot {identifier}
+     * Emails a reset code to the account's address. The answer is the same
+     * whether or not an account matched, so it can't be used to find accounts.
+     */
+    public function forgotPassword(Request $request)
+    {
+        $data = $request->validate(['identifier' => 'required|string|max:255']);
+        $user = $this->userFor($data['identifier']);
+        $generic = response()->json([
+            'success' => true,
+            'message' => 'If an account matches, we emailed it a 6-digit code. It can take a minute to arrive — check your spam folder too.',
+            'retry_after' => 60,
+        ]);
+
+        if (! $user || ! $user->email) {
+            return $generic;
+        }
+        try {
+            EmailOtpService::send($user->email, $request->ip(), EmailOtpService::PURPOSE_RESET);
+        } catch (OtpProblem $e) {
+            // Waiting out a cooldown: the code already sent still works
+            if ($e->status === 429) {
+                return $generic;
+            }
+            return response()->json(['success' => false, 'message' => $e->getMessage()], $e->status);
+        }
+
+        return $generic;
+    }
+
+    /** POST /auth/password/reset {identifier, otp, password, password_confirmation} */
+    public function resetPassword(Request $request)
+    {
+        $data = $request->validate([
+            'identifier' => 'required|string|max:255',
+            'otp' => 'required|digits:6',
+            'password' => 'required|string|min:8|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/',
+        ], [
+            'password.regex' => 'Use at least one uppercase letter, one lowercase letter and a number.',
+            'otp.digits' => 'Enter the 6-digit code from the email.',
+        ]);
+
+        $user = $this->userFor($data['identifier']);
+        if (! $user || ! $user->email) {
+            throw ValidationException::withMessages(['otp' => "That code isn't right or has expired. Ask for a new one."]);
+        }
+        try {
+            EmailOtpService::verify($user->email, $data['otp']);
+        } catch (OtpProblem $e) {
+            throw ValidationException::withMessages(['otp' => $e->getMessage()]);
+        }
+
+        $user->forceFill(['password' => Hash::make($data['password'])]);
+        if (Schema::hasColumn('users', 'password_changed_at')) {
+            $user->password_changed_at = now();
+        }
+        $user->save();
+        // Signed out everywhere, and the wrong-password count starts over
+        SingleSession::end($user);
+        app(LoginGuard::class)->clear([$user->username, $user->email, $data['identifier']]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Your password was changed. Log in with your new password.',
+            'username' => $user->username ?: $user->email,
+        ]);
+    }
+
+    private function userFor(string $identifier): ?User
+    {
+        $id = mb_strtolower(trim($identifier));
+
+        return User::whereRaw('lower(username) = ?', [$id])->orWhereRaw('lower(email) = ?', [$id])->first();
     }
 
     public function register(Request $request)
@@ -113,14 +211,25 @@ class AuthController extends Controller
      * locked, unverified). The code lets the login page show this message
      * instead of a generic "wrong username or password".
      */
-    private function refuseLogin(string $code, string $message): never
+    private function refuseLogin(string $code, string $message, array $extra = []): never
     {
         throw new HttpResponseException(response()->json([
             'success' => false,
             'code' => $code,
             'message' => $message,
             'errors' => ['username' => [$message]],
-        ], 422));
+        ] + $extra, 422));
+    }
+
+    /** Wrong username or password, with how many tries are left before the lock */
+    private function refuseCredentials(LoginGuard $guard, string $identifier): never
+    {
+        $left = $guard->attemptsLeft($identifier);
+        if ($left === 0) {
+            $seconds = $guard->lockedSeconds($identifier);
+            $this->refuseLogin('account_locked', LoginGuard::lockedMessage(max(1, (int) ceil($seconds / 60))), ['retry_after' => $seconds]);
+        }
+        $this->refuseLogin('invalid_credentials', "That username or password doesn't match our records.", ['attempts_left' => $left]);
     }
 
     public function login(Request $request)
@@ -140,9 +249,9 @@ class AuthController extends Controller
 
             $guard = app(LoginGuard::class);
             $identifier = LoginGuard::identifier($request->username);
-            if ($minutes = $guard->lockedFor($identifier)) {
+            if ($seconds = $guard->lockedSeconds($identifier)) {
                 $guard->recordFailure($request, $identifier, 'locked');
-                $this->refuseLogin('account_locked', LoginGuard::lockedMessage($minutes));
+                $this->refuseLogin('account_locked', LoginGuard::lockedMessage(max(1, (int) ceil($seconds / 60))), ['retry_after' => $seconds]);
             }
 
             // Find user by username or email
@@ -160,18 +269,14 @@ class AuthController extends Controller
             if (!$user) {
                 Log::warning('User not found: ' . $request->username);
                 $guard->recordFailure($request, $identifier, 'unknown_account');
-                throw ValidationException::withMessages([
-                    'username' => 'The provided credentials are incorrect.',
-                ]);
+                $this->refuseCredentials($guard, $identifier);
             }
 
             // Check password
             if (!Hash::check($request->password, $user->password)) {
                 Log::warning('Password mismatch for user: ' . $user->username);
                 $guard->recordFailure($request, $identifier, 'wrong_password', $user->id);
-                throw ValidationException::withMessages([
-                    'username' => 'The provided credentials are incorrect.',
-                ]);
+                $this->refuseCredentials($guard, $identifier);
             }
 
             // Suspension is checked before verification so a suspended account
@@ -240,7 +345,9 @@ class AuthController extends Controller
             }
             $remaining = max(0, 5 - $challenge->passkey_attempts);
             throw ValidationException::withMessages([
-                'passkey' => ["Invalid passkey. {$remaining} attempt(s) remaining."],
+                'passkey' => [$remaining > 0
+                    ? "That passkey isn't right. {$remaining} " . ($remaining === 1 ? 'try' : 'tries') . ' left, or email yourself a code instead.'
+                    : 'Too many wrong passkeys. Sign in again and choose "Email me a code".'],
             ]);
         }
 
@@ -254,7 +361,7 @@ class AuthController extends Controller
         $challenge = $this->activeLoginChallenge($request->challenge_token);
 
         try {
-            EmailOtpService::send($challenge->user->email, $request->ip());
+            EmailOtpService::send($challenge->user->email, $request->ip(), EmailOtpService::PURPOSE_SIGNIN);
         } catch (\Throwable $e) {
             throw ValidationException::withMessages(['otp' => [$e->getMessage()]]);
         }
