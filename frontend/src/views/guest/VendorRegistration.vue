@@ -135,36 +135,28 @@
 
         <section class="vr-card">
           <h3>Opening hours</h3>
-          <p class="vr-sub">Different hours on some days? Add another schedule.</p>
-          <div v-for="(schedule, scheduleIndex) in operatingSchedules" :key="schedule.id" class="vr-schedule">
-            <div class="vr-schedule-head">
-              <b>{{ operatingSchedules.length > 1 ? `Schedule ${scheduleIndex + 1}` : "Your hours" }}</b>
-              <span v-if="schedule.days.length && schedule.opening_time && schedule.closing_time" class="vr-schedule-sum">{{ formatDays(schedule.days) }}, {{ formatTime(schedule.opening_time) }}–{{ formatTime(schedule.closing_time) }}</span>
-              <button v-if="operatingSchedules.length > 1" type="button" class="af-plain vr-small" @click="removeSchedule(scheduleIndex)">Remove</button>
-            </div>
-            <div class="vr-days">
-              <label v-for="day in daysOfWeek" :key="day" class="vr-day" :class="{ on: schedule.days.includes(day), off: isDayAssignedElsewhere(day, scheduleIndex) }" :title="isDayAssignedElsewhere(day, scheduleIndex) ? 'Already in another schedule' : day">
-                <input v-model="schedule.days" type="checkbox" :value="day" :disabled="isDayAssignedElsewhere(day, scheduleIndex)" />{{ day.substring(0, 3) }}
+          <p class="vr-sub">Switch on the days you're open and set the hours for each.</p>
+          <div class="vr-week">
+            <div v-for="day in daysOfWeek" :key="day" class="vr-dayrow" :class="{ closed: !weekHours[day].open }">
+              <label class="vr-switch">
+                <input type="checkbox" :checked="weekHours[day].open" :aria-label="`Open on ${day}`" @change="setDayOpen(day, $event.target.checked)" />
+                <span aria-hidden="true"></span>
+                <b>{{ day }}</b>
               </label>
-            </div>
-            <div class="vr-quick">
-              <button type="button" @click="selectWeekdays(scheduleIndex)">Weekdays</button>
-              <button type="button" @click="selectWeekends(scheduleIndex)">Weekends</button>
-              <button type="button" @click="selectAllDays(scheduleIndex)">Every day</button>
-              <button type="button" @click="clearDays(scheduleIndex)">Clear</button>
-            </div>
-            <div class="vr-grid">
-              <div class="vr-field">
-                <label class="vr-label">Opens</label>
-                <input v-model="schedule.opening_time" type="time" class="vr-input" />
+              <div v-if="weekHours[day].open" class="vr-times">
+                <input v-model="weekHours[day].from" type="time" class="vr-input vr-time" :aria-label="`${day} opens at`" />
+                <span>to</span>
+                <input v-model="weekHours[day].to" type="time" class="vr-input vr-time" :aria-label="`${day} closes at`" />
               </div>
-              <div class="vr-field">
-                <label class="vr-label">Closes</label>
-                <input v-model="schedule.closing_time" type="time" class="vr-input" />
-              </div>
+              <span v-else class="vr-closed">Closed</span>
             </div>
           </div>
-          <button v-if="operatingSchedules.length < 7" type="button" class="vr-add" @click="addSchedule">+ Add another schedule</button>
+          <div class="vr-quick">
+            <button type="button" @click="openOnly(WEEKDAYS)">Weekdays</button>
+            <button type="button" @click="openOnly(daysOfWeek.slice(0, 6))">Mon–Sat</button>
+            <button type="button" @click="openOnly(daysOfWeek)">Every day</button>
+            <button v-if="firstOpenDay && openDayCount > 1" type="button" @click="useHoursEverywhere(firstOpenDay)">Use {{ firstOpenDay }}'s hours for every open day</button>
+          </div>
           <p v-if="errors.operatingHours || errors.operating_schedules" class="vr-error">{{ errors.operatingHours || errors.operating_schedules }}</p>
         </section>
       </div>
@@ -839,31 +831,58 @@ const daysOfWeek = [
 
 const operatingSchedules = ref([{ id: 1, days: [], opening_time: "", closing_time: "" }]);
 
-// ── Quick-select helpers ───────────────────────────────────────────────────────
-const assignAvailableDays = (index, days) => {
-  operatingSchedules.value[index].days = days.filter((day) => !isDayAssignedElsewhere(day, index));
+// One row per day: open or closed, with its own hours. Days with the same
+// hours are grouped into operatingSchedules, the shape the server expects.
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const weekHours = reactive(Object.fromEntries(daysOfWeek.map((day) => [day, { open: false, from: "", to: "" }])));
+const firstOpenDay = computed(() => daysOfWeek.find((day) => weekHours[day].open) || null);
+const openDayCount = computed(() => daysOfWeek.filter((day) => weekHours[day].open).length);
+
+const syncWeekFromSchedules = () => {
+  for (const day of daysOfWeek) Object.assign(weekHours[day], { open: false, from: "", to: "" });
+  for (const schedule of operatingSchedules.value) {
+    for (const day of schedule.days) Object.assign(weekHours[day], { open: true, from: schedule.opening_time, to: schedule.closing_time });
+  }
 };
-const selectWeekdays = (index) => {
-  assignAvailableDays(index, [
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-  ]);
+watch(
+  weekHours,
+  () => {
+    const groups = new Map();
+    for (const day of daysOfWeek) {
+      const h = weekHours[day];
+      if (!h.open) continue;
+      const key = `${h.from}|${h.to}`;
+      if (!groups.has(key)) groups.set(key, { id: groups.size + 1, days: [], opening_time: h.from, closing_time: h.to });
+      groups.get(key).days.push(day);
+    }
+    operatingSchedules.value = [...groups.values()];
+  },
+  { deep: true },
+);
+
+// Hours a newly opened day starts with: the closest open day's, else 8 AM–5 PM
+const suggestedHours = (day) => {
+  const i = daysOfWeek.indexOf(day);
+  const near = [...daysOfWeek].sort((x, y) => Math.abs(daysOfWeek.indexOf(x) - i) - Math.abs(daysOfWeek.indexOf(y) - i))
+    .find((d) => d !== day && weekHours[d].open && weekHours[d].from && weekHours[d].to);
+  return near ? { from: weekHours[near].from, to: weekHours[near].to } : { from: "08:00", to: "17:00" };
 };
-const selectWeekends = (index) => {
-  assignAvailableDays(index, ["Saturday", "Sunday"]);
+const setDayOpen = (day, open) => {
+  if (open && !(weekHours[day].from && weekHours[day].to)) Object.assign(weekHours[day], suggestedHours(day));
+  weekHours[day].open = open;
 };
-const selectAllDays = (index) => {
-  assignAvailableDays(index, daysOfWeek);
+const openOnly = (days) => {
+  const hours = firstOpenDay.value ? { from: weekHours[firstOpenDay.value].from || "08:00", to: weekHours[firstOpenDay.value].to || "17:00" } : { from: "08:00", to: "17:00" };
+  for (const day of daysOfWeek) {
+    const open = days.includes(day);
+    if (open && !weekHours[day].open) Object.assign(weekHours[day], hours);
+    weekHours[day].open = open;
+  }
 };
-const clearDays = (index) => {
-  operatingSchedules.value[index].days = [];
+const useHoursEverywhere = (from) => {
+  const { from: start, to: end } = weekHours[from];
+  for (const day of daysOfWeek) if (weekHours[day].open) Object.assign(weekHours[day], { from: start, to: end });
 };
-const isDayAssignedElsewhere = (day, index) => operatingSchedules.value.some((schedule, scheduleIndex) => scheduleIndex !== index && schedule.days.includes(day));
-const addSchedule = () => { if (operatingSchedules.value.length < 7) operatingSchedules.value.push({ id: Date.now(), days: [], opening_time: "", closing_time: "" }); };
-const removeSchedule = (index) => { if (operatingSchedules.value.length > 1) operatingSchedules.value.splice(index, 1); };
 
 // ── Time formatter: "HH:MM" → "H:MM AM/PM" ───────────────────────────────────
 const formatTime = (time) => {
@@ -1528,33 +1547,19 @@ const validateStep = (step) => {
         errors.serviceAreas = "Please select at least one service area";
         isValid = false;
       }
-      const assignedOperatingDays = new Set();
-      if (!operatingSchedules.value.length) {
-        errors.operatingHours = "Please add at least one operating schedule";
-        isValid = false;
-      } else {
-        for (const schedule of operatingSchedules.value) {
-          if (!schedule.days.length) {
-            errors.operatingHours = "Each schedule needs at least one operating day";
-            isValid = false;
-            break;
-          }
-          if (!schedule.opening_time || !schedule.closing_time) {
-            errors.operatingHours = "Each schedule needs opening and closing times";
-            isValid = false;
-            break;
-          }
-          if (schedule.opening_time >= schedule.closing_time) {
-            errors.operatingHours = "Closing time must be after opening time";
-            isValid = false;
-            break;
-          }
-          if (schedule.days.some((day) => assignedOperatingDays.has(day))) {
-            errors.operatingHours = "A day can belong to only one schedule";
-            isValid = false;
-            break;
-          }
-          schedule.days.forEach((day) => assignedOperatingDays.add(day));
+      {
+        const openDays = daysOfWeek.filter((day) => weekHours[day].open);
+        const noTimes = openDays.find((day) => !weekHours[day].from || !weekHours[day].to);
+        const backwards = openDays.find((day) => weekHours[day].from && weekHours[day].to && weekHours[day].from >= weekHours[day].to);
+        if (!openDays.length) {
+          errors.operatingHours = "Switch on at least one day you're open";
+          isValid = false;
+        } else if (noTimes) {
+          errors.operatingHours = `Add the opening and closing time for ${noTimes}`;
+          isValid = false;
+        } else if (backwards) {
+          errors.operatingHours = `On ${backwards}, the closing time must be after the opening time`;
+          isValid = false;
         }
       }
       break;
@@ -1809,6 +1814,7 @@ const clearProgress = () => {
   // NEW: reset extra UI state
   selectedServiceAreas.value = [];
   operatingSchedules.value = [{ id: 1, days: [], opening_time: "", closing_time: "" }];
+  syncWeekFromSchedules();
 
   Object.keys(fileObjects).forEach((key) => {
     fileObjects[key] = Array.isArray(fileObjects[key]) ? [] : null;
@@ -2009,6 +2015,7 @@ const { status: platform, refresh: refreshPlatform } = usePlatformStatus();
 onMounted(async () => {
   refreshPlatform();
   loadProgress();
+  syncWeekFromSchedules();
   await initialiseStoreLocationMap();
   saveInterval.value = setInterval(saveProgress, 30000);
 
@@ -2141,8 +2148,8 @@ onUnmounted(() => {
 
 /* Cards */
 .vr-card {
-  margin-bottom: 16px;
-  padding: 24px 26px;
+  margin-bottom: 14px;
+  padding: 20px 22px;
   border: 1px solid var(--line-soft);
   border-radius: 20px;
   background: #fff;
@@ -2187,13 +2194,13 @@ onUnmounted(() => {
 .vr-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px 18px;
+  gap: 14px 16px;
 }
 .vr-field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  margin-bottom: 16px;
+  gap: 6px;
+  margin-bottom: 14px;
 }
 .vr-grid .vr-field {
   margin-bottom: 0;
@@ -2209,7 +2216,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  font-size: 14.5px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--ink);
 }
@@ -2220,17 +2227,17 @@ onUnmounted(() => {
 }
 .vr-input {
   width: 100%;
-  min-height: 54px;
-  padding: 0 16px;
+  min-height: 44px;
+  padding: 0 14px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 11px;
   background: var(--paper);
-  font: 400 15.5px/1.4 var(--font-sans);
+  font: 400 14.5px/1.4 var(--font-sans);
   color: var(--ink);
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
 textarea.vr-input {
-  padding: 14px 16px;
+  padding: 11px 14px;
   resize: vertical;
 }
 select.vr-input {
@@ -2353,7 +2360,7 @@ select.vr-input {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 46px;
+  height: 40px;
   padding: 0 18px;
   border: 1.5px solid var(--line);
   border-radius: 999px;
@@ -2391,89 +2398,76 @@ select.vr-input {
   box-shadow: 0 0 0 3px rgba(142, 68, 58, 0.3);
 }
 
-/* Opening hours */
-.vr-schedule {
-  padding: 16px;
+/* Opening hours: a row per day */
+.vr-week {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
   border-radius: 16px;
+  overflow: hidden;
+}
+.vr-dayrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 54px;
+  padding: 6px 16px;
+  background: #fff;
+}
+.vr-dayrow + .vr-dayrow {
+  border-top: 1px solid var(--line-soft);
+}
+.vr-dayrow.closed {
   background: var(--paper);
 }
-.vr-schedule + .vr-schedule {
-  margin-top: 12px;
+.vr-dayrow .vr-switch {
+  flex: none;
+  width: 172px;
 }
-.vr-schedule-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 12px;
-  margin-bottom: 12px;
-  font-size: 14px;
-}
-.vr-schedule-head b {
-  font-weight: 600;
-  color: var(--ink);
-}
-.vr-schedule-sum {
-  flex: 1;
-  color: var(--ink-soft);
-}
-.vr-days {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
-}
-.vr-day {
-  display: grid;
-  place-items: center;
-  height: 44px;
-  border: 1.5px solid var(--line);
-  border-radius: 12px;
-  background: #fff;
-  font-size: 13.5px;
+.vr-dayrow .vr-switch b {
+  font-size: 14.5px;
   font-weight: 500;
   color: var(--ink);
-  cursor: pointer;
 }
-.vr-day input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
+.vr-dayrow.closed .vr-switch b {
+  color: var(--ink-soft);
 }
-.vr-day.on {
-  border-color: var(--espresso);
-  background: var(--espresso);
-  color: #f7f2ea;
+.vr-times {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
 }
-.vr-day.off {
-  opacity: 0.35;
-  cursor: not-allowed;
+.vr-time {
+  min-height: 40px;
+  max-width: 150px;
+  padding: 0 10px;
+}
+.vr-closed {
+  font-size: 14px;
+  color: var(--ink-soft);
 }
 .vr-quick {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 10px 0 14px;
+  margin: 12px 0 0;
 }
-.vr-quick button,
-.vr-add {
-  height: 32px;
-  padding: 0 12px;
+.vr-quick button {
+  height: 34px;
+  padding: 0 14px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: #fff;
-  font: 500 12.5px/1 var(--font-sans);
+  font: 500 13px/1 var(--font-sans);
   color: var(--ink-soft);
   cursor: pointer;
 }
-.vr-quick button:hover,
-.vr-add:hover {
+.vr-quick button:hover {
   border-color: var(--rosewood-dark);
   color: var(--rosewood-dark);
-}
-.vr-add {
-  margin-top: 12px;
-  height: 38px;
-  padding: 0 16px;
-  font-size: 13.5px;
 }
 
 /* Document tiles */
@@ -2494,12 +2488,12 @@ select.vr-input {
 .vr-docs :deep(.dd-zone) {
   flex-direction: column;
   align-items: flex-start;
-  min-height: 132px;
+  min-height: 108px;
 }
 .vr-docs :deep(.dd-zone.has) {
   flex-direction: row;
   align-items: center;
-  min-height: 72px;
+  min-height: 60px;
 }
 
 /* Sample photos */
@@ -3001,8 +2995,31 @@ select.vr-input {
   .vr-head h2 {
     font-size: 30px;
   }
-  .vr-days {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .vr-dayrow {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 12px 14px;
+  }
+  .vr-dayrow .vr-switch {
+    width: auto;
+    flex: 1;
+  }
+  .vr-times {
+    flex-basis: 100%;
+  }
+  .vr-time {
+    width: 0;
+    min-width: 0;
+    max-width: none;
+    flex: 1;
+    padding: 0 6px 0 10px;
+    font-size: 14px;
+  }
+  .vr-week {
+    margin: 0 -4px;
+  }
+  .vr-times {
+    gap: 6px;
   }
   .vr-agree {
     grid-template-columns: minmax(0, 1fr);

@@ -57,8 +57,8 @@ const size = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.ma
   display: flex;
   align-items: center;
   gap: 14px;
-  min-height: 72px;
-  padding: 14px 16px;
+  min-height: 60px;
+  padding: 10px 14px;
   border: 1.5px dashed rgba(30, 27, 24, 0.2);
   border-radius: 16px;
   background: var(--paper, #faf8f4);
