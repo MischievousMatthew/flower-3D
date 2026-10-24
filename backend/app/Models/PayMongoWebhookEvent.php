@@ -10,6 +10,9 @@ class PayMongoWebhookEvent extends Model
 {
     use HasFactory;
 
+    // The migration's name; Laravel would otherwise look for "pay_mongo_webhook_events"
+    protected $table = 'paymongo_webhook_events';
+
     protected $fillable = [
         'event_id',
         'event_type',
