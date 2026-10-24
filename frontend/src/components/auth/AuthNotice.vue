@@ -142,7 +142,7 @@ const ICONS = {
 }
 .an-line {
   margin: 2px 0 0;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--ink-soft);
 }

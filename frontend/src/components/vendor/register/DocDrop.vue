@@ -28,7 +28,7 @@
       </template>
     </div>
     <input ref="input" type="file" class="dd-input" :name="field" :accept="accept" @change="$emit('change', $event)" />
-    <div v-if="error" class="error-message">{{ error }}</div>
+    <div class="error-message" aria-live="polite">{{ error }}</div>
   </div>
 </template>
 
@@ -57,8 +57,8 @@ const size = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.ma
   display: flex;
   align-items: center;
   gap: 14px;
-  min-height: 60px;
-  padding: 10px 14px;
+  height: 68px;
+  padding: 0 16px;
   border: 1.5px dashed rgba(30, 27, 24, 0.2);
   border-radius: 16px;
   background: var(--paper, #faf8f4);
@@ -151,9 +151,12 @@ const size = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.ma
 .dd-input {
   display: none;
 }
+/* One line kept free for the message so the layout stays put */
 .error-message {
-  margin-top: 6px;
+  min-height: calc(13px * 1.5);
+  margin-top: 4px;
   font-size: 13px;
+  line-height: 1.5;
   color: var(--rosewood-dark, #8e443a);
 }
 </style>

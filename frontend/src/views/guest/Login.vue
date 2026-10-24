@@ -344,7 +344,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .lg-slot {
   position: relative;
-  min-height: 70px;
+  min-height: 60px;
   margin-bottom: 14px;
 }
 .lg-fade-enter-active,

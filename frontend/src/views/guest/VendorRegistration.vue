@@ -82,12 +82,12 @@
           <div class="vr-field">
             <label class="vr-label" for="vr-store">Shop name</label>
             <input id="vr-store" v-model="formData.storeName" name="storeName" type="text" class="vr-input" :class="{ error: errors.storeName }" placeholder="e.g. Petal & Stem Flower Studio" maxlength="255" />
-            <p v-if="errors.storeName" class="vr-error">{{ errors.storeName }}</p>
+            <p class="vr-error" aria-live="polite">{{ errors.storeName }}</p>
           </div>
           <div class="vr-field">
             <label class="vr-label" for="vr-desc">Describe your shop <small>{{ formData.storeDescription.length }}/1000</small></label>
             <textarea id="vr-desc" v-model="formData.storeDescription" name="storeDescription" rows="4" maxlength="1000" class="vr-input" :class="{ error: errors.storeDescription }" placeholder="The flowers you love working with, how you arrange them, how you deliver…"></textarea>
-            <p v-if="errors.storeDescription" class="vr-error">{{ errors.storeDescription }}</p>
+            <p class="vr-error" aria-live="polite">{{ errors.storeDescription }}</p>
           </div>
         </section>
 
@@ -102,7 +102,7 @@
               <small>{{ STRUCTURE_LABELS[key].hint }}</small>
             </label>
           </div>
-          <p v-if="errors.businessType" class="vr-error">{{ errors.businessType }}</p>
+          <p class="vr-error" aria-live="polite">{{ errors.businessType }}</p>
         </section>
 
         <section class="vr-card">
@@ -119,7 +119,7 @@
             <p v-if="mapLoading" class="map-status">Loading the map of Cavite…</p>
           </div>
           <p class="vr-hint">Click or drag the pin onto your shop. It has to be inside Cavite; you can still edit the address text.</p>
-          <p v-if="errors.storeAddress" class="vr-error">{{ errors.storeAddress }}</p>
+          <p class="vr-error" aria-live="polite">{{ errors.storeAddress }}</p>
         </section>
 
         <section class="vr-card">
@@ -130,7 +130,7 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9" /></svg>{{ area.label }}
             </label>
           </div>
-          <p v-if="errors.serviceAreas" class="vr-error">{{ errors.serviceAreas }}</p>
+          <p class="vr-error" aria-live="polite">{{ errors.serviceAreas }}</p>
         </section>
 
         <section class="vr-card">
@@ -157,7 +157,7 @@
             <button type="button" @click="openOnly(daysOfWeek)">Every day</button>
             <button v-if="firstOpenDay && openDayCount > 1" type="button" @click="useHoursEverywhere(firstOpenDay)">Use {{ firstOpenDay }}'s hours for every open day</button>
           </div>
-          <p v-if="errors.operatingHours || errors.operating_schedules" class="vr-error">{{ errors.operatingHours || errors.operating_schedules }}</p>
+          <p class="vr-error" aria-live="polite">{{ errors.operatingHours || errors.operating_schedules }}</p>
         </section>
       </div>
 
@@ -174,22 +174,22 @@
             <div class="vr-field">
               <label class="vr-label" for="vr-owner">Full name</label>
               <input id="vr-owner" v-model="formData.ownerName" name="ownerName" type="text" autocomplete="name" class="vr-input" :class="{ error: errors.ownerName }" placeholder="As shown on your ID" />
-              <p v-if="errors.ownerName" class="vr-error">{{ errors.ownerName }}</p>
+              <p class="vr-error" aria-live="polite">{{ errors.ownerName }}</p>
             </div>
             <div class="vr-field">
               <label class="vr-label" for="vr-position">Role in the business</label>
               <input id="vr-position" v-model="formData.position" name="position" type="text" class="vr-input" :class="{ error: errors.position }" placeholder="Owner, manager, president…" />
-              <p v-if="errors.position" class="vr-error">{{ errors.position }}</p>
+              <p class="vr-error" aria-live="polite">{{ errors.position }}</p>
             </div>
             <div class="vr-field">
               <label class="vr-label" for="vr-phone">Mobile or landline</label>
               <input id="vr-phone" v-model="formData.contactNumber" name="contactNumber" type="tel" inputmode="tel" autocomplete="tel" class="vr-input" :class="{ error: errors.contactNumber }" placeholder="0917 123 4567" />
-              <p v-if="errors.contactNumber" class="vr-error">{{ errors.contactNumber }}</p>
+              <p class="vr-error" aria-live="polite">{{ errors.contactNumber }}</p>
             </div>
             <div class="vr-field">
               <label class="vr-label" for="vr-email">Email</label>
               <input id="vr-email" v-model="formData.email" name="email" type="email" autocomplete="email" class="vr-input" :class="{ error: errors.email }" placeholder="you@yourshop.com" />
-              <p v-if="errors.email" class="vr-error">{{ errors.email }}</p>
+              <p class="vr-error" aria-live="polite">{{ errors.email }}</p>
             </div>
           </div>
           <p class="vr-hint">Your sign-in details are sent to this email once you're approved.</p>
@@ -204,12 +204,12 @@
                 <option value="">Choose your ID</option>
                 <option v-for="(label, key) in GOVERNMENT_IDS" :key="key" :value="key">{{ label }}</option>
               </select>
-              <p v-if="errors.governmentIdType" class="vr-error">{{ errors.governmentIdType }}</p>
+              <p class="vr-error" aria-live="polite">{{ errors.governmentIdType }}</p>
             </div>
             <div class="vr-field">
               <label class="vr-label" for="vr-idno">ID number</label>
               <input id="vr-idno" v-model="formData.governmentIdNumber" name="governmentIdNumber" type="text" class="vr-input" :class="{ error: errors.governmentIdNumber }" placeholder="As printed on the ID" />
-              <p v-if="errors.governmentIdNumber" class="vr-error">{{ errors.governmentIdNumber }}</p>
+              <p class="vr-error" aria-live="polite">{{ errors.governmentIdNumber }}</p>
             </div>
           </div>
           <div class="vr-docs">
@@ -248,7 +248,7 @@
             <div class="vr-field">
               <label class="vr-label" for="vr-regno">{{ registration.numberLabel }}</label>
               <input id="vr-regno" v-model="formData[registration.field]" :name="registration.field" type="text" class="vr-input" :class="{ error: errors[registration.field] }" :placeholder="registration.example" />
-              <p v-if="errors[registration.field]" class="vr-error">{{ errors[registration.field] }}</p>
+              <p class="vr-error" aria-live="polite">{{ errors[registration.field] }}</p>
             </div>
           </div>
           <div class="vr-field">
@@ -263,7 +263,7 @@
             <label class="vr-label" for="vr-tin">Taxpayer Identification Number (TIN)</label>
             <input id="vr-tin" :value="formData.birTin" name="birTin" type="text" inputmode="numeric" class="vr-input vr-narrow" :class="{ error: errors.birTin }" placeholder="123-456-789-00000" @input="formData.birTin = formatTin($event.target.value); $event.target.value = formData.birTin" />
             <p v-if="errors.birTin" class="vr-error">{{ errors.birTin }}</p>
-            <p v-else class="vr-hint">9 digits, plus the branch code if your 2303 shows one.</p>
+            <p v-else class="vr-hint">9 digits, plus a branch code if you have one.</p>
           </div>
           <div class="vr-field">
             <span class="vr-label">Certificate of Registration (BIR Form 2303)</span>
@@ -277,7 +277,7 @@
             <div class="vr-field">
               <label class="vr-label" for="vr-permit">Permit number</label>
               <input id="vr-permit" v-model="formData.mayorPermitNumber" name="mayorPermitNumber" type="text" class="vr-input" :class="{ error: errors.mayorPermitNumber }" placeholder="As printed on the permit" />
-              <p v-if="errors.mayorPermitNumber" class="vr-error">{{ errors.mayorPermitNumber }}</p>
+              <p class="vr-error" aria-live="polite">{{ errors.mayorPermitNumber }}</p>
             </div>
             <div class="vr-field">
               <label class="vr-label" for="vr-valid">Valid until</label>
@@ -294,7 +294,7 @@
           <div class="vr-field">
             <label class="vr-label" for="vr-brgy">Clearance number</label>
             <input id="vr-brgy" v-model="formData.barangayClearanceNumber" name="barangayClearanceNumber" type="text" class="vr-input vr-narrow" :class="{ error: errors.barangayClearanceNumber }" placeholder="As printed on the clearance" />
-            <p v-if="errors.barangayClearanceNumber" class="vr-error">{{ errors.barangayClearanceNumber }}</p>
+            <p class="vr-error" aria-live="polite">{{ errors.barangayClearanceNumber }}</p>
           </div>
           <DocDrop field="barangay_clearance" label="your barangay clearance" :info="fileInfo.barangay_clearance" :over="!!dragOver.barangay_clearance" :error="errors.barangay_clearance" @change="handleFileUpload($event, 'barangay_clearance')" @drop="handleDrop($event, 'barangay_clearance')" @dragenter="handleDragEnter($event, 'barangay_clearance')" @dragover="handleDragOver($event, 'barangay_clearance')" @dragleave="handleDragLeave($event, 'barangay_clearance')" @remove="removeFile('barangay_clearance')" />
         </section>
@@ -313,14 +313,16 @@
             <div class="vr-agree-text">
               <b>{{ a.title }}</b>
               <small>{{ a.summary }}</small>
-              <button type="button" class="af-plain vr-small" @click="showModal(a.modal)">Read it</button>
+              <span class="vr-agree-foot">
+                <button type="button" class="af-plain vr-small" @click="showModal(a.modal)">Read it</button>
+                <span class="vr-error" aria-live="polite">{{ errors[a.field] }}</span>
+              </span>
             </div>
             <label class="vr-switch">
               <input v-model="formData[a.field]" type="checkbox" :name="a.field" />
               <span aria-hidden="true"></span>
               <em>{{ formData[a.field] ? "Accepted" : "I agree" }}</em>
             </label>
-            <p v-if="errors[a.field]" class="vr-error vr-agree-error">{{ errors[a.field] }}</p>
           </div>
         </section>
 
@@ -340,10 +342,10 @@
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
                   </button>
                 </figure>
-                <label class="vr-gallery-add" @dragover.prevent @drop.prevent="handleDrop($event, 'portfolio_photos')">
+                <label class="vr-gallery-add" aria-label="Add sample photos" @dragover.prevent @drop.prevent="handleDrop($event, 'portfolio_photos')">
                   <input ref="portfolio_photosInput" type="file" multiple accept=".jpg,.jpeg,.png,image/*" @change="handleFileUpload($event, 'portfolio_photos')" />
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-                  <span>Add photos</span>
+                  <span>Add</span>
                 </label>
               </div>
               <p class="vr-hint">Bouquets you've made. They show on your storefront.</p>
@@ -353,12 +355,12 @@
             <div class="vr-field">
               <label class="vr-label" for="vr-fb">Facebook page</label>
               <input id="vr-fb" v-model="formData.facebookPage" name="facebookPage" type="url" class="vr-input" :class="{ error: errors.facebookPage }" placeholder="https://facebook.com/yourshop" />
-              <p v-if="errors.facebookPage" class="vr-error">{{ errors.facebookPage }}</p>
+              <p class="vr-error" aria-live="polite">{{ errors.facebookPage }}</p>
             </div>
             <div class="vr-field">
               <label class="vr-label" for="vr-ig">Instagram</label>
               <input id="vr-ig" v-model="formData.instagramPage" name="instagramPage" type="url" class="vr-input" :class="{ error: errors.instagramPage }" placeholder="https://instagram.com/yourshop" />
-              <p v-if="errors.instagramPage" class="vr-error">{{ errors.instagramPage }}</p>
+              <p class="vr-error" aria-live="polite">{{ errors.instagramPage }}</p>
             </div>
           </div>
         </section>
@@ -400,7 +402,7 @@
           <input v-model="formData.confirmAccuracy" type="checkbox" name="confirmAccuracy" />
           <span>I confirm that everything in this application is true and complete, and that the documents are mine to share.</span>
         </label>
-        <p v-if="errors.confirmAccuracy" class="vr-error">{{ errors.confirmAccuracy }}</p>
+        <p class="vr-error" aria-live="polite">{{ errors.confirmAccuracy }}</p>
       </div>
 
       <!-- Moving between steps -->
@@ -1536,10 +1538,10 @@ const validateStep = (step) => {
         isValid = false;
       }
       if (formData.storeLatitude === null || formData.storeLongitude === null) {
-        errors.storeAddress = "Please pin your physical store location inside Cavite";
+        errors.storeAddress = "Pin your shop on the map, inside Cavite";
         isValid = false;
       } else if (!isInsideCavite({ lat: formData.storeLatitude, lng: formData.storeLongitude })) {
-        errors.storeAddress = "Your pinned store location must be inside Cavite";
+        errors.storeAddress = "The pin has to be inside Cavite";
         isValid = false;
       }
       // NEW: service area checkboxes
@@ -1577,7 +1579,7 @@ const validateStep = (step) => {
         errors.contactNumber = "Contact number is required";
         isValid = false;
       } else if (!phoneOk(formData.contactNumber)) {
-        errors.contactNumber = "Enter a Philippine number, like 0917 123 4567 or (046) 123 4567.";
+        errors.contactNumber = "Use a PH number, like 0917 123 4567";
         isValid = false;
       }
       if (!formData.governmentIdType) {
@@ -1617,15 +1619,15 @@ const validateStep = (step) => {
           isValid = false;
         }
       };
-      need(formData.registeredBusinessName.trim(), "registeredBusinessName", "Enter the business name exactly as it appears on your certificate");
-      need(String(formData[reg.field]).trim(), reg.field, `${reg.numberLabel} is required`);
-      need(hasSelectedFile("business_registration"), "business_registration", `Upload your ${reg.certificate}`);
+      need(formData.registeredBusinessName.trim(), "registeredBusinessName", "Registered business name is required");
+      need(String(formData[reg.field]).trim(), reg.field, "Registration number is required");
+      need(hasSelectedFile("business_registration"), "business_registration", "Upload the certificate");
       need(formData.birTin.trim(), "birTin", "TIN is required");
-      if (formData.birTin.trim()) need(tinOk(formData.birTin), "birTin", "Use your 9-digit TIN, with or without the branch code");
-      need(hasSelectedFile("bir_certificate"), "bir_certificate", "Upload your BIR Certificate of Registration (Form 2303)");
+      if (formData.birTin.trim()) need(tinOk(formData.birTin), "birTin", "Enter your 9-digit TIN");
+      need(hasSelectedFile("bir_certificate"), "bir_certificate", "Upload your BIR Form 2303");
       need(formData.mayorPermitNumber.trim(), "mayorPermitNumber", "Permit number is required");
       need(formData.mayorPermitValidUntil, "mayorPermitValidUntil", "Enter the date the permit is valid until");
-      if (formData.mayorPermitValidUntil) need(formData.mayorPermitValidUntil >= todayYmd, "mayorPermitValidUntil", "This permit has expired. Renew it, then upload the new one");
+      if (formData.mayorPermitValidUntil) need(formData.mayorPermitValidUntil >= todayYmd, "mayorPermitValidUntil", "Expired. Upload your renewed permit");
       need(hasSelectedFile("mayor_permit"), "mayor_permit", "Upload your Mayor's / Business Permit");
       need(formData.barangayClearanceNumber.trim(), "barangayClearanceNumber", "Clearance number is required");
       need(hasSelectedFile("barangay_clearance"), "barangay_clearance", "Upload your Barangay Business Clearance");
@@ -1634,15 +1636,15 @@ const validateStep = (step) => {
 
     case 4:
       if (!formData.acceptTerms) {
-        errors.acceptTerms = "You must accept the Terms & Conditions";
+        errors.acceptTerms = "Accept to continue";
         isValid = false;
       }
       if (!formData.acceptVendorAgreement) {
-        errors.acceptVendorAgreement = "You must accept the Vendor Agreement";
+        errors.acceptVendorAgreement = "Accept to continue";
         isValid = false;
       }
       if (!formData.acceptDataPrivacy) {
-        errors.acceptDataPrivacy = "You must accept the Data Privacy Policy";
+        errors.acceptDataPrivacy = "Accept to continue";
         isValid = false;
       }
       break;
@@ -2148,8 +2150,8 @@ onUnmounted(() => {
 
 /* Cards */
 .vr-card {
-  margin-bottom: 14px;
-  padding: 20px 22px;
+  margin-bottom: 16px;
+  padding: 22px 24px;
   border: 1px solid var(--line-soft);
   border-radius: 20px;
   background: #fff;
@@ -2194,13 +2196,13 @@ onUnmounted(() => {
 .vr-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px 16px;
+  gap: 8px 18px;
 }
 .vr-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
+  gap: 7px;
+  margin-bottom: 8px;
 }
 .vr-grid .vr-field {
   margin-bottom: 0;
@@ -2216,7 +2218,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--ink);
 }
@@ -2225,19 +2227,21 @@ onUnmounted(() => {
   font-variant-numeric: tabular-nums;
   color: var(--ink-soft);
 }
+/* One size for every box on the form */
 .vr-input {
   width: 100%;
-  min-height: 44px;
+  height: 48px;
   padding: 0 14px;
   border: 1px solid var(--line);
-  border-radius: 11px;
+  border-radius: 12px;
   background: var(--paper);
-  font: 400 14.5px/1.4 var(--font-sans);
+  font: 400 15px/1.4 var(--font-sans);
   color: var(--ink);
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
 textarea.vr-input {
-  padding: 11px 14px;
+  height: auto;
+  padding: 12px 14px;
   resize: vertical;
 }
 select.vr-input {
@@ -2265,10 +2269,12 @@ select.vr-input {
   line-height: 1.5;
   color: var(--ink-soft);
 }
+/* Always rendered with one line reserved, so a message never pushes the form down */
 .vr-error {
+  min-height: calc(13px * 1.5);
   margin: 0;
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
   color: #b4413a;
 }
 .vr-small {
@@ -2360,7 +2366,7 @@ select.vr-input {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 40px;
+  height: 48px;
   padding: 0 18px;
   border: 1.5px solid var(--line);
   border-radius: 999px;
@@ -2410,8 +2416,8 @@ select.vr-input {
   display: flex;
   align-items: center;
   gap: 14px;
-  min-height: 54px;
-  padding: 6px 16px;
+  min-height: 64px;
+  padding: 8px 16px;
   background: #fff;
 }
 .vr-dayrow + .vr-dayrow {
@@ -2441,9 +2447,7 @@ select.vr-input {
   color: var(--ink-soft);
 }
 .vr-time {
-  min-height: 40px;
-  max-width: 150px;
-  padding: 0 10px;
+  max-width: 170px;
 }
 .vr-closed {
   font-size: 14px;
@@ -2473,8 +2477,8 @@ select.vr-input {
 /* Document tiles */
 .vr-docs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
 }
 .vr-docs.two {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -2485,29 +2489,19 @@ select.vr-input {
   gap: 7px;
   min-width: 0;
 }
-.vr-docs :deep(.dd-zone) {
-  flex-direction: column;
-  align-items: flex-start;
-  min-height: 108px;
-}
-.vr-docs :deep(.dd-zone.has) {
-  flex-direction: row;
-  align-items: center;
-  min-height: 60px;
-}
 
 /* Sample photos */
 .vr-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, 68px);
+  gap: 10px;
 }
 .vr-gallery figure {
   position: relative;
   margin: 0;
   aspect-ratio: 1;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: 16px;
   background: var(--ivory);
 }
 .vr-gallery img {
@@ -2545,9 +2539,9 @@ select.vr-input {
   gap: 4px;
   aspect-ratio: 1;
   border: 1.5px dashed rgba(30, 27, 24, 0.2);
-  border-radius: 12px;
+  border-radius: 16px;
   background: var(--paper);
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--ink-soft);
   cursor: pointer;
 }
@@ -2600,8 +2594,14 @@ select.vr-input {
   font-size: 13px;
   color: var(--ink-soft);
 }
-.vr-agree-error {
-  grid-column: 1 / -1;
+.vr-agree-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+}
+.vr-agree-foot .vr-error {
+  min-height: 0;
 }
 .vr-switch {
   display: inline-flex;
@@ -2961,11 +2961,6 @@ select.vr-input {
 @media (max-width: 1100px) {
   .vr-docs {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .vr-docs :deep(.dd-zone) {
-    flex-direction: row;
-    align-items: center;
-    min-height: 72px;
   }
   .vr-step-name {
     font-size: 12.5px;

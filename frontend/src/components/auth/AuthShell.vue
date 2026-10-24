@@ -165,7 +165,7 @@ const flower = pickFlower();
 }
 .as-col {
   width: 100%;
-  max-width: 500px;
+  max-width: 420px;
   margin: auto 0;
   padding-top: 40px;
 }
@@ -177,12 +177,12 @@ const flower = pickFlower();
 }
 .as-title {
   margin: 0 0 12px;
-  font-size: clamp(42px, 4.4vw, 58px);
+  font-size: clamp(34px, 3.2vw, 44px);
 }
 .as-lead {
-  margin: 0 0 34px;
+  margin: 0 0 24px;
   max-width: 46ch;
-  font-size: 16px;
+  font-size: 14.5px;
   line-height: 1.65;
   color: var(--ink-soft);
 }
