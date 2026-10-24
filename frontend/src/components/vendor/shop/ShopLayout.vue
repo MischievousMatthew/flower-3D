@@ -4,7 +4,9 @@
     <!-- The header sits inside the content column so the fixed sidebar never covers it -->
     <vendorHeader v-if="!embedded" :title="title" />
     <main :class="{ 'sl-main': !embedded }">
-      <nav class="sl-tabs" :aria-label="NAV_LABEL[section] ?? 'Shop and product management'">
+      <div class="sl-tabs-wrap" :class="{ 'fade-l': canLeft, 'fade-r': canRight }">
+      <button v-if="canLeft" type="button" class="sl-tabs-arrow left" aria-label="Show earlier tabs" @click="scrollByPage(-1)"><span v-html="ICONS.chevronLeft"></span></button>
+      <nav ref="strip" class="sl-tabs" :aria-label="NAV_LABEL[section] ?? 'Shop and product management'">
         <template v-for="t in tabs" :key="t.name">
           <!-- A tab outside the plan says which plan it needs instead of navigating -->
           <button v-if="locked(t.module)" type="button" class="sl-tab locked" :title="upgradeText(t.module)" @click="toast.info(upgradeText(t.module))">
@@ -18,6 +20,8 @@
           </router-link>
         </template>
       </nav>
+      <button v-if="canRight" type="button" class="sl-tabs-arrow right" aria-label="Show more tabs" @click="scrollByPage(1)"><span v-html="ICONS.chevronRight"></span></button>
+      </div>
 
       <header v-if="!embedded" class="sl-head">
         <div>
@@ -40,6 +44,7 @@ import VendorSidebar from "../../../layouts/Sidebar/VendorSidebar.vue";
 import { toast } from "vue3-toastify";
 import { subscriptionUpgradeMessage, useSubscriptionAccess } from "../../../composables/useSubscriptionAccess";
 import { SHOP_ICONS as ICONS } from "./shopIcons";
+import { useTabScroller } from "./useTabScroller";
 
 const props = defineProps({
   // Which group of tabs to show: shop, orders, finance, staff, crm or account
@@ -51,6 +56,7 @@ const props = defineProps({
 });
 
 const route = useRoute();
+const { strip, canLeft, canRight, scrollByPage } = useTabScroller();
 const { subscriptionAccess, loadSubscriptionAccess, subscriptionAllowsModule } = useSubscriptionAccess();
 
 const TABS = [
@@ -147,6 +153,7 @@ onBeforeUnmount(() => root.value?.removeEventListener("error", onImageError, tru
   margin-bottom: 18px;
 }
 .sl-tabs {
+  position: relative;
   display: flex;
   gap: 4px;
   padding: 5px;
@@ -156,6 +163,57 @@ onBeforeUnmount(() => root.value?.removeEventListener("error", onImageError, tru
   border: 1px solid var(--v-border-strong);
   border-radius: 14px;
   scrollbar-width: none;
+}
+.sl-tabs-wrap {
+  position: relative;
+  margin-bottom: 22px;
+}
+.sl-tabs-wrap .sl-tabs {
+  margin-bottom: 0;
+}
+/* Faded edges where tabs are cut off */
+.sl-tabs-wrap.fade-l .sl-tabs {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 64px);
+  mask-image: linear-gradient(to right, transparent 0, #000 64px);
+}
+.sl-tabs-wrap.fade-r .sl-tabs {
+  -webkit-mask-image: linear-gradient(to left, transparent 0, #000 64px);
+  mask-image: linear-gradient(to left, transparent 0, #000 64px);
+}
+.sl-tabs-wrap.fade-l.fade-r .sl-tabs {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 64px, #000 calc(100% - 64px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 64px, #000 calc(100% - 64px), transparent 100%);
+}
+.sl-tabs-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--v-border-strong);
+  border-radius: 50%;
+  background: var(--v-raised);
+  color: var(--v-text-2);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color 0.15s, border-color 0.15s;
+}
+.sl-tabs-arrow:hover {
+  border-color: var(--bc-accent);
+  color: var(--bc-accent);
+}
+.sl-tabs-arrow.left {
+  left: -10px;
+}
+.sl-tabs-arrow.right {
+  right: -10px;
+}
+.sl-tabs-arrow :deep(svg) {
+  width: 16px;
+  height: 16px;
 }
 .sl-tabs::-webkit-scrollbar {
   display: none;

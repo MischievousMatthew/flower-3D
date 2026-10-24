@@ -1,10 +1,14 @@
 <template>
   <div class="hp">
-    <nav v-if="tabs.length" class="hp-tabs" aria-label="Employees">
+    <div v-if="tabs.length" class="hp-tabs-wrap" :class="{ 'fade-l': canLeft, 'fade-r': canRight }">
+    <button v-if="canLeft" type="button" class="hp-tabs-arrow left" aria-label="Show earlier tabs" @click="scrollByPage(-1)"><span v-html="ICONS.chevronLeft"></span></button>
+    <nav ref="strip" class="hp-tabs" aria-label="Sections">
       <router-link v-for="t in tabs" :key="t.name" :to="{ name: t.name }" class="hp-tab" :class="{ on: route.name === t.name }" :aria-current="route.name === t.name ? 'page' : undefined">
         <span class="hp-tab-icon" v-html="ICONS[t.icon]"></span>{{ t.label }}
       </router-link>
     </nav>
+    <button v-if="canRight" type="button" class="hp-tabs-arrow right" aria-label="Show more tabs" @click="scrollByPage(1)"><span v-html="ICONS.chevronRight"></span></button>
+    </div>
 
     <header class="hp-head">
       <div>
@@ -23,6 +27,7 @@
 // Colors come from the --v-* tokens, so the page follows the ERP light/dark switch.
 import { useRoute } from "vue-router";
 import { SHOP_ICONS as ICONS } from "../vendor/shop/shopIcons";
+import { useTabScroller } from "../vendor/shop/useTabScroller";
 import "../vendor/shop/shop.css";
 import "../vendor/staff/staff.css";
 
@@ -33,6 +38,7 @@ defineProps({
 });
 
 const route = useRoute();
+const { strip, canLeft, canRight, scrollByPage } = useTabScroller();
 </script>
 
 <style scoped>
@@ -43,6 +49,7 @@ const route = useRoute();
   color: var(--v-text);
 }
 .hp-tabs {
+  position: relative;
   display: flex;
   gap: 4px;
   width: fit-content;
@@ -54,6 +61,62 @@ const route = useRoute();
   border: 1px solid var(--v-border-strong);
   border-radius: 14px;
   scrollbar-width: none;
+}
+.hp-tabs-wrap {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 22px;
+}
+.hp-tabs-wrap .hp-tabs {
+  margin-bottom: 0;
+}
+/* Faded edges where tabs are cut off */
+.hp-tabs-wrap.fade-l .hp-tabs {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 64px);
+  mask-image: linear-gradient(to right, transparent 0, #000 64px);
+}
+.hp-tabs-wrap.fade-r .hp-tabs {
+  -webkit-mask-image: linear-gradient(to left, transparent 0, #000 64px);
+  mask-image: linear-gradient(to left, transparent 0, #000 64px);
+}
+.hp-tabs-wrap.fade-l.fade-r .hp-tabs {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 64px, #000 calc(100% - 64px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 64px, #000 calc(100% - 64px), transparent 100%);
+}
+.hp-tabs-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--v-border-strong);
+  border-radius: 50%;
+  background: var(--v-raised);
+  color: var(--v-text-2);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color 0.15s, border-color 0.15s;
+}
+.hp-tabs-arrow:hover {
+  border-color: var(--bc-accent);
+  color: var(--bc-accent);
+}
+.hp-tabs-arrow.left {
+  left: -10px;
+}
+.hp-tabs-arrow.right {
+  right: -10px;
+}
+.hp-tabs-arrow :deep(svg) {
+  width: 16px;
+  height: 16px;
+}
+.hp-tabs::-webkit-scrollbar {
+  display: none;
 }
 .hp-tab {
   flex: none;
