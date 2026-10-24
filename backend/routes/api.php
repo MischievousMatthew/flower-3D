@@ -647,6 +647,8 @@ Route::middleware('token.auth')->group(function () {
         Route::post('/', [EmployeeInfoController::class, 'store'])->middleware('employee.module:employees,create');
         Route::put('/{id}', [EmployeeInfoController::class, 'update'])->middleware('employee.module:employees,edit');
         Route::patch('/{id}/status', [EmployeeInfoController::class, 'updateStatus'])->middleware('employee.module:employees,edit');
+        Route::post('/{id}/photo', [EmployeeInfoController::class, 'updatePhoto'])->whereNumber('id')->middleware('employee.module:employees,edit');
+        Route::delete('/{id}/photo', [EmployeeInfoController::class, 'removePhoto'])->whereNumber('id')->middleware('employee.module:employees,edit');
         Route::delete('/{id}', [EmployeeInfoController::class, 'destroy'])->middleware('employee.module:employees,delete');
     });
 

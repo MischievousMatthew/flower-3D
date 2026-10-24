@@ -50,7 +50,8 @@ export const ERP_NAV = (() => {
       key: mod.key,
       label: mod.label,
       icon: ICON_FOR[mod.icon] ?? "grid",
-      path: mod.path,
+      // A module with sub-pages has no page of its own, so open its first one
+      path: mod.children?.[0]?.path ?? mod.path,
       paths: [mod.path, ...(mod.children ?? []).map((c) => c.path), ...(EXTRA_PATHS[mod.key] ?? [])],
     });
   }

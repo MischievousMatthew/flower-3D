@@ -123,10 +123,15 @@
         <aside v-if="selected" class="sp-drawer" role="dialog" aria-modal="true" aria-labelledby="pf-title">
           <div class="sp-drawer-head">
             <div class="st-person">
-              <span class="st-avatar pf-avatar-lg" :style="{ background: personColor(selected.full_name) }">
-                <img v-if="selected.avatar_url" :src="selected.avatar_url" alt="" />
-                <template v-else>{{ initialsOf(selected.full_name) }}</template>
-              </span>
+              <EmployeePhoto
+                :profile-id="selected.id"
+                :src="selected.avatar_url || ''"
+                :name="selected.full_name"
+                :color="personColor(selected.full_name)"
+                :size="56"
+                :can-edit="canEdit"
+                @update:src="photoChanged(selected.id, $event)"
+              />
               <div>
                 <h3 id="pf-title">{{ selected.full_name }}</h3>
                 <p>{{ [selected.position, selected.department].filter(Boolean).join(" · ") }}</p>
@@ -429,6 +434,7 @@ import { useAssignment } from "../../../../composables/useAssignment";
 import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcons";
 import { formatDate, money, ymd } from "../../../../components/vendor/finance/financeUi";
 import { personColor, time12 } from "../../../../components/vendor/staff/staffUi";
+import EmployeePhoto from "../../../../components/hr/EmployeePhoto.vue";
 import { buildMultipartFormData, getSelectedFile, readImagePreview, validateImageFile } from "../../../../utils/imageUpload";
 import {
   CONTACT_FIELDS, DAYS, EMERGENCY_FIELDS, EMPLOYEE_TABS, EMPLOYMENT_STATUSES, JOB_FIELDS, PER, PERSONAL_FIELDS, PROFILE_KEYS,
@@ -466,6 +472,13 @@ const search = ref("");
 const filters = reactive({ status: "", department: "", location: "" });
 const menuId = ref(null);
 const selected = ref(null);
+
+/** Keeps the list and the open profile in step after a photo change */
+function photoChanged(id, url) {
+  const row = employees.value?.find((e) => e.id === id);
+  if (row) row.avatar_url = url || null;
+  if (selected.value?.id === id) selected.value = { ...selected.value, avatar_url: url || null };
+}
 const detailTab = ref("profile");
 const form = ref(null);
 const errors = reactive({});

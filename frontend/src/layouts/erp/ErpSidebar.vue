@@ -107,7 +107,10 @@ const shopInitials = computed(() => {
   const words = shopName.value.split(/\s+/).filter((w) => /\w/.test(w));
   return (words.length >= 2 ? `${words[0][0]}${words[1][0]}` : shopName.value.slice(0, 1)).toUpperCase() || "B";
 });
-const logoUrl = computed(() => (isOwner.value && !logoFailed.value ? vendorProfile.value?.store_logo_url?.trim() || "" : ""));
+const logoUrl = computed(() => {
+  if (logoFailed.value) return "";
+  return (isOwner.value ? vendorProfile.value?.store_logo_url : user.value?.shop_logo)?.trim() || "";
+});
 
 const isLocked = (key) => subscriptionAccess.value !== null && !subscriptionAllowsModule(subscriptionAccess.value, key);
 const badgeFor = (key) => (key === "crm" ? unreadChatCount.value : key === "sc_orders" ? scOrdersBadgeCount.value : 0);

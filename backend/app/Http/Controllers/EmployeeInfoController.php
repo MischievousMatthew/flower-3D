@@ -654,6 +654,49 @@ class EmployeeInfoController extends Controller
         }
     }
 
+    /** POST /employees-info/{id}/photo {photo} — set or replace the profile picture */
+    public function updatePhoto(Request $request, int $id): JsonResponse
+    {
+        if (! $this->canManageProfiles($request->user())) {
+            return response()->json(['success' => false, 'message' => 'You can\'t change profile photos.'], 403);
+        }
+        $request->validate(['photo' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120'], [
+            'photo.max' => 'Choose a photo under 5 MB.',
+            'photo.image' => 'Choose a JPG, PNG or WebP picture.',
+            'photo.mimes' => 'Choose a JPG, PNG or WebP picture.',
+        ]);
+
+        $profile = EmployeeInfo::forOwner($this->getOwnerId())->findOrFail($id);
+        $result = CloudinaryHelper::uploadImage($request->file('photo'), 'avatars');
+        if (empty($result['public_id'])) {
+            return response()->json(['success' => false, 'message' => 'The photo couldn\'t be uploaded. Try again.'], 502);
+        }
+
+        $previous = $profile->avatar;
+        $profile->update(['avatar' => $result['public_id']]);
+        if ($previous && ! str_starts_with($previous, 'http') && $previous !== $result['public_id']) {
+            CloudinaryHelper::destroy($previous);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Photo saved.', 'data' => ['avatar_url' => $profile->avatar_url]]);
+    }
+
+    /** DELETE /employees-info/{id}/photo — back to initials */
+    public function removePhoto(Request $request, int $id): JsonResponse
+    {
+        if (! $this->canManageProfiles($request->user())) {
+            return response()->json(['success' => false, 'message' => 'You can\'t change profile photos.'], 403);
+        }
+        $profile = EmployeeInfo::forOwner($this->getOwnerId())->findOrFail($id);
+        $previous = $profile->avatar;
+        $profile->update(['avatar' => null]);
+        if ($previous && ! str_starts_with($previous, 'http')) {
+            CloudinaryHelper::destroy($previous);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Photo removed.', 'data' => ['avatar_url' => null]]);
+    }
+
     /**
      * Update only the employment status of an employee.
      */

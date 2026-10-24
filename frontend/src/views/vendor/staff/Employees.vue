@@ -278,10 +278,15 @@
         <aside v-if="profile" class="sp-drawer" role="dialog" aria-modal="true" aria-labelledby="pf-title">
           <div class="sp-drawer-head">
             <div class="st-person">
-              <span class="st-avatar" :style="{ background: personColor(profile.name) }">
-                <img v-if="profile.avatar" :src="profile.avatar" alt="" />
-                <template v-else>{{ profile.initials }}</template>
-              </span>
+              <EmployeePhoto
+                :profile-id="profile.id"
+                :src="profile.avatar || ''"
+                :name="profile.name"
+                :color="personColor(profile.name)"
+                :size="52"
+                :can-edit="!!data?.hr_available"
+                @update:src="photoChanged(profile.id, $event)"
+              />
               <div>
                 <h3 id="pf-title">{{ profile.name }}</h3>
                 <p>{{ [...new Set([profile.position, profile.department].filter(Boolean))].join(" · ") || "No position set" }}</p>
@@ -366,6 +371,20 @@
 
           <div class="sp-drawer-body">
             <h4 class="st-section-title first">Personal</h4>
+            <div class="em-photo-row">
+              <EmployeePhoto
+                :profile-id="pform.id || null"
+                :src="pform.avatar_url || ''"
+                :name="[pform.first_name, pform.last_name].filter(Boolean).join(' ') || 'New employee'"
+                :color="personColor(pform.first_name || 'New')"
+                :size="64"
+                can-edit
+                with-actions
+                @update:src="pform.avatar_url = $event; photoChanged(pform.id, $event)"
+                @file="pendingPhoto = $event"
+              />
+              <small>A clear face photo helps everyone recognise them. JPG, PNG or WebP, up to 5 MB.</small>
+            </div>
             <div class="sp-grid-2">
               <label v-for="f in PERSONAL" :key="f.key" class="sp-field" :class="{ 'sp-span-all': f.wide }">
                 <span>{{ f.label }} <small v-if="f.optional">(optional)</small></span>
@@ -504,6 +523,8 @@ import { useRoute } from "vue-router";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
 import employeeInfoService from "../../../services/employeeInfoService";
+import EmployeePhoto from "../../../components/hr/EmployeePhoto.vue";
+import { uploadPhoto } from "../../../components/hr/employeePhotoApi";
 import EmployeeDocuments from "../../../components/hr/EmployeeDocuments.vue";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
@@ -652,7 +673,18 @@ function closeProfile() {
 }
 
 
+// A photo chosen while adding someone; it uploads once the profile exists
+const pendingPhoto = ref(null);
+
+/** Keeps the list and the open profile in step after a photo change */
+function photoChanged(id, url) {
+  const row = data.value?.profiles?.find((p) => p.id === id);
+  if (row) row.avatar = url || null;
+  if (profile.value?.id === id) profile.value = { ...profile.value, avatar: url || null };
+}
+
 function openProfileForm(source = null, prefill = {}) {
+  pendingPhoto.value = null;
   Object.keys(perrors).forEach((k) => delete perrors[k]);
   pformError.value = "";
   const blank = Object.fromEntries(PROFILE_KEYS.map((k) => [k, ""]));
@@ -660,6 +692,7 @@ function openProfileForm(source = null, prefill = {}) {
   if (source) {
     for (const k of PROFILE_KEYS) f[k] = source[k] ?? "";
     f.id = source.id;
+    f.avatar_url = source.avatar_url || "";
     f.original = source.full_name;
     f.date_of_birth = day10(source.date_of_birth);
     f.date_hired = day10(source.date_hired);
@@ -714,6 +747,10 @@ async function saveProfile() {
   try {
     const res = f.id ? await employeeInfoService.update(f.id, body) : await employeeInfoService.create(body);
     toast.success(f.id ? "Profile saved." : "Profile added. HR can see it in the ERP.");
+    if (!f.id && pendingPhoto.value && res.data?.id) {
+      await uploadPhoto(res.data.id, pendingPhoto.value).catch((err) => toast.error(`${err.message} You can add it from the profile.`));
+      pendingPhoto.value = null;
+    }
     pform.value = null;
     await load();
     const saved = data.value?.profiles.find((p) => p.id === (res.data?.id ?? f.id));
@@ -731,6 +768,20 @@ onMounted(load);
 </script>
 
 <style scoped>
+.em-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px dashed var(--v-border-strong);
+  border-radius: 14px;
+}
+.em-photo-row small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--v-muted);
+}
 .em-toolbar {
   display: flex;
   align-items: center;

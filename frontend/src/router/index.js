@@ -766,6 +766,7 @@ const routes = [
           {
             path: "employees",
             name: "Employees",
+            redirect: { name: "EmployeeDirectory" },
             // erpTheme: these pages follow the ERP light/dark switch
             meta: { subscriptionModule: MODULE.EMPLOYEES, erpTheme: true },
             children: [
@@ -792,6 +793,7 @@ const routes = [
           {
             path: "attendance",
             name: "Attendance",
+            redirect: { name: "AttendanceLogs" },
             meta: { subscriptionModule: MODULE.ATTENDANCE, erpTheme: true },
             children: [
               {
@@ -820,6 +822,7 @@ const routes = [
           {
             path: "payroll",
             name: "Payroll",
+            redirect: { name: "PayrollList" },
             meta: { subscriptionModule: MODULE.PAYROLL, erpTheme: true },
             children: [
               {
