@@ -82,6 +82,69 @@ export const ERP_MODULES = [
       "Provides an overview of the company's financial activities, transactions, and important financial information.",
   },
   {
+    key: "sales_revenue",
+    label: "Sales & Revenue",
+    icon: "sales",
+    group: "Finance",
+    path: "/erp/finance/sales",
+    description:
+      "Shows completed and cancelled orders, sales by date, product and order, gross sales, discounts and refunds, and cash-on-delivery against e-wallet sales.",
+  },
+  {
+    key: "payments",
+    label: "Payments",
+    icon: "payments",
+    group: "Finance",
+    path: "/erp/finance/payments",
+    description:
+      "Shows PayMongo and cash-on-delivery payments with their status and fees, matches them against orders and the books, and records cash-on-delivery collections and settlements.",
+  },
+  {
+    key: "expenses",
+    label: "Expenses",
+    icon: "expenses",
+    group: "Finance",
+    path: "/erp/finance/expenses",
+    description:
+      "Records flowers, supplies, packaging, delivery, utilities, rent and other costs by category, with receipts and documents attached.",
+  },
+  {
+    key: "profit_loss",
+    label: "Profit & Loss",
+    icon: "profit",
+    group: "Finance",
+    path: "/erp/finance/profit-loss",
+    description:
+      "Compares revenue against costs with gross and operating profit, month by month and year by year, counting flower costs, packaging, payment fees and recorded expenses.",
+  },
+  {
+    key: "refunds",
+    label: "Refunds",
+    icon: "refunds",
+    group: "Finance",
+    path: "/erp/finance/refunds",
+    description:
+      "Tracks refund requests from request to completion with their orders and payments, records refunds as sent, and reconciles them with the books.",
+  },
+  {
+    key: "financial_reports",
+    label: "Reports",
+    icon: "reports",
+    group: "Finance",
+    path: "/erp/finance/reports",
+    description:
+      "Daily to yearly sales, expense reports, profit and loss statements, payment and refund summaries, and tax summaries, downloadable as CSV or PDF.",
+  },
+  {
+    key: "subscription_billing",
+    label: "Subscription & Billing",
+    icon: "billing",
+    group: "Finance",
+    path: "/erp/finance/subscription",
+    description:
+      "Shows the BloomCraft plan of the shop, renewal and trial dates, subscription charges, failed payments and invoices. Read-only.",
+  },
+  {
     key: "funding_requests",
     label: "Funding Requests",
     icon: "funding",
@@ -224,6 +287,13 @@ export const MODULE_PERMISSIONS = {
   payroll: ["view", "create", "delete", "approve"],
   leave_management: ["view", "create", "edit", "approve", "reject", "delete"],
   finance_dashboard: ["view"],
+  sales_revenue: ["view"],
+  payments: ["view", "edit"],
+  expenses: ["view", "create", "edit", "delete"],
+  profit_loss: ["view"],
+  refunds: ["view", "edit"],
+  financial_reports: ["view", "export"],
+  subscription_billing: ["view"],
   funding_requests: ["view", "approve", "reject"],
   payroll_requests: ["view", "edit", "approve", "reject"],
   crm: ["view", "create"],

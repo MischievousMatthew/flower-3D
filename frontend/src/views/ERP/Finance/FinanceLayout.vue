@@ -44,6 +44,7 @@
             </router-link>
           </div>
         </div>
+        <ErpThemeToggle v-if="themed" />
       </div>
       <div class="page-container">
         <router-view />
@@ -56,9 +57,12 @@
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRoute } from "vue-router";
 import DynamicSidebar from "../../../layouts/Sidebar/DynamicSidebar.vue";
+import ErpThemeToggle from "../../../components/hr/ErpThemeToggle.vue";
 import { useSidebarState } from "../../../composables/useSidebarState";
 
 const route = useRoute();
+// Pages built for light and dark mode (route meta.erpTheme) show the switch
+const themed = computed(() => route.matched.some((r) => r.meta?.erpTheme === true));
 const { isCollapsed, toggleMobile } = useSidebarState();
 
 const width = ref(window.innerWidth);
@@ -99,6 +103,8 @@ const currentPage = computed(() => {
 
 .main-content {
   flex: 1;
+  /* Lets wide tables scroll inside their card instead of widening the page */
+  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -107,10 +113,34 @@ const currentPage = computed(() => {
 }
 
 .top-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   background: #fff;
   border-bottom: 1px solid #e2e8f0;
   padding: 18px 32px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* Dark mode (only on pages with meta.erpTheme; light stays as it was) */
+html[data-vendor-theme="dark"] .finance-layout,
+html[data-vendor-theme="dark"] .main-content {
+  background: var(--v-bg);
+}
+html[data-vendor-theme="dark"] .top-section {
+  background: var(--v-surface);
+  border-bottom-color: var(--v-border);
+  box-shadow: none;
+}
+html[data-vendor-theme="dark"] .breadcrumbs,
+html[data-vendor-theme="dark"] .breadcrumbs a,
+html[data-vendor-theme="dark"] .mobile-toggle {
+  color: var(--v-text-2);
+}
+html[data-vendor-theme="dark"] .mobile-toggle:hover {
+  background: var(--v-subtle);
+  color: var(--v-text);
 }
 
 .header-left {

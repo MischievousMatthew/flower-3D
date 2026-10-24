@@ -130,21 +130,21 @@ const currentPage = computed(() => {
 }
 
 /* Dark mode (only on pages with meta.erpTheme; light stays as it was) */
-:global(html[data-vendor-theme="dark"]) .hr-layout,
-:global(html[data-vendor-theme="dark"]) .main-content {
+html[data-vendor-theme="dark"] .hr-layout,
+html[data-vendor-theme="dark"] .main-content {
   background: var(--v-bg);
 }
-:global(html[data-vendor-theme="dark"]) .top-section {
+html[data-vendor-theme="dark"] .top-section {
   background: var(--v-surface);
   border-bottom-color: var(--v-border);
   box-shadow: none;
 }
-:global(html[data-vendor-theme="dark"]) .breadcrumbs,
-:global(html[data-vendor-theme="dark"]) .breadcrumbs a,
-:global(html[data-vendor-theme="dark"]) .mobile-toggle {
+html[data-vendor-theme="dark"] .breadcrumbs,
+html[data-vendor-theme="dark"] .breadcrumbs a,
+html[data-vendor-theme="dark"] .mobile-toggle {
   color: var(--v-text-2);
 }
-:global(html[data-vendor-theme="dark"]) .mobile-toggle:hover {
+html[data-vendor-theme="dark"] .mobile-toggle:hover {
   background: var(--v-subtle);
   color: var(--v-text);
 }

@@ -64,6 +64,11 @@ use App\Http\Controllers\OrderRequestController;
 use App\Http\Controllers\CustomerReturnCaseController;
 use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\VendorBooksController;
+use App\Http\Controllers\SalesRevenueController;
+use App\Http\Controllers\PaymentsController;
+use App\Http\Controllers\RefundsController;
+use App\Http\Controllers\FinancialReportsController;
+use App\Services\FinancialReportsService;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\VendorCrmController;
 use App\Http\Controllers\CustomerInquiryController;
@@ -502,10 +507,23 @@ Route::middleware('token.auth')->group(function () {
             Route::post('/expenses',             [VendorBooksController::class, 'storeExpense']);
             Route::post('/expenses/{id}',        [VendorBooksController::class, 'updateExpense'])->whereNumber('id');
             Route::delete('/expenses/{id}',      [VendorBooksController::class, 'destroyExpense'])->whereNumber('id');
+            Route::get('/expenses/{id}/files/{fileId}/link', [VendorBooksController::class, 'expenseFileLink'])->whereNumber(['id', 'fileId']);
+            Route::get('/dashboard',             [VendorBooksController::class, 'dashboard']);
+            Route::get('/sales',                 [SalesRevenueController::class, 'summary']);
+            Route::get('/sales/orders',          [SalesRevenueController::class, 'orders']);
+            Route::get('/payments',              [PaymentsController::class, 'index']);
+            Route::post('/payments/cod/settle',  [PaymentsController::class, 'settle']);
+            Route::post('/payments/cod/{orderId}/collect', [PaymentsController::class, 'collect'])->whereNumber('orderId');
+            Route::delete('/payments/cod/{orderId}',       [PaymentsController::class, 'undo'])->whereNumber('orderId');
             Route::get('/profit-loss',           [VendorBooksController::class, 'profitLoss']);
             Route::get('/reports',               [VendorBooksController::class, 'reports']);
             Route::get('/reports/export',        [VendorBooksController::class, 'exportReport']);
+            Route::get('/financial-reports/{type}',        [FinancialReportsController::class, 'show'])->whereIn('type', FinancialReportsService::TYPES);
+            Route::get('/financial-reports/{type}/export', [FinancialReportsController::class, 'export'])->whereIn('type', FinancialReportsService::TYPES);
             Route::get('/refunds',               [VendorBooksController::class, 'refunds']);
+            Route::get('/refund-cases',          [RefundsController::class, 'index']);
+            Route::get('/refund-cases/{id}',     [RefundsController::class, 'show'])->whereNumber('id');
+            Route::post('/refund-cases/{id}/sent', [RefundsController::class, 'sent'])->whereNumber('id');
         });
 
         // Customer relationships pages (chat itself uses the /chat routes)
@@ -962,6 +980,40 @@ Route::middleware('token.auth')->group(function () {
     // ----------------------------------------------------------
 
     Route::prefix('finance')->group(function () {
+        // Same figures as the vendor Finance pages (VendorBooksService)
+        Route::get('dashboard', [VendorBooksController::class, 'dashboard'])->middleware('employee.module:finance_dashboard,view');
+        Route::middleware('employee.module:sales_revenue,view')->group(function () {
+            Route::get('sales',        [SalesRevenueController::class, 'summary']);
+            Route::get('sales/orders', [SalesRevenueController::class, 'orders']);
+        });
+        Route::get('profit-loss', [VendorBooksController::class, 'profitLoss'])->middleware('employee.module:profit_loss,view');
+        // The shop's BloomCraft plan, read-only for Finance (the owner changes it in Account → Subscription)
+        Route::middleware('employee.module:subscription_billing,view')->group(function () {
+            Route::get('subscription',              [VendorAccountController::class, 'subscription']);
+            Route::get('billing',                   [VendorAccountController::class, 'billing']);
+            Route::get('billing/{id}/invoice',      [VendorAccountController::class, 'invoice'])->whereNumber('id');
+        });
+        Route::get('reports/{type}', [FinancialReportsController::class, 'show'])->whereIn('type', FinancialReportsService::TYPES)->middleware('employee.module:financial_reports,view');
+        Route::get('reports/{type}/export', [FinancialReportsController::class, 'export'])->whereIn('type', FinancialReportsService::TYPES)->middleware('employee.module:financial_reports,export');
+        Route::middleware('employee.module:refunds,view')->group(function () {
+            Route::get('refunds',      [RefundsController::class, 'index']);
+            Route::get('refunds/{id}', [RefundsController::class, 'show'])->whereNumber('id');
+        });
+        Route::post('refunds/{id}/sent', [RefundsController::class, 'sent'])->whereNumber('id')->middleware('employee.module:refunds,edit');
+        Route::middleware('employee.module:expenses,view')->group(function () {
+            Route::get('expenses',                          [VendorBooksController::class, 'expenses']);
+            Route::get('expenses/{id}/files/{fileId}/link', [VendorBooksController::class, 'expenseFileLink'])->whereNumber(['id', 'fileId']);
+        });
+        Route::post('expenses',        [VendorBooksController::class, 'storeExpense'])->middleware('employee.module:expenses,create');
+        Route::post('expenses/{id}',   [VendorBooksController::class, 'updateExpense'])->whereNumber('id')->middleware('employee.module:expenses,edit');
+        Route::delete('expenses/{id}', [VendorBooksController::class, 'destroyExpense'])->whereNumber('id')->middleware('employee.module:expenses,delete');
+        Route::get('payments', [PaymentsController::class, 'index'])->middleware('employee.module:payments,view');
+        Route::middleware('employee.module:payments,edit')->group(function () {
+            Route::post('payments/cod/settle',            [PaymentsController::class, 'settle']);
+            Route::post('payments/cod/{orderId}/collect', [PaymentsController::class, 'collect'])->whereNumber('orderId');
+            Route::delete('payments/cod/{orderId}',       [PaymentsController::class, 'undo'])->whereNumber('orderId');
+        });
+
         Route::middleware('employee.module:funding_requests,view')->group(function () {
             Route::get('funding-requests',               [AccountingFundingRequestController::class, 'index']);
         });

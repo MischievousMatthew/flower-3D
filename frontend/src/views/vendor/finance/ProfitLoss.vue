@@ -148,6 +148,7 @@ const statement = computed(() => {
     { key: "cogs", label: "Cost of goods sold", now: c.cogs, before: p.cogs, sign: -1, indent: true, hint: "What the flowers you sold cost you" },
     { key: "gross", label: "Gross profit", now: c.gross_profit, before: p.gross_profit, sign: 1, kind: "sub" },
     { key: "payroll", label: "Payroll", now: c.payroll, before: p.payroll, sign: -1, indent: true },
+    ...(c.payment_fees || p.payment_fees ? [{ key: "fees", label: "Payment fees", hint: "PayMongo processing fees", now: c.payment_fees, before: p.payment_fees, sign: -1, indent: true }] : []),
     ...[...cats].map(([key, label]) => ({ key: `cat-${key}`, label, now: catAmount(c, key), before: catAmount(p, key), sign: -1, indent: true })),
     { key: "net", label: "Net profit", now: c.net_profit, before: p.net_profit, sign: 1, kind: "total" },
   ];

@@ -134,6 +134,13 @@ export const opaqueRouteTokens = Object.freeze({
   AttendanceReview: "14RjsJvR0RShsslTh64zGkRLYL6R8dpaYVtf2qicgFs",
   AttendanceReports: "I9Net_mIgqCuh-RYMN0MRK0HByxoTd9_nzCr6XeEAtw",
   ForgotPassword: "bz9x6ogi_KeQ7EIFLF3t9VgJI2GttDgdOP2mMQCyrXw",
+  FinanceSales: "tysDgf816qkhCx7I1NbpJmhOyq6KV3LvPaIcXNx7l_U",
+  FinancePayments: "cTRyt5k63tieYzwQXkabYpnAU_jZYRHDOdjCu57-5h8",
+  FinanceExpenses: "Cf0IZv5fnJ8gJnFxLaT4plvttzT4j4h7u68lYlu_HWw",
+  FinanceProfitLoss: "LiK1zf4bgZLcEEO-DYomIFeg__z3DSCLxQ8lP0XAY0w",
+  FinanceRefunds: "-Ow0ExBPYVXYtI0vadqVLHZD1kTTktGDKOQAZgpwcTw",
+  FinanceReports: "OKO1ycgGuU2BiQXs7xmxEzxcaNQ5KYIum6yzBJdjMGU",
+  FinanceSubscription: "xUZiHeS41fQcmReZBkBJWlAwFiVMi59eINlZykO-yls",
 });
 
 export const opaquePathFor = (name, parameterPath = "") => {

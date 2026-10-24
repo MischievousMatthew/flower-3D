@@ -19,6 +19,13 @@ class ErpModule
 
         // Finance
         'finance_dashboard',
+        'sales_revenue',
+        'payments',
+        'expenses',
+        'profit_loss',
+        'refunds',
+        'financial_reports',
+        'subscription_billing',
         'funding_requests',
         'payroll_requests',
 
@@ -54,6 +61,15 @@ class ErpModule
         // create = put people on shifts; edit = shifts, replacements, day-off overrides; delete = remove shifts
         'schedules'          => ['view', 'create', 'edit', 'delete'],
         'finance_dashboard'  => ['view'],
+        'sales_revenue'      => ['view'],
+        // edit = record cash-on-delivery collections and settlements
+        'payments'           => ['view', 'edit'],
+        'expenses'           => ['view', 'create', 'edit', 'delete'],
+        'profit_loss'        => ['view'],
+        // edit = record a refund as sent
+        'refunds'            => ['view', 'edit'],
+        'financial_reports'  => ['view', 'export'],
+        'subscription_billing' => ['view'],
         'funding_requests'   => ['view', 'approve', 'reject'],
         'payroll_requests'   => ['view', 'edit', 'approve', 'reject'],
         'crm'                => ['view', 'create'],

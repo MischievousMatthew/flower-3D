@@ -10,6 +10,7 @@ use App\Models\VendorSubscriptionCheckout;
 use App\Models\VendorSubscriptionTrial;
 use App\Services\ResourceLimitService;
 use App\Subscriptions\SubscriptionPlans;
+use App\Traits\ResolvesOwner;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -23,6 +24,8 @@ use Illuminate\Validation\ValidationException;
  */
 class VendorAccountController extends Controller
 {
+    use ResolvesOwner;
+
     /** What each subscription module unlocks, in the vendor's words. */
     private const MODULES = [
         'products'     => ['Products & catalog', 'List products, inventory, categories, 3D bouquets and promotions'],
@@ -53,7 +56,7 @@ class VendorAccountController extends Controller
 
     public function subscription(Request $request)
     {
-        $vendor = $request->user();
+        $vendor = $this->owner($request);
         $subscription = $vendor->subscription()->first();
         $active = $subscription?->isActive() ?? false;
         $plan = $subscription && SubscriptionPlans::exists($subscription->plan_key) ? SubscriptionPlans::get($subscription->plan_key) : null;
@@ -107,7 +110,7 @@ class VendorAccountController extends Controller
 
     public function billing(Request $request)
     {
-        $vendor = $request->user();
+        $vendor = $this->owner($request);
         $subscription = $vendor->subscription()->first();
 
         $payments = VendorSubscriptionCheckout::query()->where('vendor_id', $vendor->id)->latest()->get()
@@ -154,6 +157,12 @@ class VendorAccountController extends Controller
                 'renew_amount'  => $renewsAt ? ($plan['monthly_price'] ?? null) : null,
                 'plan_name'     => $plan['name'] ?? null,
                 'currency'      => 'PHP',
+                // Payments that didn't go through, and checkouts still open
+                'failed'        => $payments->whereIn('status', ['failed', 'expired'])->count(),
+                'failed_amount' => round((float) $payments->whereIn('status', ['failed', 'expired'])->sum('amount'), 2),
+                'pending'       => $payments->where('status', 'pending')->count(),
+                'trials'        => $trials->count(),
+                'trial_ends_at' => $subscription?->status?->value === 'trialing' ? $subscription->trial_ends_at?->toIso8601String() : null,
             ],
             'items' => $items,
         ]]);
@@ -161,7 +170,7 @@ class VendorAccountController extends Controller
 
     public function invoice(Request $request, int $id)
     {
-        $vendor = $request->user();
+        $vendor = $this->owner($request);
         $checkout = VendorSubscriptionCheckout::query()->where('vendor_id', $vendor->id)->where('status', 'paid')->find($id);
         if (! $checkout) {
             return response()->json(['success' => false, 'message' => 'Invoice not found.'], 404);
@@ -405,6 +414,14 @@ class VendorAccountController extends Controller
                 'required_plan' => $required['name'] ?? null,
             ];
         })->values()->all();
+    }
+
+    /** The shop owner: the vendor themself, or the shop an ERP Finance employee works for (subscription and billing are read-only for them) */
+    private function owner(Request $request): User
+    {
+        $user = $request->user();
+
+        return $user instanceof User ? $user : User::findOrFail($this->resolveOwnerId($request));
     }
 
     private function planName(string $key): string

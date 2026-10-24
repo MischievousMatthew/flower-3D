@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\PayMongoWebhookEvent;
 use App\Models\Payroll;
+use App\Support\PayMongoPayment;
 use App\Models\VendorExpense;
 use App\Models\VendorTransaction;
 use Carbon\Carbon;
@@ -17,13 +19,18 @@ use Illuminate\Support\Facades\Schema;
  *  - operating expenses the vendor recorded (vendor_expenses).
  *
  * Profit & loss:  sales − refunds = net sales; − cost of goods sold = gross profit;
- *                 − operating expenses (payroll + recorded expenses) = net profit.
+ *                 − operating expenses (payroll + recorded expenses + payment fees)
+ *                 = operating profit, reported as net profit.
  * Stock purchases are money spent on inventory; that stock is counted as a cost
- * when it sells (cost of goods sold), so it isn't subtracted twice.
+ * when it sells (cost of goods sold), so it isn't subtracted twice. Shops whose
+ * products have no cost price can count flowers and stock when bought instead
+ * (basis "bought").
  */
 class VendorBooksService
 {
     public const BUCKETS = ['day', 'week', 'month', 'year'];
+    /** sold: cost of goods is what the items sold cost; bought: it's the flowers and stock bought in the period */
+    public const COST_BASES = ['sold', 'bought'];
 
     private static ?bool $booksReady = null;
 
@@ -43,13 +50,14 @@ class VendorBooksService
         $ledger = VendorTransaction::forVendor($vendorId)
             ->whereBetween('created_at', [$from, $to])
             ->with([
-                'order:id,order_number,user_id,delivery_contact_name,payment_method',
+                'order:id,order_number,user_id,delivery_contact_name,payment_method,paymongo_response',
                 'order.user:id,name,surname',
                 'order.items:id,order_id,product_id,product_name,quantity' . ($this->booksReady() ? ',unit_cost' : ''),
                 'order.items.product:id,purchase_price',
             ])
             ->get()
             ->map(fn (VendorTransaction $t) => $this->fromLedger($t));
+        $ledger = $this->withLoggedFees($ledger);
 
         $payroll = Payroll::with('employee')
             ->where('owner_id', $vendorId)
@@ -81,7 +89,8 @@ class VendorBooksService
             ->get())
             ->map(fn (VendorExpense $x) => [
                 'key' => 'exp-' . md5('exp' . $x->id),
-                'kind' => 'expense',
+                // Flowers bought to sell are stock: their cost counts when they sell
+                'kind' => $x->isStock() ? 'stock' : 'expense',
                 'direction' => 'out',
                 'title' => $x->description,
                 'party' => $x->payee ? "To {$x->payee}" : (VendorExpense::CATEGORIES[$x->category] ?? 'Expense'),
@@ -101,14 +110,18 @@ class VendorBooksService
     }
 
     /** Totals for the period, as a profit & loss statement. */
-    public function totals(Collection $entries): array
+    public function totals(Collection $entries, string $basis = 'sold'): array
     {
         $sum = fn (string $kind) => round((float) $entries->where('kind', $kind)->sum('amount'), 2);
 
         $sales = $sum('sale');
         $refunds = $sum('refund');
-        $cogs = round((float) $entries->where('kind', 'sale')->sum('cost'), 2);
+        $cogsSold = round((float) $entries->where('kind', 'sale')->sum('cost'), 2);
+        // Flowers and stock bought in the period, for shops that count them when bought
+        $cogs = $basis === 'bought' ? $sum('stock') : $cogsSold;
         $payroll = $sum('payroll');
+        $saleEntries = $entries->where('kind', 'sale');
+        $paymentFees = round((float) $saleEntries->sum(fn ($e) => $e['fee'] ?? 0), 2);
         $byCategory = $entries->where('kind', 'expense')->groupBy('category')
             ->map(fn ($rows, $cat) => [
                 'category' => $cat,
@@ -121,21 +134,30 @@ class VendorBooksService
         $recorded = round((float) $byCategory->sum('amount'), 2);
         $netSales = round($sales - $refunds, 2);
         $gross = round($netSales - $cogs, 2);
-        $operating = round($payroll + $recorded, 2);
+        $operating = round($payroll + $recorded + $paymentFees, 2);
         $net = round($gross - $operating, 2);
+        $online = $saleEntries->filter(fn ($e) => ($e['payment_method'] ?? 'cod') !== 'cod');
 
         return [
             'sales' => $sales,
-            'orders' => $entries->where('kind', 'sale')->count(),
+            'orders' => $saleEntries->count(),
             'refunds' => $refunds,
             'net_sales' => $netSales,
             'cogs' => $cogs,
-            'cogs_estimated' => $entries->where('kind', 'sale')->contains(fn ($e) => $e['cost_estimated'] ?? false),
+            'cost_basis' => $basis === 'bought' ? 'bought' : 'sold',
+            'cogs_sold' => $cogsSold,
+            'cogs_estimated' => $basis !== 'bought' && $saleEntries->contains(fn ($e) => $e['cost_estimated'] ?? false),
+            // Items sold with no cost price: their flowers aren't in cost of goods, so profit reads high
+            'uncosted_items' => $basis === 'bought' ? 0 : (int) $saleEntries->sum(fn ($e) => $e['uncosted'] ?? 0),
             'gross_profit' => $gross,
             'payroll' => $payroll,
             'expenses' => $recorded,
             'expenses_by_category' => $byCategory,
+            'payment_fees' => $paymentFees,
+            'fees_known' => $online->filter(fn ($e) => $e['fee'] !== null)->count(),
+            'online_sales' => $online->count(),
             'operating_expenses' => $operating,
+            'operating_profit' => $net,
             'net_profit' => $net,
             'gross_margin' => $netSales > 0 ? round($gross / $netSales * 100, 1) : null,
             'net_margin' => $netSales > 0 ? round($net / $netSales * 100, 1) : null,
@@ -147,7 +169,7 @@ class VendorBooksService
     }
 
     /** The period split into days, weeks, months or years, each with its own totals. */
-    public function buckets(Collection $entries, CarbonInterface $from, CarbonInterface $to, string $unit): array
+    public function buckets(Collection $entries, CarbonInterface $from, CarbonInterface $to, string $unit, string $basis = 'sold'): array
     {
         $rows = [];
         $cursor = Carbon::instance($from)->copy()->startOf($unit === 'week' ? 'week' : $unit);
@@ -155,7 +177,7 @@ class VendorBooksService
             $start = $cursor->copy();
             $end = $cursor->copy()->endOf($unit === 'week' ? 'week' : $unit);
             $in = $entries->filter(fn ($e) => $e['at']->between($start->copy()->max($from), $end->copy()->min($to)));
-            $t = $this->totals($in);
+            $t = $this->totals($in, $basis);
             $rows[] = [
                 'key' => $start->toDateString(),
                 'label' => $this->bucketLabel($start->copy()->max($from), $end->copy()->min($to), $unit),
@@ -166,8 +188,11 @@ class VendorBooksService
                 'refunds' => $t['refunds'],
                 'net_sales' => $t['net_sales'],
                 'cogs' => $t['cogs'],
+                'gross_profit' => $t['gross_profit'],
+                'payment_fees' => $t['payment_fees'],
                 'expenses' => $t['operating_expenses'],
                 'net_profit' => $t['net_profit'],
+                'net_margin' => $t['net_margin'],
             ];
             $cursor->add(1, $unit);
         }
@@ -195,6 +220,27 @@ class VendorBooksService
         return [$prevTo->copy()->subDays($days - 1)->startOfDay(), $prevTo];
     }
 
+    /** Online sales paid before fees were saved on the order: read the fee from PayMongo's webhook log */
+    private function withLoggedFees(Collection $ledger): Collection
+    {
+        $missing = $ledger->filter(fn ($e) => $e['kind'] === 'sale' && $e['fee'] === null && $e['order_id']
+            && ($e['payment_method'] ?? 'cod') !== 'cod')->pluck('order_id')->unique();
+        if ($missing->isEmpty()) {
+            return $ledger;
+        }
+
+        $fees = PayMongoWebhookEvent::query()
+            ->whereIn('order_id', $missing)
+            ->whereIn('event_type', ['checkout_session.payment.paid', 'payment.paid'])
+            ->get(['order_id', 'payload'])
+            ->mapWithKeys(fn ($e) => [$e->order_id => PayMongoPayment::fromEvent((array) $e->payload)['fee'] ?? null])
+            ->filter(fn ($fee) => $fee !== null);
+
+        return $ledger->map(fn ($e) => $e['kind'] === 'sale' && $e['fee'] === null && isset($fees[$e['order_id']])
+            ? array_merge($e, ['fee' => round((float) $fees[$e['order_id']], 2)])
+            : $e);
+    }
+
     private function fromLedger(VendorTransaction $t): array
     {
         $meta = (array) ($t->metadata ?? []);
@@ -218,6 +264,7 @@ class VendorBooksService
             $t->category === 'order_revenue' => (function () use ($order, $customer) {
                 // Cost of what was sold: the cost saved at checkout, or today's product cost for older orders
                 $estimated = false;
+                $uncosted = 0;
                 $cost = 0.0;
                 foreach ($order?->items ?? [] as $item) {
                     $unit = $item->unit_cost;
@@ -225,8 +272,13 @@ class VendorBooksService
                         $estimated = true;
                         $unit = $item->product?->getRawOriginal('purchase_price') ?? 0;
                     }
+                    // Sold without a cost price: its flowers aren't in cost of goods
+                    if ((float) $unit <= 0) {
+                        $uncosted += (int) $item->quantity;
+                    }
                     $cost += (float) $unit * (int) $item->quantity;
                 }
+                $response = is_array($order?->paymongo_response) ? $order->paymongo_response : [];
 
                 return [
                     'kind' => 'sale',
@@ -236,6 +288,10 @@ class VendorBooksService
                     'payment_method' => $order?->payment_method,
                     'cost' => round($cost, 2),
                     'cost_estimated' => $estimated,
+                    'uncosted' => $uncosted,
+                    // PayMongo's processing fee, when it's on file
+                    'fee' => isset($response['fee']) ? round((float) $response['fee'], 2) : null,
+                    'order_id' => $order?->id,
                 ];
             })(),
             $t->category === 'refund' => [

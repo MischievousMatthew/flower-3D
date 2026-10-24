@@ -11,6 +11,7 @@ use App\Models\VendorClosedDate;
 use App\Models\ReservationAvailabilityCache;
 use App\Services\VendorFinanceService;
 use App\Services\VendorSubscriptionCheckoutService;
+use App\Support\PayMongoPayment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,9 @@ use Carbon\Carbon;
 
 class CheckoutController extends Controller
 {
+    /** The payment PayMongo reported when confirmPaidCheckoutSession() last saw a paid session */
+    private ?array $confirmedPayment = null;
+
     /**
      * Initialize checkout - now returns vendor delivery fee (no tax)
      */
@@ -543,6 +547,10 @@ class CheckoutController extends Controller
                                                 ($item->product->images[0]->image_url ?? ''),
                         'quantity'            => $item->quantity,
                         'unit_price'          => $price,
+                        // The regular price, so finance can show the discount given
+                        'list_price'          => $isCustomBouquet
+                            ? $price
+                            : max($price, (float) ($item->product->selling_price ?: $price)),
                         // What one costs the shop, kept for profit & loss
                         'unit_cost'           => $item->product?->getRawOriginal('purchase_price'),
                         'subtotal'            => $itemSubtotal,
@@ -596,6 +604,7 @@ class CheckoutController extends Controller
                         'product_image' => $itemData['product_image'] ?? null,
                         'quantity' => $itemData['quantity'],
                         'unit_price' => $itemData['unit_price'],
+                        'list_price' => $itemData['list_price'] ?? null,
                         'unit_cost' => $itemData['unit_cost'] ?? null,
                         'subtotal' => $itemData['subtotal'],
                         'color' => $itemData['color'] ?? null,
@@ -1140,6 +1149,8 @@ class CheckoutController extends Controller
                 'reference_number' => $sessionAttributes['reference_number'] ?? ($metadata['reference_number'] ?? null),
                 'payment_attempt' => $metadata['payment_attempt'] ?? null,
                 'resource' => 'checkout_session.payment.paid',
+                // Amount, fee and net, kept for Finance → Payments
+                'payment' => PayMongoPayment::fromEvent($payload),
             ]);
 
             // ── Credit vendor balance immediately on payment ──────────────────
@@ -1179,6 +1190,7 @@ class CheckoutController extends Controller
                 ?? ($metadata['reference_number'] ?? $metadata['pm_reference_number'] ?? null),
             'payment_attempt' => $metadata['payment_attempt'] ?? null,
             'resource' => 'payment.paid',
+            'payment' => PayMongoPayment::fromPaymentResource($paymentData),
         ]);
 
         $webhookEvent?->update(['order_id' => $order->id]);
@@ -1426,6 +1438,7 @@ class CheckoutController extends Controller
                     'reference_number' => $reference ?: $this->buildPayMongoReference($order),
                     'payment_attempt' => data_get($order->paymongo_response, 'payment_attempt'),
                     'resource' => 'payment.callback.paymongo_lookup',
+                    'payment' => $this->confirmedPayment,
                 ]);
             }
 
@@ -1535,6 +1548,10 @@ class CheckoutController extends Controller
                 'statuses' => $statuses->values()->all(),
                 'is_paid' => $isPaid,
             ]);
+
+            // Amount, fee and net of the payment, saved with the order when it's marked paid
+            $payment = data_get($attributes, 'payments.0');
+            $this->confirmedPayment = $isPaid && is_array($payment) ? PayMongoPayment::fromPaymentResource($payment) : null;
 
             return $isPaid;
         } catch (\Throwable $e) {
@@ -1717,7 +1734,7 @@ class CheckoutController extends Controller
                     'reference_number' => $paymentContext['reference_number'] ?? null,
                     'webhook_resource' => $paymentContext['resource'] ?? null,
                     'paid_at' => now()->toIso8601String(),
-                ]), fn ($value) => $value !== null),
+                ], $paymentContext['payment'] ?? []), fn ($value) => $value !== null),
             ]));
 
             if ($lockedOrder->reservation_date) {

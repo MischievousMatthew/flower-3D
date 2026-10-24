@@ -3,7 +3,7 @@
     <div class="bc-y" aria-hidden="true">
       <span v-for="t in ticks" :key="t">{{ shortMoney(t) }}</span>
     </div>
-    <div class="bc-plot">
+    <div ref="plot" class="bc-plot">
       <div class="bc-grid" aria-hidden="true"><i v-for="t in ticks" :key="t"></i></div>
       <div class="bc-cols" :class="{ dense: rows.length > 14 }">
         <div
@@ -41,7 +41,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { money, shortMoney } from "./financeUi";
 
 // rows: [{ key, label, short?, [series.key]: number }], series: [{ key, label, color }]
@@ -53,6 +53,17 @@ const props = defineProps({
 });
 const hover = ref(null);
 
+// Labels need about 38px each, so a narrow chart (a phone) shows every second or third one
+const plot = ref(null);
+const plotWidth = ref(0);
+let observer = null;
+onMounted(() => {
+  if (!plot.value || typeof ResizeObserver === "undefined") return;
+  observer = new ResizeObserver(([entry]) => (plotWidth.value = entry.contentRect.width));
+  observer.observe(plot.value);
+});
+onBeforeUnmount(() => observer?.disconnect());
+
 const max = computed(() => {
   const top = Math.max(0, ...props.rows.flatMap((r) => props.series.map((s) => Number(r[s.key]) || 0)));
   if (!top) return 100;
@@ -63,8 +74,11 @@ const ticks = computed(() => [max.value, max.value * 0.75, max.value * 0.5, max.
 const pct = (v) => Math.max(0, Math.min(100, ((Number(v) || 0) / max.value) * 100));
 const showLabel = (i) => {
   const n = props.rows.length;
-  const every = n > 24 ? Math.ceil(n / 8) : n > 12 ? 2 : 1;
-  return i % every === 0 || i === n - 1;
+  const byCount = n > 24 ? Math.ceil(n / 8) : n > 12 ? 2 : 1;
+  const byWidth = plotWidth.value ? Math.ceil(n / Math.max(1, Math.floor(plotWidth.value / 38))) : 1;
+  const every = Math.max(byCount, byWidth);
+  // Counted back from the newest, so it always has a label and the spacing stays even
+  return (n - 1 - i) % every === 0;
 };
 const tipSide = (i) => (i < props.rows.length / 3 ? "left" : i > (props.rows.length * 2) / 3 ? "right" : "");
 const aria = (r) => `${r.label}: ${props.series.map((s) => `${s.label} ${money(r[s.key])}`).join(", ")}`;

@@ -293,6 +293,13 @@ const ICONS = {
   payroll: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
   schedules: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><rect x="7" y="12" width="4" height="3" rx="0.5"/><rect x="13" y="16" width="4" height="3" rx="0.5"/></svg>`,
   leave: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+  sales: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg>`,
+  payments: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><path d="M6 15h4"/></svg>`,
+  expenses: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>`,
+  profit: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>`,
+  refunds: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/><path d="M12 8v8M9.5 10.5h4a1.5 1.5 0 0 1 0 3h-3a1.5 1.5 0 0 0 0 3h4"/></svg>`,
+  reports: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 3 14 8 19 8"/><line x1="9" y1="17" x2="9" y2="14"/><line x1="12" y1="17" x2="12" y2="12"/><line x1="15" y1="17" x2="15" y2="15"/></svg>`,
+  billing: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.4l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/><path d="M5 21h14"/></svg>`,
   funding: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
   products: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`,
   suppliers: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`,
@@ -948,7 +955,7 @@ async function handleLogout() {
 }
 
 /* ── Dark mode: only on ERP pages with meta.erpTheme (see useErpTheme) ── */
-:global(html[data-vendor-theme="dark"]) .dynamic-sidebar {
+html[data-vendor-theme="dark"] .dynamic-sidebar {
   --secondary: var(--v-text);
   --text-main: var(--v-text);
   --text-muted: var(--v-muted);
@@ -958,27 +965,27 @@ async function handleLogout() {
   --primary-dk: var(--v-green-text);
   background: var(--v-surface);
 }
-:global(html[data-vendor-theme="dark"]) .collapse-toggle {
+html[data-vendor-theme="dark"] .collapse-toggle {
   background: var(--v-raised);
   border-color: var(--v-border-strong);
   color: var(--v-muted);
 }
-:global(html[data-vendor-theme="dark"]) .collapse-toggle:hover {
+html[data-vendor-theme="dark"] .collapse-toggle:hover {
   color: var(--v-text);
 }
-:global(html[data-vendor-theme="dark"]) .avatar-badge {
+html[data-vendor-theme="dark"] .avatar-badge {
   border-color: var(--v-surface);
 }
-:global(html[data-vendor-theme="dark"]) .search-kbd,
-:global(html[data-vendor-theme="dark"]) .bracket-line {
+html[data-vendor-theme="dark"] .search-kbd,
+html[data-vendor-theme="dark"] .bracket-line {
   background: var(--v-subtle-2);
 }
-:global(html[data-vendor-theme="dark"]) .upgrade-hint {
+html[data-vendor-theme="dark"] .upgrade-hint {
   border-color: transparent;
   background: var(--v-amber-soft);
   color: var(--v-amber-text);
 }
-:global(html[data-vendor-theme="dark"]) .logout-item:hover {
+html[data-vendor-theme="dark"] .logout-item:hover {
   background: var(--v-red-soft);
   color: var(--v-red-text);
 }

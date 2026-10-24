@@ -51,6 +51,9 @@
         <tr><td>Less cost of goods sold{{ $t['cogs_estimated'] ? ' (partly estimated from current product costs)' : '' }}</td><td class="num">-{{ $peso($t['cogs']) }}</td></tr>
         <tr class="sub"><td>Gross profit</td><td class="num">{{ $peso($t['gross_profit']) }}</td></tr>
         <tr><td>Less payroll</td><td class="num">-{{ $peso($t['payroll']) }}</td></tr>
+        @if (($t['payment_fees'] ?? 0) > 0)
+            <tr><td>Less payment fees</td><td class="num">-{{ $peso($t['payment_fees']) }}</td></tr>
+        @endif
         @foreach ($t['expenses_by_category'] as $c)
             <tr><td>Less {{ strtolower($c['label']) }}</td><td class="num">-{{ $peso($c['amount']) }}</td></tr>
         @endforeach

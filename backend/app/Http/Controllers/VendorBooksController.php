@@ -3,14 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\CloudinaryHelper;
+use App\Models\Order;
 use App\Models\OrderRequest;
 use App\Models\VendorExpense;
+use App\Models\VendorExpenseFile;
 use App\Services\VendorBooksService;
 use App\Traits\ResolvesOwner;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
@@ -87,6 +91,7 @@ class VendorBooksController extends Controller
         $rows = ! $ready ? collect() : VendorExpense::where('owner_id', $vendorId)
             ->whereBetween('spent_on', [$from->toDateString(), $to->toDateString()])
             ->orderByDesc('spent_on')->orderByDesc('id')
+            ->with('files')
             ->get();
         $list = $rows
             ->when($data['category'] ?? null, fn ($c, $cat) => $c->where('category', $cat))
@@ -105,7 +110,14 @@ class VendorBooksController extends Controller
                 'expenses' => $list->map(fn ($x) => $this->formatExpense($x)),
                 'total' => round((float) $rows->sum('amount'), 2),
                 'previous_total' => round($previous, 2),
-                'by_category' => $totals['expenses_by_category'],
+                // Everything recorded, flowers included; stock tells which ones count as stock purchases
+                'by_category' => $rows->groupBy('category')
+                    ->map(fn ($c, $cat) => ['category' => $cat, 'label' => VendorExpense::CATEGORIES[$cat] ?? ucfirst($cat), 'amount' => round((float) $c->sum('amount'), 2), 'count' => $c->count(), 'stock' => in_array($cat, VendorExpense::STOCK_CATEGORIES, true)])
+                    ->sortByDesc('amount')->values(),
+                'stock_total' => round((float) $rows->filter->isStock()->sum('amount'), 2),
+                'without_files' => $rows->filter(fn ($x) => ! $x->receipt_path && $x->files->isEmpty())->count(),
+                'stock_categories' => VendorExpense::STOCK_CATEGORIES,
+                'max_files' => VendorExpense::MAX_FILES,
                 'automatic' => [
                     ['key' => 'payroll', 'label' => 'Payroll', 'amount' => $totals['payroll'], 'hint' => 'Approved or paid salaries'],
                     ['key' => 'refunds', 'label' => 'Refunds', 'amount' => $totals['refunds'], 'hint' => 'Refunds customers confirmed'],
@@ -137,8 +149,11 @@ class VendorBooksController extends Controller
         }
 
         $expense = VendorExpense::create($data);
+        if ($error = $this->attachFiles($request, $expense)) {
+            return $error;
+        }
 
-        return response()->json(['success' => true, 'message' => 'Expense recorded.', 'data' => $this->formatExpense($expense)], 201);
+        return response()->json(['success' => true, 'message' => 'Expense recorded.', 'data' => $this->formatExpense($expense->load('files'))], 201);
     }
 
     /** POST /vendor/books/expenses/{id} (multipart update) */
@@ -170,7 +185,16 @@ class VendorBooksController extends Controller
 
         $expense->update($data);
 
-        return response()->json(['success' => true, 'message' => 'Expense saved.', 'data' => $this->formatExpense($expense->fresh())]);
+        // Files ticked for removal go first, then any new ones (up to the limit)
+        foreach ($expense->files()->whereIn('id', (array) $request->input('remove_files', []))->get() as $file) {
+            rescue(fn () => CloudinaryHelper::destroy($file->public_id, ['type' => 'authenticated', 'resource_type' => $file->resource_type]), report: false);
+            $file->delete();
+        }
+        if ($error = $this->attachFiles($request, $expense)) {
+            return $error;
+        }
+
+        return response()->json(['success' => true, 'message' => 'Expense saved.', 'data' => $this->formatExpense($expense->fresh('files'))]);
     }
 
     /** DELETE /vendor/books/expenses/{id} */
@@ -186,31 +210,132 @@ class VendorBooksController extends Controller
         if ($expense->receipt_path) {
             rescue(fn () => CloudinaryHelper::destroy($expense->receipt_path), report: false);
         }
+        foreach ($expense->files as $file) {
+            rescue(fn () => CloudinaryHelper::destroy($file->public_id, ['type' => 'authenticated', 'resource_type' => $file->resource_type]), report: false);
+        }
         $expense->delete();
 
         return response()->json(['success' => true, 'message' => 'Expense deleted.']);
     }
 
     /** GET /vendor/books/profit-loss */
+    /**
+     * GET /vendor/books/profit-loss (also /finance/profit-loss for ERP Finance staff)
+     *
+     * The statement for the period against the one before, twelve months and
+     * the last three years side by side, and the costs that weigh most.
+     * ?basis=sold|bought picks how flower and stock costs are counted.
+     */
     public function profitLoss(Request $request): JsonResponse
     {
-        $request->validate($this->rangeRules());
+        $data = $request->validate(['basis' => ['nullable', Rule::in(VendorBooksService::COST_BASES)]] + $this->rangeRules());
+        $basis = $data['basis'] ?? 'sold';
         [$from, $to] = $this->range($request);
         $vendorId = $this->resolveOwnerId($request);
         [$pFrom, $pTo] = $this->books->previousPeriod($from, $to);
 
-        // Six months up to the end of the period, for the trend chart
-        $trendFrom = $to->copy()->startOfMonth()->subMonths(5);
-        $trendEntries = $this->books->entries($vendorId, $trendFrom, $to);
+        // One pass covers the twelve months and the three years up to the end of the period
+        $monthsFrom = $to->copy()->startOfMonth()->subMonths(11);
+        $yearsFrom = $to->copy()->startOfYear()->subYears(2);
+        $history = $this->books->entries($vendorId, $monthsFrom->copy()->min($yearsFrom), $to);
+        $between = fn (Carbon $a, Carbon $b) => $history->filter(fn ($e) => $e['at']->between($a, $b));
+        $current = $this->books->totals($this->books->entries($vendorId, $from, $to), $basis);
+        $sixFrom = $to->copy()->startOfMonth()->subMonths(5);
 
         return response()->json([
             'success' => true,
             'data' => [
                 'range' => $this->rangeInfo($from, $to),
                 'previous_range' => $this->rangeInfo($pFrom, $pTo),
-                'current' => $this->books->totals($this->books->entries($vendorId, $from, $to)),
+                'basis' => $basis,
+                'current' => $current,
+                'previous' => $this->books->totals($this->books->entries($vendorId, $pFrom, $pTo), $basis),
+                // Six months, kept for the vendor portal's chart
+                'trend' => $this->books->buckets($between($sixFrom, $to), $sixFrom, $to, 'month', $basis),
+                'monthly' => $this->books->buckets($between($monthsFrom, $to), $monthsFrom, $to, 'month', $basis),
+                'yearly' => collect([2, 1, 0])->map(function ($back) use ($to, $between, $basis) {
+                    $start = $to->copy()->startOfYear()->subYears($back);
+                    $end = $back === 0 ? $to->copy() : $start->copy()->endOfYear();
+                    $t = $this->books->totals($between($start, $end), $basis);
+
+                    return ['year' => $start->year, 'to_date' => $back === 0, 'until' => $end->toDateString()] + Arr::only($t, [
+                        'sales', 'refunds', 'net_sales', 'cogs', 'gross_profit', 'payroll', 'expenses', 'payment_fees', 'operating_expenses', 'net_profit', 'gross_margin', 'net_margin', 'orders',
+                    ]);
+                })->values(),
+                'top_costs' => $this->topCosts($current),
+            ],
+        ]);
+    }
+
+    /** Every cost in the statement, biggest first, with its share of all costs */
+    private function topCosts(array $t): array
+    {
+        $rows = collect([
+            ['key' => 'cogs', 'label' => $t['cost_basis'] === 'bought' ? 'Flowers and stock bought' : 'Cost of items sold', 'amount' => $t['cogs'], 'group' => 'cost_of_goods'],
+            ['key' => 'payroll', 'label' => 'Payroll', 'amount' => $t['payroll'], 'group' => 'operating'],
+            ['key' => 'payment_fees', 'label' => 'Payment fees', 'amount' => $t['payment_fees'], 'group' => 'operating'],
+        ])->concat(collect($t['expenses_by_category'])->map(fn ($c) => ['key' => 'cat-' . $c['category'], 'label' => $c['label'], 'amount' => $c['amount'], 'group' => 'operating']))
+            ->filter(fn ($r) => $r['amount'] > 0)
+            ->sortByDesc('amount')
+            ->values();
+        $total = (float) $rows->sum('amount');
+
+        return $rows->map(fn ($r) => $r + ['share' => $total > 0 ? round($r['amount'] / $total * 100, 1) : 0])->all();
+    }
+
+    /**
+     * GET /vendor/books/dashboard (also /finance/dashboard for ERP Finance staff)
+     *
+     * The finance overview: sales and net revenue, expenses and estimated
+     * profit for the period, money still on its way in or out, twelve months
+     * of revenue against expenses, and the latest money movements.
+     */
+    public function dashboard(Request $request): JsonResponse
+    {
+        $request->validate($this->rangeRules());
+        [$from, $to] = $this->range($request);
+        $vendorId = $this->resolveOwnerId($request);
+        [$pFrom, $pTo] = $this->books->previousPeriod($from, $to);
+
+        $entries = $this->books->entries($vendorId, $from, $to);
+        $current = $this->books->totals($entries);
+
+        // Twelve months up to the end of the period
+        $trendFrom = $to->copy()->startOfMonth()->subMonths(11);
+        $trend = $this->books->buckets($this->books->entries($vendorId, $trendFrom, $to), $trendFrom, $to, 'month');
+
+        // Cash on delivery the shop hasn't collected yet (online payments are counted once paid)
+        $uncollected = Order::query()
+            ->where('vendor_id', $vendorId)
+            ->where('payment_method', 'cod')
+            ->where('payment_status', 'unpaid')
+            ->whereNotIn('status', ['cancelled', 'failed', 'returned', 'refunded'])
+            ->selectRaw('COUNT(*) as orders, COALESCE(SUM(total_amount), 0) as amount')
+            ->first();
+
+        [$pending, $negotiating] = $this->openRefunds($this->refundCases($vendorId));
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'range' => $this->rangeInfo($from, $to),
+                'previous_range' => $this->rangeInfo($pFrom, $pTo),
+                'current' => $current,
                 'previous' => $this->books->totals($this->books->entries($vendorId, $pFrom, $pTo)),
-                'trend' => $this->books->buckets($trendEntries, $trendFrom, $to, 'month'),
+                'pending_payments' => [
+                    'amount' => round((float) $uncollected->amount, 2),
+                    'orders' => (int) $uncollected->orders,
+                ],
+                'pending_refunds' => [
+                    'amount' => round((float) $pending->sum('amount') + (float) $negotiating->sum('amount'), 2),
+                    'count' => $pending->count() + $negotiating->count(),
+                    'agreed' => round((float) $pending->sum('amount'), 2),
+                    'agreed_count' => $pending->count(),
+                    'negotiating' => round((float) $negotiating->sum('amount'), 2),
+                    'negotiating_count' => $negotiating->count(),
+                ],
+                'trend' => $trend,
+                'recent' => $entries->take(8)->map(fn ($e) => $this->publicEntry($e))->values(),
             ],
         ]);
     }
@@ -295,21 +420,8 @@ class VendorBooksController extends Controller
         $entries = $this->books->entries($vendorId, $from, $to);
         $totals = $this->books->totals($entries);
 
-        $cases = OrderRequest::query()
-            ->whereHas('order', fn ($q) => $q->where('vendor_id', $vendorId))
-            ->with(['order:id,order_number,total_amount,vendor_id', 'user:id,name,surname'])
-            ->get();
-
-        // Money the shop has agreed to give back but customers haven't confirmed yet
-        $pending = $cases->filter(fn (OrderRequest $c) => $c->status === 'approved'
-            && in_array($c->settled_resolution, [OrderRequest::FULL_REFUND, OrderRequest::PARTIAL_REFUND], true))
-            ->map(fn (OrderRequest $c) => $this->formatCase($c, (float) $c->settled_amount))
-            ->values();
-        // Still being agreed: what the latest offer would cost
-        $negotiating = $cases->filter(fn (OrderRequest $c) => $c->status === 'pending'
-            && in_array($c->offer_resolution ?? $c->resolution_requested, [OrderRequest::FULL_REFUND, OrderRequest::PARTIAL_REFUND], true))
-            ->map(fn (OrderRequest $c) => $this->formatCase($c, (float) ($c->offer_amount ?? $c->amount_requested ?? $c->order?->total_amount)))
-            ->values();
+        $cases = $this->refundCases($vendorId);
+        [$pending, $negotiating] = $this->openRefunds($cases);
         $replacements = $cases->filter(fn (OrderRequest $c) => $c->settled_resolution === OrderRequest::REPLACEMENT
             && $c->completed_at && $c->completed_at->between($from, $to))->count();
 
@@ -399,6 +511,33 @@ class VendorBooksController extends Controller
         ];
     }
 
+    private function refundCases(int $vendorId): Collection
+    {
+        return OrderRequest::query()
+            ->whereHas('order', fn ($q) => $q->where('vendor_id', $vendorId))
+            ->with(['order:id,order_number,total_amount,vendor_id', 'user:id,name,surname'])
+            ->get();
+    }
+
+    /** [agreed but not yet paid back, still being agreed], each formatted with what it would cost */
+    private function openRefunds(Collection $cases): array
+    {
+        $refund = [OrderRequest::FULL_REFUND, OrderRequest::PARTIAL_REFUND];
+
+        // Money the shop has agreed to give back but customers haven't confirmed yet
+        $pending = $cases->filter(fn (OrderRequest $c) => $c->status === 'approved'
+            && in_array($c->settled_resolution, $refund, true))
+            ->map(fn (OrderRequest $c) => $this->formatCase($c, (float) $c->settled_amount))
+            ->values();
+        // Still being agreed: what the latest offer would cost
+        $negotiating = $cases->filter(fn (OrderRequest $c) => $c->status === 'pending'
+            && in_array($c->offer_resolution ?? $c->resolution_requested, $refund, true))
+            ->map(fn (OrderRequest $c) => $this->formatCase($c, (float) ($c->offer_amount ?? $c->amount_requested ?? $c->order?->total_amount)))
+            ->values();
+
+        return [$pending, $negotiating];
+    }
+
     private function formatCase(OrderRequest $c, float $amount): array
     {
         return [
@@ -426,7 +565,14 @@ class VendorBooksController extends Controller
             'reference' => 'nullable|string|max:80',
             'notes' => 'nullable|string|max:1000',
             'receipt' => 'nullable|file|mimes:jpg,jpeg,png,webp|max:5120',
+            'files' => 'nullable|array|max:' . VendorExpense::MAX_FILES,
+            'files.*' => 'file|mimes:jpg,jpeg,png,webp,pdf|max:10240',
+            'remove_files' => 'nullable|array',
+            'remove_files.*' => 'integer',
         ], [
+            'files.*.mimes' => 'Attach photos (JPG, PNG, WebP) or PDFs.',
+            'files.*.max' => 'Each file can be up to 10 MB.',
+            'files.max' => 'Attach up to ' . VendorExpense::MAX_FILES . ' files.',
             'spent_on.before_or_equal' => "The date can't be in the future.",
             'receipt.mimes' => 'The receipt must be a photo (JPG, PNG or WebP).',
             'receipt.max' => 'The receipt must be 5 MB or smaller.',
@@ -448,6 +594,67 @@ class VendorBooksController extends Controller
         return [$path, 'image'];
     }
 
+    /** GET …/expenses/{id}/files/{fileId}/link: a short-lived link to open a receipt or document */
+    public function expenseFileLink(Request $request, int $id, int $fileId): JsonResponse
+    {
+        $file = VendorExpenseFile::where('owner_id', $this->resolveOwnerId($request))
+            ->where('vendor_expense_id', $id)
+            ->find($fileId);
+        if (! $file) {
+            return response()->json(['success' => false, 'message' => 'File not found.'], 404);
+        }
+
+        try {
+            $url = CloudinaryHelper::privateDownloadUrl($file->public_id, $file->format, $file->resource_type);
+        } catch (\Throwable $e) {
+            Log::error('Expense file link failed', ['error' => $e->getMessage(), 'file' => $file->id]);
+
+            return response()->json(['success' => false, 'message' => "Couldn't open the file right now."], 502);
+        }
+
+        return response()->json(['success' => true, 'data' => ['url' => $url]]);
+    }
+
+    /** Uploads files[] privately (up to MAX_FILES per expense); a response when it can't */
+    private function attachFiles(Request $request, VendorExpense $expense): ?JsonResponse
+    {
+        $files = array_filter((array) $request->file('files', []), fn ($f) => $f && $f->isValid());
+        if (! $files) {
+            return null;
+        }
+        if ($expense->files()->count() + count($files) > VendorExpense::MAX_FILES) {
+            return response()->json(['success' => false, 'message' => 'An expense can have up to ' . VendorExpense::MAX_FILES . ' files. Remove one first.'], 422);
+        }
+
+        $actor = $this->actorName($request);
+        foreach ($files as $file) {
+            $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
+            try {
+                // PDFs and photos stay "image" so they open in the browser
+                $upload = CloudinaryHelper::upload($file, [
+                    'folder' => "expense-files/{$expense->owner_id}",
+                    'type' => 'authenticated',
+                    'resource_type' => 'image',
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('Expense file upload failed: ' . $e->getMessage());
+
+                return response()->json(['success' => false, 'message' => "The expense is saved, but a file couldn't be uploaded. Open it and try attaching again."], 502);
+            }
+            $expense->files()->create([
+                'owner_id' => $expense->owner_id,
+                'public_id' => $upload['public_id'],
+                'resource_type' => $upload['resource_type'] ?? 'image',
+                'format' => $upload['format'] ?? $extension,
+                'file_name' => mb_substr($file->getClientOriginalName(), 0, 160),
+                'size' => (int) $file->getSize(),
+                'uploaded_by' => $actor,
+            ]);
+        }
+
+        return null;
+    }
+
     private function formatExpense(VendorExpense $x): array
     {
         return [
@@ -463,6 +670,10 @@ class VendorBooksController extends Controller
             'reference' => $x->reference,
             'notes' => $x->notes,
             'receipt_url' => $x->receiptUrl(),
+            'files' => $x->relationLoaded('files') ? $x->files->map(fn (VendorExpenseFile $f) => [
+                'id' => $f->id, 'name' => $f->file_name, 'size' => $f->size, 'image' => $f->isImage(), 'format' => $f->format,
+            ])->values() : [],
+            'stock' => $x->isStock(),
             'recorded_by' => $x->recorded_by,
             'created_at' => $x->created_at?->toIso8601String(),
         ];
