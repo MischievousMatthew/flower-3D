@@ -114,6 +114,7 @@ class EmployeeAuthController extends Controller
                     'joining_date'       => $employee->formatted_joining_date,
                     'module_permissions' => $modulePermissions,
                     'default_route'      => $defaultRoute,
+                    ...$this->workplace($employee),
                 ],
             ]);
 
@@ -188,8 +189,20 @@ class EmployeeAuthController extends Controller
                 'joining_date'       => $employee->formatted_joining_date,
                 'module_permissions' => $modulePermissions,
                 'default_route'      => $defaultRoute,
+                ...$this->workplace($employee),
             ],
         ]);
+    }
+
+    /** The role and shop shown in the ERP header */
+    private function workplace(Employee $employee): array
+    {
+        $shop = $employee->owner?->vendorApplication;
+
+        return [
+            'role_name' => $employee->staffRole?->name,
+            'shop_name' => $shop?->store_name ?: $shop?->business_name,
+        ];
     }
 
     /**

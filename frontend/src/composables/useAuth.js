@@ -1,8 +1,8 @@
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import api from "../plugins/axios";
 import { useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
-import { useAssignment } from "./useAssignment";
+import { setOwnerAccess, useAssignment } from "./useAssignment";
 import { buildLoginContext } from "../utils/loginContext";
 import {
   clearStoredAuth,
@@ -25,6 +25,7 @@ const loading = ref(false);
 const error = ref(null);
 const initialized = ref(false);
 const isLoggingOut = ref(false);
+watch(user, (u) => setOwnerAccess(u?.role === "vendor"), { immediate: true });
 
 export function useAuth() {
   const router = useRouter();

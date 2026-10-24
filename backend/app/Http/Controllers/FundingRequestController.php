@@ -50,6 +50,11 @@ class FundingRequestController extends Controller
     {
         $employee = $request->user();
 
+        // The shop owner can look at every request
+        if ($access === 'view' && $employee instanceof \App\Models\User && $employee->role === \App\Models\User::ROLE_VENDOR) {
+            return null;
+        }
+
         if (!$employee instanceof Employee) {
             return response()->json(['message' => 'Only employees can access this endpoint'], 403);
         }

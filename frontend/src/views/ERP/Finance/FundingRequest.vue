@@ -1,519 +1,195 @@
 <template>
-  <div class="finance-funding-requests">
-    <div class="requests-content">
-      <!-- Header -->
-      <div class="page-header">
-        <div class="page-title-section">
-          <h1 class="page-title">Funding Requests Review</h1>
-          <p class="page-subtitle">
-            Review and approve/reject funding requests from Inventory
-          </p>
-        </div>
+  <HrPage title="Funding requests" subtitle="Stock purchases Procurement wants to make. The assigned approver reviews each one and approves or rejects it.">
+    <template #actions>
+      <button type="button" class="sp-btn sp-btn-ghost" :disabled="loading" @click="fetchRequests"><span v-html="ICONS.restore"></span>Refresh</button>
+    </template>
 
-        <div class="header-actions">
-          <div class="search-box">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <circle cx="11" cy="11" r="8"></circle>
-              <path d="m21 21-4.35-4.35"></path>
-            </svg>
-            <input
-              type="text"
-              placeholder="Search requests"
-              v-model="searchQuery"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- Status Tabs -->
-      <div class="status-tabs">
-        <button
-          v-for="tab in statusTabs"
-          :key="tab.value"
-          :class="{ active: activeStatusTab === tab.value }"
-          @click="activeStatusTab = tab.value"
-        >
-          <span class="tab-label">{{ tab.label }}</span>
-          <span class="tab-count">{{ getStatusCount(tab.value) }}</span>
-        </button>
-      </div>
-
-      <!-- Loading State -->
-      <div v-if="loading" class="loading-container">
-        <div class="spinner"></div>
-        <p>Loading requests...</p>
-      </div>
-
-      <!-- Error State -->
-      <div v-else-if="error" class="error-container">
-        <p>{{ error }}</p>
-        <button @click="fetchRequests" class="retry-btn">Retry</button>
-      </div>
-
-      <!-- Requests Table -->
-      <div v-else class="table-container">
-        <table class="requests-table">
-          <thead>
-            <tr>
-              <th>Request Info</th>
-              <th>Submitted By</th>
-              <th>Approver</th>
-              <th>Product Details</th>
-              <th>Financial Summary</th>
-              <th>Decision Brief</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="request in filteredRequests"
-              :key="request.id"
-              @click="viewRequest(request.id)"
-              :class="{ selected: selectedRequestId === request.id }"
-            >
-              <td class="info-cell">
-                <div class="request-info">
-                  <span class="request-id">{{
-                    request.finance_request_id
-                  }}</span>
-                  <span class="request-date">{{
-                    formatDate(request.request_date)
-                  }}</span>
-                </div>
-              </td>
-              <td class="submitter-cell">
-                <div class="submitter-info">
-                  <span class="submitter-name">{{
-                    request.submitted_by_name
-                  }}</span>
-                  <span class="submitter-email">{{
-                    request.submitted_by_email
-                  }}</span>
-                </div>
-              </td>
-              <td class="approver-cell">
-                <div class="approver-info">
-                  <span class="approver-name">{{
-                    request.approver_name || "Unassigned"
-                  }}</span>
-                  <span class="approver-meta">
-                    {{
-                      isAssignedApprover(request)
-                        ? "You are the approver"
-                        : "Assigned finance approver"
-                    }}
-                  </span>
-                </div>
-              </td>
-              <td class="product-cell">
-                <div class="product-info">
-                  <span class="product-name">{{ request.product_name }}</span>
-                  <span class="product-details"
-                    >{{ request.flower_category }} • {{ request.variant }}</span
-                  >
-                  <span class="quantity"
-                    >{{ request.requested_qty }} {{ request.uom }}</span
-                  >
-                </div>
-              </td>
-              <td class="financial-cell">
-                <div class="financial-summary">
-                  <div class="amount-row">
-                    <span class="label">Total Cost:</span>
-                    <span class="value"
-                      >₱{{ formatNumber(request.estimated_total_cost) }}</span
-                    >
-                  </div>
-                  <div class="amount-row">
-                    <span class="label">Margin:</span>
-                    <span
-                      class="value"
-                      :class="getMarginClass(request.estimated_gross_margin)"
-                    >
-                      {{ request.estimated_gross_margin }}%
-                    </span>
-                  </div>
-                  <div
-                    class="recommendation-badge"
-                    :class="
-                      request.finance_recommendation
-                        ?.toLowerCase()
-                        .replace(' ', '-')
-                    "
-                  >
-                    {{ request.finance_recommendation }}
-                  </div>
-                </div>
-              </td>
-              <td class="brief-cell">
-                <div class="brief-summary">
-                  <div class="brief-row">
-                    <span class="brief-icon">📦</span>
-                    <span class="brief-text">{{
-                      truncateText(request.business_justification, 40)
-                    }}</span>
-                  </div>
-                  <div class="brief-row">
-                    <span class="brief-icon">✅</span>
-                    <span class="brief-text">{{
-                      truncateText(request.approval_impact, 40)
-                    }}</span>
-                  </div>
-                </div>
-              </td>
-              <td>
-                <span
-                  class="status-badge"
-                  :class="getStatusClass(request)"
-                >
-                  {{ displayRequestStatus(request) }}
-                </span>
-              </td>
-              <td class="action-cell" @click.stop>
-                <button
-                  v-if="request.request_status === 'Pending'"
-                  class="review-btn"
-                  @click="openReviewModal(request)"
-                  :disabled="!canReviewRequest(request)"
-                  :title="
-                    canReviewRequest(request)
-                      ? 'Review request'
-                      : 'Only the assigned approver can review this request'
-                  "
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                  </svg>
-                  Review
-                </button>
-                <button
-                  v-else
-                  class="view-btn"
-                  @click="viewRequest(request.id)"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
-                    ></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                  </svg>
-                  View
-                </button>
-              </td>
-            </tr>
-            <tr v-if="filteredRequests.length === 0">
-              <td colspan="8" class="empty-state">
-                <p>No funding requests found</p>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <div v-if="error" class="sp-banner error">
+      <span v-html="ICONS.alert"></span>{{ error }}
+      <button type="button" @click="fetchRequests">Try again</button>
     </div>
 
-    <!-- Review Modal -->
-    <div class="modal-overlay" v-if="showReviewModal" @click="closeReviewModal">
-      <div class="modal review-modal" @click.stop>
-        <div class="modal-header">
-          <h2>Review Funding Request</h2>
-          <button class="close-btn" @click="closeReviewModal">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
+    <!-- Totals -->
+    <section class="fx-kpis" aria-label="Summary">
+      <template v-if="!loaded">
+        <div v-for="n in 4" :key="n" class="sp-card fx-kpi"><div class="bc-skeleton sp-sk-line w30"></div><div class="bc-skeleton fx-sk-big"></div><div class="bc-skeleton sp-sk-line w50"></div></div>
+      </template>
+      <template v-else>
+        <article v-for="k in kpis" :key="k.key" class="sp-card fx-kpi" :class="{ hero: k.hero }">
+          <span class="fx-kpi-label"><span class="fr-ic" :class="`tone-${k.tone}`" v-html="ICONS[k.icon]"></span>{{ k.label }}</span>
+          <strong>{{ k.value }}</strong>
+          <span class="fx-kpi-sub">{{ k.sub }}</span>
+        </article>
+      </template>
+    </section>
+
+    <section class="sp-card fr-list" aria-label="Funding requests">
+      <div class="fr-list-head">
+        <div class="sp-seg" role="tablist" aria-label="Status">
+          <button v-for="tab in STATUS_TABS" :key="tab.value" type="button" role="tab" :aria-selected="activeStatusTab === tab.value" :class="{ on: activeStatusTab === tab.value }" @click="activeStatusTab = tab.value">
+            {{ tab.label }}<span class="count">{{ getStatusCount(tab.value) }}</span>
           </button>
         </div>
-
-        <div class="modal-body">
-          <!-- Request Summary -->
-          <div class="request-summary">
-            <h3>{{ reviewForm.product_name }}</h3>
-            <p class="request-id">{{ reviewForm.finance_request_id }}</p>
-            <div class="summary-grid">
-              <div class="summary-item">
-                <span class="summary-label">Requested By</span>
-                <span class="summary-value">{{
-                  reviewForm.submitted_by_name
-                }}</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">Approver</span>
-                <span class="summary-value">{{
-                  reviewForm.approver_name || "Unassigned"
-                }}</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">Requested Qty</span>
-                <span class="summary-value"
-                  >{{ reviewForm.requested_qty }} {{ reviewForm.uom }}</span
-                >
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">Total Cost</span>
-                <span class="summary-value"
-                  >₱{{ formatNumber(reviewForm.estimated_total_cost) }}</span
-                >
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">Margin</span>
-                <span
-                  class="summary-value"
-                  :class="getMarginClass(reviewForm.estimated_gross_margin)"
-                >
-                  {{ reviewForm.estimated_gross_margin }}%
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Decision Brief -->
-          <div class="decision-brief-section">
-            <h4>Decision Brief</h4>
-            <div class="brief-item">
-              <div class="brief-icon">📦</div>
-              <div class="brief-content">
-                <span class="brief-label">What & Why</span>
-                <p>{{ reviewForm.business_justification }}</p>
-              </div>
-            </div>
-            <div class="brief-item success">
-              <div class="brief-icon">✅</div>
-              <div class="brief-content">
-                <span class="brief-label">If Approved</span>
-                <p>{{ reviewForm.approval_impact }}</p>
-              </div>
-            </div>
-            <div class="brief-item warning">
-              <div class="brief-icon">⚠️</div>
-              <div class="brief-content">
-                <span class="brief-label">If Rejected/Delayed</span>
-                <p>{{ reviewForm.rejection_risk }}</p>
-              </div>
-            </div>
-            <div class="brief-item" v-if="reviewForm.additional_notes">
-              <div class="brief-icon">💡</div>
-              <div class="brief-content">
-                <span class="brief-label">Additional Context</span>
-                <p>{{ reviewForm.additional_notes }}</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Finance Recommendation -->
-          <div class="finance-recommendation">
-            <h4>Finance Recommendation</h4>
-            <div
-              class="recommendation-badge"
-              :class="
-                reviewForm.finance_recommendation
-                  ?.toLowerCase()
-                  .replace(' ', '-')
-              "
-            >
-              {{ reviewForm.finance_recommendation }}
-            </div>
-            <div class="recommendation-details">
-              <div class="detail-item">
-                <span class="label">Recommended Qty:</span>
-                <span class="value"
-                  >{{ reviewForm.recommended_qty }} {{ reviewForm.uom }}</span
-                >
-              </div>
-              <div class="detail-item">
-                <span class="label">Recommended Budget:</span>
-                <span class="value"
-                  >₱{{ formatNumber(reviewForm.recommended_budget) }}</span
-                >
-              </div>
-              <div class="detail-item" v-if="reviewForm.price_ceiling">
-                <span class="label">Price Ceiling:</span>
-                <span class="value"
-                  >₱{{ formatNumber(reviewForm.price_ceiling) }}</span
-                >
-              </div>
-            </div>
-          </div>
-
-          <!-- Decision Section -->
-          <div class="decision-section">
-            <h4>Your Decision</h4>
-            <div class="decision-buttons">
-              <button
-                class="decision-btn approve"
-                :class="{ active: reviewForm.decision === 'approve' }"
-                @click="reviewForm.decision = 'approve'"
-                :disabled="!canApproveFunding"
-                :title="canApproveFunding ? '' : permissionMessages.approve"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-                Approve
-              </button>
-              <button
-                class="decision-btn reject"
-                :class="{ active: reviewForm.decision === 'reject' }"
-                @click="reviewForm.decision = 'reject'"
-                :disabled="!canRejectFunding"
-                :title="canRejectFunding ? '' : permissionMessages.reject"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-                Reject
-              </button>
-            </div>
-          </div>
-
-          <!-- Approval Form -->
-          <div v-if="reviewForm.decision === 'approve'" class="form-section">
-            <div class="form-row">
-              <div class="form-group">
-                <label>Approved Quantity *</label>
-                <div class="input-with-unit">
-                  <input
-                    type="number"
-                    v-model.number="reviewForm.approved_quantity"
-                    :max="reviewForm.requested_qty"
-                    required
-                    min="0"
-                  />
-                  <span class="unit">{{ reviewForm.uom }}</span>
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Approved Amount *</label>
-                <div class="input-with-unit">
-                  <span class="currency">₱</span>
-                  <input
-                    type="number"
-                    v-model.number="reviewForm.approved_amount"
-                    required
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-              </div>
-            </div>
-            <div class="form-group">
-              <label>Remarks (Optional)</label>
-              <textarea
-                v-model="reviewForm.finance_remarks"
-                rows="3"
-                placeholder="Add any comments or conditions..."
-              ></textarea>
-            </div>
-          </div>
-
-          <!-- Rejection Form -->
-          <div v-if="reviewForm.decision === 'reject'" class="form-section">
-            <div class="form-group">
-              <label>Rejection Reason *</label>
-              <select v-model="reviewForm.rejection_reason" required>
-                <option value="">Select reason</option>
-                <option value="Insufficient Cash">Insufficient Cash</option>
-                <option value="Budget Exceeded">Budget Exceeded</option>
-                <option value="Low Profit Margin">Low Profit Margin</option>
-                <option value="Overstock Risk">Overstock Risk</option>
-                <option value="High Spoilage Risk">High Spoilage Risk</option>
-                <option value="Supplier Price Too High">
-                  Supplier Price Too High
-                </option>
-                <option value="Duplicate Request">Duplicate Request</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Rejection Notes *</label>
-              <textarea
-                v-model="reviewForm.rejection_notes"
-                rows="4"
-                placeholder="Explain the reason for rejection..."
-                required
-              ></textarea>
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button class="btn-cancel" @click="closeReviewModal">Cancel</button>
-          <button
-            class="btn-submit"
-            @click="submitDecision"
-            :disabled="!reviewForm.decision || submitting || !canSubmitDecision"
-            :title="decisionPermissionTooltip"
-          >
-            {{
-              submitting
-                ? "Submitting..."
-                : reviewForm.decision === "approve"
-                  ? "Approve Request"
-                  : "Reject Request"
-            }}
-          </button>
-        </div>
+        <label class="sp-search">
+          <span v-html="ICONS.search"></span>
+          <input v-model="searchQuery" class="sp-input" type="search" placeholder="Request, product or person" aria-label="Search funding requests" />
+        </label>
       </div>
-    </div>
-  </div>
+
+      <ul v-if="!loaded" class="fr-rows">
+        <li v-for="n in 4" :key="n" class="fr-row"><div class="bc-skeleton fx-icon"></div><div class="grow"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div></li>
+      </ul>
+      <div v-else-if="!filteredRequests.length" class="sp-empty">
+        <span class="sp-empty-icon" v-html="ICONS.send"></span>
+        <h3>{{ searchQuery || activeStatusTab !== "all" ? "No requests match" : "No funding requests yet" }}</h3>
+        <p>{{ searchQuery || activeStatusTab !== "all" ? "Try another status or search." : "Requests appear here when Procurement asks for money to buy stock." }}</p>
+      </div>
+      <ul v-else class="fr-rows" :class="{ dim: loading }">
+        <li v-for="r in filteredRequests" :key="r.id" class="fr-row" tabindex="0" @click="viewRequest(r.id)" @keydown.enter="viewRequest(r.id)">
+          <span class="fx-icon" :class="`tone-${STATUS[displayRequestStatus(r)]?.tone ?? 'slate'}`" v-html="ICONS.box"></span>
+          <div class="grow">
+            <strong>{{ r.product_name }} <span class="muted">· {{ r.requested_qty }} {{ r.uom }}</span></strong>
+            <span class="fr-sub">{{ [r.flower_category, r.variant].filter(Boolean).join(" · ") }}</span>
+            <span class="fr-meta">
+              <span class="mono">{{ r.finance_request_id }}</span> · {{ formatDate(r.request_date) }} · from {{ r.submitted_by_name }}
+              · approver <b :class="{ you: isAssignedApprover(r) }">{{ isAssignedApprover(r) ? "you" : r.approver_name || "not assigned" }}</b>
+            </span>
+            <span v-if="r.business_justification" class="fr-why">“{{ truncateText(r.business_justification, 110) }}”</span>
+          </div>
+          <div class="fr-state">
+            <span class="sp-chip" :class="STATUS[displayRequestStatus(r)]?.tone ?? 'slate'">{{ displayRequestStatus(r) }}</span>
+          </div>
+          <div class="fr-amt">
+            <strong>{{ peso(r.estimated_total_cost) }}</strong>
+            <small :class="marginTone(r.estimated_gross_margin)">{{ r.estimated_gross_margin }}% margin</small>
+          </div>
+          <div class="fr-actions" @click.stop>
+            <button
+              v-if="r.request_status === 'Pending'"
+              type="button"
+              class="sp-btn sp-btn-primary sp-btn-sm"
+              :disabled="!canReviewRequest(r)"
+              :title="canReviewRequest(r) ? 'Review this request' : 'Only the assigned approver can review this request'"
+              @click="openReviewModal(r)"
+            >Review</button>
+            <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="viewRequest(r.id)">Details</button>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Review -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="showReviewModal" class="sp-backdrop" @click="closeReviewModal"></div></Transition>
+      <Transition name="sp-pop">
+        <div v-if="showReviewModal" class="sp-modal-wrap">
+          <div class="sp-modal wide" role="dialog" aria-modal="true" aria-labelledby="fr-title">
+            <div class="sp-modal-head">
+              <div>
+                <h3 id="fr-title">Review {{ reviewForm.product_name }}</h3>
+                <p><span class="mono">{{ reviewForm.finance_request_id }}</span> · from {{ reviewForm.submitted_by_name }}</p>
+              </div>
+              <button type="button" class="sp-icon-btn" aria-label="Close" @click="closeReviewModal"><span v-html="ICONS.close"></span></button>
+            </div>
+
+            <dl class="fr-sum">
+              <div><dt>Quantity</dt><dd>{{ reviewForm.requested_qty }} {{ reviewForm.uom }}</dd></div>
+              <div><dt>Total cost</dt><dd>{{ peso(reviewForm.estimated_total_cost) }}</dd></div>
+              <div><dt>Margin</dt><dd :class="marginTone(reviewForm.estimated_gross_margin)">{{ reviewForm.estimated_gross_margin }}%</dd></div>
+              <div><dt>Approver</dt><dd>{{ reviewForm.approver_name || "Not assigned" }}</dd></div>
+            </dl>
+
+            <div class="fr-brief">
+              <div><span class="fr-brief-label">What and why</span><p>{{ reviewForm.business_justification || "—" }}</p></div>
+              <div class="good"><span class="fr-brief-label">If approved</span><p>{{ reviewForm.approval_impact || "—" }}</p></div>
+              <div class="warn"><span class="fr-brief-label">If rejected or delayed</span><p>{{ reviewForm.rejection_risk || "—" }}</p></div>
+              <div v-if="reviewForm.additional_notes"><span class="fr-brief-label">Other notes</span><p>{{ reviewForm.additional_notes }}</p></div>
+            </div>
+
+            <div v-if="reviewForm.finance_recommendation" class="fr-rec">
+              <span class="sp-chip teal">{{ reviewForm.finance_recommendation }}</span>
+              <span>Recommended {{ reviewForm.recommended_qty }} {{ reviewForm.uom }} for {{ peso(reviewForm.recommended_budget) }}<template v-if="reviewForm.price_ceiling"> · price ceiling {{ peso(reviewForm.price_ceiling) }}</template></span>
+            </div>
+
+            <div class="sp-field">
+              <span class="sp-label">Your decision</span>
+              <div class="fr-decide">
+                <button type="button" class="sp-pick" :class="{ on: reviewForm.decision === 'approve' }" :disabled="!canApproveFunding" :title="canApproveFunding ? '' : PERMISSION_TOOLTIPS.approve" @click="reviewForm.decision = 'approve'"><span v-html="ICONS.check"></span>Approve</button>
+                <button type="button" class="sp-pick reject" :class="{ on: reviewForm.decision === 'reject' }" :disabled="!canRejectFunding" :title="canRejectFunding ? '' : PERMISSION_TOOLTIPS.reject" @click="reviewForm.decision = 'reject'"><span v-html="ICONS.close"></span>Reject</button>
+              </div>
+            </div>
+
+            <div v-if="reviewForm.decision === 'approve'" class="sp-grid-2">
+              <label class="sp-field">
+                <span class="sp-label">Approved quantity ({{ reviewForm.uom }})</span>
+                <input v-model.number="reviewForm.approved_quantity" class="sp-input" type="number" min="0" :max="reviewForm.requested_qty" />
+              </label>
+              <label class="sp-field">
+                <span class="sp-label">Approved amount (₱)</span>
+                <input v-model.number="reviewForm.approved_amount" class="sp-input" type="number" min="0" step="0.01" />
+              </label>
+              <label class="sp-field sp-span-all">
+                <span class="sp-label">Remarks (optional)</span>
+                <textarea v-model="reviewForm.finance_remarks" class="sp-textarea" rows="3" placeholder="Any conditions, like buying in two batches"></textarea>
+              </label>
+            </div>
+            <div v-else-if="reviewForm.decision === 'reject'" class="sp-grid-2">
+              <label class="sp-field sp-span-all">
+                <span class="sp-label">Reason</span>
+                <select v-model="reviewForm.rejection_reason" class="sp-select">
+                  <option value="">Choose a reason</option>
+                  <option v-for="r in REJECT_REASONS" :key="r" :value="r">{{ r }}</option>
+                </select>
+              </label>
+              <label class="sp-field sp-span-all">
+                <span class="sp-label">Notes for Procurement</span>
+                <textarea v-model="reviewForm.rejection_notes" class="sp-textarea" rows="4" placeholder="What would need to change for this to be approved"></textarea>
+              </label>
+            </div>
+
+            <div class="sp-modal-foot">
+              <button type="button" class="sp-btn sp-btn-ghost" @click="closeReviewModal">Cancel</button>
+              <button
+                type="button"
+                class="sp-btn"
+                :class="reviewForm.decision === 'reject' ? 'sp-btn-danger' : 'sp-btn-primary'"
+                :disabled="!reviewForm.decision || submitting || !canSubmitDecision"
+                :title="decisionPermissionTooltip"
+                @click="submitDecision"
+              >{{ submitting ? "Saving…" : reviewForm.decision === "reject" ? "Reject request" : "Approve request" }}</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+  </HrPage>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import api from "../../../plugins/axios";
 import { toast } from "vue3-toastify";
+import api from "../../../plugins/axios";
+import HrPage from "../../../components/hr/HrPage.vue";
+import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
+import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { PERMISSION_TOOLTIPS, useAssignment } from "../../../composables/useAssignment";
 import { useAuth } from "../../../composables/useAuth";
+import "../../../components/vendor/finance/finance.css";
+
+const STATUS_TABS = [
+  { label: "All", value: "all" },
+  { label: "Pending", value: "Pending" },
+  { label: "Approved", value: "Approved" },
+  { label: "Rejected", value: "Rejected" },
+];
+const STATUS = {
+  Pending: { tone: "amber" },
+  Approved: { tone: "green" },
+  Paid: { tone: "teal" },
+  Rejected: { tone: "red" },
+};
+const REJECT_REASONS = ["Insufficient Cash", "Budget Exceeded", "Low Profit Margin", "Overstock Risk", "High Spoilage Risk", "Supplier Price Too High", "Duplicate Request", "Other"];
 
 const router = useRouter();
 const { can } = useAssignment();
@@ -521,1198 +197,377 @@ const { user } = useAuth();
 
 const searchQuery = ref("");
 const activeStatusTab = ref("all");
-const selectedRequestId = ref(null);
 const loading = ref(false);
-const error = ref(null);
+const loaded = ref(false);
+const error = ref("");
 const requests = ref([]);
 const showReviewModal = ref(false);
 const submitting = ref(false);
+
+const emptyReview = () => ({ id: null, decision: null, approver_id: null, approved_quantity: 0, approved_amount: 0, finance_remarks: "", rejection_reason: "", rejection_notes: "" });
+const reviewForm = ref(emptyReview());
+
 const canApproveFunding = computed(() => can("funding_requests", "approve"));
 const canRejectFunding = computed(() => can("funding_requests", "reject"));
-const permissionMessages = PERMISSION_TOOLTIPS;
-const currentEmployeeId = computed(() => Number(user.value?.id || 0));
+const currentEmployeeId = computed(() => (user.value?.type === "employee" ? Number(user.value?.id || 0) : 0));
+const isAssignedApprover = (request) => !!currentEmployeeId.value && Number(request?.approver_id || 0) === currentEmployeeId.value;
+const canReviewRequest = (request) => (canApproveFunding.value || canRejectFunding.value) && isAssignedApprover(request);
 const canSubmitDecision = computed(
   () =>
-    Number(reviewForm.value.approver_id || 0) === currentEmployeeId.value &&
-    (reviewForm.value.decision === "approve"
-      ? canApproveFunding.value
-      : reviewForm.value.decision === "reject" && canRejectFunding.value),
+    isAssignedApprover(reviewForm.value) &&
+    (reviewForm.value.decision === "approve" ? canApproveFunding.value : reviewForm.value.decision === "reject" && canRejectFunding.value),
 );
 const decisionPermissionTooltip = computed(() => {
-  if (reviewForm.value.decision === "approve" && !canApproveFunding.value) return permissionMessages.approve;
-  if (reviewForm.value.decision === "reject" && !canRejectFunding.value) return permissionMessages.reject;
+  if (reviewForm.value.decision === "approve" && !canApproveFunding.value) return PERMISSION_TOOLTIPS.approve;
+  if (reviewForm.value.decision === "reject" && !canRejectFunding.value) return PERMISSION_TOOLTIPS.reject;
   return "";
 });
 
-const reviewForm = ref({
-  id: null,
-  decision: null,
-  approved_quantity: 0,
-  approved_amount: 0,
-  finance_remarks: "",
-  rejection_reason: "",
-  rejection_notes: "",
-});
-
-const statusTabs = [
-  { label: "All Requests", value: "all" },
-  { label: "Pending", value: "Pending" },
-  { label: "Approved", value: "Approved" },
-  { label: "Rejected", value: "Rejected" },
-];
+const displayRequestStatus = (r) => (r?.request_status === "Approved" && r?.payment_status === "paid" ? "Paid" : r?.request_status || "Unknown");
 
 const filteredRequests = computed(() => {
-  let filtered = requests.value;
+  const q = searchQuery.value.trim().toLowerCase();
+  return requests.value.filter(
+    (r) =>
+      (activeStatusTab.value === "all" || r.request_status === activeStatusTab.value) &&
+      (!q || [r.finance_request_id, r.product_name, r.submitted_by_name].some((v) => String(v ?? "").toLowerCase().includes(q))),
+  );
+});
+const getStatusCount = (status) => (status === "all" ? requests.value.length : requests.value.filter((r) => r.request_status === status).length);
 
-  if (activeStatusTab.value !== "all") {
-    filtered = filtered.filter(
-      (r) => r.request_status === activeStatusTab.value,
-    );
-  }
-
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase();
-    filtered = filtered.filter(
-      (r) =>
-        r.finance_request_id.toLowerCase().includes(query) ||
-        r.product_name.toLowerCase().includes(query) ||
-        r.submitted_by_name.toLowerCase().includes(query),
-    );
-  }
-
-  return filtered;
+const sum = (rows) => rows.reduce((s, r) => s + Number(r.estimated_total_cost || 0), 0);
+const kpis = computed(() => {
+  const pending = requests.value.filter((r) => r.request_status === "Pending");
+  const approved = requests.value.filter((r) => r.request_status === "Approved");
+  const mine = pending.filter(isAssignedApprover);
+  return [
+    { key: "pending", label: "Waiting for review", icon: "clock", tone: "amber", value: pending.length, sub: `${peso(sum(pending))} requested` },
+    { key: "mine", label: "Assigned to you", icon: "user", tone: "violet", value: mine.length, hero: mine.length > 0, sub: mine.length ? "need your decision" : "nothing for you to review" },
+    { key: "approved", label: "Approved", icon: "check", tone: "green", value: approved.length, sub: `${peso(sum(approved))} in total` },
+    { key: "paid", label: "Paid out", icon: "wallet", tone: "teal", value: approved.filter((r) => r.payment_status === "paid").length, sub: "approved and paid" },
+  ];
 });
 
-const getStatusCount = (status) => {
-  if (status === "all") return requests.value.length;
-  return requests.value.filter((r) => r.request_status === status).length;
-};
+const peso = (n) => `₱${Number(n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatDate = (d) => (d ? new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" }) : "—");
+const truncateText = (t, n) => (!t || t.length <= n ? t || "" : `${t.slice(0, n).trimEnd()}…`);
+const marginTone = (m) => (m >= 30 ? "pos" : m >= 20 ? "mid" : "neg");
 
-const isAssignedApprover = (request) =>
-  Number(request?.approver_id || 0) === currentEmployeeId.value;
-
-const canReviewRequest = (request) =>
-  (canApproveFunding.value || canRejectFunding.value) && isAssignedApprover(request);
-
-const getMarginClass = (margin) => {
-  if (margin >= 30) return "text-success";
-  if (margin >= 20) return "text-warning";
-  return "text-error";
-};
-
-const getStatusClass = (status) => {
-  if (typeof status === "object" && status !== null) {
-    return displayRequestStatus(status).toLowerCase().replace(" ", "-");
-  }
-  return status.toLowerCase().replace(" ", "-");
-};
-
-const displayRequestStatus = (request) => {
-  if (request?.request_status === "Approved" && request?.payment_status === "paid") {
-    return "Paid";
-  }
-
-  return request?.request_status || "Unknown";
-};
-
-const formatDate = (date) => {
-  if (!date) return "N/A";
-  return new Date(date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-};
-
-const formatNumber = (num) => {
-  if (!num) return "0.00";
-  return parseFloat(num).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-};
-
-const truncateText = (text, maxLength) => {
-  if (!text) return "";
-  if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength) + "...";
-};
-
-const fetchRequests = async () => {
+async function fetchRequests() {
   loading.value = true;
-  error.value = null;
+  error.value = "";
   try {
     const { data } = await api.get("/finance/funding-requests");
-    if (data.success) {
-      requests.value = data.data;
-    }
-  } catch (err) {
-    console.error("Error fetching requests:", err);
-    error.value =
-      err.response?.data?.message || "Failed to load funding requests";
-    toast.error(error.value);
+    requests.value = data.data ?? [];
+  } catch (e) {
+    error.value = apiMessage(e, "Couldn't load funding requests.");
   } finally {
     loading.value = false;
+    loaded.value = true;
   }
-};
+}
 
-const viewRequest = (id) => {
-  selectedRequestId.value = id;
-  router.push({
-    name: "FinanceFundingRequestDetails",
-    params: { id },
-  });
-};
+const viewRequest = (id) => router.push({ name: "FinanceFundingRequestDetails", params: { id } });
 
-const openReviewModal = (request) => {
-  if (!canApproveFunding.value && !canRejectFunding.value) {
-    toast.error("You do not have permission to review funding requests");
-    return;
-  }
-  if (!isAssignedApprover(request)) {
+function openReviewModal(r) {
+  if (!canReviewRequest(r)) {
     toast.error("Only the assigned approver can review this request");
     return;
   }
-  reviewForm.value = {
-    id: request.id,
-    finance_request_id: request.finance_request_id,
-    approver_id: request.approver_id,
-    approver_name: request.approver_name,
-    product_name: request.product_name,
-    submitted_by_name: request.submitted_by_name,
-    requested_qty: request.requested_qty,
-    uom: request.uom,
-    estimated_total_cost: request.estimated_total_cost,
-    estimated_gross_margin: request.estimated_gross_margin,
-    business_justification: request.business_justification,
-    approval_impact: request.approval_impact,
-    rejection_risk: request.rejection_risk,
-    additional_notes: request.additional_notes,
-    finance_recommendation: request.finance_recommendation,
-    recommended_qty: request.recommended_qty,
-    recommended_budget: request.recommended_budget,
-    price_ceiling: request.price_ceiling,
-    decision: null,
-    approved_quantity: request.requested_qty,
-    approved_amount: request.estimated_total_cost,
-    finance_remarks: "",
-    rejection_reason: "",
-    rejection_notes: "",
-  };
+  reviewForm.value = { ...emptyReview(), ...r, id: r.id, approved_quantity: r.requested_qty, approved_amount: r.estimated_total_cost };
   showReviewModal.value = true;
-};
-
-const closeReviewModal = () => {
+}
+function closeReviewModal() {
   showReviewModal.value = false;
-  reviewForm.value = {
-    id: null,
-    decision: null,
-    approver_id: null,
-    approver_name: "",
-    approved_quantity: 0,
-    approved_amount: 0,
-    finance_remarks: "",
-    rejection_reason: "",
-    rejection_notes: "",
-  };
-};
+  reviewForm.value = emptyReview();
+}
 
-const submitDecision = async () => {
-  const requiredPermission = reviewForm.value.decision;
-  if (!requiredPermission || !can("funding_requests", requiredPermission)) {
-    toast.error(PERMISSION_TOOLTIPS[requiredPermission] || "You do not have permission to review funding requests");
-    return;
-  }
+async function submitDecision() {
+  const f = reviewForm.value;
   if (!canSubmitDecision.value) {
-    toast.error("Only the assigned approver can submit a decision");
+    toast.error(decisionPermissionTooltip.value || "Only the assigned approver can decide");
     return;
   }
-  if (!reviewForm.value.decision) {
-    toast.error("Please select a decision");
+  if (f.decision === "approve" && (!f.approved_quantity || !f.approved_amount)) {
+    toast.error("Enter the approved quantity and amount");
     return;
   }
-
-  if (reviewForm.value.decision === "approve") {
-    if (
-      !reviewForm.value.approved_quantity ||
-      !reviewForm.value.approved_amount
-    ) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
+  if (f.decision === "reject" && (!f.rejection_reason || !f.rejection_notes?.trim())) {
+    toast.error("Choose a reason and add a note");
+    return;
   }
-
-  if (reviewForm.value.decision === "reject") {
-    if (
-      !reviewForm.value.rejection_reason ||
-      !reviewForm.value.rejection_notes
-    ) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-  }
-
   submitting.value = true;
-
   try {
-    if (reviewForm.value.decision === "approve") {
-      const payload = {
-        approved_quantity: reviewForm.value.approved_quantity,
-        approved_amount: reviewForm.value.approved_amount,
-        finance_remarks: reviewForm.value.finance_remarks,
-      };
-
-      const { data } = await api.post(
-        `finance/funding-requests/${reviewForm.value.id}/approve`,
-        payload,
-      );
-
-      if (data.success) {
-        toast.success(data.message);
-        closeReviewModal();
-        await fetchRequests();
-      }
-    } else {
-      const payload = {
-        rejection_reason: reviewForm.value.rejection_reason,
-        rejection_notes: reviewForm.value.rejection_notes,
-      };
-
-      const { data } = await api.post(
-        `finance/funding-requests/${reviewForm.value.id}/reject`,
-        payload,
-      );
-
-      if (data.success) {
-        toast.success(data.message);
-        closeReviewModal();
-        await fetchRequests();
-      }
-    }
-  } catch (err) {
-    console.error("Error submitting decision:", err);
-    const errorMessage =
-      err.response?.data?.message || "Failed to submit decision";
-    toast.error(errorMessage);
-
-    if (err.response?.data?.errors) {
-      const errors = err.response.data.errors;
-      const firstError = Object.values(errors)[0];
-      toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
-    }
+    const payload =
+      f.decision === "approve"
+        ? { approved_quantity: f.approved_quantity, approved_amount: f.approved_amount, finance_remarks: f.finance_remarks }
+        : { rejection_reason: f.rejection_reason, rejection_notes: f.rejection_notes };
+    const { data } = await api.post(`finance/funding-requests/${f.id}/${f.decision}`, payload);
+    toast.success(data.message || (f.decision === "approve" ? "Request approved" : "Request rejected"));
+    closeReviewModal();
+    await fetchRequests();
+  } catch (e) {
+    toast.error(apiMessage(e, "Couldn't save the decision."));
   } finally {
     submitting.value = false;
   }
-};
+}
 
-onMounted(() => {
-  fetchRequests();
-});
+onMounted(fetchRequests);
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
-
-* {
+.fx-kpi.hero {
+  background: linear-gradient(150deg, var(--bc-accent-soft) 0%, var(--v-surface) 60%);
+  border-color: var(--bc-accent-muted);
+}
+.fr-ic {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+}
+.fr-ic :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
+.fr-list {
+  min-width: 0;
+}
+.fr-list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.fr-list-head .sp-search {
+  flex: 0 1 300px;
+}
+.sp-seg .count {
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--v-subtle-2);
+  font-size: 11px;
+}
+.fr-rows {
+  list-style: none;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
+  transition: opacity 0.2s;
 }
-
-.finance-funding-requests {
+.fr-rows.dim {
+  opacity: 0.55;
+}
+.fr-row {
   display: flex;
-  min-height: 100vh;
-  background: #f7fafc;
-  font-family: "Poppins", sans-serif;
-}
-
-.requests-content {
-  flex: 1;
-  padding: 32px 40px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 28px;
+  gap: 14px;
+  padding: 14px 8px;
+  border-top: 1px solid var(--v-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
 }
-
-.page-title-section {
+.fr-row:hover,
+.fr-row:focus-visible {
+  background: var(--v-subtle);
+  outline: none;
+}
+.grow {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
-
-.page-title {
-  font-size: 32px;
-  font-weight: 700;
-  color: #2d3748;
-  letter-spacing: -0.5px;
+.fr-row strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--v-text);
 }
-
-.page-subtitle {
-  font-size: 14px;
-  color: #718096;
+.muted {
   font-weight: 500;
+  color: var(--v-muted);
+}
+.fr-sub {
+  font-size: 12.5px;
+  color: var(--v-text-2);
+}
+.fr-meta {
+  font-size: 11.5px;
+  color: var(--v-faint);
+}
+.fr-meta b {
+  font-weight: 600;
+  color: var(--v-text-2);
+}
+.fr-meta b.you {
+  color: var(--bc-accent-deep);
+}
+.fr-why {
+  overflow: hidden;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--v-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.95em;
+}
+.fr-state,
+.fr-amt {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+}
+.fr-state small,
+.fr-amt small {
+  font-size: 11.5px;
+  color: var(--v-muted);
+}
+.fr-amt {
+  min-width: 120px;
+}
+.fr-amt strong {
+  font-size: 14px;
+}
+.pos {
+  color: var(--v-green-text) !important;
+}
+.mid {
+  color: var(--v-amber-text) !important;
+}
+.neg {
+  color: var(--v-red-text) !important;
+}
+.fr-actions {
+  flex: none;
+  display: flex;
+  gap: 6px;
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+/* Review */
+.fr-sum {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 16px;
 }
-
-.search-box {
+.fr-sum div {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--v-subtle);
+}
+.fr-sum dt {
+  font-size: 11.5px;
+  color: var(--v-muted);
+}
+.fr-sum dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--v-text);
+}
+.fr-brief {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.fr-brief > div {
+  padding: 10px 14px;
+  border-left: 3px solid var(--v-border-strong);
+  border-radius: 0 10px 10px 0;
+  background: var(--v-subtle);
+}
+.fr-brief > div.good {
+  border-left-color: var(--v-green-text);
+}
+.fr-brief > div.warn {
+  border-left-color: var(--v-amber-text);
+}
+.fr-brief-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--v-faint);
+}
+.fr-brief p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--v-text-2);
+}
+.fr-rec {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  min-width: 300px;
-  transition: all 0.2s;
-}
-
-.search-box:focus-within {
-  border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
-}
-
-.search-box svg {
-  color: #a0aec0;
-  flex-shrink: 0;
-}
-
-.search-box input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 14px;
-  color: #2d3748;
-  font-family: "Poppins", sans-serif;
-}
-
-.search-box input::placeholder {
-  color: #a0aec0;
-}
-
-.status-tabs {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
-  padding: 20px 24px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-}
-
-.status-tabs button {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 14px 20px;
-  background: #f7fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #4a5568;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: "Poppins", sans-serif;
-}
-
-.status-tabs button.active {
-  background: #48bb78;
-  border-color: #48bb78;
-  color: white;
-  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.25);
-}
-
-.tab-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 8px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.status-tabs button.active .tab-count {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.loading-container,
-.error-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e2e8f0;
-  border-top-color: #48bb78;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.loading-container p,
-.error-container p {
-  margin-top: 16px;
-  font-size: 14px;
-  color: #718096;
-}
-
-.retry-btn {
-  margin-top: 12px;
-  padding: 8px 20px;
-  background: #48bb78;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.retry-btn:hover {
-  background: #38a169;
-}
-
-.table-container {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.requests-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.requests-table thead {
-  background: #f7fafc;
-  border-bottom: 2px solid #e2e8f0;
-}
-
-.requests-table th {
-  padding: 14px 16px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 700;
-  color: #718096;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.requests-table tbody tr {
-  border-bottom: 1px solid #f7fafc;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.requests-table tbody tr:hover {
-  background: #f7fafc;
-}
-
-.requests-table tbody tr.selected {
-  background: #f0fff4;
-}
-
-.requests-table td {
-  padding: 16px;
-  font-size: 14px;
-  color: #2d3748;
-  vertical-align: top;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 60px 20px !important;
-  color: #a0aec0;
-}
-
-.info-cell {
-  min-width: 180px;
-}
-
-.request-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.request-id {
-  font-weight: 700;
-  color: #2d3748;
-  font-family: "Poppins", monospace;
-  font-size: 14px;
-}
-
-.request-date,
-.submitted-date {
-  font-size: 12px;
-  color: #718096;
-}
-
-.submitter-cell {
-  min-width: 160px;
-}
-
-.submitter-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.submitter-name {
-  font-weight: 600;
-  color: #2d3748;
-  font-size: 14px;
-}
-
-.submitter-email {
-  font-size: 12px;
-  color: #718096;
-}
-
-.approver-cell {
-  min-width: 170px;
-}
-
-.approver-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.approver-name {
-  font-weight: 600;
-  color: #2d3748;
-  font-size: 14px;
-}
-
-.approver-meta {
-  font-size: 12px;
-  color: #718096;
-}
-
-.product-cell {
-  min-width: 180px;
-}
-
-.product-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.product-name {
-  font-weight: 700;
-  color: #2d3748;
-  font-size: 14px;
-}
-
-.product-details {
-  font-size: 12px;
-  color: #718096;
-}
-
-.quantity {
-  font-size: 13px;
-  font-weight: 600;
-  color: #48bb78;
-}
-
-.financial-cell {
-  min-width: 180px;
-}
-
-.financial-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.amount-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-}
-
-.amount-row .label {
-  color: #718096;
-  font-weight: 500;
-}
-
-.amount-row .value {
-  font-weight: 700;
-  color: #2d3748;
-  font-family: "Poppins", monospace;
-}
-
-.text-success {
-  color: #38a169 !important;
-}
-
-.text-warning {
-  color: #dd6b20 !important;
-}
-
-.text-error {
-  color: #e53e3e !important;
-}
-
-.recommendation-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  margin-top: 4px;
-  text-align: center;
-}
-
-.recommendation-badge.approve {
-  background: #c6f6d5;
-  color: #22543d;
-}
-
-.recommendation-badge.approve-partial {
-  background: #feebc8;
-  color: #7c2d12;
-}
-
-.recommendation-badge.reject {
-  background: #fed7e2;
-  color: #742a2a;
-}
-
-.brief-cell {
-  min-width: 220px;
-}
-
-.brief-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.brief-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.brief-icon {
-  font-size: 14px;
-  flex-shrink: 0;
-}
-
-.brief-text {
-  font-size: 12px;
-  color: #4a5568;
-  line-height: 1.4;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 6px 14px;
-  border-radius: 16px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-}
-
-.status-badge.pending {
-  background: #feebc8;
-  color: #7c2d12;
-}
-
-.status-badge.approved {
-  background: #c6f6d5;
-  color: #22543d;
-}
-
-.status-badge.rejected {
-  background: #fed7e2;
-  color: #742a2a;
-}
-
-.action-cell {
-  min-width: 100px;
-}
-
-.review-btn,
-.view-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: "Poppins", sans-serif;
-  border: none;
-}
-
-.review-btn {
-  background: #48bb78;
-  color: white;
-}
-
-.review-btn:hover {
-  background: #38a169;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
-}
-.review-btn:disabled,
-.btn-submit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.view-btn {
-  background: #f7fafc;
-  color: #4a5568;
-  border: 1px solid #e2e8f0;
-}
-
-.view-btn:hover {
-  background: #e2e8f0;
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-  animation: fadeIn 0.2s;
-}
-
-.modal {
-  background: #ffffff;
-  border-radius: 20px;
-  width: 100%;
-  max-width: 800px;
-  max-height: 90vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  animation: slideUp 0.3s;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(30px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px 32px;
-  border-bottom: 2px solid #f7fafc;
-}
-
-.modal-header h2 {
-  font-size: 24px;
-  font-weight: 700;
-  color: #2d3748;
-}
-
-.close-btn {
-  background: #f7fafc;
-  border: none;
-  color: #718096;
-  cursor: pointer;
-  padding: 8px;
-  display: flex;
-  align-items: center;
-  border-radius: 8px;
-  transition: all 0.2s;
-}
-
-.close-btn:hover {
-  background: #e2e8f0;
-  color: #2d3748;
-}
-
-.modal-body {
-  padding: 32px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.request-summary {
-  padding: 20px;
-  background: #f7fafc;
-  border-radius: 12px;
-}
-
-.request-summary h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: #2d3748;
-  margin-bottom: 4px;
-}
-
-.request-summary .request-id {
-  font-size: 13px;
-  color: #718096;
-  font-family: "Poppins", monospace;
-  font-weight: 600;
   margin-bottom: 16px;
-  display: block;
+  font-size: 12.5px;
+  color: var(--v-text-2);
 }
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-}
-
-.summary-item {
+.fr-decide {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.summary-label {
-  font-size: 11px;
-  color: #718096;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.summary-value {
-  font-size: 15px;
-  font-weight: 700;
-  color: #2d3748;
-}
-
-.decision-brief-section h4,
-.finance-recommendation h4,
-.decision-section h4 {
-  font-size: 16px;
-  font-weight: 700;
-  color: #2d3748;
-  margin-bottom: 16px;
-}
-
-.brief-item {
-  display: flex;
-  gap: 12px;
-  padding: 12px;
-  background: #f7fafc;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  border-left: 3px solid #cbd5e0;
-}
-
-.brief-item:last-child {
-  margin-bottom: 0;
-}
-
-.brief-item.success {
-  border-left-color: #48bb78;
-  background: #f0fff4;
-}
-
-.brief-item.warning {
-  border-left-color: #ed8936;
-  background: #fffaf0;
-}
-
-.brief-icon {
-  font-size: 18px;
-  flex-shrink: 0;
-}
-
-.brief-content {
-  flex: 1;
-}
-
-.brief-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  color: #718096;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-}
-
-.brief-content p {
-  font-size: 13px;
-  color: #2d3748;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.finance-recommendation .recommendation-badge {
-  margin-bottom: 12px;
-}
-
-.recommendation-details {
-  display: flex;
-  flex-direction: column;
   gap: 8px;
 }
-
-.detail-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 14px;
+.fr-decide :deep(svg) {
+  width: 14px;
+  height: 14px;
+}
+.sp-pick.reject.on {
+  background: var(--v-red-soft);
+  border-color: var(--v-red-text);
+  color: var(--v-red-text);
 }
 
-.detail-item .label {
-  color: #718096;
-  font-weight: 500;
-}
-
-.detail-item .value {
-  font-weight: 700;
-  color: #2d3748;
-}
-
-.decision-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.decision-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 16px 24px;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  background: #ffffff;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: "Poppins", sans-serif;
-}
-
-.decision-btn.approve {
-  color: #38a169;
-}
-
-.decision-btn.approve.active {
-  background: #48bb78;
-  border-color: #48bb78;
-  color: white;
-}
-
-.decision-btn.reject {
-  color: #e53e3e;
-}
-
-.decision-btn.reject.active {
-  background: #e53e3e;
-  border-color: #e53e3e;
-  color: white;
-}
-
-.form-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-group label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #2d3748;
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  padding: 12px 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 14px;
-  color: #2d3748;
-  transition: all 0.2s;
-  font-family: "Poppins", sans-serif;
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #48bb78;
-  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
-}
-
-.input-with-unit {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.input-with-unit input {
-  flex: 1;
-}
-
-.input-with-unit .unit {
-  position: absolute;
-  right: 14px;
-  font-size: 14px;
-  color: #718096;
-  font-weight: 600;
-  pointer-events: none;
-}
-
-.input-with-unit .currency {
-  position: absolute;
-  left: 14px;
-  font-size: 14px;
-  color: #718096;
-  font-weight: 600;
-  pointer-events: none;
-}
-
-.input-with-unit input:has(~ .currency) {
-  padding-left: 36px;
-}
-
-.input-with-unit input:has(~ .unit) {
-  padding-right: 60px;
-}
-
-.modal-footer {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  padding: 24px 32px;
-  border-top: 2px solid #f7fafc;
-}
-
-.btn-cancel,
-.btn-submit {
-  padding: 12px 28px;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: "Poppins", sans-serif;
-}
-
-.btn-cancel {
-  background: #f7fafc;
-  border: 1px solid #e2e8f0;
-  color: #4a5568;
-}
-
-.btn-cancel:hover {
-  background: #e2e8f0;
-}
-
-.btn-submit {
-  background: #48bb78;
-  border: 1px solid #48bb78;
-  color: white;
-}
-
-.btn-submit:hover:not(:disabled) {
-  background: #38a169;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(72, 187, 120, 0.35);
-}
-
-.btn-submit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-@media (max-width: 768px) {
-  .summary-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 900px) {
+  .fr-row {
+    flex-wrap: wrap;
   }
-
-  .decision-buttons {
-    grid-template-columns: 1fr;
+  .fr-row .grow {
+    flex-basis: calc(100% - 60px);
   }
-
-  .form-row {
-    grid-template-columns: 1fr;
+  .fr-state {
+    align-items: flex-start;
+    margin-left: 54px;
+  }
+  .fr-amt {
+    margin-left: auto;
+  }
+  .fr-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .fr-why {
+    white-space: normal;
+  }
+}
+@media (max-width: 640px) {
+  .fr-sum {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fr-list-head .sp-search {
+    flex-basis: 100%;
+  }
+}
+/* Counts are short, so two cards fit side by side on a phone */
+@media (max-width: 560px) {
+  .fx-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .fx-kpi {
+    padding: 14px;
   }
 }
 </style>

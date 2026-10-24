@@ -408,8 +408,8 @@ const routes = [
       // ================= FINANCE =================
       {
         path: "finance",
-        meta: { requiresDepartment: ["Finance"], subscriptionModule: MODULE.FINANCE },
-        component: () => import("../views/ERP/Finance/FinanceLayout.vue"),
+        meta: { subscriptionModule: MODULE.FINANCE, erpTheme: true },
+        component: () => import("../layouts/erp/ErpLayout.vue"),
         children: [
           {
             path: "dashboard",
@@ -754,9 +754,9 @@ const routes = [
       // ================= HR =================
       {
         path: "hr",
-        meta: { requiresDepartment: ["HR", "Human Resources"], subscriptionModule: MODULE.HR },
+        meta: { subscriptionModule: MODULE.HR, erpTheme: true },
         name: "HR",
-        component: () => import("../views/ERP/HR/HRLayout.vue"),
+        component: () => import("../layouts/erp/ErpLayout.vue"),
         children: [
           {
             path: "",

@@ -45,6 +45,7 @@ use App\Http\Controllers\EmployeeQRController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\EmployeeLeaveController;
+use App\Http\Controllers\HrDashboardController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\WarehouseBatchController;
@@ -758,6 +759,8 @@ Route::middleware('token.auth')->group(function () {
         Route::delete('/{id}', [PayrollController::class, 'destroy'])->whereNumber('id')->middleware('employee.module:payroll,delete');
     });
 
+    Route::get('/hr/dashboard', [HrDashboardController::class, 'show'])->middleware('employee.module:hr_dashboard,view');
+
     Route::prefix('leaves')->group(function () {
         Route::middleware('employee.module:leave_management,view')->group(function () {
             Route::get('/',              [EmployeeLeaveController::class, 'index']);
@@ -1016,6 +1019,7 @@ Route::middleware('token.auth')->group(function () {
 
         Route::middleware('employee.module:funding_requests,view')->group(function () {
             Route::get('funding-requests',               [AccountingFundingRequestController::class, 'index']);
+            Route::get('funding-requests/{id}',          [FundingRequestController::class, 'show'])->whereNumber('id');
         });
 
         Route::post('funding-requests/{id}/approve', [AccountingFundingRequestController::class, 'approve'])->middleware('employee.module:funding_requests,approve');

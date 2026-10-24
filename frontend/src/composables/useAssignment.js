@@ -23,6 +23,12 @@ function matchesModuleKey(assignedKey, requestedKey) {
 // Shared across all components that call useAssignment().
 const modulePermissions = ref([]); // Array of { module, permission }
 const defaultRoute = ref("/erp/dashboard");
+// The shop owner can open every ERP page; useAuth keeps this in step with the signed-in user
+const ownerAccess = ref(false);
+
+export function setOwnerAccess(isOwner) {
+  ownerAccess.value = !!isOwner;
+}
 
 export const PERMISSION_TOOLTIPS = {
   view: "You don't have permission to view this information.",
@@ -59,11 +65,13 @@ export function useAssignment() {
   // ─── Permission helpers ──────────────────────────────────────────────────
   /** Does the employee have any assigned permission for this module? */
   function hasAccess(moduleKey) {
+    if (ownerAccess.value) return true;
     return modulePermissions.value.some((p) => matchesModuleKey(p.module, moduleKey));
   }
 
   /** Does the employee have a specific granular permission? */
   function can(moduleKey, permission) {
+    if (ownerAccess.value) return true;
     return modulePermissions.value.some(
       (p) => matchesModuleKey(p.module, moduleKey) && p.permission === permission,
     );
@@ -93,6 +101,7 @@ export function useAssignment() {
    * Useful for route guards that protect entire sections (e.g. /erp/hr/*).
    */
   function hasGroupAccess(group) {
+    if (ownerAccess.value) return true;
     const groupModuleKeys = ERP_MODULES.filter((m) => m.group === group).map((m) => m.key);
     return modulePermissions.value.some((p) =>
       groupModuleKeys.some((moduleKey) => matchesModuleKey(p.module, moduleKey)),

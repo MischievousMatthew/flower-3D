@@ -25,9 +25,19 @@ class AccountingFundingRequestController extends Controller
         return null;
     }
 
+    private function isShopOwner($user): bool
+    {
+        return $user instanceof \App\Models\User && $user->role === \App\Models\User::ROLE_VENDOR;
+    }
+
     private function requireFinanceAccess(Request $request, string $access = 'view')
     {
         $employee = $request->user();
+
+        // The shop owner can see every request; deciding stays with the assigned approver
+        if ($access === 'view' && $this->isShopOwner($employee)) {
+            return null;
+        }
 
         if (!$employee instanceof Employee) {
             return response()->json(['message' => 'Only employees can access this endpoint'], 403);
@@ -49,14 +59,11 @@ class AccountingFundingRequestController extends Controller
                 return $response;
             }
 
-            /** @var Employee $employee */
-            $employee = $request->user();
-
             $requests = DB::table('funding_requests as fr')
                 ->leftJoin('employees as requester', 'fr.requester_id', '=', 'requester.id')
                 ->leftJoin('employees as approver', 'fr.approver_id', '=', 'approver.id')
                 ->leftJoin('employees as reviewer', 'fr.reviewed_by_employee_id', '=', 'reviewer.id')
-                ->where('fr.owner_id', $employee->owner_id)
+                ->where('fr.owner_id', $this->getOwnerId($request))
                 ->select(
                     'fr.*',
                     'requester.name as submitted_by_name',
