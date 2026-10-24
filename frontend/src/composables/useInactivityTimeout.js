@@ -1,13 +1,32 @@
 import { onMounted, onUnmounted, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useAuth } from "./useAuth";
-import { toast } from "vue3-toastify";
+import { markSessionExpired } from "../utils/sessionExpired";
 
 export function useInactivityTimeout(timeoutMinutes = 15) {
   const { isAuthenticated, logout } = useAuth();
+  const router = useRouter();
 
   const timeoutMs = timeoutMinutes * 60 * 1000;
   let activityTimer = null;
   let storageCheckTimer = null;
+
+  // Away too long since the last recorded activity (e.g. the browser was closed)
+  const hasExpired = () => {
+    const lastActivity = parseInt(localStorage.getItem("last_activity") || "0", 10);
+    return lastActivity > 0 && Date.now() - lastActivity >= timeoutMs;
+  };
+
+  // A signed-in session just became known: expire it if the gap was too long,
+  // otherwise start counting. Resetting first would erase the gap.
+  const startTracking = () => {
+    if (!isAuthenticated.value) return;
+    if (hasExpired()) {
+      handleInactivity({ reopened: true });
+    } else {
+      resetTimer();
+    }
+  };
 
   const resetTimer = () => {
     if (!isAuthenticated.value) return;
@@ -18,7 +37,9 @@ export function useInactivityTimeout(timeoutMinutes = 15) {
     activityTimer = setTimeout(handleInactivity, timeoutMs);
   };
 
-  const handleInactivity = async () => {
+  // reopened: the gap was found on page load (browser closed and reopened), so
+  // sign out quietly. Otherwise the page was open the whole time: explain why.
+  const handleInactivity = async ({ reopened = false } = {}) => {
     if (!isAuthenticated.value) return;
 
     const lastActivity = parseInt(
@@ -38,11 +59,15 @@ export function useInactivityTimeout(timeoutMinutes = 15) {
 
       if (activityTimer) clearTimeout(activityTimer);
 
-      await logout();
+      const onPublicPage = router.currentRoute.value.matched.some((r) => r.meta?.public);
 
-      toast.info("Session expired due to inactivity. Please log in again.", {
-        autoClose: 6000,
-      });
+      await logout({ quiet: true });
+
+      if (!reopened) {
+        markSessionExpired();
+      } else if (!onPublicPage) {
+        router.replace("/guest/login");
+      }
     } else {
       const remainingTime = timeoutMs - (now - lastActivity);
       if (activityTimer) clearTimeout(activityTimer);
@@ -117,7 +142,7 @@ export function useInactivityTimeout(timeoutMinutes = 15) {
   // Watch for authentication state changes (e.g. user logs in)
   watch(isAuthenticated, (newVal) => {
     if (newVal) {
-      resetTimer();
+      startTracking();
     } else {
       if (activityTimer) clearTimeout(activityTimer);
     }
@@ -125,11 +150,8 @@ export function useInactivityTimeout(timeoutMinutes = 15) {
 
   onMounted(() => {
     setupListeners();
-    // Initial check just in case we are landing on an authenticated page
-    if (isAuthenticated.value) {
-      checkOnVisible();
-      resetTimer();
-    }
+    // Landing on a page with a stored session, whether or not the tab is visible yet
+    startTracking();
   });
 
   onUnmounted(() => {

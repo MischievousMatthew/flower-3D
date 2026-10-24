@@ -24,6 +24,7 @@ export const clearStoredAuth = () => {
   localStorage.removeItem("vendor_token");
   localStorage.removeItem("user");
   localStorage.removeItem("user_type");
+  localStorage.removeItem("last_activity");
 };
 
 export const hasStoredAuthSession = (path = window.location.pathname) =>

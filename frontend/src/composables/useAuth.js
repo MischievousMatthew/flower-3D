@@ -17,6 +17,7 @@ import { useAdminAccess } from "./useAdminAccess";
 import { readPendingPlan } from "../constants/subscriptionPlans";
 import { getDeviceId } from "../utils/deviceId";
 import { clearSessionReplaced } from "../utils/sessionReplaced";
+import { clearSessionExpired } from "../utils/sessionExpired";
 import { loginProblem } from "../utils/loginProblems";
 
 const user = ref(null);
@@ -59,9 +60,12 @@ export function useAuth() {
 
     localStorage.setItem("user_type", type);
     localStorage.setItem("user", JSON.stringify(userData));
+    // Signing in counts as activity, so an old timestamp can't expire the new session
+    localStorage.setItem("last_activity", Date.now().toString());
     user.value = userData;
-    // A fresh sign-in on this browser: any "signed in elsewhere" notice is over
+    // A fresh sign-in on this browser: any "signed out" notice is over
     clearSessionReplaced();
+    clearSessionExpired();
 
     setAuthHeader(type);
   };
@@ -330,7 +334,8 @@ export function useAuth() {
   };
 
   // ================= LOGOUT =================
-  const logout = async () => {
+  // quiet: sign out without the login redirect and toast (the caller decides what to show)
+  const logout = async ({ quiet = false } = {}) => {
     if (isLoggingOut.value) return;
 
     try {
@@ -357,6 +362,7 @@ export function useAuth() {
           .catch(() => console.warn("Server logout failed; this browser is signed out anyway."));
       }
 
+      if (quiet) return;
       await router.push("/guest/login");
       toast.success("Logged out successfully!");
     } finally {
@@ -371,7 +377,11 @@ export function useAuth() {
       const endpoint =
         userType === "employee" ? "/auth/employee-me" : "/auth/me";
 
+      const sentWith = userType === "employee" ? getStoredEmployeeToken() : getStoredUserToken();
       const { data } = await api.get(endpoint);
+      // Signed out while this was loading (e.g. the inactivity timeout): don't sign back in
+      const current = userType === "employee" ? getStoredEmployeeToken() : getStoredUserToken();
+      if (!current || current !== sentWith) return;
       user.value =
         userType === "employee"
           ? { ...data?.employee, type: "employee" }
