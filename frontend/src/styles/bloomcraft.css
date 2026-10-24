@@ -23,18 +23,22 @@
    DESIGN TOKENS
 ============================================================= */
 .bc-theme {
-  /* Dim-white base, warm like petals */
-  --ivory: #f4f1ec;
-  --ivory-deep: #ebe5dd;
-  --paper: #faf8f4;
-  --ink: #1e1b18;
-  --ink-soft: #6e6761;
-  --line: rgba(30, 27, 24, 0.12);
-  --line-soft: rgba(30, 27, 24, 0.07);
-  --rosewood: #b86558;
-  --rosewood-dark: #8e443a;
+  /* Logo colours: the slate navy of the "B" and the green of its leaves,
+     on a clean off-white with a hint of green */
+  --ivory: #f2f5f2;
+  --ivory-deep: #e4eae5;
+  --paper: #fafbfa;
+  --ink: #363f4e;
+  --ink-soft: #6a7282;
+  --line: rgba(54, 63, 78, 0.12);
+  --line-soft: rgba(54, 63, 78, 0.07);
+  /* Logo green for fills; the deeper green is for text and links (readable on white) */
+  --leaf: #4db173;
+  --leaf-deep: #2e7a4f;
+  --leaf-light: #8fd1a6;
+  /* Review stars and ratings stay gold */
   --gold: #d4b27a;
-  --espresso: #1b1612;
+  --espresso: #262d39;
 
   --font-display: "Cormorant Garamond", "Cormorant", Georgia, "Times New Roman", serif;
   --font-sans: "Poppins", -apple-system, "Segoe UI", sans-serif;
@@ -47,6 +51,22 @@
   font-weight: 300;
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
+}
+
+/* The earlier rosewood palette, for pages that keep it (the vendor application) */
+.bc-theme.bc-palette-classic,
+.bc-palette-classic .bc-theme {
+  --ivory: #f4f1ec;
+  --ivory-deep: #ebe5dd;
+  --paper: #faf8f4;
+  --ink: #1e1b18;
+  --ink-soft: #6e6761;
+  --line: rgba(30, 27, 24, 0.12);
+  --line-soft: rgba(30, 27, 24, 0.07);
+  --leaf: #b86558;
+  --leaf-deep: #8e443a;
+  --leaf-light: #d4b27a;
+  --espresso: #1b1612;
 }
 
 .bc-container {
@@ -72,7 +92,7 @@
 .bc-theme :is(h1, h2, h3) em {
   font-style: italic;
   font-weight: 400;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 /* One quiet label style for every section */
@@ -157,7 +177,7 @@
 }
 
 .bc-btn--dark:hover {
-  background: var(--rosewood-dark);
+  background: var(--leaf-deep);
 }
 
 .bc-btn-arrow {
@@ -171,7 +191,7 @@
 
 .bc-btn:focus-visible,
 .bc-link:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 4px;
 }
 
@@ -238,9 +258,9 @@
   max-width: 1240px;
   padding: 0.7rem 0.8rem 0.7rem 1.6rem;
   border-radius: 999px;
-  background: rgba(250, 248, 244, 0.86);
+  background: rgba(250, 251, 250, 0.86);
   border-color: var(--line-soft);
-  box-shadow: 0 12px 40px rgba(30, 27, 24, 0.08);
+  box-shadow: 0 12px 40px rgba(54, 63, 78, 0.08);
 }
 
 .bc-logo {
@@ -305,7 +325,7 @@
 }
 
 .bc-nav-login:hover {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .bc-nav-register {
@@ -321,7 +341,7 @@
 }
 
 .bc-nav-register:hover {
-  background: var(--rosewood-dark);
+  background: var(--leaf-deep);
 }
 
 .bc-nav-links a:focus-visible,
@@ -329,7 +349,7 @@
 .bc-nav-register:focus-visible,
 .bc-logo:focus-visible,
 .bc-nav-toggle:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 4px;
   border-radius: 6px;
 }
@@ -406,8 +426,8 @@
     padding: 10px 22px;
     border: 1px solid var(--line-soft);
     border-radius: 22px;
-    background: rgba(250, 248, 244, 0.97);
-    box-shadow: 0 18px 40px rgba(30, 27, 24, 0.12);
+    background: rgba(250, 251, 250, 0.97);
+    box-shadow: 0 18px 40px rgba(54, 63, 78, 0.12);
     opacity: 0;
     visibility: hidden;
     transform: translateY(-8px);
@@ -480,9 +500,9 @@
   border-radius: 10px;
   background: linear-gradient(
     100deg,
-    var(--ivory-deep, #ebe5dd) 30%,
-    var(--paper, #faf8f4) 50%,
-    var(--ivory-deep, #ebe5dd) 70%
+    var(--ivory-deep, #e4eae5) 30%,
+    var(--paper, #fafbfa) 50%,
+    var(--ivory-deep, #e4eae5) 70%
   );
   background-size: 300% 100%;
   animation: bcShimmer 1.6s ease-in-out infinite;

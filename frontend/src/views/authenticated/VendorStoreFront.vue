@@ -1029,7 +1029,7 @@ onMounted(async () => {
   font-size: clamp(260px, 38vw, 560px);
   font-style: italic;
   line-height: 1;
-  color: var(--rosewood);
+  color: var(--leaf);
   opacity: 0.14;
   user-select: none;
 }
@@ -1046,7 +1046,7 @@ onMounted(async () => {
   padding: 9px 16px;
   border: none;
   border-radius: 999px;
-  background: rgba(250, 248, 244, 0.92);
+  background: rgba(250, 251, 250, 0.92);
   color: var(--ink);
   font-size: 13px;
   font-weight: 500;
@@ -1079,7 +1079,7 @@ onMounted(async () => {
   font-family: var(--font-display);
   font-size: 64px;
   font-style: italic;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .sf-seal img {
@@ -1591,7 +1591,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(27, 22, 18, 0.45);
+  background: rgba(38, 45, 57, 0.45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   animation: fadeIn 0.3s ease;
@@ -1621,7 +1621,7 @@ onMounted(async () => {
   height: 38px;
   border: none;
   border-radius: 50%;
-  background: rgba(250, 248, 244, 0.9);
+  background: rgba(250, 251, 250, 0.9);
   color: var(--ink);
   font-size: 15px;
   cursor: pointer;
@@ -1640,7 +1640,7 @@ onMounted(async () => {
   overflow: hidden;
   border-radius: 24px;
   background: var(--paper);
-  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
+  box-shadow: 0 30px 80px rgba(38, 45, 57, 0.25);
   animation: riseIn 0.45s var(--ease-out);
 }
 
@@ -1719,7 +1719,7 @@ onMounted(async () => {
   display: flex;
   padding: 4px;
   border-radius: 999px;
-  background: rgba(250, 248, 244, 0.92);
+  background: rgba(250, 251, 250, 0.92);
 }
 
 .view-toggle button {
@@ -1855,7 +1855,7 @@ onMounted(async () => {
 }
 
 .stock-pill.out-of-stock {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .modal-cart-row {
@@ -1917,7 +1917,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(27, 22, 18, 0.9);
+  background: rgba(38, 45, 57, 0.9);
 }
 
 .sf-gallery img {
@@ -1935,14 +1935,14 @@ onMounted(async () => {
   height: 46px;
   border: none;
   border-radius: 50%;
-  background: rgba(250, 248, 244, 0.14);
-  color: #faf8f4;
+  background: rgba(250, 251, 250, 0.14);
+  color: #fafbfa;
   font-size: 24px;
   cursor: pointer;
 }
 
 .sf-gallery-btn:hover {
-  background: rgba(250, 248, 244, 0.26);
+  background: rgba(250, 251, 250, 0.26);
 }
 
 .sf-gallery-close {
@@ -1963,7 +1963,7 @@ onMounted(async () => {
   position: absolute;
   bottom: 20px;
   margin: 0;
-  color: rgba(250, 248, 244, 0.75);
+  color: rgba(250, 251, 250, 0.75);
   font-family: "Poppins", sans-serif;
   font-size: 13px;
 }
@@ -1980,7 +1980,7 @@ onMounted(async () => {
 .view-toggle button:focus-visible,
 .qty-btn:focus-visible,
 .sf-gallery-btn:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 

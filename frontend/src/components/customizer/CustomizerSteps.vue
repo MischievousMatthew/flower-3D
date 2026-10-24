@@ -50,7 +50,7 @@ defineEmits(["select"]);
   font-family: var(--font-display);
   font-size: 18px;
   line-height: 1;
-  color: rgba(30, 27, 24, 0.35);
+  color: rgba(54, 63, 78, 0.35);
   transition: color 0.2s ease;
 }
 
@@ -64,15 +64,15 @@ defineEmits(["select"]);
 
 .cs-step.on {
   color: var(--ink);
-  border-bottom-color: var(--rosewood);
+  border-bottom-color: var(--leaf);
 }
 
 .cs-step.on .cs-num {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .cs-step:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: -2px;
 }
 

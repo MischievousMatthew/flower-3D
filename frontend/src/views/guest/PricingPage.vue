@@ -207,24 +207,24 @@ const featureGroups = [
 
 <style scoped>
 :global(body) { margin: 0; background: #faf8f5; }
-.pricing-page { --ink: #1e1b18; --ink-soft: #6c655f; --ivory: #faf8f5; --ivory-deep: #f1ebe3; --rosewood: #b86558; --gold: #d4b27a; --line: rgba(30, 27, 24, 0.12); min-height: 100vh; overflow: hidden; color: var(--ink); background: radial-gradient(circle at 7% 8%, rgba(242, 206, 194, .58), transparent 25rem), radial-gradient(circle at 96% 37%, rgba(212, 178, 122, .18), transparent 23rem), var(--ivory); font-family: "Poppins", sans-serif; }
+.pricing-page { --ink: #1e1b18; --ink-soft: #6c655f; --ivory: #faf8f5; --ivory-deep: #f1ebe3; --leaf: #b86558; --gold: #d4b27a; --line: rgba(30, 27, 24, 0.12); min-height: 100vh; overflow: hidden; color: var(--ink); background: radial-gradient(circle at 7% 8%, rgba(242, 206, 194, .58), transparent 25rem), radial-gradient(circle at 96% 37%, rgba(212, 178, 122, .18), transparent 23rem), var(--ivory); font-family: "Poppins", sans-serif; }
 .pricing-nav { display: flex; align-items: center; justify-content: space-between; gap: 30px; max-width: 1200px; margin: 0 auto; padding: 22px 6%; }
 .brand { display: inline-flex; align-items: center; gap: 9px; color: var(--ink); font-family: "Montserrat", "Poppins", sans-serif; font-size: 21px; font-weight: 700; text-decoration: none; letter-spacing: -.02em; }
 .brand img { object-fit: contain; }
 .pricing-nav nav { display: flex; gap: 28px; }
 .pricing-nav nav a { position: relative; color: var(--ink); font-size: 14px; text-decoration: none; }
-.pricing-nav nav .is-current { color: var(--rosewood); font-weight: 600; }
-.pricing-nav nav .is-current::after { position: absolute; right: 0; bottom: -6px; left: 0; height: 2px; background: var(--rosewood); content: ""; }
+.pricing-nav nav .is-current { color: var(--leaf); font-weight: 600; }
+.pricing-nav nav .is-current::after { position: absolute; right: 0; bottom: -6px; left: 0; height: 2px; background: var(--leaf); content: ""; }
 .nav-actions { display: flex; gap: 10px; }
 .button { display: inline-block; padding: 10px 22px; color: var(--ivory); background: var(--ink); border: 1px solid var(--ink); border-radius: 999px; font-size: 13.5px; font-weight: 500; text-decoration: none; transition: transform .25s ease, background .25s ease; }
-.button:hover { background: var(--rosewood); border-color: var(--rosewood); transform: translateY(-2px); }
+.button:hover { background: var(--leaf); border-color: var(--leaf); transform: translateY(-2px); }
 .button--quiet { color: var(--ink); background: transparent; border-color: var(--line); }
 .button--quiet:hover { color: var(--ivory); }
 .pricing-hero { max-width: 760px; margin: 70px auto 52px; padding: 0 24px; text-align: center; }
-.eyebrow { margin: 0 0 14px; color: var(--rosewood); font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.eyebrow { margin: 0 0 14px; color: var(--leaf); font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 h1, h2, h3, p { margin-top: 0; }
 .pricing-hero h1 { max-width: 700px; margin: 0 auto 18px; font-size: clamp(38px, 5vw, 62px); line-height: 1.08; letter-spacing: -.05em; }
-.pricing-hero h1 span { color: var(--rosewood); }
+.pricing-hero h1 span { color: var(--leaf); }
 .pricing-hero > p:last-child, .section-heading > p:last-child { color: var(--ink-soft); font-size: 16px; line-height: 1.8; }
 .plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; max-width: 1200px; margin: 0 auto; padding: 0 6%; }
 .subscription-message { grid-column: 1 / -1; margin: 4px 0 0; padding: 12px 16px; color: #5b3a1e; background: #fff5df; border: 1px solid #eacb95; border-radius: 12px; font-size: 14px; text-align: center; }
@@ -235,7 +235,7 @@ h1, h2, h3, p { margin-top: 0; }
 .feature-group { padding: 23px 20px; background: rgba(255,255,255,.5); border: 1px solid var(--line); border-radius: 16px; }
 .group-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 17px; }
 .group-heading h3 { margin: 0; font-size: 16px; }
-.group-heading span { color: var(--rosewood); font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+.group-heading span { color: var(--leaf); font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
 .feature-group ul { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; color: var(--ink-soft); font-size: 12.5px; line-height: 1.45; }
 .feature-group li::before { margin-right: 7px; color: var(--gold); content: "•"; }
 .enterprise-note { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; max-width: 1080px; margin: 0 auto; padding: 70px 6%; color: var(--ivory); background: var(--ink); border-radius: 28px; }

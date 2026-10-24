@@ -139,11 +139,11 @@ function meta(item) {
 }
 
 .sp-row:hover {
-  background: rgba(30, 27, 24, 0.03);
+  background: rgba(54, 63, 78, 0.03);
 }
 
 .sp-row.active {
-  background: rgba(184, 101, 88, 0.08);
+  background: rgba(77, 177, 115, 0.08);
 }
 
 .sp-row.disabled {
@@ -152,7 +152,7 @@ function meta(item) {
 }
 
 .sp-row:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: -2px;
 }
 
@@ -202,7 +202,7 @@ function meta(item) {
 .sp-add {
   font-size: 12px;
   font-weight: 500;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .sp-count {
@@ -212,11 +212,11 @@ function meta(item) {
   height: 24px;
   padding: 0 7px;
   border-radius: 12px;
-  background: rgba(184, 101, 88, 0.12);
+  background: rgba(77, 177, 115, 0.12);
   font-size: 12px;
   font-weight: 600;
   line-height: 1;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .sp-flag {
@@ -244,7 +244,7 @@ function meta(item) {
 }
 
 .sp-fill:hover {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   border-bottom-color: currentColor;
 }
 

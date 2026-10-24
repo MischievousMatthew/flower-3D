@@ -26,7 +26,7 @@ const { site } = useSiteContent();
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(244, 241, 236, 0.88);
+  background: rgba(242, 245, 242, 0.88);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line-soft);
 }
@@ -57,7 +57,7 @@ const { site } = useSiteContent();
   text-decoration: none;
 }
 .topbar-links a.router-link-active:not(.topbar-cta) {
-  color: var(--rosewood);
+  color: var(--leaf);
 }
 .topbar-cta {
   padding: 10px 18px;

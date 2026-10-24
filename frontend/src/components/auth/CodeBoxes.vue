@@ -116,16 +116,16 @@ defineExpose({ focus: () => boxes[0]?.focus() });
   font: 500 20px/1 var(--font-sans);
   text-align: center;
   color: var(--ink);
-  caret-color: var(--rosewood-dark);
+  caret-color: var(--leaf-deep);
 }
 .cb-box:focus {
   outline: none;
-  border-color: var(--rosewood-dark);
-  box-shadow: 0 0 0 4px rgba(142, 68, 58, 0.12);
+  border-color: var(--leaf-deep);
+  box-shadow: 0 0 0 4px rgba(46, 122, 79, 0.12);
 }
 .bad .cb-box {
-  border-color: rgba(142, 68, 58, 0.55);
-  background: #fffaf8;
+  border-color: rgba(46, 122, 79, 0.55);
+  background: #f6fbf8;
 }
 .shake {
   animation: cb-shake 0.4s ease;

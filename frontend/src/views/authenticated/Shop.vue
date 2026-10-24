@@ -951,7 +951,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(27, 22, 18, 0.45);
+  background: rgba(38, 45, 57, 0.45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   animation: fadeIn 0.3s ease;
@@ -977,7 +977,7 @@ onUnmounted(() => {
   padding: 40px 34px 30px;
   border-radius: 26px;
   background: var(--paper);
-  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
+  box-shadow: 0 30px 80px rgba(38, 45, 57, 0.25);
   animation: riseIn 0.4s var(--ease-out);
 }
 
@@ -1031,7 +1031,7 @@ onUnmounted(() => {
   height: 38px;
   border: none;
   border-radius: 50%;
-  background: rgba(250, 248, 244, 0.9);
+  background: rgba(250, 251, 250, 0.9);
   color: var(--ink);
   font-size: 15px;
   cursor: pointer;
@@ -1049,7 +1049,7 @@ onUnmounted(() => {
 .thumbnail:focus-visible,
 .view-toggle button:focus-visible,
 .qty-btn:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 
@@ -1061,7 +1061,7 @@ onUnmounted(() => {
   overflow: hidden;
   border-radius: 24px;
   background: var(--paper);
-  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
+  box-shadow: 0 30px 80px rgba(38, 45, 57, 0.25);
   animation: riseIn 0.45s var(--ease-out);
 }
 
@@ -1142,7 +1142,7 @@ onUnmounted(() => {
   background: none;
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   cursor: pointer;
 }
 
@@ -1218,16 +1218,16 @@ onUnmounted(() => {
   gap: 8px;
   height: 32px;
   padding: 0 12px;
-  border: 1px solid rgba(184, 101, 88, 0.35);
+  border: 1px solid rgba(77, 177, 115, 0.35);
   border-radius: 999px;
-  background: #f8ece7;
+  background: #e9f5ed;
   font-size: 12.5px;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   cursor: pointer;
 }
 
 .fresh-chip:hover {
-  border-color: var(--rosewood-dark);
+  border-color: var(--leaf-deep);
 }
 
 .fresh-chip span {
@@ -1264,17 +1264,17 @@ onUnmounted(() => {
 .fresh-more-btn {
   height: 44px;
   padding: 0 26px;
-  border: 1px solid var(--rosewood-dark);
+  border: 1px solid var(--leaf-deep);
   border-radius: 999px;
   background: var(--paper);
   font-size: 13.5px;
   font-weight: 500;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   cursor: pointer;
 }
 
 .fresh-more-btn:hover:not(:disabled) {
-  background: #f8ece7;
+  background: #e9f5ed;
 }
 
 @media (max-width: 960px) {

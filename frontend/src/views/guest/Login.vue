@@ -383,7 +383,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgba(27, 22, 18, 0.5);
+  background: rgba(38, 45, 57, 0.5);
   backdrop-filter: blur(4px);
 }
 .lg-modal {
@@ -394,7 +394,7 @@ onBeforeUnmount(() => {
   padding: 30px 28px 24px;
   border-radius: 22px;
   background: var(--paper);
-  box-shadow: 0 40px 80px -30px rgba(27, 22, 18, 0.6);
+  box-shadow: 0 40px 80px -30px rgba(38, 45, 57, 0.6);
 }
 .lg-modal h2 {
   margin: 0;

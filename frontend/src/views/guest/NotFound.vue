@@ -147,7 +147,7 @@ onMounted(() => {
   min-height: 100dvh;
   overflow: hidden;
   background:
-    radial-gradient(60% 50% at 50% 38%, rgba(184, 101, 88, 0.08) 0%, transparent 70%),
+    radial-gradient(60% 50% at 50% 38%, rgba(77, 177, 115, 0.08) 0%, transparent 70%),
     var(--ivory);
   font-family: var(--font-sans);
   color: var(--ink);
@@ -303,7 +303,7 @@ onMounted(() => {
   font-weight: 500;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .nf-title {
@@ -315,7 +315,7 @@ onMounted(() => {
 }
 
 .nf-title em {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .nf-copy {
@@ -356,8 +356,8 @@ onMounted(() => {
 }
 
 .nf-btn--solid:hover {
-  border-color: var(--rosewood-dark);
-  background: var(--rosewood-dark);
+  border-color: var(--leaf-deep);
+  background: var(--leaf-deep);
 }
 
 .nf-btn--ghost {
@@ -384,7 +384,7 @@ onMounted(() => {
 }
 
 .nf-links a:hover {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   border-bottom-color: currentColor;
 }
 
@@ -396,7 +396,7 @@ onMounted(() => {
 }
 
 .nf-page :focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 

@@ -1286,7 +1286,7 @@ onMounted(async () => {
 .avatar-placeholder {
   display: grid;
   place-items: center;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   font-family: var(--font-display);
   font-size: 48px;
   font-weight: 500;
@@ -1310,7 +1310,7 @@ onMounted(async () => {
 }
 
 .btn-change-photo:hover {
-  background: var(--rosewood-dark);
+  background: var(--leaf-deep);
 }
 
 .user-name {
@@ -1332,7 +1332,7 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.14em;
@@ -1450,7 +1450,7 @@ onMounted(async () => {
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 500;
-  box-shadow: 0 4px 14px rgba(30, 27, 24, 0.16);
+  box-shadow: 0 4px 14px rgba(54, 63, 78, 0.16);
   cursor: pointer;
 }
 
@@ -1469,7 +1469,7 @@ onMounted(async () => {
 }
 
 .location-locate:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 
@@ -1479,7 +1479,7 @@ onMounted(async () => {
   z-index: 1;
   padding: 10px 14px;
   border-radius: 12px;
-  background: rgba(250, 248, 244, 0.94);
+  background: rgba(250, 251, 250, 0.94);
   color: var(--ink-soft);
   font-size: 13px;
 }
@@ -1524,7 +1524,7 @@ onMounted(async () => {
 }
 
 .location-status.is-error {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 @media (max-width: 760px) {
@@ -1637,11 +1637,11 @@ onMounted(async () => {
 }
 
 .input-error {
-  border-color: var(--rosewood-dark);
+  border-color: var(--leaf-deep);
 }
 
 .field-error {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   font-size: 12.5px;
 }
 
@@ -1722,7 +1722,7 @@ onMounted(async () => {
   height: 22px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 2px 6px rgba(30, 27, 24, 0.18);
+  box-shadow: 0 2px 6px rgba(54, 63, 78, 0.18);
   transition: transform 0.35s var(--ease-out);
 }
 
@@ -1739,7 +1739,7 @@ onMounted(async () => {
 }
 
 .toggle-switch input:focus-visible + .toggle-slider {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 
@@ -1760,7 +1760,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(27, 22, 18, 0.45);
+  background: rgba(38, 45, 57, 0.45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -1775,7 +1775,7 @@ onMounted(async () => {
   padding: 40px 34px 32px;
   border-radius: 26px;
   background: var(--paper);
-  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
+  box-shadow: 0 30px 80px rgba(38, 45, 57, 0.25);
 }
 
 .two-factor-modal h2 {
@@ -1851,7 +1851,7 @@ onMounted(async () => {
 .btn-edit:focus-visible,
 .btn-cancel:focus-visible,
 .two-factor-modal-close:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 

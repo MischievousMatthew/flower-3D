@@ -129,7 +129,7 @@ const formatDate = (v) => (v ? new Date(v).toLocaleDateString("en-PH", { month: 
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--rosewood);
+  color: var(--leaf);
   font-weight: 500;
   text-decoration: none;
 }
@@ -194,12 +194,12 @@ const formatDate = (v) => (v ? new Date(v).toLocaleDateString("en-PH", { month: 
 .prose blockquote {
   margin: 1.6em 0;
   padding: 0 0 0 24px;
-  border-left: 2px solid var(--rosewood);
+  border-left: 2px solid var(--leaf);
   font-family: var(--font-display);
   font-size: 28px;
   font-style: italic;
   line-height: 1.35;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 .article-cta {
   max-width: 680px;
@@ -245,7 +245,7 @@ const formatDate = (v) => (v ? new Date(v).toLocaleDateString("en-PH", { month: 
   font-size: 24px;
 }
 .related a:hover .related-title {
-  color: var(--rosewood);
+  color: var(--leaf);
 }
 .missing {
   padding: 120px 0;

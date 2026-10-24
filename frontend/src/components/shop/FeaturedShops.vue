@@ -124,7 +124,7 @@ const distance = (km) => {
 .fs-cover--logo {
   display: grid;
   place-items: center;
-  background: radial-gradient(circle at 30% 30%, #b86558 0%, #6e3a33 100%);
+  background: radial-gradient(circle at 30% 30%, #4db173 0%, #6e3a33 100%);
 }
 
 .fs-cover--logo {
@@ -135,7 +135,7 @@ const distance = (km) => {
 .fs-cover--logo img {
   width: 58px;
   height: 58px;
-  border: 3px solid rgba(250, 248, 244, 0.85);
+  border: 3px solid rgba(250, 251, 250, 0.85);
   border-radius: 50%;
   object-fit: cover;
 }
@@ -149,7 +149,7 @@ const distance = (km) => {
 .fs-shade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(20, 15, 12, 0) 30%, rgba(20, 15, 12, 0.78) 100%);
+  background: linear-gradient(180deg, rgba(30, 36, 46, 0) 30%, rgba(30, 36, 46, 0.78) 100%);
 }
 
 .fs-near {
@@ -162,11 +162,11 @@ const distance = (km) => {
   gap: 4px;
   padding: 4px 10px 4px 8px;
   border-radius: 999px;
-  background: var(--rosewood-dark);
+  background: var(--leaf-deep);
   font-size: 11px;
   font-weight: 500;
   color: var(--paper);
-  box-shadow: 0 6px 14px -8px rgba(30, 27, 24, 0.6);
+  box-shadow: 0 6px 14px -8px rgba(54, 63, 78, 0.6);
 }
 
 .fs-near svg {
@@ -183,10 +183,10 @@ const distance = (km) => {
   right: 10px;
   padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(250, 248, 244, 0.92);
+  background: rgba(250, 251, 250, 0.92);
   font-size: 10.5px;
   font-weight: 500;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .fs-copy {
@@ -218,7 +218,7 @@ const distance = (km) => {
   font-size: 11.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: rgba(250, 248, 244, 0.85);
+  color: rgba(250, 251, 250, 0.85);
 }
 
 .fs-place svg {
@@ -239,7 +239,7 @@ const distance = (km) => {
 
 .fs-meta {
   font-size: 11.5px;
-  color: rgba(250, 248, 244, 0.85);
+  color: rgba(250, 251, 250, 0.85);
 }
 
 .fs-visit {
@@ -255,7 +255,7 @@ const distance = (km) => {
 }
 
 .fs-visit:hover {
-  background: var(--rosewood-dark);
+  background: var(--leaf-deep);
   color: var(--paper);
 }
 
@@ -266,7 +266,7 @@ const distance = (km) => {
 }
 
 .fs :focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 2px;
 }
 

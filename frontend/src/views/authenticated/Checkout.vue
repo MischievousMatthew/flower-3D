@@ -1382,7 +1382,7 @@ onMounted(async () => {
 .checkout-page {
   --day-available: #7d8f69;
   --day-almost: #c99a4a;
-  --day-full: var(--rosewood);
+  --day-full: var(--leaf);
 }
 
 .dot-today {
@@ -1540,7 +1540,7 @@ onMounted(async () => {
 }
 
 .calendar-day.day-fully-booked {
-  background: rgba(184, 101, 88, 0.07);
+  background: rgba(77, 177, 115, 0.07);
   color: var(--ink-soft);
 }
 
@@ -1565,7 +1565,7 @@ onMounted(async () => {
 
 .calendar-day.day-disabled {
   background: transparent;
-  color: rgba(30, 27, 24, 0.3);
+  color: rgba(54, 63, 78, 0.3);
 }
 
 .calendar-day.other-month {
@@ -1583,7 +1583,7 @@ onMounted(async () => {
 }
 
 .calendar-day:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 2px;
 }
 
@@ -1722,7 +1722,7 @@ onMounted(async () => {
 }
 
 .price-badge {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.12em;
@@ -1773,7 +1773,7 @@ onMounted(async () => {
 }
 
 .payment-method-card:hover {
-  border-color: rgba(30, 27, 24, 0.35);
+  border-color: rgba(54, 63, 78, 0.35);
 }
 
 .payment-method-card.selected {
@@ -1791,7 +1791,7 @@ onMounted(async () => {
 }
 
 .payment-method-card:focus-within {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 
@@ -1859,7 +1859,7 @@ onMounted(async () => {
 .instructions-list li::before {
   content: "—";
   margin-right: 10px;
-  color: var(--rosewood);
+  color: var(--leaf);
 }
 
 /* ---- Summary ---- */
@@ -1985,14 +1985,14 @@ onMounted(async () => {
 }
 
 .savings-row .savings-amount {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .savings-banner {
   padding: 12px 14px;
   border-radius: 12px;
-  background: rgba(184, 101, 88, 0.08);
-  color: var(--rosewood-dark);
+  background: rgba(77, 177, 115, 0.08);
+  color: var(--leaf-deep);
   font-size: 13px;
 }
 
@@ -2035,12 +2035,12 @@ onMounted(async () => {
 .summary-notes li::before {
   content: "—";
   margin-right: 8px;
-  color: var(--rosewood);
+  color: var(--leaf);
 }
 
 .btn-nav:focus-visible,
 .step-back:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 

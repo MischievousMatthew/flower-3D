@@ -53,7 +53,7 @@ function radialTexture(innerColor, outerColor) {
 
 function buildBloomGlow() {
   const material = new THREE.SpriteMaterial({
-    map: radialTexture("rgba(255,228,214,0.85)", "rgba(255,228,214,0)"),
+    map: radialTexture("rgba(214,240,222,0.85)", "rgba(214,240,222,0)"),
     transparent: true,
     depthWrite: false,
   });
@@ -65,7 +65,7 @@ function buildBloomGlow() {
 
 function buildGroundShadow() {
   const material = new THREE.MeshBasicMaterial({
-    map: radialTexture("rgba(30,20,18,0.22)", "rgba(30,20,18,0)"),
+    map: radialTexture("rgba(30,36,46,0.22)", "rgba(30,36,46,0)"),
     transparent: true,
     depthWrite: false,
   });
@@ -84,7 +84,7 @@ function buildParticles(count) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   const material = new THREE.PointsMaterial({
-    color: 0xe9b8ae,
+    color: 0x8fd1a6,
     size: 0.035,
     transparent: true,
     opacity: 0.32,

@@ -156,7 +156,7 @@ const endsLabel = (value) => new Date(value).toLocaleDateString("en-PH", { month
   padding: 0 18px;
   border: 0;
   border-radius: 999px;
-  background: var(--rosewood-dark);
+  background: var(--leaf-deep);
   color: var(--paper);
   font: 500 12.5px var(--font-sans);
   cursor: pointer;
@@ -209,7 +209,7 @@ const endsLabel = (value) => new Date(value).toLocaleDateString("en-PH", { month
 }
 
 .so-item.active .so-photo {
-  border-color: var(--rosewood);
+  border-color: var(--leaf);
 }
 
 .so-photo img {
@@ -222,7 +222,7 @@ const endsLabel = (value) => new Date(value).toLocaleDateString("en-PH", { month
   width: 30px;
   height: 30px;
   fill: none;
-  stroke: var(--rosewood-dark);
+  stroke: var(--leaf-deep);
   stroke-width: 1.4;
 }
 
@@ -250,7 +250,7 @@ const endsLabel = (value) => new Date(value).toLocaleDateString("en-PH", { month
   align-items: center;
   min-height: 210px;
   overflow: hidden;
-  background: linear-gradient(120deg, #f6dfd8 0%, #fbeee9 55%, #f7e6e0 100%);
+  background: linear-gradient(120deg, #dcefe2 0%, #ecf6ef 55%, #e2f1e7 100%);
 }
 
 .so-promo-img {
@@ -277,7 +277,7 @@ const endsLabel = (value) => new Date(value).toLocaleDateString("en-PH", { month
 .so-promo-label {
   margin: 0 0 6px;
   font-size: 12px;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .so-promo h3 {
@@ -286,7 +286,7 @@ const endsLabel = (value) => new Date(value).toLocaleDateString("en-PH", { month
   font-size: 32px;
   font-weight: 500;
   line-height: 1.1;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .so-promo-msg {
@@ -306,10 +306,10 @@ const endsLabel = (value) => new Date(value).toLocaleDateString("en-PH", { month
 .so-code {
   height: 36px;
   padding: 0 14px;
-  border: 1px dashed var(--rosewood-dark);
+  border: 1px dashed var(--leaf-deep);
   border-radius: 999px;
-  background: rgba(250, 248, 244, 0.7);
-  color: var(--rosewood-dark);
+  background: rgba(250, 251, 250, 0.7);
+  color: var(--leaf-deep);
   font: 600 12px var(--font-sans);
   letter-spacing: 0.08em;
   cursor: pointer;
@@ -331,7 +331,7 @@ const endsLabel = (value) => new Date(value).toLocaleDateString("en-PH", { month
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgba(250, 248, 244, 0.92);
+  background: rgba(250, 251, 250, 0.92);
   color: var(--ink);
   cursor: pointer;
 }
@@ -347,7 +347,7 @@ const endsLabel = (value) => new Date(value).toLocaleDateString("en-PH", { month
 }
 
 .so :focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 

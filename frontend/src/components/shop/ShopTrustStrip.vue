@@ -83,7 +83,7 @@ const items = computed(() =>
   border: 1px solid var(--line-soft);
   border-radius: 16px;
   background: var(--paper);
-  box-shadow: 0 16px 40px -30px rgba(30, 27, 24, 0.35);
+  box-shadow: 0 16px 40px -30px rgba(54, 63, 78, 0.35);
 }
 
 .ts-item {
@@ -105,7 +105,7 @@ const items = computed(() =>
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: rgba(184, 101, 88, 0.1);
+  background: rgba(77, 177, 115, 0.1);
 }
 
 .ts--bottom .ts-icon {
@@ -116,7 +116,7 @@ const items = computed(() =>
   width: 22px;
   height: 22px;
   fill: none;
-  stroke: var(--rosewood-dark);
+  stroke: var(--leaf-deep);
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;

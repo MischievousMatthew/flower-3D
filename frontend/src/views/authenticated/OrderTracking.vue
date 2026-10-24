@@ -1452,8 +1452,8 @@ onMounted(async () => {
   --warn-bg: rgba(212, 178, 122, 0.2);
   --info: #4b6075;
   --info-bg: rgba(75, 96, 117, 0.1);
-  --bad: var(--rosewood-dark);
-  --bad-bg: rgba(184, 101, 88, 0.1);
+  --bad: var(--leaf-deep);
+  --bad-bg: rgba(77, 177, 115, 0.1);
 
   min-height: 100vh;
   padding: 150px var(--gutter) var(--section-space);
@@ -1734,7 +1734,7 @@ onMounted(async () => {
 }
 
 .ot-dot {
-  color: var(--rosewood);
+  color: var(--leaf);
 }
 
 .ot-card__aside {
@@ -1877,19 +1877,19 @@ onMounted(async () => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--rosewood);
+  background: var(--leaf);
   animation: otPulse 1.8s ease-out infinite;
 }
 
 @keyframes otPulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(184, 101, 88, 0.45);
+    box-shadow: 0 0 0 0 rgba(77, 177, 115, 0.45);
   }
   70% {
-    box-shadow: 0 0 0 8px rgba(184, 101, 88, 0);
+    box-shadow: 0 0 0 8px rgba(77, 177, 115, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(184, 101, 88, 0);
+    box-shadow: 0 0 0 0 rgba(77, 177, 115, 0);
   }
 }
 
@@ -2144,7 +2144,7 @@ onMounted(async () => {
 .ot-item__img--ph {
   display: grid;
   place-items: center;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   font-family: var(--font-display);
   font-size: 24px;
 }
@@ -2261,19 +2261,19 @@ onMounted(async () => {
 }
 
 .ot-btn--green:hover:not(:disabled) {
-  background: var(--rosewood-dark);
-  border-color: var(--rosewood-dark);
+  background: var(--leaf-deep);
+  border-color: var(--leaf-deep);
 }
 
 /* Destructive */
 .ot-btn--cancel {
-  border-color: rgba(142, 68, 58, 0.35);
-  color: var(--rosewood-dark);
+  border-color: rgba(46, 122, 79, 0.35);
+  color: var(--leaf-deep);
 }
 
 .ot-btn--cancel:hover:not(:disabled) {
-  background: var(--rosewood-dark);
-  border-color: var(--rosewood-dark);
+  background: var(--leaf-deep);
+  border-color: var(--leaf-deep);
   color: var(--ivory);
 }
 
@@ -2296,7 +2296,7 @@ onMounted(async () => {
 .ot-card__top:focus-visible,
 .ot-modal__close:focus-visible,
 .ot-dropzone__remove:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 
@@ -2309,7 +2309,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(27, 22, 18, 0.45);
+  background: rgba(38, 45, 57, 0.45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -2323,7 +2323,7 @@ onMounted(async () => {
   overflow: hidden;
   border-radius: 24px;
   background: var(--paper);
-  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
+  box-shadow: 0 30px 80px rgba(38, 45, 57, 0.25);
 }
 
 .ot-modal--sm {
@@ -2412,7 +2412,7 @@ onMounted(async () => {
 }
 
 .ot-modal__ico-lg--danger {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .ot-modal__ico-lg svg {
@@ -2462,7 +2462,7 @@ onMounted(async () => {
 }
 
 .ot-field__req {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .ot-field__optional {
@@ -2488,11 +2488,11 @@ onMounted(async () => {
 }
 
 .ot-textarea--err {
-  border-color: var(--rosewood-dark);
+  border-color: var(--leaf-deep);
 }
 
 .ot-field__err {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   font-size: 12.5px;
 }
 
@@ -2521,7 +2521,7 @@ onMounted(async () => {
 }
 
 .ot-dropzone--err {
-  border-color: var(--rosewood-dark);
+  border-color: var(--leaf-deep);
 }
 
 .ot-dropzone--filled {

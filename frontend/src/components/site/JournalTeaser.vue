@@ -60,7 +60,7 @@ defineProps({ articles: { type: Array, required: true } });
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--rosewood);
+  color: var(--leaf);
   font-size: 40px;
 }
 .teaser-img img {
@@ -76,7 +76,7 @@ defineProps({ articles: { type: Array, required: true } });
   font-size: 11.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--rosewood);
+  color: var(--leaf);
   font-weight: 500;
 }
 .teaser-card h3 {

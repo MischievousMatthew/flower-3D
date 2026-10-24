@@ -78,7 +78,7 @@ defineEmits(["mode", "toggle-bouquet", "focus", "reset", "screenshot", "fullscre
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: rgba(250, 248, 244, 0.92);
+  background: rgba(250, 251, 250, 0.92);
   backdrop-filter: blur(6px);
 }
 
@@ -113,7 +113,7 @@ defineEmits(["mode", "toggle-bouquet", "focus", "reset", "screenshot", "fullscre
 }
 
 .st-tool:hover:not(:disabled) {
-  background: rgba(30, 27, 24, 0.06);
+  background: rgba(54, 63, 78, 0.06);
   color: var(--ink);
 }
 
@@ -133,7 +133,7 @@ defineEmits(["mode", "toggle-bouquet", "focus", "reset", "screenshot", "fullscre
 }
 
 .st-tool:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 1px;
 }
 

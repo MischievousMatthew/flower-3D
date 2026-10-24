@@ -377,7 +377,7 @@ const handleImageError = (e) => {
 }
 
 .product-card:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 6px;
   border-radius: 16px;
 }
@@ -408,7 +408,7 @@ const handleImageError = (e) => {
   left: 14px;
   padding: 5px 11px;
   border-radius: 999px;
-  background: rgba(250, 248, 244, 0.92);
+  background: rgba(250, 251, 250, 0.92);
   color: var(--ink);
   font-size: 10.5px;
   font-weight: 500;
@@ -417,7 +417,7 @@ const handleImageError = (e) => {
 }
 
 .badge-sale {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 /* Quick actions: revealed on hover (always shown on touch screens) */
@@ -450,7 +450,7 @@ const handleImageError = (e) => {
   padding: 0 14px;
   border: none;
   border-radius: 999px;
-  background: rgba(250, 248, 244, 0.95);
+  background: rgba(250, 251, 250, 0.95);
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: 12.5px;
@@ -476,7 +476,7 @@ const handleImageError = (e) => {
 }
 
 .image-action-cart:hover:not(:disabled) {
-  background: var(--rosewood-dark);
+  background: var(--leaf-deep);
 }
 
 .image-action-buy:hover:not(:disabled),
@@ -506,7 +506,7 @@ const handleImageError = (e) => {
 .image-action:focus-visible,
 .dot-btn:focus-visible,
 .product-vendor-tag:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 2px;
 }
 
@@ -583,7 +583,7 @@ const handleImageError = (e) => {
   border: 1px solid var(--line-soft);
   border-radius: 14px;
   background: var(--paper);
-  box-shadow: 0 18px 40px rgba(30, 27, 24, 0.12);
+  box-shadow: 0 18px 40px rgba(54, 63, 78, 0.12);
 }
 
 .dot-menu-item {
@@ -607,7 +607,7 @@ const handleImageError = (e) => {
 }
 
 .dot-menu-item.report {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .menu-pop-enter-active,
@@ -635,7 +635,7 @@ const handleImageError = (e) => {
 .product-vendor-tag {
   align-self: flex-start;
   margin: 0;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   font-size: 12.5px;
   cursor: pointer;
 }
@@ -713,7 +713,7 @@ const handleImageError = (e) => {
 }
 
 .stock-badge.out-of-stock {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 /* ── Report modal (teleported to <body>, carries .bc-theme itself) ── */
@@ -725,7 +725,7 @@ const handleImageError = (e) => {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(27, 22, 18, 0.45);
+  background: rgba(38, 45, 57, 0.45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -736,7 +736,7 @@ const handleImageError = (e) => {
   overflow: hidden;
   border-radius: 24px;
   background: var(--paper);
-  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
+  box-shadow: 0 30px 80px rgba(38, 45, 57, 0.25);
 }
 
 .report-modal-header {
@@ -817,7 +817,7 @@ const handleImageError = (e) => {
 
 .rm-error {
   margin-top: 6px;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   font-size: 12.5px;
 }
 
@@ -867,7 +867,7 @@ const handleImageError = (e) => {
 }
 
 .rm-btn-submit:hover:not(:disabled) {
-  background: var(--rosewood-dark);
+  background: var(--leaf-deep);
 }
 
 .rm-btn-submit:disabled {
@@ -878,7 +878,7 @@ const handleImageError = (e) => {
 .rm-close:focus-visible,
 .rm-btn-cancel:focus-visible,
 .rm-btn-submit:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 

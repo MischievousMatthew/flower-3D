@@ -192,7 +192,7 @@ onMounted(() => {
   font-size: 11.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--rosewood);
+  color: var(--leaf);
   font-weight: 500;
 }
 .lead {
@@ -212,7 +212,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--rosewood);
+  color: var(--leaf);
   font-size: 46px;
 }
 .lead-img {

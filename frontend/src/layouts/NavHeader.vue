@@ -801,7 +801,7 @@ onUnmounted(() => {
 }
 
 .nav-icon-btn:hover {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .nav-icon-btn svg,
@@ -839,7 +839,7 @@ onUnmounted(() => {
   height: 17px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--rosewood);
+  background: var(--leaf);
   color: #fff;
   font-size: 10px;
   font-weight: 600;
@@ -860,7 +860,7 @@ onUnmounted(() => {
 .dropdown-item:focus-visible,
 .notification-entry:focus-visible,
 .nav-menu-action:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 4px;
   border-radius: 6px;
 }
@@ -881,7 +881,7 @@ onUnmounted(() => {
   border: 1px solid var(--line-soft);
   border-radius: 18px;
   background: var(--paper);
-  box-shadow: 0 24px 60px rgba(30, 27, 24, 0.14);
+  box-shadow: 0 24px 60px rgba(54, 63, 78, 0.14);
   animation: menuIn 0.3s var(--ease-out);
 }
 
@@ -956,7 +956,7 @@ onUnmounted(() => {
 }
 
 .notification-status-dot.info {
-  background: var(--rosewood);
+  background: var(--leaf);
 }
 
 .notification-status-dot.success {
@@ -1129,7 +1129,7 @@ onUnmounted(() => {
 }
 
 .user-plan {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .dropdown-item {
@@ -1161,7 +1161,7 @@ onUnmounted(() => {
   min-width: 20px;
   padding: 1px 6px;
   border-radius: 999px;
-  background: var(--rosewood);
+  background: var(--leaf);
   color: #fff;
   font-size: 11px;
   font-weight: 600;

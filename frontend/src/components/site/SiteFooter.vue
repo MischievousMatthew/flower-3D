@@ -58,7 +58,7 @@ const year = new Date().getFullYear();
   margin-top: clamp(40px, 6vw, 80px);
   padding: clamp(56px, 7vw, 96px) 0 28px;
   background: var(--espresso);
-  color: rgba(250, 248, 244, 0.78);
+  color: rgba(250, 251, 250, 0.78);
 }
 .footer-grid {
   display: grid;
@@ -104,16 +104,16 @@ const year = new Date().getFullYear();
   font-size: 14px;
 }
 .site-footer a {
-  color: rgba(250, 248, 244, 0.85);
+  color: rgba(250, 251, 250, 0.85);
   text-decoration: none;
 }
 .site-footer a:hover {
-  color: var(--gold);
+  color: var(--leaf-light);
 }
 .footer-bottom {
   margin-top: 48px;
   padding-top: 20px;
-  border-top: 1px solid rgba(250, 248, 244, 0.12);
+  border-top: 1px solid rgba(250, 251, 250, 0.12);
   font-size: 12.5px;
 }
 .footer-bottom p {

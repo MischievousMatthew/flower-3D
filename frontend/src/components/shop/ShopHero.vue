@@ -143,7 +143,7 @@ onBeforeUnmount(() => clearInterval(timer));
 .sh-fade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(244, 241, 236, 0.97) 0%, rgba(244, 241, 236, 0.86) 32%, rgba(244, 241, 236, 0.15) 62%, rgba(244, 241, 236, 0) 100%);
+  background: linear-gradient(90deg, rgba(242, 245, 242, 0.97) 0%, rgba(242, 245, 242, 0.86) 32%, rgba(242, 245, 242, 0.15) 62%, rgba(242, 245, 242, 0) 100%);
 }
 
 .sh-inner {
@@ -162,7 +162,7 @@ onBeforeUnmount(() => clearInterval(timer));
   font-weight: 500;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .sh-title {
@@ -209,8 +209,8 @@ onBeforeUnmount(() => clearInterval(timer));
 }
 
 .sh-btn--solid {
-  border: 1px solid var(--rosewood-dark);
-  background: var(--rosewood-dark);
+  border: 1px solid var(--leaf-deep);
+  background: var(--leaf-deep);
   color: var(--paper);
 }
 
@@ -220,9 +220,9 @@ onBeforeUnmount(() => clearInterval(timer));
 }
 
 .sh-btn--ghost {
-  border: 1px solid var(--rosewood-dark);
-  background: rgba(250, 248, 244, 0.6);
-  color: var(--rosewood-dark);
+  border: 1px solid var(--leaf-deep);
+  background: rgba(250, 251, 250, 0.6);
+  color: var(--leaf-deep);
 }
 
 .sh-btn--ghost:hover {
@@ -239,15 +239,15 @@ onBeforeUnmount(() => clearInterval(timer));
   gap: 12px;
   padding: 12px 16px;
   border-radius: 12px;
-  background: rgba(250, 248, 244, 0.94);
-  box-shadow: 0 12px 30px -16px rgba(30, 27, 24, 0.35);
+  background: rgba(250, 251, 250, 0.94);
+  box-shadow: 0 12px 30px -16px rgba(54, 63, 78, 0.35);
 }
 
 .sh-badge svg {
   width: 26px;
   height: 26px;
   fill: none;
-  stroke: var(--rosewood-dark);
+  stroke: var(--leaf-deep);
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -280,11 +280,11 @@ onBeforeUnmount(() => clearInterval(timer));
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgba(250, 248, 244, 0.92);
+  background: rgba(250, 251, 250, 0.92);
   color: var(--ink);
   cursor: pointer;
   transform: translateY(-50%);
-  box-shadow: 0 8px 20px -12px rgba(30, 27, 24, 0.4);
+  box-shadow: 0 8px 20px -12px rgba(54, 63, 78, 0.4);
 }
 
 .sh-arrow svg {
@@ -321,7 +321,7 @@ onBeforeUnmount(() => clearInterval(timer));
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(250, 248, 244, 0.7);
+  background: rgba(250, 251, 250, 0.7);
   cursor: pointer;
   transition: width 0.3s var(--ease-out), background 0.3s;
 }
@@ -332,7 +332,7 @@ onBeforeUnmount(() => clearInterval(timer));
 }
 
 .sh :focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 
@@ -347,7 +347,7 @@ onBeforeUnmount(() => clearInterval(timer));
   }
 
   .sh-fade {
-    background: linear-gradient(180deg, rgba(244, 241, 236, 0) 0%, rgba(244, 241, 236, 0.55) 35%, rgba(244, 241, 236, 0.97) 70%);
+    background: linear-gradient(180deg, rgba(242, 245, 242, 0) 0%, rgba(242, 245, 242, 0.55) 35%, rgba(242, 245, 242, 0.97) 70%);
   }
 
   .sh-copy {

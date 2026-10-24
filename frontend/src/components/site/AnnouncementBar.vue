@@ -60,8 +60,8 @@ onBeforeUnmount(() => clearInterval(timer));
 
 <style scoped>
 .announce {
-  --bg: var(--espresso, #1b1612);
-  --fg: var(--paper, #faf8f4);
+  --bg: var(--espresso, #262d39);
+  --fg: var(--paper, #fafbfa);
   display: flex;
   align-items: center;
   gap: 10px;

@@ -333,14 +333,14 @@ onBeforeUnmount(() => {
   transition: background 0.3s;
 }
 .rg-steps .done .rg-bar {
-  background: var(--rosewood-dark);
+  background: var(--leaf-deep);
 }
 .rg-steps .on {
   color: var(--ink);
   font-weight: 500;
 }
 .rg-steps .on .rg-bar {
-  background: linear-gradient(90deg, var(--rosewood-dark) 50%, var(--line) 50%);
+  background: linear-gradient(90deg, var(--leaf-deep) 50%, var(--line) 50%);
 }
 .rg-step-timer {
   margin: -8px 0 0;

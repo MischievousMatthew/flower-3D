@@ -161,7 +161,7 @@ function fill(value, min, max) {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--paper);
-  box-shadow: 0 18px 40px -18px rgba(30, 27, 24, 0.28);
+  box-shadow: 0 18px 40px -18px rgba(54, 63, 78, 0.28);
   font-size: 12.5px;
   color: var(--ink-soft);
   transition: left 0.12s ease-out, top 0.12s ease-out;
@@ -477,7 +477,7 @@ kbd {
 }
 
 .sc-link.danger {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .sc-link .fc-icon {
@@ -512,7 +512,7 @@ kbd {
 }
 
 .sc-close:hover {
-  background: rgba(30, 27, 24, 0.05);
+  background: rgba(54, 63, 78, 0.05);
   color: var(--ink);
 }
 
@@ -522,7 +522,7 @@ kbd {
 }
 
 .sc :focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 1px;
 }
 </style>

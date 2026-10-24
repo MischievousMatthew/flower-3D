@@ -82,7 +82,7 @@ const peso = (value) => (props.format ? props.format(value) : `₱${Number(value
 .or-meter i {
   display: block;
   height: 100%;
-  background: var(--rosewood);
+  background: var(--leaf);
   transition: width 0.3s ease;
 }
 
@@ -151,8 +151,8 @@ const peso = (value) => (props.format ? props.format(value) : `₱${Number(value
 }
 
 .or-btn-dark:hover:not(:disabled) {
-  border-color: var(--rosewood-dark);
-  background: var(--rosewood-dark);
+  border-color: var(--leaf-deep);
+  background: var(--leaf-deep);
 }
 
 .or-btn-outline {
@@ -171,7 +171,7 @@ const peso = (value) => (props.format ? props.format(value) : `₱${Number(value
 }
 
 .or-btn:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 2px;
 }
 

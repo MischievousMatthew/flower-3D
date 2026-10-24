@@ -68,7 +68,7 @@ const size = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.ma
 .dd-zone:hover,
 .dd-zone.over,
 .dd-zone:focus-visible {
-  border-color: var(--rosewood-dark, #8e443a);
+  border-color: var(--leaf-deep, #8e443a);
   background: #fff;
   outline: none;
 }
@@ -85,7 +85,7 @@ const size = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.ma
   width: 26px;
   height: 26px;
   fill: none;
-  stroke: var(--rosewood-dark, #8e443a);
+  stroke: var(--leaf-deep, #8e443a);
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -122,7 +122,7 @@ const size = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.ma
   background: var(--ivory, #f4f1ec);
   font-size: 11px;
   font-weight: 600;
-  color: var(--rosewood-dark, #8e443a);
+  color: var(--leaf-deep, #8e443a);
 }
 .dd-remove {
   display: grid;
@@ -157,6 +157,6 @@ const size = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.ma
   margin-top: 4px;
   font-size: 13px;
   line-height: 1.5;
-  color: var(--rosewood-dark, #8e443a);
+  color: var(--leaf-deep, #8e443a);
 }
 </style>

@@ -1321,9 +1321,9 @@ onUnmounted(() => {
   --c-ink: var(--ink);
   --c-soft: var(--ink-soft);
   --c-line: var(--line);
-  --c-hover: rgba(30, 27, 24, 0.04);
+  --c-hover: rgba(54, 63, 78, 0.04);
   --c-accent: var(--ink);
-  --c-accent-hover: var(--rosewood-dark);
+  --c-accent-hover: var(--leaf-deep);
   --c-accent-ink: var(--ivory);
   --c-accent-soft: var(--ivory-deep);
   --c-bubble-in: #ffffff;
@@ -1783,7 +1783,7 @@ onUnmounted(() => {
   border: 1px solid var(--c-line);
   border-radius: 14px;
   background: var(--c-surface);
-  box-shadow: 0 14px 34px rgba(20, 18, 16, 0.14);
+  box-shadow: 0 14px 34px rgba(30, 36, 46, 0.14);
 }
 
 .conv-menu button {
@@ -2419,7 +2419,7 @@ onUnmounted(() => {
   align-items: flex-start;
   justify-content: center;
   padding: 12vh 16px 16px;
-  background: rgba(20, 18, 16, 0.4);
+  background: rgba(30, 36, 46, 0.4);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
@@ -2427,7 +2427,7 @@ onUnmounted(() => {
 .overlay--dark {
   align-items: center;
   padding: 24px;
-  background: rgba(15, 13, 11, 0.88);
+  background: rgba(24, 29, 38, 0.88);
 }
 
 .viewer-image {
@@ -2459,7 +2459,7 @@ onUnmounted(() => {
   padding: 18px 18px 12px;
   border-radius: 24px;
   background: var(--c-surface);
-  box-shadow: 0 30px 80px rgba(20, 18, 16, 0.25);
+  box-shadow: 0 30px 80px rgba(30, 36, 46, 0.25);
 }
 
 .dialog-head {
@@ -2504,7 +2504,7 @@ onUnmounted(() => {
     right: 0;
     bottom: 0;
     z-index: 5;
-    box-shadow: -16px 0 40px rgba(20, 18, 16, 0.12);
+    box-shadow: -16px 0 40px rgba(30, 36, 46, 0.12);
   }
 }
 

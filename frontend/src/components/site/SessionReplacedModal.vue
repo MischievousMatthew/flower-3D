@@ -49,7 +49,7 @@ watch(
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgba(30, 27, 24, 0.5);
+  background: rgba(54, 63, 78, 0.5);
   backdrop-filter: blur(4px);
 }
 
@@ -57,11 +57,11 @@ watch(
   width: min(420px, 100%);
   padding: 30px 28px 26px;
   border-radius: 16px;
-  background: #faf8f4;
-  box-shadow: 0 30px 70px -20px rgba(30, 27, 24, 0.45);
+  background: #fafbfa;
+  box-shadow: 0 30px 70px -20px rgba(54, 63, 78, 0.45);
   font-family: "Poppins", -apple-system, "Segoe UI", sans-serif;
   text-align: center;
-  color: #1e1b18;
+  color: #363f4e;
 }
 
 .srm-icon {
@@ -71,8 +71,8 @@ watch(
   height: 52px;
   margin-bottom: 14px;
   border-radius: 50%;
-  background: rgba(184, 101, 88, 0.12);
-  color: #8e443a;
+  background: rgba(77, 177, 115, 0.12);
+  color: #2e7a4f;
 }
 
 .srm-icon svg {
@@ -91,7 +91,7 @@ watch(
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #8e443a;
+  color: #2e7a4f;
 }
 
 .srm h2 {
@@ -112,10 +112,10 @@ watch(
   margin: 0 0 22px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(184, 101, 88, 0.08);
+  background: rgba(77, 177, 115, 0.08);
   font-size: 12.5px;
   line-height: 1.55;
-  color: #8e443a;
+  color: #2e7a4f;
 }
 
 .srm-btn {
@@ -123,19 +123,19 @@ watch(
   height: 44px;
   border: 0;
   border-radius: 10px;
-  background: #1e1b18;
-  color: #faf8f4;
+  background: #363f4e;
+  color: #fafbfa;
   font: 500 14px "Poppins", -apple-system, "Segoe UI", sans-serif;
   cursor: pointer;
   transition: background 0.2s ease;
 }
 
 .srm-btn:hover {
-  background: #8e443a;
+  background: #2e7a4f;
 }
 
 .srm-btn:focus-visible {
-  outline: 2px solid #b86558;
+  outline: 2px solid #4db173;
   outline-offset: 2px;
 }
 

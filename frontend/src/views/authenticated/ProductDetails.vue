@@ -569,7 +569,7 @@ watch(
 }
 
 .pd-crumbs a {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   text-decoration: none;
 }
 
@@ -616,7 +616,7 @@ watch(
 }
 
 .pd-thumb.on {
-  border-color: var(--rosewood);
+  border-color: var(--leaf);
 }
 
 .pd-thumb img {
@@ -628,7 +628,7 @@ watch(
 .pd-thumb--3d {
   gap: 2px;
   border-color: var(--line);
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   font-size: 11px;
   font-weight: 600;
 }
@@ -670,7 +670,7 @@ watch(
   place-items: center;
   height: 100%;
   font-size: 60px;
-  color: var(--rosewood);
+  color: var(--leaf);
 }
 
 .pd-arrow {
@@ -683,11 +683,11 @@ watch(
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgba(250, 248, 244, 0.92);
+  background: rgba(250, 251, 250, 0.92);
   color: var(--ink);
   cursor: pointer;
   transform: translateY(-50%);
-  box-shadow: 0 8px 20px -12px rgba(30, 27, 24, 0.4);
+  box-shadow: 0 8px 20px -12px rgba(54, 63, 78, 0.4);
 }
 
 .pd-arrow svg,
@@ -720,12 +720,12 @@ watch(
   padding: 0 16px;
   border: 0;
   border-radius: 999px;
-  background: rgba(250, 248, 244, 0.95);
+  background: rgba(250, 251, 250, 0.95);
   color: var(--ink);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  box-shadow: 0 8px 20px -12px rgba(30, 27, 24, 0.4);
+  box-shadow: 0 8px 20px -12px rgba(54, 63, 78, 0.4);
 }
 
 .pd-dots {
@@ -745,7 +745,7 @@ watch(
 
 .pd-dots span.on {
   width: 22px;
-  background: var(--rosewood);
+  background: var(--leaf);
 }
 
 .pd-info {
@@ -818,7 +818,7 @@ watch(
   font-size: 38px;
   font-weight: 600;
   line-height: 1;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .pd-price s {
@@ -829,10 +829,10 @@ watch(
 .pd-save {
   padding: 3px 10px;
   border-radius: 6px;
-  background: rgba(184, 101, 88, 0.14);
+  background: rgba(77, 177, 115, 0.14);
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .pd-shop {
@@ -847,7 +847,7 @@ watch(
   border-bottom: 1px solid currentColor;
   background: none;
   font-size: 13px;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   cursor: pointer;
 }
 
@@ -910,7 +910,7 @@ watch(
 
 .pd-qty input:focus {
   background: var(--ivory);
-  outline: 1px solid var(--rosewood);
+  outline: 1px solid var(--leaf);
 }
 
 .pd-stock {
@@ -919,7 +919,7 @@ watch(
 }
 
 .pd-stock.out {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .pd-buy {
@@ -950,8 +950,8 @@ watch(
 }
 
 .pd-btn--solid {
-  border: 1px solid var(--rosewood-dark);
-  background: var(--rosewood-dark);
+  border: 1px solid var(--leaf-deep);
+  background: var(--leaf-deep);
   color: var(--paper);
 }
 
@@ -961,13 +961,13 @@ watch(
 }
 
 .pd-btn--ghost {
-  border: 1px solid var(--rosewood-dark);
+  border: 1px solid var(--leaf-deep);
   background: var(--paper);
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .pd-btn--ghost:hover:not(:disabled) {
-  background: #f6e7e2;
+  background: #e9f5ed;
 }
 
 .pd-btn:disabled {
@@ -999,7 +999,7 @@ watch(
 .pd-feats svg {
   flex-shrink: 0;
   fill: none;
-  stroke: var(--rosewood-dark);
+  stroke: var(--leaf-deep);
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -1036,7 +1036,7 @@ watch(
   padding: 18px 8px;
   border: 1px solid var(--line-soft);
   border-radius: 14px;
-  background: #f8ece7;
+  background: #e9f5ed;
   list-style: none;
 }
 
@@ -1048,7 +1048,7 @@ watch(
 }
 
 .pd-strip li + li {
-  border-left: 1px solid rgba(184, 101, 88, 0.2);
+  border-left: 1px solid rgba(77, 177, 115, 0.2);
 }
 
 .pd-strip svg {
@@ -1083,7 +1083,7 @@ watch(
 }
 
 .pd-tablist button.on {
-  border-bottom-color: var(--rosewood-dark);
+  border-bottom-color: var(--leaf-deep);
   font-weight: 500;
   color: var(--ink);
 }
@@ -1142,7 +1142,7 @@ watch(
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: rgba(184, 101, 88, 0.1);
+  background: rgba(77, 177, 115, 0.1);
 }
 
 .pd-feats svg {
@@ -1169,7 +1169,7 @@ watch(
   margin: 0;
   overflow: hidden;
   border-radius: 14px;
-  background: #f6e3dd;
+  background: #e2f1e7;
 }
 
 .pd-quote:not(:has(img)) {
@@ -1192,7 +1192,7 @@ watch(
   font-style: italic;
   line-height: 1.3;
   text-align: center;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .pd-specs {
@@ -1257,7 +1257,7 @@ watch(
 .pd-viewall {
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   text-decoration: none;
 }
 
@@ -1323,7 +1323,7 @@ watch(
 }
 
 .pd-page :focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 2px;
 }
 

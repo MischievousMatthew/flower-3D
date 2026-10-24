@@ -124,9 +124,9 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   background:
-    radial-gradient(circle at 50% 42%, rgba(184, 101, 88, 0.1), transparent 45%),
-    #f4f1ec;
-  color: #1e1b18;
+    radial-gradient(circle at 50% 42%, rgba(77, 177, 115, 0.1), transparent 45%),
+    #f2f5f2;
+  color: #363f4e;
   clip-path: inset(0 0 0 0);
 }
 
@@ -159,7 +159,7 @@ onBeforeUnmount(() => {
 }
 
 .loader-letter:nth-child(n + 6) {
-  color: #b86558;
+  color: #4db173;
 }
 
 .loader-tagline {
@@ -167,7 +167,7 @@ onBeforeUnmount(() => {
   font-family: "Poppins", sans-serif;
   font-size: 14px;
   font-style: italic;
-  color: #6e6761;
+  color: #6a7282;
 }
 
 .loader-meter {
@@ -192,21 +192,21 @@ onBeforeUnmount(() => {
 .loader-count small {
   font-size: 0.45em;
   margin-left: 2px;
-  color: #6e6761;
+  color: #6a7282;
 }
 
 .loader-line {
   flex: 1;
   height: 1px;
   margin-bottom: 8px;
-  background: rgba(30, 27, 24, 0.12);
+  background: rgba(54, 63, 78, 0.12);
   overflow: hidden;
 }
 
 .loader-line-fill {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #b86558, #d4b27a);
+  background: linear-gradient(90deg, #4db173, #8fd1a6);
   transform: scaleX(0);
   transform-origin: left;
 }

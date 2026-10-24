@@ -77,7 +77,7 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
 }
 
 .pt:hover {
-  box-shadow: 0 16px 34px -22px rgba(30, 27, 24, 0.35);
+  box-shadow: 0 16px 34px -22px rgba(54, 63, 78, 0.35);
   transform: translateY(-2px);
 }
 
@@ -113,7 +113,7 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
   place-items: center;
   height: 100%;
   font-size: 30px;
-  color: var(--rosewood);
+  color: var(--leaf);
 }
 
 .pt-badge {
@@ -132,11 +132,11 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
 }
 
 .pt-badge.sale {
-  background: var(--rosewood-dark);
+  background: var(--leaf-deep);
 }
 
 .pt-badge.muted {
-  background: rgba(30, 27, 24, 0.6);
+  background: rgba(54, 63, 78, 0.6);
 }
 
 .pt-body {
@@ -173,7 +173,7 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
 }
 
 .pt-price strong.sale {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .pt-price s {
@@ -211,14 +211,14 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
   border: 1px solid var(--line);
   border-radius: 9px;
   background: var(--paper);
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 .pt-cart:hover:not(:disabled) {
-  border-color: var(--rosewood-dark);
-  background: var(--rosewood-dark);
+  border-color: var(--leaf-deep);
+  background: var(--leaf-deep);
   color: var(--paper);
 }
 
@@ -238,7 +238,7 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
 }
 
 .pt :focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 2px;
 }
 </style>

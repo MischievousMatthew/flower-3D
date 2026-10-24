@@ -87,9 +87,9 @@ const flower = pickFlower();
   padding: 40px 44px;
   overflow: hidden;
   background:
-    radial-gradient(ellipse 70% 50% at 50% 38%, rgba(212, 178, 122, 0.12), transparent 70%),
+    radial-gradient(ellipse 70% 50% at 50% 38%, color-mix(in srgb, var(--leaf-light) 12%, transparent), transparent 70%),
     var(--espresso);
-  color: var(--gold);
+  color: var(--leaf-light);
 }
 .as-brand {
   display: inline-flex;
@@ -104,7 +104,7 @@ const flower = pickFlower();
 .as-bloom {
   width: min(78%, 320px);
   margin: 0 auto;
-  color: var(--gold);
+  color: var(--leaf-light);
 }
 .as-bloom.draw :is(path, circle) {
   stroke-dasharray: 700;
@@ -122,10 +122,10 @@ const flower = pickFlower();
   font-family: var(--font-display);
   font-size: 19px;
   line-height: 1.45;
-  color: rgba(244, 239, 230, 0.72);
+  color: rgba(242, 245, 242, 0.72);
 }
 .as-caption :deep(i) {
-  color: var(--gold);
+  color: var(--leaf-light);
 }
 
 /* Form side */

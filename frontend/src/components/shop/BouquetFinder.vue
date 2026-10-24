@@ -134,7 +134,7 @@ const capitalize = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1)
   padding: 24px 22px;
   border: 1px solid #efdcd5;
   border-radius: 16px;
-  background: linear-gradient(170deg, #fbf1ed 0%, var(--paper) 60%);
+  background: linear-gradient(170deg, #edf7f0 0%, var(--paper) 60%);
 }
 
 .bf-head {
@@ -149,13 +149,13 @@ const capitalize = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1)
   width: 46px;
   height: 46px;
   border-radius: 50%;
-  background: rgba(184, 101, 88, 0.12);
+  background: rgba(77, 177, 115, 0.12);
 }
 
 .bf-icon svg,
 .bf-field svg {
   fill: none;
-  stroke: var(--rosewood-dark);
+  stroke: var(--leaf-deep);
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -215,7 +215,7 @@ const capitalize = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1)
 }
 
 .bf-field select:focus {
-  border-color: var(--rosewood);
+  border-color: var(--leaf);
   outline: none;
 }
 
@@ -224,7 +224,7 @@ const capitalize = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1)
   margin-top: 4px;
   border: 0;
   border-radius: 999px;
-  background: var(--rosewood-dark);
+  background: var(--leaf-deep);
   color: var(--paper);
   font: 500 14px var(--font-sans);
   cursor: pointer;
@@ -264,13 +264,13 @@ const capitalize = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1)
   border: 0;
   border-bottom: 1px solid currentColor;
   background: none;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   font: 500 13px var(--font-sans);
   cursor: pointer;
 }
 
 .bf :focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 2px;
 }
 </style>

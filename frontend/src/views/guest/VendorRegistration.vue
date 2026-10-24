@@ -1,6 +1,7 @@
 <!-- VendorRegistration.vue -->
 <template>
   <AuthShell
+    class="bc-palette-classic"
     wide
     title="Sell with BloomCraft"
     lead="Tell us about your flower shop. Our team reviews every application, usually within two working days, and emails you when your storefront is ready."
@@ -420,7 +421,7 @@
 
     <!-- The full agreement, to read -->
     <Teleport to="body">
-      <div v-if="activeModal" class="bc-theme vr-modal-back" @click.self="closeActiveModal">
+      <div v-if="activeModal" class="bc-theme bc-palette-classic vr-modal-back" @click.self="closeActiveModal">
         <div class="vr-modal" role="dialog" aria-modal="true" @keydown.esc="closeActiveModal">
           <button type="button" class="vr-modal-x" aria-label="Close" @click="closeActiveModal">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
@@ -2084,10 +2085,10 @@ onUnmounted(() => {
   cursor: default;
 }
 .vr-steps button:not(:disabled):hover .vr-step-name {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 .vr-steps .on button {
-  border-color: var(--rosewood-dark);
+  border-color: var(--leaf-deep);
   color: var(--ink);
 }
 .vr-steps .done button {
@@ -2112,7 +2113,7 @@ onUnmounted(() => {
 }
 .vr-steps .done .vr-dot {
   border-color: rgba(142, 68, 58, 0.45);
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 .vr-dot svg {
   width: 15px;
@@ -2189,7 +2190,7 @@ onUnmounted(() => {
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 /* Fields */
@@ -2252,7 +2253,7 @@ select.vr-input {
 }
 .vr-input:focus {
   outline: none;
-  border-color: var(--rosewood-dark);
+  border-color: var(--leaf-deep);
   background: #fff;
   box-shadow: 0 0 0 4px rgba(142, 68, 58, 0.12);
 }
@@ -2303,7 +2304,7 @@ select.vr-input {
   border-color: rgba(30, 27, 24, 0.25);
 }
 .vr-choice.on {
-  border-color: var(--rosewood-dark);
+  border-color: var(--leaf-deep);
   background: #fdf6f3;
 }
 .vr-choice input {
@@ -2392,9 +2393,9 @@ select.vr-input {
   opacity: 0.25;
 }
 .vr-chip.on {
-  border-color: var(--rosewood-dark);
+  border-color: var(--leaf-deep);
   background: #fdf6f3;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 .vr-chip.on svg {
   opacity: 1;
@@ -2470,8 +2471,8 @@ select.vr-input {
   cursor: pointer;
 }
 .vr-quick button:hover {
-  border-color: var(--rosewood-dark);
-  color: var(--rosewood-dark);
+  border-color: var(--leaf-deep);
+  color: var(--leaf-deep);
 }
 
 /* Document tiles */
@@ -2546,8 +2547,8 @@ select.vr-input {
   cursor: pointer;
 }
 .vr-gallery-add:hover {
-  border-color: var(--rosewood-dark);
-  color: var(--rosewood-dark);
+  border-color: var(--leaf-deep);
+  color: var(--leaf-deep);
 }
 .vr-gallery-add input {
   display: none;

@@ -2186,7 +2186,7 @@ async function restoreBouquet(customization) {
 
 function takeScreenshot() {
   if (!renderer) return;
-  scene.background = new THREE.Color("#f4f1ec");
+  scene.background = new THREE.Color("#f2f5f2");
   renderer.render(scene, camera);
   const link = document.createElement("a");
   link.href = renderer.domElement.toDataURL("image/png");
@@ -2345,7 +2345,7 @@ function showToast(message, type = "success") {
 }
 
 .fc-page :is(button, [role="button"], input, label):focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 2px;
 }
 
@@ -2408,7 +2408,7 @@ function showToast(message, type = "success") {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(27, 22, 18, 0.45);
+  background: rgba(38, 45, 57, 0.45);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
@@ -2421,7 +2421,7 @@ function showToast(message, type = "success") {
   padding: 26px 26px 22px;
   border-radius: 22px;
   background: var(--paper);
-  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
+  box-shadow: 0 30px 80px rgba(38, 45, 57, 0.25);
 }
 
 .fc-modal-head {
@@ -2486,7 +2486,7 @@ function showToast(message, type = "success") {
 
 .fc-card-counter.full,
 .fc-card-capped {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .fc-card-capped {
@@ -2509,7 +2509,7 @@ function showToast(message, type = "success") {
 
 .fc-modal-close:focus-visible,
 .fc-modal-cancel:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 
@@ -2526,7 +2526,7 @@ function showToast(message, type = "success") {
   padding: 10px 18px 10px 14px;
   border: 1px solid var(--line-soft);
   border-radius: 999px;
-  background: rgba(250, 248, 244, 0.9);
+  background: rgba(250, 251, 250, 0.9);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   transform: translateX(-50%);
@@ -2557,7 +2557,7 @@ function showToast(message, type = "success") {
 }
 
 .fc-hint.live .fc-hint-copy span {
-  color: rgba(244, 241, 236, 0.7);
+  color: rgba(242, 245, 242, 0.7);
 }
 
 .fc-hint-cancel {
@@ -2569,7 +2569,7 @@ function showToast(message, type = "success") {
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: rgba(244, 241, 236, 0.12);
+  background: rgba(242, 245, 242, 0.12);
   cursor: pointer;
 }
 
@@ -2719,11 +2719,11 @@ function showToast(message, type = "success") {
 }
 
 .fc-mini.on {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .fc-mini.danger:hover {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .fc-switch {
@@ -2741,12 +2741,12 @@ function showToast(message, type = "success") {
 }
 
 .fc-switch:hover {
-  border-color: rgba(30, 27, 24, 0.25);
+  border-color: rgba(54, 63, 78, 0.25);
 }
 
 .fc-switch[aria-checked="true"] {
-  border-color: rgba(142, 68, 58, 0.3);
-  background: rgba(184, 101, 88, 0.06);
+  border-color: rgba(46, 122, 79, 0.3);
+  background: rgba(77, 177, 115, 0.06);
 }
 
 .fc-switch-copy {
@@ -2775,7 +2775,7 @@ function showToast(message, type = "success") {
   height: 20px;
   flex-shrink: 0;
   border-radius: 999px;
-  background: rgba(30, 27, 24, 0.16);
+  background: rgba(54, 63, 78, 0.16);
   transition: background 0.3s var(--ease-out);
 }
 
@@ -2787,12 +2787,12 @@ function showToast(message, type = "success") {
   height: 16px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(30, 27, 24, 0.2);
+  box-shadow: 0 1px 3px rgba(54, 63, 78, 0.2);
   transition: transform 0.3s var(--ease-out);
 }
 
 .fc-switch[aria-checked="true"] .fc-switch-track {
-  background: var(--rosewood);
+  background: var(--leaf);
 }
 
 .fc-switch[aria-checked="true"] .fc-switch-knob {
@@ -2876,14 +2876,14 @@ function showToast(message, type = "success") {
 .fc-segment-btn.active {
   background: var(--paper);
   color: var(--ink);
-  box-shadow: 0 1px 3px rgba(30, 27, 24, 0.1);
+  box-shadow: 0 1px 3px rgba(54, 63, 78, 0.1);
 }
 
 .fc-segment-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(30, 27, 24, 0.15);
+  box-shadow: inset 0 0 0 1px rgba(54, 63, 78, 0.15);
 }
 
 .fc-options {
@@ -2920,7 +2920,7 @@ function showToast(message, type = "success") {
   height: 28px;
   flex-shrink: 0;
   border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(30, 27, 24, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(54, 63, 78, 0.12);
 }
 
 .fc-option-copy {
@@ -2953,7 +2953,7 @@ function showToast(message, type = "success") {
 .fc-option-check {
   width: 16px;
   height: 16px;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 
@@ -2979,7 +2979,7 @@ function showToast(message, type = "success") {
   background: var(--ink);
   color: var(--ivory);
   font-size: 13.5px;
-  box-shadow: 0 16px 40px rgba(30, 27, 24, 0.18);
+  box-shadow: 0 16px 40px rgba(54, 63, 78, 0.18);
 }
 
 .fc-toast-enter-active,
@@ -3019,11 +3019,11 @@ function showToast(message, type = "success") {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   background: var(--paper);
-  box-shadow: 0 24px 60px rgba(30, 27, 24, 0.12);
+  box-shadow: 0 24px 60px rgba(54, 63, 78, 0.12);
 }
 .fc-start-step {
   margin: 0 0 6px;
-  color: var(--rosewood);
+  color: var(--leaf);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -3062,8 +3062,8 @@ function showToast(message, type = "success") {
 }
 .fc-occasion:hover,
 .fc-occasion.on {
-  border-color: var(--rosewood);
-  box-shadow: 0 10px 24px rgba(30, 27, 24, 0.08);
+  border-color: var(--leaf);
+  box-shadow: 0 10px 24px rgba(54, 63, 78, 0.08);
   transform: translateY(-2px);
 }
 .fc-occasion-icon {
@@ -3085,7 +3085,7 @@ function showToast(message, type = "success") {
 }
 .fc-occasion-meta {
   margin-top: 4px;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   font-size: 12px;
   font-weight: 500;
 }
@@ -3119,13 +3119,13 @@ function showToast(message, type = "success") {
 }
 .fc-size small {
   margin-top: 6px;
-  color: var(--rosewood);
+  color: var(--leaf);
   font-size: 12px;
   font-weight: 600;
 }
 .fc-size:hover:not(:disabled),
 .fc-size.on {
-  border-color: var(--rosewood);
+  border-color: var(--leaf);
   transform: translateY(-2px);
 }
 .fc-size:disabled {
@@ -3261,7 +3261,7 @@ function showToast(message, type = "success") {
   border: 0;
   border-bottom: 1px solid currentColor;
   background: none;
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   font-size: 12.5px;
   cursor: pointer;
 }
@@ -3383,12 +3383,12 @@ function showToast(message, type = "success") {
   position: relative;
   min-height: 0;
   overflow: hidden;
-  background: radial-gradient(120% 90% at 55% 38%, #fbf8f3 0%, #efe8de 55%, #e6ddd0 100%);
+  background: radial-gradient(120% 90% at 55% 38%, #fafbfa 0%, #eaefeb 55%, #dde5df 100%);
   transition: box-shadow 0.3s var(--ease-out);
 }
 
 .fc-stage.over {
-  box-shadow: inset 0 0 0 2px var(--rosewood);
+  box-shadow: inset 0 0 0 2px var(--leaf);
 }
 
 .fc-viewer {
@@ -3415,7 +3415,7 @@ function showToast(message, type = "success") {
   padding: 6px 12px;
   border: 0;
   border-radius: 10px;
-  background: rgba(250, 248, 244, 0.78);
+  background: rgba(250, 251, 250, 0.78);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   color: var(--ink-soft);
@@ -3499,7 +3499,7 @@ function showToast(message, type = "success") {
     bottom: 0;
     z-index: 8;
     padding: 12px 16px 14px;
-    box-shadow: 0 -10px 24px -18px rgba(30, 27, 24, 0.3);
+    box-shadow: 0 -10px 24px -18px rgba(54, 63, 78, 0.3);
   }
 
   .fc-hint {

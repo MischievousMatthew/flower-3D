@@ -171,7 +171,7 @@ const ICONS = {
   background: #f4e7e2;
 }
 .lock .an-icon {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 .offline {
   background: #e7ebef;

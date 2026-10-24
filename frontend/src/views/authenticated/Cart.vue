@@ -410,7 +410,7 @@
           model-url="/Boquet.glb"
           model-type="glb"
           :arrangement="viewingArrangement"
-          background-color="#ebe5dd"
+          background-color="#e4eae5"
         />
       </div>
     </div>
@@ -954,9 +954,9 @@ const handleImageError = (e) => {
 }
 
 .stock-alert-banner--error {
-  border-color: rgba(142, 68, 58, 0.35);
-  background: rgba(184, 101, 88, 0.08);
-  color: var(--rosewood-dark);
+  border-color: rgba(46, 122, 79, 0.35);
+  background: rgba(77, 177, 115, 0.08);
+  color: var(--leaf-deep);
 }
 
 .select-all-section {
@@ -1094,7 +1094,7 @@ const handleImageError = (e) => {
 .item-specifications span + span::before {
   content: "·";
   margin: 0 8px;
-  color: var(--rosewood);
+  color: var(--leaf);
 }
 
 .btn-remove {
@@ -1113,7 +1113,7 @@ const handleImageError = (e) => {
 
 .btn-remove:hover {
   background: var(--ivory-deep);
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .btn-remove svg {
@@ -1183,7 +1183,7 @@ const handleImageError = (e) => {
 }
 
 .stock-warning {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   font-size: 11.5px;
   font-weight: 500;
   letter-spacing: 0.12em;
@@ -1217,7 +1217,7 @@ const handleImageError = (e) => {
 }
 
 .item-action:hover:not(:disabled) {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 .item-action:disabled {
@@ -1250,7 +1250,7 @@ const handleImageError = (e) => {
 }
 
 .price-badge {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.14em;
@@ -1264,7 +1264,7 @@ const handleImageError = (e) => {
 }
 
 .subtotal-saving {
-  color: var(--rosewood-dark);
+  color: var(--leaf-deep);
 }
 
 /* ---- Summary ---- */
@@ -1306,7 +1306,7 @@ const handleImageError = (e) => {
 
 .discount-amount,
 .breakdown-saving {
-  color: var(--rosewood-dark) !important;
+  color: var(--leaf-deep) !important;
 }
 
 .discount-breakdown {
@@ -1390,7 +1390,7 @@ const handleImageError = (e) => {
 .btn-remove:focus-visible,
 .item-action:focus-visible,
 .checkbox-container input:focus-visible {
-  outline: 2px solid var(--rosewood);
+  outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 
@@ -1463,7 +1463,7 @@ const handleImageError = (e) => {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(27, 22, 18, 0.45);
+  background: rgba(38, 45, 57, 0.45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -1474,7 +1474,7 @@ const handleImageError = (e) => {
   padding: 40px 34px 32px;
   border-radius: 26px;
   background: var(--paper);
-  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
+  box-shadow: 0 30px 80px rgba(38, 45, 57, 0.25);
 }
 
 .modal-title {
@@ -1524,7 +1524,7 @@ const handleImageError = (e) => {
   overflow: hidden;
   border-radius: 24px;
   background: var(--paper);
-  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
+  box-shadow: 0 30px 80px rgba(38, 45, 57, 0.25);
 }
 
 .bouquet-modal-header {

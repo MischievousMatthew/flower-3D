@@ -103,7 +103,7 @@ function handleKeydown(event) {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(27, 22, 18, 0.45);
+  background: rgba(38, 45, 57, 0.45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -114,9 +114,9 @@ function handleKeydown(event) {
   max-width: 480px;
   padding: 40px 34px 32px;
   border-radius: 26px;
-  background: #f4f1ec;
-  color: #1e1b18;
-  box-shadow: 0 30px 80px rgba(27, 22, 18, 0.25);
+  background: #f2f5f2;
+  color: #363f4e;
+  box-shadow: 0 30px 80px rgba(38, 45, 57, 0.25);
   font-family: "Poppins", sans-serif;
 }
 
@@ -129,20 +129,20 @@ function handleKeydown(event) {
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: #6e6761;
+  color: #6a7282;
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
 }
 
 .plan-modal-close:hover {
-  background: rgba(30, 27, 24, 0.06);
+  background: rgba(54, 63, 78, 0.06);
 }
 
 .plan-modal-eyebrow {
   display: inline-block;
   margin-bottom: 12px;
-  color: #b86558;
+  color: #4db173;
   font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -159,7 +159,7 @@ function handleKeydown(event) {
 
 .plan-modal p {
   margin: 0 0 26px;
-  color: #6e6761;
+  color: #6a7282;
   font-size: 14.5px;
   line-height: 1.7;
 }
@@ -171,10 +171,10 @@ function handleKeydown(event) {
 
 .plan-modal-btn {
   padding: 14px 20px;
-  border: 1px solid rgba(30, 27, 24, 0.15);
+  border: 1px solid rgba(54, 63, 78, 0.15);
   border-radius: 999px;
   background: transparent;
-  color: #1e1b18;
+  color: #363f4e;
   font: inherit;
   font-size: 14.5px;
   font-weight: 600;
@@ -183,23 +183,23 @@ function handleKeydown(event) {
 }
 
 .plan-modal-btn:hover {
-  border-color: #1e1b18;
+  border-color: #363f4e;
 }
 
 .plan-modal-btn--dark {
-  background: #1e1b18;
-  border-color: #1e1b18;
-  color: #f4f1ec;
+  background: #363f4e;
+  border-color: #363f4e;
+  color: #f2f5f2;
 }
 
 .plan-modal-btn--dark:hover {
-  background: #b86558;
-  border-color: #b86558;
+  background: #4db173;
+  border-color: #4db173;
 }
 
 .plan-modal-btn:focus-visible,
 .plan-modal-close:focus-visible {
-  outline: 2px solid #b86558;
+  outline: 2px solid #4db173;
   outline-offset: 3px;
 }
 

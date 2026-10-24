@@ -79,7 +79,7 @@ defineExpose({ focus: () => input.value?.focus() });
   background: var(--ivory);
 }
 .pf-eye:focus-visible {
-  outline: 2px solid var(--rosewood-dark);
+  outline: 2px solid var(--leaf-deep);
 }
 .pf-eye svg {
   width: 20px;
