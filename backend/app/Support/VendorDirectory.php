@@ -37,6 +37,12 @@ final class VendorDirectory
         ]])->all();
     }
 
+    /** One shop's store name (e.g. for "sent to Petal & Stem") */
+    public static function nameOf(?int $vendorId): string
+    {
+        return $vendorId ? (self::details([$vendorId])[$vendorId]['store_name'] ?? 'The shop') : 'The shop';
+    }
+
     public static function unknown($id): array
     {
         return ['id' => $id, 'name' => 'Deleted vendor', 'email' => null, 'store_name' => 'Deleted vendor', 'logo_url' => null];

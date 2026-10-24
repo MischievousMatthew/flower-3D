@@ -1,13 +1,33 @@
 <template>
-  <ShopLayout section="crm" title="Customer Chat" subtitle="Talk with your customers. Their orders with you are on the right, so you can answer without switching pages.">
+  <component :is="erp ? HrPage : ShopLayout" v-bind="layoutProps">
     <template #actions>
-      <button type="button" class="sp-btn sp-btn-primary" @click="openNew"><span v-html="ICONS.plus"></span>New message</button>
+      <button v-if="canReply" type="button" class="sp-btn sp-btn-primary" @click="openNew"><span v-html="ICONS.plus"></span>New message</button>
     </template>
 
     <div v-if="error" class="sp-banner error">
       <span v-html="ICONS.alert"></span>{{ error }}
       <button type="button" @click="loadConversations()">Try again</button>
     </div>
+
+    <!-- Unread, waiting and reply speed, so nobody is left hanging -->
+    <section v-if="summary" class="ch-summary" aria-label="Inbox summary">
+      <div class="ch-sum" :class="{ hot: summary.unread_messages }">
+        <span class="ch-sum-icon" v-html="ICONS.chat"></span>
+        <span><strong>{{ summary.unread_messages }}</strong><small>unread {{ summary.unread_messages === 1 ? "message" : "messages" }}<template v-if="summary.unread_chats"> in {{ summary.unread_chats }} {{ summary.unread_chats === 1 ? "chat" : "chats" }}</template></small></span>
+      </div>
+      <div class="ch-sum" :class="{ warn: summary.waiting_chats }">
+        <span class="ch-sum-icon" v-html="ICONS.clock"></span>
+        <span><strong>{{ summary.waiting_chats }}</strong><small>{{ summary.waiting_chats ? `waiting for a reply · oldest ${waitText(summary.oldest_waiting_at)}` : "no one waiting for a reply" }}</small></span>
+      </div>
+      <div class="ch-sum">
+        <span class="ch-sum-icon" v-html="ICONS.activity"></span>
+        <span><strong>{{ replyText(summary.avg_reply_minutes) }}</strong><small>average reply, last 7 days</small></span>
+      </div>
+      <component :is="questionsRoute ? 'router-link' : 'div'" :to="questionsRoute" class="ch-sum" :class="{ warn: summary.overdue_inquiries, link: !!questionsRoute }">
+        <span class="ch-sum-icon" v-html="ICONS.help"></span>
+        <span><strong>{{ summary.open_inquiries }}</strong><small>{{ summary.open_inquiries ? `open ${summary.open_inquiries === 1 ? "question" : "questions"}${summary.overdue_inquiries ? ` · ${summary.overdue_inquiries} over a day` : ""}` : "no open questions" }}</small></span>
+      </component>
+    </section>
 
     <section class="sp-card ch-shell" :class="{ 'has-thread': !!active, 'show-info': showInfo }">
       <!-- Conversations -->
@@ -48,6 +68,7 @@
                 </span>
                 <span class="ch-item-bottom">
                   <span class="ch-preview">{{ c.last_message || "No messages yet" }}</span>
+                  <span v-if="summary?.waiting?.[c.id]" class="ch-wait" :class="{ late: isLate(summary.waiting[c.id]) }" :title="`Waiting for a reply since ${clock(summary.waiting[c.id])}`">{{ waitText(summary.waiting[c.id]) }}</span>
                   <b v-if="c.unread_count" class="ch-badge">{{ c.unread_count > 9 ? "9+" : c.unread_count }}</b>
                 </span>
               </span>
@@ -75,8 +96,8 @@
               <small :class="{ online: active.customer.online }">{{ active.customer.online ? "Online now" : "Offline" }}</small>
             </div>
             <div class="ch-head-actions">
-              <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="toggleArchive(active)">{{ active.is_archived ? "Move to inbox" : "Archive" }}</button>
-              <button type="button" class="sp-icon-btn danger" aria-label="Delete conversation" @click="confirmDelete = true"><span v-html="ICONS.trash"></span></button>
+              <button v-if="canManage" type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="toggleArchive(active)">{{ active.is_archived ? "Move to inbox" : "Archive" }}</button>
+              <button v-if="canManage" type="button" class="sp-icon-btn danger" aria-label="Delete conversation" @click="confirmDelete = true"><span v-html="ICONS.trash"></span></button>
               <button type="button" class="sp-icon-btn ch-info-btn" :class="{ on: showInfo }" aria-label="Customer details" :aria-pressed="showInfo" @click="showInfo = !showInfo"><span v-html="ICONS.user"></span></button>
             </div>
           </header>
@@ -90,14 +111,31 @@
               <template v-for="g in grouped" :key="g.day">
                 <p class="ch-day"><span>{{ g.day }}</span></p>
                 <div v-for="m in g.items" :key="m.id" class="ch-msg" :class="{ own: m.is_own, pending: m.pending }">
-                  <div class="ch-bubble">
+                  <div class="ch-bubble" :class="{ card: m.meta?.kind }">
+                    <div v-if="m.meta?.kind === 'order'" class="ch-card order">
+                      <span class="ch-card-icon" v-html="ICONS.receipt"></span>
+                      <span class="ch-card-main">
+                        <small>Order update · {{ m.meta.order_number }}</small>
+                        <strong>{{ m.meta.title }}</strong>
+                        <span v-if="m.meta.note" class="ch-card-note">{{ m.meta.note }}</span>
+                      </span>
+                    </div>
+                    <div v-else-if="m.meta?.kind === 'product'" class="ch-card product">
+                      <span class="ch-card-img"><img v-if="m.meta.image" :src="m.meta.image" alt="" loading="lazy" /><span v-else v-html="ICONS.flower"></span></span>
+                      <span class="ch-card-main">
+                        <small>Product</small>
+                        <strong>{{ m.meta.name }}</strong>
+                        <span class="ch-card-price">{{ money(m.meta.price) }}</span>
+                      </span>
+                    </div>
                     <div v-if="images(m).length" class="ch-images" :class="{ many: images(m).length > 1 }">
                       <a v-for="a in images(m)" :key="a.url" :href="a.url" target="_blank" rel="noopener"><img :src="a.url" :alt="a.name || 'Photo'" loading="lazy" /></a>
                     </div>
                     <a v-for="a in files(m)" :key="a.url" :href="a.url" target="_blank" rel="noopener" class="ch-file">
                       <span v-html="ICONS.note"></span><span>{{ a.name || "File" }}</span>
                     </a>
-                    <p v-if="m.text">{{ m.text }}</p>
+                    <p v-if="m.text && !m.meta?.kind">{{ m.text }}</p>
+                    <p v-else-if="m.meta?.kind === 'product' && m.text && m.text !== m.meta.name">{{ m.text }}</p>
                   </div>
                   <small class="ch-meta">{{ m.pending ? "Sending…" : clock(m.created_at) }}<template v-if="m.is_own && !m.pending"> · {{ m.read ? "Seen" : "Sent" }}</template></small>
                 </div>
@@ -105,7 +143,8 @@
             </template>
           </div>
 
-          <form class="ch-composer" @submit.prevent="send">
+          <p v-if="!canReply" class="ch-readonly"><span v-html="ICONS.lock"></span>You can read these chats. Ask the shop owner for permission to reply.</p>
+          <form v-else class="ch-composer" @submit.prevent="send">
             <div v-if="pending.length" class="ch-attach-list">
               <span v-for="(f, i) in pending" :key="i" class="ch-attach">
                 <img v-if="f.preview" :src="f.preview" alt="" />
@@ -120,6 +159,7 @@
                 <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.txt" @change="pickFiles" />
                 <span v-html="ICONS.clip"></span>
               </label>
+              <button type="button" class="sp-icon-btn" aria-label="Send an order update or a product" title="Send an order update or a product" @click="openShare"><span v-html="ICONS.receipt"></span></button>
               <div class="ch-quick">
                 <button type="button" class="sp-icon-btn" aria-label="Quick replies" :aria-expanded="showQuick" @click="showQuick = !showQuick"><span v-html="ICONS.sparkle"></span></button>
                 <div v-if="showQuick" class="ch-quick-menu" role="menu">
@@ -175,7 +215,7 @@
           <p v-if="!info.orders.length" class="sp-hint">They haven't ordered from you yet.</p>
           <ul v-else class="ch-orders">
             <li v-for="o in info.orders" :key="o.id">
-              <button type="button" @click="openOrder(o)">
+              <button type="button" :disabled="erp" @click="openOrder(o)">
                 <span><b>{{ o.order_number }}</b><small>{{ shortDate(o.created_at) }} · {{ money(o.total) }}</small></span>
                 <span class="sp-chip" :class="(ORDER_STATUS[o.status] ?? [o.status, 'slate'])[1]">{{ (ORDER_STATUS[o.status] ?? [o.status])[0] }}</span>
               </button>
@@ -186,7 +226,7 @@
             <h4>Their questions</h4>
             <ul class="ch-orders">
               <li v-for="q in info.inquiries" :key="q.id">
-                <button type="button" @click="router.push({ name: 'VendorInquiries', query: { inquiry: q.id } })">
+                <button type="button" :disabled="erp" @click="router.push({ name: 'VendorInquiries', query: { inquiry: q.id } })">
                   <span><b>{{ q.about }}</b><small>{{ timeAgo(q.created_at) }}</small></span>
                   <span class="sp-chip" :class="q.status === 'open' ? 'amber' : 'green'">{{ q.status === "open" ? "Waiting" : q.status === "answered" ? "Answered" : "Done" }}</span>
                 </button>
@@ -244,6 +284,79 @@
       </Transition>
     </Teleport>
 
+    <!-- Order update or product -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="share" class="sp-backdrop" @click="share = null"></div></Transition>
+      <Transition name="sp-pop">
+        <div v-if="share" class="sp-modal-wrap">
+          <form class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="sh-title" @submit.prevent="sendShare">
+            <div class="sp-modal-head">
+              <div><h3 id="sh-title">Send to {{ active?.customer.name.split(" ")[0] }}</h3><p>It appears in their chat as a card, and order updates also notify them.</p></div>
+              <button type="button" class="sp-icon-btn" aria-label="Close" @click="share = null"><span v-html="ICONS.close"></span></button>
+            </div>
+            <div class="sp-seg sh-tabs" role="tablist" aria-label="What to send">
+              <button type="button" role="tab" :aria-selected="share.tab === 'order'" :class="{ on: share.tab === 'order' }" @click="share.tab = 'order'">Order update</button>
+              <button type="button" role="tab" :aria-selected="share.tab === 'product'" :class="{ on: share.tab === 'product' }" @click="share.tab = 'product'">Product</button>
+            </div>
+
+            <div v-if="!share.options" class="sh-sk"><div v-for="n in 3" :key="n" class="bc-skeleton sp-sk-line"></div></div>
+            <template v-else-if="share.tab === 'order'">
+              <p v-if="!share.options.orders.length" class="sp-hint">{{ active?.customer.name.split(" ")[0] }} hasn't ordered from you yet.</p>
+              <template v-else>
+                <div class="sp-field">
+                  <span class="sp-label">Which order</span>
+                  <ul class="sh-list" role="listbox" aria-label="Orders">
+                    <li v-for="o in share.options.orders" :key="o.id">
+                      <button type="button" role="option" class="sh-row" :class="{ on: share.orderId === o.id }" :aria-selected="share.orderId === o.id" @click="share.orderId = o.id">
+                        <span class="grow"><b>{{ o.order_number }}</b><small>{{ shortDate(o.created_at) }} · {{ money(o.total) }}</small></span>
+                        <span class="sp-chip" :class="(ORDER_STATUS[o.status] ?? [o.status, 'slate'])[1]">{{ (ORDER_STATUS[o.status] ?? [o.status])[0] }}</span>
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+                <div class="sp-field">
+                  <span class="sp-label">Update</span>
+                  <div class="sh-picks">
+                    <button v-for="u in share.options.updates" :key="u.value" type="button" class="sp-pick" :class="{ on: share.update === u.value }" :aria-pressed="share.update === u.value" @click="share.update = u.value">{{ u.label }}</button>
+                  </div>
+                </div>
+                <label class="sp-field">
+                  <span class="sp-label">Message <small>{{ share.update === "note" ? "(needed)" : "(optional)" }}</small></span>
+                  <textarea v-model="share.note" class="sp-textarea" rows="2" maxlength="500" :placeholder="share.update === 'delayed' ? 'e.g. Traffic in Imus, about 30 minutes late. Sorry!' : 'e.g. Rider is Jun, arriving around 3 PM.'"></textarea>
+                </label>
+                <p class="sp-hint">This only messages {{ active?.customer.name.split(" ")[0] }}. It doesn't change the order's status.</p>
+              </template>
+            </template>
+            <template v-else>
+              <label class="sp-search">
+                <span v-html="ICONS.search"></span>
+                <input v-model="share.search" class="sp-input" type="search" placeholder="Search your products" aria-label="Search your products" @input="searchShare" />
+              </label>
+              <p v-if="!share.options.products.length" class="sp-hint">No products found.</p>
+              <ul v-else class="sh-list" role="listbox" aria-label="Products">
+                <li v-for="pr in share.options.products" :key="pr.id">
+                  <button type="button" role="option" class="sh-row" :class="{ on: share.productId === pr.id }" :aria-selected="share.productId === pr.id" @click="share.productId = pr.id">
+                    <span class="sh-thumb"><img v-if="pr.image" :src="pr.image" alt="" loading="lazy" /><span v-else v-html="ICONS.flower"></span></span>
+                    <span class="grow"><b>{{ pr.name }}</b><small>{{ money(pr.price) }}</small></span>
+                  </button>
+                </li>
+              </ul>
+              <label class="sp-field">
+                <span class="sp-label">Message <small>(optional)</small></span>
+                <textarea v-model="share.note" class="sp-textarea" rows="2" maxlength="500" placeholder="e.g. This one comes in pink too."></textarea>
+              </label>
+            </template>
+
+            <p v-if="share.error" class="sp-error">{{ share.error }}</p>
+            <div class="sp-modal-foot">
+              <button type="button" class="sp-btn sp-btn-ghost" @click="share = null">Cancel</button>
+              <button type="submit" class="sp-btn sp-btn-primary" :disabled="!canSendShare || share.busy"><span v-html="ICONS.send"></span>{{ share.busy ? "Sending…" : share.tab === "order" ? "Send update" : "Send product" }}</button>
+            </div>
+          </form>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- Delete -->
     <Teleport to="body">
       <Transition name="sp-fade"><div v-if="confirmDelete" class="sp-backdrop" @click="confirmDelete = false"></div></Transition>
@@ -260,7 +373,7 @@
         </div>
       </Transition>
     </Teleport>
-  </ShopLayout>
+  </component>
 </template>
 
 <script setup>
@@ -269,6 +382,8 @@ import { useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
+import HrPage from "../../../components/hr/HrPage.vue";
+import { useAssignment } from "../../../composables/useAssignment";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { money } from "../../../components/vendor/finance/financeUi";
@@ -276,6 +391,23 @@ import { ORDER_STATUS, QUICK_REPLIES, clock, colorFor, dayHeading, initialsOf, t
 import { linkedId } from "../../../utils/hiddenIds";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
+
+// erp: shown in the ERP workspace, where staff need the Chat permissions
+const props = defineProps({ erp: { type: Boolean, default: false } });
+const erp = props.erp;
+const { can } = useAssignment();
+const SUBTITLE = "Talk with your customers. Their orders with you are on the right, so you can answer without switching pages.";
+const layoutProps = erp ? { title: "Customer chat", subtitle: SUBTITLE } : { section: "crm", title: "Customer Chat", subtitle: SUBTITLE };
+const canReply = computed(() => !erp || can("crm", "create"));
+// Archiving and deleting stay with the shop owner (they always pass can())
+const canManage = computed(() => !erp || can("crm", "edit"));
+
+// Inbox summary (unread, waiting, reply speed) and the send-update window
+const summary = ref(null);
+const share = ref(null);
+const questionsRoute = computed(() => (erp ? { name: "CRMInquiries" } : { name: "VendorInquiries" }));
+let summaryTimer = null;
+let shareTimer = null;
 
 const MAX_FILES = 5;
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -369,7 +501,7 @@ async function select(c) {
 
 async function loadInfo(c) {
   try {
-    const { data } = await api.get(`vendor/crm/customers/${c.customer.id}`);
+    const { data } = await api.get(`${erp ? "crm" : "vendor/crm"}/customers/${c.customer.id}`);
     if (active.value?.id === c.id) info.value = data.data;
   } catch {
     if (active.value?.id === c.id) info.value = { stats: { orders: 0, spent: 0 }, orders: [], inquiries: [] };
@@ -465,6 +597,7 @@ async function send() {
     lastId.value = Math.max(lastId.value, data.message.id);
     files.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
     c.is_archived = false;
+    if (summary.value?.waiting?.[c.id]) loadSummary();
     c.last_message = text || "You sent an attachment";
     c.last_message_time = "Just now";
     conversations.value = [c, ...conversations.value.filter((x) => x.id !== c.id)];
@@ -503,7 +636,98 @@ async function remove() {
 }
 
 function openOrder(o) {
+  if (props.erp) return; // order pages live in the vendor portal
   router.push({ name: "VendorOrderDetails", query: { order: o.id } });
+}
+
+async function loadSummary() {
+  try {
+    const { data } = await api.get("crm/communication");
+    summary.value = data.data;
+  } catch {
+    // The summary is a nice-to-have; the chat works without it
+  }
+}
+
+const minutesSince = (at) => Math.max(0, Math.round((Date.now() - new Date(at).getTime()) / 60000));
+const isLate = (at) => minutesSince(at) >= 60;
+function waitText(at) {
+  if (!at) return "";
+  const m = minutesSince(at);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min`;
+  if (m < 1440) return `${Math.floor(m / 60)} h`;
+  return `${Math.floor(m / 1440)} d`;
+}
+function replyText(m) {
+  if (m === null || m === undefined) return "—";
+  if (m < 60) return `${Math.max(1, m)} min`;
+  if (m < 1440) return `${(m / 60).toFixed(m < 600 ? 1 : 0)} h`;
+  return `${(m / 1440).toFixed(1)} d`;
+}
+
+const canSendShare = computed(() => {
+  const s = share.value;
+  if (!s?.options) return false;
+  if (s.tab === "order") return !!s.orderId && !!s.update && (s.update !== "note" || !!s.note.trim());
+  return !!s.productId;
+});
+
+async function loadShareables(search = "") {
+  const c = active.value;
+  const { data } = await api.get(`/chat/conversations/${c.id}/shareables`, { params: { search: search || undefined } });
+  return data.data;
+}
+async function openShare() {
+  if (!active.value) return;
+  share.value = { tab: "order", options: null, orderId: null, update: "on_the_way", productId: null, note: "", search: "", busy: false, error: "" };
+  try {
+    const options = await loadShareables();
+    if (!share.value) return;
+    share.value.options = options;
+    share.value.orderId = options.orders[0]?.id ?? null;
+    if (!options.orders.length) share.value.tab = "product";
+  } catch (e) {
+    if (share.value) share.value.error = apiMessage(e, "Couldn't load their orders and your products.");
+  }
+}
+function searchShare() {
+  clearTimeout(shareTimer);
+  shareTimer = setTimeout(async () => {
+    if (!share.value) return;
+    try {
+      const options = await loadShareables(share.value.search.trim());
+      if (share.value) share.value.options = { ...share.value.options, products: options.products };
+    } catch {
+      // Keep the last results
+    }
+  }, 300);
+}
+async function sendShare() {
+  const s = share.value;
+  const c = active.value;
+  if (!s || !c || !canSendShare.value) return;
+  s.busy = true;
+  s.error = "";
+  try {
+    const { data } = s.tab === "order"
+      ? await api.post(`/chat/conversations/${c.id}/order-update`, { order_id: s.orderId, update: s.update, note: s.note.trim() || null })
+      : await api.post(`/chat/conversations/${c.id}/share-product`, { product_id: s.productId, note: s.note.trim() || null });
+    const msg = data.data;
+    messages.value.push(msg);
+    lastId.value = Math.max(lastId.value, msg.id);
+    scrollDown();
+    c.last_message = msg.text;
+    c.last_message_time = "Just now";
+    conversations.value = [c, ...conversations.value.filter((x) => x.id !== c.id)];
+    toast.success(data.message || "Sent.");
+    share.value = null;
+    loadSummary();
+  } catch (e) {
+    s.error = apiMessage(e, "Couldn't send it.");
+  } finally {
+    if (share.value) share.value.busy = false;
+  }
 }
 
 function openNew() {
@@ -572,12 +796,16 @@ onMounted(async () => {
     view.value = target.is_archived ? "archived" : "inbox";
     select(target);
   }
+  loadSummary();
+  summaryTimer = setInterval(() => !document.hidden && loadSummary(), 30000);
   pollTimer = setInterval(poll, 4000);
   listTimer = setInterval(() => !document.hidden && loadConversations({ quiet: true }), 15000);
   window.addEventListener("keydown", onKey);
 });
 onBeforeUnmount(() => {
   clearInterval(pollTimer);
+  clearInterval(summaryTimer);
+  clearTimeout(shareTimer);
   clearInterval(listTimer);
   clearTimeout(searchTimer);
   window.removeEventListener("keydown", onKey);
@@ -586,6 +814,236 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* Inbox summary */
+.ch-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.ch-sum {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--v-border);
+  border-radius: 14px;
+  background: var(--v-surface);
+  color: inherit;
+  text-decoration: none;
+}
+.ch-sum.link:hover {
+  border-color: var(--v-border-strong);
+}
+.ch-sum > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ch-sum strong {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--v-text);
+}
+.ch-sum small {
+  font-size: 12px;
+  color: var(--v-muted);
+}
+.ch-sum-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--v-subtle);
+  color: var(--v-muted);
+}
+.ch-sum-icon :deep(svg) {
+  width: 17px;
+  height: 17px;
+}
+.ch-sum.hot .ch-sum-icon {
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
+}
+.ch-sum.warn .ch-sum-icon {
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
+}
+.ch-wait {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ch-wait.late {
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
+}
+
+/* Order and product cards: a slim frame around the card, the note below it */
+.ch-bubble.card {
+  min-width: 230px;
+  padding: 5px;
+}
+.ch-bubble.card .ch-card {
+  margin-bottom: 0;
+}
+.ch-bubble.card > p {
+  margin-top: 4px;
+  padding: 3px 9px 4px;
+}
+.ch-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--v-surface);
+  border: 1px solid var(--v-border);
+  color: var(--v-text);
+}
+.ch-card-icon,
+.ch-card-img {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
+}
+.ch-card-icon :deep(svg),
+.ch-card-img :deep(svg) {
+  width: 19px;
+  height: 19px;
+}
+.ch-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ch-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.ch-card-main small {
+  font-size: 11px;
+  color: var(--v-muted);
+}
+.ch-card-main strong {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.ch-card-note {
+  font-size: 12.5px;
+  color: var(--v-text-2);
+  white-space: pre-wrap;
+}
+.ch-card-price {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--bc-accent-deep);
+}
+
+/* Send-update window */
+.sh-tabs {
+  margin-bottom: 14px;
+}
+.sh-sk {
+  display: grid;
+  gap: 10px;
+}
+.sh-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--v-border);
+  border-radius: 12px;
+}
+.sh-list li + li {
+  border-top: 1px solid var(--v-border);
+}
+.sh-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sh-row:hover,
+.sh-row.on {
+  background: var(--bc-accent-soft);
+}
+.sh-row .grow {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sh-row b {
+  font-size: 13px;
+  color: var(--v-text);
+}
+.sh-row small {
+  font-size: 12px;
+  color: var(--v-muted);
+}
+.sh-thumb {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--v-subtle);
+  color: var(--v-muted);
+}
+.sh-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sh-thumb :deep(svg) {
+  width: 17px;
+  height: 17px;
+}
+.sh-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.sp-label small {
+  font-weight: 400;
+  color: var(--v-faint);
+}
+@media (max-width: 1100px) {
+  .ch-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .ch-shell {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
@@ -927,6 +1385,20 @@ onBeforeUnmount(() => {
 }
 
 /* Composer */
+.ch-readonly {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 18px;
+  border-top: 1px solid var(--v-border);
+  font-size: 12.5px;
+  color: var(--v-muted);
+}
+.ch-readonly :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
 .ch-composer {
   padding: 10px 14px 8px;
   border-top: 1px solid var(--v-border);
@@ -1158,8 +1630,12 @@ onBeforeUnmount(() => {
   text-align: left;
   cursor: pointer;
 }
-.ch-orders button:hover {
+.ch-orders button:not(:disabled):hover {
   background: var(--v-subtle);
+}
+.ch-orders button:disabled {
+  color: inherit;
+  cursor: default;
 }
 .ch-orders button > span:first-child {
   min-width: 0;

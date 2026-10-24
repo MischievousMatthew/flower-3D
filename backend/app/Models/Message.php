@@ -21,6 +21,7 @@ class Message extends Model
         'message',
         'message_type',
         'attachments',
+        'meta',
         'is_read',
         'read_at'
     ];
@@ -31,6 +32,8 @@ class Message extends Model
             'is_read' => 'boolean',
             'read_at' => 'datetime',
             'attachments' => 'array', // ADD THIS LINE
+            // Order updates and shared products: the card's details
+            'meta' => 'array',
         ];
     }
 

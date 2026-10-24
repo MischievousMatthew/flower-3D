@@ -119,7 +119,10 @@ class AdminSupportController extends Controller
                 'messages' => $ticket->messages->map(fn ($m) => [
                     'id' => $m->id,
                     'from_admin' => $m->from_admin,
-                    'author' => $m->from_admin ? (PaymentLedger::personName($m->author) ?? 'Admin') : ($this->requesterName($ticket, $stores)),
+                    // Shop replies (complaints routed to a shop) are signed by the staff member
+                    'author' => $m->from_admin ? (PaymentLedger::personName($m->author) ?? 'Admin')
+                        : ($m->from_shop ? ($m->author_name ?? 'Shop') . ' (shop' . ($m->is_internal ? ', internal note' : '') . ')' : $this->requesterName($ticket, $stores)),
+                    'from_shop' => (bool) $m->from_shop,
                     'body' => $m->body,
                     'created_at' => $m->created_at?->toIso8601String(),
                 ]),

@@ -1,5 +1,5 @@
 <template>
-  <ShopLayout section="crm" title="Reviews & Ratings" subtitle="What customers say about your products. Reply to thank them or sort out a problem; your reply shows under their review.">
+  <component :is="bare ? 'div' : erp ? HrPage : ShopLayout" v-bind="bare ? {} : layoutProps">
     <div v-if="error" class="sp-banner error">
       <span v-html="ICONS.alert"></span>{{ error }}
       <button type="button" @click="load()">Try again</button>
@@ -125,12 +125,12 @@
             <div v-if="r.reply && editing !== r.id" class="rv-reply">
               <div class="rv-reply-head"><b>Your reply</b><span class="st-sub">{{ timeAgo(r.replied_at) }}</span></div>
               <p>{{ r.reply }}</p>
-              <div class="rv-reply-actions">
+              <div v-if="canReply" class="rv-reply-actions">
                 <button type="button" class="st-link" @click="startEdit(r)">Edit</button>
                 <button type="button" class="st-link muted" :disabled="busy === r.id" @click="save(r, '')">Remove</button>
               </div>
             </div>
-            <form v-else-if="data.can_reply && (editing === r.id || !r.reply)" class="rv-form" @submit.prevent="save(r, drafts[r.id])">
+            <form v-else-if="canReply && (editing === r.id || !r.reply)" class="rv-form" @submit.prevent="save(r, drafts[r.id])">
               <template v-if="open[r.id] || editing === r.id">
                 <textarea v-model="drafts[r.id]" class="sp-textarea" rows="3" maxlength="1000" :placeholder="r.rating <= 2 ? 'Sorry to hear that. Tell them how you\'ll make it right…' : 'Thank them for their order…'" :aria-label="`Reply to ${r.reviewer}`"></textarea>
                 <div class="rv-form-foot">
@@ -153,7 +153,7 @@
         <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="data.meta.page >= data.meta.last_page" @click="load(data.meta.page + 1)">Next<span v-html="ICONS.right"></span></button>
       </nav>
     </section>
-  </ShopLayout>
+  </component>
 </template>
 
 <script setup>
@@ -161,12 +161,23 @@ import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
+import HrPage from "../../../components/hr/HrPage.vue";
+import { useAssignment } from "../../../composables/useAssignment";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { timeAgo } from "../../../components/vendor/crm/crmUi";
 import { linkedId } from "../../../utils/hiddenIds";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
+
+// erp: in the ERP workspace (its routes and the Reviews & feedback permission); bare: no page header, for a tab inside another page
+const props = defineProps({ erp: { type: Boolean, default: false }, bare: { type: Boolean, default: false } });
+const { erp, bare } = props;
+const { can } = useAssignment();
+const SUBTITLE = "What customers say about your products. Reply to thank them or sort out a problem; your reply shows under their review.";
+const layoutProps = erp ? { title: "Reviews & ratings", subtitle: SUBTITLE } : { section: "crm", title: "Reviews & Ratings", subtitle: SUBTITLE };
+const base = erp ? "crm/reviews" : "vendor/crm/reviews";
+const canReply = computed(() => !!data.value?.can_reply && (!erp || can("crm_reviews", "create")));
 
 const data = ref(null);
 const error = ref("");
@@ -211,7 +222,7 @@ async function load(page = 1) {
     search: search.value.trim() || undefined,
   };
   try {
-    const res = await api.get("vendor/crm/reviews", { params });
+    const res = await api.get(base, { params });
     data.value = res.data.data;
   } catch (e) {
     error.value = apiMessage(e, "Couldn't load reviews.");
@@ -260,7 +271,7 @@ function cancel(r) {
 async function save(r, text) {
   busy.value = r.id;
   try {
-    const { data: res } = await api.post(`vendor/crm/reviews/${r.id}/reply`, { reply: (text || "").trim() });
+    const { data: res } = await api.post(`${base}/${r.id}/reply`, { reply: (text || "").trim() });
     toast.success(res.message);
     r.reply = (text || "").trim() || null;
     r.replied_at = r.reply ? new Date().toISOString() : null;
@@ -268,7 +279,7 @@ async function save(r, text) {
     open[r.id] = false;
     drafts[r.id] = "";
     if (data.value.summary.unreplied !== null) {
-      const res2 = await api.get("vendor/crm/reviews", { params: { page: 1 } });
+      const res2 = await api.get(base, { params: { page: 1 } });
       data.value.summary = res2.data.data.summary;
     }
   } catch (e) {

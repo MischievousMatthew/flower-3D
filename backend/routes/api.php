@@ -46,6 +46,14 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\EmployeeLeaveController;
 use App\Http\Controllers\HrDashboardController;
+use App\Http\Controllers\CrmDashboardController;
+use App\Http\Controllers\CrmCustomersController;
+use App\Http\Controllers\CustomerPreferencesController;
+use App\Http\Controllers\ChatShareController;
+use App\Http\Controllers\CrmCommunicationController;
+use App\Http\Controllers\CrmCasesController;
+use App\Http\Controllers\CrmSegmentsController;
+use App\Http\Controllers\CrmFeedbackController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\WarehouseBatchController;
@@ -286,6 +294,20 @@ Route::middleware('token.auth')->group(function () {
 
     Route::prefix('customer')->group(function () {
 
+        // ── Preferences, special dates and favorites (shared with shops on request) ──
+        Route::get('/preferences',                   [CustomerPreferencesController::class, 'show']);
+        Route::put('/preferences',                   [CustomerPreferencesController::class, 'update']);
+        Route::post('/preferences/dates',            [CustomerPreferencesController::class, 'storeDate'])->middleware('throttle:30,60');
+        Route::delete('/preferences/dates/{id}',     [CustomerPreferencesController::class, 'destroyDate'])->whereNumber('id');
+        Route::delete('/preferences/shops/{vendorId}', [CustomerPreferencesController::class, 'forgetShop'])->whereNumber('vendorId');
+        Route::get('/offers',                        [CustomerPreferencesController::class, 'offers']);
+        Route::post('/offers/consent',               [CustomerPreferencesController::class, 'offerConsentAnswer'])->middleware('throttle:20,60');
+        Route::post('/offers/shops/{vendorId}',      [CustomerPreferencesController::class, 'muteShop'])->whereNumber('vendorId');
+        Route::delete('/offers/shops/{vendorId}',    [CustomerPreferencesController::class, 'muteShop'])->whereNumber('vendorId');
+        Route::get('/favorites',                     [CustomerPreferencesController::class, 'favorites']);
+        Route::post('/favorites/{productId}',        [CustomerPreferencesController::class, 'favorite'])->whereNumber('productId');
+        Route::delete('/favorites/{productId}',      [CustomerPreferencesController::class, 'unfavorite'])->whereNumber('productId');
+
         // ── Questions to a shop about a product or an order ───────────────────
         Route::get('/inquiries',  [CustomerInquiryController::class, 'mine']);
         Route::post('/inquiries', [CustomerInquiryController::class, 'store'])->middleware('throttle:10,60');
@@ -332,6 +354,11 @@ Route::middleware('token.auth')->group(function () {
 
     // ── Chat ─────────────────────────────────────────────────────────────
     Route::prefix('chat')->group(function () {
+        // The shop sends order updates and products as cards (customers get them in their chat)
+        Route::get('/conversations/{id}/shareables', [ChatShareController::class, 'options'])->whereNumber('id')->middleware('employee.module:crm,view');
+        Route::post('/conversations/{id}/order-update', [ChatShareController::class, 'orderUpdate'])->whereNumber('id')->middleware(['employee.module:crm,create', 'throttle:60,1']);
+        Route::post('/conversations/{id}/share-product', [ChatShareController::class, 'shareProduct'])->whereNumber('id')->middleware(['employee.module:crm,create', 'throttle:60,1']);
+
         Route::middleware('employee.module:crm,view')->group(function () {
             Route::get('/conversations',                  [ChatController::class, 'getConversations']);
             Route::get('/my-conversations',               [ChatController::class, 'getConversations']);
@@ -979,6 +1006,44 @@ Route::middleware('token.auth')->group(function () {
             });
         });
     });
+
+    // CRM overview (customers, inquiries, issues, reviews, chat replies)
+    Route::get('crm/dashboard', [CrmDashboardController::class, 'show'])->middleware('employee.module:crm_dashboard,view');
+    // Customer management: profiles, purchase history, preferences, dates, notes
+    Route::prefix('crm/customers')->group(function () {
+        Route::get('/', [CrmCustomersController::class, 'index'])->middleware('employee.module:crm_customers,view');
+        Route::get('/{id}/profile', [CrmCustomersController::class, 'show'])->whereNumber('id')->middleware('employee.module:crm_customers,view');
+        Route::put('/{id}/preferences', [CrmCustomersController::class, 'updatePreferences'])->whereNumber('id')->middleware('employee.module:crm_customers,edit');
+        Route::post('/{id}/dates', [CrmCustomersController::class, 'storeDate'])->whereNumber('id')->middleware('employee.module:crm_customers,create');
+        Route::delete('/{id}/dates/{dateId}', [CrmCustomersController::class, 'destroyDate'])->whereNumber(['id', 'dateId'])->middleware('employee.module:crm_customers,delete');
+        Route::post('/{id}/notes', [CrmCustomersController::class, 'storeNote'])->whereNumber('id')->middleware('employee.module:crm_customers,create');
+        Route::patch('/{id}/notes/{noteId}', [CrmCustomersController::class, 'pinNote'])->whereNumber(['id', 'noteId'])->middleware('employee.module:crm_customers,edit');
+        Route::delete('/{id}/notes/{noteId}', [CrmCustomersController::class, 'destroyNote'])->whereNumber(['id', 'noteId'])->middleware('employee.module:crm_customers,delete');
+    });
+    // Reviews & feedback: the same reviews and replies as the vendor portal, plus trends and recurring complaints
+    Route::get('crm/feedback', [CrmFeedbackController::class, 'show'])->middleware('employee.module:crm_reviews,view');
+    Route::get('crm/reviews', [VendorCrmController::class, 'reviews'])->middleware('employee.module:crm_reviews,view');
+    Route::post('crm/reviews/{id}/reply', [VendorCrmController::class, 'reply'])->whereNumber('id')->middleware('employee.module:crm_reviews,create');
+    // Customer segments and the offers sent to them
+    Route::get('crm/segments', [CrmSegmentsController::class, 'index'])->middleware('employee.module:crm_segments,view');
+    Route::get('crm/segments/{segment}', [CrmSegmentsController::class, 'show'])->whereAlpha('segment')->middleware('employee.module:crm_segments,view');
+    Route::post('crm/segments/{segment}/offers', [CrmSegmentsController::class, 'send'])->whereAlpha('segment')->middleware(['employee.module:crm_segments,create', 'throttle:20,60']);
+    // Customer support cases: complaints and service issues (support tickets routed to the shop)
+    Route::prefix('crm/cases')->group(function () {
+        Route::get('/', [CrmCasesController::class, 'index'])->middleware('employee.module:crm_cases,view');
+        Route::get('/links', [CrmCasesController::class, 'links'])->middleware('employee.module:crm_cases,view');
+        Route::get('/{id}', [CrmCasesController::class, 'show'])->whereNumber('id')->middleware('employee.module:crm_cases,view');
+        Route::post('/', [CrmCasesController::class, 'store'])->middleware('employee.module:crm_cases,create');
+        Route::post('/{id}/reply', [CrmCasesController::class, 'reply'])->whereNumber('id')->middleware('employee.module:crm_cases,create');
+        Route::patch('/{id}', [CrmCasesController::class, 'update'])->whereNumber('id')->middleware('employee.module:crm_cases,edit');
+    });
+    // Customer communication: inbox summary and product/order questions
+    Route::get('crm/communication', [CrmCommunicationController::class, 'summary'])->middleware('employee.module:crm,view');
+    Route::get('crm/inquiries', [VendorCrmController::class, 'inquiries'])->middleware('employee.module:crm,view');
+    Route::post('crm/inquiries/{id}/answer', [VendorCrmController::class, 'answer'])->whereNumber('id')->middleware('employee.module:crm,create');
+    Route::post('crm/inquiries/{id}/status', [VendorCrmController::class, 'inquiryStatus'])->whereNumber('id')->middleware('employee.module:crm,create');
+    // The customer panel beside an ERP chat
+    Route::get('crm/customers/{id}', [VendorCrmController::class, 'customer'])->whereNumber('id')->middleware('employee.module:crm,view');
 
     // ----------------------------------------------------------
     // 6k. Finance

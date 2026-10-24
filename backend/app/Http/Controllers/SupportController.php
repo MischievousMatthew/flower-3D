@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\SupportMessage;
 use App\Models\SupportTicket;
 use App\Models\User;
+use App\Support\VendorDirectory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,11 @@ class SupportController extends Controller
         return response()->json([
             'success' => true,
             'data' => $tickets->map(fn ($t) => $this->row($t)),
-            'categories' => SupportTicket::CATEGORIES,
+            // Complaint categories go to a shop, so only customers get them
+            'categories' => $request->user()->role === User::ROLE_CUSTOMER
+                ? SupportTicket::CATEGORIES
+                : array_diff_key(SupportTicket::CATEGORIES, array_flip(SupportTicket::SHOP_CATEGORIES)),
+            'shop_categories' => SupportTicket::SHOP_CATEGORIES,
         ]);
     }
 
@@ -60,7 +65,19 @@ class SupportController extends Controller
             }
         }
 
-        $ticket = DB::transaction(function () use ($user, $data, $orderId) {
+        // A customer's complaint about an order goes to the shop that sold it
+        $vendorId = null;
+        if (in_array($data['category'], SupportTicket::SHOP_CATEGORIES, true)) {
+            if ($user->role !== User::ROLE_CUSTOMER) {
+                return response()->json(['success' => false, 'errors' => ['category' => ['Pick another topic.']]], 422);
+            }
+            if (! $orderId) {
+                return response()->json(['success' => false, 'errors' => ['order_id' => ['Pick the order this is about, so the shop can help.']]], 422);
+            }
+            $vendorId = (int) Order::withoutGlobalScopes()->whereKey($orderId)->value('vendor_id') ?: null;
+        }
+
+        $ticket = DB::transaction(function () use ($user, $data, $orderId, $vendorId) {
             $ticket = SupportTicket::create([
                 'requester_id' => $user->id,
                 'requester_role' => $user->role,
@@ -69,6 +86,7 @@ class SupportController extends Controller
                 'priority' => in_array($data['category'], ['payments', 'account'], true) ? 'high' : 'normal',
                 'status' => 'open',
                 'order_id' => $orderId,
+                'vendor_id' => $vendorId,
             ]);
             SupportMessage::create([
                 'ticket_id' => $ticket->id,
@@ -82,7 +100,9 @@ class SupportController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "Request {$ticket->reference} sent. We'll reply here and let you know.",
+            'message' => $vendorId
+                ? "Request {$ticket->reference} sent to " . VendorDirectory::nameOf($vendorId) . ". They'll reply here and you'll be notified."
+                : "Request {$ticket->reference} sent. We'll reply here and let you know.",
             'data' => $this->detail($ticket->fresh()),
         ], 201);
     }
@@ -158,6 +178,8 @@ class SupportController extends Controller
             'category' => $t->category,
             'category_label' => SupportTicket::CATEGORIES[$t->category] ?? $t->category,
             'status' => $t->status,
+            // Who is handling it: the shop, or BloomCraft support
+            'handled_by' => $t->vendor_id ? VendorDirectory::nameOf($t->vendor_id) : 'BloomCraft Support',
             'last_activity_at' => $t->last_activity_at?->toIso8601String(),
             'created_at' => $t->created_at?->toIso8601String(),
         ];
@@ -166,14 +188,17 @@ class SupportController extends Controller
     private function detail(SupportTicket $t): array
     {
         $t->load(['messages', 'order:id,order_number']);
+        $shop = $t->vendor_id ? VendorDirectory::nameOf($t->vendor_id) : null;
 
         return $this->row($t) + [
             'order' => $t->order ? ['id' => $t->order->id, 'order_number' => $t->order->order_number] : null,
-            'messages' => $t->messages->map(fn ($m) => [
+            // The shop's team-only notes are never shown
+            'messages' => $t->messages->reject(fn ($m) => $m->is_internal)->values()->map(fn ($m) => [
                 'id' => $m->id,
-                'from_admin' => $m->from_admin,
-                // Individual admin names aren't shown to vendors/customers
-                'author' => $m->from_admin ? 'BloomCraft Support' : 'You',
+                // "Not mine": a reply from support or from the shop
+                'from_admin' => $m->from_admin || $m->from_shop,
+                // Individual admin and staff names aren't shown to vendors/customers
+                'author' => $m->from_admin ? 'BloomCraft Support' : ($m->from_shop ? ($shop ?? 'The shop') : 'You'),
                 'body' => $m->body,
                 'created_at' => $m->created_at?->toIso8601String(),
             ]),

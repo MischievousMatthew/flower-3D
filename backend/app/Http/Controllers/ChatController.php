@@ -178,6 +178,7 @@ class ChatController extends Controller
                         'read' => (bool) $message->is_read,
                         'type' => $message->message_type ?? 'text',
                         'attachments' => $attachments,
+                        'meta' => $message->meta,
                         // Vendor-side messages belong to the shared shop identity,
                         // so every authorized CRM user sees them as their shop's messages.
                         'is_own' => $this->isMessageFromActorSide($message, $conversation, $actor),
@@ -325,6 +326,7 @@ class ChatController extends Controller
                     'read' => false,
                     'type' => $messageType,
                     'attachments' => $message->attachments,
+                    'meta' => $message->meta,
                     'is_own' => true,
                 ],
             ]);
@@ -382,6 +384,7 @@ class ChatController extends Controller
                     'read' => $message->is_read,
                     'type' => $message->message_type,
                     'attachments' => $message->attachments ?? [],
+                    'meta' => $message->meta,
                     'is_own' => $message->conversation
                         ? $this->isMessageFromActorSide($message, $message->conversation, $actor)
                         : false,

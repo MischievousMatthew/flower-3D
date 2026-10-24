@@ -30,6 +30,11 @@ class ErpModule
         'payroll_requests',
 
         // CRM
+        'crm_dashboard',
+        'crm_customers',
+        'crm_cases',
+        'crm_segments',
+        'crm_reviews',
         'crm',
 
         // Procurement / Inventory
@@ -72,6 +77,11 @@ class ErpModule
         'subscription_billing' => ['view'],
         'funding_requests'   => ['view', 'approve', 'reject'],
         'payroll_requests'   => ['view', 'edit', 'approve', 'reject'],
+        'crm_dashboard'      => ['view'],
+        'crm_customers'      => ['view', 'create', 'edit', 'delete'],
+        'crm_cases'          => ['view', 'create', 'edit'],
+        'crm_segments'       => ['view', 'create'],
+        'crm_reviews'        => ['view', 'create'],
         'crm'                => ['view', 'create'],
         'inventory_products' => ['view', 'create', 'edit', 'delete'],
         'inventory_funding'  => ['view', 'create', 'edit', 'delete'],

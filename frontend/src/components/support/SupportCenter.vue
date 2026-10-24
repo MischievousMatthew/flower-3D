@@ -4,7 +4,7 @@
       <div>
         <p class="kicker">Help &amp; support</p>
         <h1>How can we help?</h1>
-        <p class="lede">Send BloomCraft a request and we'll reply here. You'll also get a notification.</p>
+        <p class="lede">{{ categories.complaint ? "Ask BloomCraft, or tell a shop about a problem with your order. Replies come here, and you'll get a notification." : "Send BloomCraft a request and we'll reply here. You'll also get a notification." }}</p>
       </div>
       <button type="button" class="btn primary" @click="startNew">+ New request</button>
     </header>
@@ -28,7 +28,7 @@
                 <span class="status" :class="`s-${t.status}`">{{ STATUS[t.status] }}</span>
               </span>
               <span class="ticket-subject">{{ t.subject }}</span>
-              <span class="muted small">{{ t.category_label }} · {{ timeAgo(t.last_activity_at) }}</span>
+              <span class="muted small">{{ t.category_label }}<template v-if="t.handled_by"> · {{ t.handled_by }}</template> · {{ timeAgo(t.last_activity_at) }}</span>
             </button>
           </li>
         </ul>
@@ -48,10 +48,13 @@
             <span>Subject</span>
             <input v-model="draft.subject" maxlength="160" required placeholder="A short summary" />
           </label>
+          <p v-if="toShop" class="route-note">
+            This goes straight to the shop that sold the order, and they'll reply here. BloomCraft Support can still step in if you need us.
+          </p>
           <label class="field">
-            <span>Order number (optional)</span>
-            <select v-model="draft.order_id">
-              <option value="">Not about a specific order</option>
+            <span>{{ toShop ? "Which order?" : "Order number (optional)" }}</span>
+            <select v-model="draft.order_id" :required="toShop">
+              <option value="">{{ toShop ? "Pick the order" : "Not about a specific order" }}</option>
               <option v-for="o in orders" :key="o.id" :value="o.id">{{ orderLabel(o) }}</option>
             </select>
             <small v-if="ordersLoaded && !orders.length" class="muted small">You have no orders yet.</small>
@@ -79,6 +82,7 @@
               <span class="ref">{{ active.reference }} · {{ active.category_label }}</span>
               <h2>{{ active.subject }}</h2>
               <span v-if="active.order" class="muted small">About order {{ active.order.order_number }}</span>
+              <span v-if="active.handled_by" class="muted small handled">Handled by {{ active.handled_by }}</span>
             </div>
             <span class="status" :class="`s-${active.status}`">{{ STATUS[active.status] }}</span>
           </div>
@@ -92,7 +96,7 @@
             <textarea v-model="reply" rows="3" maxlength="5000" :placeholder="active.status === 'resolved' ? 'Still need help? Writing here reopens the request.' : 'Write a reply…'"></textarea>
             <p v-if="error" class="error">{{ error }}</p>
             <div class="actions">
-              <button v-if="['open', 'waiting'].includes(active.status)" type="button" class="btn" :disabled="busy" @click="resolve">My issue is solved</button>
+              <button v-if="['open', 'in_progress', 'waiting'].includes(active.status)" type="button" class="btn" :disabled="busy" @click="resolve">My issue is solved</button>
               <button type="submit" class="btn primary" :disabled="busy || reply.trim().length < 2">{{ busy ? "Sending…" : "Send" }}</button>
             </div>
           </form>
@@ -109,7 +113,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import api from "../../plugins/axios";
@@ -123,10 +127,13 @@ const props = defineProps({
 
 const route = useRoute();
 const router = useRouter();
-const STATUS = { open: "Waiting for us", waiting: "Waiting for you", resolved: "Solved", closed: "Closed" };
+const STATUS = { open: "Waiting for a reply", in_progress: "Being handled", waiting: "Waiting for you", resolved: "Solved", closed: "Closed" };
 
 const tickets = ref([]);
 const categories = ref({});
+// Complaint topics go to the shop that sold the order, so they need one
+const shopCategories = ref([]);
+const toShop = computed(() => shopCategories.value.includes(draft.category));
 const orders = ref([]);
 const ordersLoaded = ref(false);
 const active = ref(null);
@@ -143,6 +150,7 @@ const loadList = async () => {
     const { data } = await api.get("/support/tickets");
     tickets.value = data.data;
     categories.value = data.categories;
+    shopCategories.value = data.shop_categories ?? [];
   } catch {
     toast.error("Your requests couldn't be loaded.");
   } finally {
@@ -203,8 +211,12 @@ const firstError = (e) => {
 };
 
 const submit = async () => {
-  busy.value = true;
   error.value = "";
+  if (toShop.value && !draft.order_id) {
+    error.value = "Pick the order this is about, so the shop can help.";
+    return;
+  }
+  busy.value = true;
   try {
     const { data } = await api.post("/support/tickets", { ...draft, order_id: draft.order_id || null });
     toast.success(data.message);
@@ -424,6 +436,19 @@ onMounted(async () => {
 }
 .s-open { background: var(--v-amber-soft); color: var(--v-amber-text); }
 .s-waiting { background: var(--v-blue-soft); color: var(--v-blue-text); }
+.s-in_progress { background: var(--v-purple-soft); color: var(--v-purple-text); }
+.route-note {
+  margin: -4px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--v-subtle);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--v-text-2);
+}
+.handled {
+  display: block;
+}
 .s-resolved { background: var(--v-green-soft); color: var(--v-green-text); }
 .s-closed { background: var(--v-subtle); color: var(--v-muted); }
 .form {

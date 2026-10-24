@@ -377,8 +377,45 @@
                       </template>
                     </div>
 
+                    <!-- Order updates and products the shop sent -->
+                    <button
+                      v-if="item.message.meta?.kind === 'order'"
+                      type="button"
+                      class="msg-card"
+                      :aria-label="`${item.message.meta.title} for order ${item.message.meta.order_number}. Open your orders`"
+                      @click="router.push({ name: 'OrderTracking' })"
+                    >
+                      <span class="msg-card-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                      </span>
+                      <span class="msg-card-main">
+                        <small>Order update · {{ item.message.meta.order_number }}</small>
+                        <strong>{{ item.message.meta.title }}</strong>
+                        <span v-if="item.message.meta.note" class="msg-card-note">{{ item.message.meta.note }}</span>
+                        <span class="msg-card-link">View your order</span>
+                      </span>
+                    </button>
+                    <button
+                      v-else-if="item.message.meta?.kind === 'product'"
+                      type="button"
+                      class="msg-card"
+                      :aria-label="`${item.message.meta.name}. Open the product`"
+                      @click="router.push({ name: 'ProductDetails', params: { id: String(item.message.meta.product_id) } })"
+                    >
+                      <span class="msg-card-img" aria-hidden="true">
+                        <img v-if="item.message.meta.image" :src="item.message.meta.image" alt="" loading="lazy" />
+                        <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 16.5A4.5 4.5 0 1 1 7.5 12 4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 1 1 4.5 4.5 4.5 4.5 0 1 1-4.5 4.5"/></svg>
+                      </span>
+                      <span class="msg-card-main">
+                        <small>From the shop</small>
+                        <strong>{{ item.message.meta.name }}</strong>
+                        <span class="msg-card-price">₱{{ Number(item.message.meta.price || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 }) }}</span>
+                        <span class="msg-card-link">View product</span>
+                      </span>
+                    </button>
+
                     <p
-                      v-if="item.message.text && !isAttachmentPlaceholder(item.message.text)"
+                      v-if="item.message.text && !isAttachmentPlaceholder(item.message.text) && (!item.message.meta?.kind || (item.message.meta.kind === 'product' && item.message.text !== item.message.meta.name))"
                       class="bubble"
                     >{{ item.message.text }}</p>
 
@@ -2104,6 +2141,77 @@ onUnmounted(() => {
 
 .sent .msg {
   align-items: flex-end;
+}
+
+/* Cards for order updates and products from the shop */
+.msg-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: min(300px, 100%);
+  margin-bottom: 6px;
+  padding: 12px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--c-radius);
+  background: var(--c-bubble-in);
+  color: var(--c-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.msg-card:hover {
+  border-color: var(--c-accent);
+}
+.msg-card:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+.msg-card-icon,
+.msg-card-img {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c-accent) 14%, transparent);
+  color: var(--c-accent);
+}
+.msg-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.msg-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.msg-card-main small {
+  font-size: 12px;
+  opacity: 0.7;
+}
+.msg-card-main strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.msg-card-note {
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.msg-card-price {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.msg-card-link {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-accent);
 }
 
 .bubble {

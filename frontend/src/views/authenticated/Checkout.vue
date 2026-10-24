@@ -380,6 +380,15 @@
               </ul>
             </div>
 
+            <!-- Offers: unticked unless they choose it; hidden if they already get offers -->
+            <label v-if="showOfferOptIn" class="offer-optin">
+              <input v-model="offerOptIn" type="checkbox" />
+              <span>
+                <strong>Send me offers from shops I order from</strong>
+                <small>Like birthday treats or discounts. Optional, and you can stop anytime in your profile.</small>
+              </span>
+            </label>
+
             <div class="step-actions">
               <button
                 class="bc-link step-back"
@@ -510,6 +519,26 @@ const route = useRoute();
 const currentStep = ref(1);
 const isLoading = ref(false);
 const isProcessing = ref(false);
+// Shop offers: an unticked checkbox, shown only to customers who don't get offers yet
+const offerOptIn = ref(false);
+const showOfferOptIn = ref(false);
+async function loadOfferConsent() {
+  try {
+    const { data } = await api.get("/customer/preferences");
+    showOfferOptIn.value = !data?.data?.accept_offers;
+  } catch {
+    showOfferOptIn.value = false;
+  }
+}
+/** Saves a ticked box; never holds up the order */
+async function saveOfferOptIn() {
+  if (!showOfferOptIn.value || !offerOptIn.value) return;
+  try {
+    await api.post("/customer/offers/consent", { accept: true, source: "checkout" });
+  } catch {
+    // They can still switch offers on in their profile
+  }
+}
 const isDirectCheckout = ref(false);
 const directCheckoutData = ref(null);
 const pendingOnlineOrderId = ref(null);
@@ -1097,6 +1126,7 @@ async function placeOrder() {
     console.log("Sending order data:", orderData);
 
     const response = await api.post("/checkout/create-order", orderData);
+    if (response.data?.success || response.data?.checkout_url) await saveOfferOptIn();
 
     console.log("Order response:", response.data);
 
@@ -1200,6 +1230,7 @@ function formatCutoffTime(value) {
 }
 
 onMounted(async () => {
+  loadOfferConsent();
   pendingOnlineOrderId.value = Number(
     route.query.order_id || sessionStorage.getItem("pending_online_order_id"),
   ) || null;
@@ -1605,6 +1636,44 @@ onMounted(async () => {
 }
 
 /* ---- Step actions ---- */
+.offer-optin {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 8px 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+}
+.offer-optin input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--leaf-deep);
+  cursor: pointer;
+}
+.offer-optin span {
+  display: grid;
+  gap: 2px;
+}
+.offer-optin strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.offer-optin small {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+.offer-optin:focus-within {
+  outline: 2px solid var(--leaf-deep);
+  outline-offset: 2px;
+}
+
 .step-actions {
   display: flex;
   justify-content: space-between;

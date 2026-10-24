@@ -24,15 +24,15 @@
           class="es-item"
           active-class=""
           exact-active-class=""
-          :class="{ active: activeKey === item.key, locked: isLocked(item.key) }"
+          :class="{ active: activeKey === item.key, locked: isLocked(item.access) }"
           :aria-current="activeKey === item.key ? 'page' : undefined"
-          :title="isLocked(item.key) ? subscriptionUpgradeMessage(subscriptionAccess, item.key) : undefined"
-          @click="onNavigate($event, item.key)"
+          :title="isLocked(item.access) ? subscriptionUpgradeMessage(subscriptionAccess, item.access) : undefined"
+          @click="onNavigate($event, item.access)"
         >
           <span class="es-icon" v-html="ICONS[item.icon]"></span>
           <span class="es-text">{{ item.label }}</span>
-          <span v-if="isLocked(item.key)" class="es-lock" aria-label="Not in your plan" v-html="ICONS.lock"></span>
-          <span v-else-if="badgeFor(item.key) > 0" class="es-badge">{{ badgeFor(item.key) > 99 ? "99+" : badgeFor(item.key) }}</span>
+          <span v-if="isLocked(item.access)" class="es-lock" aria-label="Not in your plan" v-html="ICONS.lock"></span>
+          <span v-else-if="badgeFor(item.key) > 0" class="es-badge" :aria-label="`${badgeFor(item.key)} unread`">{{ badgeFor(item.key) > 99 ? "99+" : badgeFor(item.key) }}</span>
         </router-link>
       </section>
       <p v-if="!sections.length" class="es-empty">No pages have been shared with your role yet. Ask the shop owner to add some.</p>
@@ -91,7 +91,7 @@ const isOwner = computed(() => user.value?.role === "vendor");
 
 // The owner sees every page; staff see the pages their role allows, HR and Finance alike
 const sections = computed(() =>
-  ERP_NAV.map((s) => ({ ...s, items: s.items.filter((i) => isOwner.value || canView(i.key)) })).filter((s) => s.items.length),
+  ERP_NAV.map((s) => ({ ...s, items: s.items.filter((i) => isOwner.value || canView(i.access)) })).filter((s) => s.items.length),
 );
 const activeKey = computed(() => erpPlaceFor(route.meta.canonicalPath || route.path)?.item.key ?? null);
 
@@ -100,7 +100,7 @@ const shopName = computed(() => {
   return user.value?.shop_name || "Workspace";
 });
 const subtitle = computed(() => {
-  if (isOwner.value) return "Owner · HR & Finance";
+  if (isOwner.value) return "Owner · Workspace";
   return user.value?.role_name ? `${user.value.name} · ${user.value.role_name}` : user.value?.name || "Staff";
 });
 const shopInitials = computed(() => {

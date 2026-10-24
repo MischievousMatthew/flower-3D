@@ -54,6 +54,20 @@
 
     <!-- ── Content ──────────────────────────────────────────────────────────── -->
     <div class="ot-content">
+      <!-- Asked once, after their first order: offers from shops they buy from -->
+      <section v-if="offerAsk" class="ot-offer-ask" aria-labelledby="ot-offer-title" aria-live="polite">
+        <span class="ot-offer-ask__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg>
+        </span>
+        <div class="ot-offer-ask__text">
+          <h2 id="ot-offer-title">Want offers from shops you order from?</h2>
+          <p>Birthday treats, welcome-back discounts and early access to seasonal flowers. Only from shops you've bought from, at most one every few days, and you can stop anytime in your profile.</p>
+        </div>
+        <div class="ot-offer-ask__actions">
+          <button type="button" class="ot-offer-btn ot-offer-btn--yes" :disabled="offerBusy" @click="answerOffers(true)">Yes, send offers</button>
+          <button type="button" class="ot-offer-btn" :disabled="offerBusy" @click="answerOffers(false)">Not now</button>
+        </div>
+      </section>
       <!-- Skeleton -->
       <div v-if="loading" class="ot-skeletons">
         <div v-for="n in 3" :key="n" class="ot-skel">
@@ -1350,8 +1364,33 @@ const scrollToSection = (id) => {
 
 const cartCount = ref(0);
 
+// The one-time question about shop offers
+const offerAsk = ref(false);
+const offerBusy = ref(false);
+async function loadOfferAsk() {
+  try {
+    const { data } = await api.get("/customer/preferences");
+    offerAsk.value = !!data?.data?.offers_prompt;
+  } catch {
+    offerAsk.value = false;
+  }
+}
+async function answerOffers(accept) {
+  offerBusy.value = true;
+  try {
+    const { data } = await api.post("/customer/offers/consent", { accept, source: "prompt" });
+    offerAsk.value = false;
+    toast.success(data.message);
+  } catch {
+    toast.error("Couldn't save that. You can choose in your profile anytime.");
+  } finally {
+    offerBusy.value = false;
+  }
+}
+
 onMounted(async () => {
   await fetchOrders();
+  loadOfferAsk();
 
   if (route.query.payment === "success") {
     toast.success("Payment confirmed. Your order has been updated.", {
@@ -1567,6 +1606,93 @@ onMounted(async () => {
 .ot-content {
   max-width: 1240px;
   margin: 0 auto;
+}
+
+.ot-offer-ask {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 18px 20px;
+  border: 1px solid color-mix(in srgb, var(--leaf) 45%, #fff);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--leaf) 8%, #fff);
+}
+.ot-offer-ask__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--leaf-deep);
+}
+.ot-offer-ask__text {
+  flex: 1;
+  min-width: 0;
+}
+.ot-offer-ask__text h2 {
+  margin: 0 0 4px;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ot-offer-ask__text p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.ot-offer-ask__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* Both answers look like real buttons, the same size */
+.ot-offer-btn {
+  min-width: 140px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.ot-offer-btn:hover:not(:disabled) {
+  background: var(--ivory-deep);
+}
+.ot-offer-btn--yes {
+  background: var(--ink);
+  color: var(--ivory);
+}
+.ot-offer-btn--yes:hover:not(:disabled) {
+  background: var(--leaf-deep);
+}
+.ot-offer-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.ot-offer-btn:focus-visible {
+  outline: 2px solid var(--leaf-deep);
+  outline-offset: 2px;
+}
+@media (max-width: 760px) {
+  .ot-offer-ask {
+    flex-wrap: wrap;
+  }
+  .ot-offer-ask__actions {
+    width: 100%;
+  }
+  .ot-offer-btn {
+    flex: 1;
+  }
 }
 
 .ot-list {

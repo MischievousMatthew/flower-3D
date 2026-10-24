@@ -141,6 +141,12 @@ export const opaqueRouteTokens = Object.freeze({
   FinanceRefunds: "-Ow0ExBPYVXYtI0vadqVLHZD1kTTktGDKOQAZgpwcTw",
   FinanceReports: "OKO1ycgGuU2BiQXs7xmxEzxcaNQ5KYIum6yzBJdjMGU",
   FinanceSubscription: "xUZiHeS41fQcmReZBkBJWlAwFiVMi59eINlZykO-yls",
+  CRMDashboard: "ieTQgoioDAhWTaOwoRAUZm250EGHsM0tIDKggGWknN0",
+  CRMCustomers: "KAeF60n_jhkBvnogGn_advNke1mxp6s1MWa2UiCp9D0",
+  CRMInquiries: "Ds88z2DnSKHrmHKv2HfO8sgirJnrcc4Q5ySWkKkmD38",
+  CRMCases: "HYwrcgLBjGDeImgFq4dL467AsTjQPqxUivo2lEJXw_4",
+  CRMSegments: "n_U8QrwzqwkGoZNVAmguCaIw8GaeeIpTgu053WmeLvc",
+  CRMReviews: "e_Mt7vR5LHeT3hZ5Y_60Gqhdk5RWGuFCe97BOOXW9p0",
 });
 
 export const opaquePathFor = (name, parameterPath = "") => {

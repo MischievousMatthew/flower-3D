@@ -366,6 +366,9 @@
           </div>
         </section>
 
+        <!-- Flower preferences, special days, favorites, what shops saved -->
+        <ProfilePreferences v-if="user.role === 'customer'" />
+
         <!-- Two-factor authentication -->
         <section
           v-if="user.role === 'customer'"
@@ -474,6 +477,7 @@ import {
 import { useRouter } from "vue-router";
 import api from "../../plugins/axios";
 import NavHeader from "../../layouts/NavHeader.vue";
+import ProfilePreferences from "../../components/customer/ProfilePreferences.vue";
 import { useAuth } from "../../composables/useAuth";
 import { toast } from "vue3-toastify";
 import "../../styles/bloomcraft.css";

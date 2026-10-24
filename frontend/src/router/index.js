@@ -741,8 +741,39 @@ const routes = [
 
       {
         path: "crm",
-        meta: { subscriptionModule: MODULE.CRM },
+        meta: { subscriptionModule: MODULE.CRM, erpTheme: true },
+        component: () => import("../layouts/erp/ErpLayout.vue"),
         children: [
+          {
+            path: "dashboard",
+            name: "CRMDashboard",
+            component: () => import("../views/ERP/CRM/Dashboard.vue"),
+          },
+          {
+            path: "customers",
+            name: "CRMCustomers",
+            component: () => import("../views/ERP/CRM/Customers.vue"),
+          },
+          {
+            path: "inquiries",
+            name: "CRMInquiries",
+            component: () => import("../views/ERP/CRM/Inquiries.vue"),
+          },
+          {
+            path: "cases",
+            name: "CRMCases",
+            component: () => import("../views/ERP/CRM/Cases.vue"),
+          },
+          {
+            path: "segments",
+            name: "CRMSegments",
+            component: () => import("../views/ERP/CRM/Segments.vue"),
+          },
+          {
+            path: "reviews",
+            name: "CRMReviews",
+            component: () => import("../views/ERP/CRM/Reviews.vue"),
+          },
           {
             path: "chat",
             name: "CRMChat",
@@ -1127,6 +1158,12 @@ const employeeModuleForPath = (path) => {
     ["/erp/finance/funding", "funding_requests"],
     ["/erp/finance/payroll", "payroll_requests"],
     ["/erp/finance", "finance_dashboard"],
+    ["/erp/crm/dashboard", "crm_dashboard"],
+    ["/erp/crm/customers", "crm_customers"],
+    ["/erp/crm/cases", "crm_cases"],
+    ["/erp/crm/segments", "crm_segments"],
+    ["/erp/crm/reviews", "crm_reviews"],
+    ["/erp/crm/inquiries", "crm"],
     ["/erp/crm", "crm"],
     ["/erp/hr/employees", "employees"],
     ["/erp/hr/attendance", "attendance"],

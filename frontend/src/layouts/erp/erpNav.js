@@ -28,6 +28,10 @@ const ICON_FOR = {
   billing: "sparkle",
   funding: "send",
   crm: "chat",
+  inquiries: "help",
+  cases: "alert",
+  segments: "grid",
+  reviews: "star",
   products: "flower",
   suppliers: "store",
   warehouse: "box",
@@ -48,6 +52,8 @@ export const ERP_NAV = (() => {
     if (!sections.has(label)) sections.set(label, { label, group: mod.group, items: [] });
     sections.get(label).items.push({
       key: mod.key,
+      // The permission that opens it (usually the module itself)
+      access: mod.access ?? mod.key,
       label: mod.label,
       icon: ICON_FOR[mod.icon] ?? "grid",
       // A module with sub-pages has no page of its own, so open its first one

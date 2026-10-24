@@ -1,5 +1,5 @@
 <template>
-  <ShopLayout section="crm" title="Customer Inquiries" subtitle="Questions customers ask about your products and their orders. Answered product questions can appear on the product page for other shoppers.">
+  <component :is="erp ? HrPage : ShopLayout" v-bind="layoutProps">
     <div v-if="settingUp" class="sp-banner info"><span v-html="ICONS.clock"></span>{{ settingUp }}</div>
     <div v-else-if="error" class="sp-banner error">
       <span v-html="ICONS.alert"></span>{{ error }}
@@ -71,12 +71,12 @@
               <span class="sp-chip" :class="STATUS[q.status][1]">{{ STATUS[q.status][0] }}</span>
             </div>
 
-            <button v-if="q.product" type="button" class="iq-about" @click="openProduct(q)">
+            <button v-if="q.product" type="button" class="iq-about" :disabled="erp" @click="openProduct(q)">
               <img v-if="q.product.image" :src="q.product.image" alt="" />
               <span v-else class="iq-about-icon" v-html="ICONS.flower"></span>
               <span><small>About a product</small>{{ q.product.name }}</span>
             </button>
-            <button v-else-if="q.order" type="button" class="iq-about" @click="openOrder(q)">
+            <button v-else-if="q.order" type="button" class="iq-about" :disabled="erp" @click="openOrder(q)">
               <span class="iq-about-icon" v-html="ICONS.receipt"></span>
               <span><small>About their order · {{ money(q.order.total) }}</small>{{ q.order.order_number }}</span>
             </button>
@@ -91,7 +91,7 @@
               <p>{{ q.answer }}</p>
             </div>
 
-            <form v-if="!q.answer || editing === q.id" class="iq-reply" @submit.prevent="submit(q)">
+            <form v-if="canReply && (!q.answer || editing === q.id)" class="iq-reply" @submit.prevent="submit(q)">
               <textarea
                 v-model="drafts[q.id]"
                 class="sp-textarea"
@@ -116,13 +116,13 @@
             </form>
 
             <div class="iq-actions">
-              <button v-if="q.answer && editing !== q.id" type="button" class="st-link" @click="startEdit(q)">Edit answer</button>
-              <button v-if="q.product && q.answer" type="button" class="st-link" :disabled="busy === q.id" @click="setPublic(q, !q.is_public)">
+              <button v-if="canReply && q.answer && editing !== q.id" type="button" class="st-link" @click="startEdit(q)">Edit answer</button>
+              <button v-if="canReply && q.product && q.answer" type="button" class="st-link" :disabled="busy === q.id" @click="setPublic(q, !q.is_public)">
                 {{ q.is_public ? "Hide from product page" : "Show on product page" }}
               </button>
-              <button type="button" class="st-link" @click="messageCustomer(q)">Message {{ q.customer.name.split(" ")[0] }}</button>
-              <button v-if="q.status !== 'closed'" type="button" class="st-link muted" :disabled="busy === q.id" @click="setDone(q, true)">Mark as done</button>
-              <button v-else type="button" class="st-link muted" :disabled="busy === q.id" @click="setDone(q, false)">Reopen</button>
+              <button v-if="canReply" type="button" class="st-link" @click="messageCustomer(q)">Message {{ q.customer.name.split(" ")[0] }}</button>
+              <button v-if="canReply && q.status !== 'closed'" type="button" class="st-link muted" :disabled="busy === q.id" @click="setDone(q, true)">Mark as done</button>
+              <button v-else-if="canReply" type="button" class="st-link muted" :disabled="busy === q.id" @click="setDone(q, false)">Reopen</button>
               <span v-if="q.product && q.answer && q.is_public" class="sp-chip teal iq-public-chip"><span v-html="ICONS.eye"></span>On product page</span>
             </div>
           </div>
@@ -135,7 +135,7 @@
         <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="data.meta.page >= data.meta.last_page" @click="load(data.meta.page + 1)">Next<span v-html="ICONS.right"></span></button>
       </nav>
     </section>
-  </ShopLayout>
+  </component>
 </template>
 
 <script setup>
@@ -144,6 +144,8 @@ import { useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
+import HrPage from "../../../components/hr/HrPage.vue";
+import { useAssignment } from "../../../composables/useAssignment";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { money } from "../../../components/vendor/finance/financeUi";
@@ -151,6 +153,15 @@ import { colorFor, initialsOf, timeAgo } from "../../../components/vendor/crm/cr
 import { linkedId } from "../../../utils/hiddenIds";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
+
+// erp: shown in the ERP workspace, where staff need the Chat permissions
+const props = defineProps({ erp: { type: Boolean, default: false } });
+const erp = props.erp;
+const { can } = useAssignment();
+const canReply = computed(() => !erp || can("crm", "create"));
+const SUBTITLE = "Questions customers ask about your products and their orders. Answered product questions can appear on the product page for other shoppers.";
+const layoutProps = erp ? { title: "Customer questions", subtitle: SUBTITLE } : { section: "crm", title: "Customer Inquiries", subtitle: SUBTITLE };
+const base = erp ? "crm/inquiries" : "vendor/crm/inquiries";
 
 const TABS = [
   { key: "open", label: "Waiting" },
@@ -189,7 +200,7 @@ const replyTime = computed(() => {
 async function load(page = 1) {
   error.value = "";
   try {
-    const res = await api.get("vendor/crm/inquiries", { params: { page, status: status.value || undefined, about: about.value || undefined, search: search.value.trim() || undefined } });
+    const res = await api.get(base, { params: { page, status: status.value || undefined, about: about.value || undefined, search: search.value.trim() || undefined } });
     data.value = res.data.data;
     for (const q of data.value.inquiries) {
       if (!(q.id in publicFlags)) publicFlags[q.id] = q.is_public;
@@ -214,7 +225,7 @@ function replace(updated) {
 }
 async function refreshCounts() {
   try {
-    const res = await api.get("vendor/crm/inquiries", { params: { status: "open", page: 1 } });
+    const res = await api.get(base, { params: { status: "open", page: 1 } });
     data.value.counts = res.data.data.counts;
     data.value.avg_reply_hours = res.data.data.avg_reply_hours;
   } catch {
@@ -227,7 +238,7 @@ async function submit(q) {
   if (!answer) return;
   busy.value = q.id;
   try {
-    const { data: res } = await api.post(`vendor/crm/inquiries/${q.id}/answer`, { answer, is_public: q.product ? !!publicFlags[q.id] : false });
+    const { data: res } = await api.post(`${base}/${q.id}/answer`, { answer, is_public: q.product ? !!publicFlags[q.id] : false });
     toast.success(res.message);
     replace(res.data);
     drafts[q.id] = "";
@@ -247,7 +258,7 @@ function startEdit(q) {
 async function setDone(q, done) {
   busy.value = q.id;
   try {
-    const { data: res } = await api.post(`vendor/crm/inquiries/${q.id}/status`, { status: done ? "closed" : "open" });
+    const { data: res } = await api.post(`${base}/${q.id}/status`, { status: done ? "closed" : "open" });
     toast.success(res.message);
     replace(res.data);
     refreshCounts();
@@ -260,7 +271,7 @@ async function setDone(q, done) {
 async function setPublic(q, on) {
   busy.value = q.id;
   try {
-    const { data: res } = await api.post(`vendor/crm/inquiries/${q.id}/status`, { is_public: on });
+    const { data: res } = await api.post(`${base}/${q.id}/status`, { is_public: on });
     toast.success(res.message);
     replace(res.data);
     publicFlags[q.id] = on;
@@ -282,7 +293,7 @@ async function messageCustomer(q) {
     const { data: res } = await api.get("/chat/conversations");
     const existing = (res.conversations ?? []).find((c) => c.customer?.id === q.customer.id);
     if (existing) {
-      router.push({ name: "VendorChat", query: { conversation: existing.id } });
+      router.push({ name: erp ? "CRMChat" : "VendorChat", query: { conversation: existing.id } });
       return;
     }
     const about = q.product ? q.product.name : `order ${q.order?.order_number ?? ""}`.trim();
@@ -290,7 +301,7 @@ async function messageCustomer(q) {
       customer_id: q.customer.id,
       message: `Hi ${q.customer.name.split(" ")[0]}! Following up on your question about ${about}.`,
     });
-    router.push({ name: "VendorChat", query: { conversation: started.conversation?.id } });
+    router.push({ name: erp ? "CRMChat" : "VendorChat", query: { conversation: started.conversation?.id } });
   } catch (e) {
     toast.error(apiMessage(e, "Couldn't open the chat."));
   }
