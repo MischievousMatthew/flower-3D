@@ -5,7 +5,8 @@ import api from "../plugins/axios";
  * The signed-in admin's role and permissions (Security → Roles).
  * The backend enforces every permission; this only decides what to show.
  */
-const access = reactive({ loaded: false, id: null, role: null, isSuperAdmin: false, permissions: [], name: null });
+// isOwner: the account owner, the only one who can edit or remove administrators
+const access = reactive({ loaded: false, id: null, role: null, isSuperAdmin: false, isOwner: false, permissions: [], name: null });
 let request = null;
 
 /**
@@ -42,6 +43,7 @@ const load = (force = false) => {
         id: data.data.id,
         role: data.data.role,
         isSuperAdmin: data.data.is_super_admin,
+        isOwner: !!data.data.is_owner,
         permissions: data.data.permissions ?? [],
         name: data.data.name,
       });
@@ -63,7 +65,7 @@ const firstAllowedPath = () => ADMIN_PAGES.find((p) => can(p.permission))?.path 
 
 const reset = () => {
   request = null;
-  Object.assign(access, { loaded: false, id: null, role: null, isSuperAdmin: false, permissions: [], name: null });
+  Object.assign(access, { loaded: false, id: null, role: null, isSuperAdmin: false, isOwner: false, permissions: [], name: null });
 };
 
 export function useAdminAccess() {

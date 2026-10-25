@@ -38,7 +38,8 @@ class AdminSeeder extends Seeder
             'is_verified' => true,
             'role' => User::ROLE_ADMIN,
         ]);
-        $admin->forceFill(['admin_role_id' => $superAdminRole])->save();
+        // The first admin is the owner: the only one who can edit or remove administrators
+        $admin->forceFill(['admin_role_id' => $superAdminRole] + (Schema::hasColumn('users', 'is_admin_owner') ? ['is_admin_owner' => true] : []))->save();
 
         if (!env('ADMIN_INITIAL_PASSWORD')) {
             Log::warning("First super admin created: username '{$admin->username}', temporary password '{$password}'. Change it after signing in.");

@@ -62,6 +62,8 @@ class User extends Authenticatable
         'vendor_data' => 'array',
         'date_of_birth' => 'date',
         'two_factor_enabled' => 'boolean',
+        // Set by migration/seeder only, never from a form
+        'is_admin_owner' => 'boolean',
     ];
 
     // Add these accessors

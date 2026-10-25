@@ -195,7 +195,8 @@ class StaffController extends Controller
             'name' => 'required|string|max:255',
             // The email is also the username they sign in with
             'email' => 'required|email|max:255|unique:employees,email|unique:employees,username',
-            'password' => 'required|string|min:8|max:100',
+            // The same password rule as everyone else
+            'password' => 'required|string|min:8|max:100|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/',
             'title' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:500',
@@ -203,6 +204,7 @@ class StaffController extends Controller
             'staff_role_id' => ['required', Rule::exists('staff_roles', 'id')->where('owner_id', $ownerId)],
         ], [
             'email.unique' => 'Someone already uses that email.',
+            'password.regex' => 'Use at least one uppercase letter, one lowercase letter and a number.',
             'staff_role_id.required' => 'Choose a role.',
         ]);
 
@@ -245,9 +247,10 @@ class StaffController extends Controller
             'joining_date' => 'required|date',
             'status' => 'required|in:Active,On Leave,Resign',
             'staff_role_id' => ['required', Rule::exists('staff_roles', 'id')->where('owner_id', $ownerId)],
-            'password' => 'nullable|string|min:8|max:100',
+            'password' => 'nullable|string|min:8|max:100|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/',
         ], [
             'email.unique' => 'Someone already uses that email.',
+            'password.regex' => 'Use at least one uppercase letter, one lowercase letter and a number.',
             'staff_role_id.required' => 'Choose a role.',
         ]);
 

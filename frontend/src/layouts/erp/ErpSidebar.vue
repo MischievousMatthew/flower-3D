@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isMobileOpen" class="es-backdrop" @click="closeMobile"></div>
+  <div v-if="isMobileOpen" class="es-backdrop" data-close-guard="off" @click="closeMobile"></div>
 
   <aside class="es" :class="{ 'mobile-open': isMobileOpen }" aria-label="Workspace navigation">
     <!-- Whose workspace this is -->

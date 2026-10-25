@@ -44,6 +44,7 @@ class SecurityController extends Controller
                 'name' => PaymentLedger::personName($user),
                 'role' => $user->adminRole?->name ?? 'No role',
                 'is_super_admin' => (bool) $user->adminRole?->is_system,
+                'is_owner' => (bool) $user->is_admin_owner,
                 'permissions' => $user->adminRole?->expanded() ?? [],
             ],
         ]);
@@ -55,7 +56,9 @@ class SecurityController extends Controller
     public function admins(): JsonResponse
     {
         $admins = User::query()->where('role', User::ROLE_ADMIN)->with('adminRole:id,name,is_system')
-            ->orderBy('name')->get(['id', 'name', 'surname', 'username', 'email', 'contact_number', 'is_suspended', 'admin_role_id', 'created_at']);
+            // The owner first, then everyone by name
+            ->orderByDesc('is_admin_owner')->orderBy('name')
+            ->get(['id', 'name', 'surname', 'username', 'email', 'contact_number', 'is_suspended', 'admin_role_id', 'is_admin_owner', 'created_at']);
         $lastLogin = DB::table('login_audit_logs')->whereIn('user_id', $admins->pluck('id'))
             ->selectRaw('user_id, max(logged_in_at) as at')->groupBy('user_id')->pluck('at', 'user_id');
         $actions = AdminAuditLog::query()->whereIn('admin_id', $admins->pluck('id'))->where('created_at', '>=', now()->subDays(30))
@@ -73,6 +76,7 @@ class SecurityController extends Controller
                 'role_id' => $a->admin_role_id,
                 'role' => $a->adminRole?->name,
                 'is_super_admin' => (bool) $a->adminRole?->is_system,
+                'is_owner' => (bool) $a->is_admin_owner,
                 'active' => !$a->is_suspended,
                 'last_login_at' => isset($lastLogin[$a->id]) ? CarbonImmutable::parse($lastLogin[$a->id])->toIso8601String() : null,
                 'actions_30d' => (int) ($actions[$a->id] ?? 0),
@@ -107,7 +111,11 @@ class SecurityController extends Controller
         return response()->json(['success' => true, 'message' => 'Administrator added. Share the password with them privately.'], 201);
     }
 
-    /** PUT /api/admin/security/admins/{id}  { name, surname, admin_role_id } */
+    /**
+     * PUT /api/admin/security/admins/{id}  { name, surname, username, email, admin_role_id }
+     * Name, username and email: the owner only. Role: anyone who manages security,
+     * never on the owner.
+     */
     public function updateAdmin(Request $request, int $id): JsonResponse
     {
         $admin = $this->findAdmin($id);
@@ -118,12 +126,22 @@ class SecurityController extends Controller
         $data = $request->validate([
             'name' => 'sometimes|required|string|max:120',
             'surname' => 'sometimes|required|string|max:120',
+            'username' => ['sometimes', 'required', 'string', 'max:60', 'alpha_dash', $this->freeIgnoringCase('username', $admin->id, 'This username is taken.')],
+            'email' => ['sometimes', 'required', 'email', 'max:190', $this->freeIgnoringCase('email', $admin->id, 'Another account already uses this email.')],
             'admin_role_id' => 'sometimes|required|integer|exists:admin_roles,id',
         ]);
+
+        $editsDetails = array_intersect_key($data, array_flip(['name', 'surname', 'username', 'email']));
+        if ($editsDetails && !$this->isOwner($request)) {
+            return $this->refuse('Only the account owner can edit administrator details.', 403);
+        }
 
         if (isset($data['admin_role_id']) && (int) $data['admin_role_id'] !== (int) $admin->admin_role_id) {
             if ($admin->id === $request->user()->id) {
                 return $this->refuse("You can't change your own role.");
+            }
+            if ($admin->is_admin_owner) {
+                return $this->refuse("The account owner's role can't be changed.");
             }
             $newRole = AdminRole::find($data['admin_role_id']);
             if ($admin->adminRole?->is_system && !$newRole->is_system && $this->activeSuperAdmins() <= 1) {
@@ -131,9 +149,50 @@ class SecurityController extends Controller
             }
         }
 
-        $admin->forceFill(array_intersect_key($data, array_flip(['name', 'surname', 'admin_role_id'])))->save();
+        foreach (['name', 'surname', 'username'] as $text) {
+            if (isset($data[$text])) {
+                $data[$text] = trim($data[$text]);
+            }
+        }
+        if (isset($data['email'])) {
+            $data['email'] = mb_strtolower(trim($data['email']));
+        }
+        $admin->forceFill(array_intersect_key($data, array_flip(['name', 'surname', 'username', 'email', 'admin_role_id'])))->save();
 
         return response()->json(['success' => true, 'message' => 'Saved.']);
+    }
+
+    /**
+     * DELETE /api/admin/security/admins/{id}: the owner only. Their audit
+     * history stays readable (it keeps their name).
+     */
+    public function deleteAdmin(Request $request, int $id): JsonResponse
+    {
+        $admin = $this->findAdmin($id);
+        if (!$admin) {
+            return $this->notFound();
+        }
+        if (!$this->isOwner($request)) {
+            return $this->refuse('Only the account owner can remove administrators.', 403);
+        }
+        if ($admin->id === $request->user()->id || $admin->is_admin_owner) {
+            return $this->refuse("The account owner can't be removed.");
+        }
+        if ($admin->adminRole?->is_system && !$admin->is_suspended && $this->activeSuperAdmins() <= 1) {
+            return $this->refuse('This is the only active super admin.');
+        }
+
+        $name = PaymentLedger::personName($admin);
+        try {
+            DB::transaction(fn () => $admin->delete());
+        } catch (\Illuminate\Database\QueryException) {
+            // Other records still point at this account: keep it, but with no way in
+            $admin->forceFill(['is_suspended' => true, 'api_token' => null])->save();
+
+            return response()->json(['success' => true, 'message' => "{$name} is linked to other records, so their access was turned off instead of removing the account."]);
+        }
+
+        return response()->json(['success' => true, 'message' => "{$name} was removed. Their past actions stay in the audit log."]);
     }
 
     /** POST /api/admin/security/admins/{id}/active  { active } */
@@ -148,6 +207,9 @@ class SecurityController extends Controller
         if (!$active) {
             if ($admin->id === $request->user()->id) {
                 return $this->refuse("You can't turn off your own access.");
+            }
+            if ($admin->is_admin_owner) {
+                return $this->refuse("The account owner's access can't be turned off.");
             }
             if ($admin->adminRole?->is_system && $this->activeSuperAdmins() <= 1) {
                 return $this->refuse('This is the only active super admin.');
@@ -166,6 +228,9 @@ class SecurityController extends Controller
         $admin = $this->findAdmin($id);
         if (!$admin) {
             return $this->notFound();
+        }
+        if ($admin->is_admin_owner && $admin->id !== $request->user()->id) {
+            return $this->refuse("Only the account owner can change the owner's password.", 403);
         }
         $data = $request->validate(['password' => ['required', 'string', Password::min(10)->letters()->mixedCase()->numbers()]]);
 
@@ -556,9 +621,25 @@ class SecurityController extends Controller
         return collect([$browser, $os])->filter()->implode(' · ') ?: 'Unknown';
     }
 
-    private function refuse(string $message): JsonResponse
+    private function refuse(string $message, int $status = 422): JsonResponse
     {
-        return response()->json(['success' => false, 'message' => $message], 422);
+        return response()->json(['success' => false, 'message' => $message], $status);
+    }
+
+    /** The signed-in admin is the account owner */
+    private function isOwner(Request $request): bool
+    {
+        return (bool) $request->user()?->is_admin_owner;
+    }
+
+    /** No other account uses this value, ignoring capitals */
+    private function freeIgnoringCase(string $column, int $exceptId, string $message): \Closure
+    {
+        return function ($attribute, $value, $fail) use ($column, $exceptId, $message) {
+            if (User::query()->whereKeyNot($exceptId)->whereRaw("lower({$column}) = ?", [mb_strtolower(trim((string) $value))])->exists()) {
+                $fail($message);
+            }
+        };
     }
 
     private function notFound(): JsonResponse

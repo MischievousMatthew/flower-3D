@@ -45,13 +45,13 @@
                     <div class="person">
                       <span class="avatar">{{ initials(a.name) }}</span>
                       <div>
-                        <span class="strong">{{ a.name }} <span v-if="a.id === access.id" class="you">You</span></span>
+                        <span class="strong">{{ a.name }} <span v-if="a.is_owner" class="owner" title="The account owner: the only one who can edit or remove administrators">Owner</span> <span v-if="a.id === access.id" class="you">You</span></span>
                         <span class="sub">@{{ a.username }} · {{ a.email }}</span>
                       </div>
                     </div>
                   </td>
                   <td>
-                    <select v-if="canManage && a.id !== access.id" :value="a.role_id" class="input small" @change="changeRole(a, $event.target.value)">
+                    <select v-if="canManage && a.id !== access.id && !a.is_owner" :value="a.role_id" class="input small" @change="changeRole(a, $event.target.value)">
                       <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
                     </select>
                     <span v-else class="pill" :class="{ super: a.is_super_admin }">{{ a.role || "No role" }}</span>
@@ -60,13 +60,17 @@
                   <td class="muted">{{ a.last_login_at ? timeAgo(a.last_login_at) : "Never" }}</td>
                   <td class="num">{{ a.actions_30d }}</td>
                   <td class="right">
-                    <div v-if="canManage" class="row-actions">
+                    <!-- Nobody else changes the owner; only the owner edits or removes anyone -->
+                    <div v-if="canManage && (!a.is_owner || a.id === access.id)" class="row-actions">
+                      <button v-if="access.isOwner" type="button" class="mini-btn" @click="openEditDialog(a)">{{ a.id === access.id ? "Edit my account" : "Edit" }}</button>
                       <button type="button" class="mini-btn" @click="openPasswordDialog(a)">{{ a.id === access.id ? "Change my password" : "Set password" }}</button>
                       <template v-if="a.id !== access.id">
                         <button v-if="a.active" type="button" class="mini-btn danger" @click="setActive(a, false)">Turn off</button>
                         <button v-else type="button" class="mini-btn ok" @click="setActive(a, true)">Turn on</button>
+                        <button v-if="access.isOwner" type="button" class="mini-btn danger" @click="openRemoveDialog(a)">Remove</button>
                       </template>
                     </div>
+                    <span v-else-if="a.is_owner" class="sub owner-note">Only the owner can change this account</span>
                   </td>
                 </tr>
               </tbody>
@@ -544,8 +548,28 @@
                 <button type="button" class="mini-btn" @click="showPassword = !showPassword">{{ showPassword ? "Hide" : "Show" }}</button>
                 <button type="button" class="mini-btn" @click="generatePassword">Generate</button>
               </div>
-              <small class="sub">At least 10 characters with upper- and lowercase letters and a number. Share it privately.</small>
             </label>
+            <PasswordRules :password="form.password" :min="10" tone="admin" />
+            <small class="sub">Share it with them privately.</small>
+          </template>
+
+          <template v-else-if="dialog.type === 'edit'">
+            <h3>{{ dialog.target.id === access.id ? "Edit your account" : `Edit ${dialog.target.name}` }}</h3>
+            <p class="sub">{{ dialog.target.id === access.id ? "Use a real email you can open: password resets and sign-in codes are sent there. Your password and role stay the same." : "They sign in with the new username or email from their next sign-in. Their password and role stay the same." }}</p>
+            <div class="two">
+              <label class="field"><span>First name</span><input v-model="form.name" class="input" maxlength="120" required /></label>
+              <label class="field"><span>Last name</span><input v-model="form.surname" class="input" maxlength="120" required /></label>
+            </div>
+            <div class="two">
+              <label class="field"><span>Username</span><input v-model="form.username" class="input" maxlength="60" required autocomplete="off" /></label>
+              <label class="field"><span>Email</span><input v-model="form.email" type="email" class="input" maxlength="190" required autocomplete="off" /></label>
+            </div>
+          </template>
+
+          <template v-else-if="dialog.type === 'remove'">
+            <h3>Remove {{ dialog.target.name }}?</h3>
+            <p class="sub">They won't be able to sign in to the admin panel anymore. This can't be undone, but everything they did stays in the audit log under their name.</p>
+            <p class="sub">To pause their access instead, use Turn off.</p>
           </template>
 
           <template v-else-if="dialog.type === 'password'">
@@ -558,6 +582,7 @@
                 <button type="button" class="mini-btn" @click="generatePassword">Generate</button>
               </div>
             </label>
+            <PasswordRules :password="form.password" :min="10" tone="admin" />
           </template>
 
           <template v-else-if="dialog.type === 'role'">
@@ -580,7 +605,7 @@
           <p v-if="dialog.error" class="form-error">{{ dialog.error }}</p>
           <div class="dialog-actions">
             <button type="button" class="ghost-btn" :disabled="busy" @click="closeDialog">Cancel</button>
-            <button type="submit" class="primary-btn" :disabled="busy">{{ busy ? "Saving…" : "Save" }}</button>
+            <button type="submit" class="primary-btn" :class="{ danger: dialog.type === 'remove' }" :disabled="busy">{{ busy ? (dialog.type === "remove" ? "Removing…" : "Saving…") : dialog.type === "remove" ? "Remove administrator" : "Save" }}</button>
           </div>
         </form>
       </div>
@@ -591,6 +616,8 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import InfoTip from "./components/InfoTip.vue";
+import PasswordRules from "../../components/auth/PasswordRules.vue";
+import { passwordOk } from "../../utils/passwordRules";
 import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import { useSidebarState } from "../../composables/useSidebarState";
@@ -963,6 +990,8 @@ const openDialog = (type, target, values) => {
 const openAdminDialog = () =>
   openDialog("admin", null, { name: "", surname: "", username: "", email: "", password: "", admin_role_id: roles.value.find((r) => !r.is_system)?.id ?? roles.value[0]?.id });
 const openPasswordDialog = (admin) => openDialog("password", admin, { password: "" });
+const openEditDialog = (admin) => openDialog("edit", admin, { name: admin.first_name ?? "", surname: admin.surname ?? "", username: admin.username ?? "", email: admin.email ?? "" });
+const openRemoveDialog = (admin) => openDialog("remove", admin, {});
 const openRoleDialog = (role = null) =>
   openDialog("role", role, { name: role?.name ?? "", description: role?.description ?? "", permissions: [...(role?.permissions ?? ["dashboard.view"])] });
 const closeDialog = () => {
@@ -980,11 +1009,23 @@ const generatePassword = () => {
   showPassword.value = true;
 };
 const submitDialog = async () => {
+  // Administrator passwords need 10 characters, upper- and lowercase and a number
+  if (["admin", "password"].includes(dialog.type) && !passwordOk(form.password, 10)) {
+    dialog.error = "The password needs every item on the list.";
+    return;
+  }
   busy.value = true;
   dialog.error = "";
   try {
     let message;
-    if (dialog.type === "admin") {
+    if (dialog.type === "edit") {
+      ({ data: { message } } = await api.put(`/admin/security/admins/${dialog.target.id}`, form));
+      fetchAdmins();
+    } else if (dialog.type === "remove") {
+      ({ data: { message } } = await api.delete(`/admin/security/admins/${dialog.target.id}`));
+      fetchAdmins();
+      fetchRoles();
+    } else if (dialog.type === "admin") {
       ({ data: { message } } = await api.post("/admin/security/admins", form));
       fetchAdmins();
       fetchRoles();
@@ -1228,6 +1269,29 @@ onMounted(async () => {
   cursor: default;
 }
 .mini-btn.danger { color: #b91c1c; }
+.owner {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: #1e2739;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.owner-note {
+  display: inline;
+  font-size: 11.5px;
+}
+.primary-btn.danger {
+  background: #dc2626;
+}
+.primary-btn.danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
 .mini-btn.ok { color: #15803d; }
 .link-btn {
   display: inline-block;

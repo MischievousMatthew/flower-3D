@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isMobileOpen" class="sidebar-backdrop" @click="closeMobile"></div>
+  <div v-if="isMobileOpen" class="sidebar-backdrop" data-close-guard="off" @click="closeMobile"></div>
 
   <aside class="sidebar" :class="{ 'mobile-open': isMobileOpen }" aria-label="Admin navigation">
     <div class="brand">

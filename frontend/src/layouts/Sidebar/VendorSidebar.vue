@@ -1,6 +1,6 @@
 <template>
   <!-- Backdrop for mobile -->
-  <div v-if="isMobileOpen" class="sidebar-backdrop" @click="closeMobile"></div>
+  <div v-if="isMobileOpen" class="sidebar-backdrop" data-close-guard="off" @click="closeMobile"></div>
 
   <aside class="sidebar" :class="{ 'mobile-open': isMobileOpen }" :style="accentVars" aria-label="Vendor navigation">
     <!-- Shop identity -->

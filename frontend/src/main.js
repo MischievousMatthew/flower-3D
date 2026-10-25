@@ -6,8 +6,11 @@ import "vue3-toastify/dist/index.css";
 import { configurePhilippineDateTimeDefaults } from "./utils/philippineDateTime";
 import { applyVendorTheme } from "./composables/useVendorTheme";
 import "./styles/vendor-theme.css";
+import { installModalCloseGuard } from "./utils/modalCloseGuard";
 
 configurePhilippineDateTimeDefaults();
+// Clicking outside a modal with typed info asks first (every modal on the site)
+installModalCloseGuard();
 
 // After a new deploy, an open tab still runs the old code and its page files
 // no longer exist. Reload to pick up the new version — at most once every

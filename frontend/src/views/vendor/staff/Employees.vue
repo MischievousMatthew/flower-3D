@@ -256,8 +256,9 @@
                   <input v-model="form.password" :type="showPass ? 'text' : 'password'" class="sp-input" :class="{ invalid: errors.password }" maxlength="100" autocomplete="new-password" />
                   <button type="button" class="st-link" @click="showPass = !showPass">{{ showPass ? "Hide" : "Show" }}</button>
                 </div>
+                <PasswordRules v-if="!form.id || form.password" :password="form.password" tone="vendor" />
                 <small v-if="errors.password" class="sp-error">{{ errors.password }}</small>
-                <small v-else class="st-sub">At least 8 characters.{{ form.id ? " Changing it signs them out." : "" }}</small>
+                <small v-else-if="form.id" class="st-sub">Changing it signs them out.</small>
               </label>
             </div>
             <p v-if="formError" class="sp-error">{{ formError }}</p>
@@ -522,6 +523,8 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute } from "vue-router";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
+import PasswordRules from "../../../components/auth/PasswordRules.vue";
+import { passwordOk } from "../../../utils/passwordRules";
 import employeeInfoService from "../../../services/employeeInfoService";
 import EmployeePhoto from "../../../components/hr/EmployeePhoto.vue";
 import { uploadPhoto } from "../../../components/hr/employeePhotoApi";
@@ -623,11 +626,8 @@ function validate() {
   if (!f.name.trim()) errors.name = "Enter their name.";
   if (!/^\S+@\S+\.\S+$/.test(f.email.trim())) errors.email = "Enter a valid email.";
   if (!f.joining_date) errors.joining_date = "Pick the day they started.";
-  if (!f.id) {
-    if (f.password.length < 8) errors.password = "Use at least 8 characters.";
-  } else if (f.password && f.password.length < 8) {
-    errors.password = "Use at least 8 characters.";
-  }
+  // The same rule as every other account (the checklist shows what's missing)
+  if ((!f.id || f.password) && !passwordOk(f.password)) errors.password = "The password needs every item on the list.";
   return !Object.keys(errors).length;
 }
 

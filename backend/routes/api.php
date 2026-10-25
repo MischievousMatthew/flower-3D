@@ -1232,6 +1232,7 @@ Route::middleware('token.auth')->group(function () {
             Route::middleware('admin.can:security.manage')->group(function () {
                 Route::post('/admins', [SecurityController::class, 'createAdmin']);
                 Route::put('/admins/{id}', [SecurityController::class, 'updateAdmin'])->whereNumber('id');
+                Route::delete('/admins/{id}', [SecurityController::class, 'deleteAdmin'])->whereNumber('id');
                 Route::post('/admins/{id}/active', [SecurityController::class, 'setAdminActive'])->whereNumber('id');
                 Route::post('/admins/{id}/password', [SecurityController::class, 'resetAdminPassword'])->whereNumber('id');
                 Route::post('/roles', [SecurityController::class, 'saveRole']);
