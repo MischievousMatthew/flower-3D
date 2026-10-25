@@ -213,8 +213,8 @@ class CustomerPreferencesController extends Controller
         $saved = VendorCustomerProfile::where('customer_id', $user->id)->get()->keyBy('vendor_id');
         $shopIds = $saved->keys()->merge($dates->whereNotNull('vendor_id')->pluck('vendor_id'))->unique();
         $shopNames = $shopIds->diff($shops->keys())->isEmpty() ? $shops : $shops->union(
-            User::whereIn('id', $shopIds->diff($shops->keys()))->with('vendor:id,email,store_name,business_name')->get(['id', 'email', 'name'])
-                ->mapWithKeys(fn ($u) => [$u->id => $u->vendor?->store_name ?: $u->vendor?->business_name ?: $u->name])
+            User::whereIn('id', $shopIds->diff($shops->keys()))->with('vendor:id,email,store_name,registered_business_name')->get(['id', 'email', 'name'])
+                ->mapWithKeys(fn ($u) => [$u->id => $u->vendor?->store_name ?: $u->vendor?->registered_business_name ?: $u->name])
         );
 
         return [
@@ -261,7 +261,7 @@ class CustomerPreferencesController extends Controller
             ->map(fn ($f) => [
                 'product_id' => $f->product_id,
                 'name' => $f->product->product_name,
-                'price' => (float) ($f->product->selling_price ?? $f->product->price ?? 0),
+                'price' => (float) ($f->product->selling_price ?? 0),
                 'image' => $f->product->primaryImage?->image_url ?? $f->product->images->first()?->image_url,
                 'available' => ! $f->product->deleted_at,
             ])->values()->all();

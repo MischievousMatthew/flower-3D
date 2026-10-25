@@ -201,7 +201,7 @@ class EmployeeAuthController extends Controller
 
         return [
             'role_name' => $employee->staffRole?->name,
-            'shop_name' => $shop?->store_name ?: $shop?->business_name,
+            'shop_name' => $shop?->store_name ?: $shop?->registered_business_name,
             'shop_logo' => $shop?->store_logo_url,
         ];
     }

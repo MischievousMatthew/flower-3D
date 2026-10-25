@@ -38,7 +38,6 @@ class CrmDashboardTest extends TestCase
         }
         Schema::table('products', function (Blueprint $t) {
             $t->unsignedBigInteger('owner_id')->nullable();
-            $t->unsignedBigInteger('vendor_id')->nullable();
             $t->string('product_name')->nullable();
             $t->softDeletes();
         });
@@ -131,7 +130,7 @@ class CrmDashboardTest extends TestCase
         $other = $this->shopOwner();
         $this->buy($other, $ben, 7000, '2026-10-07 10:00:00');
 
-        $rose = DB::table('products')->insertGetId(['owner_id' => $vendor->id, 'vendor_id' => $vendor->id, 'product_name' => 'Rose box']);
+        $rose = DB::table('products')->insertGetId(['owner_id' => $vendor->id, 'product_name' => 'Rose box']);
         $inq = fn ($who, $status, $asked, $answered = null) => DB::table('customer_inquiries')->insert([
             'vendor_id' => $vendor->id, 'customer_id' => $who->id, 'product_id' => $rose, 'question' => 'Same-day delivery?',
             'status' => $status, 'answered_at' => $answered, 'created_at' => $asked, 'updated_at' => $asked,

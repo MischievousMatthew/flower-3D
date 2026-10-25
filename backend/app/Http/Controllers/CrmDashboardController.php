@@ -168,7 +168,7 @@ class CrmDashboardController extends Controller
     private function satisfaction(int $vendorId, Carbon $from, Carbon $to, Carbon $pFrom, Carbon $pTo): array
     {
         // The shop's products, including removed ones (their reviews still count)
-        $products = Product::withoutGlobalScopes()->where(fn ($q) => $q->where('vendor_id', $vendorId)->orWhere('owner_id', $vendorId))->select('id');
+        $products = Product::withoutGlobalScopes()->where('owner_id', $vendorId)->select('id');
         $reviews = fn () => ProductReview::query()->whereNull('hidden_at')->whereIn('product_id', $products);
         $period = $reviews()->whereBetween('created_at', [$from, $to])->get(['rating']);
         $all = $reviews()->selectRaw('COUNT(*) as n, AVG(rating) as avg')->first();

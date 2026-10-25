@@ -41,13 +41,11 @@ class CustomerManagementTest extends TestCase
         });
         Schema::table('vendor_applications', function (Blueprint $t) {
             $t->string('store_name')->nullable();
-            $t->string('business_name')->nullable();
+            $t->string('registered_business_name')->nullable();
         });
         Schema::table('products', function (Blueprint $t) {
             $t->unsignedBigInteger('owner_id')->nullable();
-            $t->unsignedBigInteger('vendor_id')->nullable();
             $t->string('product_name')->nullable();
-            $t->decimal('price', 12, 2)->nullable();
             $t->decimal('selling_price', 12, 2)->nullable();
             $t->softDeletes();
         });
@@ -122,7 +120,7 @@ class CustomerManagementTest extends TestCase
         $shop = $this->shop('Petal & Stem');
         $ana = $this->customer();
         $this->order($shop, ['user_id' => $ana->id, 'total_amount' => 1200, 'paid_at' => '2026-10-02 10:00:00']);
-        $rose = DB::table('products')->insertGetId(['owner_id' => $shop->id, 'vendor_id' => $shop->id, 'product_name' => 'Rose box', 'selling_price' => 1200]);
+        $rose = DB::table('products')->insertGetId(['owner_id' => $shop->id, 'product_name' => 'Rose box', 'selling_price' => 1200]);
 
         $this->as($ana)->putJson('/api/customer/preferences', [
             'flowers' => ['Tulips', ' tulips ', 'Peonies'], 'colors' => ['Pastel'], 'avoid' => ['Lilies'], 'occasions' => ['Birthday'],
@@ -158,8 +156,8 @@ class CustomerManagementTest extends TestCase
         $shop = $this->shop('Petal & Stem');
         $ana = $this->customer();
         DB::table('conversations')->insert(['owner_id' => $shop->id, 'vendor_id' => $shop->id, 'customer_id' => $ana->id]);
-        $tulips = DB::table('products')->insertGetId(['owner_id' => $shop->id, 'vendor_id' => $shop->id, 'product_name' => 'Tulip bunch']);
-        $notOurs = DB::table('products')->insertGetId(['owner_id' => 999, 'vendor_id' => 999, 'product_name' => 'Elsewhere']);
+        $tulips = DB::table('products')->insertGetId(['owner_id' => $shop->id, 'product_name' => 'Tulip bunch']);
+        $notOurs = DB::table('products')->insertGetId(['owner_id' => 999, 'product_name' => 'Elsewhere']);
 
         $this->as($shop)->putJson("/api/crm/customers/{$ana->id}/preferences", ['flowers' => ['Sunflowers'], 'favorite_product_ids' => [$tulips, $notOurs]])
             ->assertOk()->assertJsonPath('data.shop.flowers', ['Sunflowers'])

@@ -44,9 +44,7 @@ class CustomerCommunicationTest extends TestCase
         });
         Schema::table('products', function (Blueprint $t) {
             $t->unsignedBigInteger('owner_id')->nullable();
-            $t->unsignedBigInteger('vendor_id')->nullable();
             $t->string('product_name')->nullable();
-            $t->decimal('price', 12, 2)->nullable();
             $t->decimal('selling_price', 12, 2)->nullable();
             $t->softDeletes();
         });
@@ -66,7 +64,6 @@ class CustomerCommunicationTest extends TestCase
             $t->unsignedBigInteger('customer_id');
             $t->text('last_message')->nullable();
             $t->timestamp('last_message_time')->nullable();
-            $t->unsignedBigInteger('last_message_sender_id')->nullable();
             $t->unsignedInteger('unread_count_customer')->default(0);
             $t->unsignedInteger('unread_count_vendor')->default(0);
             $t->boolean('is_active')->default(true);
@@ -147,7 +144,7 @@ class CustomerCommunicationTest extends TestCase
         $shop = $this->shopOwner();
         $ana = User::create(['name' => 'Ana', 'surname' => 'Reyes', 'email' => 'ana@example.com', 'password' => 'x', 'role' => 'customer']);
         $orderId = $this->order($shop, ['user_id' => $ana->id, 'order_number' => 'ORD-77', 'status' => 'processing', 'total_amount' => 1850]);
-        $rose = DB::table('products')->insertGetId(['owner_id' => $shop->id, 'vendor_id' => $shop->id, 'product_name' => 'Rose box', 'selling_price' => 1500]);
+        $rose = DB::table('products')->insertGetId(['owner_id' => $shop->id, 'product_name' => 'Rose box', 'selling_price' => 1500]);
         $chat = DB::table('conversations')->insertGetId(['owner_id' => $shop->id, 'vendor_id' => $shop->id, 'customer_id' => $ana->id]);
 
         // Someone else's order can't be used

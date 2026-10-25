@@ -153,6 +153,6 @@ class CustomerRecords
     /** The shop's products, removed ones included */
     public function products(int $vendorId): Builder
     {
-        return Product::withoutGlobalScopes()->where(fn ($q) => $q->where('vendor_id', $vendorId)->orWhere('owner_id', $vendorId));
+        return Product::withoutGlobalScopes()->where('owner_id', $vendorId);
     }
 }

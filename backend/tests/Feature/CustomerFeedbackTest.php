@@ -35,7 +35,6 @@ class CustomerFeedbackTest extends TestCase
         Schema::table('vendor_applications', fn (Blueprint $t) => $t->string('store_name')->nullable());
         Schema::table('products', function (Blueprint $t) {
             $t->unsignedBigInteger('owner_id')->nullable();
-            $t->unsignedBigInteger('vendor_id')->nullable();
             $t->string('product_name')->nullable();
             $t->softDeletes();
         });
@@ -122,7 +121,7 @@ class CustomerFeedbackTest extends TestCase
     {
         $shop = $this->shopOwner();
         $ana = User::create(['name' => 'Ana', 'surname' => 'Reyes', 'email' => 'ana@example.com', 'password' => 'x', 'role' => 'customer']);
-        $rose = DB::table('products')->insertGetId(['owner_id' => $shop->id, 'vendor_id' => $shop->id, 'product_name' => 'Rose box']);
+        $rose = DB::table('products')->insertGetId(['owner_id' => $shop->id, 'product_name' => 'Rose box']);
         $review = fn ($stars, $comment, $at, $reply = null) => DB::table('product_reviews')->insertGetId([
             'product_id' => $rose, 'user_id' => $ana->id, 'rating' => $stars, 'comment' => $comment, 'vendor_reply' => $reply, 'created_at' => $at, 'updated_at' => $at,
         ]);
@@ -162,7 +161,7 @@ class CustomerFeedbackTest extends TestCase
     {
         $shop = $this->shopOwner();
         $ana = User::create(['name' => 'Ana', 'surname' => 'Reyes', 'email' => 'ana@example.com', 'password' => 'x', 'role' => 'customer']);
-        $rose = DB::table('products')->insertGetId(['owner_id' => $shop->id, 'vendor_id' => $shop->id, 'product_name' => 'Rose box']);
+        $rose = DB::table('products')->insertGetId(['owner_id' => $shop->id, 'product_name' => 'Rose box']);
         $id = DB::table('product_reviews')->insertGetId(['product_id' => $rose, 'user_id' => $ana->id, 'rating' => 2, 'comment' => 'Wilted', 'created_at' => now(), 'updated_at' => now()]);
 
         $staff = function (array $perms) use ($shop) {

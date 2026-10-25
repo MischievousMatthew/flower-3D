@@ -43,7 +43,7 @@ class CrmFeedbackController extends Controller
         $from = now()->startOfMonth()->subMonths($months - 1);
         $cut = now()->subDays(30);
 
-        $productIds = Product::withoutGlobalScopes()->where(fn ($q) => $q->where('owner_id', $vendorId)->orWhere('vendor_id', $vendorId))->pluck('product_name', 'id');
+        $productIds = Product::withoutGlobalScopes()->where('owner_id', $vendorId)->pluck('product_name', 'id');
         $reviews = ProductReview::query()->whereIn('product_id', $productIds->keys())->whereNull('hidden_at')
             ->where('created_at', '>=', $from)->get(['id', 'product_id', 'rating', 'comment', 'vendor_reply', 'is_anonymous', 'user_id', 'created_at']);
         $cases = SupportTicket::query()->where('vendor_id', $vendorId)->where('created_at', '>=', $from)

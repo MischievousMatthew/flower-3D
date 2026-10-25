@@ -53,7 +53,6 @@ class CustomerSegmentsTest extends TestCase
         Schema::table('vendor_applications', fn (Blueprint $t) => $t->string('store_name')->nullable());
         Schema::table('products', function (Blueprint $t) {
             $t->unsignedBigInteger('owner_id')->nullable();
-            $t->unsignedBigInteger('vendor_id')->nullable();
             $t->string('product_name')->nullable();
             $t->json('occasion_tags')->nullable();
             $t->softDeletes();
@@ -111,7 +110,7 @@ class CustomerSegmentsTest extends TestCase
     {
         $shop = $this->shopOwner();
         DB::table('vendor_applications')->where('email', $shop->email)->update(['store_name' => 'Petal & Stem']);
-        $bridal = DB::table('products')->insertGetId(['owner_id' => $shop->id, 'vendor_id' => $shop->id, 'product_name' => 'Bridal bouquet', 'occasion_tags' => json_encode(['Wedding'])]);
+        $bridal = DB::table('products')->insertGetId(['owner_id' => $shop->id, 'product_name' => 'Bridal bouquet', 'occasion_tags' => json_encode(['Wedding'])]);
         [$ana, $ben, $cy, $dee, $eve] = array_map(fn ($n) => $this->customer($n), ['Ana', 'Ben', 'Cy', 'Dee', 'Eve']);
 
         $this->buy($shop, $ana, '2026-10-10 10:00:00');                                  // new

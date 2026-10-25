@@ -57,8 +57,8 @@ class ChatShareController extends Controller
         $search = trim((string) $request->input('search', ''));
         $products = $this->records->products($vendorId)->whereNull('deleted_at')
             ->when($search !== '', fn ($q) => $q->where('product_name', 'like', '%' . $search . '%'))
-            ->orderBy('product_name')->limit(12)->get(['id', 'product_name', 'price', 'selling_price'])
-            ->map(fn ($p) => ['id' => $p->id, 'name' => $p->product_name, 'price' => (float) ($p->selling_price ?? $p->price ?? 0), 'image' => $this->imageOf($p->id)]);
+            ->orderBy('product_name')->limit(12)->get(['id', 'product_name', 'selling_price'])
+            ->map(fn ($p) => ['id' => $p->id, 'name' => $p->product_name, 'price' => (float) ($p->selling_price ?? 0), 'image' => $this->imageOf($p->id)]);
 
         return response()->json(['success' => true, 'data' => [
             'orders' => $orders,
@@ -107,7 +107,7 @@ class ChatShareController extends Controller
         [$vendorId, $conversation] = $this->conversation($request, $id);
         $product = $this->records->products($vendorId)->whereNull('deleted_at')->findOrFail($data['product_id']);
         $note = trim((string) ($data['note'] ?? ''));
-        $price = (float) ($product->selling_price ?? $product->price ?? 0);
+        $price = (float) ($product->selling_price ?? 0);
 
         $message = $this->post($request, $conversation, 'product', $note !== '' ? $note : $product->product_name, [
             'kind' => 'product',
@@ -137,7 +137,6 @@ class ChatShareController extends Controller
         $conversation->update([
             'last_message' => Str::limit($text, 50),
             'last_message_time' => now(),
-            'last_message_sender_id' => $conversation->vendor_id,
             // A new message brings an archived chat back for the customer
             'customer_archived_at' => null,
         ]);

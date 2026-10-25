@@ -378,10 +378,7 @@ class ProductReviewController extends Controller
         // Verify this product belongs to the vendor
         $product = Product::withTrashed()
             ->where('id', $productId)
-            ->where(function ($q) use ($user) {
-                $q->where('vendor_id', $user->id)
-                  ->orWhere('owner_id', $user->id);
-            })
+            ->where('owner_id', $user->id)
             ->first();
 
         if (! $product) {
