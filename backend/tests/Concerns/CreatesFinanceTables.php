@@ -19,6 +19,8 @@ trait CreatesFinanceTables
 
     protected function createFinanceTables(): void
     {
+        // Column checks are cached per process; look again for this schema
+        (new \ReflectionProperty(\App\Services\VendorSalesService::class, 'orderMoneyColumns'))->setValue(null, null);
         foreach (['vendor_transactions', 'orders', 'order_items', 'products', 'order_requests', 'vendor_expenses', 'paymongo_webhook_events', 'cod_collections', 'vendor_expense_files', 'order_request_messages', 'deliveries', 'user_notifications'] as $table) {
             Schema::dropIfExists($table);
         }
@@ -49,7 +51,7 @@ trait CreatesFinanceTables
             $t->string('payment_method');
             $t->decimal('subtotal', 12, 2)->default(0);
             $t->decimal('delivery_fee', 12, 2)->default(0);
-            $t->decimal('tax_amount', 12, 2)->default(0);
+            // No tax_amount: the real orders table dropped it (2026_02_01 migration)
             $t->decimal('discount_amount', 12, 2)->default(0);
             $t->decimal('total_amount', 12, 2);
             $t->string('delivery_contact_name')->nullable();

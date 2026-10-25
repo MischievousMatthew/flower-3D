@@ -24,7 +24,18 @@ class VendorSalesService
 
     private static ?bool $listPriceReady = null;
 
+    /** @var string[]|null Money columns the orders table really has (tax_amount was dropped in February) */
+    private static ?array $orderMoneyColumns = null;
+
     /** Whether order items record their regular price yet (needed to show discounts) */
+    private function orderMoneyColumns(): array
+    {
+        return self::$orderMoneyColumns ??= array_values(array_filter(
+            ['delivery_fee', 'tax_amount', 'discount_amount'],
+            fn ($column) => Schema::hasColumn('orders', $column),
+        ));
+    }
+
     public function listPriceReady(): bool
     {
         return self::$listPriceReady ??= Schema::hasColumn('order_items', 'list_price');
@@ -69,7 +80,7 @@ class VendorSalesService
                 ['id', 'order_id', 'product_id', 'product_name', 'quantity', 'unit_price', 'subtotal'],
                 $this->listPriceReady() ? ['list_price'] : [],
             ))])
-            ->get(['id', 'order_number', 'payment_method', 'delivery_fee', 'tax_amount', 'discount_amount', 'total_amount'])
+            ->get(array_merge(['id', 'order_number', 'payment_method', 'total_amount'], $this->orderMoneyColumns()))
             ->keyBy('id');
 
         return $credits->map(function ($credit) use ($orders) {
