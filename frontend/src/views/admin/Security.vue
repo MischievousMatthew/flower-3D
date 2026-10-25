@@ -302,44 +302,69 @@
               </div>
             </section>
 
-            <section class="panel">
+            <section class="panel" aria-labelledby="er-title">
               <div class="panel-head">
                 <div>
-                  <h3 class="panel-title">API errors</h3>
-                  <p class="panel-sub">Actions that failed because of a server error. Full technical details stay in the server logs.</p>
+                  <h3 id="er-title" class="panel-title">Errors</h3>
+                  <p class="panel-sub">When something breaks, people see a plain message with a code like BC-7K2Q9F instead of the technical error. The cause is kept here under that code.</p>
                 </div>
-                <select v-model.number="errorHours" class="input"><option :value="1">Last hour</option><option :value="24">Last 24 hours</option><option :value="168">Last 7 days</option><option :value="720">Last 30 days</option></select>
+                <select v-model.number="errorHours" class="input" aria-label="Period"><option :value="1">Last hour</option><option :value="24">Last 24 hours</option><option :value="168">Last 7 days</option><option :value="720">Last 30 days</option></select>
               </div>
-              <div v-if="!apiErrors" class="sk sk-row tall"></div>
+
+              <form class="er-lookup" role="search" @submit.prevent="lookUpCode">
+                <label for="er-code" class="mini-title">Look up a code someone sent you</label>
+                <div class="er-lookup-row">
+                  <input id="er-code" v-model="errorCode" class="input er-input mono" placeholder="BC-7K2Q9F" autocomplete="off" spellcheck="false" maxlength="12" aria-describedby="er-code-help" />
+                  <button type="submit" class="primary-btn" :disabled="!errorCode.trim() || lookingUp">{{ lookingUp ? "Looking…" : "Find" }}</button>
+                  <button v-if="lookup" type="button" class="ghost-btn" @click="clearLookup">Show latest</button>
+                </div>
+                <small id="er-code-help" class="sub">Customers, shops and staff see this code in the error message. Errors are kept for 90 days.</small>
+              </form>
+
+              <div v-if="!apiErrors && !lookup" class="sk sk-row tall"></div>
               <template v-else>
-                <p v-if="!apiErrors.total" class="calm">✓ No server errors in this period.</p>
-                <template v-else>
-                  <div class="bars" :aria-label="`${apiErrors.total} errors`">
-                    <div v-for="(count, label) in apiErrors.series" :key="label" class="bar-col" :title="`${label}: ${count}`">
-                      <span class="bar" :style="{ height: barHeight(count) }"></span>
+                <template v-if="!lookup">
+                  <p v-if="!apiErrors.total" class="calm">✓ No errors in this period.</p>
+                  <template v-else>
+                    <p class="er-summary">
+                      <span class="strong">{{ apiErrors.total }} {{ apiErrors.total === 1 ? "error" : "errors" }}</span>
+                      <span class="muted"> · {{ apiErrors.shielded ?? 0 }} shown to people as a plain message</span>
+                    </p>
+                    <div class="split tight">
+                      <div class="bars" :aria-label="`${apiErrors.total} errors over time`">
+                        <div v-for="(count, label) in apiErrors.series" :key="label" class="bar-col" :title="`${label}: ${count}`">
+                          <span class="bar" :style="{ height: barHeight(count) }"></span>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 class="mini-title">Most affected features</h4>
+                        <ul class="mini-list">
+                          <li v-for="e in apiErrors.by_feature" :key="e.feature">
+                            <span class="strong">{{ e.feature }}</span>
+                            <span class="sub">{{ e.total }}× · last {{ timeAgo(e.last_at) }}</span>
+                          </li>
+                        </ul>
+                      </div>
                     </div>
-                  </div>
-                  <div class="split tight">
-                    <div>
-                      <h4 class="mini-title">Most affected features</h4>
-                      <ul class="mini-list">
-                        <li v-for="e in apiErrors.by_feature" :key="e.feature">
-                          <span class="strong">{{ e.feature }}</span>
-                          <span class="sub">{{ e.total }}× · last {{ timeAgo(e.last_at) }}</span>
-                        </li>
-                      </ul>
-                    </div>
-                    <div>
-                      <h4 class="mini-title">Latest</h4>
-                      <ul class="mini-list">
-                        <li v-for="e in apiErrors.recent.slice(0, 12)" :key="e.id">
-                          <span class="strong">{{ e.feature }} <span class="pill bad">Error {{ e.status }}</span></span>
-                          <span class="sub">{{ e.exception ? e.exception + ": " : "" }}{{ e.message || "No message" }}</span>
-                          <span class="sub">{{ formatDateTime(e.at) }}<template v-if="e.duration_ms"> · {{ e.duration_ms }} ms</template></span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
+                  </template>
+                </template>
+
+                <template v-if="lookup || apiErrors.total">
+                  <h4 class="mini-title er-list-title" aria-live="polite">{{ lookup ? (lookup.length ? `Found ${lookup.length === 1 ? "1 error" : lookup.length + " errors"} for ${lookedUp}` : `No error with code ${lookedUp}`) : "Latest" }}</h4>
+                  <p v-if="lookup && !lookup.length" class="er-none">Check the code for typos. Errors older than 90 days are cleared.</p>
+                  <ul class="er-list">
+                    <li v-for="e in errorRows" :key="e.id" class="er-row">
+                      <div class="er-top">
+                        <span v-if="e.reference" class="er-code mono">{{ e.reference }}</span>
+                        <button v-if="e.reference" type="button" class="mini-btn er-copy" :aria-label="`Copy code ${e.reference}`" @click="copyCode(e.reference)">Copy</button>
+                        <span class="strong er-feature">{{ e.feature }}</span>
+                        <span class="pill" :class="{ super: e.account === 'vendor' || e.account === 'staff' }">{{ accountLabel(e) }}</span>
+                        <time class="sub er-time" :datetime="e.at">{{ formatDateTime(e.at) }}</time>
+                      </div>
+                      <p v-if="e.shown" class="er-line"><span class="er-k">They saw</span><span>{{ e.shown }}</span></p>
+                      <p class="er-line"><span class="er-k">Cause</span><span class="mono er-cause">{{ errorCause(e) }}</span></p>
+                    </li>
+                  </ul>
                 </template>
               </template>
             </section>
@@ -815,6 +840,45 @@ const fetchErrors = async () => {
   }
 };
 watch(errorHours, fetchErrors);
+
+// Looking up a code someone quoted to support
+const errorCode = ref("");
+const lookedUp = ref("");
+const lookup = ref(null);
+const lookingUp = ref(false);
+const lookUpCode = async () => {
+  const code = errorCode.value.trim().toUpperCase();
+  if (!code) return;
+  lookingUp.value = true;
+  try {
+    lookup.value = (await api.get("/admin/security/api-errors", { params: { reference: code } })).data.data.lookup;
+    lookedUp.value = code.startsWith("BC-") ? code : `BC-${code}`;
+  } catch {
+    toast.error("That code couldn't be looked up. Please try again.");
+  } finally {
+    lookingUp.value = false;
+  }
+};
+const clearLookup = () => {
+  lookup.value = null;
+  errorCode.value = "";
+};
+const errorRows = computed(() => lookup.value ?? apiErrors.value?.recent?.slice(0, 15) ?? []);
+const ACCOUNT_LABELS = { customer: "Customer", vendor: "Shop owner", staff: "Staff", admin: "Admin", guest: "Not signed in" };
+const accountLabel = (e) => {
+  const kind = ACCOUNT_LABELS[e.account] ?? "Account not recorded";
+  return e.account_name ? `${kind} · ${e.account_name}` : kind;
+};
+const errorCause = (e) =>
+  [`Error ${e.status}`, e.exception, e.message, e.location ? `at ${e.location}` : null].filter(Boolean).join(" · ");
+const copyCode = async (code) => {
+  try {
+    await navigator.clipboard.writeText(code);
+    toast.success(`Copied ${code}`);
+  } catch {
+    toast.error("Couldn't copy. Select the code and copy it instead.");
+  }
+};
 const barHeight = (count) => {
   const max = Math.max(1, ...Object.values(apiErrors.value?.series ?? {}));
   return `${Math.max(6, Math.round((count / max) * 100))}%`;
@@ -1511,6 +1575,117 @@ onMounted(async () => {
   font-weight: 600;
   color: #475569;
   margin: 0;
+}
+
+/* Errors: code lookup and list */
+.er-lookup {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 16px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #f8f7ff;
+  border: 1px solid #ede9fe;
+}
+.er-lookup-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.er-input {
+  flex: 1 1 180px;
+  min-height: 40px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.er-lookup .primary-btn,
+.er-lookup .ghost-btn {
+  min-height: 40px;
+}
+.er-summary {
+  margin: 0;
+  font-size: 13px;
+}
+.er-list-title {
+  margin-top: 18px;
+}
+.er-none {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+.er-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.er-row {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid #eef0f4;
+  border-radius: 12px;
+  background: #fff;
+}
+.er-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.er-code {
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: #1e2739;
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.er-copy {
+  min-height: 28px;
+}
+.er-feature {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.er-time {
+  display: inline;
+  margin-left: auto;
+}
+.er-line {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 10px;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #334155;
+}
+.er-k {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  padding-top: 1px;
+}
+.er-cause {
+  color: #b91c1c;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .er-line {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .er-time {
+    margin-left: 0;
+    width: 100%;
+  }
 }
 
 /* Settings */

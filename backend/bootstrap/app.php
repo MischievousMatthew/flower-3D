@@ -41,10 +41,48 @@ return Application::configure(basePath: dirname(__DIR__))
         // Keep a record of server errors the API returns (Security → API errors)
         $middleware->api(append: [\App\Http\Middleware\LogApiErrors::class]);
 
+        // Programmer errors never reach people; they get a plain message and a code
+        $middleware->api(append: [\App\Http\Middleware\FriendlyApiErrors::class]);
+
         // Staff & operations → Activity logs: what employees change
         $middleware->api(append: [\App\Http\Middleware\LogStaffActivity::class]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // API errors in plain words, even with APP_DEBUG on. The full error
+        // still goes to the Laravel log and, by its code, to the admin log.
+        $exceptions->render(function (\Throwable $e, \Illuminate\Http\Request $request) {
+            if (! $request->is('api/*') && ! $request->expectsJson()) {
+                return null;
+            }
+            if ($e instanceof \Illuminate\Validation\ValidationException) {
+                return null;
+            }
+            if ($e instanceof \Illuminate\Auth\AuthenticationException) {
+                return response()->json(['success' => false, 'code' => 'unauthenticated', 'message' => \App\Support\FriendlyErrors::forStatus(401)], 401);
+            }
+            if ($e instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+                return response()->json(['success' => false, 'message' => \App\Support\FriendlyErrors::forStatus(404)], 404);
+            }
+            if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface && $e->getStatusCode() < 500) {
+                $status = $e->getStatusCode();
+                $message = trim($e->getMessage());
+                $readable = $message !== '' && ! \App\Support\FriendlyErrors::isTechnical($message) && ! \App\Support\FriendlyErrors::isFrameworkDefault($message);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $readable ? $message : (\App\Support\FriendlyErrors::forStatus($status) ?? 'That request could not be completed.'),
+                ], $status, $e->getHeaders());
+            }
+
+            \App\Support\FriendlyErrors::remember($request, $e->getMessage(), $e);
+            $status = $e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface ? $e->getStatusCode() : 500;
+
+            return response()->json([
+                'success' => false,
+                'code' => 'server_error',
+                'message' => $status === 503 ? \App\Support\FriendlyErrors::forStatus(503) : \App\Support\FriendlyErrors::message($request, $e),
+                'reference' => \App\Support\FriendlyErrors::reference($request),
+            ], $status);
+        });
     })
     ->create();

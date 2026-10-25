@@ -3,6 +3,7 @@ import axios from "axios";
 import { toast } from "vue3-toastify";
 import { clearStoredAuth, getPreferredAuthToken } from "../utils/authSession";
 import { markSessionReplaced } from "../utils/sessionReplaced";
+import { makeFriendly } from "../utils/friendlyError";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL?.trim();
 
@@ -99,6 +100,10 @@ api.interceptors.response.use(
       url: error.config?.url,
       data: error.response?.data,
     });
+
+    // Plain words for every screen that shows the error (no internet, server
+    // waking up, or anything technical the server let through)
+    makeFriendly(error);
 
     // ================= SUSPENDED STORE =================
     // The vendor (or the store they work for) was suspended: sign out and

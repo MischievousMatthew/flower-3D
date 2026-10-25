@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
@@ -460,6 +461,14 @@ class SecurityController extends Controller
         $since = now()->subHours($hours);
         $rows = ApiErrorLog::query()->where('created_at', '>=', $since);
 
+        // Someone quoted a code ("BC-7K2Q9F") to support: find it at any date
+        $code = Str::upper(trim((string) $request->input('reference')));
+        if ($code !== '') {
+            $found = ApiErrorLog::query()->where('reference', Str::startsWith($code, 'BC-') ? $code : "BC-{$code}")->latest('created_at')->limit(5)->get();
+
+            return response()->json(['success' => true, 'data' => ['lookup' => $found->map(fn ($e) => $this->errorRow($e))->values()]]);
+        }
+
         // Errors per hour (or per day for longer spans) for the chart
         $bucket = $hours > 48 ? 'day' : 'hour';
         $series = (clone $rows)->get(['created_at'])->groupBy(fn ($r) => $bucket === 'day' ? $r->created_at->format('Y-m-d') : $r->created_at->format('Y-m-d H:00'))
@@ -476,20 +485,33 @@ class SecurityController extends Controller
                     ->groupBy(fn ($e) => $this->feature($e))
                     ->map(fn ($group, $feature) => ['feature' => $feature, 'total' => $group->count(), 'last_at' => $group->max('created_at')->toIso8601String()])
                     ->sortByDesc('total')->take(10)->values(),
-                'recent' => (clone $rows)->latest('created_at')->limit(50)->get()->map(fn ($e) => [
-                    'id' => $e->id,
-                    'feature' => $this->feature($e),
-                    'status' => $e->status_code,
-                    'exception' => $e->exception ? class_basename($e->exception) : null,
-                    'message' => ApiAreas::cleanMessage($e->message),
-                    'duration_ms' => $e->duration_ms,
-                    'at' => $e->created_at?->toIso8601String(),
-                ]),
+                // Shown to people as a plain message instead of the programmer error
+                'shielded' => (clone $rows)->whereNotNull('reference')->count(),
+                'recent' => (clone $rows)->latest('created_at')->limit(50)->get()->map(fn ($e) => $this->errorRow($e)),
             ],
         ]);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────
+
+    /** One error for the admin list: the technical side, and what the person saw */
+    private function errorRow(ApiErrorLog $e): array
+    {
+        return [
+            'id' => $e->id,
+            'reference' => $e->reference,
+            'feature' => $this->feature($e),
+            'status' => $e->status_code,
+            'exception' => $e->exception ? class_basename($e->exception) : null,
+            'message' => ApiAreas::cleanMessage($e->message),
+            'location' => $e->location,
+            'shown' => $e->shown_message,
+            'account' => $e->account_type,
+            'account_name' => $e->account_name,
+            'duration_ms' => $e->duration_ms,
+            'at' => $e->created_at?->toIso8601String(),
+        ];
+    }
 
     private function feature(ApiErrorLog $e): string
     {
