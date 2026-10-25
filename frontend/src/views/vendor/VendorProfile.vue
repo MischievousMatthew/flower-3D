@@ -783,7 +783,7 @@ import { useRoute, useRouter } from "vue-router";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import "../../styles/bloomcraft.css";
 import api from "../../plugins/axios";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { useFormSubmit } from "../../composables/useFormSubmit";
 import { useVendorProfile } from "../../composables/useVendorProfile";
 

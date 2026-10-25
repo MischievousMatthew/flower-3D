@@ -366,7 +366,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from "vue";
 import { useRouter } from "vue-router";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 
 import LoadingOverlay from "../../../../layouts/components/LoadingOverlay.vue";
 import attendanceService from "../../../../services/attendanceService";

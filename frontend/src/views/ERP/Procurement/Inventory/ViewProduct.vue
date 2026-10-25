@@ -1589,7 +1589,7 @@ import {
   PERMISSION_TOOLTIPS,
   useAssignment,
 } from "../../../../composables/useAssignment";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { clearStoredAuth } from "../../../../utils/authSession";
 
 const { taxonomies, withCurrent } = useProductTaxonomies();

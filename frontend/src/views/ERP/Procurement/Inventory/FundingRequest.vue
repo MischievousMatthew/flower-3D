@@ -248,7 +248,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../../plugins/axios";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { PERMISSION_TOOLTIPS, useAssignment } from "../../../../composables/useAssignment";
 
 

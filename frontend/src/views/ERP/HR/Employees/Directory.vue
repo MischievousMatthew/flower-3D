@@ -100,7 +100,7 @@
 <script setup>
 import { computed, onActivated, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import HrPage from "../../../../components/hr/HrPage.vue";
 import employeeInfoService from "../../../../services/employeeInfoService";
 import { useAssignment } from "../../../../composables/useAssignment";

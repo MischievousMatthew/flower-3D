@@ -1,6 +1,6 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { useAuth } from "./useAuth";
 import { useAssignment } from "./useAssignment";
 import api from "../plugins/axios";

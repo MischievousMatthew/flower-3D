@@ -674,8 +674,7 @@ import {
   useAssignment,
 } from "../../../../composables/useAssignment";
 
-import { toast } from "vue3-toastify";
-import "vue3-toastify/dist/index.css";
+import { toast } from "@/utils/snackbar";
 import api from "../../../../plugins/axios";
 import { useProductTaxonomies } from "../../../../composables/useProductTaxonomies";
 

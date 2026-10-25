@@ -17,22 +17,17 @@
         </li>
       </ol>
 
-      <AuthNotice v-if="notice" class="rg-notice" :error="!['success', 'info'].includes(notice.tone)" :tone="notice.tone" :title="notice.title" :body="notice.body">
-        <router-link v-if="notice.login" :to="{ name: 'Login', query: { u: form.email } }" class="af-link">Sign in instead</router-link>
-        <router-link v-if="notice.login" :to="{ name: 'ForgotPassword', query: { u: form.email } }" class="af-link">Reset your password</router-link>
-      </AuthNotice>
-
       <!-- Step 1: name -->
       <form v-if="step === 1" class="af-form" novalidate @submit.prevent="next">
         <div class="af-row">
           <div class="af-field">
             <label class="af-label" for="rg-first">First name</label>
-            <input id="rg-first" ref="firstInput" v-model.trim="form.name" class="af-input" autocomplete="given-name" :aria-invalid="!!errors.name" @input="errors.name = ''" />
+            <input id="rg-first" ref="firstInput" v-model.trim="form.name" class="af-input" placeholder=" " autocomplete="given-name" :aria-invalid="!!errors.name" @input="errors.name = ''" />
             <p v-if="errors.name" class="af-note bad">{{ errors.name }}</p>
           </div>
           <div class="af-field">
             <label class="af-label" for="rg-last">Last name</label>
-            <input id="rg-last" v-model.trim="form.surname" class="af-input" autocomplete="family-name" :aria-invalid="!!errors.surname" @input="errors.surname = ''" />
+            <input id="rg-last" v-model.trim="form.surname" class="af-input" placeholder=" " autocomplete="family-name" :aria-invalid="!!errors.surname" @input="errors.surname = ''" />
             <p v-if="errors.surname" class="af-note bad">{{ errors.surname }}</p>
           </div>
         </div>
@@ -41,7 +36,7 @@
           <input
             id="rg-user"
             v-model.trim="form.username"
-            class="af-input"
+            class="af-input" placeholder=" "
             autocomplete="username"
             autocapitalize="none"
             spellcheck="false"
@@ -68,7 +63,7 @@
             id="rg-email"
             ref="emailInput"
             v-model.trim="form.email"
-            class="af-input"
+            class="af-input" placeholder=" "
             type="email"
             autocomplete="email"
             inputmode="email"
@@ -124,6 +119,7 @@
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import AuthShell from "../../components/auth/AuthShell.vue";
 import AuthNotice from "../../components/auth/AuthNotice.vue";
+import { toast } from "@/utils/snackbar";
 import PasswordField from "../../components/auth/PasswordField.vue";
 import PasswordRules from "../../components/auth/PasswordRules.vue";
 import CodeBoxes from "../../components/auth/CodeBoxes.vue";
@@ -146,6 +142,16 @@ const step = ref(1);
 const form = reactive({ name: "", surname: "", username: "", email: "", otp: "", password: "", password_confirmation: "" });
 const errors = reactive({});
 const notice = ref(null);
+// Sign-up messages are snackbars; "you already have an account" offers to sign in
+const SNACK_TYPE = { success: "success", info: "info", warn: "warning", lock: "warning", offline: "error" };
+watch(notice, (n) => {
+  if (!n) return;
+  const title = n.title.replace(/[.!]$/, "");
+  toast[SNACK_TYPE[n.tone] ?? "error"](`${title}. ${n.body ?? ""}`.trim(), {
+    toastId: "register-notice",
+    action: n.login ? { label: "Sign in", to: { name: "Login", query: { u: form.email } } } : null,
+  });
+});
 const checking = ref(false);
 const sending = ref(false);
 const codeSent = ref(false);

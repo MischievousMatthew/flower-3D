@@ -420,7 +420,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import HrPage from "../../../../components/hr/HrPage.vue";
 import EmployeeDocuments from "../../../../components/hr/EmployeeDocuments.vue";
 import EmployeeQRCode from "../../../../layouts/components/EmployeeQRCode.vue";

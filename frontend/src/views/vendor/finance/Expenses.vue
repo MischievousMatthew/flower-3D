@@ -202,7 +202,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import RangePicker from "../../../components/vendor/finance/RangePicker.vue";

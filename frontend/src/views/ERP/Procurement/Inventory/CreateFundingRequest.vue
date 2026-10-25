@@ -720,7 +720,7 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../../plugins/axios";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { useAssignment } from "../../../../composables/useAssignment";
 
 

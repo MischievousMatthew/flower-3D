@@ -12,7 +12,7 @@
 
 import { ref, onMounted } from "vue";
 import api from "@/plugins/axios";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 
 // Shared state across all instances (singleton pattern)
 const sharedVendorProfile = ref({

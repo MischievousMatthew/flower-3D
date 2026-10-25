@@ -1,22 +1,11 @@
 <template>
   <AuthShell
     :title="twoFactorRequired ? (twoFactorMethod === 'passkey' ? 'Enter your passkey' : 'Check your email') : 'Welcome back'"
-    :lead="twoFactorRequired ? twoFactorLead : 'Sign in to order flowers, run your shop, or open the ERP. Staff accounts use the same form.'"
+    :lead="twoFactorRequired ? twoFactorLead : 'Good to see you again. Sign in to pick up right where you left off.'"
   >
     <template #top>
       New to BloomCraft? <router-link to="/guest/register" class="af-link">Create an account</router-link>
     </template>
-
-    <!-- Messages appear in space that's always kept, so the form never moves -->
-    <div class="lg-slot">
-      <Transition name="lg-fade">
-        <AuthNotice v-if="notice" compact :error="notice.tone !== 'success'" :tone="notice.tone" :title="notice.title" :body="notice.body" :countdown="notice.countdown || 0" @done="lockEnded">
-          <router-link v-if="notice.actions?.includes('forgot')" :to="{ name: 'ForgotPassword', query: { u: form.username || undefined } }" class="af-link">Reset password</router-link>
-          <button v-if="notice.actions?.includes('retry')" type="button" class="af-plain" :disabled="loading" @click="twoFactorRequired ? completeTwoFactorLogin() : handleLogin()">Try again</button>
-          <a v-if="notice.actions?.includes('support') && supportEmail" :href="`mailto:${supportEmail}`" class="af-link">Contact support</a>
-        </AuthNotice>
-      </Transition>
-    </div>
 
     <!-- Username and password -->
     <form v-if="!twoFactorRequired" class="af-form" novalidate @submit.prevent="handleLogin()">
@@ -26,7 +15,7 @@
           id="lg-user"
           ref="userInput"
           v-model.trim="form.username"
-          class="af-input"
+          class="af-input" placeholder=" "
           type="text"
           autocomplete="username"
           autocapitalize="none"
@@ -39,10 +28,7 @@
       </div>
 
       <div class="af-field">
-        <label class="af-label" for="lg-pass">
-          Password
-          <router-link :to="{ name: 'ForgotPassword', query: { u: form.username || undefined } }" class="af-link lg-forgot">Forgot it?</router-link>
-        </label>
+        <label class="af-label" for="lg-pass">Password</label>
         <PasswordField
           id="lg-pass"
           ref="passInput"
@@ -52,6 +38,7 @@
           @update:model-value="fieldError.password = ''"
         />
         <p v-if="fieldError.password" id="lg-pass-note" class="af-note bad">{{ fieldError.password }}</p>
+        <router-link :to="{ name: 'ForgotPassword', query: { u: form.username || undefined } }" class="af-link lg-forgot">Forgot password?</router-link>
       </div>
 
       <button type="submit" class="af-btn" :class="{ busy: loading }" :disabled="loading || locked">
@@ -112,16 +99,16 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AuthShell from "../../components/auth/AuthShell.vue";
-import AuthNotice from "../../components/auth/AuthNotice.vue";
 import PasswordField from "../../components/auth/PasswordField.vue";
 import CodeBoxes from "../../components/auth/CodeBoxes.vue";
 import CodeTimer from "../../components/auth/CodeTimer.vue";
 import { useAuth } from "../../composables/useAuth";
 import { useSiteContent } from "../../composables/useSiteContent";
-import { explainLoginProblem } from "../../utils/loginProblems";
+import { explainLoginProblem, formatWait } from "../../utils/loginProblems";
+import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
 import { hasStoredAuthSession, getPreferredAuthToken, getPreferredUserType } from "../../utils/authSession";
 
@@ -180,6 +167,28 @@ const show = (result) => {
     nextTick(() => passInput.value?.focus());
   }
 };
+// Every sign-in message is a snackbar, with what to do next as its button
+let lockTimer = null;
+const SNACK_TYPE = { success: "success", info: "info", warn: "warning", lock: "warning", offline: "error" };
+watch(notice, (n) => {
+  if (!n) return;
+  const wait = n.countdown ? ` Try again in ${formatWait(n.countdown)}.` : "";
+  let action = null;
+  if (n.actions?.includes("forgot")) action = { label: "Forgot password", to: { name: "ForgotPassword", query: { u: form.username || undefined } } };
+  else if (n.actions?.includes("retry")) action = { label: "Try again", onClick: () => (twoFactorRequired.value ? completeTwoFactorLogin() : handleLogin()) };
+  else if (n.actions?.includes("support") && supportEmail.value) action = { label: "Contact support", onClick: () => (window.location.href = `mailto:${supportEmail.value}`) };
+  const title = n.title.replace(/[.!]$/, "");
+  toast[SNACK_TYPE[n.tone] ?? "error"](`${title}. ${n.body ?? ""}${wait}`.trim(), {
+    toastId: "login-notice",
+    action,
+    // A lock or being offline stays until it's over (or closed)
+    autoClose: n.tone === "lock" || n.tone === "offline" ? false : undefined,
+  });
+  clearTimeout(lockTimer);
+  if (n.tone === "lock" && n.countdown) lockTimer = setTimeout(lockEnded, n.countdown * 1000);
+});
+onBeforeUnmount(() => clearTimeout(lockTimer));
+
 const lockEnded = () => {
   locked.value = false;
   notice.value = { tone: "success", title: "You can try again now", body: "Take your time with the password.", actions: ["forgot"] };
@@ -342,26 +351,11 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.lg-slot {
-  position: relative;
-  min-height: 60px;
-  margin-bottom: 14px;
-}
-.lg-fade-enter-active,
-.lg-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-.lg-fade-enter-from,
-.lg-fade-leave-to {
-  opacity: 0;
-}
-.lg-fade-leave-active {
-  position: absolute;
-  inset: 0 0 auto;
-}
 .lg-forgot {
+  align-self: flex-end;
+  margin-top: 2px;
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 500;
 }
 .lg-slow {
   margin-top: -6px;

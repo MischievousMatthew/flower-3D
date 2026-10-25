@@ -168,7 +168,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
 import TagInput from "../crm/TagInput.vue";
 import { CRM_ICONS, DATE_KINDS, MONTHS, SUGGEST, blankDate, datePayload, daysIn, kindOf, monthDay, whenText } from "../crm/customerPrefs";

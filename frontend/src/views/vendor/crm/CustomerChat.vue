@@ -379,7 +379,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import HrPage from "../../../components/hr/HrPage.vue";

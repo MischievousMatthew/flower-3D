@@ -432,8 +432,7 @@ import vendorHeader from "../../layouts/vendorHeader.vue";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import ShopLayout from "../../components/vendor/shop/ShopLayout.vue";
 import BouquetPresetsPanel from "../../components/vendor/shop/BouquetPresetsPanel.vue";
-import { toast } from "vue3-toastify";
-import "vue3-toastify/dist/index.css";
+import { toast } from "@/utils/snackbar";
 import "../../styles/bloomcraft.css";
 
 const TABS = [

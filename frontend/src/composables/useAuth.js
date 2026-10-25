@@ -1,7 +1,7 @@
 import { ref, computed, watch } from "vue";
 import api from "../plugins/axios";
 import { useRouter } from "vue-router";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { setOwnerAccess, useAssignment } from "./useAssignment";
 import { buildLoginContext } from "../utils/loginContext";
 import {

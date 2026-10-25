@@ -4,7 +4,6 @@
       Remembered it? <router-link :to="{ name: 'Login', query: { u: identifier || undefined } }" class="af-link">Sign in</router-link>
     </template>
 
-    <AuthNotice v-if="notice" class="fp-notice" :error="notice.tone !== 'success'" :tone="notice.tone" :title="notice.title" :body="notice.body" />
 
     <!-- Step 1: who are you -->
     <form v-if="step === 1" class="af-form" novalidate @submit.prevent="sendCode">
@@ -14,7 +13,7 @@
           id="fp-id"
           ref="idInput"
           v-model.trim="identifier"
-          class="af-input"
+          class="af-input" placeholder=" "
           type="text"
           autocomplete="username"
           autocapitalize="none"
@@ -64,10 +63,10 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { watch, computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { toast } from "@/utils/snackbar";
 import { useRoute, useRouter } from "vue-router";
 import AuthShell from "../../components/auth/AuthShell.vue";
-import AuthNotice from "../../components/auth/AuthNotice.vue";
 import PasswordField from "../../components/auth/PasswordField.vue";
 import PasswordRules from "../../components/auth/PasswordRules.vue";
 import CodeBoxes from "../../components/auth/CodeBoxes.vue";
@@ -86,6 +85,12 @@ const password = ref("");
 const confirm = ref("");
 const errors = reactive({ otp: "", password: "", confirm: "" });
 const notice = ref(null);
+// Messages are snackbars, like the rest of sign-in
+const SNACK_TYPE = { success: "success", info: "info", warn: "warning", lock: "warning", offline: "error" };
+watch(notice, (n) => {
+  if (!n) return;
+  toast[SNACK_TYPE[n.tone] ?? "error"](`${n.title.replace(/[.!]$/, "")}. ${n.body ?? ""}`.trim(), { toastId: "forgot-notice" });
+});
 const sending = ref(false);
 const saving = ref(false);
 const resendIn = ref(0);

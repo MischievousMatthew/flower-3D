@@ -41,7 +41,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import vendorHeader from "../../../layouts/vendorHeader.vue";
 import VendorSidebar from "../../../layouts/Sidebar/VendorSidebar.vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { subscriptionUpgradeMessage, useSubscriptionAccess } from "../../../composables/useSubscriptionAccess";
 import { SHOP_ICONS as ICONS } from "./shopIcons";
 import { useTabScroller } from "./useTabScroller";

@@ -309,8 +309,7 @@ import { useAuth } from "../../composables/useAuth";
 import { useCart } from "../../composables/useCart";
 import { useFlyToCart } from "../../composables/useFlyToCart";
 import { useSiteContent } from "../../composables/useSiteContent";
-import { toast } from "vue3-toastify";
-import "vue3-toastify/dist/index.css";
+import { toast } from "@/utils/snackbar";
 import "../../styles/bloomcraft.css";
 
 const TABS = [

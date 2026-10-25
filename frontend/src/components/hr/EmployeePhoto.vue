@@ -33,7 +33,7 @@
 // right away when the profile exists (profileId), or held as a file for a
 // new profile, which the form uploads once it is saved (see uploadPhoto).
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { SHOP_ICONS as ICONS } from "../vendor/shop/shopIcons";
 import { MAX_PHOTO_BYTES, removePhoto, uploadPhoto } from "./employeePhotoApi";
 

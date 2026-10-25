@@ -225,7 +225,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import { useProductTaxonomies } from "../../../composables/useProductTaxonomies";
 import { SHOP_ICONS as ICONS } from "./shopIcons";

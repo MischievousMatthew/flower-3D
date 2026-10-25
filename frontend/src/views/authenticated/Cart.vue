@@ -426,8 +426,7 @@ import { useCart } from "../../composables/useCart";
 import NavHeader from "../../layouts/NavHeader.vue";
 import api from "../../plugins/axios"; // ✅ needed to fetch profile
 import { showCheckoutPaused, usePlatformStatus } from "../../composables/usePlatformStatus";
-import { toast } from "vue3-toastify";
-import "vue3-toastify/dist/index.css";
+import { toast } from "@/utils/snackbar";
 import "../../styles/bloomcraft.css";
 import ThreeDModelViewer from "../../layouts/3D/3DModelViewer.vue";
 

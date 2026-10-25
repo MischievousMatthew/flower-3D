@@ -496,8 +496,7 @@ import ProductReviews from "../../layouts/components/ProductReviews.vue";
 import ProductQuestions from "../../layouts/components/ProductQuestions.vue";
 import { useCart } from "../../composables/useCart";
 import { useFlyToCart } from "../../composables/useFlyToCart";
-import { toast } from "vue3-toastify";
-import "vue3-toastify/dist/index.css";
+import { toast } from "@/utils/snackbar";
 import "../../styles/bloomcraft.css";
 
 const route = useRoute();

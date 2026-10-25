@@ -512,7 +512,7 @@
 import { computed, ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import api from "../../../../plugins/axios";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { useAssignment } from "../../../../composables/useAssignment";
 
 const props = defineProps({

@@ -5,7 +5,7 @@
 // It works for every modal on the site without changes to each one: a click
 // on a full-screen backdrop is checked before the page's own handler sees it.
 // A backdrop can opt out with data-close-guard="off" (e.g. the mobile menu).
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 
 const SECOND_CLICK_WITHIN_MS = 6000;
 const FIELDS = "input:not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]):not([type=search]), textarea, select";

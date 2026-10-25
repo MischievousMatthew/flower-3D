@@ -240,7 +240,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
 
 const props = defineProps({

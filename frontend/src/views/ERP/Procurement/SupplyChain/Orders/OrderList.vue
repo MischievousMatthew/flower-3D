@@ -429,8 +429,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from "vue";
-import { toast } from "vue3-toastify";
-import "vue3-toastify/dist/index.css";
+import { toast } from "@/utils/snackbar";
 import { orderService } from "../../../../../services/orderService";
 import { supplierService } from "../../../../../services/supplierService";
 

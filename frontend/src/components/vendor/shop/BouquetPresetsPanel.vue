@@ -76,7 +76,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import { OCCASION_INFO, sizeName } from "../../../constants/bouquetPresets";
 import { OCCASION_ICONS } from "../../../constants/occasionIcons";

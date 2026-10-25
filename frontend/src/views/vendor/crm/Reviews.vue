@@ -154,7 +154,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import ShowMore from "../../../components/common/ShowMore.vue";
 import { useShowMoreInto } from "../../../composables/useShowMore";

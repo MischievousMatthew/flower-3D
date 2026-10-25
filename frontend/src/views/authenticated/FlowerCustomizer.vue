@@ -541,8 +541,7 @@ import StageTools from "../../components/customizer/StageTools.vue";
 import { useAuth } from "../../composables/useAuth";
 import { useCart } from "../../composables/useCart";
 import { checkoutPausedNotice, showCheckoutPaused, usePlatformStatus } from "../../composables/usePlatformStatus";
-import { toast as toastify } from "vue3-toastify";
-import "vue3-toastify/dist/index.css";
+import { toast as toastify } from "@/utils/snackbar";
 import "../../styles/bloomcraft.css";
 
 

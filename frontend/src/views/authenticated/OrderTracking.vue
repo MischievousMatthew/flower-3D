@@ -850,8 +850,7 @@ import ReviewModal from "../../layouts/components/ReviewModal.vue";
 import ReturnCasePanel from "../../components/returns/ReturnCasePanel.vue";
 import ProductQuestions from "../../layouts/components/ProductQuestions.vue";
 import "../../styles/bloomcraft.css";
-import { toast } from "vue3-toastify";
-import "vue3-toastify/dist/index.css";
+import { toast } from "@/utils/snackbar";
 
 const API_BASE = "customer/orders";
 const route = useRoute();

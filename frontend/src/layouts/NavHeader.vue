@@ -296,7 +296,7 @@ import { useAuth } from "../composables/useAuth";
 import { useCart } from "../composables/useCart";
 import { useChatNotifications } from "../composables/useChatNotifications";
 import api from "../plugins/axios";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import "../styles/bloomcraft.css";
 import CheckoutStatusBanner from "../components/site/CheckoutStatusBanner.vue";
 

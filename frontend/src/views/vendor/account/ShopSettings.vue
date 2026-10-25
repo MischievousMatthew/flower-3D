@@ -190,7 +190,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import ServiceAreaPicker from "../../../components/vendor/shop/ServiceAreaPicker.vue";

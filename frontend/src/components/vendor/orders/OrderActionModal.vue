@@ -31,7 +31,7 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import { SHOP_ICONS as ICONS } from "../shop/shopIcons";
 import { apiMessage } from "../shop/useVendorCatalog";

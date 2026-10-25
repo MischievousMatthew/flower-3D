@@ -511,7 +511,7 @@ import { useRouter, useRoute } from "vue-router";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import api from "../../plugins/axios.js";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 
 const router = useRouter();
 const route = useRoute();

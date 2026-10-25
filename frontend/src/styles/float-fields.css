@@ -1,0 +1,104 @@
+/*
+ * Floating labels for the sign-in, sign-up and vendor application forms.
+ * At rest: a soft grey box with the label inside, in capitals.
+ * While typing, or once filled: a white box with a dark outline and the
+ * label small at the top. Works on the existing markup
+ * (label, then its input) for .af-field and .vr-field.
+ * An empty field needs a placeholder (" " is enough) so it can tell empty
+ * from filled; example placeholders only show while typing.
+ */
+:is(.af-field, .vr-field):has(> :is(.af-label, .vr-label) + :is(.af-input, .vr-input, .pf)) {
+  position: relative;
+}
+
+/* The label, sitting inside the box */
+:is(.af-field, .vr-field):has(> :is(.af-label, .vr-label) + :is(.af-input, .vr-input, .pf)) > :is(.af-label, .vr-label) {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 58px;
+  margin: 0;
+  pointer-events: none;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5f646b;
+  transition: height 0.16s ease, font-size 0.16s ease, color 0.16s ease;
+}
+:is(.af-field, .vr-field):has(> :is(.af-label, .vr-label) + :is(.af-input, .vr-input, .pf)) > :is(.af-label, .vr-label) small {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+/* A link or button inside a label (e.g. "Change" next to the email) stays clickable */
+:is(.af-field, .vr-field) > :is(.af-label, .vr-label) :is(a, button) {
+  pointer-events: auto;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* The box at rest */
+:is(.af-field, .vr-field) > :is(.af-label, .vr-label) + :is(.af-input, .vr-input),
+:is(.af-field, .vr-field) > :is(.af-label, .vr-label) + .pf .af-input {
+  height: 58px;
+  padding: 22px 16px 6px;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  background: #efefef;
+  box-shadow: none;
+  font-size: 15px;
+  transition: background-color 0.16s ease, border-color 0.16s ease;
+}
+:is(.af-field, .vr-field) > .vr-label + textarea.vr-input {
+  height: auto;
+  min-height: 116px;
+  padding-top: 26px;
+}
+:is(.af-field, .vr-field) > :is(.af-label, .vr-label) + :is(.af-input, .vr-input)::placeholder,
+:is(.af-field, .vr-field) > :is(.af-label, .vr-label) + .pf .af-input::placeholder {
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+/* Typing or filled: white, outlined, the label moves up */
+:is(.af-field, .vr-field):has(> :is(.af-label, .vr-label) + :is(.af-input, .vr-input, .pf)):has(:is(.af-input, .vr-input):focus, :is(.af-input, .vr-input):not(:placeholder-shown), select.vr-input, input[type="date"].vr-input) > :is(.af-label, .vr-label) {
+  height: 26px;
+  font-size: 10.5px;
+  color: #3b4250;
+}
+:is(.af-field, .vr-field) > :is(.af-label, .vr-label) + :is(.af-input, .vr-input):is(:focus, :not(:placeholder-shown)),
+:is(.af-field, .vr-field) > .vr-label + :is(select, input[type="date"]).vr-input,
+:is(.af-field, .vr-field) > .af-label + .pf .af-input:is(:focus, :not(:placeholder-shown)) {
+  border-color: #1f2430;
+  background: #fff;
+}
+:is(.af-field, .vr-field) > :is(.af-label, .vr-label) + :is(.af-input, .vr-input):focus,
+:is(.af-field, .vr-field) > .af-label + .pf .af-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(77, 177, 115, 0.2);
+}
+:is(.af-field, .vr-field) > :is(.af-label, .vr-label) + :is(.af-input, .vr-input):focus::placeholder,
+:is(.af-field, .vr-field) > .af-label + .pf .af-input:focus::placeholder {
+  opacity: 1;
+}
+
+/* Something to fix: a red outline, in either state */
+:is(.af-field, .vr-field) > :is(.af-label, .vr-label) + :is(.af-input, .vr-input):is([aria-invalid="true"], .error),
+:is(.af-field, .vr-field) > .af-label + .pf .af-input[aria-invalid="true"] {
+  border-color: #c0392b;
+  background: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.af-field, .vr-field) > :is(.af-label, .vr-label),
+  :is(.af-field, .vr-field) :is(.af-input, .vr-input) {
+    transition: none;
+  }
+}

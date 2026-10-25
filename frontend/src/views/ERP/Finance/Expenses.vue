@@ -248,7 +248,7 @@
 
 <script setup>
 import { computed, defineComponent, h, onMounted, ref, watch } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import HrPage from "../../../components/hr/HrPage.vue";
 import RangePicker from "../../../components/vendor/finance/RangePicker.vue";

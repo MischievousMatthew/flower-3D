@@ -479,7 +479,7 @@ import api from "../../plugins/axios";
 import NavHeader from "../../layouts/NavHeader.vue";
 import ProfilePreferences from "../../components/customer/ProfilePreferences.vue";
 import { useAuth } from "../../composables/useAuth";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import "../../styles/bloomcraft.css";
 import {
   buildMultipartFormData,

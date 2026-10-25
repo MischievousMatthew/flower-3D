@@ -652,7 +652,7 @@ import { loadChartJs } from "../../utils/chartjs";
 import PasswordRules from "../../components/auth/PasswordRules.vue";
 import { passwordOk } from "../../utils/passwordRules";
 import { useRoute, useRouter } from "vue-router";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { useSidebarState } from "../../composables/useSidebarState";
 import { useAdminAccess } from "../../composables/useAdminAccess";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";

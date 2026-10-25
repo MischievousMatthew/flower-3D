@@ -223,7 +223,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import ProductEditor from "../../../components/vendor/shop/ProductEditor.vue";

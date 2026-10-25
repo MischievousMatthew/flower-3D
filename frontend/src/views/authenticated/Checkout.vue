@@ -499,7 +499,7 @@ import NavHeader from "../../layouts/NavHeader.vue";
 import "../../styles/bloomcraft.css";
 import api from "../../plugins/axios.js";
 import { showCheckoutPaused } from "../../composables/usePlatformStatus";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { usePrice } from "../../composables/usePrice.js";
 
 const PH_TIMEZONE = "Asia/Manila";

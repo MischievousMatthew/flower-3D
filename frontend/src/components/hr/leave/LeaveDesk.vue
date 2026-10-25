@@ -316,7 +316,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { SHOP_ICONS as ICONS } from "../../vendor/shop/shopIcons";
 import { personColor } from "../../vendor/staff/staffUi";
 import { initialsOf } from "../hrUi";

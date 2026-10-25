@@ -1,6 +1,6 @@
 // frontend/src/plugins/axios.js
 import axios from "axios";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { clearStoredAuth, getPreferredAuthToken } from "../utils/authSession";
 import { markSessionReplaced } from "../utils/sessionReplaced";
 import { markSessionExpired } from "../utils/sessionExpired";

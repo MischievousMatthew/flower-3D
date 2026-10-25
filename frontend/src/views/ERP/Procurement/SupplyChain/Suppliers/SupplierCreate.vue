@@ -229,8 +229,7 @@
 <script setup>
 import { ref, reactive } from "vue";
 import { useRouter } from "vue-router";
-import { toast } from "vue3-toastify";
-import "vue3-toastify/dist/index.css";
+import { toast } from "@/utils/snackbar";
 import { supplierService } from "../../../../../services/supplierService";
 import {
   buildMultipartFormData,

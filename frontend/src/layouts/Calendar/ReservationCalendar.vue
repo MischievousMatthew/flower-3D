@@ -247,7 +247,7 @@
 import { ref, computed, onMounted, watch } from "vue";
 import LoadingOverlay from "../../layouts/components/LoadingOverlay.vue";
 import api from "../../plugins/axios";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 
 const props = defineProps({
   vendorId: { type: Number, required: true },

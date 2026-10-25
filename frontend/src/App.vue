@@ -3,6 +3,8 @@
   <CheckoutPausedModal />
   <SessionReplacedModal />
   <SessionExpiredModal />
+  <!-- Messages for everything (at most two at a time) -->
+  <SnackbarHost />
 </template>
 
 <script setup>
@@ -10,11 +12,11 @@ import { onMounted } from "vue";
 import CheckoutPausedModal from "./components/site/CheckoutPausedModal.vue";
 import SessionReplacedModal from "./components/site/SessionReplacedModal.vue";
 import SessionExpiredModal from "./components/site/SessionExpiredModal.vue";
+import SnackbarHost from "./components/site/SnackbarHost.vue";
 import { startSessionWatch } from "./composables/useSessionWatch";
 import { useRoute } from "vue-router";
 import { useAuth } from "./composables/useAuth";
 import { useInactivityTimeout } from "./composables/useInactivityTimeout";
-import "vue3-toastify/dist/index.css";
 
 const { initAuth } = useAuth();
 const route = useRoute();

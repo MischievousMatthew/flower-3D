@@ -115,7 +115,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
 import { linkedId } from "../../utils/hiddenIds";
 

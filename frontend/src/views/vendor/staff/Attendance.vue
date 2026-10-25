@@ -185,7 +185,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import AttendanceReport from "../../../components/hr/attendance/AttendanceReport.vue";

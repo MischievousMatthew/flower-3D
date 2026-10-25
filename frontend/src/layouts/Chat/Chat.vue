@@ -631,7 +631,7 @@ import { useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import NavHeader from "../NavHeader.vue";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
 import { formatPhilippineDate, formatPhilippineTime } from "../../utils/philippineDateTime";
 

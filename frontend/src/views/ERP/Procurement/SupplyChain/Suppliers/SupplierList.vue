@@ -266,8 +266,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import { toast } from "vue3-toastify";
-import "vue3-toastify/dist/index.css";
+import { toast } from "@/utils/snackbar";
 import { supplierService } from "../../../../../services/supplierService";
 
 

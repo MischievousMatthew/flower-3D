@@ -80,7 +80,7 @@
 <script setup>
 import { ref, onMounted, watch, computed } from "vue";
 import QRCode from "qrcode";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
 import { useAssignment } from "../../composables/useAssignment";
 

@@ -148,7 +148,7 @@
 
 <script setup>
 import { onMounted, reactive, ref } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { SHOP_ICONS as ICONS } from "../../vendor/shop/shopIcons";
 import { formatDate } from "../../vendor/finance/financeUi";
 import { range12, relativeTime, time12 } from "../../vendor/staff/staffUi";

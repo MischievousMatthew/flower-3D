@@ -1179,8 +1179,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import { toast } from "vue3-toastify";
-import "vue3-toastify/dist/index.css";
+import { toast } from "@/utils/snackbar";
 import { deliveryService } from "../../../../../services/deliveryService";
 import ReturnCasePanel from "../../../../../components/returns/ReturnCasePanel.vue";
 import LoadingOverlay from "../../../../../layouts/components/LoadingOverlay.vue";

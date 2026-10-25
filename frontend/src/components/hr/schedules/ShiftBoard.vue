@@ -413,7 +413,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { SHOP_ICONS as ICONS } from "../../vendor/shop/shopIcons";
 import { ROLE_COLORS, personColor } from "../../vendor/staff/staffUi";
 import { initialsOf } from "../hrUi";

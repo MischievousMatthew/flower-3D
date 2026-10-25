@@ -363,7 +363,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { loadChartJs } from "../../utils/chartjs";
 import { useRouter } from "vue-router";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";

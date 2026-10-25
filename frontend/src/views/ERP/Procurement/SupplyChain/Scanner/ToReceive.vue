@@ -230,7 +230,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import ScannerInput from "../../../../../layouts/components/ScannerInput.vue";
 import { deliveryService } from "../../../../../services/deliveryService";
 

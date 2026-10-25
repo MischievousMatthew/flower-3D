@@ -22,15 +22,6 @@
       body="Please check back soon. If you already applied, we'll email you about your application."
     />
 
-    <AuthNotice v-if="resumed && !formProblem" class="vr-problem" tone="success" title="Welcome back" body="We kept what you entered on this device, so you can carry on where you left off. Documents may need to be added again.">
-      <button type="button" class="af-plain" @click="resumed = false">Continue</button>
-      <button type="button" class="af-plain" @click="startOver">Start over</button>
-    </AuthNotice>
-
-    <!-- Problems with the form: explained here, in words, never a red pop-up -->
-    <AuthNotice v-if="formProblem" ref="problemBox" class="vr-problem" error :tone="formProblem.tone" :title="formProblem.title" :body="formProblem.body">
-      <button v-if="formProblem.goTo" type="button" class="af-plain" @click="jumpToProblem">Show me</button>
-    </AuthNotice>
 
     <!-- Sent: a full page that says what happens next -->
     <section v-if="showApplicationModal" class="vr-done" aria-live="polite">
@@ -453,7 +444,7 @@ import { usePlatformStatus } from "../../composables/usePlatformStatus";
 import AuthShell from "../../components/auth/AuthShell.vue";
 import AuthNotice from "../../components/auth/AuthNotice.vue";
 import DocDrop from "../../components/vendor/register/DocDrop.vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -463,21 +454,33 @@ import { findPlan, readPendingPlan } from "../../constants/subscriptionPlans";
 
 const router = useRouter();
 
-// Problems are explained in a notice at the top of the form (and scrolled to),
-// with a "Show me" that jumps to the field — instead of red pop-ups
+// Problems are explained in a snackbar, in words, with "Show me" to jump to
+// the field; the field itself is marked too
 const formProblem = ref(null);
 const resumed = ref(false);
+watch(resumed, (on) => {
+  if (on) {
+    toast.success("Welcome back. We kept what you entered on this device, so you can carry on. Documents may need to be added again.", {
+      toastId: "vendor-resume",
+      autoClose: 9000,
+      action: { label: "Start over", onClick: () => startOver() },
+    });
+  }
+});
 const startOver = () => {
   clearProgress();
   resumed.value = false;
   window.scrollTo({ top: 0, behavior: "smooth" });
 };
-const problemBox = ref(null);
 let problemField = null;
 const explain = (title, body, { tone = "warn", field = null } = {}) => {
   formProblem.value = { tone, title, body, goTo: !!field, step: currentStep.value };
   problemField = field;
-  nextTick(() => problemBox.value?.$el?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  toast[tone === "info" ? "info" : tone === "success" ? "success" : "error"](`${title.replace(/[.!]$/, "")}. ${body ?? ""}`.trim(), {
+    toastId: "vendor-problem",
+    action: field ? { label: "Show me", onClick: () => jumpToProblem() } : null,
+  });
+  nextTick(() => jumpToProblem());
 };
 const jumpToProblem = () => {
   const el = (problemField && document.querySelector(`[name="${problemField}"]`)) || document.querySelector(".input-group .error-message");

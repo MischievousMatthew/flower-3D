@@ -147,7 +147,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import HrPage from "../../../../components/hr/HrPage.vue";
 import { ATTENDANCE_TABS, initialsOf } from "../../../../components/hr/hrUi";
 import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcons";

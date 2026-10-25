@@ -2,10 +2,10 @@ import { createApp } from "vue";
 import "./style.css";
 import App from "./App.vue";
 import router from "./router/index.js";
-import "vue3-toastify/dist/index.css";
 import { configurePhilippineDateTimeDefaults } from "./utils/philippineDateTime";
 import { applyVendorTheme } from "./composables/useVendorTheme";
 import "./styles/vendor-theme.css";
+import "./styles/float-fields.css";
 import { installModalCloseGuard } from "./utils/modalCloseGuard";
 
 configurePhilippineDateTimeDefaults();

@@ -521,7 +521,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute } from "vue-router";
-import { toast } from "vue3-toastify";
+import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import PasswordRules from "../../../components/auth/PasswordRules.vue";
 import { passwordOk } from "../../../utils/passwordRules";
