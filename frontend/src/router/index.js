@@ -483,9 +483,9 @@ const routes = [
       // ================= PROCUREMENT =================
       {
         path: "procurement",
-        meta: { requiresDepartment: ["Procurement", "Purchasing"] },
-        component: () =>
-          import("../views/ERP/Procurement/ProcurementLayout.vue"),
+        // Same workspace as HR, Finance and CRM; its pages keep their own light look until they're redesigned
+        meta: { erpTheme: true, erpLegacy: true },
+        component: () => import("../layouts/erp/ErpLayout.vue"),
         children: [
           // ───────── INVENTORY MANAGER ─────────
           {
