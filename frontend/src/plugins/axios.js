@@ -3,6 +3,7 @@ import axios from "axios";
 import { toast } from "vue3-toastify";
 import { clearStoredAuth, getPreferredAuthToken } from "../utils/authSession";
 import { markSessionReplaced } from "../utils/sessionReplaced";
+import { markSessionExpired } from "../utils/sessionExpired";
 import { makeFriendly } from "../utils/friendlyError";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -137,6 +138,15 @@ api.interceptors.response.use(
     // of silently bouncing to the login page; the modal's Log out finishes up.
     if (error.response?.status === 401 && error.response?.data?.code === "session_replaced") {
       markSessionReplaced(error.response.data.message);
+      return Promise.reject(error);
+    }
+
+    // ================= EXPIRED ON THE SERVER =================
+    // The token went unused too long: sign out here too and say why
+    if (error.response?.status === 401 && error.response?.data?.code === "session_expired") {
+      clearStoredAuth();
+      delete api.defaults.headers.common["Authorization"];
+      markSessionExpired();
       return Promise.reject(error);
     }
 

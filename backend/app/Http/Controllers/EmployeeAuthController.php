@@ -7,11 +7,12 @@ use App\Constants\ErpModule;
 use App\Services\LoginAuditService;
 use App\Services\AccountSuspensionService;
 use App\Services\LoginGuard;
+use App\Support\AccountLookup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class EmployeeAuthController extends Controller
 {
@@ -38,14 +39,15 @@ class EmployeeAuthController extends Controller
                 return response()->json(['success' => false, 'code' => 'account_locked', 'message' => LoginGuard::lockedMessage(max(1, (int) ceil($seconds / 60))), 'retry_after' => $seconds], 429);
             }
 
-            $employee = Employee::where(fn ($q) => $q->where('username', $request->username)->orWhere('email', $request->username))->first();
+            // Username or email, capitals don't matter
+            [$employee, $passwordOk] = AccountLookup::signIn(Employee::query(), $request->username, $request->password);
 
             // No staff account by that name: the login form tries the customer
             // and vendor sign-in next, which records the attempt
             if (!$employee) {
                 return response()->json(['success' => false, 'message' => 'Invalid credentials'], 401);
             }
-            if (!Hash::check($request->password, $employee->password)) {
+            if (!$passwordOk) {
                 $guard->recordFailure($request, $identifier, 'wrong_password', null, 'employee');
                 return response()->json([
                     'success' => false,
@@ -95,7 +97,6 @@ class EmployeeAuthController extends Controller
 
             Log::info('Employee login successful', [
                 'employee_id' => $employee->id,
-                'username'    => $employee->username,
                 'modules'     => $modulePermissions->count(),
             ]);
 
@@ -118,6 +119,9 @@ class EmployeeAuthController extends Controller
                 ],
             ]);
 
+        } catch (ValidationException $e) {
+            // A missing username or password is the person's to fix, not a server error
+            throw $e;
         } catch (\Throwable $e) {
             Log::error('Employee login error', [
                 'error' => $e->getMessage(),

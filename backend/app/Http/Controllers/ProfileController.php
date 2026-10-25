@@ -231,7 +231,7 @@ class ProfileController extends Controller
         $challenge = $this->activeChallenge($request);
 
         try {
-            if (!EmailOtpService::verify($user->email, $request->otp)) {
+            if (!EmailOtpService::verify($user->email, $request->otp, EmailOtpService::PURPOSE_VERIFY)) {
                 throw new \Exception('Invalid OTP. Please request a new one.');
             }
         } catch (\Throwable $e) {

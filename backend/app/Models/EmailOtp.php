@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Hash;
 class EmailOtp extends Model
 {
     protected $fillable = [
-        'email', 'otp_hash', 'expires_at', 'attempts', 'is_locked', 'ip_address',
+        'email', 'otp_hash', 'expires_at', 'attempts', 'is_locked', 'ip_address', 'purpose',
     ];
 
     protected $casts = [

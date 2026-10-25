@@ -51,8 +51,14 @@
               <div class="ac-meter"><i :style="{ width: `${strength.pct}%` }"></i></div>
               <small>{{ strength.label }}</small>
             </div>
+            <!-- The rules the server checks, ticked off while typing -->
+            <ul class="sc-rules" aria-label="Password rules">
+              <li v-for="r in rules" :key="r.label" :class="{ met: r.met }">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path v-if="r.met" d="m6 12.5 4 4 8-9" /><circle v-else cx="12" cy="12" r="3.2" /></svg>
+                {{ r.label }}<span class="sc-sr">{{ r.met ? " — done" : " — not yet" }}</span>
+              </li>
+            </ul>
             <small v-if="pwErrors.password" class="sp-error">{{ pwErrors.password }}</small>
-            <small v-else-if="!pw.password">At least 8 characters. Mix in capitals, numbers and symbols.</small>
           </label>
           <label class="sp-field">
             <span>Confirm new password</span>
@@ -60,7 +66,7 @@
             <small v-if="pw.password_confirmation && !matches" class="sp-error">Passwords don't match.</small>
           </label>
           <div class="sc-form-foot">
-            <button type="submit" class="sp-btn sp-btn-primary" :disabled="pwSaving || !pw.current_password || pw.password.length < 8 || !matches">
+            <button type="submit" class="sp-btn sp-btn-primary" :disabled="pwSaving || !pw.current_password || !passwordOk(pw.password) || !matches">
               <span v-html="ICONS.lock"></span>{{ pwSaving ? "Updating…" : "Update password" }}
             </button>
           </div>
@@ -187,6 +193,7 @@ import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { dateTime, longDate } from "../../../components/vendor/account/accountUi";
+import { passwordOk, passwordRules } from "../../../utils/passwordRules";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
 import "../../../components/vendor/account/account.css";
@@ -232,6 +239,7 @@ const pwErrors = reactive({});
 const pwSaving = ref(false);
 const show = reactive({ current: false, new: false });
 const matches = computed(() => pw.password === pw.password_confirmation);
+const rules = computed(() => passwordRules(pw.password));
 const passwordAge = computed(() => {
   const age = daysSince(data.value.password_changed_at);
   if (age === null) return "We don't have a record of you changing it here yet.";
@@ -429,6 +437,43 @@ onMounted(load);
 .sc-eye :deep(svg) {
   width: 16px;
   height: 16px;
+}
+.sc-rules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 14px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  color: var(--v-muted);
+}
+.sc-rules li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sc-rules svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sc-rules li.met {
+  color: var(--v-green-text);
+  font-weight: 500;
+}
+.sc-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 .sc-strength {
   display: flex;

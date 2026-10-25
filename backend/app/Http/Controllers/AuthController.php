@@ -8,6 +8,7 @@ use App\Models\TwoFactorLoginChallenge;
 use App\Services\LoginAuditService;
 use App\Services\AccountSuspensionService;
 use App\Services\LoginGuard;
+use App\Support\AccountLookup;
 use App\Support\PlatformSettings;
 use App\Support\SingleSession;
 use App\Services\EmailOtpService;
@@ -20,7 +21,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Exception;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
@@ -133,7 +133,7 @@ class AuthController extends Controller
             throw ValidationException::withMessages(['otp' => "That code isn't right or has expired. Ask for a new one."]);
         }
         try {
-            EmailOtpService::verify($user->email, $data['otp']);
+            EmailOtpService::verify($user->email, $data['otp'], EmailOtpService::PURPOSE_RESET);
         } catch (OtpProblem $e) {
             throw ValidationException::withMessages(['otp' => $e->getMessage()]);
         }
@@ -167,11 +167,18 @@ class AuthController extends Controller
             return response()->json(['success' => false, 'message' => 'New customer sign-ups are paused right now. Please try again later.'], 403);
         }
 
+        // "Ana" and "ana" are the same name, as the availability check already says
+        $takenIgnoringCase = fn (string $column, string $message) => function ($attribute, $value, $fail) use ($column, $message) {
+            if (User::whereRaw("lower({$column}) = ?", [mb_strtolower(trim((string) $value))])->exists()) {
+                $fail($message);
+            }
+        };
+
         $request->validate([
             'name'                  => 'required|string|max:255',
             'surname'               => 'required|string|max:255',
-            'username'              => 'required|string|max:255|unique:users|alpha_dash',
-            'email'                 => 'required|email|max:255|unique:users',
+            'username'              => ['required', 'string', 'max:255', 'alpha_dash', $takenIgnoringCase('username', 'This username is taken. Try another one.')],
+            'email'                 => ['required', 'email', 'max:255', $takenIgnoringCase('email', 'This email already has an account. Log in instead, or reset your password if you forgot it.')],
             'contact_number'        => 'nullable|string|regex:/^[0-9]{10,15}$/',
             'password'              => 'required|string|min:8|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/',
             'otp'                   => 'required|string|size:6',
@@ -180,7 +187,7 @@ class AuthController extends Controller
         ]);
 
         try {
-            EmailOtpService::verify($request->email, $request->otp);
+            EmailOtpService::verify($request->email, $request->otp, EmailOtpService::PURPOSE_SIGNUP);
         } catch (\Exception $e) {
             throw ValidationException::withMessages(['otp' => $e->getMessage()]);
         }
@@ -188,8 +195,8 @@ class AuthController extends Controller
         $user = User::create([
             'name'               => $request->name,
             'surname'            => $request->surname,
-            'username'           => $request->username,
-            'email'              => $request->email,
+            'username'           => trim($request->username),
+            'email'              => mb_strtolower(trim($request->email)),
             'contact_number'     => $request->contact_number,
             'password'           => Hash::make($request->password),
             'is_verified'        => true,
@@ -230,18 +237,15 @@ class AuthController extends Controller
             $seconds = $guard->lockedSeconds($identifier);
             $this->refuseLogin('account_locked', LoginGuard::lockedMessage(max(1, (int) ceil($seconds / 60))), ['retry_after' => $seconds]);
         }
-        $this->refuseLogin('invalid_credentials', "That username or password doesn't match our records.", ['attempts_left' => $left]);
+        // How many tries are left is only shared when the admin turned it on (Security → Sign-in protection)
+        $this->refuseLogin('invalid_credentials', "That username or password doesn't match our records.", PlatformSettings::get('login_show_attempts') ? ['attempts_left' => $left] : []);
     }
 
     public function login(Request $request)
     {
-        DB::enableQueryLog();
-        
+        // Nothing typed here is logged: people sometimes put their password in the
+        // username box. Failed sign-ins are kept in login_attempts instead.
         try {
-            Log::info('=== LOGIN REQUEST ===', [
-                'username' => $request->username,
-            ]);
-            
             $request->validate([
                 'username' => 'required|string',
                 'password' => 'required|string',
@@ -255,27 +259,15 @@ class AuthController extends Controller
                 $this->refuseLogin('account_locked', LoginGuard::lockedMessage(max(1, (int) ceil($seconds / 60))), ['retry_after' => $seconds]);
             }
 
-            // Find user by username or email
-            $user = User::where('username', $request->username)
-                        ->orWhere('email', $request->username)
-                        ->first();
-
-            Log::info('User lookup result:', [
-                'found' => !is_null($user),
-                'username' => $request->username,
-                'user_id' => $user->id ?? null,
-                'queries' => DB::getQueryLog()
-            ]);
+            // Username or email, capitals don't matter
+            [$user, $passwordOk] = AccountLookup::signIn(User::query(), $request->username, $request->password);
 
             if (!$user) {
-                Log::warning('User not found: ' . $request->username);
                 $guard->recordFailure($request, $identifier, 'unknown_account');
                 $this->refuseCredentials($guard, $identifier);
             }
 
-            // Check password
-            if (!Hash::check($request->password, $user->password)) {
-                Log::warning('Password mismatch for user: ' . $user->username);
+            if (!$passwordOk) {
                 $guard->recordFailure($request, $identifier, 'wrong_password', $user->id);
                 $this->refuseCredentials($guard, $identifier);
             }
@@ -288,7 +280,6 @@ class AuthController extends Controller
             }
 
             if (!$user->is_verified) {
-                Log::warning('Unverified user attempted login: ' . $user->username);
                 $guard->recordFailure($request, $identifier, 'unverified', $user->id);
                 $this->refuseLogin('account_unverified', "Your account isn't verified yet. Open the verification link we emailed you, then sign in again.");
             }
@@ -313,15 +304,11 @@ class AuthController extends Controller
 
             return $this->completeUserLogin($user, $request);
         } catch (ValidationException $e) {
-            Log::warning('Login validation failed', $e->errors());
             throw $e;
         } catch (HttpResponseException $e) {
             throw $e;
         } catch (Exception $e) {
-            Log::error('Login Error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-                'queries' => DB::getQueryLog()
-            ]);
+            Log::error('Login error', ['exception' => get_class($e), 'message' => $e->getMessage(), 'at' => basename($e->getFile()) . ':' . $e->getLine()]);
             throw ValidationException::withMessages([
                 'username' => 'An error occurred during login. Please try again.',
             ]);
@@ -384,7 +371,7 @@ class AuthController extends Controller
         $challenge = $this->activeLoginChallenge($request->challenge_token);
 
         try {
-            if (!EmailOtpService::verify($challenge->user->email, $request->otp)) {
+            if (!EmailOtpService::verify($challenge->user->email, $request->otp, EmailOtpService::PURPOSE_SIGNIN)) {
                 throw new Exception('Invalid OTP. Please request a new one.');
             }
         } catch (\Throwable $e) {
@@ -432,17 +419,6 @@ class AuthController extends Controller
             SingleSession::start($user, hash('sha256', $token), $request->input('device_id'));
             $this->loginAuditService->logUserLogin($user, $request);
 
-            Log::info('Login successful', [
-                'user_id' => $user->id,
-                'username' => $user->username,
-                'role' => $user->role,
-                'token_created' => true
-            ]);
-
-            $employee = \DB::table('employees')
-                ->where('owner_id', $user->id)
-                ->first();
-
             $userData = [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -453,8 +429,6 @@ class AuthController extends Controller
                 'role' => $user->role,
                 'vendor_data' => $user->vendor_data,
             ];
-
-            Log::info('Login user data:', $userData);
 
         return response()->json([
                 'message' => 'Login successful',
@@ -605,223 +579,6 @@ class AuthController extends Controller
         } catch (Exception $e) {
             Log::error('Logout error: ' . $e->getMessage());
             return response()->json(['message' => 'Logout completed'], 200);
-        }
-    }
-
-    public function employeeLogin(Request $request)
-    {
-        DB::enableQueryLog();
-        
-        try {
-            Log::info('=== EMPLOYEE LOGIN REQUEST ===', $request->all());
-            
-            $request->validate([
-                'username' => 'required|string',
-                'password' => 'required|string',
-                'login_context' => 'nullable|array',
-            ]);
-
-            // Find employee by username or email
-            $employee = \DB::table('employees')
-                ->where('username', $request->username)
-                ->orWhere('email', $request->username)
-                ->first();
-
-            Log::info('Employee lookup result:', [
-                'found' => !is_null($employee),
-                'username' => $request->username,
-            ]);
-
-            if (!$employee) {
-                Log::warning('Employee not found: ' . $request->username);
-                throw ValidationException::withMessages([
-                    'username' => 'Invalid employee credentials.',
-                ]);
-            }
-
-            // Check password
-            if (!Hash::check($request->password, $employee->password)) {
-                Log::warning('Password mismatch for employee: ' . $employee->username);
-                throw ValidationException::withMessages([
-                    'username' => 'Invalid employee credentials.',
-                ]);
-            }
-
-            // Check status
-            if ($employee->status !== 'Active') {
-                Log::warning('Inactive employee attempted login: ' . $employee->username);
-                throw ValidationException::withMessages([
-                    'username' => 'Your account is not active.',
-                ]);
-            }
-
-            // Find the owner user to create token
-            $user = User::find($employee->owner_id);
-            
-            if (!$user) {
-                throw ValidationException::withMessages([
-                    'username' => 'Account configuration error.',
-                ]);
-            }
-
-            $token = Str::random(80);
-            \DB::table('users')
-                ->where('id', $user->id)
-                ->update(['api_token' => hash('sha256', $token)]);
-
-            $employeeData = [
-                'id' => $employee->id,
-                'owner_id' => $employee->owner_id,
-                'name' => $employee->name,
-                'email' => $employee->email,
-                'username' => $employee->username,
-                'role' => $employee->role,
-                'department' => $employee->department,
-                'status' => $employee->status,
-            ];
-
-            $redirectUrl = $this->getRedirectUrl((object)$employeeData);
-
-            Log::info('Employee login successful', [
-                'employee_id' => $employee->id,
-                'username' => $employee->username,
-                'role' => $employee->role,
-                'department' => $employee->department,
-                'redirect_url' => $redirectUrl,
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Employee login successful',
-                'token' => $token,
-                'employee' => $employeeData,
-                'redirect_url' => $redirectUrl,
-            ]);
-        } catch (ValidationException $e) {
-            Log::warning('Employee login validation failed', $e->errors());
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (Exception $e) {
-            Log::error('Employee login error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-                'queries' => DB::getQueryLog()
-            ]);
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'An error occurred during login.',
-            ], 500);
-        }
-    }
-
-    public function employeeMe(Request $request)
-    {
-        try {
-            $user = $request->user();
-            
-            if (!$user) {
-                return response()->json(['error' => 'Unauthenticated'], 401);
-            }
-            
-            // Get employee record
-            $employee = \DB::table('employees')
-                ->where('owner_id', $user->id)
-                ->first();
-
-            if (!$employee) {
-                return response()->json(['error' => 'Employee record not found'], 404);
-            }
-            
-            return response()->json([
-                'employee' => [
-                    'id' => $employee->id,
-                    'owner_id' => $employee->owner_id,
-                    'name' => $employee->name,
-                    'email' => $employee->email,
-                    'username' => $employee->username,
-                    'role' => $employee->role,
-                    'department' => $employee->department,
-                    'status' => $employee->status,
-                    'phone' => $employee->phone,
-                    'address' => $employee->address,
-                ]
-            ]);
-        } catch (Exception $e) {
-            Log::error('Employee me error: ' . $e->getMessage());
-            return response()->json(['error' => 'Internal server error'], 500);
-        }
-    }
-
-    public function vendorLogin(Request $request)
-    {
-        try {
-            Log::info('=== VENDOR LOGIN REQUEST ===', ['username' => $request->username]);
-            
-            $request->validate([
-                'username' => 'required|string',
-                'password' => 'required|string',
-            ]);
-
-            $guard = app(LoginGuard::class);
-            $identifier = LoginGuard::identifier($request->username);
-            if ($minutes = $guard->lockedFor($identifier)) {
-                $guard->recordFailure($request, $identifier, 'locked');
-                throw ValidationException::withMessages(['username' => LoginGuard::lockedMessage($minutes)]);
-            }
-
-            $user = User::where('username', $request->username)
-                        ->orWhere('email', $request->username)
-                        ->first();
-
-            if (!$user || !Hash::check($request->password, $user->password)) {
-                $guard->recordFailure($request, $identifier, $user ? 'wrong_password' : 'unknown_account', $user?->id);
-                throw ValidationException::withMessages([
-                    'username' => 'Invalid vendor credentials.',
-                ]);
-            }
-
-            if ($user->role !== 'vendor') {
-                throw ValidationException::withMessages([
-                    'username' => 'Vendor access only.',
-                ]);
-            }
-
-            if (!$user->is_verified) {
-                throw ValidationException::withMessages([
-                    'username' => 'Vendor account not active.',
-                ]);
-            }
-
-            if (AccountSuspensionService::isBlocked($user)) {
-                throw ValidationException::withMessages([
-                    'username' => AccountSuspensionService::messageFor($user),
-                ]);
-            }
-            
-            $this->askBeforeTakingOver($user, $request);
-
-            $token = Str::random(80);
-            SingleSession::start($user, hash('sha256', $token), $request->input('device_id'));
-            $this->loginAuditService->logUserLogin($user, $request);
-
-            return response()->json([
-                'message' => 'Vendor login successful',
-                'token'   => $token,
-                'user'    => [
-                    'id'         => $user->id,
-                    'name'       => $user->name,
-                    'username'   => $user->username,
-                    'email'      => $user->email,
-                    'role'       => $user->role,
-                    'vendor_data'=> $user->vendor_data,
-                ],
-            ]);
-        } catch (Exception $e) {
-            Log::error('Vendor login error: ' . $e->getMessage());
-            throw $e;
         }
     }
 }

@@ -708,10 +708,12 @@ class VendorProfileController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'current_password'      => 'required|string',
-                'password'              => 'required|string|min:8|confirmed',
+                // The same rule as signing up and resetting a password
+                'password'              => 'required|string|min:8|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/',
                 'password_confirmation' => 'required|string',
             ], [
                 'password.min'       => 'New password must be at least 8 characters.',
+                'password.regex'     => 'Use at least one uppercase letter, one lowercase letter and a number.',
                 'password.confirmed' => 'New passwords do not match.',
             ]);
 

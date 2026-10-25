@@ -131,6 +131,18 @@ class FriendlyErrorsTest extends TestCase
         $this->assertSame(0, DB::table('api_error_logs')->count());
     }
 
+    public function test_a_ready_made_answer_from_middleware_is_kept_as_it_is(): void
+    {
+        $request = \Illuminate\Http\Request::create('/api/anything', 'POST');
+        $request->headers->set('Accept', 'application/json');
+        $answer = new \Illuminate\Http\Exceptions\HttpResponseException(response()->json(['success' => false, 'message' => 'Too many tries.'], 429));
+
+        $response = $this->app->make(\Illuminate\Contracts\Debug\ExceptionHandler::class)->render($request, $answer);
+
+        $this->assertSame(429, $response->getStatusCode());
+        $this->assertSame('Too many tries.', json_decode($response->getContent(), true)['message']);
+    }
+
     public function test_admins_can_look_up_the_code_someone_quoted(): void
     {
         $vendor = $this->shopOwner();

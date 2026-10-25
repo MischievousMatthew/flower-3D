@@ -103,28 +103,28 @@ use App\Http\Controllers\VendorBouquetPresetController;
 // ============================================================
 
 Route::prefix('auth')->group(function () {
-    Route::post('/send-otp',     [AuthController::class, 'sendOtp'])->middleware('throttle:6,1');
-    Route::post('/check-availability', [AuthController::class, 'checkAvailability'])->middleware('throttle:30,1');
-    Route::post('/password/forgot', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
-    Route::post('/password/reset',  [AuthController::class, 'resetPassword'])->middleware('throttle:10,1');
-    Route::post('/register',     [AuthController::class, 'register']);
-    Route::post('/login',        [AuthController::class, 'login']);
-    Route::post('/two-factor/verify-passkey', [AuthController::class, 'verifyTwoFactorPasskey']);
-    Route::post('/two-factor/send-otp', [AuthController::class, 'sendTwoFactorLoginOtp']);
-    Route::post('/two-factor/verify-otp', [AuthController::class, 'verifyTwoFactorLoginOtp']);
-    Route::post('/vendor/login', [AuthController::class, 'vendorLogin']);
+    Route::post('/send-otp',     [AuthController::class, 'sendOtp'])->middleware('throttle:auth-signup-code');
+    Route::post('/check-availability', [AuthController::class, 'checkAvailability'])->middleware('throttle:auth-availability');
+    Route::post('/password/forgot', [AuthController::class, 'forgotPassword'])->middleware('throttle:auth-forgot');
+    Route::post('/password/reset',  [AuthController::class, 'resetPassword'])->middleware('throttle:auth-reset');
+    Route::post('/register',     [AuthController::class, 'register'])->middleware('throttle:auth-register');
+    Route::post('/login',        [AuthController::class, 'login'])->middleware('throttle:auth-login');
+    Route::post('/two-factor/verify-passkey', [AuthController::class, 'verifyTwoFactorPasskey'])->middleware('throttle:auth-two-factor');
+    Route::post('/two-factor/send-otp', [AuthController::class, 'sendTwoFactorLoginOtp'])->middleware('throttle:auth-two-factor');
+    Route::post('/two-factor/verify-otp', [AuthController::class, 'verifyTwoFactorLoginOtp'])->middleware('throttle:auth-two-factor');
 });
 
-Route::post('/auth/employee-login', [EmployeeAuthController::class, 'login']);
+Route::post('/auth/employee-login', [EmployeeAuthController::class, 'login'])->middleware('throttle:auth-login');
 
 // ============================================================
 // 2. PUBLIC — VENDOR REGISTRATION
 // ============================================================
 
-Route::post('/vendor/register', [VendorController::class, 'register']);
-Route::get('/vendor/status',    [VendorController::class, 'checkStatus']);
+Route::post('/vendor/register', [VendorController::class, 'register'])->middleware('throttle:vendor-apply');
+// The link given after applying: the application ID plus its private token
+Route::get('/vendor/status/{applicationId}', [VendorController::class, 'checkStatus'])->middleware('throttle:auth-availability');
 Route::get('/vendor/resubmission/{token}', [VendorApplicationResubmissionController::class, 'showForVendor']);
-Route::post('/vendor/resubmission/{token}', [VendorApplicationResubmissionController::class, 'submitForVendor']);
+Route::post('/vendor/resubmission/{token}', [VendorApplicationResubmissionController::class, 'submitForVendor'])->middleware('throttle:vendor-apply');
 
 // ============================================================
 // 3. PUBLIC — CUSTOMER STOREFRONT

@@ -23,6 +23,21 @@ final class SingleSession
     public const ACTIVE_MESSAGE = 'This account is already logged in on another device or browser.';
     public const REPLACED_MESSAGE = 'Your account was logged in on another device or browser.';
 
+    /**
+     * Unused this long, a token stops working on the server as well. Open tabs
+     * check in every minute and the browser signs out after ACTIVE_MINUTES
+     * idle, so this only ends sessions nobody is using (or a copied token).
+     */
+    public const EXPIRE_IDLE_MINUTES = 30;
+
+    public const EXPIRED_MESSAGE = 'You were signed out because the account was not used for a while. Please sign in again.';
+
+    /** Not used for EXPIRE_IDLE_MINUTES. A session without a "last seen" yet starts its clock now. */
+    public static function isExpired(User $user): bool
+    {
+        return $user->last_seen_at !== null && $user->last_seen_at->lt(now()->subMinutes(self::EXPIRE_IDLE_MINUTES));
+    }
+
     public static function deviceFrom(?string $device): ?string
     {
         $device = trim((string) $device);

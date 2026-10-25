@@ -28,12 +28,12 @@ class TokenAuth
         $authenticatable = null;
 
         if ($type === 'employee') {
-            $authenticatable = $this->resolveByToken(Employee::query(), $plainToken, $hashedToken);
+            $authenticatable = $this->resolveByToken(Employee::query(), $hashedToken);
         } elseif ($type === 'user') {
-            $authenticatable = $this->resolveByToken(User::query(), $plainToken, $hashedToken);
+            $authenticatable = $this->resolveByToken(User::query(), $hashedToken);
         } else {
-            $authenticatable = $this->resolveByToken(User::query(), $plainToken, $hashedToken)
-                ?? $this->resolveByToken(Employee::query(), $plainToken, $hashedToken);
+            $authenticatable = $this->resolveByToken(User::query(), $hashedToken)
+                ?? $this->resolveByToken(Employee::query(), $hashedToken);
         }
 
         if (!$authenticatable) {
@@ -61,6 +61,16 @@ class TokenAuth
         }
 
         if ($authenticatable instanceof User) {
+            // A token left unused too long stops working here too, not only in the browser
+            if (SingleSession::isExpired($authenticatable)) {
+                SingleSession::end($authenticatable);
+
+                return response()->json([
+                    'success' => false,
+                    'code' => 'session_expired',
+                    'message' => SingleSession::EXPIRED_MESSAGE,
+                ], 401);
+            }
             SingleSession::touch($authenticatable);
         }
 
@@ -70,13 +80,10 @@ class TokenAuth
         return $next($request);
     }
 
-    private function resolveByToken($query, string $plainToken, string $hashedToken)
+    private function resolveByToken($query, string $hashedToken)
     {
-        return $query
-            ->where(function ($tokenQuery) use ($plainToken, $hashedToken) {
-                $tokenQuery->where('api_token', $hashedToken)
-                    ->orWhere('api_token', $plainToken);
-            })
-            ->first();
+        // Only hashed tokens are stored; a token kept in plain text (an old
+        // sign-in) would work for anyone who could read the database
+        return $query->where('api_token', $hashedToken)->first();
     }
 }

@@ -359,20 +359,18 @@ class VendorController extends Controller
         return $hours >= 0 && $hours <= 23 && $minutes >= 0 && $minutes <= 59;
     }
 
-    public function checkStatus(Request $request)
+    /**
+     * GET /vendor/status/{applicationId}?token=… (the link given after applying).
+     * Needs the private token, not just an email, so nobody can look up
+     * someone else's application.
+     */
+    public function checkStatus(Request $request, string $applicationId)
     {
-        $email = $request->query('email');
+        $token = (string) $request->query('token', '');
+        $application = VendorApplication::where('application_id', $applicationId)->first();
 
-        if (!$email) {
-            return response()->json(['success' => false, 'message' => 'Email parameter is required.'], 400);
-        }
-
-        $application = VendorApplication::where('email', $email)
-            ->orderBy('created_at', 'desc')
-            ->first();
-
-        if (!$application) {
-            return response()->json(['success' => false, 'message' => 'No application found with this email.'], 404);
+        if (!$application || $token === '' || !$application->status_token || !hash_equals($application->status_token, $token)) {
+            return response()->json(['success' => false, 'message' => "We couldn't find that application. Use the full link you got after applying."], 404);
         }
 
         return response()->json([

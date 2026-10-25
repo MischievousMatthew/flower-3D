@@ -777,6 +777,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from "vue";
+import { passwordOk } from "../../utils/passwordRules";
 import vendorHeader from "../../layouts/vendorHeader.vue";
 import { useRoute, useRouter } from "vue-router";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
@@ -1136,8 +1137,8 @@ const changePassword = () => {
     passwordForm.errors.current_password = "Current password is required";
     return;
   }
-  if (!passwordData.password || passwordData.password.length < 8) {
-    passwordForm.errors.password = "New password must be at least 8 characters";
+  if (!passwordOk(passwordData.password || "")) {
+    passwordForm.errors.password = "Use at least 8 characters with an uppercase letter, a lowercase letter and a number.";
     return;
   }
   if (!passwordsMatch.value) {

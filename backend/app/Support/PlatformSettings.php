@@ -20,6 +20,8 @@ final class PlatformSettings
         'stale_pending_days' => 3,           // when a pending order counts as stuck
         'login_max_attempts' => 5,           // failed sign-ins before a temporary lock
         'login_lockout_minutes' => 15,
+        'login_show_attempts' => false,   // tell people how many tries are left before the lock
+        'login_ip_per_minute' => 20,      // sign-in tries a minute from one internet connection
     ];
 
     private static ?array $cache = null;

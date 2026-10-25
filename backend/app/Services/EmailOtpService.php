@@ -56,6 +56,7 @@ class EmailOtpService
                 'attempts' => 0,
                 'is_locked' => false,
                 'ip_address' => $ip,
+                'purpose' => $purpose,
             ],
         );
 
@@ -64,17 +65,21 @@ class EmailOtpService
     }
 
     /**
-     * Checks a code and uses it up.
+     * Checks a code and uses it up. With a purpose, only a code sent for that
+     * purpose works (codes from before purposes were kept still do).
      *
      * @throws OtpProblem when the code is missing, wrong, expired or locked
      */
-    public static function verify(string $email, string $plain): bool
+    public static function verify(string $email, string $plain, ?string $purpose = null): bool
     {
         $email = strtolower(trim($email));
         $record = EmailOtp::where('email', $email)->first();
 
         if (! $record) {
             throw new OtpProblem('That code has expired or was never sent. Ask for a new one.');
+        }
+        if ($purpose && $record->purpose && $record->purpose !== $purpose) {
+            throw new OtpProblem('That code was sent for something else. Ask for a new one here.');
         }
         if ($record->is_locked) {
             throw new OtpProblem('Too many wrong codes. Ask for a new one.');

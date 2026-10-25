@@ -362,12 +362,14 @@ class SecurityController extends Controller
             'stale_pending_days' => 'required|integer|min:1|max:30',
             'login_max_attempts' => 'required|integer|min:3|max:20',
             'login_lockout_minutes' => 'required|integer|min:1|max:1440',
+            'login_show_attempts' => 'sometimes|boolean',
+            'login_ip_per_minute' => 'sometimes|integer|min:10|max:300',
         ]);
 
-        foreach (['registrations_open', 'vendor_applications_open', 'checkout_paused'] as $flag) {
+        foreach (array_intersect(['registrations_open', 'vendor_applications_open', 'checkout_paused', 'login_show_attempts'], array_keys($data)) as $flag) {
             $data[$flag] = (bool) $data[$flag];
         }
-        foreach (['stale_pending_days', 'login_max_attempts', 'login_lockout_minutes'] as $number) {
+        foreach (array_intersect(['stale_pending_days', 'login_max_attempts', 'login_lockout_minutes', 'login_ip_per_minute'], array_keys($data)) as $number) {
             $data[$number] = (int) $data[$number];
         }
 

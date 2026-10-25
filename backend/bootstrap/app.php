@@ -57,6 +57,10 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($e instanceof \Illuminate\Validation\ValidationException) {
                 return null;
             }
+            // A ready-made answer (rate limits, refusals from middleware) is not an error
+            if ($e instanceof \Illuminate\Http\Exceptions\HttpResponseException) {
+                return $e->getResponse();
+            }
             if ($e instanceof \Illuminate\Auth\AuthenticationException) {
                 return response()->json(['success' => false, 'code' => 'unauthenticated', 'message' => \App\Support\FriendlyErrors::forStatus(401)], 401);
             }

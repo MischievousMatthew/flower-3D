@@ -265,9 +265,62 @@
               </label>
 
               <h3 class="set-group">Sign-in protection</h3>
+              <p class="set-intro">Stops people from guessing passwords. These apply to customers, shops and staff alike.</p>
+
               <div class="two">
-                <label class="field"><span>Wrong passwords before a lock</span><input v-model.number="settings.login_max_attempts" type="number" min="3" max="20" class="input" /></label>
-                <label class="field"><span>Lock lasts (minutes)</span><input v-model.number="settings.login_lockout_minutes" type="number" min="1" max="1440" class="input" /></label>
+                <div class="field">
+                  <span class="field-label">
+                    <label for="set-max-attempts">Wrong passwords before a lock</label>
+                    <InfoTip label="Wrong passwords before a lock">
+                      Counts wrong passwords for one account in a row. When it reaches this number, that account can't sign in until the lock ends. A correct sign-in or a password reset starts the count again. Usernames that don't exist never lock anything.
+                    </InfoTip>
+                  </span>
+                  <input id="set-max-attempts" v-model.number="settings.login_max_attempts" type="number" min="3" max="20" class="input" aria-describedby="set-max-attempts-help" />
+                  <small id="set-max-attempts-help" class="field-help">Only that one account is locked, not the whole site. 3 to 20; 5 is usual.</small>
+                </div>
+                <div class="field">
+                  <span class="field-label">
+                    <label for="set-lock-minutes">Lock lasts (minutes)</label>
+                    <InfoTip label="Lock lasts">
+                      How long a locked account has to wait before it can try again. The sign-in page shows a countdown. The owner can skip the wait by resetting their password with "Forgot password".
+                    </InfoTip>
+                  </span>
+                  <input id="set-lock-minutes" v-model.number="settings.login_lockout_minutes" type="number" min="1" max="1440" class="input" aria-describedby="set-lock-minutes-help" />
+                  <small id="set-lock-minutes-help" class="field-help">Wrong passwords older than this also stop counting. 1 to 1440 (a day); 15 is usual.</small>
+                </div>
+              </div>
+
+              <label class="toggle-row">
+                <div>
+                  <span class="strong">
+                    Show how many tries are left
+                    <InfoTip label="Show how many tries are left">
+                      Off: a wrong password only says "That didn't match. Check your username and password." On: it also says "3 tries left". Keeping it off gives someone guessing passwords less to go on; people still see a clear message and countdown if their account gets locked.
+                    </InfoTip>
+                  </span>
+                  <span class="sub">{{ settings.login_show_attempts ? 'On: a wrong password says how many tries are left before the lock.' : "Off: a wrong password doesn't say how close the lock is." }}</span>
+                </div>
+                <input v-model="settings.login_show_attempts" type="checkbox" class="switch" :disabled="switchSaving" @change="saveSwitch('login_show_attempts')" />
+              </label>
+
+              <div class="field narrow">
+                <span class="field-label">
+                  <label for="set-ip-limit">Sign-in tries a minute from one internet connection</label>
+                  <InfoTip label="Sign-in tries a minute from one internet connection">
+                    Counts every sign-in from the same Wi-Fi or network, right or wrong and for any account. It stops programs that try many passwords quickly. A person never gets close; if the limit is reached, that connection waits up to a minute and sees "Slow down a little".
+                  </InfoTip>
+                </span>
+                <input id="set-ip-limit" v-model.number="settings.login_ip_per_minute" type="number" min="10" max="300" class="input" aria-describedby="set-ip-limit-help" />
+                <small id="set-ip-limit-help" class="field-help">People on one Wi-Fi share this, e.g. a whole class or office. Raise it if many sign in at the same moment. 10 to 300; 20 is usual.</small>
+              </div>
+
+              <div class="set-summary" aria-live="polite">
+                <span class="mini-title">What happens now</span>
+                <ul>
+                  <li>{{ lockSentence }}</li>
+                  <li>{{ settings.login_show_attempts ? 'People are told how many tries they have left.' : "People aren't told how many tries they have left." }}</li>
+                  <li>{{ ipSentence }}</li>
+                </ul>
               </div>
 
               <h3 class="set-group">Monitoring</h3>
@@ -536,7 +589,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import InfoTip from "./components/InfoTip.vue";
 import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import { useSidebarState } from "../../composables/useSidebarState";
@@ -795,7 +849,19 @@ const SWITCH_TOASTS = {
   registrations_open: (on) => (on ? "Customer sign-ups are open." : "Customer sign-ups are closed."),
   vendor_applications_open: (on) => (on ? "Vendor applications are open." : "Vendor applications are closed."),
   checkout_paused: (on) => (on ? "Checkout is paused for every store." : "Checkout is open again."),
+  login_show_attempts: (on) => (on ? "Sign-in now shows how many tries are left." : "Sign-in no longer shows how many tries are left."),
 };
+// The sign-in protection numbers, said in a sentence
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const lockSentence = computed(() => {
+  const max = Number(settings.value?.login_max_attempts) || 5;
+  const minutes = Number(settings.value?.login_lockout_minutes) || 15;
+  return `${plural(max, "wrong password", "wrong passwords")} in a row lock that account for ${plural(minutes, "minute", "minutes")}.`;
+});
+const ipSentence = computed(() => {
+  const n = Number(settings.value?.login_ip_per_minute) || 20;
+  return `One internet connection can try signing in ${plural(n, "time", "times")} a minute; after that it waits up to a minute.`;
+});
 const switchSaving = ref(false);
 const saveSwitch = async (key) => {
   const value = settings.value[key];
@@ -1769,6 +1835,36 @@ onMounted(async () => {
 }
 .field.narrow {
   max-width: 420px;
+}
+.set-intro {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  color: #64748b;
+}
+.field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.field-help {
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+.set-summary {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f8f7ff;
+  border: 1px solid #ede9fe;
+}
+.set-summary ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 3px;
+  font-size: 12.5px;
+  color: #334155;
 }
 .two {
   display: grid;

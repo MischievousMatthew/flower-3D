@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\CreatesAuthTables;
 use Tests\TestCase;
 
 /**
@@ -20,71 +21,12 @@ use Tests\TestCase;
  */
 class LoginTroublesTest extends TestCase
 {
+    use CreatesAuthTables;
+
     protected function setUp(): void
     {
         parent::setUp();
-        foreach (['login_attempts', 'login_audit_logs', 'email_otps', 'employees', 'users'] as $t) {
-            Schema::dropIfExists($t);
-        }
-        Schema::create('users', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('surname')->nullable();
-            $table->string('username')->nullable();
-            $table->string('email')->unique();
-            $table->string('contact_number')->nullable();
-            $table->string('password');
-            $table->string('role')->default('customer');
-            $table->json('vendor_data')->nullable();
-            $table->boolean('is_verified')->default(true);
-            $table->timestamp('email_verified_at')->nullable();
-            $table->boolean('is_suspended')->default(false);
-            $table->boolean('two_factor_enabled')->default(false);
-            $table->string('api_token', 80)->nullable()->unique();
-            $table->timestamp('last_seen_at')->nullable();
-            $table->string('session_device', 64)->nullable();
-            $table->string('replaced_token_hash', 64)->nullable();
-            $table->timestamp('password_changed_at')->nullable();
-            $table->timestamps();
-        });
-        Schema::create('employees', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('owner_id')->nullable();
-            $table->string('name')->nullable();
-            $table->string('username')->nullable();
-            $table->string('email')->nullable();
-            $table->string('password')->nullable();
-            $table->string('status')->default('Active');
-            $table->string('api_token', 80)->nullable();
-            $table->timestamps();
-            $table->softDeletes();
-        });
-        Schema::create('login_attempts', function (Blueprint $table) {
-            $table->id();
-            $table->string('identifier', 190)->index();
-            $table->unsignedBigInteger('user_id')->nullable();
-            $table->string('actor_type', 20)->default('user');
-            $table->string('reason', 40);
-            $table->string('ip_address', 45)->nullable();
-            $table->string('user_agent', 255)->nullable();
-            $table->timestamp('created_at')->useCurrent();
-        });
-        Schema::create('login_audit_logs', function (Blueprint $table) {
-            $table->id();
-            $table->string('username')->nullable();
-            $table->string('email')->nullable();
-            $table->timestamp('logged_in_at')->nullable();
-        });
-        Schema::create('email_otps', function (Blueprint $table) {
-            $table->id();
-            $table->string('email')->unique();
-            $table->string('otp_hash');
-            $table->timestamp('expires_at');
-            $table->unsignedTinyInteger('attempts')->default(0);
-            $table->boolean('is_locked')->default(false);
-            $table->string('ip_address', 45)->nullable();
-            $table->timestamps();
-        });
+        $this->createAuthTables();
         $this->mock(LoginAuditService::class)->shouldIgnoreMissing();
         Cache::flush();
         config(['services.brevo.key' => 'test-key', 'mail.from.address' => 'hello@bloomcraft.test', 'mail.from.name' => 'BloomCraft']);
@@ -114,12 +56,12 @@ class LoginTroublesTest extends TestCase
         return $code;
     }
 
-    public function test_a_wrong_password_says_how_many_tries_are_left_and_then_how_long_to_wait(): void
+    public function test_a_wrong_password_keeps_the_tries_left_private_and_then_says_how_long_to_wait(): void
     {
         $this->customer();
-        $this->login('nope')->assertStatus(422)->assertJson(['code' => 'invalid_credentials', 'attempts_left' => 4]);
-        foreach ([3, 2, 1] as $left) {
-            $this->login('nope')->assertJson(['attempts_left' => $left]);
+        // By default nobody is told how close the lock is
+        foreach (range(1, 4) as $try) {
+            $this->login('nope')->assertStatus(422)->assertJson(['code' => 'invalid_credentials'])->assertJsonMissingPath('attempts_left');
         }
         $locked = $this->login('nope')->assertStatus(422)->assertJson(['code' => 'account_locked'])->json();
         $this->assertGreaterThan(800, $locked['retry_after']);
@@ -127,12 +69,23 @@ class LoginTroublesTest extends TestCase
         $this->login('Secret-pass1')->assertJson(['code' => 'account_locked']);
     }
 
+    public function test_the_admin_can_choose_to_show_how_many_tries_are_left(): void
+    {
+        \App\Support\PlatformSettings::save(['login_show_attempts' => true]);
+        $this->customer();
+        $this->login('nope')->assertStatus(422)->assertJson(['code' => 'invalid_credentials', 'attempts_left' => 4]);
+        foreach ([3, 2, 1] as $left) {
+            $this->login('nope')->assertJson(['attempts_left' => $left]);
+        }
+        $this->login('nope')->assertJson(['code' => 'account_locked']);
+    }
+
     public function test_one_wrong_password_counts_once_even_though_staff_sign_in_is_tried_first(): void
     {
         $this->customer();
         // What the login form does: staff sign-in, then customer sign-in
         $this->postJson('/api/auth/employee-login', ['username' => 'ana', 'password' => 'nope'])->assertStatus(401);
-        $this->login('nope')->assertJson(['attempts_left' => 4]);
+        $this->login('nope')->assertJson(['code' => 'invalid_credentials']);
         $this->assertSame(1, DB::table('login_attempts')->where('reason', 'wrong_password')->count());
     }
 
