@@ -52,8 +52,8 @@ class CustomerRecords
             ->merge(CustomerInquiry::query()->where('customer_id', $customerId)->distinct()->pluck('vendor_id'))
             ->map(fn ($id) => (int) $id)->unique();
 
-        return User::whereIn('id', $ids)->with('vendor:id,email,store_name,business_name')->get(['id', 'name', 'surname', 'email'])
-            ->mapWithKeys(fn (User $u) => [$u->id => $u->vendor?->store_name ?: $u->vendor?->business_name ?: trim("{$u->name} {$u->surname}")]);
+        return User::whereIn('id', $ids)->with('vendor:id,email,store_name,registered_business_name')->get(['id', 'name', 'surname', 'email'])
+            ->mapWithKeys(fn (User $u) => [$u->id => $u->vendor?->store_name ?: $u->vendor?->registered_business_name ?: trim("{$u->name} {$u->surname}")]);
     }
 
     /** Trimmed, de-duplicated, capped list of short words */

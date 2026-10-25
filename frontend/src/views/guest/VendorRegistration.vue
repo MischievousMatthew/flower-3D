@@ -676,8 +676,9 @@ const caviteMunicipalities = [
 ];
 const caviteLocations = [...caviteCities, ...caviteMunicipalities];
 
-const CAVITE_BOUNDARY_URL =
-  "https://raw.githubusercontent.com/faeldon/philippines-json-maps/master/2023/geojson/provdists/lowres/municities-provdist-402100000.0.001.json";
+// Cavite's towns and cities, kept in public/geo so the map doesn't depend on
+// another site (from faeldon/philippines-json-maps, MIT)
+const CAVITE_BOUNDARY_URL = `${import.meta.env.BASE_URL}geo/cavite-municities.json`;
 const storeLocationMap = ref(null);
 const mapLoading = ref(true);
 let mapInstance = null;
