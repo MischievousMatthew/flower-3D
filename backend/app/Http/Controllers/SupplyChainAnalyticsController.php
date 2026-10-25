@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Services\AnalyticsService;
+use App\Services\SupplyChainDashboardService;
 use App\Traits\ScopesOwner;
 use Illuminate\Http\JsonResponse;
 
@@ -50,6 +51,18 @@ class SupplyChainAnalyticsController extends Controller
         $inventory = $this->service->inventoryStockSummary($ownerId);
 
         return response()->json($inventory);
+    }
+
+    /**
+     * Everything on the Supply Chain dashboard in one call
+     */
+    public function dashboard(Request $request, SupplyChainDashboardService $dashboard): JsonResponse
+    {
+        $filters = $request->validate(['days' => ['nullable', 'integer', 'in:7,30,90']]);
+
+        return response()->json([
+            'data' => $dashboard->build($this->getOwnerId(), (int) ($filters['days'] ?? 30)),
+        ]);
     }
 
     /**

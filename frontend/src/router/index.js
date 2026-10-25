@@ -553,6 +553,7 @@ const routes = [
               {
                 path: "dashboard",
                 name: "SupplyChainDashboard",
+                meta: { erpLegacy: false },
                 component: () =>
                   import("../views/ERP/Procurement/SupplyChain/Analytics/Dashboard.vue"),
               },

@@ -14,7 +14,8 @@ import { useRoute } from "vue-router";
 import ErpShell from "./ErpShell.vue";
 
 const route = useRoute();
-const legacy = computed(() => route.matched.some((r) => r.meta?.erpLegacy));
+// route.meta is merged parent → child, so a redesigned page sets erpLegacy: false to leave the panel
+const legacy = computed(() => route.meta?.erpLegacy === true);
 </script>
 
 <style scoped>

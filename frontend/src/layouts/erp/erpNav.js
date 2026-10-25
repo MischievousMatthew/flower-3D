@@ -48,8 +48,9 @@ const EXTRA_PATHS = {
 export const ERP_NAV = (() => {
   const sections = new Map();
   for (const mod of ERP_MODULES) {
-    const label = SECTION_LABELS[mod.group] ?? mod.group;
-    if (!sections.has(label)) sections.set(label, { label, group: mod.group, items: [] });
+    const group = mod.navGroup ?? mod.group;
+    const label = SECTION_LABELS[group] ?? group;
+    if (!sections.has(label)) sections.set(label, { label, group, items: [] });
     sections.get(label).items.push({
       key: mod.key,
       // The permission that opens it (usually the module itself)

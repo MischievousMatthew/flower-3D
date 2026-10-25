@@ -225,6 +225,18 @@ export const ERP_MODULES = [
   },
 
   {
+    // Shown at the top of the Procurement section in the sidebar; its
+    // permission still sits with the other Supply Chain modules
+    key: "sc_dashboard",
+    label: "Supply Chain Dashboard",
+    icon: "dashboard",
+    group: "Supply Chain",
+    navGroup: "Procurement",
+    path: "/erp/procurement/supply-chain/dashboard",
+    description:
+      "Purchase orders, supplier deliveries on the way, low and out-of-stock products, supplier performance, and wastage.",
+  },
+  {
     key: "inventory_products",
     label: "Inventory Products",
     icon: "products",
@@ -247,15 +259,6 @@ export const ERP_MODULES = [
       "Allows employees to create and manage requests for products, materials, or services needed by the company.",
   },
 
-  {
-    key: "sc_dashboard",
-    label: "SC Dashboard",
-    icon: "dashboard",
-    group: "Supply Chain",
-    path: "/erp/procurement/supply-chain/dashboard",
-    description:
-      "Provides an overview of inventory, warehouse activities, deliveries, and other supply chain operations.",
-  },
   {
     key: "suppliers",
     label: "Suppliers",

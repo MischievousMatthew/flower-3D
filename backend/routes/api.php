@@ -997,6 +997,7 @@ Route::middleware('token.auth')->group(function () {
 
         Route::prefix('analytics')->group(function () {
             Route::middleware('employee.module:sc_dashboard,view')->group(function () {
+                Route::get('/dashboard',            [SupplyChainAnalyticsController::class, 'dashboard']);
                 Route::get('/summary',              [SupplyChainAnalyticsController::class, 'summary']);
                 Route::get('/inventory',            [SupplyChainAnalyticsController::class, 'inventory']);
                 Route::get('/orders',               [AnalyticsController::class, 'orders']);
