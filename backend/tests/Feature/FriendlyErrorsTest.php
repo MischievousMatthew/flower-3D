@@ -55,6 +55,7 @@ class FriendlyErrorsTest extends TestCase
             $t->timestamp('created_at')->useCurrent();
         });
         (require base_path('database/migrations/2026_10_25_100000_add_reference_to_api_error_logs.php'))->up();
+        (require base_path('database/migrations/2026_10_25_400000_add_resolution_to_api_error_logs.php'))->up();
 
         Route::middleware(['api', 'token.auth'])->prefix('api/_test')->group(function () {
             Route::get('/crash', fn () => throw new QueryException('pgsql', 'select "tax_amount" from "orders"', [], new \PDOException(self::SQL_ERROR)));
@@ -141,6 +142,59 @@ class FriendlyErrorsTest extends TestCase
 
         $this->assertSame(429, $response->getStatusCode());
         $this->assertSame('Too many tries.', json_decode($response->getContent(), true)['message']);
+    }
+
+    private function superAdmin(): User
+    {
+        $roleId = DB::table('admin_roles')->insertGetId(['name' => 'Super admin', 'permissions' => json_encode(['*']), 'is_system' => true]);
+        $admin = User::create(['name' => 'Admin', 'email' => 'admin@example.com', 'password' => 'x', 'role' => User::ROLE_ADMIN]);
+        $admin->forceFill(['admin_role_id' => $roleId])->save();
+
+        return $admin;
+    }
+
+    public function test_the_same_error_is_one_problem_and_marking_it_fixed_clears_it_until_it_happens_again(): void
+    {
+        $vendor = $this->shopOwner();
+        foreach (range(1, 3) as $i) {
+            $this->signIn($vendor)->getJson('/api/_test/crash');
+            $this->app['auth']->forgetGuards();
+        }
+        $this->postJson('/api/_test/caught');
+        $admin = $this->superAdmin();
+
+        $data = $this->signIn($admin)->getJson('/api/admin/security/api-errors')->assertOk()->json('data');
+        $this->assertSame(2, $data['open_problems']);
+        $crash = collect($data['problems'])->firstWhere('count', 3);
+        $this->assertNotNull($crash);
+        // Every hour of the last day is on the chart, zeros included, for the line
+        $this->assertCount(24, $data['series']);
+        $this->assertSame(4, array_sum(array_column($data['series'], 'count')));
+
+        $this->postJson('/api/admin/security/api-errors/resolve', ['signature' => $crash['signature']])->assertOk()->assertJsonPath('fixed', 3);
+        $this->assertSame(1, $this->getJson('/api/admin/security/api-errors')->json('data.open_problems'));
+
+        // It happens again: it's back as open
+        $this->app['auth']->forgetGuards();
+        $this->signIn($vendor)->getJson('/api/_test/crash');
+        $this->app['auth']->forgetGuards();
+        $again = collect($this->signIn($admin)->getJson('/api/admin/security/api-errors')->json('data.problems'))->firstWhere('signature', $crash['signature']);
+        $this->assertSame(1, $again['count']);
+    }
+
+    public function test_problems_come_ten_at_a_time_and_say_when_there_are_no_more(): void
+    {
+        foreach (range(1, 13) as $i) {
+            DB::table('api_error_logs')->insert(['method' => 'GET', 'path' => "/api/thing{$i}", 'status_code' => 500, 'exception' => 'TypeError', 'message' => "Problem number {$i} broke", 'location' => "Thing{$i}.php:1", 'signature' => md5("p{$i}"), 'created_at' => now()->subMinutes($i)]);
+        }
+        $admin = $this->superAdmin();
+
+        $first = $this->signIn($admin)->getJson('/api/admin/security/api-errors')->json('data');
+        $this->assertCount(10, $first['problems']);
+        $this->assertSame(['offset' => 0, 'limit' => 10, 'has_more' => true, 'total' => 13], $first['meta']);
+        $rest = $this->getJson('/api/admin/security/api-errors?offset=10&limit=10')->json('data');
+        $this->assertCount(3, $rest['problems']);
+        $this->assertFalse($rest['meta']['has_more']);
     }
 
     public function test_admins_can_look_up_the_code_someone_quoted(): void

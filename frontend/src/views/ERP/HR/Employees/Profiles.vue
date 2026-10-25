@@ -43,7 +43,7 @@
         </div>
       </div>
 
-      <p v-if="loadError" class="sp-banner error"><span v-html="ICONS.alert"></span>{{ loadError }}<button type="button" @click="load(page.current_page)">Try again</button></p>
+      <p v-if="loadError" class="sp-banner error"><span v-html="ICONS.alert"></span>{{ loadError }}<button type="button" @click="load()">Try again</button></p>
 
       <ul v-else-if="employees === null" class="pf-sk">
         <li v-for="n in 6" :key="n"><div class="bc-skeleton st-avatar"></div><div class="grow"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div></li>
@@ -106,13 +106,8 @@
           </table>
         </div>
 
-        <footer v-if="page.last_page > 1" class="pf-pages">
-          <span>{{ page.from }}–{{ page.to }} of {{ page.total }}</span>
-          <div>
-            <button type="button" class="sp-icon-btn" aria-label="Previous page" :disabled="page.current_page === 1" @click="load(page.current_page - 1)"><span v-html="ICONS.chevronLeft"></span></button>
-            <button type="button" class="sp-icon-btn" aria-label="Next page" :disabled="page.current_page === page.last_page" @click="load(page.current_page + 1)"><span v-html="ICONS.chevronRight"></span></button>
-          </div>
-        </footer>
+        <!-- 10 people, then 10 more, then 20 at a time -->
+        <ShowMore v-if="employees && employees.length" tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="employees.length" :total="pager.total.value" @more="pager.showMore()" />
       </template>
     </section>
 
@@ -430,6 +425,8 @@ import HrPage from "../../../../components/hr/HrPage.vue";
 import EmployeeDocuments from "../../../../components/hr/EmployeeDocuments.vue";
 import EmployeeQRCode from "../../../../layouts/components/EmployeeQRCode.vue";
 import employeeInfoService from "../../../../services/employeeInfoService";
+import ShowMore from "../../../../components/common/ShowMore.vue";
+import { useShowMorePaged } from "../../../../composables/useShowMore";
 import { useAssignment } from "../../../../composables/useAssignment";
 import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcons";
 import { formatDate, money, ymd } from "../../../../components/vendor/finance/financeUi";
@@ -503,20 +500,30 @@ const statTiles = computed(() => {
 const masked = (n) => (String(n).length > 4 ? `•••• ${String(n).slice(-4)}` : n);
 const quickStatuses = (e) => ["Regular", "Probationary"].filter((s) => s !== e.employment_status);
 
-async function load(p = 1) {
+/** One page of profiles from the server, for the "Show more" list */
+async function fetchPage(p) {
+  const res = await employeeInfoService.getAll({
+    page: p,
+    per_page: 15,
+    search: search.value.trim() || undefined,
+    status: filters.status || undefined,
+    department: filters.department || undefined,
+    location: filters.location || undefined,
+  });
+  page.value = res.pagination ?? page.value;
+  return { items: res.data ?? [], lastPage: page.value.last_page ?? 1, total: page.value.total };
+}
+const pager = useShowMorePaged(fetchPage);
+watch(() => pager.visible.value, (rows) => {
+  if (employees.value !== null) employees.value = rows;
+});
+async function load() {
   loadError.value = "";
   employees.value = null;
   try {
-    const res = await employeeInfoService.getAll({
-      page: p,
-      per_page: 15,
-      search: search.value.trim() || undefined,
-      status: filters.status || undefined,
-      department: filters.department || undefined,
-      location: filters.location || undefined,
-    });
-    employees.value = res.data ?? [];
-    page.value = res.pagination ?? page.value;
+    await pager.load();
+    if (pager.failure.value) throw pager.failure.value;
+    employees.value = pager.visible.value;
   } catch (e) {
     employees.value = [];
     loadError.value = e?.message || "Couldn't load the profiles.";

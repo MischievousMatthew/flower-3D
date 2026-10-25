@@ -8,10 +8,12 @@ use App\Models\AdminRole;
 use App\Models\ApiErrorLog;
 use App\Models\LoginAttempt;
 use App\Models\User;
+use App\Services\PlatformNotices;
 use App\Support\ApiAreas;
 use App\Support\AuditTargets;
 use App\Support\PaymentLedger;
 use App\Support\PlatformSettings;
+use App\Support\ShowMore;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -414,16 +416,21 @@ class SecurityController extends Controller
 
     public function settings(): JsonResponse
     {
-        return response()->json(['success' => true, 'data' => PlatformSettings::all()]);
+        // checkout_paused_now: the switch, or a scheduled pause that is under way
+        return response()->json(['success' => true, 'data' => PlatformSettings::all() + ['checkout_paused_now' => PlatformSettings::checkoutPausedNow()]]);
     }
 
-    public function saveSettings(Request $request): JsonResponse
+    public function saveSettings(Request $request, PlatformNotices $notices): JsonResponse
     {
         $data = $request->validate([
             'registrations_open' => 'required|boolean',
             'vendor_applications_open' => 'required|boolean',
             'checkout_paused' => 'required|boolean',
             'checkout_pause_message' => 'required|string|min:5|max:200',
+            'checkout_pause_starts_at' => 'sometimes|nullable|date',
+            'checkout_pause_ends_at' => 'sometimes|nullable|date',
+            // Sent by the switch when it's turned off: reopen now, even during a scheduled pause
+            'reopen_now' => 'sometimes|boolean',
             'stale_pending_days' => 'required|integer|min:1|max:30',
             'login_max_attempts' => 'required|integer|min:3|max:20',
             'login_lockout_minutes' => 'required|integer|min:1|max:1440',
@@ -438,7 +445,76 @@ class SecurityController extends Controller
             $data[$number] = (int) $data[$number];
         }
 
-        return response()->json(['success' => true, 'message' => 'Platform settings saved.', 'data' => PlatformSettings::save($data)]);
+        $wasPaused = PlatformSettings::checkoutPausedNow();
+        [$oldStart, $oldEnd] = PlatformSettings::pauseWindow();
+
+        // The scheduled pause: a start, and optionally an end
+        if (array_key_exists('checkout_pause_starts_at', $data) || array_key_exists('checkout_pause_ends_at', $data)) {
+            $start = !empty($data['checkout_pause_starts_at']) ? CarbonImmutable::parse($data['checkout_pause_starts_at']) : null;
+            $end = !empty($data['checkout_pause_ends_at']) ? CarbonImmutable::parse($data['checkout_pause_ends_at']) : null;
+            if ($end && !$start) {
+                return $this->refuse('Pick when the scheduled pause starts, or clear the end time.');
+            }
+            if ($start && (!$oldStart || !$start->equalTo($oldStart)) && $start->lt(now()->subMinute())) {
+                return $this->refuse('Pick a start time that is still to come. To pause right now, use the switch.');
+            }
+            if ($start && $end && $end->lte($start)) {
+                return $this->refuse('The end time has to be after the start time.');
+            }
+            if ($end && $end->lte(now())) {
+                return $this->refuse('That end time has already passed.');
+            }
+            $data['checkout_pause_starts_at'] = $start?->toIso8601String();
+            $data['checkout_pause_ends_at'] = $end?->toIso8601String();
+        }
+
+        // Turning the switch off reopens checkout at once, ending a scheduled pause that's under way
+        if (($data['reopen_now'] ?? false) && !$data['checkout_paused'] && $oldStart && now()->gte($oldStart)) {
+            $data['checkout_pause_starts_at'] = null;
+            $data['checkout_pause_ends_at'] = null;
+        }
+        unset($data['reopen_now']);
+
+        $saved = PlatformSettings::save($data);
+        [$newStart, $newEnd] = PlatformSettings::pauseWindow();
+        $notified = $this->noticeCheckoutChanges($notices, $wasPaused, PlatformSettings::checkoutPausedNow(), [$oldStart, $oldEnd], [$newStart, $newEnd], $saved['checkout_pause_message']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Platform settings saved.' . ($notified ? " {$notified} " . ($notified === 1 ? 'shop was' : 'shops were') . ' notified.' : ''),
+            'data' => $saved + ['checkout_paused_now' => PlatformSettings::checkoutPausedNow()],
+            'notified' => $notified,
+        ]);
+    }
+
+    /** Tells every shop when checkout pauses, reopens, or a pause is scheduled or cancelled */
+    private function noticeCheckoutChanges(PlatformNotices $notices, bool $wasPaused, bool $isPaused, array $old, array $new, string $message): int
+    {
+        [$oldStart, $oldEnd] = $old;
+        [$newStart, $newEnd] = $new;
+        $when = fn (CarbonImmutable $t) => $t->setTimezone(config('app.timezone'))->format('M j, g:i A');
+        $sent = 0;
+
+        $scheduleChanged = ($oldStart?->toIso8601String() !== $newStart?->toIso8601String()) || ($oldEnd?->toIso8601String() !== $newEnd?->toIso8601String());
+        if ($scheduleChanged && $newStart && $newStart->isFuture()) {
+            $sent = max($sent, $notices->toAllShops(
+                'Scheduled maintenance: checkout pauses ' . $when($newStart) . ($newEnd ? ' to ' . $when($newEnd) : ''),
+                'Customers won\'t be able to place new orders ' . ($newEnd ? 'during this time' : 'from then until it is turned back on') . '. Orders already placed and payments aren\'t affected. Customers see: "' . $message . '"',
+            ));
+        } elseif ($scheduleChanged && !$newStart && $oldStart && $oldStart->isFuture()) {
+            $sent = max($sent, $notices->toAllShops('Scheduled maintenance cancelled', 'The checkout pause planned for ' . $when($oldStart) . ' won\'t happen. Customers can keep ordering as usual.', null, false));
+        }
+
+        if (!$wasPaused && $isPaused) {
+            $sent = max($sent, $notices->toAllShops(
+                'Checkout is paused on BloomCraft',
+                'Customers can\'t place new orders right now. Orders already placed and payments aren\'t affected. Customers see: "' . $message . '"',
+            ));
+        } elseif ($wasPaused && !$isPaused) {
+            $sent = max($sent, $notices->toAllShops('Checkout is open again', 'Customers can place new orders again.', null, false));
+        }
+
+        return $sent;
     }
 
     // ── System health & API errors ───────────────────────────────────────
@@ -502,9 +578,15 @@ class SecurityController extends Controller
         $add('Integrations', 'Email (Brevo)', config('services.brevo.key') ? 'ok' : 'warn', config('services.brevo.key') ? 'Configured' : 'No API key: emails won\'t send');
         $add('Integrations', 'Route distances (OSRM)', config('services.osrm.url') ? 'ok' : 'warn', config('services.osrm.url') ? parse_url((string) config('services.osrm.url'), PHP_URL_HOST) : 'Not set: straight-line distances are used');
 
-        // Recent behaviour
-        $errors24 = ApiErrorLog::where('created_at', '>=', now()->subDay())->count();
-        $add('Last 24 hours', 'API server errors', $errors24 >= 20 ? 'fail' : ($errors24 ? 'warn' : 'ok'), $errors24 . ' ' . ($errors24 === 1 ? 'error' : 'errors'));
+        // Recent behaviour: errors count until they're marked fixed (Errors below)
+        try {
+            $openProblems = ApiErrorLog::whereNull('resolved_at')->whereNotNull('signature')->distinct()->count('signature');
+            $add('Last 24 hours', 'Open errors', $openProblems >= 10 ? 'fail' : ($openProblems ? 'warn' : 'ok'),
+                $openProblems ? "{$openProblems} " . ($openProblems === 1 ? 'problem' : 'problems') . ' not marked fixed yet' : 'None: every error has been fixed');
+        } catch (\Throwable) {
+            $errors24 = ApiErrorLog::where('created_at', '>=', now()->subDay())->count();
+            $add('Last 24 hours', 'Open errors', $errors24 ? 'warn' : 'ok', $errors24 . ' ' . ($errors24 === 1 ? 'error' : 'errors'));
+        }
         $failed24 = LoginAttempt::where('created_at', '>=', now()->subDay())->count();
         $add('Last 24 hours', 'Failed sign-ins', $failed24 >= 50 ? 'warn' : 'ok', (string) $failed24);
 
@@ -536,16 +618,36 @@ class SecurityController extends Controller
             return response()->json(['success' => true, 'data' => ['lookup' => $found->map(fn ($e) => $this->errorRow($e))->values()]]);
         }
 
-        // Errors per hour (or per day for longer spans) for the chart
-        $bucket = $hours > 48 ? 'day' : 'hour';
-        $series = (clone $rows)->get(['created_at'])->groupBy(fn ($r) => $bucket === 'day' ? $r->created_at->format('Y-m-d') : $r->created_at->format('Y-m-d H:00'))
-            ->map->count();
+        // Errors per hour (or per day for longer spans), every slot filled, for the line chart
+        $byDay = $hours > 48;
+        $counts = (clone $rows)->get(['created_at'])
+            ->countBy(fn ($r) => $r->created_at->copy()->setTimezone(config('app.timezone'))->format($byDay ? 'Y-m-d' : 'Y-m-d H'));
+        $series = [];
+        $cursor = CarbonImmutable::now(config('app.timezone'))->startOf($byDay ? 'day' : 'hour')->sub($byDay ? 'days' : 'hours', $byDay ? (int) ceil($hours / 24) - 1 : $hours - 1);
+        $end = CarbonImmutable::now(config('app.timezone'));
+        while ($cursor->lte($end)) {
+            $key = $cursor->format($byDay ? 'Y-m-d' : 'Y-m-d H');
+            $series[] = ['label' => $byDay ? $cursor->format('M j') : $cursor->format('g A'), 'at' => $cursor->toIso8601String(), 'count' => (int) ($counts[$key] ?? 0)];
+            $cursor = $byDay ? $cursor->addDay() : $cursor->addHour();
+        }
+
+        // Open problems (not marked fixed), newest first, a slice at a time ("Show more")
+        [$offset, $limit] = ShowMore::window($request);
+        $open = ApiErrorLog::query()->whereNull('resolved_at')->whereNotNull('signature');
+        $totalProblems = (clone $open)->distinct()->count('signature');
+        $groups = (clone $open)
+            ->selectRaw('signature, count(*) as total, max(created_at) as last_at, min(created_at) as first_at, max(id) as latest_id')
+            ->groupBy('signature')->orderByDesc('last_at')
+            ->offset($offset)->limit($limit)->get();
+        $latest = ApiErrorLog::query()->whereIn('id', $groups->pluck('latest_id'))->get()->keyBy('id');
+        $problems = $groups->map(fn ($g) => ['signature' => $g->signature, 'count' => (int) $g->total, 'first_at' => CarbonImmutable::parse($g->first_at)->toIso8601String(), 'last_at' => CarbonImmutable::parse($g->last_at)->toIso8601String()]
+            + $this->errorRow($latest[$g->latest_id]))->values();
 
         return response()->json([
             'success' => true,
             'data' => [
                 'total' => (clone $rows)->count(),
-                'bucket' => $bucket,
+                'bucket' => $byDay ? 'day' : 'hour',
                 'series' => $series,
                 // Grouped by feature, never by API path
                 'by_feature' => (clone $rows)->get(['method', 'path', 'action', 'created_at'])
@@ -554,9 +656,28 @@ class SecurityController extends Controller
                     ->sortByDesc('total')->take(10)->values(),
                 // Shown to people as a plain message instead of the programmer error
                 'shielded' => (clone $rows)->whereNotNull('reference')->count(),
-                'recent' => (clone $rows)->latest('created_at')->limit(50)->get()->map(fn ($e) => $this->errorRow($e)),
+                'open_problems' => $totalProblems,
+                'problems' => $problems,
+                'meta' => ShowMore::meta($offset, $limit, $totalProblems),
+                'checked_at' => now()->toIso8601String(),
             ],
         ]);
+    }
+
+    /**
+     * POST /api/admin/security/api-errors/resolve { signature }
+     * Marks a problem fixed: every open error with that cause leaves the list.
+     * If it happens again, the new error shows up as open.
+     */
+    public function resolveApiError(Request $request): JsonResponse
+    {
+        $data = $request->validate(['signature' => 'required|string|size:32']);
+        $fixed = ApiErrorLog::query()->where('signature', $data['signature'])->whereNull('resolved_at')->update(['resolved_at' => now()]);
+        if (!$fixed) {
+            return $this->notFound();
+        }
+
+        return response()->json(['success' => true, 'message' => "Marked as fixed ({$fixed} " . ($fixed === 1 ? 'error' : 'errors') . '). If it happens again, it will show up here.', 'fixed' => $fixed]);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────

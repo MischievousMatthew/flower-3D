@@ -19,7 +19,7 @@
           <button type="button" class="item" :class="{ unread: !n.read, important: n.important }" @click="openItem(n)">
             <span class="item-icon">{{ ICON[n.type] ?? "💬" }}</span>
             <span class="item-text">
-              <span class="item-title">{{ n.title }}</span>
+              <span class="item-title">{{ n.title }} <span v-if="n.important" class="item-tag">Important</span></span>
               <span v-if="n.body" class="item-body">{{ n.body }}</span>
               <span class="item-time">{{ timeAgo(n.created_at) }}</span>
             </span>
@@ -44,7 +44,7 @@ const props = defineProps({
   allPath: { type: [String, Object], default: null },
 });
 
-const ICON = { announcement: "📣", order: "🧾", payment: "💳", stock: "📦", message: "💬", inquiry: "❓", review: "⭐", return: "↩️", inquiry_answer: "💡", review_reply: "💬" };
+const ICON = { platform: "📢", announcement: "📣", order: "🧾", payment: "💳", stock: "📦", message: "💬", inquiry: "❓", review: "⭐", return: "↩️", inquiry_answer: "💡", review_reply: "💬" };
 
 /** "route:VendorOrderDetails?order=12" → a named route; the order ID travels hidden */
 const target = (link) => {
@@ -234,10 +234,21 @@ defineExpose({ refresh: fetchCount });
 .item.unread {
   background: var(--v-purple-soft);
 }
-.item.important .item-title::after {
-  content: " · Important";
+.item-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--v-red-soft);
   color: var(--v-red-text);
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+.item.important {
+  box-shadow: inset 3px 0 0 var(--v-red-text);
 }
 .item-icon {
   font-size: 16px;

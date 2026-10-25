@@ -88,7 +88,7 @@
         <span class="pr-toolbar-count"
           >{{ meta.total }} review{{ meta.total !== 1 ? "s" : "" }}</span
         >
-        <select v-model="sortBy" @change="load(1)" class="pr-sort">
+        <select v-model="sortBy" @change="reviewList.load()" class="pr-sort">
           <option value="newest">Newest</option>
           <option value="oldest">Oldest</option>
           <option value="highest">Highest rated</option>
@@ -97,7 +97,7 @@
       </div>
 
       <div class="pr-list">
-        <div v-for="review in reviews" :key="review.id" class="pr-item">
+        <div v-for="review in reviewList.rows.value" :key="review.id" class="pr-item">
           <!-- Avatar + name -->
           <div class="pr-item__head">
             <div class="pr-avatar">
@@ -190,26 +190,8 @@
         </div>
       </div>
 
-      <!-- Pagination -->
-      <div v-if="meta.last_page > 1" class="pr-pager">
-        <button
-          class="pr-pager-btn"
-          :disabled="meta.current_page === 1"
-          @click="load(meta.current_page - 1)"
-        >
-          ← Prev
-        </button>
-        <span class="pr-pager-info"
-          >{{ meta.current_page }} / {{ meta.last_page }}</span
-        >
-        <button
-          class="pr-pager-btn"
-          :disabled="meta.current_page === meta.last_page"
-          @click="load(meta.current_page + 1)"
-        >
-          Next →
-        </button>
-      </div>
+      <!-- 10 reviews, then 10 more, then 20 at a time -->
+      <ShowMore v-if="reviews.length" :tone="vendor ? 'vendor' : 'customer'" :has-more="reviewList.hasMore.value" :loading="reviewList.loadingMore.value" :shown="reviewList.rows.value.length" :total="reviewList.total.value" @more="reviewList.showMore()" />
     </template>
 
     <!-- ── Edit modal ────────────────────────────────────────────────────────── -->
@@ -300,8 +282,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from "vue";
+import { computed, ref, reactive, onMounted, watch } from "vue";
 import api from "../../plugins/axios";
+import ShowMore from "../../components/common/ShowMore.vue";
+import { useShowMoreRows } from "../../composables/useShowMore";
 
 const props = defineProps({
   productId: { type: Number, required: true },
@@ -354,7 +338,8 @@ async function load(page = 1) {
     });
     const body = res?.data ?? res;
 
-    reviews.value = Array.isArray(body?.data) ? body.data : [];
+    const rows = Array.isArray(body?.data) ? body.data : [];
+    reviews.value = page > 1 ? [...reviews.value, ...rows] : rows;
     if (body?.summary) summary.value = body.summary;
     if (body?.meta) Object.assign(meta, body.meta);
   } catch (e) {
@@ -363,6 +348,9 @@ async function load(page = 1) {
     loading.value = false;
   }
 }
+
+// 10 reviews first, then 10 more, then 20 at a time
+const reviewList = useShowMoreRows(reviews, computed(() => meta), load);
 
 async function loadSummary() {
   if (summary.value) return; // already loaded with reviews
@@ -404,7 +392,7 @@ async function saveEdit() {
       { headers: authHeaders() },
     );
     closeEdit();
-    await load(meta.current_page);
+    await reviewList.refresh();
     emit("updated");
   } catch (e) {
     alert(e.response?.data?.message ?? "Update failed.");
@@ -418,7 +406,7 @@ async function deleteReview(review) {
   if (!confirm("Delete your review? This cannot be undone.")) return;
   try {
     await api.delete(`reviews/${review.id}`, { headers: authHeaders() });
-    await load(meta.current_page);
+    await reviewList.refresh();
     emit("updated");
   } catch (e) {
     alert(e.response?.data?.message ?? "Delete failed.");
@@ -454,7 +442,7 @@ onMounted(async () => {
 });
 watch(
   () => props.productId,
-  () => load(1),
+  () => reviewList.load(),
 );
 </script>
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Services\PlatformNotices;
 use App\Http\Controllers\Controller;
 use App\Models\AccountEvent;
 use App\Models\Order;
@@ -224,7 +225,7 @@ class AdminCustomerController extends Controller
     /**
      * POST /api/admin/customers/{id}/suspend  { reason }
      */
-    public function suspend(Request $request, int $id): JsonResponse
+    public function suspend(Request $request, int $id, PlatformNotices $notices): JsonResponse
     {
         $data = $request->validate(['reason' => 'required|string|min:5|max:1000']);
         $customer = $this->find($id);
@@ -237,6 +238,8 @@ class AdminCustomerController extends Controller
         } catch (LogicException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
+        // Waiting in their notifications, so the reason is there when they're back
+        $notices->toUser($customer->id, 'Your account was suspended', 'Reason: ' . trim($data['reason']));
 
         return response()->json(['success' => true, 'message' => 'Account suspended. They have been signed out.']);
     }
@@ -244,7 +247,7 @@ class AdminCustomerController extends Controller
     /**
      * POST /api/admin/customers/{id}/reactivate  { note? }
      */
-    public function reactivate(Request $request, int $id): JsonResponse
+    public function reactivate(Request $request, int $id, PlatformNotices $notices): JsonResponse
     {
         $data = $request->validate(['note' => 'nullable|string|max:1000']);
         $customer = $this->find($id);
@@ -257,6 +260,7 @@ class AdminCustomerController extends Controller
         } catch (LogicException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
+        $notices->toUser($customer->id, 'Your account is active again', !empty($data['note']) ? trim($data['note']) : 'You can sign in and order as usual.');
 
         return response()->json(['success' => true, 'message' => 'Account reactivated. They can sign in again.']);
     }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Services\PlatformNotices;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\ProductModerationEvent;
@@ -185,7 +186,7 @@ class AdminProductController extends Controller
     /**
      * POST /api/admin/products/{id}/{action}  (approve | hide | remove | restore)
      */
-    public function moderate(Request $request, int $id, string $action): JsonResponse
+    public function moderate(Request $request, int $id, string $action, PlatformNotices $notices): JsonResponse
     {
         $needsReason = in_array($action, ['hide', 'remove'], true);
         $data = $request->validate([
@@ -209,6 +210,15 @@ class AdminProductController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
+        $name = $product->product_name ?: 'your product';
+        $why = $reason ? "Reason: {$reason}" : null;
+        match ($action) {
+            'approve' => $notices->toUser($product->owner_id, "Your listing was approved: {$name}", 'It is now showing on your shop.', '/vendor/products', false),
+            'hide' => $notices->toUser($product->owner_id, "BloomCraft hid your listing: {$name}", trim(($why ? "{$why}. " : '') . 'Customers can\'t see it for now. Fix it and send it back for review from Products.'), '/vendor/products'),
+            'remove' => $notices->toUser($product->owner_id, "BloomCraft removed your listing: {$name}", trim(($why ? "{$why}. " : '') . 'It is no longer on your shop. Contact support if you think this is a mistake.'), '/vendor/products'),
+            'restore' => $notices->toUser($product->owner_id, "Your listing is back on your shop: {$name}", $why, '/vendor/products', false),
+        };
+
         $messages = [
             'approve' => 'Listing approved.',
             'hide' => 'Listing hidden. The vendor can fix it and send it back for review.',
@@ -216,7 +226,7 @@ class AdminProductController extends Controller
             'restore' => 'Listing is back on the shop.',
         ];
 
-        return response()->json(['success' => true, 'message' => $messages[$action]]);
+        return response()->json(['success' => true, 'message' => $messages[$action] . ' The shop was notified.']);
     }
 
     // ── Categories, flower types, occasions ──────────────────────────────

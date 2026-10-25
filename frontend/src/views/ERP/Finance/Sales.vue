@@ -188,7 +188,7 @@
         </div>
         <template v-else>
           <ul class="fx-list" :class="{ dim: ordersLoading }">
-            <li v-for="o in orders.orders" :key="o.id" class="sr-order">
+            <li v-for="o in orderList.rows.value" :key="o.id" class="sr-order">
               <div class="grow">
                 <strong>{{ o.order_number }} <span class="sr-customer">· {{ o.customer }}</span></strong>
                 <span class="sr-items">{{ o.items || "No items" }} · {{ countText(o.item_count, "item") }}</span>
@@ -202,13 +202,7 @@
               </div>
             </li>
           </ul>
-          <footer v-if="orders.meta.last_page > 1" class="fx-pager">
-            <span>{{ orders.meta.total }} orders · page {{ orders.meta.page }} of {{ orders.meta.last_page }}</span>
-            <div>
-              <button type="button" class="sp-icon-btn" :disabled="orders.meta.page <= 1" aria-label="Previous page" @click="loadOrders(orders.meta.page - 1)"><span v-html="ICONS.chevronLeft"></span></button>
-              <button type="button" class="sp-icon-btn" :disabled="orders.meta.page >= orders.meta.last_page" aria-label="Next page" @click="loadOrders(orders.meta.page + 1)"><span v-html="ICONS.chevronRight"></span></button>
-            </div>
-          </footer>
+          <ShowMore v-if="orders && orders.orders.length" tone="vendor" :has-more="orderList.hasMore.value" :loading="orderList.loadingMore.value" :shown="orderList.rows.value.length" :total="orderList.total.value" @more="orderList.showMore()" />
         </template>
       </template>
     </section>
@@ -218,6 +212,8 @@
 <script setup>
 import { computed, defineComponent, h, onMounted, ref, watch } from "vue";
 import api from "../../../plugins/axios";
+import ShowMore from "../../../components/common/ShowMore.vue";
+import { useShowMoreInto } from "../../../composables/useShowMore";
 import HrPage from "../../../components/hr/HrPage.vue";
 import RangePicker from "../../../components/vendor/finance/RangePicker.vue";
 import BarChart from "../../../components/vendor/finance/BarChart.vue";
@@ -255,6 +251,12 @@ const loading = ref(false);
 const view = ref("date");
 
 const orders = ref(null);
+// 10 orders first, then 10 more, then 20 at a time
+const orderList = useShowMoreInto(orders, "orders", async (p) =>
+  (await api.get(`${base.value}/orders`, {
+    params: { from: financeRange.from, to: financeRange.to, page: p, status: orderStatus.value || undefined, payment: orderPayment.value || undefined, search: orderSearch.value.trim() || undefined },
+  })).data.data,
+);
 const ordersLoading = ref(false);
 const orderStatus = ref("");
 const orderPayment = ref("");
@@ -334,13 +336,10 @@ async function load() {
   }
 }
 
-async function loadOrders(page = 1) {
+async function loadOrders() {
   ordersLoading.value = true;
   try {
-    const res = await api.get(`${base.value}/orders`, {
-      params: { from: financeRange.from, to: financeRange.to, page, status: orderStatus.value || undefined, payment: orderPayment.value || undefined, search: orderSearch.value.trim() || undefined },
-    });
-    orders.value = res.data.data;
+    await orderList.load();
   } catch (e) {
     error.value = apiMessage(e, "Couldn't load the orders.");
   } finally {

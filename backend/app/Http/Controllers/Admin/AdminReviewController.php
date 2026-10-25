@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Services\PlatformNotices;
 use App\Helpers\CloudinaryHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
@@ -102,7 +103,7 @@ class AdminReviewController extends Controller
     }
 
     /** POST /api/admin/reviews/{id}/hide { reason } */
-    public function hide(Request $request, int $id): JsonResponse
+    public function hide(Request $request, int $id, PlatformNotices $notices): JsonResponse
     {
         $data = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:500']]);
         $review = ProductReview::query()->findOrFail($id);
@@ -114,12 +115,14 @@ class AdminReviewController extends Controller
         // Saved without touching updated_at, so it never looks like the customer edited it
         $review->timestamps = false;
         $review->forceFill(['hidden_at' => now(), 'hidden_reason' => $data['reason'], 'hidden_by' => $request->user()->id])->save();
+        $product = $review->product()->withoutGlobalScopes()->value('product_name');
+        $notices->toUser($review->user_id, 'BloomCraft hid your review' . ($product ? " of {$product}" : ''), "Reason: {$data['reason']}. It no longer shows on the shop. Contact support if you think this is a mistake.");
 
-        return response()->json(['success' => true, 'message' => 'Review hidden. It no longer shows on the shop or counts towards ratings.']);
+        return response()->json(['success' => true, 'message' => 'Review hidden. It no longer shows on the shop or counts towards ratings. The customer was notified.']);
     }
 
     /** POST /api/admin/reviews/{id}/restore */
-    public function restore(int $id): JsonResponse
+    public function restore(int $id, PlatformNotices $notices): JsonResponse
     {
         $review = ProductReview::query()->findOrFail($id);
 
@@ -129,8 +132,10 @@ class AdminReviewController extends Controller
 
         $review->timestamps = false;
         $review->forceFill(['hidden_at' => null, 'hidden_reason' => null, 'hidden_by' => null])->save();
+        $product = $review->product()->withoutGlobalScopes()->value('product_name');
+        $notices->toUser($review->user_id, 'Your review is showing again' . ($product ? " on {$product}" : ''), null, null, false);
 
-        return response()->json(['success' => true, 'message' => 'Review restored.']);
+        return response()->json(['success' => true, 'message' => 'Review restored. The customer was notified.']);
     }
 
     /** GET /api/admin/reviews/reports?status=pending|approved|rejected&search=&page= */

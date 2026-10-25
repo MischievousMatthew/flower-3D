@@ -51,11 +51,7 @@
         </section>
       </div>
 
-      <nav v-if="data && data.meta.last_page > 1" class="ac-pages" aria-label="Pages">
-        <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="data.meta.page <= 1 || loading" @click="load(data.meta.page - 1)"><span v-html="ICONS.left"></span>Newer</button>
-        <span class="st-sub">Page {{ data.meta.page }} of {{ data.meta.last_page }}</span>
-        <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="data.meta.page >= data.meta.last_page || loading" @click="load(data.meta.page + 1)">Older<span v-html="ICONS.right"></span></button>
-      </nav>
+      <ShowMore v-if="data && data.entries.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
     </section>
   </ShopLayout>
 </template>
@@ -63,6 +59,8 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import api from "../../../plugins/axios";
+import ShowMore from "../../../components/common/ShowMore.vue";
+import { useShowMoreInto } from "../../../composables/useShowMore";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
@@ -73,6 +71,10 @@ import "../../../components/vendor/staff/staff.css";
 
 const today = ymd(new Date());
 const data = ref(null);
+// 10 changes first, then 10 more, then 20 at a time
+const list = useShowMoreInto(data, "entries", async (page) =>
+  (await api.get("vendor/staff/activity", { params: { page, employee_id: who.value || undefined, area: area.value || undefined, from: from.value || undefined, to: to.value || undefined } })).data.data,
+);
 const error = ref("");
 const settingUp = ref("");
 const loading = ref(false);
@@ -84,7 +86,7 @@ const to = ref("");
 const filtered = computed(() => !!(who.value || area.value || from.value || to.value));
 const byDay = computed(() => {
   const days = new Map();
-  for (const e of data.value?.entries ?? []) {
+  for (const e of list.rows.value) {
     const day = ymd(new Date(e.at));
     if (!days.has(day)) days.set(day, { day, label: dayLabel(day), entries: [] });
     days.get(day).entries.push(e);
@@ -103,14 +105,11 @@ const initials = (name) => String(name).split(/\s+/).filter(Boolean).slice(0, 2)
 /** "Timed in" reads as "timed in" after the person's name; keep proper names after a colon as they are */
 const lower = (text) => text.charAt(0).toLowerCase() + text.slice(1);
 
-async function load(page = 1) {
+async function load() {
   error.value = "";
   loading.value = true;
   try {
-    const res = await api.get("vendor/staff/activity", {
-      params: { page, employee_id: who.value || undefined, area: area.value || undefined, from: from.value || undefined, to: to.value || undefined },
-    });
-    data.value = res.data.data;
+    await list.load();
   } catch (e) {
     if (e?.response?.data?.code === "staff_setting_up") settingUp.value = e.response.data.message;
     else error.value = apiMessage(e, "Couldn't load the activity log.");

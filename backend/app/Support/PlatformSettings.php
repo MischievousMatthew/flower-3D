@@ -17,6 +17,9 @@ final class PlatformSettings
         'vendor_applications_open' => true,  // stores can apply
         'checkout_paused' => false,          // stop all new orders
         'checkout_pause_message' => 'Ordering is paused for a moment. Please try again later.',
+        // Scheduled maintenance: checkout pauses by itself from start to end (ISO times; end optional)
+        'checkout_pause_starts_at' => null,
+        'checkout_pause_ends_at' => null,
         'stale_pending_days' => 3,           // when a pending order counts as stuck
         'login_max_attempts' => 5,           // failed sign-ins before a temporary lock
         'login_lockout_minutes' => 15,
@@ -45,16 +48,51 @@ final class PlatformSettings
         return self::$cache = array_merge(self::DEFAULTS, array_intersect_key($stored, self::DEFAULTS));
     }
 
-    /** What customers and stores may know: whether sign-ups and checkout are open */
+    /**
+     * Whether checkout is paused right now: the switch is on, or a scheduled
+     * pause has started and not ended. Checked on each request, so nothing
+     * needs to run in the background at the start or end time.
+     */
+    public static function checkoutPausedNow(): bool
+    {
+        $all = self::all();
+        if ($all['checkout_paused']) {
+            return true;
+        }
+        [$start, $end] = self::pauseWindow();
+
+        return $start !== null && now()->gte($start) && ($end === null || now()->lt($end));
+    }
+
+    /** @return array{0: ?\Carbon\CarbonImmutable, 1: ?\Carbon\CarbonImmutable} the scheduled pause, if any */
+    public static function pauseWindow(): array
+    {
+        $all = self::all();
+        $parse = function ($value) {
+            try {
+                return $value ? \Carbon\CarbonImmutable::parse($value) : null;
+            } catch (\Throwable) {
+                return null;
+            }
+        };
+
+        return [$parse($all['checkout_pause_starts_at']), $parse($all['checkout_pause_ends_at'])];
+    }
+
+    /** What customers and stores may know: whether sign-ups and checkout are open, and any planned pause */
     public static function publicStatus(): array
     {
         $all = self::all();
+        [$start, $end] = self::pauseWindow();
+        $upcoming = $start && ($end === null || now()->lt($end));
 
         return [
             'registrations_open' => (bool) $all['registrations_open'],
             'vendor_applications_open' => (bool) $all['vendor_applications_open'],
-            'checkout_paused' => (bool) $all['checkout_paused'],
+            'checkout_paused' => self::checkoutPausedNow(),
             'checkout_pause_message' => (string) $all['checkout_pause_message'],
+            'checkout_pause_starts_at' => $upcoming ? $start->toIso8601String() : null,
+            'checkout_pause_ends_at' => $upcoming && $end ? $end->toIso8601String() : null,
         ];
     }
 

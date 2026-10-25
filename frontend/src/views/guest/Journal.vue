@@ -66,11 +66,7 @@
             </li>
           </ul>
 
-          <div v-if="meta.current_page < meta.last_page" class="more">
-            <button type="button" class="bc-btn bc-btn--dark" :disabled="loading" @click="load(meta.current_page + 1, true)">
-              {{ loading ? "Loading…" : "More articles" }}
-            </button>
-          </div>
+          <ShowMore v-if="articles.length" tone="customer" :has-more="meta.current_page < meta.last_page" :loading="loading" :shown="articles.length" :total="meta.total || 0" done-text="You've read every story so far" @more="load(meta.current_page + 1, true)" />
         </template>
       </section>
     </main>
@@ -83,6 +79,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import api from "../../plugins/axios";
+import ShowMore from "../../components/common/ShowMore.vue";
 import SiteTopBar from "../../components/site/SiteTopBar.vue";
 import SiteFooter from "../../components/site/SiteFooter.vue";
 import { useSiteContent } from "../../composables/useSiteContent";

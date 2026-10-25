@@ -126,11 +126,8 @@
               {{ activeFilterChips.length ? "Nothing matches these filters yet. Try removing one." : "Flowers show up here as shops add them." }}
             </p>
 
-            <div v-if="pagination.current_page < pagination.last_page" class="fresh-more">
-              <button type="button" class="fresh-more-btn" :disabled="isLoading" @click="loadMoreProducts">
-                {{ isLoading ? "Loading…" : "Load more flowers" }}
-              </button>
-            </div>
+            <!-- Flowers come a grid's worth at a time; the end says so -->
+            <ShowMore v-if="products.length" tone="customer" :has-more="pagination.current_page < pagination.last_page" :loading="isLoading" :shown="products.length" :total="pagination.total || 0" done-text="You've seen every flower here" @more="loadMoreProducts" />
           </section>
 
           <FeaturedShops
@@ -193,6 +190,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import api from "../../plugins/axios.js";
+import ShowMore from "../../components/common/ShowMore.vue";
 import NavHeader from "../../layouts/NavHeader.vue";
 import productService from "../../services/productService.js";
 import { useCart } from "../../composables/useCart";

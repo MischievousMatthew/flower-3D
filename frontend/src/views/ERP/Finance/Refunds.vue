@@ -2,12 +2,12 @@
   <HrPage title="Refunds" subtitle="Refund requests from customers, what was decided, the money sent back, and whether it all matches the books.">
     <template #actions>
       <RangePicker @change="load(1)" />
-      <button type="button" class="sp-btn sp-btn-ghost" :disabled="loading" @click="load(page)">Refresh</button>
+      <button type="button" class="sp-btn sp-btn-ghost" :disabled="loading" @click="refresh()">Refresh</button>
     </template>
 
     <div v-if="error" class="sp-banner error">
       <span v-html="ICONS.alert"></span>{{ error }}
-      <button type="button" @click="load(page)">Try again</button>
+      <button type="button" @click="refresh()">Try again</button>
     </div>
 
     <!-- Headline numbers -->
@@ -115,7 +115,7 @@
       </div>
       <template v-else>
         <ul class="rf-rows" :class="{ dim: loading }">
-          <li v-for="r in data.rows" :key="r.id" class="rf-row">
+          <li v-for="r in list.rows.value" :key="r.id" class="rf-row">
             <span class="fx-icon" :class="`tone-${STATUS[r.status].tone}`" v-html="ICONS.restore"></span>
             <div class="grow">
               <strong>{{ r.order.order_number }} <span class="muted">· {{ r.customer }}</span><span v-if="r.carried_over" class="sp-chip slate rf-mini">from before</span></strong>
@@ -141,13 +141,7 @@
             </div>
           </li>
         </ul>
-        <footer v-if="data.meta.last_page > 1" class="fx-pager">
-          <span>{{ data.meta.total }} refunds · page {{ data.meta.page }} of {{ data.meta.last_page }}</span>
-          <div>
-            <button type="button" class="sp-icon-btn" :disabled="page <= 1" aria-label="Previous page" @click="load(page - 1)"><span v-html="ICONS.chevronLeft"></span></button>
-            <button type="button" class="sp-icon-btn" :disabled="page >= data.meta.last_page" aria-label="Next page" @click="load(page + 1)"><span v-html="ICONS.chevronRight"></span></button>
-          </div>
-        </footer>
+        <ShowMore v-if="data && data.rows.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
       </template>
     </section>
 
@@ -253,6 +247,8 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
+import ShowMore from "../../../components/common/ShowMore.vue";
+import { useShowMoreInto } from "../../../composables/useShowMore";
 import HrPage from "../../../components/hr/HrPage.vue";
 import RangePicker from "../../../components/vendor/finance/RangePicker.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
@@ -338,22 +334,26 @@ const kpis = computed(() => {
   ];
 });
 
-async function load(p = 1) {
+// 10 refunds first, then 10 more, then 20 at a time
+const list = useShowMoreInto(data, "rows", async (p) =>
+  (await api.get(base.value, {
+    params: {
+      from: financeRange.from,
+      to: financeRange.to,
+      page: p,
+      status: status.value && status.value !== "issues" ? status.value : undefined,
+      issues: status.value === "issues" ? 1 : undefined,
+      search: search.value.trim() || undefined,
+    },
+  })).data.data,
+);
+/** Reloads after a change, keeping as many refunds showing */
+const refresh = () => list.refresh().catch((e) => (error.value = apiMessage(e, "Couldn't load refunds for this period.")));
+async function load() {
   error.value = "";
   loading.value = true;
   try {
-    const res = await api.get(base.value, {
-      params: {
-        from: financeRange.from,
-        to: financeRange.to,
-        page: p,
-        status: status.value && status.value !== "issues" ? status.value : undefined,
-        issues: status.value === "issues" ? 1 : undefined,
-        search: search.value.trim() || undefined,
-      },
-    });
-    data.value = res.data.data;
-    page.value = res.data.data.meta.page;
+    await list.load();
   } catch (e) {
     error.value = apiMessage(e, "Couldn't load refunds for this period.");
   } finally {
@@ -391,7 +391,7 @@ async function saveSent() {
     toast.success(res.data.message);
     sentForm.value = null;
     detailRow.value = null;
-    load(page.value);
+    refresh();
   } catch (e) {
     formError.value = apiMessage(e, "Couldn't record the refund.");
   } finally {

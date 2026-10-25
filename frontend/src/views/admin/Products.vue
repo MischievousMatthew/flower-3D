@@ -87,12 +87,12 @@
               </div>
             </div>
             <p v-else-if="loadError && !products.length" class="empty-msg">
-              The listings couldn't be loaded. <button type="button" class="link-btn" @click="fetchProducts(meta.current_page)">Try again</button>
+              The listings couldn't be loaded. <button type="button" class="link-btn" @click="productList.refresh()">Try again</button>
             </p>
             <p v-else-if="!products.length" class="empty-msg">{{ hasFilters ? "No listings match these filters." : EMPTY[filters.tab] ?? "No listings yet." }}</p>
             <div v-else class="product-grid" :class="{ dim: loading }">
               <article
-                v-for="p in products"
+                v-for="p in productList.rows.value"
                 :key="p.id"
                 class="card"
                 :class="{ selected: drawer.id === p.id }"
@@ -143,14 +143,7 @@
               </article>
             </div>
 
-            <div v-if="meta.total > meta.per_page" class="pager">
-              <span class="pager-info">{{ (meta.current_page - 1) * meta.per_page + 1 }}–{{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }}</span>
-              <div class="pager-btns">
-                <button type="button" class="ghost-btn" :disabled="meta.current_page <= 1 || loading" @click="fetchProducts(meta.current_page - 1)">Previous</button>
-                <span class="pager-info">{{ meta.current_page }} / {{ meta.last_page }}</span>
-                <button type="button" class="ghost-btn" :disabled="meta.current_page >= meta.last_page || loading" @click="fetchProducts(meta.current_page + 1)">Next</button>
-              </div>
-            </div>
+            <ShowMore v-if="products.length" tone="admin" :has-more="productList.hasMore.value" :loading="productList.loadingMore.value" :shown="productList.rows.value.length" :total="productList.total.value" @more="productList.showMore()" />
           </section>
         </template>
 
@@ -407,6 +400,8 @@ import { useProductTaxonomies } from "../../composables/useProductTaxonomies";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
+import ShowMore from "../../components/common/ShowMore.vue";
+import { useShowMoreRows } from "../../composables/useShowMore";
 import { linkedId } from "../../utils/hiddenIds";
 
 const { toggleMobile } = useSidebarState();
@@ -499,7 +494,7 @@ const fetchProducts = async (page = 1) => {
     const params = Object.fromEntries(Object.entries({ ...filters, search: filters.search.trim(), page, per_page: 12 }).filter(([, v]) => v !== ""));
     const { data } = await api.get("/admin/products", { params });
     if (id !== listRequest) return;
-    products.value = data.data;
+    products.value = page > 1 ? [...products.value, ...(data.data ?? [])] : data.data;
     meta.value = data.meta;
   } catch {
     if (id !== listRequest) return;
@@ -509,13 +504,15 @@ const fetchProducts = async (page = 1) => {
     if (id === listRequest) loading.value = false;
   }
 };
+// 10 rows first, then 10 more, then 20 at a time
+const productList = useShowMoreRows(products, meta, fetchProducts);
 
 let searchTimer = null;
 watch(
   () => ({ ...filters }),
   (next, prev) => {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => fetchProducts(1), next.search !== prev.search ? 300 : 0);
+    searchTimer = setTimeout(() => productList.load(), next.search !== prev.search ? 300 : 0);
     if (next.tab !== prev.tab) router.replace({ query: { ...route.query, tab: next.tab } });
   },
 );
@@ -524,7 +521,7 @@ const clearFilters = () => Object.assign(filters, { search: "", category: "", fl
 
 const refresh = () => {
   fetchSummary();
-  if (view.value === "listings") fetchProducts(meta.value.current_page);
+  if (view.value === "listings") productList.refresh();
   else fetchLists();
   if (drawer.id) loadProduct(drawer.id);
 };
@@ -602,7 +599,7 @@ const confirmModerate = async () => {
     const id = dialog.product.id;
     dialog.busy = false;
     dialog.action = null;
-    await Promise.all([fetchProducts(meta.value.current_page), fetchSummary(), drawer.id === id ? loadProduct(id) : null]);
+    await Promise.all([productList.refresh(), fetchSummary(), drawer.id === id ? loadProduct(id) : null]);
   } catch (error) {
     dialog.busy = false;
     dialog.error = error.response?.data?.message || "That didn't work. Try again.";
@@ -636,7 +633,7 @@ const loadSection = () => {
   if (!listingsLoaded) {
     listingsLoaded = true;
     fetchSummary();
-    fetchProducts();
+    productList.load();
   }
 };
 watch(view, loadSection);

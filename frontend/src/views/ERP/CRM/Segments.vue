@@ -66,7 +66,7 @@
         <p v-else-if="!members.rows.length" class="sp-hint">No one matches.</p>
         <template v-else>
           <ul class="sg-rows" :class="{ dim: membersLoading }">
-            <li v-for="m in members.rows" :key="m.id" class="sg-row">
+            <li v-for="m in memberList.rows.value" :key="m.id" class="sg-row">
               <span class="sg-avatar" aria-hidden="true">{{ initials(m.name) }}</span>
               <div class="grow">
                 <strong>{{ m.name }}</strong>
@@ -79,13 +79,7 @@
               <span class="sp-chip" :class="m.gets_offers ? 'green' : 'slate'">{{ m.gets_offers ? "Gets offers" : "No offers" }}</span>
             </li>
           </ul>
-          <footer v-if="members.meta.last_page > 1" class="sg-pager">
-            <span>{{ members.meta.total }} people · page {{ members.meta.page }} of {{ members.meta.last_page }}</span>
-            <div>
-              <button type="button" class="sp-icon-btn" :disabled="members.meta.page <= 1" aria-label="Previous page" @click="loadMembers(members.meta.page - 1)"><span v-html="ICONS.chevronLeft"></span></button>
-              <button type="button" class="sp-icon-btn" :disabled="members.meta.page >= members.meta.last_page" aria-label="Next page" @click="loadMembers(members.meta.page + 1)"><span v-html="ICONS.chevronRight"></span></button>
-            </div>
-          </footer>
+          <ShowMore v-if="members && members.rows.length" tone="vendor" :has-more="memberList.hasMore.value" :loading="memberList.loadingMore.value" :shown="memberList.rows.value.length" :total="memberList.total.value" @more="memberList.showMore()" />
         </template>
       </section>
 
@@ -164,6 +158,8 @@
 import { computed, onMounted, ref } from "vue";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
+import ShowMore from "../../../components/common/ShowMore.vue";
+import { useShowMoreInto } from "../../../composables/useShowMore";
 import HrPage from "../../../components/hr/HrPage.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
@@ -192,6 +188,10 @@ const error = ref("");
 const loading = ref(false);
 const selected = ref("");
 const members = ref(null);
+// 10 people first, then 10 more, then 20 at a time
+const memberList = useShowMoreInto(members, "rows", async (p) =>
+  (await api.get(`crm/segments/${selected.value}`, { params: { page: p, search: search.value.trim() || undefined } })).data.data,
+);
 const membersLoading = ref(false);
 const search = ref("");
 const form = ref(null);
@@ -221,12 +221,10 @@ async function load() {
     loading.value = false;
   }
 }
-async function loadMembers(p = 1) {
-  const key = selected.value;
+async function loadMembers() {
   membersLoading.value = true;
   try {
-    const res = await api.get(`crm/segments/${key}`, { params: { page: p, search: search.value.trim() || undefined } });
-    if (selected.value === key) members.value = res.data.data;
+    await memberList.load();
   } catch (e) {
     toast.error(apiMessage(e, "Couldn't load this group."));
   } finally {

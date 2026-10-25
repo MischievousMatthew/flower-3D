@@ -130,16 +130,11 @@
         </li>
       </ul>
 
-      <footer v-if="meta.last_page > 1" class="pager">
-        <span>{{ (meta.page - 1) * meta.per_page + 1 }}–{{ Math.min(meta.page * meta.per_page, meta.total) }} of {{ meta.total }}</span>
-        <div>
-          <button type="button" class="sp-icon-btn" :disabled="meta.page <= 1 || loading" aria-label="Previous page" @click="go(meta.page - 1)"><span v-html="ICONS.chevronLeft"></span></button>
-          <button type="button" class="sp-icon-btn" :disabled="meta.page >= meta.last_page || loading" aria-label="Next page" @click="go(meta.page + 1)"><span v-html="ICONS.chevronRight"></span></button>
-        </div>
-      </footer>
+      <!-- 10 orders, then 10 more, then 20 at a time -->
+      <ShowMore v-if="orders.length" tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="orders.length" :total="pager.total.value" @more="pager.showMore()" />
     </section>
 
-    <OrderActionModal :order="acting?.order" :action="acting?.action" @close="acting = null" @done="load" />
+    <OrderActionModal :order="acting?.order" :action="acting?.action" @close="acting = null" @done="pager.refresh()" />
   </ShopLayout>
 </template>
 
@@ -147,6 +142,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../plugins/axios";
+import ShowMore from "../../../components/common/ShowMore.vue";
+import { useShowMorePaged } from "../../../composables/useShowMore";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import OrderActionModal from "../../../components/vendor/orders/OrderActionModal.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
@@ -200,31 +197,35 @@ function readTab() {
   }
 }
 
+/** One page of orders from the server, for the "Show more" list */
+async function fetchPage(p) {
+  const { data } = await api.get("vendor/fulfillment/orders", {
+    params: {
+      tab: tab.value,
+      search: search.value.trim() || undefined,
+      from: from.value || undefined,
+      to: to.value || undefined,
+      sort: sort.value,
+      page: p,
+    },
+  });
+  counts.value = data.counts;
+  meta.value = data.meta;
+  return { items: data.data, lastPage: data.meta.last_page, total: data.meta.total };
+}
+// Orders show 10 at first, then 10 more, then 20 at a time
+const pager = useShowMorePaged(fetchPage);
+watch(() => pager.visible.value, (rows) => (orders.value = rows), { immediate: true });
+
+/** Starts the list over (opening the page, a new tab, search or sort) */
 async function load() {
   const mine = ++seq;
   loading.value = true;
   error.value = "";
-  try {
-    const { data } = await api.get("vendor/fulfillment/orders", {
-      params: {
-        tab: tab.value,
-        search: search.value.trim() || undefined,
-        from: from.value || undefined,
-        to: to.value || undefined,
-        sort: sort.value,
-        page: page.value,
-      },
-    });
-    if (mine !== seq) return;
-    orders.value = data.data;
-    counts.value = data.counts;
-    meta.value = data.meta;
-  } catch (e) {
-    if (mine !== seq) return;
-    error.value = apiMessage(e, "Couldn't load your orders.");
-  } finally {
-    if (mine === seq) loading.value = false;
-  }
+  await pager.load();
+  if (mine !== seq) return;
+  if (pager.error.value) error.value = pager.error.value || "Couldn't load your orders.";
+  loading.value = false;
 }
 function reload() {
   page.value = 1;
@@ -238,11 +239,6 @@ function setTab(key) {
     /* private mode */
   }
   reload();
-}
-function go(p) {
-  page.value = p;
-  load();
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 function clearFilters() {
   search.value = "";

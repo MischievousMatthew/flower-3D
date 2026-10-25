@@ -2,12 +2,12 @@
   <HrPage title="Payments" subtitle="PayMongo and cash-on-delivery payments, what they cost in fees, and whether they match the orders and the books.">
     <template #actions>
       <RangePicker @change="load(1)" />
-      <button type="button" class="sp-btn sp-btn-ghost" :disabled="loading" @click="load(page)">Refresh</button>
+      <button type="button" class="sp-btn sp-btn-ghost" :disabled="loading" @click="refresh()">Refresh</button>
     </template>
 
     <div v-if="error" class="sp-banner error">
       <span v-html="ICONS.alert"></span>{{ error }}
-      <button type="button" @click="load(page)">Try again</button>
+      <button type="button" @click="refresh()">Try again</button>
     </div>
 
     <!-- Headline numbers -->
@@ -152,7 +152,7 @@
       </div>
       <template v-else>
         <ul class="pm-rows" :class="{ dim: loading }">
-          <li v-for="r in data.rows" :key="r.id" class="pm-row" :class="{ picked: selected.includes(r.id) }">
+          <li v-for="r in list.rows.value" :key="r.id" class="pm-row" :class="{ picked: selected.includes(r.id) }">
             <label v-if="tab === 'cod' && canRecord" class="pm-check" :class="{ off: r.cod?.stage !== 'collected' }">
               <input type="checkbox" :disabled="r.cod?.stage !== 'collected'" :checked="selected.includes(r.id)" :aria-label="`Select ${r.order_number} to settle`" @change="toggle(r)" />
             </label>
@@ -187,13 +187,7 @@
             </div>
           </li>
         </ul>
-        <footer v-if="data.meta.last_page > 1" class="fx-pager">
-          <span>{{ data.meta.total }} payments · page {{ data.meta.page }} of {{ data.meta.last_page }}</span>
-          <div>
-            <button type="button" class="sp-icon-btn" :disabled="page <= 1" aria-label="Previous page" @click="load(page - 1)"><span v-html="ICONS.chevronLeft"></span></button>
-            <button type="button" class="sp-icon-btn" :disabled="page >= data.meta.last_page" aria-label="Next page" @click="load(page + 1)"><span v-html="ICONS.chevronRight"></span></button>
-          </div>
-        </footer>
+        <ShowMore v-if="data && data.rows.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
       </template>
     </section>
 
@@ -304,6 +298,8 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
+import ShowMore from "../../../components/common/ShowMore.vue";
+import { useShowMoreInto } from "../../../composables/useShowMore";
 import HrPage from "../../../components/hr/HrPage.vue";
 import RangePicker from "../../../components/vendor/finance/RangePicker.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
@@ -397,10 +393,25 @@ const emptyText = computed(() => {
   return "Payments appear here as customers place orders.";
 });
 
-async function load(p = 1) {
+// 10 payments first, then 10 more, then 20 at a time; picked rows stay picked
+const list = useShowMoreInto(data, "rows", (p) => fetchPayments(p), (payload) => {
+  for (const r of payload.rows ?? []) if (selected.value.includes(r.id)) selectedRows.value[r.id] = r;
+});
+/** Reloads after a change, keeping as many payments showing */
+const refresh = () => list.refresh().catch((e) => (error.value = apiMessage(e, "Couldn't load payments for this period.")));
+async function load() {
   error.value = "";
   loading.value = true;
   try {
+    await list.load();
+  } catch (e) {
+    error.value = apiMessage(e, "Couldn't load payments for this period.");
+  } finally {
+    loading.value = false;
+  }
+}
+async function fetchPayments(p) {
+  {
     const params = {
       from: financeRange.from,
       to: financeRange.to,
@@ -411,14 +422,7 @@ async function load(p = 1) {
       cod_stage: tab.value === "cod" ? codStage.value || undefined : undefined,
       issues: tab.value === "issues" ? 1 : undefined,
     };
-    const res = await api.get(base.value, { params });
-    data.value = res.data.data;
-    page.value = res.data.data.meta.page;
-    for (const r of data.value.rows) if (selected.value.includes(r.id)) selectedRows.value[r.id] = r;
-  } catch (e) {
-    error.value = apiMessage(e, "Couldn't load payments for this period.");
-  } finally {
-    loading.value = false;
+    return (await api.get(base.value, { params })).data.data;
   }
 }
 
@@ -484,7 +488,7 @@ async function saveCollect() {
     });
     toast.success(res.data.message);
     collectForm.value = null;
-    load(page.value);
+    refresh();
   } catch (e) {
     formError.value = apiMessage(e, "Couldn't record the cash.");
   } finally {
@@ -506,7 +510,7 @@ async function saveSettle() {
     toast.success(res.data.message);
     settleForm.value = null;
     clearSelection();
-    load(page.value);
+    refresh();
   } catch (e) {
     formError.value = apiMessage(e, "Couldn't settle the cash.");
   } finally {
@@ -521,7 +525,7 @@ async function saveUndo() {
     toast.success(res.data.message);
     selected.value = selected.value.filter((id) => id !== undoTarget.value.id);
     undoTarget.value = null;
-    load(page.value);
+    refresh();
   } catch (e) {
     toast.error(apiMessage(e, "Couldn't undo that."));
   } finally {

@@ -504,26 +504,8 @@
           </div>
         </div>
 
-        <!-- Pagination -->
-        <div v-if="meta.last_page > 1" class="ot-pager">
-          <button
-            class="ot-btn ot-btn--ghost"
-            :disabled="meta.current_page === 1"
-            @click="goPage(meta.current_page - 1)"
-          >
-            ← Prev
-          </button>
-          <span class="ot-pager__info"
-            >{{ meta.current_page }} / {{ meta.last_page }}</span
-          >
-          <button
-            class="ot-btn ot-btn--ghost"
-            :disabled="meta.current_page === meta.last_page"
-            @click="goPage(meta.current_page + 1)"
-          >
-            Next →
-          </button>
-        </div>
+        <!-- 10 orders, then 10 more, then 20 at a time -->
+        <ShowMore tone="customer" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="orders.length" :total="pager.total.value" @more="pager.showMore()" />
       </template>
     </div>
 
@@ -857,7 +839,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick } from "vue";
+import { watch, ref, reactive, onMounted, nextTick } from "vue";
+import ShowMore from "../../components/common/ShowMore.vue";
+import { useShowMorePaged } from "../../composables/useShowMore";
 import { useRoute, useRouter } from "vue-router";
 import api from "../../plugins/axios";
 import { useAuth } from "../../composables/useAuth";
@@ -984,27 +968,30 @@ function authHeaders() {
 }
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
-async function fetchOrders(page = 1) {
+/** One page of orders from the server, for the "Show more" list */
+async function fetchOrdersPage(page) {
+  const params = { page, per_page: meta.per_page };
+  if (activeTab.value !== "all") params.delivery_status = activeTab.value;
+  if (search.value.trim()) params.search = search.value.trim();
+
+  const res = await api.get(API_BASE, { params, headers: authHeaders() });
+  Object.assign(meta, res.data.meta ?? {});
+  return { items: res.data.data ?? [], lastPage: meta.last_page, total: meta.total };
+}
+// Orders show 10 at first, then 10 more, then 20 at a time
+const pager = useShowMorePaged(fetchOrdersPage);
+watch(() => pager.visible.value, (rows) => (orders.value = rows), { immediate: true });
+
+/** Starts the list over (opening the page, a new tab or search) */
+async function fetchOrders() {
   loading.value = true;
   error.value = null;
-  try {
-    const params = { page, per_page: meta.per_page };
-    if (activeTab.value !== "all") params.delivery_status = activeTab.value;
-    if (search.value.trim()) params.search = search.value.trim();
-
-    const res = await api.get(API_BASE, { params, headers: authHeaders() });
-    orders.value = res.data.data ?? [];
-    Object.assign(meta, res.data.meta ?? {});
-  } catch (e) {
-    error.value =
-      e.response?.status === 401
-        ? "Session expired — please log in again."
-        : (e.response?.data?.message ??
-          "Could not load orders. Please try again.");
-  } finally {
-    loading.value = false;
-  }
+  await pager.load();
+  if (pager.error.value) error.value = pager.error.value || "Could not load orders. Please try again.";
+  loading.value = false;
 }
+/** After an action (cancel, received…): reload, keeping as many orders showing */
+const refreshOrders = () => pager.refresh();
 
 // ── Action guards ─────────────────────────────────────────────────────────────
 const canComplete = (o) => o.delivery?.status === "to_received";
@@ -1048,7 +1035,7 @@ function doComplete(order) {
         { headers: authHeaders() },
       );
       confirmModal.show = false;
-      await fetchOrders(meta.current_page);
+      await refreshOrders();
     } catch (e) {
       toast.error(e.response?.data?.message ?? "That didn't go through. Please try again.");
     } finally {
@@ -1081,7 +1068,7 @@ function doCancel(order) {
         autoClose: 3500,
         position: toast.POSITION.TOP_RIGHT,
       });
-      await fetchOrders(meta.current_page);
+      await refreshOrders();
     } catch (e) {
       toast.error(e.response?.data?.message || "Unable to cancel this order.", {
         autoClose: 3500,
@@ -1229,7 +1216,7 @@ async function submitRequest() {
     reqModal.submitting = false;
     closeReqModal();
     toast.success(data.message || "Request sent to the shop.");
-    await fetchOrders(meta.current_page);
+    await refreshOrders();
     scrollToCase({ id: orderId });
   } catch (e) {
     const msg =
@@ -1267,7 +1254,7 @@ function onReviewed(orderId) {
     position: toast.POSITION.TOP_RIGHT,
   });
   // Refresh orders list in background
-  fetchOrders(meta.current_page);
+  refreshOrders();
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
@@ -1277,15 +1264,11 @@ const toggle = (id) => {
 const setTab = (v) => {
   activeTab.value = v;
   expandedId.value = null;
-  fetchOrders(1);
-};
-const goPage = (p) => {
-  fetchOrders(p);
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  fetchOrders();
 };
 const debounceSearch = () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => fetchOrders(1), 400);
+  searchTimer = setTimeout(() => fetchOrders(), 400);
 };
 
 // stepper

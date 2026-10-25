@@ -267,10 +267,10 @@ class CheckoutController extends Controller
     /**
      * Create order with reservation date using vendor-specific reservation rules.
      */
-    /** Security → Platform settings can pause all new orders */
+    /** Security → Platform settings can pause all new orders, now or on a schedule */
     private function checkoutPaused(): ?\Illuminate\Http\JsonResponse
     {
-        return \App\Support\PlatformSettings::get('checkout_paused')
+        return \App\Support\PlatformSettings::checkoutPausedNow()
             ? response()->json(['success' => false, 'message' => \App\Support\PlatformSettings::get('checkout_pause_message')], 503)
             : null;
     }

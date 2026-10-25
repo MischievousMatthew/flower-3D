@@ -85,13 +85,8 @@
             </tbody>
           </table>
         </div>
-        <footer v-if="page.last_page > 1" class="pd-pages">
-          <span>{{ page.from }}–{{ page.to }} of {{ page.total }}</span>
-          <div>
-            <button type="button" class="sp-icon-btn" aria-label="Previous page" :disabled="page.current_page === 1" @click="load(page.current_page - 1)"><span v-html="ICONS.chevronLeft"></span></button>
-            <button type="button" class="sp-icon-btn" aria-label="Next page" :disabled="page.current_page === page.last_page" @click="load(page.current_page + 1)"><span v-html="ICONS.chevronRight"></span></button>
-          </div>
-        </footer>
+        <!-- 10 payrolls, then 10 more, then 20 at a time -->
+        <ShowMore v-if="rows && rows.length" tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="rows.length" :total="pager.total.value" @more="pager.showMore()" />
       </section>
     </template>
 
@@ -357,6 +352,8 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from "vue";
+import ShowMore from "../../../components/common/ShowMore.vue";
+import { useShowMorePaged } from "../../../composables/useShowMore";
 import { toast } from "vue3-toastify";
 import { SHOP_ICONS as ICONS } from "../../vendor/shop/shopIcons";
 import { personColor } from "../../vendor/staff/staffUi";
@@ -436,14 +433,24 @@ function toggleAll() {
 
 const params = () => ({ status: filters.status, month: filters.month || undefined, year: filters.year, search: search.value.trim() || undefined });
 
-async function load(p = 1) {
+/** One page of payrolls from the server, for the "Show more" list */
+async function fetchPage(p) {
+  const res = await props.api.list({ ...params(), page: p, per_page: 30 });
+  page.value = res.pagination;
+  return { items: res.data, lastPage: res.pagination?.last_page ?? 1, total: res.pagination?.total };
+}
+const pager = useShowMorePaged(fetchPage);
+watch(() => pager.visible.value, (list) => {
+  if (rows.value !== null) rows.value = list;
+});
+async function load() {
   error.value = "";
   rows.value = null;
   selected.value = [];
   try {
-    const res = await props.api.list({ ...params(), page: p, per_page: 30 });
-    rows.value = res.data;
-    page.value = res.pagination;
+    await pager.load();
+    if (pager.failure.value) throw pager.failure.value;
+    rows.value = pager.visible.value;
   } catch (e) {
     rows.value = [];
     error.value = message(e, "Couldn't load payrolls.");
@@ -476,7 +483,7 @@ async function bulk(action) {
     const res = await props.api[action](selected.value, bulkNote.value.trim() || null);
     toast.success(res.message);
     bulkNote.value = "";
-    await Promise.all([load(page.value.current_page), loadSummary()]);
+    await Promise.all([pager.refresh(), loadSummary()]);
   } catch (e) {
     toast.error(message(e, "Couldn't do that."));
   } finally {
@@ -543,7 +550,7 @@ async function slipAction(fn) {
   try {
     const res = await fn();
     toast.success(res.message);
-    await Promise.all([load(page.value.current_page), loadSummary()]);
+    await Promise.all([pager.refresh(), loadSummary()]);
     if (slipOpen.value && slipRow.value) await openSlip(slipRow.value);
   } catch (e) {
     slipError.value = message(e, "Couldn't do that.");
@@ -579,7 +586,7 @@ async function removeSlip() {
     const res = await props.api.remove(slip.value.id);
     toast.success(res.message);
     slipOpen.value = false;
-    await Promise.all([load(page.value.current_page), loadSummary()]);
+    await Promise.all([pager.refresh(), loadSummary()]);
   } catch (e) {
     slipError.value = message(e, "Couldn't delete it.");
   } finally {

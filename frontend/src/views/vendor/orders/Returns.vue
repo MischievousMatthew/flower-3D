@@ -61,13 +61,8 @@
               </button>
             </li>
           </ul>
-          <footer v-if="meta.last_page > 1" class="pager">
-            <span>Page {{ meta.current_page }} of {{ meta.last_page }}</span>
-            <div>
-              <button type="button" class="sp-icon-btn" :disabled="meta.current_page <= 1" aria-label="Previous page" @click="go(meta.current_page - 1)"><span v-html="ICONS.chevronLeft"></span></button>
-              <button type="button" class="sp-icon-btn" :disabled="meta.current_page >= meta.last_page" aria-label="Next page" @click="go(meta.current_page + 1)"><span v-html="ICONS.chevronRight"></span></button>
-            </div>
-          </footer>
+          <!-- 10 requests, then 10 more, then 20 at a time -->
+          <ShowMore v-if="cases && cases.length" tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="cases.length" :total="pager.total.value" @more="pager.showMore()" />
         </section>
       </div>
 
@@ -111,6 +106,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../plugins/axios";
+import ShowMore from "../../../components/common/ShowMore.vue";
+import { useShowMorePaged } from "../../../composables/useShowMore";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import ReturnCasePanel from "../../../components/returns/ReturnCasePanel.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
@@ -134,6 +131,20 @@ const search = ref("");
 const cases = ref(null);
 const counts = ref(null);
 const meta = ref({ current_page: 1, last_page: 1 });
+/** One page of requests from the server, for the "Show more" list */
+async function fetchPage(p) {
+  const { data } = await api.get("sc/order-requests", {
+    params: { status: tab.value || undefined, search: search.value.trim() || undefined, page: p, per_page: 15 },
+  });
+  counts.value = data.counts;
+  meta.value = data.meta;
+  return { items: data.data, lastPage: data.meta.last_page, total: data.meta.total };
+}
+const pager = useShowMorePaged(fetchPage);
+// Once loaded, the list follows "Show more" (before that, null shows the skeleton)
+watch(() => pager.visible.value, (rows) => {
+  if (cases.value !== null) cases.value = rows;
+});
 const error = ref("");
 const openId = ref(null);
 const page = ref(1);
@@ -146,13 +157,10 @@ async function load() {
   const mine = ++seq;
   error.value = "";
   try {
-    const { data } = await api.get("sc/order-requests", {
-      params: { status: tab.value || undefined, search: search.value.trim() || undefined, page: page.value, per_page: 15 },
-    });
+    await pager.load();
     if (mine !== seq) return;
-    cases.value = data.data;
-    counts.value = data.counts;
-    meta.value = data.meta;
+    if (pager.failure.value) throw pager.failure.value;
+    cases.value = pager.visible.value;
   } catch (e) {
     if (mine !== seq) return;
     error.value = apiMessage(e, "Couldn't load return and refund requests.");
@@ -163,10 +171,6 @@ function setTab(key) {
   tab.value = key;
   page.value = 1;
   cases.value = null;
-  load();
-}
-function go(p) {
-  page.value = p;
   load();
 }
 watch(search, () => {

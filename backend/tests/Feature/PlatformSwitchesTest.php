@@ -110,6 +110,9 @@ class PlatformSwitchesTest extends TestCase
                 'vendor_applications_open' => false,
                 'checkout_paused' => true,
                 'checkout_pause_message' => 'Back soon, we are restocking.',
+                // A planned pause, so customers can be told ahead (none here)
+                'checkout_pause_starts_at' => null,
+                'checkout_pause_ends_at' => null,
             ]]);
     }
 
@@ -117,7 +120,7 @@ class PlatformSwitchesTest extends TestCase
     {
         $data = $this->getJson('/api/site/status')->assertOk()->json('data');
 
-        $this->assertSame(['registrations_open', 'vendor_applications_open', 'checkout_paused', 'checkout_pause_message'], array_keys($data));
+        $this->assertSame(['registrations_open', 'vendor_applications_open', 'checkout_paused', 'checkout_pause_message', 'checkout_pause_starts_at', 'checkout_pause_ends_at'], array_keys($data));
     }
 
     public function test_the_admin_can_see_the_new_value_right_after_saving(): void

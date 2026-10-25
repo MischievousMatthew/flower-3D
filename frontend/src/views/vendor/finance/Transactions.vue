@@ -64,7 +64,7 @@
           <p>{{ search || kind || direction ? "Try another filter." : "Customer payments appear here once orders are paid or delivered." }}</p>
         </div>
         <ul v-else class="fx-list" :class="{ dim: loading }">
-          <li v-for="e in data.entries" :key="e.key" class="fx-row">
+          <li v-for="e in list.rows.value" :key="e.key" class="fx-row">
             <span class="fx-icon" :class="`tone-${KIND[e.kind]?.tone}`" v-html="ICONS[KIND[e.kind]?.icon || 'receipt']"></span>
             <div class="fx-main">
               <strong>{{ e.title }}</strong>
@@ -78,13 +78,7 @@
             <span class="fx-amt" :class="e.direction">{{ e.direction === "in" ? "+" : "−" }}{{ money(e.amount) }}</span>
           </li>
         </ul>
-        <footer v-if="data && data.meta.last_page > 1" class="fx-pager">
-          <span>{{ data.meta.total }} transactions · page {{ data.meta.page }} of {{ data.meta.last_page }}</span>
-          <div>
-            <button type="button" class="sp-icon-btn" :disabled="page <= 1" aria-label="Previous page" @click="go(page - 1)"><span v-html="ICONS.chevronLeft"></span></button>
-            <button type="button" class="sp-icon-btn" :disabled="page >= data.meta.last_page" aria-label="Next page" @click="go(page + 1)"><span v-html="ICONS.chevronRight"></span></button>
-          </div>
-        </footer>
+        <ShowMore v-if="data && data.entries.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
       </section>
 
       <!-- How customers paid -->
@@ -117,6 +111,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import api from "../../../plugins/axios";
+import ShowMore from "../../../components/common/ShowMore.vue";
+import { useShowMoreInto } from "../../../composables/useShowMore";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import RangePicker from "../../../components/vendor/finance/RangePicker.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
@@ -132,6 +128,12 @@ const DIRECTIONS = [
 ];
 
 const data = ref(null);
+// 10 transactions first, then 10 more, then 20 at a time
+const list = useShowMoreInto(data, "entries", async (p) =>
+  (await api.get("vendor/books/transactions", {
+    params: { from: financeRange.from, to: financeRange.to, direction: direction.value || undefined, kind: kind.value || undefined, search: search.value.trim() || undefined, page: p },
+  })).data.data,
+);
 const error = ref("");
 const loading = ref(false);
 const direction = ref("");
@@ -150,10 +152,7 @@ async function load() {
   loading.value = true;
   error.value = "";
   try {
-    const res = await api.get("vendor/books/transactions", {
-      params: { from: financeRange.from, to: financeRange.to, direction: direction.value || undefined, kind: kind.value || undefined, search: search.value.trim() || undefined, page: page.value },
-    });
-    if (mine === seq) data.value = res.data.data;
+    await list.load();
   } catch (e) {
     if (mine === seq) error.value = apiMessage(e, "Couldn't load your transactions.");
   } finally {
@@ -167,10 +166,6 @@ function reload() {
 function setDirection(d) {
   direction.value = d;
   reload();
-}
-function go(p) {
-  page.value = p;
-  load();
 }
 watch(search, () => {
   clearTimeout(timer);

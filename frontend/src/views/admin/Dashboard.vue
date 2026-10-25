@@ -361,6 +361,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { loadChartJs } from "../../utils/chartjs";
 import { useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import { useSidebarState } from "../../composables/useSidebarState";
@@ -477,20 +478,6 @@ const chartCanvas = ref(null);
 const statusCanvas = ref(null);
 let mainChart = null;
 let statusChart = null;
-
-const loadChartJs = () =>
-  new Promise((resolve, reject) => {
-    if (window.Chart) return resolve();
-    const existing = document.querySelector("script[data-chartjs]");
-    const script = existing || document.createElement("script");
-    script.addEventListener("load", resolve);
-    script.addEventListener("error", reject);
-    if (!existing) {
-      script.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
-      script.dataset.chartjs = "true";
-      document.head.appendChild(script);
-    }
-  });
 
 const renderCharts = async () => {
   try {

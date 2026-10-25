@@ -20,6 +20,8 @@ class NotificationController extends Controller
     {
         $this->syncShop($request);
         $items = UserNotification::query()->where('user_id', $request->user()->id)
+            // Important notices stay on top until they're read
+            ->orderByRaw('case when important = ? and read_at is null then 0 else 1 end', [true])
             ->latest()->orderByDesc('id')->limit(min(max((int) $request->input('limit', 20), 1), 50))->get();
 
         return response()->json([

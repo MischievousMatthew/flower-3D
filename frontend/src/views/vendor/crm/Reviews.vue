@@ -104,7 +104,7 @@
         <p>{{ filtered ? "Try another filter." : "Customers can rate a product after their order is delivered. Reviews show up here." }}</p>
       </div>
       <ul v-else class="rv-list">
-        <li v-for="r in data.reviews" :key="r.id" :ref="(el) => setFocusEl(r.id, el)" class="rv-item" :class="{ focus: r.id === focusId, hidden: r.hidden }">
+        <li v-for="r in list.rows.value" :key="r.id" :ref="(el) => setFocusEl(r.id, el)" class="rv-item" :class="{ focus: r.id === focusId, hidden: r.hidden }">
           <img v-if="r.product.image" :src="r.product.image" alt="" class="rv-thumb" />
           <span v-else class="rv-thumb rv-thumb-icon" v-html="ICONS.flower"></span>
           <div class="rv-main">
@@ -147,11 +147,7 @@
         </li>
       </ul>
 
-      <nav v-if="data && data.meta.last_page > 1" class="rv-pages" aria-label="Pages">
-        <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="data.meta.page <= 1" @click="load(data.meta.page - 1)"><span v-html="ICONS.left"></span>Previous</button>
-        <span class="st-sub">Page {{ data.meta.page }} of {{ data.meta.last_page }}</span>
-        <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="data.meta.page >= data.meta.last_page" @click="load(data.meta.page + 1)">Next<span v-html="ICONS.right"></span></button>
-      </nav>
+      <ShowMore v-if="data && data.reviews.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
     </section>
   </component>
 </template>
@@ -160,6 +156,8 @@
 import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
+import ShowMore from "../../../components/common/ShowMore.vue";
+import { useShowMoreInto } from "../../../composables/useShowMore";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import HrPage from "../../../components/hr/HrPage.vue";
 import { useAssignment } from "../../../composables/useAssignment";
@@ -211,8 +209,8 @@ const trend = computed(() => {
 const pct = (n) => (s.value.count ? ((s.value.distribution?.[n] ?? 0) / s.value.count) * 100 : 0);
 const starFill = (n) => Math.max(0, Math.min(100, ((s.value.average ?? 0) - (n - 1)) * 100));
 
-async function load(page = 1) {
-  error.value = "";
+// 10 reviews first, then 10 more, then 20 at a time
+const list = useShowMoreInto(data, "reviews", async (page) => {
   const params = {
     page,
     rating: rating.value || undefined,
@@ -221,9 +219,12 @@ async function load(page = 1) {
     sort: sort.value,
     search: search.value.trim() || undefined,
   };
+  return (await api.get(base, { params })).data.data;
+});
+async function load() {
+  error.value = "";
   try {
-    const res = await api.get(base, { params });
-    data.value = res.data.data;
+    await list.load();
   } catch (e) {
     error.value = apiMessage(e, "Couldn't load reviews.");
   }

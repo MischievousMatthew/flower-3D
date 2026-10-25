@@ -41,7 +41,7 @@ class LogApiErrors
             $started = $request->attributes->get('started_at');
             [$type, $name, $userId, $employeeId] = $this->account($request->user());
 
-            ApiErrorLog::create([
+            $row = [
                 'method' => $request->method(),
                 'path' => Str::limit('/' . ltrim($request->path(), '/'), 250, ''),
                 'action' => $request->route() ? Str::limit($request->route()->getActionName(), 185, '') : null,
@@ -57,7 +57,9 @@ class LogApiErrors
                 'employee_id' => $employeeId,
                 'location' => $exception ? Str::limit(basename($exception->getFile()) . ':' . $exception->getLine(), 185, '') : null,
                 'shown_message' => is_string($payload['message'] ?? null) ? Str::limit($payload['message'], 297) : null,
-            ]);
+            ];
+            // Which problem it belongs to, so the admin list groups it and "fixed" applies to all of them
+            ApiErrorLog::create($row + ['signature' => ApiErrorLog::signatureFor($row)]);
 
             if (random_int(1, 200) === 1) {
                 ApiErrorLog::where('created_at', '<', now()->subDays(self::KEEP_DAYS))->delete();

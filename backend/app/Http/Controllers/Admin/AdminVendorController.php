@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Services\PlatformNotices;
 use App\Enums\SubscriptionStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
@@ -127,7 +128,7 @@ class AdminVendorController extends Controller
     /**
      * POST /api/admin/vendors/{id}/suspend
      */
-    public function suspend(Request $request, int $id): JsonResponse
+    public function suspend(Request $request, int $id, PlatformNotices $notices): JsonResponse
     {
         $data = $request->validate(['reason' => 'required|string|min:5|max:1000']);
         $vendor = User::query()->where('role', User::ROLE_VENDOR)->find($id);
@@ -140,6 +141,8 @@ class AdminVendorController extends Controller
         } catch (LogicException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
+        // Waiting in their notifications, so the reason is there when they're back
+        $notices->toUser($vendor->id, 'Your shop was suspended', 'Reason: ' . trim($data['reason']));
 
         return response()->json(['success' => true, 'message' => 'Vendor suspended. They and their staff have been signed out.']);
     }
@@ -147,7 +150,7 @@ class AdminVendorController extends Controller
     /**
      * POST /api/admin/vendors/{id}/reactivate
      */
-    public function reactivate(Request $request, int $id): JsonResponse
+    public function reactivate(Request $request, int $id, PlatformNotices $notices): JsonResponse
     {
         $data = $request->validate(['note' => 'nullable|string|max:1000']);
         $vendor = User::query()->where('role', User::ROLE_VENDOR)->find($id);
@@ -160,6 +163,7 @@ class AdminVendorController extends Controller
         } catch (LogicException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
+        $notices->toUser($vendor->id, 'Your shop is active again', !empty($data['note']) ? trim($data['note']) : 'Customers can see your shop and order again.');
 
         return response()->json(['success' => true, 'message' => 'Vendor reactivated. Their store is visible again.']);
     }

@@ -30,14 +30,14 @@
           <p>{{ unreadOnly ? "No unread notifications." : "When something happens in your shop, you'll see it here and on the bell at the top." }}</p>
         </div>
         <template v-else>
-          <section v-for="g in grouped" :key="g.day" class="nt-day">
-            <h3>{{ g.day }}</h3>
+          <section v-for="g in grouped" :key="g.day" class="nt-day" :class="{ pinned: g.pinned }">
+            <h3><span v-if="g.pinned" class="nt-pin" v-html="ICONS.alert"></span>{{ g.day }}</h3>
             <ul class="nt-list">
               <li v-for="n in g.items" :key="n.id">
                 <button type="button" class="nt-item" :class="{ unread: !n.read, important: n.important && !n.read }" @click="open(n)">
                   <span class="nt-icon" :class="`tone-${kind(n).tone}`" v-html="ICONS[kind(n).icon]"></span>
                   <span class="nt-main">
-                    <strong>{{ n.title }}</strong>
+                    <strong>{{ n.title }} <span v-if="n.important" class="nt-tag">Important</span></strong>
                     <span v-if="n.body" class="nt-body">{{ n.body }}</span>
                     <small>{{ kind(n).label }} · {{ timeAgo(n.created_at) }}</small>
                   </span>
@@ -47,11 +47,7 @@
               </li>
             </ul>
           </section>
-          <nav v-if="data.meta.last_page > 1" class="nt-pages" aria-label="Pages">
-            <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="data.meta.page <= 1" @click="load(data.meta.page - 1)"><span v-html="ICONS.left"></span>Newer</button>
-            <span class="st-sub">Page {{ data.meta.page }} of {{ data.meta.last_page }}</span>
-            <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="data.meta.page >= data.meta.last_page" @click="load(data.meta.page + 1)">Older<span v-html="ICONS.right"></span></button>
-          </nav>
+          <ShowMore v-if="data && data.items.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
         </template>
       </section>
 
@@ -78,6 +74,8 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
+import ShowMore from "../../../components/common/ShowMore.vue";
+import { useShowMoreInto } from "../../../composables/useShowMore";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
@@ -86,7 +84,7 @@ import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
 import "../../../components/vendor/finance/finance.css";
 
-const FILTERS = ["order", "payment", "stock", "message", "inquiry", "review", "return", "announcement"];
+const FILTERS = ["platform", "order", "payment", "stock", "message", "inquiry", "review", "return", "announcement"];
 // Settings keys → how they look
 const KIND_FOR = {
   orders: NOTIFICATION_KINDS.order,
@@ -100,6 +98,13 @@ const KIND_FOR = {
 
 const router = useRouter();
 const data = ref(null);
+// 10 notifications first, then 10 more, then 20 at a time
+const list = useShowMoreInto(
+  data,
+  "items",
+  async (page) => (await api.get("vendor/crm/notifications", { params: { page, type: type.value || undefined, unread: unreadOnly.value ? 1 : undefined } })).data.data,
+  (payload, page) => page === 1 && Object.assign(prefs, payload.preferences),
+);
 const error = ref("");
 const type = ref(null);
 const unreadOnly = ref(false);
@@ -109,20 +114,22 @@ const prefs = reactive({});
 const kind = (n) => NOTIFICATION_KINDS[n.type] ?? NOTIFICATION_KINDS.support;
 const grouped = computed(() => {
   const out = [];
-  for (const n of data.value?.items ?? []) {
+  const items = list.rows.value;
+  // Unread important notices stay pinned on top, whatever their day
+  const pinned = items.filter((n) => n.important && !n.read);
+  if (pinned.length) out.push({ day: "Important", pinned: true, items: pinned });
+  for (const n of items.filter((x) => !pinned.includes(x))) {
     const day = dayHeading(n.created_at);
-    if (!out.length || out[out.length - 1].day !== day) out.push({ day, items: [] });
+    if (!out.length || out[out.length - 1].pinned || out[out.length - 1].day !== day) out.push({ day, items: [] });
     out[out.length - 1].items.push(n);
   }
   return out;
 });
 
-async function load(page = 1) {
+async function load() {
   error.value = "";
   try {
-    const res = await api.get("vendor/crm/notifications", { params: { page, type: type.value || undefined, unread: unreadOnly.value ? 1 : undefined } });
-    data.value = res.data.data;
-    Object.assign(prefs, data.value.preferences);
+    await list.load();
   } catch (e) {
     error.value = apiMessage(e, "Couldn't load your notifications.");
   }
@@ -236,7 +243,35 @@ onMounted(() => load());
   background: var(--v-subtle);
 }
 .nt-item.important {
-  box-shadow: inset 3px 0 0 var(--bc-accent);
+  box-shadow: inset 3px 0 0 var(--v-red-text);
+}
+.nt-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.nt-day.pinned h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--v-red-text);
+}
+.nt-pin {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+}
+.nt-pin :deep(svg) {
+  width: 15px;
+  height: 15px;
 }
 .nt-icon {
   flex: none;

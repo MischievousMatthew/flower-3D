@@ -18,6 +18,8 @@ export const NOTIFICATION_KINDS = {
   review: { label: "Reviews", icon: "star", tone: "pink" },
   return: { label: "Returns", icon: "restore", tone: "red" },
   announcement: { label: "BloomCraft", icon: "megaphone", tone: "slate" },
+  // Notices about something an admin did that affects the shop (checkout paused, a listing hidden…)
+  platform: { label: "From BloomCraft", icon: "megaphone", tone: "red" },
   support: { label: "Support", icon: "note", tone: "slate" },
 };
 

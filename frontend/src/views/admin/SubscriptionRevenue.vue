@@ -419,7 +419,7 @@
                   <tr><td colspan="7" class="empty-cell">{{ hasFilters ? "No transactions match these filters" : "No subscription payments yet" }}</td></tr>
                 </tbody>
                 <tbody v-else :class="{ dim: transactionsLoading }">
-                  <tr v-for="row in transactions" :key="row.id">
+                  <tr v-for="row in txList.rows.value" :key="row.id">
                     <td>
                       <div class="vendor-cell">
                         <VendorAvatar :vendor="row.vendor" />
@@ -487,16 +487,7 @@
               </table>
             </div>
 
-            <div v-if="tab === 'transactions' && meta.last_page > 1" class="pager">
-              <span class="pager-info">
-                {{ (meta.current_page - 1) * meta.per_page + 1 }}–{{ Math.min(meta.current_page * meta.per_page, meta.total) }}
-                of {{ meta.total }}
-              </span>
-              <div class="pager-btns">
-                <button type="button" class="ghost-btn" :disabled="meta.current_page <= 1 || transactionsLoading" @click="goToPage(meta.current_page - 1)">Previous</button>
-                <button type="button" class="ghost-btn" :disabled="meta.current_page >= meta.last_page || transactionsLoading" @click="goToPage(meta.current_page + 1)">Next</button>
-              </div>
-            </div>
+            <ShowMore v-if="transactions.length" tone="admin" :has-more="txList.hasMore.value" :loading="txList.loadingMore.value" :shown="txList.rows.value.length" :total="txList.total.value" @more="txList.showMore()" />
           </section>
         </template>
       </div>
@@ -511,6 +502,8 @@ import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
+import ShowMore from "../../components/common/ShowMore.vue";
+import { useShowMoreRows } from "../../composables/useShowMore";
 
 const { toggleMobile } = useSidebarState();
 
@@ -637,7 +630,7 @@ const setRange = (value) => {
 
 const refresh = () => {
   fetchOverview();
-  if (tab.value === "transactions") fetchTransactions();
+  if (tab.value === "transactions") txList.load();
   else fetchSubscribers();
 };
 
@@ -797,7 +790,7 @@ const fetchTransactions = async (page = 1) => {
       params: { ...filterParams(), page, per_page: 10 },
     });
     if (id !== transactionRequest) return;
-    transactions.value = data.data;
+    transactions.value = page > 1 ? [...transactions.value, ...(data.data ?? [])] : data.data;
     meta.value = data.meta;
     transactionTotal.value = data.meta.total;
   } catch {
@@ -806,6 +799,8 @@ const fetchTransactions = async (page = 1) => {
     if (id === transactionRequest) transactionsLoading.value = false;
   }
 };
+// 10 rows first, then 10 more, then 20 at a time
+const txList = useShowMoreRows(transactions, meta, fetchTransactions);
 
 let subscriberRequest = 0;
 const fetchSubscribers = async () => {
@@ -821,14 +816,12 @@ const fetchSubscribers = async () => {
   }
 };
 
-const goToPage = (page) => fetchTransactions(page);
-
 const switchTab = (value) => {
   if (tab.value === value) return;
   tab.value = value;
   // The two tabs use different statuses; clearing one refetches via the watcher
   if (filters.status) return void (filters.status = "");
-  if (value === "transactions") fetchTransactions();
+  if (value === "transactions") txList.load();
   else fetchSubscribers();
 };
 
@@ -838,7 +831,7 @@ watch(
   () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-      if (tab.value === "transactions") fetchTransactions();
+      if (tab.value === "transactions") txList.load();
       else fetchSubscribers();
     }, 300);
   },
@@ -890,7 +883,7 @@ const planChipStyle = (key) => {
 let clockTimer = null;
 onMounted(() => {
   fetchOverview();
-  fetchTransactions();
+  txList.load();
   fetchSubscribers();
   clockTimer = setInterval(() => (now.value = Date.now()), 30_000);
 });

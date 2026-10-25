@@ -98,7 +98,7 @@
                 <tr><td colspan="6" class="empty-cell">{{ tab === "pending" ? "No applications waiting. You're all caught up." : "No rejected applications." }}</td></tr>
               </tbody>
               <tbody v-else :class="{ dim: listLoading }">
-                <tr v-for="a in applications" :key="a.id" class="click-row" tabindex="0" @click="openApplication(a)" @keydown.enter="openApplication(a)">
+                <tr v-for="a in appList.rows.value" :key="a.id" class="click-row" tabindex="0" @click="openApplication(a)" @keydown.enter="openApplication(a)">
                   <td>
                     <div class="vendor-cell">
                       <VendorAvatar :vendor="{ store_name: a.store_name, logo_url: a.store_logo_url }" :size="34" />
@@ -159,11 +159,11 @@
               <tbody v-if="listLoading && !vendors.length">
                 <tr v-for="n in 6" :key="n"><td v-for="c in 8" :key="c"><div class="sk sk-line"></div></td></tr>
               </tbody>
-              <tbody v-else-if="!pagedVendors.length">
+              <tbody v-else-if="!vendors.length">
                 <tr><td colspan="8" class="empty-cell">{{ tab === "suspended" ? "No suspended vendors." : search ? "No vendors match your search." : "No vendors yet." }}</td></tr>
               </tbody>
               <tbody v-else :class="{ dim: listLoading }">
-                <tr v-for="v in pagedVendors" :key="v.id" class="click-row" :class="{ selected: drawer.vendorId === v.id }" tabindex="0" @click="openVendor(v.id)" @keydown.enter="openVendor(v.id)">
+                <tr v-for="v in vendorList.visible.value" :key="v.id" class="click-row" :class="{ selected: drawer.vendorId === v.id }" tabindex="0" @click="openVendor(v.id)" @keydown.enter="openVendor(v.id)">
                   <td>
                     <div class="vendor-cell">
                       <VendorAvatar :vendor="v" :size="34" />
@@ -203,14 +203,16 @@
             </table>
           </div>
 
-          <div v-if="pager.total > pager.perPage" class="pager">
-            <span class="pager-info">{{ (pager.page - 1) * pager.perPage + 1 }}–{{ Math.min(pager.page * pager.perPage, pager.total) }} of {{ pager.total }}</span>
-            <div class="pager-btns">
-              <button type="button" class="ghost-btn" :disabled="pager.page <= 1 || listLoading" @click="goToPage(pager.page - 1)">Previous</button>
-              <span class="pager-info">{{ pager.page }} / {{ pager.lastPage }}</span>
-              <button type="button" class="ghost-btn" :disabled="pager.page >= pager.lastPage || listLoading" @click="goToPage(pager.page + 1)">Next</button>
-            </div>
-          </div>
+          <!-- 10 rows, then 10 more, then 20 at a time -->
+          <ShowMore
+            v-if="isApplicationTab ? applications.length : vendors.length"
+            tone="admin"
+            :has-more="isApplicationTab ? appList.hasMore.value : vendorList.hasMore.value"
+            :loading="appList.loadingMore.value"
+            :shown="isApplicationTab ? appList.rows.value.length : vendorList.shown.value"
+            :total="isApplicationTab ? appList.total.value : vendorList.total.value"
+            @more="isApplicationTab ? appList.showMore() : vendorList.showMore()"
+          />
         </section>
       </div>
     </main>
@@ -570,6 +572,8 @@ import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import VendorApplicationDetails from "./components/VendorApplicationDetails.vue";
 import api from "../../plugins/axios";
+import ShowMore from "../../components/common/ShowMore.vue";
+import { useShowMoreLocal, useShowMoreRows } from "../../composables/useShowMore";
 import { linkedId } from "../../utils/hiddenIds";
 
 const { toggleMobile } = useSidebarState();
@@ -628,7 +632,8 @@ const listLoading = ref(false);
 const pager = reactive({ page: 1, lastPage: 1, total: 0, perPage: 12 });
 
 const hasFilters = computed(() => Boolean(search.value.trim() || appFilters.business_type || appFilters.start_date || appFilters.end_date));
-const pagedVendors = computed(() => vendors.value.slice((pager.page - 1) * pager.perPage, pager.page * pager.perPage));
+// Vendors are all loaded at once; applications come a page at a time
+const vendorList = useShowMoreLocal(vendors, () => [tab.value, search.value, vendorSort.value]);
 
 let listRequest = 0;
 const fetchList = async (page = 1) => {
@@ -646,7 +651,7 @@ const fetchList = async (page = 1) => {
         },
       });
       if (id !== listRequest) return;
-      applications.value = data.data ?? [];
+      applications.value = page > 1 ? [...applications.value, ...(data.data ?? [])] : data.data ?? [];
       Object.assign(pager, { page: data.meta?.current_page ?? 1, lastPage: data.meta?.last_page ?? 1, total: data.meta?.total ?? applications.value.length });
     } else {
       const { data } = await api.get("/admin/vendors", {
@@ -654,7 +659,7 @@ const fetchList = async (page = 1) => {
       });
       if (id !== listRequest) return;
       vendors.value = data.data ?? [];
-      Object.assign(pager, { page, total: vendors.value.length, lastPage: Math.max(1, Math.ceil(vendors.value.length / pager.perPage)) });
+      Object.assign(pager, { page: 1, total: vendors.value.length, lastPage: 1 });
     }
   } catch {
     if (id === listRequest) toast.error("The list couldn't be loaded.");
@@ -663,10 +668,8 @@ const fetchList = async (page = 1) => {
   }
 };
 
-const goToPage = (page) => {
-  if (isApplicationTab.value) fetchList(page);
-  else pager.page = page;
-};
+// 10 applications first, then 10 more, then 20 at a time
+const appList = useShowMoreRows(applications, computed(() => ({ current_page: pager.page, last_page: pager.lastPage, total: pager.total })), fetchList);
 
 const setTab = (key) => {
   if (tab.value === key) return;
@@ -675,7 +678,7 @@ const setTab = (key) => {
   vendors.value = [];
   pager.page = 1;
   router.replace({ query: { ...route.query, tab: key } });
-  fetchList();
+  appList.load();
 };
 
 const clearFilters = () => {
@@ -685,17 +688,17 @@ const clearFilters = () => {
 
 const refresh = () => {
   fetchSummary();
-  fetchList(isApplicationTab.value ? pager.page : 1);
+  appList.refresh();
   if (drawer.mode === "vendor" && drawer.vendorId) loadVendor(drawer.vendorId);
 };
 
 let searchTimer = null;
 watch(search, () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => fetchList(1), 300);
+  searchTimer = setTimeout(() => appList.load(), 300);
 });
-watch(() => ({ ...appFilters }), () => fetchList(1));
-watch(vendorSort, () => fetchList(1));
+watch(() => ({ ...appFilters }), () => appList.load());
+watch(vendorSort, () => appList.load());
 
 // ── Export ───────────────────────────────────────────────────────
 const exporting = ref(false);
@@ -844,7 +847,7 @@ const apiMessage = (error, fallback) => error?.response?.data?.message || error?
 
 const afterApplicationChange = async () => {
   if (drawer.mode === "application") closeDrawer();
-  await Promise.all([fetchList(pager.page), fetchSummary()]);
+  await Promise.all([appList.refresh(), fetchSummary()]);
 };
 
 const confirmDialog = async () => {
@@ -872,11 +875,11 @@ const confirmDialog = async () => {
     } else if (type === "again") {
       ({ data: { message } } = await api.post(`/admin/vendor-application-resubmissions/${target.id}/request-again`, { rejection_reason: text || null }));
       await reloadResubmissions();
-      fetchList(pager.page);
+      appList.refresh();
     } else if (type === "suspend" || type === "reactivate") {
       const body = type === "suspend" ? { reason: text } : { note: text || null };
       ({ data: { message } } = await api.post(`/admin/vendors/${target.id}/${type}`, body));
-      await Promise.all([fetchList(1), fetchSummary(), drawer.vendorId === target.id ? loadVendor(target.id) : null]);
+      await Promise.all([appList.load(), fetchSummary(), drawer.vendorId === target.id ? loadVendor(target.id) : null]);
     }
     toast.success(message || "Done.");
     dialog.busy = false;
@@ -898,7 +901,7 @@ const approveResubmission = async (item) => {
     const { data } = await api.post(`/admin/vendor-application-resubmissions/${item.id}/approve`);
     toast.success(data.message || "Requirement accepted.");
     await reloadResubmissions();
-    fetchList(pager.page);
+    appList.refresh();
   } catch (error) {
     toast.error(apiMessage(error, "The requirement couldn't be accepted."));
   }
@@ -950,7 +953,7 @@ const onKeydown = (e) => {
 
 onMounted(() => {
   fetchSummary();
-  fetchList();
+  appList.load();
   const vendorId = linkedId("vendor");
   if (vendorId) openVendor(vendorId);
   window.addEventListener("keydown", onKeydown);

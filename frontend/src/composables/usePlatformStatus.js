@@ -8,6 +8,9 @@ const OPEN = {
   vendor_applications_open: true,
   checkout_paused: false,
   checkout_pause_message: "Ordering is paused for a moment. Please try again later.",
+  // A planned pause (shown to customers before it starts)
+  checkout_pause_starts_at: null,
+  checkout_pause_ends_at: null,
 };
 
 // The "checkout is paused" modal, shared by every page (mounted once in App.vue)

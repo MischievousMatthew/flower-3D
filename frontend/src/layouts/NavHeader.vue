@@ -8,6 +8,8 @@
     }"
     aria-label="Main navigation"
   >
+    <!-- Ordering paused, or a planned pause coming up (Admin → System settings) -->
+    <CheckoutStatusBanner />
     <router-link to="/" class="bc-logo" @click="closeMobileMenu">
       <img
         src="/bloomcraft-blankBg.png"
@@ -89,11 +91,12 @@
                   :key="`notice-${notice.id}`"
                   type="button"
                   class="notification-entry"
+                  :class="{ important: notice.important && !notice.read }"
                   @click="openNotice(notice)"
                 >
-                  <span class="notification-status-dot" :class="notice.read ? '' : 'info'"></span>
+                  <span class="notification-status-dot" :class="notice.read ? '' : notice.important ? 'alert' : 'info'"></span>
                   <span class="notification-entry-content">
-                    <span class="notification-entry-title">{{ notice.title }}</span>
+                    <span class="notification-entry-title">{{ notice.title }} <span v-if="notice.important" class="notification-tag">Important</span></span>
                     <span v-if="notice.body" class="notification-entry-message">{{ notice.body }}</span>
                     <span class="notification-entry-time">{{ formatNoticeTime(notice.created_at) }}</span>
                   </span>
@@ -295,6 +298,7 @@ import { useChatNotifications } from "../composables/useChatNotifications";
 import api from "../plugins/axios";
 import { toast } from "vue3-toastify";
 import "../styles/bloomcraft.css";
+import CheckoutStatusBanner from "../components/site/CheckoutStatusBanner.vue";
 
 const router = useRouter();
 const { isAuthenticated, logout, user } = useAuth();
@@ -928,6 +932,26 @@ onUnmounted(() => {
   overflow-y: auto;
 }
 
+/* Important notices from BloomCraft: tagged, with a red edge, and listed first by the server */
+.notification-entry.important {
+  box-shadow: inset 3px 0 0 #c2410c;
+}
+.notification-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: #fdecea;
+  color: #b42318;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+.notification-status-dot.alert {
+  background: #c2410c;
+}
 .notification-entry {
   display: flex;
   gap: 12px;

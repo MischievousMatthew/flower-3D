@@ -94,13 +94,13 @@
                   <tr v-for="n in 8" :key="n"><td v-for="c in 7" :key="c"><div class="sk sk-line"></div></td></tr>
                 </tbody>
                 <tbody v-else-if="loadError && !rows.length">
-                  <tr><td colspan="7" class="empty-cell">The customers couldn't be loaded. <button type="button" class="link-btn" @click="fetchCustomers(meta.current_page)">Try again</button></td></tr>
+                  <tr><td colspan="7" class="empty-cell">The customers couldn't be loaded. <button type="button" class="link-btn" @click="customerList.refresh()">Try again</button></td></tr>
                 </tbody>
                 <tbody v-else-if="!rows.length">
                   <tr><td colspan="7" class="empty-cell">{{ hasFilters || filters.tab !== "all" ? "No customers match." : "No customers yet." }}</td></tr>
                 </tbody>
                 <tbody v-else :class="{ dim: loading }">
-                  <tr v-for="(c, i) in rows" :key="c.id" class="click-row" :class="{ selected: drawer.id === c.id }" tabindex="0" @click="openCustomer(c.id)" @keydown.enter="openCustomer(c.id)">
+                  <tr v-for="(c, i) in customerList.rows.value" :key="c.id" class="click-row" :class="{ selected: drawer.id === c.id }" tabindex="0" @click="openCustomer(c.id)" @keydown.enter="openCustomer(c.id)">
                     <td>
                       <div class="person">
                         <Avatar :name="c.name" :src="c.avatar_url" />
@@ -131,14 +131,7 @@
               </table>
             </div>
 
-            <div v-if="meta.total > meta.per_page" class="pager">
-              <span class="pager-info">{{ (meta.current_page - 1) * meta.per_page + 1 }}–{{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }}</span>
-              <div class="pager-btns">
-                <button type="button" class="ghost-btn" :disabled="meta.current_page <= 1 || loading" @click="fetchCustomers(meta.current_page - 1)">Previous</button>
-                <span class="pager-info">{{ meta.current_page }} / {{ meta.last_page }}</span>
-                <button type="button" class="ghost-btn" :disabled="meta.current_page >= meta.last_page || loading" @click="fetchCustomers(meta.current_page + 1)">Next</button>
-              </div>
-            </div>
+            <ShowMore v-if="rows.length" tone="admin" :has-more="customerList.hasMore.value" :loading="customerList.loadingMore.value" :shown="customerList.rows.value.length" :total="customerList.total.value" @more="customerList.showMore()" />
           </section>
         </template>
 
@@ -407,6 +400,8 @@ import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
+import ShowMore from "../../components/common/ShowMore.vue";
+import { useShowMoreRows } from "../../composables/useShowMore";
 import { linkedId } from "../../utils/hiddenIds";
 
 const { toggleMobile } = useSidebarState();
@@ -485,7 +480,7 @@ const fetchCustomers = async (page = 1) => {
     const params = Object.fromEntries(Object.entries({ ...filters, search: filters.search.trim(), page, per_page: 15 }).filter(([, v]) => v !== ""));
     const { data } = await api.get("/admin/customers", { params });
     if (id !== listRequest) return;
-    rows.value = data.data;
+    rows.value = page > 1 ? [...rows.value, ...(data.data ?? [])] : data.data;
     meta.value = data.meta;
     regions.value = data.regions ?? [];
   } catch {
@@ -496,13 +491,15 @@ const fetchCustomers = async (page = 1) => {
     if (id === listRequest) loading.value = false;
   }
 };
+// 10 rows first, then 10 more, then 20 at a time
+const customerList = useShowMoreRows(rows, meta, fetchCustomers);
 
 let searchTimer = null;
 watch(
   () => ({ ...filters }),
   (next, prev) => {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => fetchCustomers(1), next.search !== prev.search ? 300 : 0);
+    searchTimer = setTimeout(() => customerList.load(), next.search !== prev.search ? 300 : 0);
     if (next.tab !== prev.tab) router.replace({ query: { ...route.query, tab: next.tab } });
   },
 );
@@ -510,7 +507,7 @@ const clearFilters = () => Object.assign(filters, { search: "", region: "", veri
 
 const refresh = () => {
   fetchSummary();
-  if (view.value === "accounts") fetchCustomers(meta.value.current_page);
+  if (view.value === "accounts") customerList.refresh();
   else fetchComplaints();
   if (drawer.id) loadCustomer(drawer.id);
 };
@@ -610,7 +607,7 @@ const confirmDialog = async () => {
       const body = type === "suspend" ? { reason: text } : { note: text || null };
       const { data } = await api.post(`/admin/customers/${target.id}/${type}`, body);
       toast.success(data.message);
-      await Promise.all([fetchCustomers(meta.value.current_page), fetchSummary(), drawer.id === target.id ? loadCustomer(target.id) : null]);
+      await Promise.all([customerList.refresh(), fetchSummary(), drawer.id === target.id ? loadCustomer(target.id) : null]);
     }
     dialog.busy = false;
     dialog.type = null;
@@ -647,7 +644,7 @@ const onKeydown = (e) => {
 
 onMounted(() => {
   fetchSummary();
-  fetchCustomers();
+  customerList.load();
   if (view.value === "complaints") fetchComplaints();
   const customerId = linkedId("customer");
   if (customerId) openCustomer(customerId);

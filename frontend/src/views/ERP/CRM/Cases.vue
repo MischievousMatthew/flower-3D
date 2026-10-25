@@ -1,13 +1,13 @@
 <template>
   <HrPage title="Support cases" subtitle="Complaints and service issues from customers. They follow the same case on their Help page and are told when you reply or resolve it.">
     <template #actions>
-      <button type="button" class="sp-btn sp-btn-ghost" :disabled="loading" @click="load(page)"><span v-html="ICONS.restore"></span>Refresh</button>
+      <button type="button" class="sp-btn sp-btn-ghost" :disabled="loading" @click="refresh()"><span v-html="ICONS.restore"></span>Refresh</button>
       <button v-if="canCreate" type="button" class="sp-btn sp-btn-primary" @click="openNew"><span v-html="ICONS.plus"></span>Record a case</button>
     </template>
 
     <div v-if="error" class="sp-banner error">
       <span v-html="ICONS.alert"></span>{{ error }}
-      <button type="button" @click="load(page)">Try again</button>
+      <button type="button" @click="refresh()">Try again</button>
     </div>
 
     <!-- At a glance -->
@@ -65,7 +65,7 @@
       </div>
       <template v-else>
         <ul class="ca-rows" :class="{ dim: loading }">
-          <li v-for="c in data.rows" :key="c.id">
+          <li v-for="c in list.rows.value" :key="c.id">
             <button type="button" class="ca-row" :class="{ on: selectedId === c.id }" @click="open(c.id)">
               <span class="ca-pri" :class="c.priority" :title="`${PRIORITY[c.priority].label} priority`">
                 <span v-html="PRIORITY[c.priority].icon"></span><b>{{ PRIORITY[c.priority].label }}</b>
@@ -85,13 +85,7 @@
             </button>
           </li>
         </ul>
-        <footer v-if="data.meta.last_page > 1" class="ca-pager">
-          <span>{{ data.meta.total }} cases · page {{ data.meta.page }} of {{ data.meta.last_page }}</span>
-          <div>
-            <button type="button" class="sp-icon-btn" :disabled="page <= 1" aria-label="Previous page" @click="load(page - 1)"><span v-html="ICONS.chevronLeft"></span></button>
-            <button type="button" class="sp-icon-btn" :disabled="page >= data.meta.last_page" aria-label="Next page" @click="load(page + 1)"><span v-html="ICONS.chevronRight"></span></button>
-          </div>
-        </footer>
+        <ShowMore v-if="data && data.rows.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
       </template>
     </section>
 
@@ -298,6 +292,8 @@
 import { computed, onMounted, ref } from "vue";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
+import ShowMore from "../../../components/common/ShowMore.vue";
+import { useShowMoreInto } from "../../../composables/useShowMore";
 import HrPage from "../../../components/hr/HrPage.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
@@ -378,13 +374,17 @@ function ago(at) {
   return `${Math.floor(m / 1440)} d ago`;
 }
 
-async function load(p = 1) {
+// 10 cases first, then 10 more, then 20 at a time
+const list = useShowMoreInto(data, "rows", async (p) =>
+  (await api.get("crm/cases", { params: { page: p, status: status.value, priority: priority.value || undefined, assigned: assigned.value || undefined, search: search.value.trim() || undefined } })).data.data,
+);
+/** Reloads after a change, keeping as many cases showing */
+const refresh = () => list.refresh().catch((e) => (error.value = apiMessage(e, "Couldn't load support cases.")));
+async function load() {
   error.value = "";
   loading.value = true;
   try {
-    const res = await api.get("crm/cases", { params: { page: p, status: status.value, priority: priority.value || undefined, assigned: assigned.value || undefined, search: search.value.trim() || undefined } });
-    data.value = res.data.data;
-    page.value = p;
+    await list.load();
   } catch (e) {
     error.value = apiMessage(e, "Couldn't load support cases.");
   } finally {
@@ -421,7 +421,7 @@ async function update(changes) {
     const res = await api.patch(`crm/cases/${selectedId.value}`, changes);
     detail.value = res.data.data;
     toast.success("Case updated.");
-    load(page.value);
+    refresh();
   } catch (e) {
     toast.error(apiMessage(e, "Couldn't update the case."));
     open(selectedId.value);
@@ -437,7 +437,7 @@ async function reply() {
     detail.value = res.data.data;
     toast.success(internal.value ? "Note added." : `Sent. ${firstName.value} will be notified.`);
     draft.value = "";
-    load(page.value);
+    refresh();
   } catch (e) {
     toast.error(apiMessage(e, "Couldn't save that."));
   } finally {

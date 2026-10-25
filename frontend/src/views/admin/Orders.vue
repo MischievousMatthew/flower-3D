@@ -149,7 +149,7 @@
                 <tr>
                   <td colspan="8" class="empty-cell">
                     The orders couldn't be loaded.
-                    <button type="button" class="link-btn" @click="fetchOrders(meta.current_page)">Try again</button>
+                    <button type="button" class="link-btn" @click="orderList.refresh()">Try again</button>
                   </td>
                 </tr>
               </tbody>
@@ -162,7 +162,7 @@
               </tbody>
               <tbody v-else :class="{ dim: listLoading }">
                 <tr
-                  v-for="order in orders"
+                  v-for="order in orderList.rows.value"
                   :key="order.id"
                   class="order-row"
                   :class="{ selected: drawer.id === order.id }"
@@ -221,16 +221,7 @@
             </table>
           </div>
 
-          <div v-if="meta.total" class="pager">
-            <span class="pager-info">
-              {{ (meta.current_page - 1) * meta.per_page + 1 }}–{{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }} orders
-            </span>
-            <div class="pager-btns">
-              <button type="button" class="ghost-btn" :disabled="meta.current_page <= 1 || listLoading" @click="fetchOrders(meta.current_page - 1)">Previous</button>
-              <span class="page-num">{{ meta.current_page }} / {{ meta.last_page }}</span>
-              <button type="button" class="ghost-btn" :disabled="meta.current_page >= meta.last_page || listLoading" @click="fetchOrders(meta.current_page + 1)">Next</button>
-            </div>
-          </div>
+          <ShowMore v-if="orders.length" tone="admin" :has-more="orderList.hasMore.value" :loading="orderList.loadingMore.value" :shown="orderList.rows.value.length" :total="orderList.total.value" @more="orderList.showMore()" />
         </section>
       </div>
     </main>
@@ -507,6 +498,8 @@ import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
+import ShowMore from "../../components/common/ShowMore.vue";
+import { useShowMoreRows } from "../../composables/useShowMore";
 import { linkedId } from "../../utils/hiddenIds";
 
 const { toggleMobile } = useSidebarState();
@@ -592,7 +585,7 @@ const fetchOrders = async (page = 1) => {
     );
     const { data } = await api.get("/admin/orders", { params });
     if (id !== listRequest) return;
-    orders.value = data.data;
+    orders.value = page > 1 ? [...orders.value, ...(data.data ?? [])] : data.data;
     meta.value = data.meta;
   } catch {
     if (id !== listRequest) return;
@@ -602,6 +595,8 @@ const fetchOrders = async (page = 1) => {
     if (id === listRequest) listLoading.value = false;
   }
 };
+// 10 rows first, then 10 more, then 20 at a time
+const orderList = useShowMoreRows(orders, meta, fetchOrders);
 
 const setBucket = (key) => {
   filters.bucket = filters.bucket === key ? "" : key;
@@ -612,7 +607,7 @@ const clearFilters = () => Object.assign(filters, blankFilters());
 
 const refresh = () => {
   fetchSummary();
-  fetchOrders(meta.value.current_page);
+  orderList.refresh();
   if (drawer.id) loadDetail(drawer.id);
 };
 
@@ -622,7 +617,7 @@ watch(
   (now, before) => {
     clearTimeout(searchTimer);
     const delay = now.search !== before.search ? 300 : 0;
-    searchTimer = setTimeout(() => fetchOrders(1), delay);
+    searchTimer = setTimeout(() => orderList.load(), delay);
     if (now.bucket !== before.bucket) {
       router.replace({ query: { ...route.query, tab: now.bucket || undefined } });
     }
@@ -725,7 +720,7 @@ const onKeydown = (event) => {
 
 onMounted(() => {
   fetchSummary();
-  fetchOrders();
+  orderList.load();
   const fromLink = linkedId("order");
   if (fromLink) openOrder(fromLink);
   window.addEventListener("keydown", onKeydown);

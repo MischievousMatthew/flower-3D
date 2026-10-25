@@ -1,12 +1,12 @@
 <template>
   <HrPage title="Customers" subtitle="Everyone who has ordered, chatted or asked the shop a question: how to reach them, what they bought, what they like, and notes for the team.">
     <template #actions>
-      <button type="button" class="sp-btn sp-btn-ghost" :disabled="loading" @click="load(page)"><span v-html="ICONS.restore"></span>Refresh</button>
+      <button type="button" class="sp-btn sp-btn-ghost" :disabled="loading" @click="refresh()"><span v-html="ICONS.restore"></span>Refresh</button>
     </template>
 
     <div v-if="error" class="sp-banner error">
       <span v-html="ICONS.alert"></span>{{ error }}
-      <button type="button" @click="load(page)">Try again</button>
+      <button type="button" @click="refresh()">Try again</button>
     </div>
 
     <!-- Coming up -->
@@ -47,7 +47,7 @@
       </div>
       <template v-else>
         <ul class="cu-rows" :class="{ dim: loading }">
-          <li v-for="c in data.rows" :key="c.id">
+          <li v-for="c in list.rows.value" :key="c.id">
             <button type="button" class="cu-row" :class="{ on: selectedId === c.id }" @click="open(c.id)">
               <Avatar :name="c.name" :src="c.avatar" />
               <span class="grow">
@@ -66,13 +66,7 @@
             </button>
           </li>
         </ul>
-        <footer v-if="data.meta.last_page > 1" class="fx-pager">
-          <span>{{ data.meta.total }} customers · page {{ data.meta.page }} of {{ data.meta.last_page }}</span>
-          <div>
-            <button type="button" class="sp-icon-btn" :disabled="page <= 1" aria-label="Previous page" @click="load(page - 1)"><span v-html="ICONS.chevronLeft"></span></button>
-            <button type="button" class="sp-icon-btn" :disabled="page >= data.meta.last_page" aria-label="Next page" @click="load(page + 1)"><span v-html="ICONS.chevronRight"></span></button>
-          </div>
-        </footer>
+        <ShowMore v-if="data && data.rows.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
       </template>
     </section>
 
@@ -278,6 +272,8 @@
 import { computed, defineComponent, h, onMounted, reactive, ref } from "vue";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
+import ShowMore from "../../../components/common/ShowMore.vue";
+import { useShowMoreInto } from "../../../composables/useShowMore";
 import HrPage from "../../../components/hr/HrPage.vue";
 import TagInput from "../../../components/crm/TagInput.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
@@ -367,13 +363,17 @@ const notesLabel = (n) => `${n} internal ${n === 1 ? "note" : "notes"}`;
 const shortDate = (d, time = false) =>
   d ? new Date(d).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", ...(time ? { hour: "numeric", minute: "2-digit" } : {}) }) : "—";
 
-async function load(p = 1) {
+// 10 customers first, then 10 more, then 20 at a time
+const list = useShowMoreInto(data, "rows", async (p) =>
+  (await api.get("crm/customers", { params: { page: p, filter: filter.value, search: search.value.trim() || undefined } })).data.data,
+);
+/** Reloads after a change, keeping as many customers showing */
+const refresh = () => list.refresh().catch((e) => (error.value = apiMessage(e, "Couldn't load customers.")));
+async function load() {
   error.value = "";
   loading.value = true;
   try {
-    const res = await api.get("crm/customers", { params: { page: p, filter: filter.value, search: search.value.trim() || undefined } });
-    data.value = res.data.data;
-    page.value = p;
+    await list.load();
   } catch (e) {
     error.value = apiMessage(e, "Couldn't load customers.");
   } finally {
@@ -441,7 +441,7 @@ async function addDate() {
   const ok = await change("date", () => api.post(`crm/customers/${selectedId.value}/dates`, datePayload(dateForm.value)), "Day added.");
   if (ok) {
     dateForm.value = blankDate();
-    load(page.value);
+    refresh();
   }
 }
 const removeDate = (d) => change(`date${d.id}`, () => api.delete(`crm/customers/${selectedId.value}/dates/${d.id}`), "Day removed.");
@@ -450,13 +450,13 @@ async function addNote() {
   const ok = await change("note", () => api.post(`crm/customers/${selectedId.value}/notes`, { body: noteDraft.value.trim() }), "Note added.");
   if (ok) {
     noteDraft.value = "";
-    load(page.value);
+    refresh();
   }
 }
 const pin = (n) => change("pin", () => api.patch(`crm/customers/${selectedId.value}/notes/${n.id}`, { pinned: !n.pinned }));
 function removeNote(n) {
   if (!confirm("Delete this note?")) return;
-  change("note", () => api.delete(`crm/customers/${selectedId.value}/notes/${n.id}`), "Note deleted.").then((ok) => ok && load(page.value));
+  change("note", () => api.delete(`crm/customers/${selectedId.value}/notes/${n.id}`), "Note deleted.").then((ok) => ok && refresh());
 }
 
 onMounted(() => load(1));

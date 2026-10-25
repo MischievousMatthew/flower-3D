@@ -291,47 +291,8 @@
           </tbody>
         </table>
 
-        <!-- Pagination -->
-        <div class="pagination" v-if="pagination.last_page > 1">
-          <button
-            class="page-btn"
-            :disabled="pagination.current_page === 1"
-            @click="goToPage(pagination.current_page - 1)"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <polyline points="15 18 9 12 15 6"></polyline>
-            </svg>
-          </button>
-          <span class="page-info">
-            Showing {{ pagination.from }}-{{ pagination.to }} of
-            {{ pagination.total }}
-          </span>
-          <button
-            class="page-btn"
-            :disabled="pagination.current_page === pagination.last_page"
-            @click="goToPage(pagination.current_page + 1)"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
-          </button>
-        </div>
+        <!-- 10 records, then 10 more, then 20 at a time -->
+        <ShowMore v-if="records.length" tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="records.length" :total="pager.total.value" @more="pager.showMore()" />
       </div>
     </div>
 
@@ -403,13 +364,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 
 import LoadingOverlay from "../../../../layouts/components/LoadingOverlay.vue";
 import attendanceService from "../../../../services/attendanceService";
-import employeeInfoService from "../../../../services/employeeInfoService";
+import employeeInfoService from "../../../../services/employeeInfoService";
+import ShowMore from "../../../../components/common/ShowMore.vue";
+import { useShowMorePaged } from "../../../../composables/useShowMore";
 
 const router = useRouter();
 
@@ -471,22 +434,22 @@ onMounted(async () => {
 });
 
 // Load records
-async function loadRecords(page = 1) {
+/** One page of records from the server, for the "Show more" list */
+async function fetchRecordsPage(page) {
+  const response = await attendanceService.getAll({ page, ...filters.value });
+  if (!response.success) return { items: [], lastPage: 1, total: 0 };
+  pagination.value = response.pagination;
+  return { items: response.data, lastPage: response.pagination?.last_page ?? 1, total: response.pagination?.total };
+}
+const pager = useShowMorePaged(fetchRecordsPage);
+watch(() => pager.visible.value, (rows) => (records.value = rows));
+
+async function loadRecords() {
   try {
     isLoading.value = true;
     loadingMessage.value = "Loading records...";
-
-    const params = {
-      page,
-      ...filters.value,
-    };
-
-    const response = await attendanceService.getAll(params);
-
-    if (response.success) {
-      records.value = response.data;
-      pagination.value = response.pagination;
-    }
+    await pager.load();
+    if (pager.failure.value) throw pager.failure.value;
   } catch (error) {
     toast.error(error.message || "Failed to load records");
   } finally {
@@ -552,11 +515,6 @@ function resetFilters() {
   };
   loadRecords(1);
   loadSummary();
-}
-
-// Pagination
-function goToPage(page) {
-  loadRecords(page);
 }
 
 // Menu toggle

@@ -59,7 +59,7 @@
         <p>{{ search || about ? "Try another search or filter." : status === "open" ? "When a customer asks about a product or one of their orders, it shows up here, and you'll get a notification." : "Answered and finished questions are kept here." }}</p>
       </div>
       <ul v-else class="iq-list">
-        <li v-for="q in data.inquiries" :key="q.id" :ref="(el) => setFocusEl(q.id, el)" class="iq-item" :class="{ open: q.status === 'open', focus: q.id === focusId }">
+        <li v-for="q in list.rows.value" :key="q.id" :ref="(el) => setFocusEl(q.id, el)" class="iq-item" :class="{ open: q.status === 'open', focus: q.id === focusId }">
           <span class="st-avatar" :style="{ background: colorFor(q.customer.name) }">
             <img v-if="q.customer.avatar" :src="q.customer.avatar" alt="" />
             <template v-else>{{ initialsOf(q.customer.name) }}</template>
@@ -129,11 +129,7 @@
         </li>
       </ul>
 
-      <nav v-if="data && data.meta.last_page > 1" class="iq-pages" aria-label="Pages">
-        <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="data.meta.page <= 1" @click="load(data.meta.page - 1)"><span v-html="ICONS.left"></span>Previous</button>
-        <span class="st-sub">Page {{ data.meta.page }} of {{ data.meta.last_page }}</span>
-        <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="data.meta.page >= data.meta.last_page" @click="load(data.meta.page + 1)">Next<span v-html="ICONS.right"></span></button>
-      </nav>
+      <ShowMore v-if="data && data.inquiries.length" tone="vendor" :has-more="list.hasMore.value" :loading="list.loadingMore.value" :shown="list.rows.value.length" :total="list.total.value" @more="list.showMore()" />
     </section>
   </component>
 </template>
@@ -143,6 +139,8 @@ import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import api from "../../../plugins/axios";
+import ShowMore from "../../../components/common/ShowMore.vue";
+import { useShowMoreInto } from "../../../composables/useShowMore";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import HrPage from "../../../components/hr/HrPage.vue";
 import { useAssignment } from "../../../composables/useAssignment";
@@ -173,6 +171,17 @@ const STATUS = { open: ["Waiting for you", "amber"], answered: ["Answered", "gre
 
 const router = useRouter();
 const data = ref(null);
+// 10 questions first, then 10 more, then 20 at a time
+const list = useShowMoreInto(
+  data,
+  "inquiries",
+  async (page) => (await api.get(base, { params: { page, status: status.value || undefined, about: about.value || undefined, search: search.value.trim() || undefined } })).data.data,
+  (payload) => {
+    for (const q of payload.inquiries ?? []) {
+      if (!(q.id in publicFlags)) publicFlags[q.id] = q.is_public;
+    }
+  },
+);
 const error = ref("");
 const settingUp = ref("");
 const status = ref("open");
@@ -197,14 +206,10 @@ const replyTime = computed(() => {
   return `${Math.round(h / 24)} days`;
 });
 
-async function load(page = 1) {
+async function load() {
   error.value = "";
   try {
-    const res = await api.get(base, { params: { page, status: status.value || undefined, about: about.value || undefined, search: search.value.trim() || undefined } });
-    data.value = res.data.data;
-    for (const q of data.value.inquiries) {
-      if (!(q.id in publicFlags)) publicFlags[q.id] = q.is_public;
-    }
+    await list.load();
   } catch (e) {
     if (e?.response?.data?.code === "crm_setting_up") settingUp.value = e.response.data.message;
     else error.value = apiMessage(e, "Couldn't load questions.");

@@ -135,7 +135,7 @@
             <table class="data-table">
               <thead><tr><th>No.</th><th>When</th><th>Admin</th><th>What</th><th>Details</th><th>Result</th><th>From</th></tr></thead>
               <tbody>
-                <tr v-for="(l, i) in audit" :key="l.id">
+                <tr v-for="(l, i) in auditList.rows.value" :key="l.id">
                   <td class="muted mono">{{ rowNumber(auditMeta, i) }}</td>
                   <td class="muted">{{ formatDateTime(l.created_at) }}</td>
                   <td class="strong">{{ l.admin_name || "—" }}</td>
@@ -155,14 +155,7 @@
               </tbody>
             </table>
           </div>
-          <div v-if="auditMeta.total > auditMeta.per_page" class="pager">
-            <span class="sub">{{ auditMeta.total }} entries</span>
-            <div class="row-actions">
-              <button type="button" class="mini-btn" :disabled="auditMeta.current_page <= 1" @click="fetchAudit(auditMeta.current_page - 1)">Previous</button>
-              <span class="sub">{{ auditMeta.current_page }} / {{ auditMeta.last_page }}</span>
-              <button type="button" class="mini-btn" :disabled="auditMeta.current_page >= auditMeta.last_page" @click="fetchAudit(auditMeta.current_page + 1)">Next</button>
-            </div>
-          </div>
+          <ShowMore v-if="audit.length" tone="admin" :has-more="auditList.hasMore.value" :loading="auditList.loadingMore.value" :shown="auditList.rows.value.length" :total="auditList.total.value" @more="auditList.showMore()" />
         </section>
 
         <!-- ═══ Sign-ins ═══ -->
@@ -259,14 +252,43 @@
                 <div><span class="strong">Vendor applications</span><span class="sub">When off, the vendor registration form is refused.</span></div>
                 <input v-model="settings.vendor_applications_open" type="checkbox" class="switch" :disabled="switchSaving" @change="saveSwitch('vendor_applications_open')" />
               </label>
-              <label class="toggle-row" :class="{ alarm: settings.checkout_paused }">
-                <div><span class="strong">Pause all checkout</span><span class="sub">Stops every new order across all stores, e.g. during an incident. Payments already made aren't affected.</span></div>
-                <input v-model="settings.checkout_paused" type="checkbox" class="switch danger" :disabled="switchSaving" @change="saveSwitch('checkout_paused')" />
+              <label class="toggle-row" :class="{ alarm: settings.checkout_paused_now }">
+                <div>
+                  <span class="strong">
+                    Pause all checkout
+                    <InfoTip label="Pause all checkout">
+                      Works right away: on stops every new order across all stores, off lets customers order again, even in the middle of a scheduled pause. Every shop gets an important notice each time, and customers see a red bar at the top of the site while it's paused.
+                    </InfoTip>
+                  </span>
+                  <span class="sub">{{ pauseStatus }}</span>
+                </div>
+                <input :checked="settings.checkout_paused_now" type="checkbox" class="switch danger" :disabled="switchSaving" @change="setCheckoutPause($event.target.checked)" />
               </label>
               <label class="field">
                 <span>Message customers see while checkout is paused</span>
                 <input v-model="settings.checkout_pause_message" class="input" maxlength="200" />
               </label>
+
+              <div class="set-schedule">
+                <span class="field-label">
+                  <span class="strong">Schedule a pause (maintenance)</span>
+                  <InfoTip label="Schedule a pause">
+                    Checkout pauses by itself at the start time and opens again at the end time. Leave the end empty to keep it paused until you turn it back on. Shops get an important notice as soon as you save, and customers see a "planned maintenance" bar up to 7 days before it starts.
+                  </InfoTip>
+                </span>
+                <div class="two">
+                  <label class="field">
+                    <span>Pause starts</span>
+                    <input v-model="pauseStart" type="datetime-local" class="input" :min="nowLocal" aria-describedby="pause-help" />
+                  </label>
+                  <label class="field">
+                    <span>Opens again (optional)</span>
+                    <input v-model="pauseEnd" type="datetime-local" class="input" :min="pauseStart || nowLocal" aria-describedby="pause-help" />
+                  </label>
+                </div>
+                <small id="pause-help" class="field-help">{{ scheduleSentence }} Save with <b>Save settings</b>.</small>
+                <button v-if="settings.checkout_pause_starts_at" type="button" class="mini-btn danger set-clear" :disabled="busy" @click="clearSchedule">Cancel the scheduled pause</button>
+              </div>
 
               <h3 class="set-group">Sign-in protection</h3>
               <p class="set-intro">Stops people from guessing passwords. These apply to customers, shops and staff alike.</p>
@@ -341,10 +363,20 @@
         <template v-else-if="tab === 'health'">
           <div v-if="!health" class="sk-list"><span v-for="n in 4" :key="n" class="sk sk-row tall"></span></div>
           <template v-else>
-            <div class="health-banner" :class="health.overall">
-              <strong>{{ { ok: "Everything looks healthy", warn: "Working, with some warnings", fail: "Something needs fixing" }[health.overall] }}</strong>
-              <span class="sub">Checked {{ formatDateTime(health.checked_at) }} · PHP {{ health.versions.php }} · Laravel {{ health.versions.laravel }} · {{ health.timezone }}</span>
-              <button type="button" class="mini-btn" @click="fetchHealth">Check again</button>
+            <div class="health-banner" :class="healthProblems.length ? (healthProblems.some((c) => c.status === 'fail') ? 'fail' : 'warn') : 'ok'" aria-live="polite">
+              <div class="hb-head">
+                <strong>{{ healthProblems.length ? `${healthProblems.length} ${healthProblems.length === 1 ? "thing needs" : "things need"} attention` : "No problems found" }}</strong>
+                <span class="live" :title="`Updates by itself every ${LIVE_SECONDS} seconds while this page is open`"><i aria-hidden="true"></i>Live · checked {{ timeAgo(health.checked_at) }}</span>
+                <button type="button" class="mini-btn" :disabled="refreshing" @click="refreshHealthNow">{{ refreshing ? "Checking…" : "Check now" }}</button>
+              </div>
+              <ul v-if="healthProblems.length" class="hb-list">
+                <li v-for="c in healthProblems" :key="c.name">
+                  <span class="check-dot" :class="c.status" aria-hidden="true">{{ { warn: "!", fail: "✕" }[c.status] }}</span>
+                  <span><b>{{ c.name }}</b> · {{ c.detail }}</span>
+                </li>
+              </ul>
+              <p v-else class="sub hb-ok">Everything is working, and no errors are waiting to be fixed.</p>
+              <span class="sub">PHP {{ health.versions.php }} · Laravel {{ health.versions.laravel }} · {{ health.timezone }}</span>
             </div>
             <section class="split">
               <div v-for="(checks, group) in healthGroups" :key="group" class="panel">
@@ -363,9 +395,9 @@
               <div class="panel-head">
                 <div>
                   <h3 id="er-title" class="panel-title">Errors</h3>
-                  <p class="panel-sub">When something breaks, people see a plain message with a code like BC-7K2Q9F instead of the technical error. The cause is kept here under that code.</p>
+                  <p class="panel-sub">Every error anyone hits on BloomCraft shows up here as it happens. People see a plain message with a code like BC-7K2Q9F; the cause is kept here. Mark a problem fixed once it's solved.</p>
                 </div>
-                <select v-model.number="errorHours" class="input" aria-label="Period"><option :value="1">Last hour</option><option :value="24">Last 24 hours</option><option :value="168">Last 7 days</option><option :value="720">Last 30 days</option></select>
+                <select v-model.number="errorHours" class="input" aria-label="Period for the chart"><option :value="1">Last hour</option><option :value="24">Last 24 hours</option><option :value="168">Last 7 days</option><option :value="720">Last 30 days</option></select>
               </div>
 
               <form class="er-lookup" role="search" @submit.prevent="lookUpCode">
@@ -373,56 +405,61 @@
                 <div class="er-lookup-row">
                   <input id="er-code" v-model="errorCode" class="input er-input mono" placeholder="BC-7K2Q9F" autocomplete="off" spellcheck="false" maxlength="12" aria-describedby="er-code-help" />
                   <button type="submit" class="primary-btn" :disabled="!errorCode.trim() || lookingUp">{{ lookingUp ? "Looking…" : "Find" }}</button>
-                  <button v-if="lookup" type="button" class="ghost-btn" @click="clearLookup">Show latest</button>
+                  <button v-if="lookup" type="button" class="ghost-btn" @click="clearLookup">Show all problems</button>
                 </div>
                 <small id="er-code-help" class="sub">Customers, shops and staff see this code in the error message. Errors are kept for 90 days.</small>
               </form>
 
-              <div v-if="!apiErrors && !lookup" class="sk sk-row tall"></div>
-              <template v-else>
-                <template v-if="!lookup">
-                  <p v-if="!apiErrors.total" class="calm">✓ No errors in this period.</p>
-                  <template v-else>
-                    <p class="er-summary">
-                      <span class="strong">{{ apiErrors.total }} {{ apiErrors.total === 1 ? "error" : "errors" }}</span>
-                      <span class="muted"> · {{ apiErrors.shielded ?? 0 }} shown to people as a plain message</span>
-                    </p>
-                    <div class="split tight">
-                      <div class="bars" :aria-label="`${apiErrors.total} errors over time`">
-                        <div v-for="(count, label) in apiErrors.series" :key="label" class="bar-col" :title="`${label}: ${count}`">
-                          <span class="bar" :style="{ height: barHeight(count) }"></span>
-                        </div>
-                      </div>
-                      <div>
-                        <h4 class="mini-title">Most affected features</h4>
-                        <ul class="mini-list">
-                          <li v-for="e in apiErrors.by_feature" :key="e.feature">
-                            <span class="strong">{{ e.feature }}</span>
-                            <span class="sub">{{ e.total }}× · last {{ timeAgo(e.last_at) }}</span>
-                          </li>
-                        </ul>
-                      </div>
+              <div v-if="!apiErrors" class="sk sk-row tall"></div>
+              <template v-else-if="!lookup">
+                <div class="er-stats">
+                  <div class="er-stat"><span class="er-num">{{ apiErrors.open_problems }}</span><span class="sub">{{ apiErrors.open_problems === 1 ? "problem" : "problems" }} to fix</span></div>
+                  <div class="er-stat"><span class="er-num">{{ apiErrors.total }}</span><span class="sub">{{ apiErrors.total === 1 ? "error" : "errors" }} in {{ periodLabel }}</span></div>
+                  <div class="er-stat"><span class="er-num">{{ apiErrors.shielded ?? 0 }}</span><span class="sub">shown to people as a plain message</span></div>
+                </div>
+                <div class="split tight er-charts">
+                  <div>
+                    <h4 class="mini-title">Errors over {{ periodLabel }}</h4>
+                    <p v-if="!apiErrors.total" class="calm er-chart-empty">✓ No errors in {{ periodLabel }}.</p>
+                    <div v-show="apiErrors.total" class="er-chart">
+                      <canvas ref="errorChart" role="img" :aria-label="`Line chart: ${apiErrors.total} errors over ${periodLabel}`"></canvas>
                     </div>
-                  </template>
-                </template>
+                  </div>
+                  <div>
+                    <h4 class="mini-title">Most affected features</h4>
+                    <p v-if="!apiErrors.by_feature.length" class="sub">None in {{ periodLabel }}.</p>
+                    <ul v-else class="mini-list">
+                      <li v-for="e in apiErrors.by_feature.slice(0, 5)" :key="e.feature">
+                        <span class="strong">{{ e.feature }}</span>
+                        <span class="sub">{{ e.total }}× · last {{ timeAgo(e.last_at) }}</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </template>
 
-                <template v-if="lookup || apiErrors.total">
-                  <h4 class="mini-title er-list-title" aria-live="polite">{{ lookup ? (lookup.length ? `Found ${lookup.length === 1 ? "1 error" : lookup.length + " errors"} for ${lookedUp}` : `No error with code ${lookedUp}`) : "Latest" }}</h4>
-                  <p v-if="lookup && !lookup.length" class="er-none">Check the code for typos. Errors older than 90 days are cleared.</p>
-                  <ul class="er-list">
-                    <li v-for="e in errorRows" :key="e.id" class="er-row">
-                      <div class="er-top">
-                        <span v-if="e.reference" class="er-code mono">{{ e.reference }}</span>
-                        <button v-if="e.reference" type="button" class="mini-btn er-copy" :aria-label="`Copy code ${e.reference}`" @click="copyCode(e.reference)">Copy</button>
-                        <span class="strong er-feature">{{ e.feature }}</span>
-                        <span class="pill" :class="{ super: e.account === 'vendor' || e.account === 'staff' }">{{ accountLabel(e) }}</span>
-                        <time class="sub er-time" :datetime="e.at">{{ formatDateTime(e.at) }}</time>
-                      </div>
-                      <p v-if="e.shown" class="er-line"><span class="er-k">They saw</span><span>{{ e.shown }}</span></p>
-                      <p class="er-line"><span class="er-k">Cause</span><span class="mono er-cause">{{ errorCause(e) }}</span></p>
-                    </li>
-                  </ul>
-                </template>
+              <template v-if="apiErrors || lookup">
+                <h4 class="mini-title er-list-title" aria-live="polite">{{ lookup ? (lookup.length ? `Found ${lookup.length === 1 ? "1 error" : lookup.length + " errors"} for ${lookedUp}` : `No error with code ${lookedUp}`) : "Problems to fix, newest first" }}</h4>
+                <p v-if="lookup && !lookup.length" class="er-none">Check the code for typos. Errors older than 90 days are cleared.</p>
+                <p v-else-if="!lookup && problems.loaded.value && !problems.items.value.length" class="calm er-clear">✓ No errors found. Everything that went wrong has been fixed.</p>
+                <ul class="er-list">
+                  <li v-for="e in errorRows" :key="e.signature || e.id" class="er-row">
+                    <div class="er-top">
+                      <span v-if="e.reference" class="er-code mono">{{ e.reference }}</span>
+                      <button v-if="e.reference" type="button" class="mini-btn er-copy" :aria-label="`Copy code ${e.reference}`" @click="copyCode(e.reference)">Copy</button>
+                      <span class="strong er-feature">{{ e.feature }}</span>
+                      <span v-if="e.count" class="pill bad">{{ e.count }}×</span>
+                      <time class="sub er-time" :datetime="e.last_at || e.at">{{ e.count > 1 ? `Last ${formatDateTime(e.last_at)} · first ${timeAgo(e.first_at)}` : formatDateTime(e.last_at || e.at) }}</time>
+                    </div>
+                    <p class="er-line"><span class="er-k">Who</span><span>{{ whoHit(e) }}</span></p>
+                    <p v-if="e.shown" class="er-line"><span class="er-k">They saw</span><span>{{ e.shown }}</span></p>
+                    <p class="er-line"><span class="er-k">Cause</span><span class="mono er-cause">{{ errorCause(e) }}</span></p>
+                    <div v-if="e.signature && canManage" class="er-actions">
+                      <button type="button" class="mini-btn ok" :disabled="fixing === e.signature" @click="markFixed(e)">{{ fixing === e.signature ? "Saving…" : "Mark as fixed" }}</button>
+                    </div>
+                  </li>
+                </ul>
+                <ShowMore v-if="!lookup" tone="admin" :has-more="problems.hasMore.value" :loading="problems.loadingMore.value" :shown="problems.items.value.length" :total="problems.total.value" done-text="You're all caught up: that's every open problem" @more="problems.showMore()" />
               </template>
             </section>
           </template>
@@ -452,7 +489,7 @@
             <table class="data-table">
               <thead><tr><th>No.</th><th>Account</th><th>Type</th><th>When</th><th>Device</th><th>Location</th><th>IP address</th></tr></thead>
               <tbody>
-                <tr v-for="(l, i) in history" :key="l.id">
+                <tr v-for="(l, i) in historyList.rows.value" :key="l.id">
                   <td class="muted mono">{{ rowNumber(historyMeta, i) }}</td>
                   <td>
                     <span class="strong">{{ l.actor_name || "Unknown" }}</span>
@@ -467,14 +504,7 @@
               </tbody>
             </table>
           </div>
-          <div v-if="historyMeta.last_page > 1" class="pager">
-            <span class="sub">{{ historyMeta.total }} sign-ins</span>
-            <div class="row-actions">
-              <button type="button" class="mini-btn" :disabled="historyMeta.current_page <= 1" @click="fetchHistory(historyMeta.current_page - 1)">Previous</button>
-              <span class="sub">{{ historyMeta.current_page }} / {{ historyMeta.last_page }}</span>
-              <button type="button" class="mini-btn" :disabled="historyMeta.current_page >= historyMeta.last_page" @click="fetchHistory(historyMeta.current_page + 1)">Next</button>
-            </div>
-          </div>
+          <ShowMore v-if="history.length" tone="admin" :has-more="historyList.hasMore.value" :loading="historyList.loadingMore.value" :shown="historyList.rows.value.length" :total="historyList.total.value" @more="historyList.showMore()" />
         </section>
 
         <!-- ═══ Website info ═══ -->
@@ -614,8 +644,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import InfoTip from "./components/InfoTip.vue";
+import ShowMore from "../../components/common/ShowMore.vue";
+import { useShowMoreRemote, useShowMoreRows } from "../../composables/useShowMore";
+import { loadChartJs } from "../../utils/chartjs";
 import PasswordRules from "../../components/auth/PasswordRules.vue";
 import { passwordOk } from "../../utils/passwordRules";
 import { useRoute, useRouter } from "vue-router";
@@ -805,7 +838,7 @@ const fetchAudit = async (page = 1) => {
   try {
     const params = Object.fromEntries(Object.entries({ ...auditFilters, page }).filter(([, v]) => v !== ""));
     const { data } = await api.get("/admin/security/audit", { params });
-    audit.value = data.data;
+    audit.value = page > 1 ? [...audit.value, ...(data.data ?? [])] : data.data;
     auditMeta.value = data.meta;
     auditAdmins.value = data.admins;
   } catch {
@@ -814,12 +847,14 @@ const fetchAudit = async (page = 1) => {
     loading.audit = false;
   }
 };
+// 10 rows first, then 10 more, then 20 at a time
+const auditList = useShowMoreRows(audit, auditMeta, fetchAudit);
 let auditTimer = null;
 watch(
   () => ({ ...auditFilters }),
   () => {
     clearTimeout(auditTimer);
-    auditTimer = setTimeout(() => fetchAudit(1), 300);
+    auditTimer = setTimeout(() => auditList.load(), 300);
   },
 );
 // "SomethingController@doThing" → "Do thing" when there's no friendlier label
@@ -849,19 +884,74 @@ watch(signinHours, fetchSignins);
 // ── Settings ─────────────────────────────────────────────────────
 const settings = ref(null);
 const settingsError = ref("");
+// The scheduled pause, as the datetime inputs need it (local time, no seconds)
+const pauseStart = ref("");
+const pauseEnd = ref("");
+const toLocalInput = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+const toIso = (local) => (local ? new Date(local).toISOString() : null);
+const nowLocal = computed(() => toLocalInput(new Date().toISOString()));
+const fmtWhen = (value) => new Date(value).toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const applySettings = (data) => {
+  settings.value = data;
+  pauseStart.value = toLocalInput(data.checkout_pause_starts_at);
+  pauseEnd.value = toLocalInput(data.checkout_pause_ends_at);
+};
 const fetchSettings = async () => {
   try {
-    settings.value = (await api.get("/admin/security/settings")).data.data;
+    applySettings((await api.get("/admin/security/settings")).data.data);
   } catch {
     toast.error("Settings couldn't be loaded.");
+  }
+};
+// What the switch is doing right now, in words
+const pauseStatus = computed(() => {
+  const s = settings.value ?? {};
+  if (s.checkout_paused) return "On: nobody can place new orders. Turn it off to open checkout again.";
+  if (s.checkout_paused_now) return `On by the schedule${s.checkout_pause_ends_at ? ` until ${fmtWhen(s.checkout_pause_ends_at)}` : ""}. Turn it off to open checkout now.`;
+  return "Off: customers can order. Payments already made are never affected.";
+});
+const scheduleSentence = computed(() => {
+  if (!pauseStart.value) return "No pause is scheduled.";
+  return `Checkout pauses ${fmtWhen(pauseStart.value)}${pauseEnd.value ? ` and opens again ${fmtWhen(pauseEnd.value)}` : " and stays paused until you turn it back on"}.`;
+});
+const clearSchedule = () => {
+  pauseStart.value = "";
+  pauseEnd.value = "";
+  saveSettings();
+};
+// The switch works at once; turning it off also ends a scheduled pause that's under way
+const setCheckoutPause = async (on) => {
+  switchSaving.value = true;
+  settingsError.value = "";
+  try {
+    const saved = (await api.get("/admin/security/settings")).data.data;
+    const { data } = await api.put("/admin/security/settings", { ...saved, checkout_paused: on, reopen_now: !on });
+    settings.value = { ...settings.value, checkout_paused: data.data.checkout_paused, checkout_paused_now: data.data.checkout_paused_now, checkout_pause_starts_at: data.data.checkout_pause_starts_at, checkout_pause_ends_at: data.data.checkout_pause_ends_at };
+    pauseStart.value = toLocalInput(data.data.checkout_pause_starts_at);
+    pauseEnd.value = toLocalInput(data.data.checkout_pause_ends_at);
+    toast.success(`${on ? "Checkout is paused for every store." : "Checkout is open again."}${data.notified ? ` ${data.notified} ${data.notified === 1 ? "shop was" : "shops were"} notified.` : ""}`);
+  } catch (e) {
+    const errors = e.response?.data?.errors;
+    settingsError.value = errors ? Object.values(errors)[0]?.[0] : e.response?.data?.message || "That change couldn't be saved.";
+  } finally {
+    switchSaving.value = false;
   }
 };
 const saveSettings = async () => {
   busy.value = true;
   settingsError.value = "";
   try {
-    const { data } = await api.put("/admin/security/settings", settings.value);
-    settings.value = data.data;
+    const { data } = await api.put("/admin/security/settings", {
+      ...settings.value,
+      checkout_pause_starts_at: toIso(pauseStart.value),
+      checkout_pause_ends_at: toIso(pauseEnd.value),
+    });
+    applySettings(data.data);
     toast.success(data.message);
   } catch (e) {
     const errors = e.response?.data?.errors;
@@ -925,14 +1015,118 @@ const fetchHealth = async () => {
     toast.error("Health checks couldn't run.");
   }
 };
+// Open problems a slice at a time; the first slice also brings the summary and chart
+const problems = useShowMoreRemote(async ({ offset, limit }) => {
+  const data = (await api.get("/admin/security/api-errors", { params: { hours: errorHours.value, offset, limit } })).data.data;
+  if (offset === 0) apiErrors.value = data;
+  return { items: data.problems, meta: data.meta };
+});
 const fetchErrors = async () => {
-  try {
-    apiErrors.value = (await api.get("/admin/security/api-errors", { params: { hours: errorHours.value } })).data.data;
-  } catch {
-    toast.error("API errors couldn't be loaded.");
-  }
+  await problems.load();
+  if (problems.error.value) toast.error("Errors couldn't be loaded.");
 };
 watch(errorHours, fetchErrors);
+const periodLabel = computed(() => ({ 1: "the last hour", 24: "the last 24 hours", 168: "the last 7 days", 720: "the last 30 days" })[errorHours.value]);
+
+// Live: checks and errors update by themselves while the page is open and visible
+const LIVE_SECONDS = 30;
+const refreshing = ref(false);
+let liveTimer = null;
+const refreshLive = async () => {
+  if (tab.value !== "health" || document.visibilityState !== "visible") return;
+  try {
+    health.value = (await api.get("/admin/security/health")).data.data;
+  } catch {
+    // the next check tries again
+  }
+  if (!lookup.value) await problems.refresh();
+};
+const refreshHealthNow = async () => {
+  refreshing.value = true;
+  await refreshLive();
+  refreshing.value = false;
+};
+watch(
+  () => tab.value,
+  (t) => {
+    clearInterval(liveTimer);
+    if (t === "health") liveTimer = setInterval(refreshLive, LIVE_SECONDS * 1000);
+  },
+  { immediate: true },
+);
+onBeforeUnmount(() => clearInterval(liveTimer));
+// Failing and warning checks, failures first, for the banner
+const healthProblems = computed(() =>
+  (health.value?.checks ?? []).filter((c) => c.status !== "ok").sort((a, b) => (a.status === "fail" ? -1 : 0) - (b.status === "fail" ? -1 : 0)),
+);
+
+// Marking a problem fixed takes it off the list (it comes back if it happens again)
+const fixing = ref("");
+const markFixed = async (e) => {
+  fixing.value = e.signature;
+  try {
+    const { data } = await api.post("/admin/security/api-errors/resolve", { signature: e.signature });
+    toast.success(data.message);
+    problems.items.value = problems.items.value.filter((x) => x.signature !== e.signature);
+    await problems.refresh();
+    health.value = (await api.get("/admin/security/health")).data.data;
+  } catch (err) {
+    toast.error(err.response?.data?.message || "It couldn't be marked as fixed.");
+  } finally {
+    fixing.value = "";
+  }
+};
+
+// The line chart, drawn like the dashboard's
+const errorChart = ref(null);
+let errorChartInstance = null;
+const drawErrorChart = async () => {
+  await nextTick();
+  if (!errorChart.value || !apiErrors.value) return;
+  let Chart;
+  try {
+    Chart = await loadChartJs();
+  } catch {
+    return; // the numbers above still show
+  }
+  const points = apiErrors.value.series ?? [];
+  errorChartInstance?.destroy();
+  errorChartInstance = new Chart(errorChart.value, {
+    type: "line",
+    data: {
+      labels: points.map((p) => p.label),
+      datasets: [{
+        label: "Errors",
+        data: points.map((p) => p.count),
+        borderColor: "#ef4444",
+        backgroundColor: "rgba(239, 68, 68, 0.1)",
+        fill: true,
+        tension: 0.35,
+        pointRadius: points.length > 40 ? 0 : 3,
+        pointHoverRadius: 5,
+        pointBackgroundColor: "#fff",
+        pointBorderWidth: 2,
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => ` ${c.raw} ${c.raw === 1 ? "error" : "errors"}` } },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: "#94a3b8", font: { size: 11 }, maxRotation: 0, autoSkipPadding: 14 } },
+        y: { beginAtZero: true, grid: { color: "#f1f5f9" }, ticks: { color: "#94a3b8", font: { size: 11 }, precision: 0 } },
+      },
+    },
+  });
+};
+watch(() => apiErrors.value?.series, drawErrorChart);
+onBeforeUnmount(() => errorChartInstance?.destroy());
 
 // Looking up a code someone quoted to support
 const errorCode = ref("");
@@ -956,11 +1150,17 @@ const clearLookup = () => {
   lookup.value = null;
   errorCode.value = "";
 };
-const errorRows = computed(() => lookup.value ?? apiErrors.value?.recent?.slice(0, 15) ?? []);
-const ACCOUNT_LABELS = { customer: "Customer", vendor: "Shop owner", staff: "Staff", admin: "Admin", guest: "Not signed in" };
-const accountLabel = (e) => {
-  const kind = ACCOUNT_LABELS[e.account] ?? "Account not recorded";
-  return e.account_name ? `${kind} · ${e.account_name}` : kind;
+const errorRows = computed(() => lookup.value ?? problems.items.value);
+// Who ran into it, in plain words
+const whoHit = (e) => {
+  switch (e.account) {
+    case "vendor": return `A shop owner${e.account_name ? ` (${e.account_name})` : ""}`;
+    case "staff": return `A staff member${e.account_name ? ` (${e.account_name})` : ""}`;
+    case "admin": return `An admin${e.account_name ? ` (${e.account_name})` : ""}`;
+    case "customer": return "A customer (names aren't shown here)";
+    case "guest": return "Someone who wasn't signed in";
+    default: return "Not known: this error happened before BloomCraft started noting who ran into errors";
+  }
 };
 const errorCause = (e) =>
   [`Error ${e.status}`, e.exception, e.message, e.location ? `at ${e.location}` : null].filter(Boolean).join(" · ");
@@ -1053,10 +1253,10 @@ const loadTab = (key) => {
     if (!roles.value.length) fetchRoles();
   }
   if (key === "roles") fetchRoles();
-  if (key === "audit") fetchAudit(1);
+  if (key === "audit") auditList.load();
   if (key === "signins") fetchSignins();
   if (key === "settings") fetchSettings();
-  if (key === "history") fetchHistory(1);
+  if (key === "history") historyList.load();
   if (key === "website" && !website.value) fetchWebsite();
   if (key === "health") {
     fetchHealth();
@@ -1078,7 +1278,7 @@ const fetchHistory = async (page = 1) => {
   try {
     const params = { page, per_page: 25, search: historyFilters.search || undefined, actor_type: historyFilters.actor_type || undefined };
     const result = (await api.get("/admin/login-logs", { params })).data.data;
-    history.value = result.data;
+    history.value = page > 1 ? [...history.value, ...(result.data ?? [])] : result.data;
     historyMeta.value = { current_page: result.current_page, last_page: result.last_page, per_page: result.per_page, total: result.total };
   } catch {
     toast.error("Sign-in history couldn't be loaded.");
@@ -1086,12 +1286,14 @@ const fetchHistory = async (page = 1) => {
     loading.history = false;
   }
 };
+// 10 rows first, then 10 more, then 20 at a time
+const historyList = useShowMoreRows(history, historyMeta, fetchHistory);
 let historyTimer = null;
 watch(
   () => ({ ...historyFilters }),
   () => {
     clearTimeout(historyTimer);
-    historyTimer = setTimeout(() => fetchHistory(1), 300);
+    historyTimer = setTimeout(() => historyList.load(), 300);
   },
 );
 
@@ -1733,9 +1935,93 @@ onMounted(async () => {
 .er-lookup .ghost-btn {
   min-height: 40px;
 }
-.er-summary {
-  margin: 0;
+.er-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.er-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid #eef0f4;
+  border-radius: 12px;
+}
+.er-num {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e2739;
+  font-variant-numeric: tabular-nums;
+}
+.er-charts {
+  margin-top: 16px;
+}
+.er-chart {
+  position: relative;
+  height: 220px;
+  margin-top: 8px;
+}
+.er-chart-empty {
+  margin-top: 8px;
+}
+.er-clear {
+  margin-top: 8px;
+}
+.er-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.hb-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+.hb-head .mini-btn {
+  margin-left: auto;
+}
+.hb-list {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 8px;
+  padding: 0;
+  list-style: none;
   font-size: 13px;
+  color: #334155;
+}
+.hb-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hb-ok {
+  margin: 6px 0 4px;
+  font-size: 13px;
+}
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+.live i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+  animation: live-pulse 2s ease-out infinite;
+}
+@keyframes live-pulse {
+  to { box-shadow: 0 0 0 7px rgba(34, 197, 94, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live i { animation: none; }
+}
+@media (max-width: 640px) {
+  .er-stats { grid-template-columns: 1fr; }
 }
 .er-list-title {
   margin-top: 18px;
@@ -1900,6 +2186,16 @@ onMounted(async () => {
 .field.narrow {
   max-width: 420px;
 }
+.set-schedule {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid #eef1f6;
+  border-radius: 12px;
+}
+.set-clear {
+  justify-self: start;
+}
 .set-intro {
   margin: 0 0 4px;
   font-size: 12.5px;
@@ -1949,9 +2245,8 @@ onMounted(async () => {
 /* Health */
 .health-banner {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 4px;
   padding: 14px 18px;
   border-radius: 14px;
   border: 1px solid #bbf7d0;
@@ -1961,9 +2256,9 @@ onMounted(async () => {
 .health-banner strong {
   font-size: 15px;
 }
-.health-banner .sub {
-  flex: 1;
-  display: inline;
+.health-banner > .sub {
+  font-size: 11.5px;
+  opacity: 0.8;
 }
 .health-banner.warn { border-color: #fde68a; background: #fffbeb; color: #92400e; }
 .health-banner.fail { border-color: #fecaca; background: #fef2f2; color: #991b1b; }

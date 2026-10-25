@@ -265,8 +265,10 @@ class VendorCrmController extends Controller
 
         $base = UserNotification::query()->where('user_id', $vendor->id);
         $page = (clone $base)
-            ->when($data['type'] ?? null, fn ($q, $t) => $t === 'support' ? $q->whereNotIn('type', ['order', 'payment', 'stock', 'message', 'inquiry', 'review', 'return', 'announcement']) : $q->where('type', $t))
+            ->when($data['type'] ?? null, fn ($q, $t) => $t === 'support' ? $q->whereNotIn('type', ['order', 'payment', 'stock', 'message', 'inquiry', 'review', 'return', 'announcement', 'platform']) : $q->where('type', $t))
             ->when($request->boolean('unread'), fn ($q) => $q->whereNull('read_at'))
+            // Important notices stay on top until they're read
+            ->orderByRaw('case when important = ? and read_at is null then 0 else 1 end', [true])
             ->orderByDesc('created_at')->orderByDesc('id')
             ->paginate(25);
 

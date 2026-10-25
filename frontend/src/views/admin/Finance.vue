@@ -320,13 +320,13 @@
                     <tr v-for="n in 8" :key="n"><td v-for="c in 8" :key="c"><div class="sk sk-line"></div></td></tr>
                   </tbody>
                   <tbody v-else-if="txError && !rows.length">
-                    <tr><td colspan="8" class="empty-cell">The payments couldn't be loaded. <button type="button" class="link-btn" @click="fetchTransactions(meta.current_page)">Try again</button></td></tr>
+                    <tr><td colspan="8" class="empty-cell">The payments couldn't be loaded. <button type="button" class="link-btn" @click="txList.refresh()">Try again</button></td></tr>
                   </tbody>
                   <tbody v-else-if="!rows.length">
                     <tr><td colspan="8" class="empty-cell">{{ txFiltered ? "No payments match these filters." : "No payments yet." }}</td></tr>
                   </tbody>
                   <tbody v-else :class="{ dim: txLoading }">
-                    <tr v-for="row in rows" :key="row.key" class="click-row" tabindex="0" @click="openSource(row)" @keydown.enter="openSource(row)">
+                    <tr v-for="row in txList.rows.value" :key="row.key" class="click-row" tabindex="0" @click="openSource(row)" @keydown.enter="openSource(row)">
                       <td class="muted">{{ formatDateTime(row.occurred_at) }}</td>
                       <td>
                         <span class="type-chip" :class="row.source">{{ row.source === "subscription" ? "Subscription" : "Vendor sale" }}</span>
@@ -363,14 +363,7 @@
                 </table>
               </div>
 
-              <div v-if="meta.total" class="pager">
-                <span class="pager-info">{{ (meta.current_page - 1) * meta.per_page + 1 }}–{{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }}</span>
-                <div class="pager-btns">
-                  <button type="button" class="ghost-btn" :disabled="meta.current_page <= 1 || txLoading" @click="fetchTransactions(meta.current_page - 1)">Previous</button>
-                  <span class="pager-info">{{ meta.current_page }} / {{ meta.last_page }}</span>
-                  <button type="button" class="ghost-btn" :disabled="meta.current_page >= meta.last_page || txLoading" @click="fetchTransactions(meta.current_page + 1)">Next</button>
-                </div>
-              </div>
+              <ShowMore v-if="rows.length" tone="admin" :has-more="txList.hasMore.value" :loading="txList.loadingMore.value" :shown="txList.rows.value.length" :total="txList.total.value" @more="txList.showMore()" />
             </template>
 
             <!-- Vendor sales -->
@@ -456,6 +449,8 @@ import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
+import ShowMore from "../../components/common/ShowMore.vue";
+import { useShowMoreRows } from "../../composables/useShowMore";
 
 const { toggleMobile } = useSidebarState();
 const route = useRoute();
@@ -533,7 +528,7 @@ const setRange = (value) => {
 
 const refresh = () => {
   fetchOverview();
-  fetchTransactions(meta.value.current_page);
+  txList.refresh();
   if (vendorsLoaded) fetchVendors();
 };
 
@@ -650,7 +645,7 @@ const fetchTransactions = async (page = 1) => {
   try {
     const { data } = await api.get("/admin/finance/transactions", { params: { ...txParams(), page, per_page: 15 } });
     if (id !== txRequest) return;
-    rows.value = data.data;
+    rows.value = page > 1 ? [...rows.value, ...(data.data ?? [])] : data.data;
     meta.value = data.meta;
   } catch {
     if (id !== txRequest) return;
@@ -660,13 +655,15 @@ const fetchTransactions = async (page = 1) => {
     if (id === txRequest) txLoading.value = false;
   }
 };
+// 10 rows first, then 10 more, then 20 at a time
+const txList = useShowMoreRows(rows, meta, fetchTransactions);
 
 let txTimer = null;
 watch(
   () => ({ ...tx }),
   (next, prev) => {
     clearTimeout(txTimer);
-    txTimer = setTimeout(() => fetchTransactions(1), next.search !== prev.search ? 300 : 0);
+    txTimer = setTimeout(() => txList.load(), next.search !== prev.search ? 300 : 0);
   },
 );
 const clearTx = () => Object.assign(tx, blankTx());
@@ -779,7 +776,7 @@ onMounted(() => {
   if (route.query.tab === "refunds") return router.replace("/admin/refunds");
   if (route.query.tab === "vendors") tab.value = "vendors";
   fetchOverview();
-  fetchTransactions();
+  txList.load();
   clock = setInterval(() => (now.value = Date.now()), 30_000);
 });
 onBeforeUnmount(() => {

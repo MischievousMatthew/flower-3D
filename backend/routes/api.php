@@ -1239,6 +1239,7 @@ Route::middleware('token.auth')->group(function () {
                 Route::put('/roles/{id}', [SecurityController::class, 'saveRole'])->whereNumber('id');
                 Route::delete('/roles/{id}', [SecurityController::class, 'deleteRole'])->whereNumber('id');
                 Route::put('/settings', [SecurityController::class, 'saveSettings']);
+                Route::post('/api-errors/resolve', [SecurityController::class, 'resolveApiError']);
             });
         });
     });

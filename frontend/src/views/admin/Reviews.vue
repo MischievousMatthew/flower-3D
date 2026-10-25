@@ -82,7 +82,7 @@
             <div v-if="loading.reviews && !reviews.length" class="sk-list"><span v-for="n in 4" :key="n" class="sk sk-card"></span></div>
             <p v-else-if="!reviews.length" class="empty">No reviews match these filters.</p>
             <ul v-else class="card-list" :class="{ dim: loading.reviews }">
-              <li v-for="r in reviews" :key="r.id" class="review-card" :class="{ hidden: r.hidden }">
+              <li v-for="r in reviewList.rows.value" :key="r.id" class="review-card" :class="{ hidden: r.hidden }">
                 <div class="rc-product">
                   <img v-if="r.product.image" :src="r.product.image" alt="" class="thumb" />
                   <span v-else class="thumb empty-thumb">🌸</span>
@@ -110,7 +110,7 @@
                 </div>
               </li>
             </ul>
-            <Pager :meta="reviewMeta" @go="fetchReviews" />
+            <ShowMore v-if="reviews.length" tone="admin" :has-more="reviewList.hasMore.value" :loading="reviewList.loadingMore.value" :shown="reviewList.rows.value.length" :total="reviewList.total.value" @more="reviewList.showMore()" />
           </section>
         </template>
 
@@ -136,7 +136,7 @@
           <div v-if="loading.reports && !reports.length" class="sk-list"><span v-for="n in 3" :key="n" class="sk sk-card"></span></div>
           <p v-else-if="!reports.length" class="empty">{{ reportFilters.status === "pending" ? "No reports waiting. You're all caught up." : "No reports here." }}</p>
           <ul v-else class="card-list" :class="{ dim: loading.reports }">
-            <li v-for="r in reports" :key="r.id" class="report-card">
+            <li v-for="r in reportList.rows.value" :key="r.id" class="report-card">
               <img v-if="r.product.image" :src="r.product.image" alt="" class="thumb lg" />
               <span v-else class="thumb lg empty-thumb">🌸</span>
               <div class="rp-body">
@@ -162,7 +162,7 @@
               </div>
             </li>
           </ul>
-          <Pager :meta="reportMeta" @go="fetchReports" />
+          <ShowMore v-if="reports.length" tone="admin" :has-more="reportList.hasMore.value" :loading="reportList.loadingMore.value" :shown="reportList.rows.value.length" :total="reportList.total.value" @more="reportList.showMore()" />
         </section>
       </div>
     </main>
@@ -205,29 +205,15 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue3-toastify";
 import { useSidebarState } from "../../composables/useSidebarState";
 import { useAdminAccess } from "../../composables/useAdminAccess";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import api from "../../plugins/axios";
-
-const Pager = defineComponent({
-  props: { meta: { type: Object, required: true } },
-  emits: ["go"],
-  setup: (props, { emit }) => () =>
-    props.meta.last_page > 1
-      ? h("div", { class: "pager" }, [
-          h("span", { class: "sub" }, `${props.meta.total} in total`),
-          h("div", { class: "pager-btns" }, [
-            h("button", { type: "button", class: "mini-btn", disabled: props.meta.current_page <= 1, onClick: () => emit("go", props.meta.current_page - 1) }, "Previous"),
-            h("span", { class: "sub" }, `${props.meta.current_page} / ${props.meta.last_page}`),
-            h("button", { type: "button", class: "mini-btn", disabled: props.meta.current_page >= props.meta.last_page, onClick: () => emit("go", props.meta.current_page + 1) }, "Next"),
-          ]),
-        ])
-      : null,
-});
+import ShowMore from "../../components/common/ShowMore.vue";
+import { useShowMoreRows } from "../../composables/useShowMore";
 
 const { toggleMobile } = useSidebarState();
 const route = useRoute();
@@ -270,7 +256,7 @@ const fetchReviews = async (page = 1) => {
     const params = { page, search: reviewFilters.search || undefined, rating: reviewFilters.rating || undefined, status: reviewFilters.status || undefined, photo: reviewFilters.photo ? 1 : undefined };
     const { data } = await api.get("/admin/reviews", { params });
     if (id !== reviewRequest) return;
-    reviews.value = data.data;
+    reviews.value = page > 1 ? [...reviews.value, ...(data.data ?? [])] : data.data;
     reviewMeta.value = data.meta;
   } catch {
     if (id === reviewRequest) toast.error("Reviews couldn't be loaded.");
@@ -278,12 +264,14 @@ const fetchReviews = async (page = 1) => {
     if (id === reviewRequest) loading.reviews = false;
   }
 };
+// 10 rows first, then 10 more, then 20 at a time
+const reviewList = useShowMoreRows(reviews, reviewMeta, fetchReviews);
 let reviewTimer = null;
 watch(
   () => ({ ...reviewFilters }),
   () => {
     clearTimeout(reviewTimer);
-    reviewTimer = setTimeout(() => fetchReviews(1), 300);
+    reviewTimer = setTimeout(() => reviewList.load(), 300);
   },
 );
 const applyQuick = (values) => Object.assign(reviewFilters, { search: "", rating: "", status: "", photo: false }, values);
@@ -297,7 +285,7 @@ const restore = async (review) => {
   try {
     const { data } = await api.post(`/admin/reviews/${review.id}/restore`);
     toast.success(data.message);
-    fetchReviews(reviewMeta.value.current_page);
+    reviewList.refresh();
     fetchSummary();
   } catch (e) {
     toast.error(e.response?.data?.message || "The review couldn't be restored.");
@@ -319,7 +307,7 @@ const fetchReports = async (page = 1) => {
     const params = { page, status: reportFilters.status || undefined, search: reportFilters.search || undefined };
     const { data } = await api.get("/admin/reviews/reports", { params });
     if (id !== reportRequest) return;
-    reports.value = data.data;
+    reports.value = page > 1 ? [...reports.value, ...(data.data ?? [])] : data.data;
     reportMeta.value = data.meta;
     reportCounts.value = data.counts ?? {};
   } catch {
@@ -328,12 +316,14 @@ const fetchReports = async (page = 1) => {
     if (id === reportRequest) loading.reports = false;
   }
 };
+// 10 rows first, then 10 more, then 20 at a time
+const reportList = useShowMoreRows(reports, reportMeta, fetchReports);
 let reportTimer = null;
 watch(
   () => ({ ...reportFilters }),
   () => {
     clearTimeout(reportTimer);
-    reportTimer = setTimeout(() => fetchReports(1), 250);
+    reportTimer = setTimeout(() => reportList.load(), 250);
   },
 );
 
@@ -351,12 +341,12 @@ const confirmDialog = async () => {
     if (dialog.type === "hide") {
       const { data } = await api.post(`/admin/reviews/${dialog.target.id}/hide`, { reason: dialog.reason.trim() });
       toast.success(data.message);
-      fetchReviews(reviewMeta.value.current_page);
+      reviewList.refresh();
     } else {
       const { data } = await api.post(`/admin/reports/${dialog.target.id}/review`, { action: dialog.action });
       toast.success(dialog.action === "approve" ? "Report upheld. The listing was removed." : "Report dismissed.");
       if (data.vendor_suspended) toast.warning(`${dialog.target.vendor.store_name} reached ${STRIKE_LIMIT} strikes and was suspended.`);
-      fetchReports(reportMeta.value.current_page);
+      reportList.refresh();
     }
     fetchSummary();
     dialog.busy = false;
@@ -373,8 +363,8 @@ const loaded = { reviews: false, reports: false };
 const loadTab = (key) => {
   if (loaded[key]) return;
   loaded[key] = true;
-  if (key === "reviews") fetchReviews(1);
-  else fetchReports(1);
+  if (key === "reviews") reviewList.load();
+  else reportList.load();
 };
 const setTab = (key) => {
   tab.value = key;
