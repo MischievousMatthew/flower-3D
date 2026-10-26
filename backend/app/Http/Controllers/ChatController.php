@@ -6,6 +6,9 @@ use App\Helpers\CloudinaryHelper;
 use App\Models\Conversation;
 use App\Models\Employee;
 use App\Models\Message;
+use App\Models\Order;
+use App\Models\Product;
+use App\Models\ProductImage;
 use App\Models\User;
 use App\Models\VendorApplication;
 use Illuminate\Http\JsonResponse;
@@ -223,6 +226,9 @@ class ChatController extends Controller
                 'conversation_id' => 'required|exists:conversations,id',
                 'message' => 'nullable|string|max:1000',
                 'attachments.*' => 'nullable|file|mimes:jpg,jpeg,png,gif,bmp,webp,pdf,doc,docx,txt|max:5120',
+                // "Ask the shop" from a product page or an order: the message carries a card for it
+                'about_product_id' => 'nullable|integer',
+                'about_order_id' => 'nullable|integer',
             ]);
 
             if ($validator->fails()) {
@@ -241,6 +247,17 @@ class ChatController extends Controller
 
             $attachments = [];
             $messageText = trim($request->input('message', ''));
+
+            $about = null;
+            if ($request->filled('about_product_id') || $request->filled('about_order_id')) {
+                if ($messageText === '') {
+                    return response()->json(['success' => false, 'errors' => ['message' => ['Write your question.']]], 422);
+                }
+                $about = $this->aboutCard($conversation, $request->integer('about_product_id') ?: null, $request->integer('about_order_id') ?: null);
+                if (!$about) {
+                    return response()->json(['success' => false, 'message' => "That product or order isn't from this shop."], 422);
+                }
+            }
 
             if ($request->hasFile('attachments')) {
                 foreach ($request->file('attachments') as $file) {
@@ -283,9 +300,12 @@ class ChatController extends Controller
                 'message' => $hasText
                     ? $messageText
                     : null, // photo or file only: no placeholder text
-                'message_type' => $messageType,
+                'message_type' => $about ? $about['kind'] : $messageType,
                 'is_read' => false,
             ];
+            if ($about) {
+                $messageData['meta'] = $about;
+            }
 
             if ($hasAttachments) {
                 $messageData['attachments'] = $attachments;
@@ -299,6 +319,8 @@ class ChatController extends Controller
                 $lastMessagePreview = $messageType === 'image'
                     ? $senderDisplayName . ' sent a photo'
                     : $senderDisplayName . ' sent a file';
+            } elseif ($about) {
+                $lastMessagePreview = Str::limit(($about['kind'] === 'order_question' ? $about['order_number'] : $about['name']) . ': ' . $messageText, 50);
             } else {
                 $lastMessagePreview = Str::limit($messageText, 50);
             }
@@ -324,7 +346,7 @@ class ChatController extends Controller
                     'created_at' => $message->created_at?->copy()->setTimezone('Asia/Manila')->toIso8601String(),
                     'time' => $message->created_at->diffForHumans(),
                     'read' => false,
-                    'type' => $messageType,
+                    'type' => $message->message_type,
                     'attachments' => $message->attachments,
                     'meta' => $message->meta,
                     'is_own' => true,
@@ -467,6 +489,41 @@ class ChatController extends Controller
         }
     }
 
+    /**
+     * The card for a product or order a message asks about. Only the
+     * conversation's shop's products, and only that customer's orders there.
+     */
+    private function aboutCard(Conversation $conversation, ?int $productId, ?int $orderId): ?array
+    {
+        if ($orderId) {
+            $order = Order::withoutGlobalScopes()->where('vendor_id', $conversation->vendor_id)
+                ->where('user_id', $conversation->customer_id)->find($orderId);
+
+            return $order ? [
+                'kind' => 'order_question',
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'order_status' => $order->status,
+                'total' => round((float) $order->total_amount, 2),
+            ] : null;
+        }
+
+        $product = Product::withoutGlobalScopes()->where('owner_id', $conversation->vendor_id)->whereNull('deleted_at')->find($productId);
+        if (!$product) {
+            return null;
+        }
+        $image = ProductImage::withoutGlobalScopes()->where('product_id', $product->id)
+            ->orderByDesc('is_primary')->orderBy('display_order')->value('image_url');
+
+        return [
+            'kind' => 'product_question',
+            'product_id' => $product->id,
+            'name' => $product->product_name,
+            'price' => round((float) ($product->has_discount && $product->discount_price ? $product->discount_price : ($product->selling_price ?? 0)), 2),
+            'image' => $image,
+        ];
+    }
+
     public function startConversation(Request $request): JsonResponse
     {
         $accessResponse = $this->ensureChatAccess($request, 'create');
@@ -478,7 +535,8 @@ class ChatController extends Controller
             $validator = Validator::make($request->all(), [
                 'vendor_id' => 'required_without:customer_id|exists:users,id',
                 'customer_id' => 'required_without:vendor_id|exists:users,id',
-                'message' => 'required|string',
+                // Optional: "Ask the shop" opens the chat first and sends the question with its card
+                'message' => 'nullable|string|max:1000',
             ]);
 
             if ($validator->fails()) {
@@ -509,21 +567,28 @@ class ChatController extends Controller
                 ['owner_id' => $vendorId, 'is_active' => true]
             );
 
-            $message = Message::create([
-                'owner_id' => $vendorId,
-                'conversation_id' => $conversation->id,
-                'sender_id' => $participantId,
-                'message' => $request->string('message')->toString(),
-                'message_type' => 'text',
-            ]);
+            $text = trim((string) $request->input('message', ''));
+            $message = null;
+            if ($text !== '') {
+                $message = Message::create([
+                    'owner_id' => $vendorId,
+                    'conversation_id' => $conversation->id,
+                    'sender_id' => $participantId,
+                    'message' => $text,
+                    'message_type' => 'text',
+                ]);
 
-            $conversation->update([
-                'last_message' => $request->string('message')->toString(),
-                'last_message_time' => now(),
-                $isVendorContext ? 'unread_count_customer' : 'unread_count_vendor' =>
-                    $conversation->{$isVendorContext ? 'unread_count_customer' : 'unread_count_vendor'} + 1,
-                'is_active' => true,
-            ]);
+                $conversation->update([
+                    'last_message' => $text,
+                    'last_message_time' => now(),
+                    $isVendorContext ? 'unread_count_customer' : 'unread_count_vendor' =>
+                        $conversation->{$isVendorContext ? 'unread_count_customer' : 'unread_count_vendor'} + 1,
+                    'is_active' => true,
+                ]);
+            } elseif (!$conversation->last_message_time) {
+                // A new, empty chat still sorts as the latest one
+                $conversation->update(['last_message_time' => now(), 'is_active' => true]);
+            }
 
             return response()->json([
                 'success' => true,

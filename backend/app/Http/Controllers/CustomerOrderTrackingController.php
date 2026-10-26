@@ -254,6 +254,8 @@ class CustomerOrderTrackingController extends Controller
             'delivery_contact_name' => $order->delivery_contact_name,
             'delivery_contact_number' => $order->delivery_contact_number,
             'store_name' => $storeName,
+            // The shop's account, for "Ask the shop" (chat)
+            'vendor_id' => $order->vendor_id,
             'customer_notes' => $order->customer_notes,
             'reservation_date' => $order->reservation_date?->toDateString(),
             'created_at' => $order->created_at?->toIso8601String(),

@@ -122,10 +122,16 @@
               </template>
             </div>
 
-            <p class="pd-shop">
-              Sold by
-              <button type="button" @click="goToStore">{{ product.vendor_name || "a BloomCraft shop" }}</button>
-            </p>
+            <div class="pd-shop-row">
+              <p class="pd-shop">
+                Sold by
+                <button type="button" @click="goToStore">{{ product.vendor_name || "a BloomCraft shop" }}</button>
+              </p>
+              <button type="button" class="pd-ask" @click="askShop">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" /></svg>
+                Ask the shop about this
+              </button>
+            </div>
 
             <div class="pd-qty-row">
               <span class="pd-qty-label">Quantity</span>
@@ -560,6 +566,23 @@ function buyNow() {
   router.push({ path: "/customer/checkout", query: { direct: "true", product_id: p.id, quantity: qty.value } });
 }
 
+// Opens the chat with this shop; the question is sent with a card for this product
+function askShop() {
+  if (!product.value?.vendor_id) return;
+  if (!isAuthenticated.value) {
+    toast.info("Log in to message the shop.");
+    router.push({ path: "/guest/login", query: { redirect: route.fullPath } });
+    return;
+  }
+  router.push({
+    path: "/customer/chat",
+    query: { vendor_id: String(product.value.vendor_id), vendor_name: product.value.vendor_name || "" },
+    state: {
+      chatAbout: JSON.stringify({ type: "product", id: product.value.id, name: product.value.product_name, image: images.value[0]?.image_url || null }),
+    },
+  });
+}
+
 function goToStore() {
   if (!product.value?.vendor_id) return;
   router.push({ name: "VendorStorefront", state: { storeId: String(product.value.vendor_id) } });
@@ -883,6 +906,50 @@ watch(
   font-size: 12.5px;
   font-weight: 600;
   color: var(--leaf-deep);
+}
+
+.pd-shop-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.pd-ask {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--leaf-deep);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--leaf-deep);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.pd-ask:hover {
+  background: var(--leaf-deep);
+  color: #fff;
+}
+
+.pd-ask:focus-visible {
+  outline: 2px solid var(--leaf-deep);
+  outline-offset: 2px;
+}
+
+.pd-ask svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linejoin: round;
 }
 
 .pd-shop {

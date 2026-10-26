@@ -324,6 +324,18 @@
                     }}
                   </button>
 
+                  <!-- A question about this order goes to the shop's chat with the order attached -->
+                  <button
+                    v-if="order.vendor_id"
+                    class="ot-btn ot-btn--outline"
+                    @click.stop="askShop(order)"
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" class="ot-btn__ico">
+                      <path d="M17.5 10a6.7 6.7 0 0 1-9.7 5.9L3 17l.9-4.1A6.7 6.7 0 1 1 17.5 10Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                    </svg>
+                    Ask the shop
+                  </button>
+
                   <!-- Return or refund -->
                   <button
                     v-if="order.can_open_return_case"
@@ -1005,7 +1017,15 @@ const canCancel = (o) =>
   (!o.delivery || o.delivery.status === "pending") &&
   !isPaidEWallet(o);
 const showActions = (o) =>
-  canCancel(o) || canComplete(o) || o.can_open_return_case || o.return_case || canReview(o);
+  !!o.vendor_id || canCancel(o) || canComplete(o) || o.can_open_return_case || o.return_case || canReview(o);
+
+// Opens the shop's chat; the question is sent with a card for this order
+const askShop = (order) =>
+  router.push({
+    path: "/customer/chat",
+    query: { vendor_id: String(order.vendor_id), vendor_name: order.store_name || "" },
+    state: { chatAbout: JSON.stringify({ type: "order", id: order.id, order_number: order.order_number }) },
+  });
 
 // ① canReview computed helper — true if order is completed
 const canReview = (order) =>

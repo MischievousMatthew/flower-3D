@@ -414,8 +414,45 @@
                       </span>
                     </button>
 
+                    <!-- A question the customer asked about one of their orders or a product -->
+                    <button
+                      v-else-if="item.message.meta?.kind === 'order_question'"
+                      type="button"
+                      class="msg-card"
+                      :aria-label="`Question about order ${item.message.meta.order_number}. Open your orders`"
+                      @click="router.push({ name: 'OrderTracking' })"
+                    >
+                      <span class="msg-card-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                      </span>
+                      <span class="msg-card-main">
+                        <small>{{ item.message.is_own ? "You asked about" : "Question about" }} an order</small>
+                        <strong>{{ item.message.meta.order_number }}</strong>
+                        <span class="msg-card-note">{{ statusLabel(item.message.meta.order_status) }} · ₱{{ Number(item.message.meta.total || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 }) }}</span>
+                        <span class="msg-card-link">View your order</span>
+                      </span>
+                    </button>
+                    <button
+                      v-else-if="item.message.meta?.kind === 'product_question'"
+                      type="button"
+                      class="msg-card"
+                      :aria-label="`Question about ${item.message.meta.name}. Open the product`"
+                      @click="router.push({ name: 'ProductDetails', params: { id: String(item.message.meta.product_id) } })"
+                    >
+                      <span class="msg-card-img" aria-hidden="true">
+                        <img v-if="item.message.meta.image" :src="item.message.meta.image" alt="" loading="lazy" />
+                        <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 16.5A4.5 4.5 0 1 1 7.5 12 4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 1 1 4.5 4.5 4.5 4.5 0 1 1-4.5 4.5"/></svg>
+                      </span>
+                      <span class="msg-card-main">
+                        <small>{{ item.message.is_own ? "You asked about" : "Question about" }}</small>
+                        <strong>{{ item.message.meta.name }}</strong>
+                        <span class="msg-card-price">₱{{ Number(item.message.meta.price || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 }) }}</span>
+                        <span class="msg-card-link">View product</span>
+                      </span>
+                    </button>
+
                     <p
-                      v-if="item.message.text && !isAttachmentPlaceholder(item.message.text) && (!item.message.meta?.kind || (item.message.meta.kind === 'product' && item.message.text !== item.message.meta.name))"
+                      v-if="item.message.text && !isAttachmentPlaceholder(item.message.text) && (!item.message.meta?.kind || ['order_question', 'product_question'].includes(item.message.meta.kind) || (item.message.meta.kind === 'product' && item.message.text !== item.message.meta.name))"
                       class="bubble"
                     >{{ item.message.text }}</p>
 
@@ -432,6 +469,19 @@
           </div>
 
           <footer class="composer">
+            <div v-if="activeAbout" class="composer-about" role="status">
+              <span class="composer-about-img" aria-hidden="true">
+                <img v-if="activeAbout.image" :src="activeAbout.image" alt="" />
+                <svg v-else viewBox="0 0 24 24"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+              </span>
+              <span class="composer-about-main">
+                <small>Asking about {{ activeAbout.type === "order" ? "your order" : "this product" }}</small>
+                <strong>{{ activeAbout.type === "order" ? activeAbout.order_number : activeAbout.name }}</strong>
+              </span>
+              <button class="chip-remove" type="button" aria-label="Don't attach it to my message" @click="about = null">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
+              </button>
+            </div>
             <div v-if="selectedFiles.length > 0" class="composer-files">
               <span v-for="(file, index) in selectedFiles" :key="index" class="composer-file">
                 <span class="file-badge">{{ fileExtension(file.name) }}</span>
@@ -474,7 +524,7 @@
                   ref="composerInput"
                   v-model="messageText"
                   rows="1"
-                  :placeholder="canSendMessages ? 'Write a message' : 'You have view-only access to this chat'"
+                  :placeholder="!canSendMessages ? 'You have view-only access to this chat' : activeAbout ? 'Write your question' : 'Write a message'"
                   :disabled="!canSendMessages || isSending"
                   :title="canSendMessages ? '' : permissionTooltip"
                   @keydown.enter.exact.prevent="sendMessage"
@@ -663,6 +713,11 @@ const props = defineProps({
   initialVendorName: {
     type: String,
     default: "",
+  },
+  // "Ask the shop" from a product page or an order: {type: "product"|"order", id, name|order_number, image}
+  initialAbout: {
+    type: Object,
+    default: null,
   },
   // CRM employees need the crm edit / delete permissions; everyone else can
   canArchiveConversations: {
@@ -1024,6 +1079,11 @@ const sendMessage = async () => {
   const filesToSend = [...selectedFiles.value];
 
   if (!textToSend && filesToSend.length === 0) return;
+  const askingAbout = activeAbout.value;
+  if (askingAbout && !textToSend) {
+    toast.error("Write your question first.");
+    return;
+  }
 
   try {
     isSending.value = true;
@@ -1031,6 +1091,7 @@ const sendMessage = async () => {
     const formData = new FormData();
     formData.append("conversation_id", selectedConversation.value.id);
     if (textToSend) formData.append("message", textToSend);
+    if (askingAbout) formData.append(askingAbout.type === "order" ? "about_order_id" : "about_product_id", askingAbout.id);
     filesToSend.forEach((file) => formData.append("attachments[]", file));
 
     const { data } = await api.post("chat/messages/send", formData, {
@@ -1050,6 +1111,8 @@ const sendMessage = async () => {
       lastMessageId.value = Math.max(lastMessageId.value, data.message.id);
       messageText.value = "";
       selectedFiles.value = [];
+      // The card goes with the first question only
+      if (askingAbout) about.value = null;
 
       nextTick(() => {
         resizeComposer();
@@ -1059,7 +1122,7 @@ const sendMessage = async () => {
     }
   } catch (error) {
     console.error("Error sending message:", error);
-    toast.error("Your message wasn't sent. Try again.");
+    toast.error(error.response?.status === 422 && error.response?.data?.message ? error.response.data.message : "Your message wasn't sent. Try again.");
   } finally {
     isSending.value = false;
   }
@@ -1161,7 +1224,7 @@ const startNewConversation = async (otherUser) => {
   try {
     const { data } = await api.post("/chat/conversations/start", {
       [isVendor.value ? "customer_id" : "vendor_id"]: otherUser.id,
-      message: "Hi! I'd like to connect with you.",
+      ...(about.value ? {} : { message: "Hi! I'd like to connect with you." }),
     });
 
     if (data.success) {
@@ -1178,6 +1241,14 @@ const startNewConversation = async (otherUser) => {
     toast.error(error.response?.data?.message || "Couldn't start the conversation.");
   }
 };
+
+// The product or order the next message asks about (only in that shop's chat)
+const about = ref(props.initialAbout ? { ...props.initialAbout, vendorId: Number(props.initialVendorId) } : null);
+const activeAbout = computed(() =>
+  about.value && !isVendor.value && Number(selectedConversation.value?.vendor?.id) === about.value.vendorId ? about.value : null,
+);
+const ORDER_STATUS_LABELS = { pending: "Waiting for the shop", processing: "Being prepared", ready: "Ready", out_for_delivery: "Out for delivery", delivered: "Delivered", completed: "Completed", cancelled: "Cancelled" };
+const statusLabel = (status) => ORDER_STATUS_LABELS[status] ?? String(status ?? "").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 const handleInitialVendorConversation = async () => {
   if (
@@ -2319,6 +2390,60 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 10px;
+}
+
+/* The product or order the next message asks about */
+.composer-about {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 8px 8px 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--c-accent) 35%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--c-accent) 8%, transparent);
+}
+.composer-about-img {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--c-accent) 14%, transparent);
+  color: var(--c-accent);
+}
+.composer-about-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.composer-about-img svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.composer-about-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.composer-about-main small {
+  font-size: 11.5px;
+  color: var(--c-accent);
+  font-weight: 600;
+}
+.composer-about-main strong {
+  overflow: hidden;
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .composer-file {

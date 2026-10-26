@@ -128,13 +128,30 @@
                         <span class="ch-card-price">{{ money(m.meta.price) }}</span>
                       </span>
                     </div>
+                    <!-- The customer asked about one of their orders or a product -->
+                    <button v-else-if="m.meta?.kind === 'order_question'" type="button" class="ch-card order ch-card-link" :aria-label="`Open order ${m.meta.order_number}`" @click="router.push({ name: 'VendorOrderDetails', query: { order: m.meta.order_id } })">
+                      <span class="ch-card-icon" v-html="ICONS.receipt"></span>
+                      <span class="ch-card-main">
+                        <small>{{ m.is_own ? "About order" : "Asking about order" }}</small>
+                        <strong>{{ m.meta.order_number }}</strong>
+                        <span class="ch-card-note">{{ orderStatus(m.meta.order_status) }} · {{ money(m.meta.total) }}</span>
+                      </span>
+                    </button>
+                    <div v-else-if="m.meta?.kind === 'product_question'" class="ch-card product">
+                      <span class="ch-card-img"><img v-if="m.meta.image" :src="m.meta.image" alt="" loading="lazy" /><span v-else v-html="ICONS.flower"></span></span>
+                      <span class="ch-card-main">
+                        <small>Asking about</small>
+                        <strong>{{ m.meta.name }}</strong>
+                        <span class="ch-card-price">{{ money(m.meta.price) }}</span>
+                      </span>
+                    </div>
                     <div v-if="images(m).length" class="ch-images" :class="{ many: images(m).length > 1 }">
                       <a v-for="a in images(m)" :key="a.url" :href="a.url" target="_blank" rel="noopener"><img :src="a.url" :alt="a.name || 'Photo'" loading="lazy" /></a>
                     </div>
                     <a v-for="a in files(m)" :key="a.url" :href="a.url" target="_blank" rel="noopener" class="ch-file">
                       <span v-html="ICONS.note"></span><span>{{ a.name || "File" }}</span>
                     </a>
-                    <p v-if="m.text && !m.meta?.kind">{{ m.text }}</p>
+                    <p v-if="m.text && (!m.meta?.kind || ['order_question', 'product_question'].includes(m.meta.kind))">{{ m.text }}</p>
                     <p v-else-if="m.meta?.kind === 'product' && m.text && m.text !== m.meta.name">{{ m.text }}</p>
                   </div>
                   <small class="ch-meta">{{ m.pending ? "Sending…" : clock(m.created_at) }}<template v-if="m.is_own && !m.pending"> · {{ m.read ? "Seen" : "Sent" }}</template></small>
@@ -413,6 +430,7 @@ const MAX_FILES = 5;
 const MAX_BYTES = 5 * 1024 * 1024;
 
 const router = useRouter();
+const orderStatus = (status) => String(status ?? "").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 const conversations = ref([]);
 const loaded = ref(false);
 const error = ref("");
@@ -909,6 +927,20 @@ onBeforeUnmount(() => {
   background: var(--v-surface);
   border: 1px solid var(--v-border);
   color: var(--v-text);
+}
+.ch-card-link {
+  width: 100%;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ch-card-link:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+  border-radius: 10px;
 }
 .ch-card-icon,
 .ch-card-img {
