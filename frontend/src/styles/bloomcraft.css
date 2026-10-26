@@ -53,22 +53,6 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* The earlier rosewood palette, for pages that keep it (the vendor application) */
-.bc-theme.bc-palette-classic,
-.bc-palette-classic .bc-theme {
-  --ivory: #f4f1ec;
-  --ivory-deep: #ebe5dd;
-  --paper: #faf8f4;
-  --ink: #1e1b18;
-  --ink-soft: #6e6761;
-  --line: rgba(30, 27, 24, 0.12);
-  --line-soft: rgba(30, 27, 24, 0.07);
-  --leaf: #b86558;
-  --leaf-deep: #8e443a;
-  --leaf-light: #d4b27a;
-  --espresso: #1b1612;
-}
-
 .bc-container {
   width: 100%;
   max-width: calc(1240px + var(--gutter) * 2);
