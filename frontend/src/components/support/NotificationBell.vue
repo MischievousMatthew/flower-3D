@@ -29,13 +29,14 @@
       <router-link v-if="allPath" :to="allPath" class="menu-foot" @click="openMenu = false">See all notifications →</router-link>
       <router-link v-else-if="supportPath" :to="supportPath" class="menu-foot" @click="openMenu = false">Help &amp; support →</router-link>
     </div>
+    <NotificationDetail :notice="detail" @close="detail = null" />
   </div>
 </template>
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
 import api from "../../plugins/axios";
+import NotificationDetail from "./NotificationDetail.vue";
 
 /** Inbox for announcements from BloomCraft and support replies */
 const props = defineProps({
@@ -46,19 +47,14 @@ const props = defineProps({
 
 const ICON = { platform: "📢", announcement: "📣", order: "🧾", payment: "💳", stock: "📦", message: "💬", inquiry: "❓", review: "⭐", return: "↩️", inquiry_answer: "💡", review_reply: "💬" };
 
-/** "route:VendorOrderDetails?order=12" → a named route; the order ID travels hidden */
-const target = (link) => {
-  if (!link.startsWith("route:")) return link;
-  const [name, qs] = link.slice(6).split("?");
-  return { name, query: Object.fromEntries(new URLSearchParams(qs ?? "")) };
-};
-const router = useRouter();
 
 const root = ref(null);
 const openMenu = ref(false);
 const items = ref([]);
 const unread = ref(0);
 const loading = ref(false);
+// The notification opened in full (title, whole message, a way to its page)
+const detail = ref(null);
 
 const fetchCount = async () => {
   try {
@@ -94,11 +90,8 @@ const openItem = async (n) => {
       // stays unread on the server; harmless
     }
   }
-  if (n.link_url) {
-    openMenu.value = false;
-    if (/^https?:\/\//i.test(n.link_url)) window.open(n.link_url, "_blank", "noopener");
-    else router.push(target(n.link_url));
-  }
+  openMenu.value = false;
+  detail.value = n;
 };
 
 const readAll = async () => {

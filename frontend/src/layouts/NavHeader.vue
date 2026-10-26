@@ -286,6 +286,7 @@
         <span class="bc-nav-toggle-bar" aria-hidden="true"></span>
       </button>
     </div>
+    <NotificationDetail :notice="openedNotice" @close="openedNotice = null" />
   </nav>
 </template>
 
@@ -299,6 +300,7 @@ import api from "../plugins/axios";
 import { toast } from "@/utils/snackbar";
 import "../styles/bloomcraft.css";
 import CheckoutStatusBanner from "../components/site/CheckoutStatusBanner.vue";
+import NotificationDetail from "../components/support/NotificationDetail.vue";
 
 const router = useRouter();
 const { isAuthenticated, logout, user } = useAuth();
@@ -464,12 +466,11 @@ const openNotice = async (notice) => {
       // stays unread on the server; harmless
     }
   }
-  if (notice.link_url) {
-    showNotificationDropdown.value = false;
-    if (/^https?:\/\//i.test(notice.link_url)) window.open(notice.link_url, "_blank", "noopener");
-    else router.push(notice.link_url);
-  }
+  // The whole message, with a button to its page when it has one
+  showNotificationDropdown.value = false;
+  openedNotice.value = notice;
 };
+const openedNotice = ref(null);
 const readAllNotices = async () => {
   notices.value.forEach((n) => (n.read = true));
   noticeUnread.value = 0;

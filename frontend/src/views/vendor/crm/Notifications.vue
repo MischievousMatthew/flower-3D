@@ -66,12 +66,12 @@
         <p class="sp-hint nt-note">Announcements from BloomCraft and replies to your support requests always come through.</p>
       </aside>
     </div>
+    <NotificationDetail :notice="opened" @close="opened = null" />
   </ShopLayout>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { useRouter } from "vue-router";
 import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import ShowMore from "../../../components/common/ShowMore.vue";
@@ -79,7 +79,8 @@ import { useShowMoreInto } from "../../../composables/useShowMore";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
-import { NOTIFICATION_KINDS, dayHeading, notificationTarget, timeAgo } from "../../../components/vendor/crm/crmUi";
+import { NOTIFICATION_KINDS, dayHeading, timeAgo } from "../../../components/vendor/crm/crmUi";
+import NotificationDetail from "../../../components/support/NotificationDetail.vue";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
 import "../../../components/vendor/finance/finance.css";
@@ -96,7 +97,6 @@ const KIND_FOR = {
   returns: NOTIFICATION_KINDS.return,
 };
 
-const router = useRouter();
 const data = ref(null);
 // 10 notifications first, then 10 more, then 20 at a time
 const list = useShowMoreInto(
@@ -147,11 +147,10 @@ async function open(n) {
     if (data.value.unread_by_type?.[n.type]) data.value.unread_by_type[n.type] -= 1;
     api.post(`/notifications/${n.id}/read`).catch(() => {});
   }
-  const target = notificationTarget(n.link_url);
-  if (!target) return;
-  if (typeof target === "string" && /^https?:\/\//i.test(target)) window.open(target, "_blank", "noopener");
-  else router.push(target);
+  // The whole message, with a button to its page when it has one
+  opened.value = n;
 }
+const opened = ref(null);
 
 async function readAll() {
   marking.value = true;
