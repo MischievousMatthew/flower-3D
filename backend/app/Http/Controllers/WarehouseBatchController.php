@@ -106,10 +106,11 @@ class WarehouseBatchController extends Controller
 
         // Auto-complete the purchase order when a batch is received from it
         if ($sourceOrderId) {
-            $order = PurchaseOrder::find($sourceOrderId);
+            $order = PurchaseOrder::where('owner_id', $this->getOwnerId())->find($sourceOrderId);
 
-            if ($order && in_array($order->status, ['received', 'shipped', 'processing', 'pending'], true)) {
-                $order->update(['status' => 'completed']);
+            if ($order && in_array($order->status, ['received', 'shipped', 'processing', 'pending', 'partially_received'], true)) {
+                // Completed once every line has arrived, otherwise partly received
+                app(\App\Services\OrderService::class)->recordBatchReceipt($order, (int) $data['product_id'], (int) $data['qty_received']);
             }
         }
 

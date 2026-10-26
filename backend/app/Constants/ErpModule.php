@@ -88,7 +88,8 @@ class ErpModule
         'sc_dashboard'       => ['view'],
         'suppliers'          => ['view', 'create', 'edit', 'delete'],
         'warehouse'          => ['view', 'create', 'edit', 'delete'],
-        'sc_orders'          => ['view', 'create', 'edit', 'delete'],
+        // approve = approve orders and send them to the supplier, or send them back
+        'sc_orders'          => ['view', 'create', 'edit', 'delete', 'approve'],
         'deliveries'         => ['view', 'edit', 'approve', 'reject', 'export', 'print'],
         'order_scan'         => ['view', 'edit'],
     ];

@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 class SupplyChainDashboardService
 {
     /** Purchase orders that have not arrived yet */
-    private const OPEN = ['pending', 'processing', 'shipped'];
+    private const OPEN = ['pending', 'processing', 'shipped', 'partially_received'];
 
     /** Used when a product has no minimum stock level set */
     private const DEFAULT_MIN_STOCK = 10;
@@ -63,7 +63,7 @@ class SupplyChainDashboardService
         return [
             'total'      => (int) $rows->sum('c'),
             'total_value' => round((float) $rows->sum('v'), 2),
-            'by_status'  => collect(['pending', 'processing', 'shipped', 'received', 'completed'])
+            'by_status'  => collect(['draft', 'pending_approval', 'pending', 'processing', 'shipped', 'partially_received', 'received', 'completed'])
                 ->mapWithKeys(fn ($s) => [$s => $count($s)]),
             'open'       => collect(self::OPEN)->sum($count),
             'open_value' => $value(self::OPEN),
@@ -81,7 +81,7 @@ class SupplyChainDashboardService
             ->leftJoin('suppliers as s', 's.id', '=', 'po.supplier_id')
             ->leftJoin('shipments as sh', 'sh.purchase_order_id', '=', 'po.id')
             ->where('po.owner_id', $ownerId)
-            ->whereIn('po.status', ['processing', 'shipped'])
+            ->whereIn('po.status', ['processing', 'shipped', 'partially_received'])
             ->orderByRaw("CASE WHEN po.status = 'shipped' THEN 0 ELSE 1 END")
             ->orderBy('po.created_at')
             ->limit(8)
@@ -162,7 +162,7 @@ class SupplyChainDashboardService
                 'supplier_id',
                 DB::raw('COUNT(*) as total'),
                 DB::raw("SUM(CASE WHEN status IN ('received', 'completed') THEN 1 ELSE 0 END) as arrived"),
-                DB::raw("SUM(CASE WHEN status IN ('pending', 'processing', 'shipped') THEN 1 ELSE 0 END) as open"),
+                DB::raw("SUM(CASE WHEN status IN ('pending', 'processing', 'shipped', 'partially_received') THEN 1 ELSE 0 END) as open"),
                 DB::raw('COALESCE(SUM(total_amount), 0) as value'),
             )
             ->groupBy('supplier_id')

@@ -268,6 +268,7 @@ const kpis = computed(() => {
         { label: "waiting to be confirmed", count: o.by_status.pending, cls: "s-wait" },
         { label: "being prepared", count: o.by_status.processing, cls: "s-prep" },
         { label: "on the way", count: o.by_status.shipped, cls: "s-road" },
+        { label: "partly received", count: o.by_status.partially_received ?? 0, cls: "s-part" },
       ] : null,
     },
     {
@@ -288,7 +289,8 @@ const poStatuses = computed(() => {
     { key: "pending", label: "Waiting to be confirmed", count: b.pending, cls: "s-wait" },
     { key: "processing", label: "Being prepared", count: b.processing, cls: "s-prep" },
     { key: "shipped", label: "On the way", count: b.shipped, cls: "s-road" },
-    { key: "done", label: "Arrived", count: b.received + b.completed, cls: "s-done" },
+    { key: "partial", label: "Partly received", count: b.partially_received ?? 0, cls: "s-part" },
+    { key: "done", label: "Arrived", count: (b.received ?? 0) + (b.completed ?? 0), cls: "s-done" },
   ];
 });
 
@@ -451,6 +453,7 @@ onMounted(load);
 .s-prep { background: #8b5cf6; }
 .s-road { background: #3b82f6; }
 .s-done { background: #10b981; }
+.s-part { background: #ec4899; }
 
 /* Alerts */
 .sc-alerts {
