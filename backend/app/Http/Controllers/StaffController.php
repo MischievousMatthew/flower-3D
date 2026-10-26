@@ -605,6 +605,7 @@ class StaffController extends Controller
         $data = $request->validate([
             'employee_id' => 'nullable|integer',
             'area' => 'nullable|string|max:40',
+            'search' => 'nullable|string|max:80',
             'from' => 'nullable|date',
             'to' => 'nullable|date',
             'page' => 'nullable|integer|min:1',
@@ -613,6 +614,12 @@ class StaffController extends Controller
         $page = StaffActivityLog::where('owner_id', $ownerId)
             ->when($data['employee_id'] ?? null, fn ($q, $id) => $q->where('employee_id', $id))
             ->when($data['area'] ?? null, fn ($q, $a) => $q->where('area', $a))
+            // "Badet" finds what was done to Badet as well as what Badet did
+            ->when(isset($data['search']) && trim($data['search']) !== '' && Schema::hasColumn('staff_activity_logs', 'details'), function ($q) use ($data) {
+                $like = '%' . mb_strtolower(trim($data['search'])) . '%';
+                $q->where(fn ($w) => $w->whereRaw('LOWER(details) LIKE ?', [$like])->orWhereRaw('LOWER(subject) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(actor_name) LIKE ?', [$like])->orWhereRaw('LOWER(action) LIKE ?', [$like]));
+            })
             ->when($data['from'] ?? null, fn ($q, $d) => $q->where('created_at', '>=', Carbon::parse($d)->startOfDay()))
             ->when($data['to'] ?? null, fn ($q, $d) => $q->where('created_at', '<=', Carbon::parse($d)->endOfDay()))
             ->orderByDesc('created_at')->orderByDesc('id')
@@ -626,6 +633,9 @@ class StaffController extends Controller
                     'employee_id' => $l->employee_id,
                     'who' => $l->actor_name ?? 'Former employee',
                     'action' => $l->action,
+                    // What exactly was done and to whom (older entries only have the general action)
+                    'details' => $l->details ?? null,
+                    'subject' => $l->subject ?? null,
                     'area' => $l->area,
                     'at' => $l->created_at?->toIso8601String(),
                 ]),

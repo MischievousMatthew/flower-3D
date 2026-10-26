@@ -4,9 +4,11 @@ namespace App\Http\Middleware;
 
 use App\Models\Employee;
 use App\Models\StaffActivityLog;
+use App\Support\StaffActivityDetails;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -290,6 +292,9 @@ class LogStaffActivity
 
     public function handle(Request $request, Closure $next): Response
     {
+        // Worked out before the action runs, while a record it deletes can still be named
+        $specific = $this->specific($request);
+
         $response = $next($request);
         if (self::$disabled) {
             return $response;
@@ -309,6 +314,10 @@ class LogStaffActivity
                     'actor_name' => $user->name,
                     'action' => Str::limit($action, 157),
                     'area' => Str::limit($area, 37),
+                    ...($specific && self::hasDetails() ? [
+                        'details' => Str::limit($specific[0], 497),
+                        'subject' => $specific[1] !== null ? Str::limit($specific[1], 147) : null,
+                    ] : []),
                     'method' => $request->method(),
                     'status' => $response->getStatusCode(),
                     'ip' => $request->ip(),
@@ -321,6 +330,34 @@ class LogStaffActivity
         }
 
         return $response;
+    }
+
+    /** [sentence, who/what was affected] for a staff member's change, or null */
+    private function specific(Request $request): ?array
+    {
+        try {
+            if (! $request->user() instanceof Employee
+                || ! in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)
+                || ! $request->route()
+                || $this->ignored($request)) {
+                return null;
+            }
+            $full = $request->route()->getActionName();
+
+            return StaffActivityDetails::describe(class_basename(Str::before($full, '@')) . '@' . Str::after($full, '@'), $request);
+        } catch (\Throwable $e) {
+            // The general wording is still logged
+            Log::info('Staff activity details skipped: ' . $e->getMessage());
+
+            return null;
+        }
+    }
+
+    private static function hasDetails(): bool
+    {
+        static $has = null;
+
+        return $has ??= Schema::hasColumn('staff_activity_logs', 'details');
     }
 
     /** Whether this request is one the log should skip */

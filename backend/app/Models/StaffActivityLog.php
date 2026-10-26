@@ -10,7 +10,7 @@ class StaffActivityLog extends Model
 {
     public const UPDATED_AT = null;
 
-    protected $fillable = ['owner_id', 'employee_id', 'actor_name', 'action', 'area', 'method', 'status', 'ip'];
+    protected $fillable = ['owner_id', 'employee_id', 'actor_name', 'action', 'details', 'subject', 'area', 'method', 'status', 'ip'];
 
     protected $casts = ['created_at' => 'datetime'];
 

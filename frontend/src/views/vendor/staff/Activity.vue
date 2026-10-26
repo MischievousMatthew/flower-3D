@@ -13,6 +13,10 @@
           <span v-else class="bc-skeleton sp-sk-line w30 ac-sk-inline"></span>
         </p>
         <div class="ac-filters">
+          <label class="sp-search ac-search">
+            <span v-html="ICONS.search"></span>
+            <input v-model="search" class="sp-input" type="search" placeholder="Search a name, product or order" aria-label="Search the activity" />
+          </label>
           <select v-model="who" class="sp-select" aria-label="Person" @change="load()">
             <option value="">Everyone</option>
             <option v-for="e in data?.employees ?? []" :key="e.id" :value="e.id">{{ e.name }}</option>
@@ -33,7 +37,7 @@
       <div v-else-if="!data.entries.length" class="sp-empty">
         <span class="sp-empty-icon" v-html="ICONS.activity"></span>
         <h3>{{ filtered ? "Nothing matches" : "No activity yet" }}</h3>
-        <p>{{ filtered ? "Try another person, area or date." : "When your employees time in, update deliveries, edit products or approve requests in the ERP, it shows up here." }}</p>
+        <p>{{ filtered ? "Try another name, person, area or date." : "When your employees time in, update deliveries, edit products or approve requests in the ERP, it shows up here." }}</p>
       </div>
       <div v-else class="ac-days">
         <section v-for="d in byDay" :key="d.day" class="ac-day">
@@ -42,8 +46,13 @@
             <li v-for="e in d.entries" :key="e.key" class="ac-row">
               <span class="st-avatar sm" :style="{ background: personColor(e.who) }">{{ initials(e.who) }}</span>
               <div class="ac-main">
-                <p><b>{{ e.who }}</b> {{ lower(e.action) }}</p>
-                <small><span class="sp-chip slate">{{ e.area }}</span></small>
+                <p><b>{{ e.who }}</b> {{ lower(e.details || e.action) }}</p>
+                <small class="ac-tags">
+                  <span class="sp-chip slate">{{ e.area }}</span>
+                  <button v-if="e.subject" type="button" class="sp-chip blue ac-subject" :title="`Show everything that involved ${e.subject}`" @click="search = e.subject">
+                    <span v-html="ICONS.user"></span>{{ e.subject }}
+                  </button>
+                </small>
               </div>
               <time :datetime="e.at" :title="new Date(e.at).toLocaleString('en-PH')">{{ clockTime(e.at) }}</time>
             </li>
@@ -57,7 +66,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import api from "../../../plugins/axios";
 import ShowMore from "../../../components/common/ShowMore.vue";
 import { useShowMoreInto } from "../../../composables/useShowMore";
@@ -73,7 +82,7 @@ const today = ymd(new Date());
 const data = ref(null);
 // 10 changes first, then 10 more, then 20 at a time
 const list = useShowMoreInto(data, "entries", async (page) =>
-  (await api.get("vendor/staff/activity", { params: { page, employee_id: who.value || undefined, area: area.value || undefined, from: from.value || undefined, to: to.value || undefined } })).data.data,
+  (await api.get("vendor/staff/activity", { params: { page, search: search.value.trim() || undefined, employee_id: who.value || undefined, area: area.value || undefined, from: from.value || undefined, to: to.value || undefined } })).data.data,
 );
 const error = ref("");
 const settingUp = ref("");
@@ -82,8 +91,15 @@ const who = ref("");
 const area = ref("");
 const from = ref("");
 const to = ref("");
+// A name finds what was done to that person as well as what they did
+const search = ref("");
+let searchTimer;
+watch(search, () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(load, 350);
+});
 
-const filtered = computed(() => !!(who.value || area.value || from.value || to.value));
+const filtered = computed(() => !!(search.value.trim() || who.value || area.value || from.value || to.value));
 const byDay = computed(() => {
   const days = new Map();
   for (const e of list.rows.value) {
@@ -118,6 +134,7 @@ async function load() {
   }
 }
 function clear() {
+  search.value = "";
   who.value = "";
   area.value = "";
   from.value = "";
@@ -126,6 +143,7 @@ function clear() {
 }
 
 onMounted(() => load());
+onBeforeUnmount(() => clearTimeout(searchTimer));
 </script>
 
 <style scoped>
@@ -156,6 +174,34 @@ onMounted(() => load());
 }
 .ac-date {
   width: 150px;
+}
+.ac-search {
+  flex: 1 1 220px;
+  min-width: 200px;
+}
+.ac-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ac-subject {
+  border: 0;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ac-subject:hover {
+  filter: brightness(0.96);
+}
+.ac-subject:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.ac-subject :deep(svg) {
+  flex: none;
+  width: 12px;
+  height: 12px;
 }
 .ac-days {
   display: flex;
