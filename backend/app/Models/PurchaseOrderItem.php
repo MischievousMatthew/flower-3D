@@ -20,15 +20,29 @@ class PurchaseOrderItem extends Model
         'quantity',
         'price',
         'subtotal',
+        'received_qty',
+        'rejected_qty',
+        'cancelled_qty',
+        'unit',
+        'supplier_product_id',
     ];
 
     protected $casts = [
-        'quantity' => 'integer',
+        'quantity'     => 'integer',
+        'received_qty'  => 'integer',
+        'rejected_qty'  => 'integer',
+        'cancelled_qty' => 'integer',
         'price'    => 'decimal:2',
         'subtotal' => 'decimal:2',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────
+
+    /** Still to come: ordered, less what was accepted and what won't come */
+    public function outstanding(): int
+    {
+        return max(0, (int) $this->quantity - (int) $this->received_qty - (int) $this->cancelled_qty);
+    }
 
     public function order(): BelongsTo
     {
