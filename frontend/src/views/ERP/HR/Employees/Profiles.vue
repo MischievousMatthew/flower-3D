@@ -69,7 +69,7 @@
               <col style="width: 15%" />
               <col style="width: 13%" />
               <col style="width: 12%" />
-              <col style="width: 6%" />
+              <col class="pf-actions-col" />
             </colgroup>
             <thead>
               <tr><th>Person</th><th>Job</th><th>Location</th><th>Status</th><th>Hired</th><th><span class="pf-sr">Actions</span></th></tr>
@@ -98,15 +98,18 @@
                 <td data-label="Location">{{ e.work_location || "—" }}</td>
                 <td data-label="Status"><span class="sp-chip" :class="statusTone(e.employment_status)">{{ e.employment_status }}</span></td>
                 <td data-label="Hired">{{ e.date_hired ? formatDate(day10(e.date_hired)) : "—" }}</td>
-                <td class="num" @click.stop>
+                <td class="num pf-actions" @click.stop>
                   <div class="pf-menu-wrap">
-                    <button type="button" class="sp-icon-btn" :aria-label="`More for ${e.full_name}`" :aria-expanded="menuId === e.id" @click="menuId = menuId === e.id ? null : e.id"><span v-html="ICONS.more"></span></button>
-                    <div v-if="menuId === e.id" class="pf-menu" role="menu">
+                    <button type="button" class="sp-icon-btn" :aria-label="`More for ${e.full_name}`" aria-haspopup="menu" :aria-expanded="menuId === e.id" @click="toggleMenu(e, $event)"><span v-html="ICONS.more"></span></button>
+                    <!-- Drawn over the page so the table's scroll box can't cut it off -->
+                    <Teleport to="body">
+                    <div v-if="menuId === e.id" class="pf-menu" role="menu" :style="menuStyle" @click.stop>
                       <button type="button" role="menuitem" @click="openDetails(e)"><span v-html="ICONS.eye"></span>View</button>
                       <button type="button" role="menuitem" :disabled="!canEdit" :title="canEdit ? '' : NO_PERMISSION.edit" @click="openForm(e)"><span v-html="ICONS.edit"></span>Edit</button>
                       <button v-for="s in quickStatuses(e)" :key="s" type="button" role="menuitem" :disabled="!canEdit" @click="setEmploymentStatus(e, s)"><span v-html="ICONS.check"></span>Mark as {{ s }}</button>
                       <button type="button" role="menuitem" class="danger" :disabled="!canDelete" :title="canDelete ? '' : NO_PERMISSION.delete" @click="askDelete(e)"><span v-html="ICONS.trash"></span>Delete</button>
                     </div>
+                    </Teleport>
                   </div>
                 </td>
               </tr>
@@ -740,9 +743,28 @@ async function openFromQuery() {
   else openDetails(target);
 }
 
+// The row menu sits on the page (position: fixed) under its button, or above it near the bottom
+const menuStyle = ref({});
+const MENU_WIDTH = 210;
+function toggleMenu(e, event) {
+  if (menuId.value === e.id) {
+    menuId.value = null;
+    return;
+  }
+  const r = event.currentTarget.getBoundingClientRect();
+  const height = 48 + 40 * (3 + quickStatuses(e).length);
+  const below = r.bottom + 6 + height <= window.innerHeight;
+  menuStyle.value = {
+    right: `${Math.max(8, window.innerWidth - r.right)}px`,
+    ...(below ? { top: `${r.bottom + 6}px` } : { bottom: `${window.innerHeight - r.top + 6}px` }),
+  };
+  menuId.value = e.id;
+}
 const closeMenu = (e) => {
-  if (!e.target.closest?.(".pf-menu-wrap")) menuId.value = null;
+  if (!e.target.closest?.(".pf-menu-wrap, .pf-menu")) menuId.value = null;
 };
+// A fixed menu would float away from its row on scroll or resize
+const dropMenu = () => (menuId.value = null);
 const onKey = (e) => {
   if (e.key !== "Escape") return;
   if (deleting.value) deleting.value = null;
@@ -754,6 +776,8 @@ const onKey = (e) => {
 onMounted(async () => {
   document.addEventListener("click", closeMenu);
   document.addEventListener("keydown", onKey);
+  window.addEventListener("scroll", dropMenu, true);
+  window.addEventListener("resize", dropMenu);
   loadStats();
   await load(1);
   openFromQuery();
@@ -761,6 +785,8 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   document.removeEventListener("click", closeMenu);
   document.removeEventListener("keydown", onKey);
+  window.removeEventListener("scroll", dropMenu, true);
+  window.removeEventListener("resize", dropMenu);
   clearTimeout(searchTimer);
 });
 </script>
@@ -827,14 +853,20 @@ onBeforeUnmount(() => {
   position: relative;
   display: inline-block;
 }
+.pf-actions-col {
+  width: 64px;
+}
+/* The button cell never cuts off or shows "…" */
+.st-table td.pf-actions {
+  overflow: visible;
+  text-overflow: clip;
+}
 .pf-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 20;
+  position: fixed;
+  z-index: 900;
+  width: 210px;
   display: flex;
   flex-direction: column;
-  min-width: 200px;
   padding: 6px;
   border: 1px solid var(--v-border);
   border-radius: 12px;
