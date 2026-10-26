@@ -79,9 +79,9 @@ class DeliveryController extends Controller
         $ownerId  = null;
         if ($authUser instanceof \App\Models\Employee) {
             $ownerId = $authUser->owner_id;
-        } else {
-            $employee = \App\Models\Employee::where('id', Auth::id())->first();
-            $ownerId  = $employee?->owner_id;
+        } elseif ($authUser) {
+            // The shop owner signed in as themselves: their own shop
+            $ownerId = $authUser->id;
         }
 
         $paginated = $this->service->forSCCoordinator($filters);

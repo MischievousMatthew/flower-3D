@@ -70,7 +70,7 @@
 
       <!-- Loading State -->
       <div v-if="loading" class="loading-container">
-        <div class="spinner"></div>
+        <div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div>
         <p>Loading requests...</p>
       </div>
 
@@ -414,6 +414,15 @@ onMounted(() => fetchRequests());
 </script>
 
 <style scoped>
+.sk-line {
+  height: 12px;
+  margin: 6px auto;
+  border-radius: 6px;
+  width: 60%;
+}
+.sk-short {
+  width: 35%;
+}
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
 
 * {
@@ -426,7 +435,7 @@ onMounted(() => fetchRequests());
 .funding-requests {
   display: flex;
   min-height: 100vh;
-  background: #f7fafc;
+  background: transparent;
 }
 .requests-content {
   flex: 1;
@@ -447,12 +456,12 @@ onMounted(() => fetchRequests());
 .page-title {
   font-size: 32px;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--v-text);
   letter-spacing: -0.5px;
 }
 .page-subtitle {
   font-size: 14px;
-  color: #718096;
+  color: var(--v-muted);
   font-weight: 500;
 }
 .header-actions {
@@ -466,8 +475,8 @@ onMounted(() => fetchRequests());
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--v-surface);
+  border: 1px solid var(--v-border);
   border-radius: 10px;
   min-width: 300px;
   transition: all 0.2s;
@@ -477,7 +486,7 @@ onMounted(() => fetchRequests());
   box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
 }
 .search-box svg {
-  color: #a0aec0;
+  color: var(--v-faint);
   flex-shrink: 0;
 }
 .search-box input {
@@ -486,10 +495,10 @@ onMounted(() => fetchRequests());
   background: transparent;
   outline: none;
   font-size: 14px;
-  color: #2d3748;
+  color: var(--v-text);
 }
 .search-box input::placeholder {
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 
 .create-btn {
@@ -524,8 +533,8 @@ onMounted(() => fetchRequests());
   gap: 12px;
   margin-bottom: 24px;
   padding: 20px 24px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--v-surface);
+  border: 1px solid var(--v-border);
   border-radius: 12px;
 }
 .status-tabs button {
@@ -535,12 +544,12 @@ onMounted(() => fetchRequests());
   justify-content: center;
   gap: 12px;
   padding: 14px 20px;
-  background: #f7fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--v-subtle);
+  border: 1px solid var(--v-border);
   border-radius: 10px;
   font-size: 14px;
   font-weight: 600;
-  color: #4a5568;
+  color: var(--v-text-2);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -573,14 +582,14 @@ onMounted(() => fetchRequests());
   align-items: center;
   justify-content: center;
   padding: 60px 20px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--v-surface);
+  border: 1px solid var(--v-border);
   border-radius: 12px;
 }
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #e2e8f0;
+  border: 4px solid var(--v-border);
   border-top-color: #4299e1;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -594,7 +603,7 @@ onMounted(() => fetchRequests());
 .error-container p {
   margin-top: 16px;
   font-size: 14px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .retry-btn {
   margin-top: 12px;
@@ -613,8 +622,8 @@ onMounted(() => fetchRequests());
 }
 
 .table-container {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--v-surface);
+  border: 1px solid var(--v-border);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -623,39 +632,39 @@ onMounted(() => fetchRequests());
   border-collapse: collapse;
 }
 .requests-table thead {
-  background: #f7fafc;
-  border-bottom: 2px solid #e2e8f0;
+  background: var(--v-subtle);
+  border-bottom: 2px solid var(--v-border);
 }
 .requests-table th {
   padding: 14px 16px;
   text-align: left;
   font-size: 12px;
   font-weight: 700;
-  color: #718096;
+  color: var(--v-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 .requests-table tbody tr {
-  border-bottom: 1px solid #f7fafc;
+  border-bottom: 1px solid var(--v-border);
   cursor: pointer;
   transition: all 0.2s;
 }
 .requests-table tbody tr:hover {
-  background: #f0f7ff;
+  background: var(--v-blue-soft);
 }
 .requests-table tbody tr.selected {
-  background: #ebf8ff;
+  background: var(--v-blue-soft);
 }
 .requests-table td {
   padding: 16px;
   font-size: 14px;
-  color: #2d3748;
+  color: var(--v-text);
   vertical-align: top;
 }
 .empty-state {
   text-align: center;
   padding: 60px 20px !important;
-  color: #a0aec0;
+  color: var(--v-faint);
 }
 
 .info-cell {
@@ -668,14 +677,14 @@ onMounted(() => fetchRequests());
 }
 .request-id {
   font-weight: 700;
-  color: #2d3748;
+  color: var(--v-text);
   font-family: "Poppins", monospace;
   font-size: 14px;
 }
 .request-date,
 .requested-by {
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 
 .product-cell {
@@ -688,17 +697,17 @@ onMounted(() => fetchRequests());
 }
 .product-name {
   font-weight: 700;
-  color: #2d3748;
+  color: var(--v-text);
   font-size: 14px;
 }
 .product-details {
   font-size: 12px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .quantity {
   font-size: 13px;
   font-weight: 600;
-  color: #4299e1;
+  color: var(--v-blue-text);
 }
 
 .manager-info {
@@ -709,7 +718,7 @@ onMounted(() => fetchRequests());
 .manager-name {
   font-size: 13px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--v-text);
 }
 
 .financial-cell {
@@ -727,23 +736,23 @@ onMounted(() => fetchRequests());
   font-size: 12px;
 }
 .amount-row .label {
-  color: #718096;
+  color: var(--v-muted);
   font-weight: 500;
 }
 .amount-row .value {
   font-weight: 700;
-  color: #2d3748;
+  color: var(--v-text);
   font-family: "Poppins", monospace;
 }
 
 .text-success {
-  color: #2b6cb0 !important;
+  color: var(--v-blue-text) !important;
 }
 .text-warning {
-  color: #dd6b20 !important;
+  color: var(--v-amber-text) !important;
 }
 .text-error {
-  color: #e53e3e !important;
+  color: var(--v-red-text) !important;
 }
 
 .recommendation-badge {
@@ -759,15 +768,15 @@ onMounted(() => fetchRequests());
 }
 .recommendation-badge.approve {
   background: #bee3f8;
-  color: #2c5282;
+  color: var(--v-blue-text);
 }
 .recommendation-badge.approve-partial {
-  background: #feebc8;
-  color: #7c2d12;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
 }
 .recommendation-badge.reject {
   background: #fed7e2;
-  color: #742a2a;
+  color: var(--v-red-text);
 }
 
 .urgency-badge {
@@ -782,15 +791,15 @@ onMounted(() => fetchRequests());
 }
 .urgency-badge.normal {
   background: #bee3f8;
-  color: #2c5282;
+  color: var(--v-blue-text);
 }
 .urgency-badge.urgent {
-  background: #feebc8;
-  color: #7c2d12;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
 }
 .urgency-badge.critical {
   background: #fed7e2;
-  color: #742a2a;
+  color: var(--v-red-text);
 }
 
 .status-badge {
@@ -802,20 +811,20 @@ onMounted(() => fetchRequests());
   letter-spacing: 0.3px;
 }
 .status-badge.draft {
-  background: #e2e8f0;
-  color: #4a5568;
+  background: var(--v-blue-soft);
+  color: var(--v-text-2);
 }
 .status-badge.pending {
-  background: #feebc8;
-  color: #7c2d12;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
 }
 .status-badge.approved {
   background: #bee3f8;
-  color: #2c5282;
+  color: var(--v-blue-text);
 }
 .status-badge.rejected {
   background: #fed7e2;
-  color: #742a2a;
+  color: var(--v-red-text);
 }
 
 .action-cell {
@@ -824,7 +833,7 @@ onMounted(() => fetchRequests());
 .action-btn {
   background: transparent;
   border: none;
-  color: #a0aec0;
+  color: var(--v-faint);
   cursor: pointer;
   padding: 6px;
   display: flex;
@@ -833,8 +842,8 @@ onMounted(() => fetchRequests());
   transition: all 0.2s;
 }
 .action-btn:hover {
-  background: #f7fafc;
-  color: #4a5568;
+  background: var(--v-subtle);
+  color: var(--v-text-2);
 }
 
 .dropdown-menu {
@@ -842,8 +851,8 @@ onMounted(() => fetchRequests());
   right: 0;
   top: 100%;
   margin-top: 4px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--v-surface);
+  border: 1px solid var(--v-border);
   border-radius: 10px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   z-index: 100;
@@ -858,21 +867,21 @@ onMounted(() => fetchRequests());
   background: transparent;
   border: none;
   font-size: 14px;
-  color: #2d3748;
+  color: var(--v-text);
   cursor: pointer;
   transition: all 0.2s;
   font-weight: 500;
 }
 .dropdown-menu button:hover {
-  background: #f0f7ff;
+  background: var(--v-blue-soft);
 }
 .dropdown-menu button:disabled:hover {
   background: transparent;
 }
 .dropdown-menu button.delete-btn {
-  color: #e53e3e;
+  color: var(--v-red-text);
 }
 .dropdown-menu button.delete-btn:hover {
-  background: #fff5f5;
+  background: var(--v-red-soft);
 }
 </style>

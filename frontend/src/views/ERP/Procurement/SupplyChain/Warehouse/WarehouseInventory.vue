@@ -165,7 +165,7 @@
         <tbody>
           <tr v-if="loading">
             <td colspan="8" class="loading-cell">
-              <div class="spinner"></div>
+              <div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div>
             </td>
           </tr>
           <tr v-else-if="!whFilter">
@@ -450,6 +450,15 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.sk-line {
+  height: 12px;
+  margin: 6px auto;
+  border-radius: 6px;
+  width: 60%;
+}
+.sk-short {
+  width: 35%;
+}
 * {
   box-sizing: border-box;
   font-family: "Poppins", sans-serif;
@@ -469,12 +478,12 @@ onMounted(async () => {
 .page-title {
   font-size: 22px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   margin: 0;
 }
 .page-sub {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin: 2px 0 0;
 }
 .header-actions {
@@ -487,9 +496,9 @@ onMounted(async () => {
   align-items: center;
   gap: 7px;
   padding: 9px 16px;
-  background: #fff;
-  color: #374151;
-  border: 1.5px solid #e5e7eb;
+  background: var(--v-surface);
+  color: var(--v-text-2);
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
   font-size: 13.5px;
   font-weight: 500;
@@ -498,7 +507,7 @@ onMounted(async () => {
   transition: background 0.15s;
 }
 .btn-secondary:hover {
-  background: #f9fafb;
+  background: var(--v-subtle);
 }
 
 /* Summary strip */
@@ -508,8 +517,8 @@ onMounted(async () => {
   gap: 14px;
 }
 .sum-card {
-  background: #fff;
-  border: 1px solid #e8ecf0;
+  background: var(--v-surface);
+  border: 1px solid var(--v-border);
   border-radius: 12px;
   padding: 16px 18px;
   display: flex;
@@ -526,38 +535,38 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 .sum-icon.teal {
-  background: #ecfdf5;
+  background: var(--v-green-soft);
   color: #10b981;
 }
 .sum-icon.blue {
-  background: #eff6ff;
-  color: #3b82f6;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
 }
 .sum-icon.green {
-  background: #f0fdf4;
-  color: #16a34a;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
 }
 .sum-icon.purple {
-  background: #faf5ff;
-  color: #7c3aed;
+  background: var(--v-purple-soft);
+  color: var(--v-purple-text);
 }
 .sum-val {
   font-size: 22px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   line-height: 1;
 }
 .sum-lbl {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin-top: 2px;
 }
 
 /* Card */
 .card {
-  background: #fff;
+  background: var(--v-surface);
   border-radius: 14px;
-  border: 1px solid #e8ecf0;
+  border: 1px solid var(--v-border);
   overflow: hidden;
 }
 
@@ -566,7 +575,7 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   padding: 14px 20px;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--v-border);
 }
 .toolbar-left {
   display: flex;
@@ -576,11 +585,11 @@ onMounted(async () => {
 
 .select-filter {
   padding: 7px 12px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 8px;
   font-size: 13px;
-  color: #374151;
-  background: #fff;
+  color: var(--v-text-2);
+  background: var(--v-input);
   outline: none;
   cursor: pointer;
   font-family: inherit;
@@ -590,8 +599,8 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   padding: 7px 12px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--v-subtle);
+  border: 1px solid var(--v-border);
   border-radius: 8px;
 }
 .search-box input {
@@ -599,7 +608,7 @@ onMounted(async () => {
   background: none;
   outline: none;
   font-size: 13px;
-  color: #374151;
+  color: var(--v-text-2);
   width: 180px;
   font-family: inherit;
 }
@@ -615,34 +624,34 @@ onMounted(async () => {
   text-align: left;
   font-size: 11.5px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--v-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  border-bottom: 1px solid #e8ecf0;
-  background: #f9fafb;
+  border-bottom: 1px solid var(--v-border);
+  background: var(--v-subtle);
 }
 .data-row td {
   padding: 13px 16px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--v-border);
   vertical-align: middle;
 }
 .data-row:last-child td {
   border-bottom: none;
 }
 .data-row:hover td {
-  background: #fafafa;
+  background: var(--v-subtle);
 }
 
 .loading-cell,
 .empty-cell {
   text-align: center;
   padding: 56px 16px !important;
-  color: #9ca3af;
+  color: var(--v-faint);
 }
 .spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid #e5e7eb;
+  border: 3px solid var(--v-border);
   border-top-color: #10b981;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -670,16 +679,16 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 .loc-icon.cold {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
 }
 .loc-icon.warm {
-  background: #d1fae5;
-  color: #059669;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
 }
 .loc-name {
   font-weight: 600;
-  color: #111827;
+  color: var(--v-text);
   font-size: 13.5px;
 }
 .loc-full-tag {
@@ -687,8 +696,8 @@ onMounted(async () => {
   margin-top: 2px;
   font-size: 10.5px;
   font-weight: 600;
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
   padding: 1px 6px;
   border-radius: 4px;
 }
@@ -696,13 +705,13 @@ onMounted(async () => {
 .code-pill {
   font-family: monospace;
   font-size: 12.5px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   padding: 2px 7px;
   border-radius: 5px;
-  color: #374151;
+  color: var(--v-text-2);
 }
 .muted {
-  color: #6b7280;
+  color: var(--v-muted);
   font-size: 13px;
 }
 .link {
@@ -720,12 +729,12 @@ onMounted(async () => {
   border-radius: 20px;
 }
 .type-chip.cold {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
 }
 .type-chip.normal {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--v-subtle);
+  color: var(--v-muted);
 }
 
 /* Capacity */
@@ -737,7 +746,7 @@ onMounted(async () => {
 }
 .cap-bar {
   height: 4px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -760,13 +769,13 @@ onMounted(async () => {
   font-weight: 600;
 }
 .cap-text.ok {
-  color: #059669;
+  color: var(--v-green-text);
 }
 .cap-text.warn {
-  color: #d97706;
+  color: var(--v-amber-text);
 }
 .cap-text.danger {
-  color: #dc2626;
+  color: var(--v-red-text);
 }
 
 /* Batch count */
@@ -775,7 +784,7 @@ onMounted(async () => {
   font-weight: 700;
 }
 .batch-num.has-batches {
-  color: #111827;
+  color: var(--v-text);
 }
 .batch-num.no-batches {
   color: #d1d5db;
@@ -813,7 +822,7 @@ onMounted(async () => {
 .cond-num {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--v-text-2);
 }
 
 /* Actions */
@@ -825,18 +834,18 @@ onMounted(async () => {
   width: 30px;
   height: 30px;
   border-radius: 7px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
+  border: 1px solid var(--v-border);
+  background: var(--v-surface);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--v-muted);
   transition: all 0.15s;
 }
 .action-btn.eye:hover {
-  background: #eff6ff;
-  color: #2563eb;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
   border-color: #93c5fd;
 }
 </style>

@@ -1,619 +1,262 @@
 <template>
-  <div class="ship-page">
-    
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">Shipments</h1>
-        <p class="page-sub">Track all outbound and inbound deliveries</p>
+  <HrPage title="Shipments" subtitle="Track supplier deliveries for your purchase orders, from the carrier picking them up to the delivery at your door.">
+    <template #actions>
+      <button v-if="canEdit('deliveries')" type="button" class="sp-btn sp-btn-primary" @click="openCreate"><span v-html="ICONS.plus"></span>Track a delivery</button>
+    </template>
+
+    <div class="sp-card sl-bar">
+      <div class="sp-seg" role="group" aria-label="Status">
+        <button v-for="t in TABS" :key="t.value" type="button" :class="{ on: status === t.value }" :aria-pressed="status === t.value" @click="setStatus(t.value)">{{ t.label }}</button>
       </div>
-      <button class="btn-primary" @click="showCreate = true">
-        <svg viewBox="0 0 20 20" fill="currentColor" width="15">
-          <path
-            d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-          />
-        </svg>
-        Create Shipment
-      </button>
     </div>
 
-    <!-- Status Filters -->
-    <div class="status-filter-row">
-      <button
-        v-for="tab in statusTabs"
-        :key="tab.value"
-        class="stab"
-        :class="{ active: activeStatus === tab.value }"
-        @click="
-          activeStatus = tab.value;
-          fetchShipments();
-        "
-      >
-        <span class="stab-dot" :class="tab.value"></span>
-        {{ tab.label }}
-        <span class="stab-count">{{ tab.count }}</span>
-      </button>
+    <div v-if="loadError" class="sp-banner error">
+      <span v-html="ICONS.alert"></span>{{ loadError }}
+      <button type="button" @click="load">Try again</button>
     </div>
 
-    <div class="card">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Tracking #</th>
-            <th>Order</th>
-            <th>Carrier</th>
-            <th>Status</th>
-            <th>Shipped</th>
-            <th>Expected</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loading">
-            <td colspan="7" class="loading-cell">
-              <div class="spinner"></div>
-            </td>
-          </tr>
-          <tr v-for="s in shipments" :key="s.id" class="data-row">
-            <td>
-              <router-link
-                :to="`/erp/procurement/supply-chain/logistics/${s.id}`"
-                class="tracking-link"
-              >
-                <svg
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  width="12"
-                >
-                  <rect x="1" y="4" width="10" height="12" rx="1" />
-                  <path d="M11 7h5l2 4v4h-7V7z" />
-                  <circle cx="4" cy="16" r="2" />
-                  <circle cx="16" cy="16" r="2" />
-                </svg>
-                {{ s.tracking_number }}
-              </router-link>
-            </td>
-            <td>
-              <code class="order-ref">{{
-                s.purchase_order?.order_number
-              }}</code>
-            </td>
-            <td class="muted">{{ s.carrier }}</td>
-            <td>
-              <span class="ship-badge" :class="s.status">{{
-                formatStatus(s.status)
-              }}</span>
-            </td>
-            <td class="muted">
-              {{ s.shipped_date ? formatDate(s.shipped_date) : "—" }}
-            </td>
-            <td class="muted">—</td>
-            <td>
-              <div class="action-cell">
-                <router-link
-                  :to="`/erp/procurement/supply-chain/logistics/${s.id}`"
-                  class="action-btn"
-                  title="Track"
-                >
-                  <svg
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    width="14"
-                  >
-                    <path d="M10 3a7 7 0 100 14A7 7 0 0010 3z" />
-                    <path d="M10 7v4l2 2" />
-                  </svg>
-                </router-link>
-                <button
-                  v-if="s.status === 'pending'"
-                  class="action-btn ok"
-                  @click="ship(s)"
-                  title="Mark Shipped"
-                >
-                  <svg
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    width="14"
-                  >
-                    <path d="M4 10h12M10 4l6 6-6 6" />
-                  </svg>
-                </button>
-                <button
-                  v-if="['in_transit', 'out_for_delivery'].includes(s.status)"
-                  class="action-btn green"
-                  @click="receive(s)"
-                  title="Mark Received"
-                >
-                  <svg
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    width="14"
-                  >
-                    <path d="M5 10l4 4 6-6" />
-                  </svg>
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <section class="sp-card sl-card" aria-label="Shipments">
+      <ul v-if="rows === null" class="sl-rows"><li v-for="n in 5" :key="n" class="sl-row"><div class="bc-skeleton sp-sk-line w50"></div></li></ul>
+      <div v-else-if="!rows.length" class="sp-empty">
+        <span class="sp-empty-icon" v-html="ICONS.truck"></span>
+        <h3>{{ status ? `No shipments ${shipStatus(status).label.toLowerCase()}` : "No shipments yet" }}</h3>
+        <p>Add the carrier and tracking number when a supplier sends an order, then follow it here until it arrives.</p>
+        <button v-if="!status && canEdit('deliveries')" type="button" class="sp-btn sp-btn-primary" @click="openCreate"><span v-html="ICONS.plus"></span>Track a delivery</button>
+      </div>
+      <template v-else>
+        <ul class="sl-rows">
+          <li v-for="s in rows" :key="s.id">
+            <router-link :to="{ name: 'ShipmentTracking', params: { id: s.id } }" class="sl-row">
+              <span class="sl-ic" :class="`tone-${shipStatus(s.status).tone}`" v-html="ICONS[shipStatus(s.status).icon]"></span>
+              <span class="grow">
+                <b>{{ s.tracking_number }}</b>
+                <small>{{ s.carrier }} · {{ s.purchase_order?.order_number ?? "Order removed" }}</small>
+              </span>
+              <span class="sl-dates">
+                <small>{{ s.shipped_date ? `Shipped ${date(s.shipped_date)}` : "Not shipped yet" }}</small>
+                <small v-if="s.received_date">Arrived {{ date(s.received_date) }}</small>
+              </span>
+              <span class="sp-chip" :class="shipStatus(s.status).tone">{{ shipStatus(s.status).label }}</span>
+            </router-link>
+          </li>
+        </ul>
+        <ShowMore tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="rows.length" :total="pager.total.value" @more="pager.showMore()" />
+      </template>
+    </section>
 
-    <!-- Create Shipment Modal -->
-    <transition name="modal-fade">
-      <div
-        v-if="showCreate"
-        class="modal-overlay"
-        @click.self="showCreate = false"
-      >
-        <div class="modal">
-          <div class="modal-header">
-            <h3>Create Shipment</h3>
-            <button class="modal-close" @click="showCreate = false">×</button>
-          </div>
-          <div class="modal-body">
-            <div class="field">
-              <label>Purchase Order <span class="req">*</span></label>
-              <select v-model="newShip.purchase_order_id">
-                <option value="" disabled>Select order…</option>
-                <option v-for="o in availableOrders" :key="o.id" :value="o.id">
-                  {{ o.order_number }}
-                </option>
+    <!-- Track a delivery -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="form" class="sp-backdrop" @click="form = null"></div></Transition>
+      <Transition name="sp-pop">
+        <div v-if="form" class="sp-modal-wrap">
+          <form class="sp-modal sl-form" role="dialog" aria-modal="true" aria-labelledby="sl-new" novalidate @submit.prevent="create">
+            <div class="sp-modal-head">
+              <div><h3 id="sl-new">Track a supplier delivery</h3><p>For an order that's with the supplier. You can mark it shipped and delivered as it moves.</p></div>
+              <button type="button" class="sp-icon-btn" aria-label="Close" @click="form = null"><span v-html="ICONS.close"></span></button>
+            </div>
+            <label class="sp-field">
+              <span class="sp-label">Purchase order</span>
+              <select v-model="form.purchase_order_id" class="sp-select" :class="{ invalid: form.errors.purchase_order_id }">
+                <option value="">{{ orders === null ? "Loading…" : orders.length ? "Choose an order" : "No orders are waiting on a supplier" }}</option>
+                <option v-for="o in orders ?? []" :key="o.id" :value="o.id">{{ o.order_number }} · {{ o.supplier?.company_name }}</option>
               </select>
+              <small v-if="form.errors.purchase_order_id" class="sp-error">{{ form.errors.purchase_order_id }}</small>
+            </label>
+            <div class="sp-grid-2">
+              <label class="sp-field">
+                <span class="sp-label">Carrier</span>
+                <input v-model.trim="form.carrier" class="sp-input" :class="{ invalid: form.errors.carrier }" maxlength="255" list="sl-carriers" placeholder="e.g. LBC, J&T, Lalamove" />
+                <datalist id="sl-carriers"><option v-for="c in CARRIERS" :key="c" :value="c" /></datalist>
+                <small v-if="form.errors.carrier" class="sp-error">{{ form.errors.carrier }}</small>
+              </label>
+              <label class="sp-field">
+                <span class="sp-label">Tracking number <small>(optional)</small></span>
+                <input v-model.trim="form.tracking_number" class="sp-input" maxlength="255" placeholder="One is made if empty" />
+              </label>
             </div>
-            <div class="field">
-              <label>Carrier <span class="req">*</span></label>
-              <input
-                v-model="newShip.carrier"
-                placeholder="e.g. FedEx, DHL, UPS"
-              />
+            <p v-if="form.error" class="sp-error">{{ form.error }}</p>
+            <div class="sp-modal-foot">
+              <button type="button" class="sp-btn sp-btn-ghost" @click="form = null">Cancel</button>
+              <button type="submit" class="sp-btn sp-btn-primary" :disabled="form.busy">{{ form.busy ? "Saving…" : "Start tracking" }}</button>
             </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn-cancel" @click="showCreate = false">
-              Cancel
-            </button>
-            <button class="btn-primary sm" @click="createShipment">
-              Create
-            </button>
-          </div>
+          </form>
         </div>
-      </div>
-    </transition>
-  </div>
+      </Transition>
+    </Teleport>
+  </HrPage>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, watch, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import HrPage from "../../../../../components/hr/HrPage.vue";
+import ShowMore from "../../../../../components/common/ShowMore.vue";
+import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopIcons";
+import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";
+import { SHIP_STATUS, shipStatus } from "../../../../../components/procurement/shipmentUi";
+import { useShowMorePaged } from "../../../../../composables/useShowMore";
+import { useAssignment } from "../../../../../composables/useAssignment";
 import { shipmentService } from "../../../../../services/shipmentService";
 import { orderService } from "../../../../../services/orderService";
+import { toast } from "@/utils/snackbar";
 
+const TABS = [{ value: "", label: "All" }, ...Object.entries(SHIP_STATUS).map(([value, s]) => ({ value, label: s.label }))];
+const CARRIERS = ["LBC", "J&T Express", "Lalamove", "Grab Express", "2GO", "Supplier's own truck"];
 
-const shipments = ref([]);
-const availableOrders = ref([]);
-const loading = ref(false);
-const activeStatus = ref("");
-const showCreate = ref(false);
-const newShip = ref({ purchase_order_id: "", carrier: "" });
+const router = useRouter();
+const { canEdit } = useAssignment();
+const status = ref("");
+const rows = ref(null);
+const loadError = ref("");
+const form = ref(null);
+const orders = ref(null);
 
-const STATUSES = [
-  "pending",
-  "in_transit",
-  "out_for_delivery",
-  "delivered",
-  "failed",
-  "returned",
-];
-const statusTabs = ref(
-  STATUSES.map((s) => ({ value: s, label: formatStatus(s), count: 0 })),
-);
-statusTabs.value.unshift({ value: "", label: "All", count: 0 });
+const date = (d) => (d ? new Date(`${String(d).slice(0, 10)}T00:00:00`).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—");
 
-function formatStatus(s) {
-  return (s || "").replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+async function fetchPage(page) {
+  const res = await shipmentService.list({ status: status.value || undefined, per_page: 20, page });
+  const body = res.data ?? {};
+  return { items: body.data ?? [], lastPage: body.last_page ?? 1, total: body.total };
+}
+const pager = useShowMorePaged(fetchPage);
+watch(() => pager.visible.value, (v) => {
+  if (rows.value !== null) rows.value = v;
+});
+async function load() {
+  loadError.value = "";
+  try {
+    await pager.load();
+    if (pager.failure.value) throw pager.failure.value;
+    rows.value = pager.visible.value;
+  } catch (e) {
+    rows.value = rows.value ?? [];
+    loadError.value = apiMessage(e, "Couldn't load the shipments.");
+  }
+}
+function setStatus(s) {
+  status.value = s;
+  load();
 }
 
-async function fetchShipments() {
-  loading.value = true;
+async function openCreate() {
+  form.value = { purchase_order_id: "", carrier: "", tracking_number: "", errors: {}, error: "", busy: false };
+  if (orders.value === null) {
+    try {
+      const res = await orderService.list({ stage: "ordered", per_page: 100 });
+      // Only orders the supplier hasn't shipped yet, without a shipment
+      orders.value = (res.data?.data ?? []).filter((o) => ["pending", "processing"].includes(o.status));
+    } catch {
+      orders.value = [];
+    }
+  }
+}
+async function create() {
+  const f = form.value;
+  f.errors = {};
+  f.error = "";
+  if (!f.purchase_order_id) f.errors.purchase_order_id = "Choose the order.";
+  if (!f.carrier) f.errors.carrier = "Enter who's delivering it.";
+  if (Object.keys(f.errors).length) return;
+  f.busy = true;
   try {
-    const params = {};
-    if (activeStatus.value) params.status = activeStatus.value;
-    const res = await shipmentService.list(params);
-    shipments.value = res.data || res;
-    // Update counts
-    statusTabs.value.forEach((t) => {
-      t.count = t.value
-        ? shipments.value.filter((s) => s.status === t.value).length
-        : shipments.value.length;
-    });
-  } finally {
-    loading.value = false;
+    const res = await shipmentService.create({ purchase_order_id: f.purchase_order_id, carrier: f.carrier, tracking_number: f.tracking_number || null });
+    form.value = null;
+    orders.value = null;
+    toast.success(`Tracking ${res.data.tracking_number}.`);
+    router.push({ name: "ShipmentTracking", params: { id: res.data.id } });
+  } catch (e) {
+    f.busy = false;
+    for (const [k, v] of Object.entries(e?.response?.data?.errors ?? {})) f.errors[k] = v[0];
+    f.error = Object.keys(f.errors).length ? "" : apiMessage(e, "Couldn't start tracking it.");
   }
 }
 
-async function ship(s) {
-  await shipmentService.markShipped(s.id);
-  s.status = "in_transit";
-  s.shipped_date = new Date().toISOString();
-}
-
-async function receive(s) {
-  await shipmentService.markReceived(s.id);
-  s.status = "delivered";
-  s.received_date = new Date().toISOString();
-}
-
-async function createShipment() {
-  await shipmentService.create({ ...newShip.value, items: [] });
-  showCreate.value = false;
-  newShip.value = { purchase_order_id: "", carrier: "" };
-  fetchShipments();
-}
-
-function formatDate(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-onMounted(async () => {
-  fetchShipments();
-  const res = await orderService.list({ status: "processing", per_page: 100 });
-  availableOrders.value = res.data || res;
-});
+onMounted(load);
 </script>
 
 <style scoped>
-* {
-  box-sizing: border-box;
-  font-family: "Poppins", sans-serif;
-}
-
-.ship-page {
+.grow {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 2px;
 }
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+.sl-bar {
+  padding: 12px;
+  margin-bottom: 16px;
+  overflow-x: auto;
 }
-.page-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #111827;
+.sl-bar .sp-seg {
+  width: max-content;
+}
+.sl-card {
+  padding: 8px;
+}
+.sl-rows {
+  list-style: none;
   margin: 0;
+  padding: 0;
 }
-.page-sub {
-  font-size: 13px;
-  color: #6b7280;
-  margin: 2px 0 0;
+.sl-rows > li + li {
+  border-top: 1px solid var(--v-border);
 }
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 18px;
-  background: #10b981;
-  color: #fff;
-  border: none;
-  border-radius: 9px;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.btn-primary.sm {
-  padding: 8px 16px;
-  font-size: 13px;
-}
-
-.status-filter-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.stab {
+.sl-row {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 7px 14px;
-  border-radius: 8px;
-  border: 1.5px solid #e5e7eb;
-  background: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  color: #6b7280;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.stab:hover {
-  border-color: #d1d5db;
-  color: #374151;
-}
-.stab.active {
-  border-color: #10b981;
-  background: #ecfdf5;
-  color: #059669;
-}
-.stab-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-.stab-dot.pending {
-  background: #f59e0b;
-}
-.stab-dot.in_transit {
-  background: #3b82f6;
-}
-.stab-dot.out_for_delivery {
-  background: #8b5cf6;
-}
-.stab-dot.delivered {
-  background: #10b981;
-}
-.stab-dot.failed {
-  background: #ef4444;
-}
-.stab-dot.returned {
-  background: #6b7280;
-}
-.stab-count {
-  background: #f3f4f6;
-  border-radius: 10px;
-  padding: 1px 7px;
-  font-size: 11px;
-}
-.stab.active .stab-count {
-  background: #d1fae5;
-}
-
-.card {
-  background: #fff;
-  border-radius: 14px;
-  border: 1px solid #e8ecf0;
-  overflow: hidden;
-}
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13.5px;
-}
-.data-table th {
-  padding: 10px 16px;
-  text-align: left;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-bottom: 1px solid #e8ecf0;
-  background: #f9fafb;
-}
-.data-row td {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f3f4f6;
-  vertical-align: middle;
-}
-.data-row:last-child td {
-  border-bottom: none;
-}
-.data-row:hover td {
-  background: #fafafa;
-}
-.loading-cell {
-  text-align: center;
-  padding: 48px 16px !important;
-}
-.spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid #e5e7eb;
-  border-top-color: #10b981;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  margin: 0 auto;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.tracking-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: monospace;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: #374151;
+  gap: 14px;
+  padding: 12px 10px;
+  border-radius: 12px;
+  color: inherit;
   text-decoration: none;
 }
-.tracking-link:hover {
-  color: #10b981;
+a.sl-row:hover {
+  background: var(--v-subtle);
 }
-.order-ref {
-  font-family: monospace;
+a.sl-row:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: -2px;
+}
+.sl-ic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+}
+.sl-ic :deep(svg) {
+  width: 17px;
+  height: 17px;
+}
+.sl-row b {
+  font-size: 13.5px;
+  color: var(--v-text);
+}
+.sl-row small {
   font-size: 12px;
-  background: #f3f4f6;
-  padding: 2px 7px;
-  border-radius: 5px;
+  color: var(--v-muted);
 }
-.muted {
-  color: #6b7280;
-}
-
-.ship-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-.ship-badge.pending {
-  background: #fef3c7;
-  color: #92400e;
-}
-.ship-badge.in_transit {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-.ship-badge.out_for_delivery {
-  background: #ede9fe;
-  color: #6d28d9;
-}
-.ship-badge.delivered {
-  background: #dcfce7;
-  color: #16a34a;
-}
-.ship-badge.failed {
-  background: #fee2e2;
-  color: #dc2626;
-}
-.ship-badge.returned {
-  background: #f3f4f6;
-  color: #6b7280;
-}
-
-.action-cell {
+.sl-dates {
   display: flex;
-  gap: 4px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
 }
-.action-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: #6b7280;
-  text-decoration: none;
-}
-.action-btn:hover {
-  background: #f9fafb;
-  color: #374151;
-}
-.action-btn.ok {
-  border-color: #a7f3d0;
-  color: #059669;
-}
-.action-btn.green {
-  border-color: #10b981;
-  background: #ecfdf5;
-  color: #059669;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.modal {
-  background: #fff;
-  border-radius: 14px;
-  width: 420px;
-  overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-}
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 20px;
-  border-bottom: 1px solid #f0f2f5;
-}
-.modal-header h3 {
-  font-size: 16px;
-  font-weight: 700;
-  color: #111827;
-  margin: 0;
-}
-.modal-close {
-  border: none;
-  background: none;
-  font-size: 22px;
-  color: #9ca3af;
-  cursor: pointer;
-}
-.modal-body {
-  padding: 20px;
+.sl-form {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 14px 20px;
-  border-top: 1px solid #f0f2f5;
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.field label {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #374151;
-}
-.field input,
-.field select {
-  padding: 9px 12px;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 9px;
-  font-size: 13.5px;
-  color: #111827;
-  outline: none;
-  font-family: inherit;
-  background: #fff;
-}
-.field input:focus,
-.field select:focus {
-  border-color: #10b981;
-}
-.req {
-  color: #ef4444;
-}
-.btn-cancel {
-  padding: 9px 18px;
-  border-radius: 8px;
-  border: 1.5px solid #e5e7eb;
-  background: #fff;
-  color: #374151;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition: opacity 0.2s;
-}
-.modal-fade-enter-from,
-.modal-fade-leave-to {
-  opacity: 0;
+@media (max-width: 640px) {
+  .sl-row {
+    flex-wrap: wrap;
+  }
+  .sl-dates {
+    align-items: flex-start;
+    order: 5;
+    width: 100%;
+    padding-left: 52px;
+  }
 }
 </style>

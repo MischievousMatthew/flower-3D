@@ -48,7 +48,7 @@
     </div>
 
     <!-- Warehouse grid -->
-    <div v-if="loading" class="loading-state"><div class="spinner"></div></div>
+    <div v-if="loading" class="loading-state"><div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div></div>
     <div v-else class="wh-grid">
       <div v-for="wh in warehouses" :key="wh.id" class="wh-card">
         <div class="wh-card-header">
@@ -254,7 +254,7 @@
 
             <!-- Loading -->
             <div v-if="locLoading" class="loc-loading">
-              <div class="spinner-sm"></div>
+              <div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div>
               Loading locations…
             </div>
 
@@ -378,7 +378,6 @@
               :disabled="creating"
               @click="saveWarehouse"
             >
-              <div v-if="creating" class="spinner-xs"></div>
               {{ creating ? "Creating…" : "Create Warehouse" }}
             </button>
           </div>
@@ -421,7 +420,7 @@
             </div>
 
             <div v-if="locLoading" class="loc-loading">
-              <div class="spinner-sm"></div>
+              <div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div>
               Loading locations…
             </div>
 
@@ -561,7 +560,6 @@
               :disabled="!linkSelectedId || linking"
               @click="confirmLink"
             >
-              <div v-if="linking" class="spinner-xs"></div>
               {{ linking ? "Linking…" : "Link Location" }}
             </button>
           </div>
@@ -844,6 +842,15 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.sk-line {
+  height: 12px;
+  margin: 6px auto;
+  border-radius: 6px;
+  width: 60%;
+}
+.sk-short {
+  width: 35%;
+}
 * {
   box-sizing: border-box;
   font-family: "Poppins", sans-serif;
@@ -862,12 +869,12 @@ onBeforeUnmount(() => {
 .page-title {
   font-size: 22px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   margin: 0;
 }
 .page-sub {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin: 2px 0 0;
 }
 .header-actions {
@@ -904,9 +911,9 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 7px;
   padding: 9px 16px;
-  background: #fff;
-  color: #374151;
-  border: 1.5px solid #e5e7eb;
+  background: var(--v-surface);
+  color: var(--v-text-2);
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
   font-size: 13.5px;
   font-weight: 500;
@@ -914,7 +921,7 @@ onBeforeUnmount(() => {
   text-decoration: none;
 }
 .btn-secondary:hover {
-  background: #f9fafb;
+  background: var(--v-subtle);
 }
 
 .loading-state {
@@ -925,7 +932,7 @@ onBeforeUnmount(() => {
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #e5e7eb;
+  border: 3px solid var(--v-border);
   border-top-color: #10b981;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -943,9 +950,9 @@ onBeforeUnmount(() => {
   gap: 16px;
 }
 .wh-card {
-  background: #fff;
+  background: var(--v-surface);
   border-radius: 14px;
-  border: 1px solid #e8ecf0;
+  border: 1px solid var(--v-border);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -967,7 +974,7 @@ onBeforeUnmount(() => {
   width: 44px;
   height: 44px;
   border-radius: 10px;
-  background: #ecfdf5;
+  background: var(--v-green-soft);
   color: #10b981;
   display: flex;
   align-items: center;
@@ -980,7 +987,7 @@ onBeforeUnmount(() => {
 .wh-name {
   font-size: 15px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   margin: 0;
 }
 .wh-loc {
@@ -988,12 +995,12 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--v-faint);
   margin-top: 3px;
 }
 .limit-summary {
   margin: 5px 0 0;
-  color: #64748b;
+  color: var(--v-muted);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1005,8 +1012,8 @@ onBeforeUnmount(() => {
   padding: 12px 14px;
   border: 1px solid #fde68a;
   border-radius: 10px;
-  background: #fffbeb;
-  color: #92400e;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
   font-size: 13px;
 }
 .limit-notice div { display: grid; gap: 3px; }
@@ -1033,28 +1040,28 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 4px 8px;
   border-radius: 999px;
-  background: #f3f4f6;
-  color: #4b5563;
+  background: var(--v-subtle);
+  color: var(--v-text-2);
   font-size: 11px;
   font-weight: 600;
 }
 .wh-badge.strong {
-  background: #ecfdf5;
-  color: #047857;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
 }
 .wh-menu-btn {
   border: none;
   background: none;
   cursor: pointer;
   font-size: 18px;
-  color: #9ca3af;
+  color: var(--v-faint);
   padding: 4px;
 }
 .wh-stats {
   display: flex;
   align-items: center;
   justify-content: space-around;
-  background: #f9fafb;
+  background: var(--v-subtle);
   border-radius: 10px;
   padding: 12px;
 }
@@ -1067,19 +1074,19 @@ onBeforeUnmount(() => {
 .wh-stat-num {
   font-size: 20px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
 }
 .wh-stat-num.warn {
   color: #f59e0b;
 }
 .wh-stat-lbl {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--v-faint);
 }
 .wh-stat-div {
   width: 1px;
   height: 28px;
-  background: #e5e7eb;
+  background: var(--v-subtle-2);
 }
 .wh-manager {
   display: flex;
@@ -1090,8 +1097,8 @@ onBeforeUnmount(() => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
   font-size: 13px;
   font-weight: 700;
   display: flex;
@@ -1104,12 +1111,12 @@ onBeforeUnmount(() => {
 }
 .manager-label {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--v-faint);
 }
 .manager-name {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--v-text-2);
 }
 .wh-actions {
   display: grid;
@@ -1123,9 +1130,9 @@ onBeforeUnmount(() => {
   gap: 5px;
   padding: 8px 12px;
   border-radius: 8px;
-  border: 1.5px solid #e5e7eb;
-  background: #fff;
-  color: #374151;
+  border: 1.5px solid var(--v-border);
+  background: var(--v-surface);
+  color: var(--v-text-2);
   font-size: 13px;
   font-weight: 500;
   font-family: "Poppins", sans-serif;
@@ -1133,15 +1140,15 @@ onBeforeUnmount(() => {
   transition: background 0.15s;
 }
 .wh-btn:hover {
-  background: #f9fafb;
+  background: var(--v-subtle);
 }
 .wh-btn.green {
-  background: #ecfdf5;
+  background: var(--v-green-soft);
   border-color: #a7f3d0;
-  color: #059669;
+  color: var(--v-green-text);
 }
 .wh-btn.green:hover {
-  background: #d1fae5;
+  background: var(--v-green-soft);
 }
 .empty-card {
   grid-column: 1/-1;
@@ -1150,13 +1157,13 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 14px;
   padding: 60px 20px;
-  background: #fff;
+  background: var(--v-surface);
   border-radius: 14px;
-  border: 2px dashed #e5e7eb;
+  border: 2px dashed var(--v-border);
 }
 .empty-card p {
   font-size: 15px;
-  color: #9ca3af;
+  color: var(--v-faint);
   margin: 0;
 }
 
@@ -1171,7 +1178,7 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 .modal {
-  background: #fff;
+  background: var(--v-surface);
   border-radius: 16px;
   width: 480px;
   max-height: 90vh;
@@ -1188,18 +1195,18 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   justify-content: space-between;
   padding: 20px 22px 16px;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--v-border);
   flex-shrink: 0;
 }
 .modal-header h3 {
   font-size: 16px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   margin: 0;
 }
 .modal-sub {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--v-faint);
   margin: 5px 0 0;
   display: flex;
   align-items: center;
@@ -1209,7 +1216,7 @@ onBeforeUnmount(() => {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #e5e7eb;
+  background: var(--v-subtle-2);
   display: inline-block;
 }
 .step-pip.active {
@@ -1219,7 +1226,7 @@ onBeforeUnmount(() => {
   border: none;
   background: none;
   font-size: 22px;
-  color: #9ca3af;
+  color: var(--v-faint);
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -1236,7 +1243,7 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   gap: 10px;
   padding: 14px 22px;
-  border-top: 1px solid #f0f2f5;
+  border-top: 1px solid var(--v-border);
   flex-shrink: 0;
 }
 
@@ -1246,7 +1253,7 @@ onBeforeUnmount(() => {
 }
 .step2-hint {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin: 0;
   line-height: 1.5;
 }
@@ -1257,9 +1264,9 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
-  background: #f9fafb;
+  background: var(--v-subtle);
   flex-shrink: 0;
 }
 .loc-search input {
@@ -1267,7 +1274,7 @@ onBeforeUnmount(() => {
   background: none;
   outline: none;
   font-size: 13.5px;
-  color: #111827;
+  color: var(--v-text);
   flex: 1;
   font-family: inherit;
 }
@@ -1275,20 +1282,20 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #9ca3af;
+  color: var(--v-faint);
   font-size: 13px;
 }
 .spinner-sm {
   width: 18px;
   height: 18px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--v-border);
   border-top-color: #10b981;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
 .loc-empty {
   font-size: 13px;
-  color: #9ca3af;
+  color: var(--v-faint);
   padding: 6px 0;
 }
 .inline-link {
@@ -1308,7 +1315,7 @@ onBeforeUnmount(() => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #9ca3af;
+  color: var(--v-faint);
   padding: 4px 0 6px;
 }
 
@@ -1317,9 +1324,9 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--v-surface);
   cursor: pointer;
   text-align: left;
   font-family: inherit;
@@ -1328,16 +1335,16 @@ onBeforeUnmount(() => {
 }
 .loc-row:hover:not(:disabled):not(.selected):not(.linked) {
   border-color: #10b981;
-  background: #f9fafb;
+  background: var(--v-subtle);
 }
 .loc-row.selected {
   border-color: #10b981;
-  background: #ecfdf5;
+  background: var(--v-green-soft);
 }
 .loc-row.linked {
   opacity: 0.55;
   cursor: default;
-  background: #f9fafb;
+  background: var(--v-subtle);
 }
 .loc-row.taken {
   opacity: 0.75;
@@ -1353,12 +1360,12 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 .loc-row-icon.cold {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
 }
 .loc-row-icon.warm {
-  background: #d1fae5;
-  color: #059669;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
 }
 .loc-row-info {
   flex: 1;
@@ -1370,7 +1377,7 @@ onBeforeUnmount(() => {
 .loc-row-name {
   font-size: 13px;
   font-weight: 600;
-  color: #111827;
+  color: var(--v-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1378,7 +1385,7 @@ onBeforeUnmount(() => {
 .loc-row-code {
   font-family: monospace;
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--v-faint);
 }
 .loc-row-badges {
   display: flex;
@@ -1391,16 +1398,16 @@ onBeforeUnmount(() => {
   font-weight: 600;
   padding: 2px 6px;
   border-radius: 5px;
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--v-subtle);
+  color: var(--v-muted);
 }
 .badge.cold {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
 }
 .badge.warn {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
 }
 .loc-check {
   width: 20px;
@@ -1416,8 +1423,8 @@ onBeforeUnmount(() => {
 .already-tag {
   font-size: 11px;
   font-weight: 600;
-  color: #059669;
-  background: #dcfce7;
+  color: var(--v-green-text);
+  background: var(--v-green-soft);
   padding: 2px 8px;
   border-radius: 10px;
   white-space: nowrap;
@@ -1427,7 +1434,7 @@ onBeforeUnmount(() => {
 .selected-hint {
   font-size: 12.5px;
   font-weight: 600;
-  color: #059669;
+  color: var(--v-green-text);
   padding: 2px 0;
 }
 
@@ -1440,14 +1447,14 @@ onBeforeUnmount(() => {
 .field label {
   font-size: 12.5px;
   font-weight: 600;
-  color: #374151;
+  color: var(--v-text-2);
 }
 .field input {
   padding: 9px 12px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
   font-size: 13.5px;
-  color: #111827;
+  color: var(--v-text);
   outline: none;
   font-family: inherit;
 }
@@ -1458,19 +1465,19 @@ onBeforeUnmount(() => {
   border-color: #ef4444;
 }
 .req {
-  color: #ef4444;
+  color: var(--v-red-text);
 }
 .err-msg {
   font-size: 11.5px;
-  color: #ef4444;
+  color: var(--v-red-text);
 }
 
 .btn-cancel {
   padding: 9px 18px;
   border-radius: 8px;
-  border: 1.5px solid #e5e7eb;
-  background: #fff;
-  color: #374151;
+  border: 1.5px solid var(--v-border);
+  background: var(--v-surface);
+  color: var(--v-text-2);
   font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
@@ -1480,7 +1487,7 @@ onBeforeUnmount(() => {
   width: 13px;
   height: 13px;
   border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
+  border-top-color: var(--v-border);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
   flex-shrink: 0;
@@ -1500,8 +1507,8 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 .toast.success {
-  background: #111827;
-  color: #fff;
+  background: var(--v-ink);
+  color: var(--v-ink-text);
 }
 .toast.error {
   background: #ef4444;

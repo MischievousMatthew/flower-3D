@@ -78,7 +78,7 @@
                 class="product-dropdown"
               >
                 <div v-if="productsLoading" class="dd-loading">
-                  <div class="spinner-xs"></div>
+                  <div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div>
                   Searching...
                 </div>
                 <button
@@ -172,7 +172,7 @@
         </div>
 
         <div v-if="locationsLoading" class="loading-inline">
-          <div class="spinner-xs"></div>
+          <div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div>
           Loading locations...
         </div>
         <div v-else-if="!locations.length" class="alert-warn">
@@ -385,7 +385,6 @@
             :disabled="submitting || !isFormReady"
             @click="submit"
           >
-            <div v-if="submitting" class="spinner-xs white"></div>
             {{ submitting ? "Adding..." : "Add to Warehouse" }}
           </button>
           <router-link
@@ -705,6 +704,15 @@ function showToast(msg, type = "success") {
 </script>
 
 <style scoped>
+.sk-line {
+  height: 12px;
+  margin: 6px auto;
+  border-radius: 6px;
+  width: 60%;
+}
+.sk-short {
+  width: 35%;
+}
 * {
   box-sizing: border-box;
   font-family: "Poppins", sans-serif;
@@ -725,23 +733,23 @@ function showToast(msg, type = "success") {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #6b7280;
+  color: var(--v-muted);
   text-decoration: none;
   font-size: 13px;
 }
 .back-link:hover {
-  color: #111827;
+  color: var(--v-text);
 }
 .form-title {
   font-size: 22px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   margin: 0;
 }
 .wh-label {
   font-size: 16px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--v-muted);
 }
 
 .form-grid {
@@ -752,9 +760,9 @@ function showToast(msg, type = "success") {
 }
 
 .form-card {
-  background: #fff;
+  background: var(--v-surface);
   border-radius: 14px;
-  border: 1px solid #e8ecf0;
+  border: 1px solid var(--v-border);
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -767,7 +775,7 @@ function showToast(msg, type = "success") {
   gap: 8px;
   font-size: 13px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
 }
 .section-dot {
   width: 8px;
@@ -783,11 +791,11 @@ function showToast(msg, type = "success") {
 .input-addon {
   display: flex;
   align-items: center;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
   overflow: hidden;
   transition: border-color 0.15s;
-  background: #fff;
+  background: var(--v-input);
 }
 .input-addon:focus-within {
   border-color: #10b981;
@@ -796,7 +804,7 @@ function showToast(msg, type = "success") {
   border-color: #ef4444;
 }
 .search-icon {
-  color: #9ca3af;
+  color: var(--v-faint);
   margin-left: 10px;
   flex-shrink: 0;
 }
@@ -807,25 +815,25 @@ function showToast(msg, type = "success") {
   font-size: 13.5px;
   outline: none;
   font-family: inherit;
-  color: #374151;
+  color: var(--v-text-2);
   background: transparent;
 }
 .input-addon input.has-value {
   font-weight: 600;
-  color: #059669;
+  color: var(--v-green-text);
 }
 .clear-btn {
   padding: 0 12px;
   border: none;
   background: none;
   font-size: 18px;
-  color: #9ca3af;
+  color: var(--v-faint);
   cursor: pointer;
   line-height: 1;
   align-self: stretch;
 }
 .clear-btn:hover {
-  color: #374151;
+  color: var(--v-text-2);
 }
 
 .product-dropdown {
@@ -833,8 +841,8 @@ function showToast(msg, type = "success") {
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  background: #fff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--v-surface);
+  border: 1.5px solid var(--v-border);
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   z-index: 100;
@@ -846,7 +854,7 @@ function showToast(msg, type = "success") {
   align-items: center;
   gap: 8px;
   padding: 14px 16px;
-  color: #9ca3af;
+  color: var(--v-faint);
   font-size: 13px;
 }
 .dd-item {
@@ -863,7 +871,7 @@ function showToast(msg, type = "success") {
   transition: background 0.1s;
 }
 .dd-item:hover {
-  background: #f9fafb;
+  background: var(--v-subtle);
 }
 .dd-img {
   width: 38px;
@@ -871,13 +879,13 @@ function showToast(msg, type = "success") {
   border-radius: 8px;
   flex-shrink: 0;
   overflow: hidden;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 15px;
   font-weight: 700;
-  color: #9ca3af;
+  color: var(--v-faint);
 }
 .dd-img img {
   width: 100%;
@@ -891,7 +899,7 @@ function showToast(msg, type = "success") {
 .dd-name {
   font-size: 13px;
   font-weight: 600;
-  color: #111827;
+  color: var(--v-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -905,10 +913,10 @@ function showToast(msg, type = "success") {
 }
 .dd-meta code {
   font-size: 11px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   padding: 1px 5px;
   border-radius: 4px;
-  color: #374151;
+  color: var(--v-text-2);
 }
 .dd-tag {
   font-size: 10.5px;
@@ -918,12 +926,12 @@ function showToast(msg, type = "success") {
   text-transform: capitalize;
 }
 .dd-tag.flower {
-  background: #ede9fe;
-  color: #7c3aed;
+  background: var(--v-purple-soft);
+  color: var(--v-purple-text);
 }
 .dd-tag.color {
-  background: #fce7f3;
-  color: #be185d;
+  background: var(--v-pink-soft);
+  color: var(--v-pink-text);
 }
 .dd-stock {
   font-size: 15px;
@@ -935,17 +943,17 @@ function showToast(msg, type = "success") {
 .dd-stock span {
   font-size: 10px;
   font-weight: 400;
-  color: #9ca3af;
+  color: var(--v-faint);
   display: block;
 }
 .dd-stock.ok {
-  color: #111827;
+  color: var(--v-text);
 }
 .dd-stock.warn {
   color: #f59e0b;
 }
 .dd-stock.danger {
-  color: #ef4444;
+  color: var(--v-red-text);
 }
 
 .selected-strip {
@@ -953,7 +961,7 @@ function showToast(msg, type = "success") {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  background: #f0fdf4;
+  background: var(--v-green-soft);
   border: 1.5px solid #a7f3d0;
   border-radius: 10px;
   padding: 10px 14px;
@@ -964,13 +972,13 @@ function showToast(msg, type = "success") {
   border-radius: 8px;
   flex-shrink: 0;
   overflow: hidden;
-  background: #d1fae5;
+  background: var(--v-green-soft);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 15px;
   font-weight: 700;
-  color: #059669;
+  color: var(--v-green-text);
 }
 .strip-img img {
   width: 100%;
@@ -987,7 +995,7 @@ function showToast(msg, type = "success") {
 .strip-name {
   font-size: 13px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -995,7 +1003,7 @@ function showToast(msg, type = "success") {
 .strip-sku {
   font-family: monospace;
   font-size: 11.5px;
-  color: #6b7280;
+  color: var(--v-muted);
 }
 .strip-right {
   display: flex;
@@ -1008,16 +1016,16 @@ function showToast(msg, type = "success") {
   font-weight: 600;
 }
 .strip-stat.ok {
-  color: #059669;
+  color: var(--v-green-text);
 }
 .strip-stat.warn {
   color: #f59e0b;
 }
 .strip-stat.danger {
-  color: #ef4444;
+  color: var(--v-red-text);
 }
 .strip-stat.blue {
-  color: #3b82f6;
+  color: var(--v-blue-text);
 }
 .strip-tags {
   display: flex;
@@ -1032,35 +1040,35 @@ function showToast(msg, type = "success") {
   text-transform: capitalize;
 }
 .tag.flower {
-  background: #ede9fe;
-  color: #7c3aed;
+  background: var(--v-purple-soft);
+  color: var(--v-purple-text);
 }
 .tag.color {
-  background: #fce7f3;
-  color: #be185d;
+  background: var(--v-pink-soft);
+  color: var(--v-pink-text);
 }
 .tag.cold {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
 }
 
 .loading-inline {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #9ca3af;
+  color: var(--v-faint);
   font-size: 13px;
 }
 .alert-warn {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #fffbeb;
+  background: var(--v-amber-soft);
   border: 1px solid #fde68a;
   border-radius: 9px;
   padding: 10px 14px;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--v-muted);
 }
 .link {
   color: #10b981;
@@ -1076,8 +1084,8 @@ function showToast(msg, type = "success") {
 .loc-card {
   padding: 10px 12px;
   border-radius: 9px;
-  border: 2px solid #e5e7eb;
-  background: #fff;
+  border: 2px solid var(--v-border);
+  background: var(--v-surface);
   cursor: pointer;
   text-align: left;
   position: relative;
@@ -1086,11 +1094,11 @@ function showToast(msg, type = "success") {
 }
 .loc-card:hover:not(:disabled) {
   border-color: #10b981;
-  background: #f9fafb;
+  background: var(--v-subtle);
 }
 .loc-card.selected {
   border-color: #10b981;
-  background: #ecfdf5;
+  background: var(--v-green-soft);
 }
 .loc-card.full {
   opacity: 0.5;
@@ -1099,12 +1107,12 @@ function showToast(msg, type = "success") {
 .loc-name {
   font-size: 12.5px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
 }
 .loc-code {
   font-size: 11px;
   font-family: monospace;
-  color: #9ca3af;
+  color: var(--v-faint);
 }
 .loc-badges {
   display: flex;
@@ -1117,16 +1125,16 @@ function showToast(msg, type = "success") {
   font-weight: 600;
   padding: 1.5px 5px;
   border-radius: 4px;
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--v-subtle);
+  color: var(--v-muted);
 }
 .loc-badge.cold {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
 }
 .loc-badge.danger {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
 }
 .loc-check {
   position: absolute;
@@ -1155,18 +1163,18 @@ function showToast(msg, type = "success") {
 .field label {
   font-size: 12.5px;
   font-weight: 600;
-  color: #374151;
+  color: var(--v-text-2);
 }
 .field input,
 .textarea {
   padding: 9px 12px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
   font-size: 13.5px;
-  color: #111827;
+  color: var(--v-text);
   outline: none;
   font-family: inherit;
-  background: #fff;
+  background: var(--v-input);
   transition: border-color 0.15s;
 }
 .field input:focus,
@@ -1180,23 +1188,23 @@ function showToast(msg, type = "success") {
   resize: vertical;
 }
 .req {
-  color: #ef4444;
+  color: var(--v-red-text);
 }
 .err-msg {
   font-size: 11.5px;
-  color: #ef4444;
+  color: var(--v-red-text);
 }
 .field-hint {
   font-size: 11.5px;
-  color: #9ca3af;
+  color: var(--v-faint);
 }
 
 .qty-control {
   display: flex;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
   overflow: hidden;
-  background: #fff;
+  background: var(--v-surface);
   transition: border-color 0.15s;
 }
 .qty-control:focus-within {
@@ -1208,9 +1216,9 @@ function showToast(msg, type = "success") {
 .qty-btn {
   width: 36px;
   border: none;
-  background: #f9fafb;
+  background: var(--v-subtle);
   font-size: 18px;
-  color: #374151;
+  color: var(--v-text-2);
   cursor: pointer;
   transition: background 0.1s;
   flex-shrink: 0;
@@ -1219,7 +1227,7 @@ function showToast(msg, type = "success") {
   justify-content: center;
 }
 .qty-btn:hover:not(:disabled) {
-  background: #e5e7eb;
+  background: var(--v-subtle-2);
 }
 .qty-btn:disabled {
   opacity: 0.4;
@@ -1231,7 +1239,7 @@ function showToast(msg, type = "success") {
   text-align: center;
   font-size: 16px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   outline: none;
   font-family: inherit;
   padding: 9px 0;
@@ -1240,13 +1248,13 @@ function showToast(msg, type = "success") {
 }
 
 .freshness-bar-wrap {
-  background: #f9fafb;
+  background: var(--v-subtle);
   border-radius: 9px;
   padding: 12px 14px;
 }
 .fb-track {
   height: 5px;
-  background: #e5e7eb;
+  background: var(--v-subtle-2);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -1281,24 +1289,24 @@ function showToast(msg, type = "success") {
   text-transform: capitalize;
 }
 .fb-chip.fresh {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
 }
 .fb-chip.aging {
-  background: #fef9c3;
-  color: #854d0e;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
 }
 .fb-chip.wilting {
-  background: #ffedd5;
-  color: #9a3412;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
 }
 .fb-chip.spoiled {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
 }
 .fb-days {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--v-muted);
 }
 
 .side-panel {
@@ -1307,15 +1315,15 @@ function showToast(msg, type = "success") {
   gap: 14px;
 }
 .panel-card {
-  background: #fff;
+  background: var(--v-surface);
   border-radius: 12px;
-  border: 1px solid #e8ecf0;
+  border: 1px solid var(--v-border);
   padding: 18px;
 }
 .panel-title {
   font-size: 13px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   margin-bottom: 14px;
 }
 
@@ -1329,8 +1337,8 @@ function showToast(msg, type = "success") {
   width: 56px;
   height: 56px;
   border-radius: 14px;
-  background: #ecfdf5;
-  color: #059669;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
   font-size: 22px;
   font-weight: 700;
   display: flex;
@@ -1346,20 +1354,20 @@ function showToast(msg, type = "success") {
 .preview-name {
   font-size: 13.5px;
   font-weight: 600;
-  color: #111827;
+  color: var(--v-text);
   text-align: center;
 }
 .preview-sku {
   font-family: monospace;
   font-size: 12px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   padding: 2px 8px;
   border-radius: 5px;
-  color: #374151;
+  color: var(--v-text-2);
 }
 .qty-badge {
-  background: #dcfce7;
-  color: #16a34a;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
   padding: 3px 12px;
   border-radius: 20px;
   font-size: 12px;
@@ -1370,11 +1378,11 @@ function showToast(msg, type = "success") {
   align-items: center;
   gap: 5px;
   font-size: 11.5px;
-  color: #6b7280;
+  color: var(--v-muted);
   text-align: center;
 }
 .preview-meta.muted {
-  color: #9ca3af;
+  color: var(--v-faint);
 }
 
 .actions-card {
@@ -1411,9 +1419,9 @@ function showToast(msg, type = "success") {
   width: 100%;
   padding: 10px;
   border-radius: 10px;
-  border: 1.5px solid #e5e7eb;
-  background: #fff;
-  color: #374151;
+  border: 1.5px solid var(--v-border);
+  background: var(--v-surface);
+  color: var(--v-text-2);
   font-weight: 500;
   font-size: 13.5px;
   cursor: pointer;
@@ -1422,7 +1430,7 @@ function showToast(msg, type = "success") {
   transition: background 0.15s;
 }
 .btn-cancel:hover {
-  background: #f9fafb;
+  background: var(--v-subtle);
 }
 
 .checklist-card {
@@ -1435,18 +1443,18 @@ function showToast(msg, type = "success") {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--v-faint);
   transition: color 0.2s;
 }
 .check-row.done {
-  color: #059669;
+  color: var(--v-green-text);
   font-weight: 600;
 }
 .check-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  border: 2px solid #d1d5db;
+  border: 2px solid var(--v-border-strong);
   flex-shrink: 0;
   transition: all 0.2s;
 }
@@ -1459,7 +1467,7 @@ function showToast(msg, type = "success") {
   width: 13px;
   height: 13px;
   border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
+  border-top-color: var(--v-border);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
   flex-shrink: 0;
@@ -1483,8 +1491,8 @@ function showToast(msg, type = "success") {
   white-space: nowrap;
 }
 .toast.success {
-  background: #111827;
-  color: #fff;
+  background: var(--v-ink);
+  color: var(--v-ink-text);
 }
 .toast.error {
   background: #ef4444;

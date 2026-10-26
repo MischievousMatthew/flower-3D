@@ -63,13 +63,13 @@ class ShipmentService
 
             if (!in_array($order->status, ['pending', 'processing'], true)) {
                 throw new \RuntimeException(
-                    "Cannot create shipment for order in [{$order->status}] status."
+                    "Only an order that's with the supplier (sent or being prepared) can get a shipment. This one is {$order->status}."
                 );
             }
 
             if ($order->shipment()->exists()) {
                 throw new \RuntimeException(
-                    "Purchase order [{$order->order_number}] already has a shipment."
+                    "{$order->order_number} already has a shipment. Open it to update the tracking."
                 );
             }
 
@@ -81,7 +81,7 @@ class ShipmentService
             $shipment = Shipment::create([
                 'owner_id'          => $ownerId,
                 'purchase_order_id' => $order->id,
-                'tracking_number'   => $this->generateTrackingNumber($data['carrier']),
+                'tracking_number'   => ($data['tracking_number'] ?? null) ?: $this->generateTrackingNumber($data['carrier']),
                 'carrier'           => $data['carrier'],
                 'status'            => 'pending',
             ]);

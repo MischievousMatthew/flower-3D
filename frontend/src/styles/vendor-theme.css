@@ -35,6 +35,9 @@
   --v-pink-text: #b83280;
   --v-teal-soft: #e6fffa;
   --v-teal-text: #2c7a7b;
+  /* A dark fill (e.g. a dark button) and the text on it; flips in dark mode */
+  --v-ink: #1f2937;
+  --v-ink-text: #ffffff;
 }
 
 html[data-vendor-theme="dark"] {
@@ -66,6 +69,8 @@ html[data-vendor-theme="dark"] {
   --v-pink-text: #fbb6ce;
   --v-teal-soft: #133332;
   --v-teal-text: #81e6d9;
+  --v-ink: #e6eaf0;
+  --v-ink-text: #11161d;
   color-scheme: dark;
 
   /* Toast messages */

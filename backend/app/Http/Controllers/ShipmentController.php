@@ -43,12 +43,20 @@ class ShipmentController extends Controller
         $data = $request->validate([
             'purchase_order_id'           => ['required', 'integer', 'exists:purchase_orders,id'],
             'carrier'                     => ['required', 'string', 'max:255'],
-            'items'                       => ['required', 'array', 'min:1'],
+            // The carrier's own tracking number; one is made up when it's left empty
+            'tracking_number'             => ['nullable', 'string', 'max:255'],
+            // Warehouse items to send out with it; a supplier's delivery to the shop has none
+            'items'                       => ['nullable', 'array'],
             'items.*.warehouse_item_id'   => ['required', 'integer', 'exists:warehouse_items,id'],
             'items.*.quantity'            => ['required', 'integer', 'min:1'],
         ]);
+        $data['items'] = $data['items'] ?? [];
 
-        return response()->json($this->service->createShipment($data, $this->getOwnerId()), 201);
+        try {
+            return response()->json($this->service->createShipment($data, $this->getOwnerId()), 201);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     /** PATCH /shipments/{id}/tracking */
@@ -69,7 +77,11 @@ class ShipmentController extends Controller
             'shipped_date' => ['nullable', 'date', 'date_format:Y-m-d'],
         ]);
 
-        return response()->json($this->service->markShipped($id, $this->getOwnerId(), $data['shipped_date'] ?? null));
+        try {
+            return response()->json($this->service->markShipped($id, $this->getOwnerId(), $data['shipped_date'] ?? null));
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     /** PATCH /shipments/{id}/receive */
@@ -79,7 +91,11 @@ class ShipmentController extends Controller
             'received_date' => ['nullable', 'date', 'date_format:Y-m-d'],
         ]);
 
-        return response()->json($this->service->markReceived($id, $this->getOwnerId(), $data['received_date'] ?? null));
+        try {
+            return response()->json($this->service->markReceived($id, $this->getOwnerId(), $data['received_date'] ?? null));
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     /** PATCH /shipments/{id}/status */
@@ -89,6 +105,10 @@ class ShipmentController extends Controller
             'status' => ['required', 'string', Rule::in(['pending', 'in_transit', 'out_for_delivery', 'delivered', 'failed', 'returned'])],
         ]);
 
-        return response()->json($this->service->updateStatus($id, $data['status'], $this->resolveOwnerId()));
+        try {
+            return response()->json($this->service->updateStatus($id, $data['status'], $this->resolveOwnerId()));
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 }

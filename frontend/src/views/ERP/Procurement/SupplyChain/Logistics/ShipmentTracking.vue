@@ -1,781 +1,361 @@
 <template>
-  <div class="tracking-page" v-if="shipment">
-    
-    <div class="page-header">
-      <router-link
-        to="/erp/procurement/supply-chain/logistics"
-        class="back-link"
-      >
-        <svg
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          width="16"
-        >
-          <path d="M13 16l-6-6 6-6" />
-        </svg>
-        Logistic Management
-      </router-link>
-      <div class="header-row">
-        <h1 class="tracking-id">{{ shipment.tracking_number }}</h1>
-        <div class="header-actions">
-          <button
-            v-if="shipment.status === 'pending'"
-            class="btn-action"
-            @click="markShipped"
-          >
-            📦 Mark as Shipped
-          </button>
-          <button
-            v-if="['in_transit', 'out_for_delivery'].includes(shipment.status)"
-            class="btn-primary"
-            @click="markReceived"
-          >
-            ✓ Mark Received
-          </button>
-        </div>
-      </div>
+  <HrPage :title="s ? s.tracking_number : 'Shipment'" :subtitle="s ? `${s.carrier} · ${shipStatus(s.status).label}` : 'Loading the shipment…'">
+    <template #actions>
+      <router-link :to="{ name: 'ShipmentList' }" class="sp-btn sp-btn-ghost"><span v-html="ICONS.chevronLeft"></span>All shipments</router-link>
+      <template v-if="s && canEdit('deliveries')">
+        <button v-if="s.status === 'pending'" type="button" class="sp-btn sp-btn-primary" :disabled="busy" @click="act('ship')"><span v-html="ICONS.truck"></span>Mark as shipped</button>
+        <button v-if="['in_transit', 'out_for_delivery'].includes(s.status)" type="button" class="sp-btn sp-btn-primary" :disabled="busy" @click="act('receive')"><span v-html="ICONS.check"></span>Mark as delivered</button>
+      </template>
+    </template>
+
+    <div v-if="loadError" class="sp-banner error">
+      <span v-html="ICONS.alert"></span>{{ loadError }}
+      <button type="button" @click="load">Try again</button>
     </div>
 
-    <!-- Delivery Progress Bar -->
-    <div class="progress-card">
-      <div
-        v-for="(step, i) in steps"
-        :key="step.status"
-        class="progress-step"
-        :class="stepClass(step.status)"
-      >
-        <div class="prog-circle">
-          <svg
-            v-if="isCompleted(step.status)"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            width="12"
-          >
-            <path
-              d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z"
-            />
-          </svg>
-          <div v-else-if="isCurrent(step.status)" class="prog-pulse"></div>
+    <section class="sp-card st-steps" aria-label="Progress">
+      <div v-if="!s" class="bc-skeleton sp-sk-line w70"></div>
+      <template v-else-if="offTrack">
+        <div class="st-off" :class="`t-${shipStatus(s.status).tone}`">
+          <span v-html="ICONS[shipStatus(s.status).icon]"></span>
+          <div><b>{{ shipStatus(s.status).label }}</b><small>This delivery didn't complete. Contact {{ supplier?.company_name ?? "the supplier" }} to arrange it again.</small></div>
         </div>
-        <div
-          v-if="i < steps.length - 1"
-          class="prog-line"
-          :class="{
-            filled:
-              isCompleted(steps[i + 1]?.status) ||
-              isCurrent(steps[i + 1]?.status),
-          }"
-        ></div>
-        <span class="prog-label">{{ step.label }}</span>
-      </div>
+      </template>
+      <ol v-else class="st-track">
+        <li v-for="(key, i) in SHIP_STEPS" :key="key" :class="{ done: i < stepIndex, now: i === stepIndex }" :aria-current="i === stepIndex ? 'step' : undefined">
+          <span class="st-dot"><span v-if="i < stepIndex" v-html="ICONS.check"></span><template v-else>{{ i + 1 }}</template></span>
+          <span class="st-txt"><b>{{ SHIP_STATUS[key].label }}</b><small>{{ stepDate(key) }}</small></span>
+        </li>
+      </ol>
+    </section>
+
+    <div v-if="!s" class="st-grid">
+      <div class="sp-card"><div class="bc-skeleton sp-sk-block"></div></div>
+      <div class="sp-card"><div class="bc-skeleton sp-sk-block"></div></div>
     </div>
+    <div v-else class="st-grid">
+      <section class="sp-card" aria-labelledby="st-ship">
+        <div class="sp-card-head"><div><h2 id="st-ship">Delivery</h2><p>The carrier and what it's bringing</p></div></div>
+        <dl class="st-facts">
+          <div><dt>Carrier</dt><dd>{{ s.carrier }}</dd></div>
+          <div><dt>Tracking number</dt><dd class="mono">{{ s.tracking_number }}</dd></div>
+          <div><dt>Shipped</dt><dd>{{ s.shipped_date ? date(s.shipped_date) : "Not yet" }}</dd></div>
+          <div><dt>Delivered</dt><dd>{{ s.received_date ? date(s.received_date) : "Not yet" }}</dd></div>
+          <div v-if="order?.expected_date"><dt>Expected</dt><dd>{{ date(order.expected_date) }}</dd></div>
+        </dl>
+        <div v-if="canEdit('deliveries') && !['delivered', 'failed', 'returned'].includes(s.status)" class="st-edit">
+          <button v-if="!edit" type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="edit = { carrier: s.carrier, tracking_number: s.tracking_number, busy: false, error: '' }"><span v-html="ICONS.edit"></span>Change carrier or tracking</button>
+          <form v-else class="st-edit-form" novalidate @submit.prevent="saveTracking">
+            <div class="sp-grid-2">
+              <label class="sp-field"><span class="sp-label">Carrier</span><input v-model.trim="edit.carrier" class="sp-input" maxlength="255" /></label>
+              <label class="sp-field"><span class="sp-label">Tracking number</span><input v-model.trim="edit.tracking_number" class="sp-input" maxlength="255" /></label>
+            </div>
+            <p v-if="edit.error" class="sp-error">{{ edit.error }}</p>
+            <div class="st-edit-act">
+              <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="edit = null">Cancel</button>
+              <button type="submit" class="sp-btn sp-btn-primary sp-btn-sm" :disabled="edit.busy">{{ edit.busy ? "Saving…" : "Save" }}</button>
+            </div>
+          </form>
+          <button v-if="['in_transit', 'out_for_delivery'].includes(s.status)" type="button" class="st-link" @click="act('failed')">It didn't arrive</button>
+        </div>
+      </section>
 
-    <!-- Two Column Layout -->
-    <div class="detail-layout">
-      <!-- Left: Shipper + Timeline -->
-      <div class="left-panel">
-        <!-- Shipper Details -->
-        <div class="info-card">
-          <div class="card-header">
-            <h3>Shipper Details</h3>
-            <button class="menu-btn">⋯</button>
-          </div>
-          <div class="shipper-grid">
-            <div class="sh-row">
-              <span class="sh-lbl">Shipper Code</span
-              ><span class="sh-val mono">{{ shipment.id }}</span>
-            </div>
-            <div class="sh-row">
-              <span class="sh-lbl">{{
-                shipment.purchase_order?.supplier?.contact_person
-              }}</span>
-              <div class="sh-person">
-                <div class="person-avatar">
-                  {{ shipment.purchase_order?.supplier?.company_name?.[0] }}
-                </div>
-                <span>{{
-                  shipment.purchase_order?.supplier?.company_name
-                }}</span>
-              </div>
-            </div>
-            <div class="sh-row">
-              <span class="sh-lbl">Contact</span
-              ><span class="sh-val">{{
-                shipment.purchase_order?.supplier?.phone || "—"
-              }}</span>
-            </div>
-            <div class="sh-row">
-              <span class="sh-lbl">Email</span
-              ><span class="sh-val">{{
-                shipment.purchase_order?.supplier?.email || "—"
-              }}</span>
-            </div>
+      <section class="sp-card" aria-labelledby="st-order">
+        <div class="sp-card-head">
+          <div><h2 id="st-order">Purchase order</h2><p>{{ order?.order_number ?? "Order removed" }}</p></div>
+          <router-link v-if="order && canView('sc_orders')" :to="{ name: 'OrderDetail', params: { id: order.id } }" class="sp-btn sp-btn-ghost sp-btn-sm">Open order</router-link>
+        </div>
+        <div v-if="supplier" class="st-sup">
+          <span class="st-logo">{{ initials(supplier.company_name) }}</span>
+          <div class="grow">
+            <b>{{ supplier.company_name }}</b>
+            <span>{{ supplier.contact_person }}</span>
+            <a v-if="supplier.phone" :href="`tel:${supplier.phone}`">{{ supplier.phone }}</a>
+            <a v-if="supplier.email" :href="`mailto:${supplier.email}`">{{ supplier.email }}</a>
+            <span v-if="supplier.address" class="muted">{{ supplier.address }}</span>
           </div>
         </div>
-
-        <!-- Stock Availability -->
-        <div class="info-card">
-          <div class="card-header">
-            <h3>Stock Availability</h3>
-            <button class="menu-btn">⋯</button>
-          </div>
-          <div
-            class="availability-banner"
-            :class="{ positive: shipment.status !== 'failed' }"
-          >
-            <svg viewBox="0 0 20 20" fill="currentColor" width="14">
-              <path
-                d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z"
-              />
-            </svg>
-            Estimated Order Delivery
-            <span class="avail-date">{{ estimatedDelivery }}</span>
-          </div>
-
-          <div class="from-to">
-            <div class="ft-col">
-              <div class="ft-lbl">From</div>
-              <div class="ft-addr">
-                {{
-                  shipment.purchase_order?.supplier?.address ||
-                  "1801 Thornridge Cir."
-                }}
-              </div>
-            </div>
-            <div class="ft-arrow">→</div>
-            <div class="ft-col">
-              <div class="ft-lbl">To</div>
-              <div class="ft-addr">{{ destinationAddress }}</div>
-            </div>
-          </div>
-
-          <div class="carrier-badge">
-            <div class="carrier-icon">🚚</div>
-            <div>
-              <div class="carrier-name">{{ shipment.carrier }}</div>
-              <div class="carrier-id">
-                Tracking: {{ shipment.tracking_number }}
-              </div>
-            </div>
-          </div>
-
-          <div class="timeline-events">
-            <div
-              v-for="(event, i) in deliveryEvents"
-              :key="i"
-              class="tl-event"
-              :class="{ done: event.done, future: !event.done }"
-            >
-              <div class="tl-dot-sm"></div>
-              <div v-if="i < deliveryEvents.length - 1" class="tl-vert"></div>
-              <div class="event-content">
-                <div class="event-name">{{ event.name }}</div>
-                <div class="event-addr">{{ event.address }}</div>
-                <div class="event-time">
-                  <span class="event-date">{{ event.date }}</span>
-                  <span class="event-hour">{{ event.time }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right: Map -->
-      <div class="map-panel">
-        <div class="card-header">
-          <h3>Map Over View</h3>
-          <button class="menu-btn">⋯</button>
-        </div>
-        <div class="map-placeholder">
-          <div class="map-grid">
-            <div
-              v-for="i in 100"
-              :key="i"
-              class="map-cell"
-              :class="mapCellClass(i)"
-            ></div>
-          </div>
-          <div class="map-marker">
-            <svg viewBox="0 0 24 32" fill="none" width="24">
-              <path
-                d="M12 0C5.4 0 0 5.4 0 12c0 8.4 12 20 12 20S24 20.4 24 12C24 5.4 18.6 0 12 0zm0 17a5 5 0 110-10 5 5 0 010 10z"
-                fill="#ef4444"
-              />
-            </svg>
-          </div>
-          <div class="map-controls">
-            <button class="map-ctrl">+</button>
-            <button class="map-ctrl">−</button>
-            <button class="map-ctrl">⊕</button>
-          </div>
-          <div class="map-layers">⊞</div>
-        </div>
-      </div>
+        <ul v-if="(s.items ?? []).length" class="st-items">
+          <li v-for="it in s.items" :key="it.id"><span>{{ it.warehouse_item?.product_name ?? "Item" }}</span><b>{{ it.quantity }}</b></li>
+        </ul>
+        <p class="sp-hint">When it arrives, receive and inspect it from the order so the right amounts go into stock.</p>
+      </section>
     </div>
-  </div>
-
-  <div v-else class="loading-state"><div class="spinner"></div></div>
+  </HrPage>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { useRoute } from "vue-router";
+import { computed, onMounted, ref } from "vue";
+import HrPage from "../../../../../components/hr/HrPage.vue";
+import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopIcons";
+import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";
+import { initials } from "../../../../../components/procurement/supplierUi";
+import { SHIP_STATUS, SHIP_STEPS, shipStatus } from "../../../../../components/procurement/shipmentUi";
+import { useAssignment } from "../../../../../composables/useAssignment";
 import { shipmentService } from "../../../../../services/shipmentService";
+import { toast } from "@/utils/snackbar";
+import "../../../../../components/vendor/finance/finance.css";
 
+const props = defineProps({ id: { type: [String, Number], required: true } });
+const { canEdit, canView } = useAssignment();
+const s = ref(null);
+const loadError = ref("");
+const busy = ref(false);
+const edit = ref(null);
 
-const route = useRoute();
-const shipment = ref(null);
-
-const STATUS_ORDER = ["pending", "in_transit", "out_for_delivery", "delivered"];
-
-const steps = [
-  { status: "pending", label: "Processing" },
-  { status: "in_transit", label: "In Transit" },
-  { status: "out_for_delivery", label: "Delivery" },
-  { status: "delivered", label: "Order Delivered" },
-];
-
-function statusIndex(s) {
-  return STATUS_ORDER.indexOf(s);
-}
-function isCompleted(s) {
-  return statusIndex(s) < statusIndex(shipment.value?.status);
-}
-function isCurrent(s) {
-  return s === shipment.value?.status;
-}
-function stepClass(s) {
-  return { done: isCompleted(s), current: isCurrent(s) };
+const order = computed(() => s.value?.purchase_order ?? null);
+const supplier = computed(() => order.value?.supplier ?? null);
+const offTrack = computed(() => ["failed", "returned"].includes(s.value?.status));
+const stepIndex = computed(() => SHIP_STEPS.indexOf(s.value?.status));
+const date = (d) => (d ? new Date(`${String(d).slice(0, 10)}T00:00:00`).toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : "—");
+function stepDate(key) {
+  if (key === "in_transit" && s.value.shipped_date) return date(s.value.shipped_date);
+  if (key === "delivered" && s.value.received_date) return date(s.value.received_date);
+  return "";
 }
 
-const estimatedDelivery = computed(() => {
-  const d = shipment.value?.shipped_date;
-  if (!d) return "TBD";
-  const date = new Date(d);
-  date.setDate(date.getDate() + 7);
-  return date.toLocaleDateString("en-US", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-});
-
-const destinationAddress = computed(
-  () => "6391 Elgin St. Celina, Delaware 10299",
-);
-
-const deliveryEvents = computed(() => {
-  if (!shipment.value) return [];
-  return [
-    {
-      name: "In Transit",
-      address: "2118 Thornridge Cir Syracuse, Connecticut 35624",
-      date: "09 June 2025",
-      time: "08:00 AM",
-      done: true,
-    },
-    {
-      name: "Delivery",
-      address: "4517 Washington Ave. Manchester, Kentucky 39495",
-      date: "10 June 2025",
-      time: "08:00 AM",
-      done:
-        shipment.value.status === "out_for_delivery" ||
-        shipment.value.status === "delivered",
-    },
-    {
-      name: "Order Delivered",
-      address: "6391 Elgin St. Celina, Delaware 10299",
-      date: "12 June 2025",
-      time: "08:00 AM",
-      done: shipment.value.status === "delivered",
-    },
-  ];
-});
-
-async function markShipped() {
-  await shipmentService.markShipped(shipment.value.id);
-  shipment.value.status = "in_transit";
-  shipment.value.shipped_date = new Date().toISOString();
+async function load() {
+  loadError.value = "";
+  try {
+    const res = await shipmentService.find(props.id);
+    s.value = res.data;
+  } catch (e) {
+    loadError.value = apiMessage(e, "Couldn't load this shipment.");
+  }
 }
 
-async function markReceived() {
-  await shipmentService.markReceived(shipment.value.id);
-  shipment.value.status = "delivered";
-  shipment.value.received_date = new Date().toISOString();
+async function act(kind) {
+  busy.value = true;
+  try {
+    if (kind === "ship") await shipmentService.markShipped(s.value.id);
+    else if (kind === "receive") await shipmentService.markReceived(s.value.id);
+    else await shipmentService.updateStatus(s.value.id, "failed");
+    toast.success(kind === "ship" ? "Marked as shipped. The order is on the way." : kind === "receive" ? "Marked as delivered. Receive and inspect it from the order." : "Marked as not arrived.");
+    await load();
+  } catch (e) {
+    toast.error(apiMessage(e, "Couldn't update the shipment."));
+  } finally {
+    busy.value = false;
+  }
 }
 
-function mapCellClass(i) {
-  const road = [
-    12, 13, 14, 22, 23, 24, 32, 33, 34, 42, 43, 44, 46, 47, 56, 57, 66, 67, 76,
-    77, 86, 87,
-  ];
-  return road.includes(i) ? "road" : i % 17 === 0 ? "building" : "";
+async function saveTracking() {
+  const e = edit.value;
+  e.busy = true;
+  e.error = "";
+  try {
+    await shipmentService.updateTracking(s.value.id, { carrier: e.carrier || undefined, tracking_number: e.tracking_number || undefined });
+    edit.value = null;
+    toast.success("Tracking updated.");
+    await load();
+  } catch (err) {
+    e.busy = false;
+    e.error = apiMessage(err, "Couldn't save the tracking.");
+  }
 }
 
-onMounted(async () => {
-  const res = await shipmentService.find(route.params.id);
-  shipment.value = res.data || res;
-});
+onMounted(load);
 </script>
 
 <style scoped>
-* {
-  box-sizing: border-box;
-  font-family: "Poppins", sans-serif;
-}
-
-.tracking-page {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.loading-state {
-  display: flex;
-  justify-content: center;
-  padding: 80px;
-}
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid #e5e7eb;
-  border-top-color: #10b981;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #6b7280;
-  text-decoration: none;
-  font-size: 13px;
-}
-.header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 4px;
-}
-.tracking-id {
-  font-size: 20px;
-  font-weight: 700;
-  color: #111827;
-  margin: 0;
-  font-family: monospace;
-}
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-.btn-primary {
-  padding: 9px 18px;
-  background: #10b981;
-  color: #fff;
-  border: none;
-  border-radius: 9px;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.btn-action {
-  padding: 9px 18px;
-  background: #fff;
-  color: #374151;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 9px;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-/* Progress */
-.progress-card {
-  background: #fff;
-  border: 1px solid #e8ecf0;
-  border-radius: 14px;
-  padding: 20px 24px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0;
-  overflow-x: auto;
-}
-.progress-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  position: relative;
+.grow {
   flex: 1;
-}
-.prog-circle {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 2.5px solid #e5e7eb;
-  background: #fff;
+  min-width: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  z-index: 1;
+  flex-direction: column;
+  gap: 2px;
 }
-.progress-step.done .prog-circle {
-  background: #10b981;
-  border-color: #10b981;
+.st-steps {
+  margin-bottom: 16px;
 }
-.progress-step.current .prog-circle {
-  border-color: #10b981;
-  background: #ecfdf5;
-}
-.prog-pulse {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #10b981;
-  animation: pulse 1.5s infinite;
-}
-@keyframes pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.3);
-    opacity: 0.7;
-  }
-}
-.prog-line {
-  position: absolute;
-  top: 16px;
-  left: calc(50% + 16px);
-  right: calc(-50% + 16px);
-  height: 2.5px;
-  background: #e5e7eb;
-  z-index: 0;
-}
-.prog-line.filled {
-  background: #10b981;
-}
-.prog-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: #9ca3af;
-  white-space: nowrap;
-}
-.progress-step.done .prog-label {
-  color: #10b981;
-}
-.progress-step.current .prog-label {
-  color: #111827;
-  font-weight: 700;
-}
-
-/* Layout */
-.detail-layout {
+.st-track {
+  list-style: none;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-.left-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.info-card {
-  background: #fff;
-  border: 1px solid #e8ecf0;
-  border-radius: 14px;
-  overflow: hidden;
-}
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
-  border-bottom: 1px solid #f0f2f5;
-}
-.card-header h3 {
-  font-size: 14px;
-  font-weight: 700;
-  color: #111827;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
   margin: 0;
+  padding: 0;
 }
-.menu-btn {
-  border: none;
-  background: none;
-  font-size: 16px;
-  color: #9ca3af;
-  cursor: pointer;
+.st-track li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
-
-.shipper-grid {
-  padding: 14px 18px;
+.st-dot {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--v-border-strong);
+  border-radius: 50%;
+  color: var(--v-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.st-dot :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
+.st-track li.done .st-dot {
+  border-color: var(--bc-accent);
+  background: var(--bc-accent);
+  color: var(--bc-accent-ink);
+}
+.st-track li.now .st-dot {
+  border-color: var(--bc-accent);
+  color: var(--bc-accent-deep);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--bc-accent) 18%, transparent);
+}
+.st-txt {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  min-width: 0;
 }
-.sh-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13.5px;
-}
-.sh-lbl {
-  color: #6b7280;
-}
-.sh-val {
-  font-weight: 500;
-  color: #374151;
-}
-.sh-val.mono {
-  font-family: monospace;
-}
-.sh-person {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  color: #111827;
-}
-.person-avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: #ede9fe;
-  color: #6d28d9;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.availability-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 12px 18px;
-  padding: 8px 14px;
-  border-radius: 8px;
-  background: #f3f4f6;
+.st-txt b {
   font-size: 13px;
-  color: #374151;
+  color: var(--v-muted);
 }
-.availability-banner.positive {
-  background: #dcfce7;
-  color: #16a34a;
+.st-track li.done b,
+.st-track li.now b {
+  color: var(--v-text);
 }
-.avail-date {
-  margin-left: auto;
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.from-to {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 0 18px 12px;
-}
-.ft-col {
-  flex: 1;
-}
-.ft-lbl {
-  font-size: 11px;
-  font-weight: 600;
-  color: #9ca3af;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 3px;
-}
-.ft-addr {
-  font-size: 12.5px;
-  color: #374151;
-  line-height: 1.5;
-}
-.ft-arrow {
-  color: #9ca3af;
-  padding-top: 20px;
-  flex-shrink: 0;
-}
-
-.carrier-badge {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 0 18px 14px;
-  padding: 10px 14px;
-  background: #f9fafb;
-  border-radius: 10px;
-}
-.carrier-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: #ecfdf5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-}
-.carrier-name {
-  font-weight: 600;
-  color: #111827;
-  font-size: 13.5px;
-}
-.carrier-id {
+.st-txt small {
   font-size: 11.5px;
-  color: #9ca3af;
+  color: var(--v-faint);
 }
-
-.timeline-events {
-  padding: 0 18px 16px;
+.st-off {
   display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-.tl-event {
-  display: flex;
+  align-items: center;
   gap: 12px;
-  position: relative;
 }
-.tl-dot-sm {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #e5e7eb;
-  flex-shrink: 0;
-  margin-top: 5px;
+.st-off :deep(svg) {
+  width: 22px;
+  height: 22px;
+  color: var(--v-red-text);
 }
-.tl-event.done .tl-dot-sm {
-  background: #10b981;
+.st-off b {
+  display: block;
+  font-size: 14px;
+  color: var(--v-text);
 }
-.tl-vert {
-  position: absolute;
-  left: 4.5px;
-  top: 14px;
-  width: 1px;
-  height: calc(100% + 8px);
-  background: #e5e7eb;
+.st-off small {
+  font-size: 12.5px;
+  color: var(--v-text-2);
 }
-.tl-event.done .tl-vert {
-  background: #10b981;
+.st-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
 }
-.event-content {
-  padding-bottom: 20px;
+.st-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
 }
-.event-name {
+.st-facts div {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--v-subtle);
+}
+.st-facts dt {
+  font-size: 11.5px;
+  color: var(--v-muted);
+}
+.st-facts dd {
+  margin: 2px 0 0;
   font-size: 13.5px;
   font-weight: 600;
-  color: #374151;
+  color: var(--v-text);
 }
-.event-name.future {
-  color: #9ca3af;
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px !important;
 }
-.event-addr {
-  font-size: 12px;
-  color: #9ca3af;
-  margin-top: 2px;
-}
-.event-time {
+.st-edit {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: 14px;
 }
-.event-date,
-.event-hour {
-  font-size: 12px;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-/* Map Panel */
-.map-panel {
-  background: #fff;
-  border: 1px solid #e8ecf0;
-  border-radius: 14px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.map-placeholder {
-  flex: 1;
-  position: relative;
-  min-height: 380px;
-  background: #f0f4f8;
-  overflow: hidden;
-}
-.map-grid {
+.st-edit-form {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  height: 100%;
-  position: absolute;
-  inset: 0;
+  gap: 10px;
+  width: 100%;
 }
-.map-cell {
-  border: 0.5px solid rgba(255, 255, 255, 0.3);
-}
-.map-cell.road {
-  background: rgba(255, 255, 255, 0.7);
-}
-.map-cell.building {
-  background: rgba(180, 180, 190, 0.5);
-  border-radius: 2px;
-}
-.map-marker {
-  position: absolute;
-  top: 40%;
-  left: 55%;
-  transform: translate(-50%, -100%);
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-}
-.map-controls {
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
+.st-edit-act {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  justify-content: flex-end;
+  gap: 8px;
 }
-.map-ctrl {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  font-size: 16px;
+.st-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--v-red-text);
+  font: inherit;
+  font-size: 12.5px;
+  text-decoration: underline;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
-.map-layers {
-  position: absolute;
-  bottom: 14px;
-  right: 14px;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
+.st-sup {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.st-sup b {
   font-size: 14px;
+  color: var(--v-text);
+}
+.st-sup span,
+.st-sup a {
+  font-size: 12.5px;
+  color: var(--v-text-2);
+}
+.st-sup .muted {
+  color: var(--v-faint);
+}
+.st-logo {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
+  font-size: 13px;
+  font-weight: 600;
+}
+.st-items {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+.st-items li {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-top: 1px solid var(--v-border);
+  font-size: 13px;
+  color: var(--v-text-2);
+}
+@media (max-width: 1000px) {
+  .st-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .st-track {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .st-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>

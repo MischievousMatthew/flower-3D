@@ -78,7 +78,7 @@
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="loading-state"><div class="spinner"></div></div>
+    <div v-if="loading" class="loading-state"><div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div></div>
 
     <!-- Grid -->
     <div v-else class="loc-grid">
@@ -544,6 +544,15 @@ onMounted(fetchLocations);
 </script>
 
 <style scoped>
+.sk-line {
+  height: 12px;
+  margin: 6px auto;
+  border-radius: 6px;
+  width: 60%;
+}
+.sk-short {
+  width: 35%;
+}
 * {
   box-sizing: border-box;
   font-family: "Poppins", sans-serif;
@@ -562,12 +571,12 @@ onMounted(fetchLocations);
 .page-title {
   font-size: 22px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   margin: 0;
 }
 .page-sub {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin: 2px 0 0;
 }
 .btn-primary {
@@ -603,8 +612,8 @@ onMounted(fetchLocations);
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #fff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--v-surface);
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
   flex: 1;
   min-width: 200px;
@@ -613,7 +622,7 @@ onMounted(fetchLocations);
   border: none;
   outline: none;
   font-size: 13.5px;
-  color: #111827;
+  color: var(--v-text);
   background: none;
   width: 100%;
   font-family: inherit;
@@ -621,7 +630,7 @@ onMounted(fetchLocations);
 .toggle-group {
   display: flex;
   gap: 2px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   border-radius: 8px;
   padding: 3px;
 }
@@ -631,13 +640,13 @@ onMounted(fetchLocations);
   border: none;
   background: none;
   font-size: 12.5px;
-  color: #6b7280;
+  color: var(--v-muted);
   cursor: pointer;
   transition: all 0.15s;
 }
 .tgl.active {
-  background: #fff;
-  color: #111827;
+  background: var(--v-surface);
+  color: var(--v-text);
   font-weight: 600;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
@@ -646,7 +655,7 @@ onMounted(fetchLocations);
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: #374151;
+  color: var(--v-text-2);
   cursor: pointer;
 }
 
@@ -658,7 +667,7 @@ onMounted(fetchLocations);
 .spinner {
   width: 30px;
   height: 30px;
-  border: 3px solid #e5e7eb;
+  border: 3px solid var(--v-border);
   border-top-color: #10b981;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -676,8 +685,8 @@ onMounted(fetchLocations);
 }
 
 .loc-card {
-  background: #fff;
-  border: 1.5px solid #e8ecf0;
+  background: var(--v-surface);
+  border: 1.5px solid var(--v-border);
   border-radius: 14px;
   padding: 18px;
   display: flex;
@@ -707,11 +716,11 @@ onMounted(fetchLocations);
   flex-shrink: 0;
 }
 .loc-icon.cold {
-  background: #dbeafe;
-  color: #2563eb;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
 }
 .loc-icon.ambient {
-  background: #ecfdf5;
+  background: var(--v-green-soft);
   color: #10b981;
 }
 .loc-info {
@@ -720,7 +729,7 @@ onMounted(fetchLocations);
 .loc-name {
   font-size: 14px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   margin: 0;
 }
 .loc-meta {
@@ -732,14 +741,14 @@ onMounted(fetchLocations);
 .loc-code {
   font-family: monospace;
   font-size: 11px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   padding: 1px 5px;
   border-radius: 4px;
-  color: #6b7280;
+  color: var(--v-muted);
 }
 .loc-zone {
   font-size: 11.5px;
-  color: #9ca3af;
+  color: var(--v-faint);
 }
 .loc-badges {
   display: flex;
@@ -754,16 +763,16 @@ onMounted(fetchLocations);
   font-weight: 600;
 }
 .badge.cold {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
 }
 .badge.active-badge {
-  background: #dcfce7;
-  color: #16a34a;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
 }
 .badge.inactive-badge {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--v-subtle);
+  color: var(--v-muted);
 }
 
 .capacity-section {
@@ -775,19 +784,19 @@ onMounted(fetchLocations);
   margin-bottom: 5px;
 }
 .cap-label span:first-child {
-  color: #6b7280;
+  color: var(--v-muted);
 }
 .text-ok {
-  color: #16a34a;
+  color: var(--v-green-text);
   font-weight: 600;
 }
 .text-danger {
-  color: #ef4444;
+  color: var(--v-red-text);
   font-weight: 600;
 }
 .cap-bar {
   height: 5px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -810,25 +819,25 @@ onMounted(fetchLocations);
   border-radius: 8px;
 }
 .bs-item.fresh {
-  background: #f0fdf4;
+  background: var(--v-green-soft);
 }
 .bs-item.aging {
-  background: #fefce8;
+  background: var(--v-amber-soft);
 }
 .bs-item.wilting {
-  background: #fff7ed;
+  background: var(--v-amber-soft);
 }
 .bs-item.spoiled {
-  background: #fef2f2;
+  background: var(--v-red-soft);
 }
 .bs-num {
   font-size: 16px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
 }
 .bs-lbl {
   font-size: 10px;
-  color: #9ca3af;
+  color: var(--v-faint);
 }
 
 .loc-actions {
@@ -840,21 +849,21 @@ onMounted(fetchLocations);
   width: 30px;
   height: 30px;
   border-radius: 7px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
+  border: 1px solid var(--v-border);
+  background: var(--v-surface);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--v-muted);
 }
 .la-btn:hover {
-  background: #f9fafb;
-  color: #374151;
+  background: var(--v-subtle);
+  color: var(--v-text-2);
 }
 .la-btn.danger:hover {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
   border-color: #fca5a5;
 }
 
@@ -865,13 +874,13 @@ onMounted(fetchLocations);
   align-items: center;
   gap: 14px;
   padding: 60px 20px;
-  background: #fff;
+  background: var(--v-surface);
   border-radius: 14px;
-  border: 2px dashed #e5e7eb;
+  border: 2px dashed var(--v-border);
 }
 .empty-card p {
   font-size: 15px;
-  color: #9ca3af;
+  color: var(--v-faint);
   margin: 0;
 }
 
@@ -886,7 +895,7 @@ onMounted(fetchLocations);
   justify-content: center;
 }
 .modal {
-  background: #fff;
+  background: var(--v-surface);
   border-radius: 14px;
   width: 480px;
   overflow: hidden;
@@ -900,19 +909,19 @@ onMounted(fetchLocations);
   align-items: center;
   justify-content: space-between;
   padding: 18px 20px;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--v-border);
 }
 .modal-header h3 {
   font-size: 16px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   margin: 0;
 }
 .modal-close {
   border: none;
   background: none;
   font-size: 22px;
-  color: #9ca3af;
+  color: var(--v-faint);
   cursor: pointer;
 }
 .modal-body {
@@ -926,11 +935,11 @@ onMounted(fetchLocations);
   justify-content: flex-end;
   gap: 10px;
   padding: 14px 20px;
-  border-top: 1px solid #f0f2f5;
+  border-top: 1px solid var(--v-border);
 }
 .confirm-text {
   font-size: 13.5px;
-  color: #374151;
+  color: var(--v-text-2);
   line-height: 1.6;
   margin: 0;
 }
@@ -948,15 +957,15 @@ onMounted(fetchLocations);
 .field label {
   font-size: 12.5px;
   font-weight: 600;
-  color: #374151;
+  color: var(--v-text-2);
 }
 .field input,
 .field select {
   padding: 9px 12px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
   font-size: 13.5px;
-  color: #111827;
+  color: var(--v-text);
   outline: none;
   font-family: inherit;
 }
@@ -967,11 +976,11 @@ onMounted(fetchLocations);
   border-color: #ef4444;
 }
 .req {
-  color: #ef4444;
+  color: var(--v-red-text);
 }
 .err-msg {
   font-size: 11.5px;
-  color: #ef4444;
+  color: var(--v-red-text);
 }
 
 .checkbox-row {
@@ -984,7 +993,7 @@ onMounted(fetchLocations);
   gap: 2px;
   font-size: 13.5px;
   font-weight: 500;
-  color: #374151;
+  color: var(--v-text-2);
   cursor: pointer;
 }
 .checkbox-label input {
@@ -992,16 +1001,16 @@ onMounted(fetchLocations);
 }
 .check-hint {
   font-size: 11.5px;
-  color: #9ca3af;
+  color: var(--v-faint);
   font-weight: 400;
 }
 
 .btn-cancel {
   padding: 9px 18px;
   border-radius: 8px;
-  border: 1.5px solid #e5e7eb;
-  background: #fff;
-  color: #374151;
+  border: 1.5px solid var(--v-border);
+  background: var(--v-surface);
+  color: var(--v-text-2);
   font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
@@ -1037,8 +1046,8 @@ onMounted(fetchLocations);
   white-space: nowrap;
 }
 .toast.success {
-  background: #111827;
-  color: #fff;
+  background: var(--v-ink);
+  color: var(--v-ink-text);
 }
 .toast.error {
   background: #ef4444;

@@ -93,7 +93,7 @@
 
     <!-- ── Batch Grid ──────────────────────────────────────────────────── -->
     <div v-if="loading" class="loading-state">
-      <div class="spinner"></div>
+      <div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div>
       <span>Loading batches…</span>
     </div>
 
@@ -384,6 +384,15 @@ export default {
 </script>
 
 <style scoped>
+.sk-line {
+  height: 12px;
+  margin: 6px auto;
+  border-radius: 6px;
+  width: 60%;
+}
+.sk-short {
+  width: 35%;
+}
 * {
   box-sizing: border-box;
   font-family: "Poppins", sans-serif;
@@ -404,12 +413,12 @@ export default {
 .page-title {
   font-size: 22px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   margin: 0;
 }
 .page-sub {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin: 2px 0 0;
 }
 .header-actions {
@@ -440,9 +449,9 @@ export default {
   align-items: center;
   gap: 7px;
   padding: 9px 16px;
-  background: #fff;
-  color: #374151;
-  border: 1.5px solid #e5e7eb;
+  background: var(--v-surface);
+  color: var(--v-text-2);
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
   font-size: 13.5px;
   font-weight: 500;
@@ -450,7 +459,7 @@ export default {
   text-decoration: none;
 }
 .btn-secondary:hover {
-  background: #f9fafb;
+  background: var(--v-subtle);
 }
 
 /* Summary strip */
@@ -460,8 +469,8 @@ export default {
   gap: 12px;
 }
 .sum-card {
-  background: #fff;
-  border: 1.5px solid #e8ecf0;
+  background: var(--v-surface);
+  border: 1.5px solid var(--v-border);
   border-radius: 12px;
   padding: 14px 16px;
   display: flex;
@@ -491,7 +500,7 @@ export default {
 }
 .sum-lbl {
   font-size: 11.5px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin-top: 2px;
 }
 .pulse-dot {
@@ -528,8 +537,8 @@ export default {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #fff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--v-surface);
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
   flex: 1;
   min-width: 220px;
@@ -538,18 +547,18 @@ export default {
   border: none;
   outline: none;
   font-size: 13.5px;
-  color: #111827;
+  color: var(--v-text);
   background: none;
   width: 100%;
   font-family: inherit;
 }
 .filter-select {
   padding: 8px 12px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
   font-size: 13px;
-  color: #374151;
-  background: #fff;
+  color: var(--v-text-2);
+  background: var(--v-input);
   outline: none;
   cursor: pointer;
 }
@@ -558,16 +567,16 @@ export default {
   align-items: center;
   gap: 5px;
   padding: 8px 12px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
-  background: #fff;
-  color: #6b7280;
+  background: var(--v-surface);
+  color: var(--v-muted);
   font-size: 13px;
   cursor: pointer;
 }
 .clear-btn:hover {
-  background: #f9fafb;
-  color: #374151;
+  background: var(--v-subtle);
+  color: var(--v-text-2);
 }
 
 /* States */
@@ -579,7 +588,7 @@ export default {
   justify-content: center;
   gap: 12px;
   padding: 80px 20px;
-  color: #9ca3af;
+  color: var(--v-faint);
 }
 .empty-state p {
   font-size: 15px;
@@ -588,7 +597,7 @@ export default {
 .spinner {
   width: 30px;
   height: 30px;
-  border: 3px solid #e5e7eb;
+  border: 3px solid var(--v-border);
   border-top-color: #10b981;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -606,8 +615,8 @@ export default {
   gap: 14px;
 }
 .batch-card {
-  background: #fff;
-  border: 1.5px solid #e8ecf0;
+  background: var(--v-surface);
+  border: 1.5px solid var(--v-border);
   border-radius: 14px;
   padding: 16px;
   display: flex;
@@ -649,13 +658,13 @@ export default {
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
   font-size: 16px;
-  color: #374151;
+  color: var(--v-text-2);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -671,7 +680,7 @@ export default {
 .card-product {
   font-size: 13.5px;
   font-weight: 600;
-  color: #111827;
+  color: var(--v-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -679,10 +688,10 @@ export default {
 .card-batch {
   font-family: monospace;
   font-size: 11px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   padding: 1px 5px;
   border-radius: 4px;
-  color: #6b7280;
+  color: var(--v-muted);
 }
 
 .condition-pill {
@@ -716,28 +725,28 @@ export default {
 .stat-val {
   font-size: 14px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
 }
 .stat-val.ok {
-  color: #16a34a;
+  color: var(--v-green-text);
 }
 .stat-val.warn {
   color: #ca8a04;
 }
 .stat-val.warn-red {
-  color: #ea580c;
+  color: var(--v-amber-text);
 }
 .stat-val.danger {
-  color: #dc2626;
+  color: var(--v-red-text);
 }
 .stat-lbl {
   font-size: 10.5px;
-  color: #9ca3af;
+  color: var(--v-faint);
 }
 .stat-sep {
   width: 1px;
   height: 28px;
-  background: #e5e7eb;
+  background: var(--v-subtle-2);
 }
 
 .freshness-bar-wrap {
@@ -748,7 +757,7 @@ export default {
 .freshness-bar {
   flex: 1;
   height: 4px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -759,7 +768,7 @@ export default {
 }
 .freshness-pct {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--v-muted);
   min-width: 30px;
   text-align: right;
 }
@@ -769,8 +778,8 @@ export default {
   justify-content: space-between;
   align-items: center;
   font-size: 11.5px;
-  color: #9ca3af;
-  border-top: 1px solid #f3f4f6;
+  color: var(--v-faint);
+  border-top: 1px solid var(--v-border);
   padding-top: 8px;
 }
 .footer-loc {
@@ -791,7 +800,7 @@ export default {
 }
 .drawer {
   width: 480px;
-  background: #fff;
+  background: var(--v-surface);
   height: 100%;
   overflow-y: auto;
   box-shadow: -8px 0 40px rgba(0, 0, 0, 0.15);

@@ -1,673 +1,233 @@
 <template>
-  <div class="completed-page">
-    
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">Completed</h1>
-        <p class="page-sub">Completed orders and received shipments history</p>
+  <HrPage title="Completed" subtitle="Deliveries the customer has received, newest first, with returns and refunds." :tabs="SCAN_TABS">
+    <section class="fx-kpis" aria-label="Summary">
+      <template v-if="!counts">
+        <div v-for="n in 4" :key="n" class="sp-card fx-kpi"><div class="bc-skeleton sp-sk-line w30"></div><div class="bc-skeleton fx-sk-big"></div></div>
+      </template>
+      <template v-else>
+        <button v-for="k in kpis" :key="k.label" type="button" class="sp-card fx-kpi cp-kpi" :class="{ on: k.status && status === k.status }" :disabled="!k.status" :aria-pressed="k.status ? status === k.status : undefined" @click="k.status && setStatus(k.status)">
+          <span class="fx-kpi-label"><span class="cp-ic" :class="`tone-${k.tone}`" v-html="ICONS[k.icon]"></span>{{ k.label }}</span>
+          <strong>{{ k.value }}</strong>
+          <span class="fx-kpi-sub">{{ k.sub }}</span>
+        </button>
+      </template>
+    </section>
+
+    <div class="sp-card cp-bar">
+      <label class="sp-search cp-search">
+        <span v-html="ICONS.search"></span>
+        <input v-model="search" class="sp-input" type="search" placeholder="Order number or delivery code" aria-label="Search deliveries" @input="debouncedLoad" />
+      </label>
+    </div>
+
+    <div v-if="loadError" class="sp-banner error">
+      <span v-html="ICONS.alert"></span>{{ loadError }}
+      <button type="button" @click="load">Try again</button>
+    </div>
+
+    <section class="sp-card cp-card" aria-label="Deliveries">
+      <ul v-if="rows === null" class="cp-rows"><li v-for="n in 6" :key="n" class="cp-row"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></li></ul>
+      <div v-else-if="!rows.length" class="sp-empty">
+        <span class="sp-empty-icon" v-html="ICONS.check"></span>
+        <h3>{{ search ? "Nothing matches" : `No ${STATUS[status].plural} yet` }}</h3>
+        <p>{{ search ? "Try another order number or code." : "Deliveries show up here once the customer confirms they got them." }}</p>
       </div>
-      <div class="header-actions">
-        <div class="date-filter">
-          <input type="date" v-model="dateFrom" @change="reload" />
-          <span class="sep">—</span>
-          <input type="date" v-model="dateTo" @change="reload" />
-        </div>
-      </div>
-    </div>
-
-    <!-- Summary Strip -->
-    <div class="summary-strip">
-      <div class="sum-card" v-for="s in summaryCards" :key="s.label">
-        <div class="sum-icon" :style="{ background: s.bg, color: s.color }">
-          {{ s.icon }}
-        </div>
-        <div>
-          <div class="sum-val" :style="{ color: s.color }">{{ s.value }}</div>
-          <div class="sum-lbl">{{ s.label }}</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tabs -->
-    <div class="tabs">
-      <button
-        class="tab"
-        :class="{ active: activeTab === 'orders' }"
-        @click="activeTab = 'orders'"
-      >
-        <svg
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          width="14"
-        >
-          <rect x="3" y="3" width="14" height="14" rx="2" />
-          <path d="M7 7h6M7 10h6M7 13h4" />
-        </svg>
-        Completed Orders
-        <span class="tab-count">{{ completedOrders.length }}</span>
-      </button>
-      <button
-        class="tab"
-        :class="{ active: activeTab === 'shipments' }"
-        @click="activeTab = 'shipments'"
-      >
-        <svg
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          width="14"
-        >
-          <rect x="1" y="5" width="10" height="10" rx="1" />
-          <path d="M11 8h5l2 3v4h-7V8z" />
-          <circle cx="4" cy="15" r="2" />
-          <circle cx="15" cy="15" r="2" />
-        </svg>
-        Received Shipments
-        <span class="tab-count">{{ completedShipments.length }}</span>
-      </button>
-    </div>
-
-    <!-- Orders Table -->
-    <div v-if="activeTab === 'orders'" class="card">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Order #</th>
-            <th>Supplier</th>
-            <th>Items</th>
-            <th>Total</th>
-            <th>Completed</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loadingOrders">
-            <td colspan="6" class="loading-cell">
-              <div class="spinner"></div>
-            </td>
-          </tr>
-          <tr v-else-if="!completedOrders.length">
-            <td colspan="6" class="empty-cell">
-              No completed orders in this period
-            </td>
-          </tr>
-          <tr v-for="o in completedOrders" :key="o.id" class="data-row">
-            <td>
-              <div class="order-num-cell">
-                <div class="done-check">✓</div>
-                <router-link
-                  :to="`/erp/procurement/supply-chain/orders/detail/${o.id}`"
-                  class="order-link"
-                  >{{
-                  o.order_number
-                }}</router-link>
-              </div>
-            </td>
-            <td>
-              <div class="supplier-cell">
-                <div class="sup-ava">{{ o.supplier?.company_name?.[0] }}</div>
-                <span>{{ o.supplier?.company_name }}</span>
-              </div>
-            </td>
-            <td class="muted">{{ o.items?.length ?? 0 }} items</td>
-            <td class="amount">${{ formatAmount(o.total_amount) }}</td>
-            <td class="muted">{{ formatDate(o.updated_at) }}</td>
-            <td>
-              <router-link
-                  :to="`/erp/procurement/supply-chain/orders/detail/${o.id}`"
-                class="action-btn"
-                title="View"
-              >
-                <svg
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  width="14"
-                >
-                  <path d="M2 10s3-7 8-7 8 7 8 7-3 7-8 7-8-7-8-7z" />
-                  <circle cx="10" cy="10" r="3" />
-                </svg>
-              </router-link>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Shipments Table -->
-    <div v-if="activeTab === 'shipments'" class="card">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Tracking #</th>
-            <th>Carrier</th>
-            <th>Order</th>
-            <th>Supplier</th>
-            <th>Received</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loadingShipments">
-            <td colspan="6" class="loading-cell">
-              <div class="spinner"></div>
-            </td>
-          </tr>
-          <tr v-else-if="!completedShipments.length">
-            <td colspan="6" class="empty-cell">
-              No received shipments in this period
-            </td>
-          </tr>
-          <tr v-for="s in completedShipments" :key="s.id" class="data-row">
-            <td>
-              <div class="tracking-cell">
-                <div class="delivered-icon">✓</div>
-                <code class="tracking-code">{{ s.tracking_number }}</code>
-              </div>
-            </td>
-            <td>
-              <div class="carrier-chip">
-                <span>{{ s.carrier }}</span>
-              </div>
-            </td>
-            <td>
-              <code class="order-ref">{{
-                s.purchase_order?.order_number
-              }}</code>
-            </td>
-            <td class="muted">
-              {{ s.purchase_order?.supplier?.company_name }}
-            </td>
-            <td class="muted">
-              {{ formatDate(s.received_date || s.updated_at) }}
-            </td>
-            <td>
-              <router-link
-                :to="`/erp/procurement/supply-chain/logistics/${s.id}`"
-                class="action-btn"
-              >
-                <svg
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  width="14"
-                >
-                  <path d="M10 3a7 7 0 100 14A7 7 0 0010 3z" />
-                  <path d="M10 7v4l2 2" />
-                </svg>
-              </router-link>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+      <template v-else>
+        <ul class="cp-rows">
+          <li v-for="d in rows" :key="d.id" class="cp-row">
+            <span class="cp-ic big" :class="`tone-${STATUS[d.status]?.tone ?? 'green'}`" v-html="ICONS[STATUS[d.status]?.icon ?? 'check']"></span>
+            <span class="grow">
+              <b>{{ d.order?.order_number ?? d.delivery_id }}</b>
+              <small>{{ d.order?.delivery_contact_name ?? "Customer" }}<template v-if="d.order?.delivery_address"> · {{ d.order.delivery_address }}</template></small>
+            </span>
+            <span class="cp-meta">
+              <small>{{ d.order?.delivered_at ? `Delivered ${when(d.order.delivered_at)}` : `Updated ${when(d.updated_at)}` }}</small>
+              <small v-if="d.last_scanned_by">Last scan by {{ d.last_scanned_by }}</small>
+            </span>
+            <span class="cp-amt">{{ money(d.order?.total_amount) }}</span>
+            <span class="sp-chip" :class="STATUS[d.status]?.tone ?? 'slate'">{{ d.status_label ?? STATUS[d.status]?.label ?? d.status }}</span>
+          </li>
+        </ul>
+        <ShowMore tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="rows.length" :total="pager.total.value" @more="pager.showMore()" />
+      </template>
+    </section>
+  </HrPage>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { scanService } from "../../../../../services/scanService";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import HrPage from "../../../../../components/hr/HrPage.vue";
+import ShowMore from "../../../../../components/common/ShowMore.vue";
+import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopIcons";
+import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";
+import { money } from "../../../../../components/vendor/finance/financeUi";
+import { useShowMorePaged } from "../../../../../composables/useShowMore";
+import { deliveryService } from "../../../../../services/deliveryService";
+import "../../../../../components/vendor/finance/finance.css";
 
+const SCAN_TABS = [
+  { name: "ScanToProcess", label: "To process", icon: "box" },
+  { name: "ScanToShip", label: "To ship", icon: "truck" },
+  { name: "ScanToReceive", label: "To receive", icon: "pin" },
+  { name: "ScanCompleted", label: "Completed", icon: "check" },
+];
+const STATUS = {
+  completed: { label: "Completed", plural: "completed deliveries", tone: "green", icon: "check" },
+  returned: { label: "Returned", plural: "returns", tone: "amber", icon: "restore" },
+  refunded: { label: "Refunded", plural: "refunds", tone: "red", icon: "wallet" },
+};
 
-const activeTab = ref("orders");
-const completedOrders = ref([]);
-const completedShipments = ref([]);
-const loadingOrders = ref(false);
-const loadingShipments = ref(false);
-const dateFrom = ref("");
-const dateTo = ref("");
+const status = ref("completed");
+const search = ref("");
+const rows = ref(null);
+const counts = ref(null);
+const loadError = ref("");
 
-const summaryCards = computed(() => [
-  {
-    label: "Completed Orders",
-    value: completedOrders.value.length,
-    icon: "✓",
-    color: "#10b981",
-    bg: "#ecfdf5",
-  },
-  {
-    label: "Received Shipments",
-    value: completedShipments.value.length,
-    icon: "📦",
-    color: "#3b82f6",
-    bg: "#eff6ff",
-  },
-  {
-    label: "Total GMV",
-    value:
-      "$" +
-      formatAmount(
-        completedOrders.value.reduce((s, o) => s + (o.total_amount || 0), 0),
-      ),
-    icon: "💰",
-    color: "#f59e0b",
-    bg: "#fffbeb",
-  },
-  {
-    label: "Avg Order Value",
-    value: completedOrders.value.length
-      ? "$" +
-        formatAmount(
-          completedOrders.value.reduce((s, o) => s + (o.total_amount || 0), 0) /
-            completedOrders.value.length,
-        )
-      : "—",
-    icon: "📊",
-    color: "#8b5cf6",
-    bg: "#f5f3ff",
-  },
-]);
+const kpis = computed(() => {
+  const c = counts.value;
+  const delivered = c.completed + c.returned + c.refunded;
+  return [
+    { status: "completed", label: "Completed", icon: "check", tone: "green", value: c.completed, sub: "received by the customer" },
+    { status: "returned", label: "Returned", icon: "restore", tone: "amber", value: c.returned, sub: "sent back" },
+    { status: "refunded", label: "Refunded", icon: "wallet", tone: "red", value: c.refunded, sub: "money given back" },
+    { status: null, label: "Kept", icon: "sparkle", tone: "teal", value: delivered ? `${Math.round((c.completed / delivered) * 100)}%` : "—", sub: "of delivered orders" },
+  ];
+});
+const when = (d) => (d ? new Date(d).toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—");
 
-async function reload() {
-  const params = {};
-  if (dateFrom.value) params.from = dateFrom.value;
-  if (dateTo.value) params.to = dateTo.value;
-
-  loadingOrders.value = true;
-  loadingShipments.value = true;
-
+async function fetchPage(page) {
+  const res = await deliveryService.scOrders({ status: status.value, search: search.value.trim() || undefined, per_page: 20, page });
+  const body = res.data ?? {};
+  counts.value = body.status_counts ?? counts.value;
+  return { items: body.data ?? [], lastPage: body.meta?.last_page ?? body.pagination?.last_page ?? 1, total: body.meta?.total ?? body.pagination?.total };
+}
+const pager = useShowMorePaged(fetchPage);
+watch(() => pager.visible.value, (v) => {
+  if (rows.value !== null) rows.value = v;
+});
+async function load() {
+  loadError.value = "";
   try {
-    const [oRes, sRes] = await Promise.all([
-      scanService.completedOrders(params),
-      scanService.completedShipments(params),
-    ]);
-    completedOrders.value = oRes.data || oRes;
-    completedShipments.value = sRes.data || sRes;
-  } catch {
-    // Mock data
-    completedOrders.value = [
-      {
-        id: 30,
-        order_number: "PO-20250520-00030",
-        supplier: { company_name: "Meta Supplies" },
-        items: [{}, {}, {}],
-        total_amount: 12400,
-        updated_at: "2025-05-20T10:00:00Z",
-      },
-      {
-        id: 31,
-        order_number: "PO-20250521-00031",
-        supplier: { company_name: "PakTextile Co." },
-        items: [{}, {}],
-        total_amount: 8750,
-        updated_at: "2025-05-21T14:30:00Z",
-      },
-      {
-        id: 32,
-        order_number: "PO-20250522-00032",
-        supplier: { company_name: "FedEx Freight" },
-        items: [{}, {}, {}, {}],
-        total_amount: 34200,
-        updated_at: "2025-05-22T09:15:00Z",
-      },
-      {
-        id: 33,
-        order_number: "PO-20250524-00033",
-        supplier: { company_name: "GlobalTex Ltd." },
-        items: [{}],
-        total_amount: 3100,
-        updated_at: "2025-05-24T16:45:00Z",
-      },
-      {
-        id: 34,
-        order_number: "PO-20250525-00034",
-        supplier: { company_name: "FreshLogix" },
-        items: [{}, {}],
-        total_amount: 6800,
-        updated_at: "2025-05-25T11:20:00Z",
-      },
-    ];
-    completedShipments.value = [
-      {
-        id: 40,
-        tracking_number: "FDX-20250520-001",
-        carrier: "FedEx",
-        purchase_order: {
-          order_number: "PO-20250520-00030",
-          supplier: { company_name: "Meta Supplies" },
-        },
-        received_date: "2025-05-20",
-      },
-      {
-        id: 41,
-        tracking_number: "DHL-20250521-002",
-        carrier: "DHL",
-        purchase_order: {
-          order_number: "PO-20250521-00031",
-          supplier: { company_name: "PakTextile Co." },
-        },
-        received_date: "2025-05-21",
-      },
-      {
-        id: 42,
-        tracking_number: "UPS-20250522-003",
-        carrier: "UPS",
-        purchase_order: {
-          order_number: "PO-20250522-00032",
-          supplier: { company_name: "FedEx Freight" },
-        },
-        received_date: "2025-05-22",
-      },
-    ];
-  } finally {
-    loadingOrders.value = false;
-    loadingShipments.value = false;
+    await pager.load();
+    if (pager.failure.value) throw pager.failure.value;
+    rows.value = pager.visible.value;
+  } catch (e) {
+    rows.value = rows.value ?? [];
+    counts.value = counts.value ?? { completed: 0, returned: 0, refunded: 0 };
+    loadError.value = apiMessage(e, "Couldn't load the deliveries.");
   }
 }
-
-function formatAmount(n) {
-  return Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2 });
+function setStatus(s) {
+  status.value = s;
+  load();
 }
-function formatDate(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+let timer = null;
+function debouncedLoad() {
+  clearTimeout(timer);
+  timer = setTimeout(load, 350);
 }
-
-onMounted(reload);
+onMounted(load);
+onBeforeUnmount(() => clearTimeout(timer));
 </script>
 
 <style scoped>
-* {
-  box-sizing: border-box;
-  font-family: "Poppins", sans-serif;
-}
-
-.completed-page {
+.grow {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 2px;
 }
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-.page-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #111827;
-  margin: 0;
-}
-.page-sub {
-  font-size: 13px;
-  color: #6b7280;
-  margin: 2px 0 0;
-}
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.date-filter {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 14px;
-  background: #fff;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 9px;
-}
-.date-filter input {
-  border: none;
-  outline: none;
-  font-size: 12.5px;
-  color: #374151;
-  background: transparent;
-  font-family: inherit;
-}
-.sep {
-  color: #9ca3af;
-}
-
-.summary-strip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-}
-.sum-card {
-  background: #fff;
-  border: 1px solid #e8ecf0;
-  border-radius: 12px;
-  padding: 16px 18px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.sum-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  flex-shrink: 0;
-}
-.sum-val {
-  font-size: 20px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-.sum-lbl {
-  font-size: 12px;
-  color: #6b7280;
-  margin-top: 2px;
-}
-
-.tabs {
-  display: flex;
-  gap: 4px;
-}
-.tab {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 18px;
-  border-radius: 9px;
-  border: 1.5px solid #e5e7eb;
-  background: #fff;
-  font-size: 13.5px;
-  font-weight: 500;
-  color: #6b7280;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.tab:hover {
-  border-color: #d1d5db;
-  color: #374151;
-}
-.tab.active {
-  border-color: #10b981;
-  background: #ecfdf5;
-  color: #059669;
-}
-.tab-count {
-  background: #f3f4f6;
-  border-radius: 10px;
-  padding: 1px 7px;
-  font-size: 11.5px;
-  font-weight: 600;
-}
-.tab.active .tab-count {
-  background: #d1fae5;
-  color: #059669;
-}
-
-.card {
-  background: #fff;
-  border-radius: 14px;
-  border: 1px solid #e8ecf0;
-  overflow: hidden;
-}
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13.5px;
-}
-.data-table th {
-  padding: 10px 16px;
+.cp-kpi {
+  color: inherit;
+  font: inherit;
   text-align: left;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-bottom: 1px solid #e8ecf0;
-  background: #f9fafb;
-}
-.data-row td {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f3f4f6;
-  vertical-align: middle;
-}
-.data-row:last-child td {
-  border-bottom: none;
-}
-.data-row:hover td {
-  background: #fafafa;
-}
-.loading-cell,
-.empty-cell {
-  text-align: center;
-  padding: 48px 16px !important;
-  color: #9ca3af;
-}
-.spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid #e5e7eb;
-  border-top-color: #10b981;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  margin: 0 auto;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.order-num-cell {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.done-check {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #dcfce7;
-  color: #16a34a;
-  font-size: 10px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.order-link {
-  font-family: monospace;
-  font-size: 13px;
-  font-weight: 700;
-  color: #111827;
-  text-decoration: none;
-}
-.order-link:hover {
-  color: #10b981;
-}
-
-.supplier-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.sup-ava {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  background: #ecfdf5;
-  color: #059669;
-  font-size: 12px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.muted {
-  color: #6b7280;
-}
-.amount {
-  font-weight: 700;
-  color: #111827;
-  font-variant-numeric: tabular-nums;
-}
-
-.tracking-cell {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.delivered-icon {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #dcfce7;
-  color: #16a34a;
-  font-size: 10px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.tracking-code {
-  font-family: monospace;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: #374151;
-}
-
-.carrier-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 9px;
-  background: #f3f4f6;
-  border-radius: 6px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #374151;
-}
-.order-ref {
-  font-family: monospace;
-  font-size: 12px;
-  background: #f3f4f6;
-  padding: 2px 7px;
-  border-radius: 5px;
-}
-
-.action-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   cursor: pointer;
-  color: #6b7280;
-  text-decoration: none;
 }
-.action-btn:hover {
-  background: #f9fafb;
-  color: #374151;
+.cp-kpi:disabled {
+  cursor: default;
+}
+.cp-kpi.on {
+  border-color: var(--bc-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 18%, transparent);
+}
+.cp-kpi:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.cp-ic {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+}
+.cp-ic.big {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+}
+.cp-ic :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
+.cp-bar {
+  padding: 12px;
+  margin-bottom: 16px;
+}
+.cp-search {
+  max-width: 380px;
+}
+.cp-card {
+  padding: 8px 16px;
+}
+.cp-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cp-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+}
+.cp-row + .cp-row {
+  border-top: 1px solid var(--v-border);
+}
+.cp-row b {
+  font-size: 13.5px;
+  color: var(--v-text);
+}
+.cp-row small {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--v-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+}
+.cp-amt {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--v-text);
+}
+@media (max-width: 760px) {
+  .cp-row {
+    flex-wrap: wrap;
+  }
+  .cp-meta {
+    align-items: flex-start;
+    order: 5;
+    width: 100%;
+    padding-left: 52px;
+  }
 }
 </style>

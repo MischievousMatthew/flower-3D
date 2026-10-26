@@ -483,8 +483,8 @@ const routes = [
       // ================= PROCUREMENT =================
       {
         path: "procurement",
-        // Same workspace as HR, Finance and CRM; its pages keep their own light look until they're redesigned
-        meta: { erpTheme: true, erpLegacy: true },
+        // Same workspace as HR, Finance and CRM, with the same light/dark theme
+        meta: { erpTheme: true },
         component: () => import("../layouts/erp/ErpLayout.vue"),
         children: [
           // ───────── INVENTORY MANAGER ─────────
@@ -526,6 +526,14 @@ const routes = [
                   import("../views/ERP/Procurement/Inventory/FundingRequestDetails.vue"),
               },
               {
+                path: "stock",
+                name: "InventoryStock",
+                // Redesigned: follows the ERP light/dark theme
+                meta: { requiresInventoryManager: true, erpLegacy: false },
+                component: () =>
+                  import("../views/ERP/Procurement/Inventory/InventoryStock.vue"),
+              },
+              {
                 path: "products",
                 name: "Products",
                 meta: { requiresInventoryManager: true },
@@ -561,7 +569,8 @@ const routes = [
               // Suppliers
               {
                 path: "suppliers",
-                meta: { subscriptionModule: MODULE.SUPPLIERS },
+                // Redesigned: follows the ERP light/dark theme instead of the legacy light panel
+                meta: { subscriptionModule: MODULE.SUPPLIERS, erpLegacy: false },
                 children: [
                   {
                     path: "",
@@ -574,6 +583,13 @@ const routes = [
                     name: "SupplierCreate",
                     component: () =>
                       import("../views/ERP/Procurement/SupplyChain/Suppliers/SupplierCreate.vue"),
+                  },
+                  {
+                    path: ":id",
+                    name: "SupplierProfile",
+                    props: true,
+                    component: () =>
+                      import("../views/ERP/Procurement/SupplyChain/Suppliers/SupplierProfile.vue"),
                   },
                   {
                     path: ":id/edit",
@@ -617,6 +633,8 @@ const routes = [
                   {
                     path: "batches-receive",
                     name: "BatchesToReceive",
+                    // Redesigned (Receiving & inspection): follows the ERP light/dark theme
+                    meta: { erpLegacy: false },
                     component: () =>
                       import("../views/ERP/Procurement/SupplyChain/Warehouse/ReceiveBatch.vue"),
                   },
@@ -638,7 +656,8 @@ const routes = [
               // Orders
               {
                 path: "orders",
-                meta: { subscriptionModule: MODULE.ORDERS },
+                // Redesigned: follows the ERP light/dark theme instead of the legacy light panel
+                meta: { subscriptionModule: MODULE.ORDERS, erpLegacy: false },
                 children: [
                   {
                     path: "",
@@ -665,7 +684,7 @@ const routes = [
               // Logistics
               {
                 path: "logistics",
-                meta: { subscriptionModule: MODULE.LOGISTICS },
+                meta: { subscriptionModule: MODULE.LOGISTICS, erpLegacy: false },
                 children: [
                   {
                     path: "",
@@ -706,7 +725,7 @@ const routes = [
               // Scanner
               {
                 path: "scan",
-                meta: { subscriptionModule: MODULE.SCANNING },
+                meta: { subscriptionModule: MODULE.SCANNING, erpLegacy: false },
                 redirect: "/erp/procurement/supply-chain/scan/process",
                 children: [
                   {

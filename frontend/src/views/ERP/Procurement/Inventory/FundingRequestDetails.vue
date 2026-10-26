@@ -249,6 +249,15 @@ onMounted(fetchRequest);
 </script>
 
 <style scoped>
+.sk-line {
+  height: 12px;
+  margin: 6px auto;
+  border-radius: 6px;
+  width: 60%;
+}
+.sk-short {
+  width: 35%;
+}
 .fd-skel {
   display: grid;
   gap: 10px;

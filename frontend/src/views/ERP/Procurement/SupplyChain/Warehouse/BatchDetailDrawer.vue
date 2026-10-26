@@ -407,7 +407,7 @@
           <button @click="activeAction = null">×</button>
         </div>
         <div v-if="logsLoading" class="logs-loading">
-          <div class="mini-spinner"></div>
+          <div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div>
         </div>
         <div v-else-if="!logs.length" class="logs-empty">
           No log entries yet.
@@ -737,6 +737,15 @@ function showToast(msg, type = "success") {
 </script>
 
 <style scoped>
+.sk-line {
+  height: 12px;
+  margin: 6px auto;
+  border-radius: 6px;
+  width: 60%;
+}
+.sk-short {
+  width: 35%;
+}
 * {
   box-sizing: border-box;
   font-family: "Poppins", sans-serif;
@@ -755,29 +764,29 @@ function showToast(msg, type = "success") {
   align-items: flex-start;
   justify-content: space-between;
   padding: 20px 20px 16px;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--v-border);
   position: sticky;
   top: 0;
-  background: #fff;
+  background: var(--v-surface);
   z-index: 10;
 }
 .drawer-title {
   font-size: 17px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   margin: 0 0 2px;
 }
 .drawer-batch {
   font-family: monospace;
   font-size: 12px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   padding: 2px 6px;
   border-radius: 4px;
-  color: #6b7280;
+  color: var(--v-muted);
 }
 .close-btn {
   border: none;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   border-radius: 8px;
   width: 32px;
   height: 32px;
@@ -785,24 +794,24 @@ function showToast(msg, type = "success") {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--v-muted);
 }
 .close-btn:hover {
-  background: #e5e7eb;
-  color: #374151;
+  background: var(--v-subtle-2);
+  color: var(--v-text-2);
 }
 
 /* Sections */
 .section {
   padding: 16px 20px;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--v-border);
 }
 .section-label {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: #9ca3af;
+  color: var(--v-faint);
   margin-bottom: 10px;
 }
 
@@ -816,13 +825,13 @@ function showToast(msg, type = "success") {
   width: 52px;
   height: 52px;
   border-radius: 12px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
   font-weight: 700;
-  color: #374151;
+  color: var(--v-text-2);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -834,11 +843,11 @@ function showToast(msg, type = "success") {
 .product-name {
   font-size: 15px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
 }
 .product-sku {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin-top: 2px;
 }
 .product-tags {
@@ -853,12 +862,12 @@ function showToast(msg, type = "success") {
   font-weight: 500;
 }
 .tag.cold {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
 }
 .tag.fragile {
-  background: #fffbeb;
-  color: #92400e;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
 }
 
 /* Condition */
@@ -886,21 +895,21 @@ function showToast(msg, type = "success") {
   font-weight: 600;
 }
 .expiry-info.ok {
-  color: #16a34a;
+  color: var(--v-green-text);
 }
 .expiry-info.warn {
   color: #ca8a04;
 }
 .expiry-info.warn-red {
-  color: #ea580c;
+  color: var(--v-amber-text);
 }
 .expiry-info.danger {
-  color: #dc2626;
+  color: var(--v-red-text);
 }
 .expiry-date {
   font-size: 12px;
   font-weight: 400;
-  color: #6b7280;
+  color: var(--v-muted);
 }
 .freshness-row {
   display: flex;
@@ -908,12 +917,12 @@ function showToast(msg, type = "success") {
   gap: 10px;
   margin-top: 10px;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--v-muted);
 }
 .freshness-bar {
   flex: 1;
   height: 6px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -930,7 +939,7 @@ function showToast(msg, type = "success") {
   gap: 10px;
 }
 .stat-box {
-  background: #f9fafb;
+  background: var(--v-subtle);
   border-radius: 10px;
   padding: 10px 12px;
   text-align: center;
@@ -938,11 +947,11 @@ function showToast(msg, type = "success") {
 .stat-num {
   font-size: 20px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
 }
 .stat-lbl {
   font-size: 10.5px;
-  color: #9ca3af;
+  color: var(--v-faint);
   margin-top: 2px;
 }
 
@@ -958,28 +967,28 @@ function showToast(msg, type = "success") {
   font-size: 13px;
 }
 .info-row span:first-child {
-  color: #6b7280;
+  color: var(--v-muted);
 }
 .info-row span:last-child {
   font-weight: 500;
-  color: #374151;
+  color: var(--v-text-2);
 }
 .ok {
-  color: #16a34a !important;
+  color: var(--v-green-text) !important;
 }
 .warn {
   color: #ca8a04 !important;
 }
 .warn-red {
-  color: #ea580c !important;
+  color: var(--v-amber-text) !important;
 }
 .danger {
-  color: #dc2626 !important;
+  color: var(--v-red-text) !important;
 }
 
 .notes-box p {
   font-size: 13px;
-  color: #374151;
+  color: var(--v-text-2);
   margin: 0;
   line-height: 1.6;
 }
@@ -995,18 +1004,18 @@ function showToast(msg, type = "success") {
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 10px;
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
-  color: #374151;
+  color: var(--v-text-2);
   transition: background 0.15s;
-  background: #fff;
+  background: var(--v-surface);
 }
 .action-card:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
+  background: var(--v-subtle);
+  border-color: var(--v-border-strong);
 }
 .action-icon {
   width: 34px;
@@ -1018,27 +1027,27 @@ function showToast(msg, type = "success") {
   flex-shrink: 0;
 }
 .action-icon.green {
-  background: #dcfce7;
-  color: #16a34a;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
 }
 .action-icon.red {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
 }
 .action-icon.blue {
-  background: #dbeafe;
-  color: #2563eb;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
 }
 .action-icon.gray {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--v-subtle);
+  color: var(--v-muted);
 }
 
 /* Action panels */
 .action-panel {
   margin: 0 20px 16px;
-  background: #f9fafb;
-  border: 1.5px solid #e5e7eb;
+  background: var(--v-subtle);
+  border: 1.5px solid var(--v-border);
   border-radius: 12px;
   padding: 16px;
 }
@@ -1051,19 +1060,19 @@ function showToast(msg, type = "success") {
 .panel-header span {
   font-size: 14px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
 }
 .panel-header button {
   border: none;
   background: none;
   font-size: 20px;
-  color: #9ca3af;
+  color: var(--v-faint);
   cursor: pointer;
   line-height: 1;
 }
 .panel-note {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin: 0 0 12px;
 }
 
@@ -1079,16 +1088,16 @@ function showToast(msg, type = "success") {
   gap: 6px;
   padding: 6px 12px;
   border-radius: 20px;
-  border: 1.5px solid #e5e7eb;
-  background: #fff;
+  border: 1.5px solid var(--v-border);
+  background: var(--v-surface);
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
-  color: #374151;
+  color: var(--v-text-2);
   transition: all 0.15s;
 }
 .cond-btn:hover {
-  border-color: #d1d5db;
+  border-color: var(--v-border-strong);
 }
 .cond-dot-sm {
   width: 7px;
@@ -1102,7 +1111,7 @@ function showToast(msg, type = "success") {
 }
 .avail-bar {
   height: 6px;
-  background: #e5e7eb;
+  background: var(--v-subtle-2);
   border-radius: 6px;
   overflow: hidden;
   margin-bottom: 6px;
@@ -1127,13 +1136,13 @@ function showToast(msg, type = "success") {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--v-muted);
 }
 .avail-labels strong {
-  color: #111827;
+  color: var(--v-text);
 }
 .avail-labels strong.over {
-  color: #ef4444;
+  color: var(--v-red-text);
 }
 
 /* ── Qty input row ───────────────────────────────────────────────────────── */
@@ -1145,12 +1154,12 @@ function showToast(msg, type = "success") {
 .qty-btn {
   width: 32px;
   height: 36px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--v-surface);
   font-size: 16px;
   font-weight: 600;
-  color: #374151;
+  color: var(--v-text-2);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1159,7 +1168,7 @@ function showToast(msg, type = "success") {
   transition: background 0.12s;
 }
 .qty-btn:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: var(--v-subtle);
 }
 .qty-btn:disabled {
   opacity: 0.4;
@@ -1170,21 +1179,21 @@ function showToast(msg, type = "success") {
   padding: 0 10px;
   font-size: 11.5px;
   font-weight: 700;
-  color: #059669;
+  color: var(--v-green-text);
   border-color: #6ee7b7;
-  background: #ecfdf5;
+  background: var(--v-green-soft);
 }
 .qty-btn.max-btn:hover {
-  background: #d1fae5;
+  background: var(--v-green-soft);
 }
 .qty-input {
   flex: 1;
   padding: 8px 11px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: var(--v-text);
   outline: none;
   font-family: inherit;
   text-align: center;
@@ -1194,7 +1203,7 @@ function showToast(msg, type = "success") {
 }
 .qty-input.input-error {
   border-color: #ef4444;
-  background: #fff5f5;
+  background: var(--v-red-soft);
 }
 
 .form-field {
@@ -1206,19 +1215,19 @@ function showToast(msg, type = "success") {
 .form-field label {
   font-size: 12px;
   font-weight: 600;
-  color: #374151;
+  color: var(--v-text-2);
 }
 .form-field input,
 .form-field select,
 .form-field textarea {
   padding: 8px 11px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 8px;
   font-size: 13.5px;
-  color: #111827;
+  color: var(--v-text);
   outline: none;
   font-family: inherit;
-  background: #fff;
+  background: var(--v-input);
 }
 .form-field input:focus,
 .form-field select:focus,
@@ -1226,11 +1235,11 @@ function showToast(msg, type = "success") {
   border-color: #10b981;
 }
 .req {
-  color: #ef4444;
+  color: var(--v-red-text);
 }
 .err-msg {
   font-size: 12px;
-  color: #ef4444;
+  color: var(--v-red-text);
   font-weight: 500;
   margin-top: 2px;
 }
@@ -1279,7 +1288,7 @@ function showToast(msg, type = "success") {
 .mini-spinner {
   width: 22px;
   height: 22px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--v-border);
   border-top-color: #10b981;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -1291,7 +1300,7 @@ function showToast(msg, type = "success") {
 }
 .logs-empty {
   font-size: 13px;
-  color: #9ca3af;
+  color: var(--v-faint);
   text-align: center;
   padding: 16px;
 }
@@ -1329,22 +1338,22 @@ function showToast(msg, type = "success") {
 .log-event {
   font-size: 13px;
   font-weight: 600;
-  color: #111827;
+  color: var(--v-text);
 }
 .log-detail {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin-top: 2px;
 }
 .log-note {
   font-size: 12px;
-  color: #374151;
+  color: var(--v-text-2);
   font-style: italic;
   margin-top: 2px;
 }
 .log-time {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--v-faint);
   margin-top: 3px;
 }
 
@@ -1373,8 +1382,8 @@ function showToast(msg, type = "success") {
   white-space: nowrap;
 }
 .toast.success {
-  background: #111827;
-  color: #fff;
+  background: var(--v-ink);
+  color: var(--v-ink-text);
 }
 .toast.error {
   background: #ef4444;

@@ -291,12 +291,9 @@ class DeliveryService
         if ($authUser instanceof \App\Models\Employee) {
             // Employee model is directly authenticated (most likely scenario)
             $ownerId = $authUser->owner_id;
-        } else {
-            // Fallback: look up employee by auth ID in the employees table
-            $employee = \App\Models\Employee::where('id', Auth::id())->first();
-            if ($employee) {
-                $ownerId = $employee->owner_id;
-            }
+        } elseif ($authUser) {
+            // The shop owner signed in as themselves: their own shop
+            $ownerId = $authUser->id;
         }
 
         Log::info('[DeliveryService] forSCCoordinator', [

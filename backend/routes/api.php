@@ -63,6 +63,9 @@ use App\Http\Controllers\ShipmentController;
 use App\Http\Controllers\BarcodeController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\SupplyChainAnalyticsController;
+use App\Http\Controllers\SupplierProfileController;
+use App\Http\Controllers\ReceivingController;
+use App\Http\Controllers\InventoryStockController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryBarcodeController;
 use App\Http\Controllers\VendorStoreFrontController;
@@ -826,6 +829,19 @@ Route::middleware('token.auth')->group(function () {
     // Inventory procurement is distinct from the vendor product catalog. The
     // nested employee checks still enforce each employee's RBAC permission.
     Route::prefix('procurement/inventory')->middleware('subscription.module:procurement')->group(function () {
+        // Stock & replenishment, on the products' own stock count
+        Route::prefix('stock')->group(function () {
+            Route::middleware('employee.module:inventory_products,view')->group(function () {
+                Route::get('/',        [InventoryStockController::class, 'index']);
+                Route::get('/history', [InventoryStockController::class, 'history']);
+            });
+            Route::middleware('employee.module:inventory_products,edit')->group(function () {
+                Route::patch('/{id}/levels', [InventoryStockController::class, 'levels'])->whereNumber('id');
+                Route::post('/{id}/adjust',  [InventoryStockController::class, 'adjust'])->whereNumber('id');
+            });
+            Route::post('/materials', [InventoryStockController::class, 'storeMaterial'])->middleware('employee.module:inventory_products,create');
+        });
+
         Route::middleware('employee.module:inventory_products,view')->group(function () {
             Route::get('/products',          [ProductController::class, 'myProducts']);
             Route::get('/my-products',       [ProductController::class, 'myProducts']);
@@ -878,6 +894,16 @@ Route::middleware('token.auth')->group(function () {
                 Route::get('/',               [SupplierController::class, 'index']);
                 Route::get('/{id}',           [SupplierController::class, 'show']);
                 Route::get('/{supplierId}/contacts',         [SupplierController::class, 'contacts']);
+                Route::get('/{id}/profile',                  [SupplierProfileController::class, 'show']);
+            });
+
+            // Catalog and ratings
+            Route::middleware('employee.module:suppliers,edit')->group(function () {
+                Route::post('/{id}/products',                [SupplierProfileController::class, 'storeProduct']);
+                Route::put('/{id}/products/{productId}',     [SupplierProfileController::class, 'updateProduct']);
+                Route::delete('/{id}/products/{productId}',  [SupplierProfileController::class, 'destroyProduct']);
+                Route::post('/{id}/ratings',                 [SupplierProfileController::class, 'storeRating']);
+                Route::delete('/{id}/ratings/{ratingId}',    [SupplierProfileController::class, 'destroyRating']);
             });
 
             Route::post('/', [SupplierController::class, 'store'])->middleware('employee.module:suppliers,create');
@@ -944,10 +970,19 @@ Route::middleware('token.auth')->group(function () {
             Route::delete('/{id}', [WarehouseLocationController::class, 'destroy'])->middleware('employee.module:warehouse,delete');
         });
 
+        // Receiving & quality inspection: warehouse or purchasing staff (checked in the controller)
+        Route::prefix('receiving')->middleware('subscription.module:warehouse')->group(function () {
+            Route::get('/',            [ReceivingController::class, 'index']);
+            Route::get('/open-orders', [ReceivingController::class, 'openOrders']);
+            Route::get('/{id}',        [ReceivingController::class, 'show'])->whereNumber('id');
+            Route::post('/',           [ReceivingController::class, 'store']);
+        });
+
         Route::prefix('orders')->group(function () {
             Route::middleware('employee.module:sc_orders,view')->group(function () {
                 Route::get('/',                                 [OrderController::class, 'index']);
                 Route::get('/funding-requests/approved',        [OrderController::class, 'approvedFundingRequests']);
+                Route::get('/stock-items',                      [OrderController::class, 'stockItems']);
                 Route::get('/{id}',                             [OrderController::class, 'show']);
             });
 
@@ -955,12 +990,19 @@ Route::middleware('token.auth')->group(function () {
                 Route::post('/',                                [OrderController::class, 'store']);
                 Route::post('/from-funding/{fundingRequestId}', [OrderController::class, 'createFromFunding']);
                 Route::post('/{id}/items', [OrderController::class, 'attachItems']);
+                Route::post('/{id}/submit', [OrderController::class, 'submit']);
+            });
+            Route::middleware('employee.module:sc_orders,approve')->group(function () {
+                Route::post('/{id}/approve',   [OrderController::class, 'approve']);
+                Route::post('/{id}/send-back', [OrderController::class, 'sendBack']);
             });
             Route::middleware('employee.module:sc_orders,edit')->group(function () {
                 Route::put('/{id}',                             [OrderController::class, 'update']);
                 Route::patch('/{id}',                           [OrderController::class, 'update']);
                 Route::patch('/{id}/status',                    [OrderController::class, 'updateStatus']);
                 Route::post('/{id}/recalculate',                [OrderController::class, 'recalculateTotals']);
+                Route::post('/{id}/email',                      [OrderController::class, 'email']);
+                Route::post('/{id}/receive',                    [OrderController::class, 'receive']);
             });
             Route::delete('/{id}', [OrderController::class, 'destroy'])->middleware('employee.module:sc_orders,delete');
             Route::delete('/{id}/items/{itemId}', [OrderController::class, 'removeItem'])->middleware('employee.module:sc_orders,delete');

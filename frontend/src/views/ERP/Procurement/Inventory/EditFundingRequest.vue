@@ -24,7 +24,7 @@
       </div>
 
       <div v-if="loading" class="loading-container">
-        <div class="spinner"></div>
+        <div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div>
         <p>Loading request...</p>
       </div>
 
@@ -700,6 +700,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.sk-line {
+  height: 12px;
+  margin: 6px auto;
+  border-radius: 6px;
+  width: 60%;
+}
+.sk-short {
+  width: 35%;
+}
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
 * {
   margin: 0;
@@ -709,7 +718,7 @@ onMounted(() => {
 
 .edit-funding-request {
   min-height: 100vh;
-  background: #f7fafc;
+  background: transparent;
   font-family: "Poppins", sans-serif;
 }
 .form-content {
@@ -727,13 +736,13 @@ onMounted(() => {
 .form-title {
   font-size: 32px;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--v-text);
   letter-spacing: -0.5px;
   margin-bottom: 4px;
 }
 .form-subtitle {
   font-size: 14px;
-  color: #718096;
+  color: var(--v-muted);
   font-weight: 500;
 }
 
@@ -742,9 +751,9 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  background: #ffffff;
-  color: #4a5568;
-  border: 1px solid #e2e8f0;
+  background: var(--v-surface);
+  color: var(--v-text-2);
+  border: 1px solid var(--v-border);
   border-radius: 10px;
   font-size: 14px;
   font-weight: 600;
@@ -753,8 +762,8 @@ onMounted(() => {
   font-family: "Poppins", sans-serif;
 }
 .back-btn:hover {
-  background: #f7fafc;
-  border-color: #cbd5e0;
+  background: var(--v-subtle);
+  border-color: var(--v-border-strong);
 }
 
 .loading-container,
@@ -764,14 +773,14 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   padding: 60px 20px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--v-surface);
+  border: 1px solid var(--v-border);
   border-radius: 12px;
 }
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #e2e8f0;
+  border: 4px solid var(--v-border);
   border-top-color: #4299e1;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -785,7 +794,7 @@ onMounted(() => {
 .error-container p {
   margin-top: 16px;
   font-size: 14px;
-  color: #718096;
+  color: var(--v-muted);
 }
 .retry-btn {
   margin-top: 12px;
@@ -803,8 +812,8 @@ onMounted(() => {
 }
 
 .funding-form {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--v-surface);
+  border: 1px solid var(--v-border);
   border-radius: 16px;
   padding: 32px;
 }
@@ -817,17 +826,17 @@ onMounted(() => {
 .permission-notice {
   margin-bottom: 20px;
   padding: 14px 16px;
-  background: #fff5f5;
+  background: var(--v-red-soft);
   border: 1px solid #feb2b2;
   border-radius: 10px;
-  color: #9b2c2c;
+  color: var(--v-red-text);
   font-size: 13px;
   font-weight: 600;
 }
 .form-section {
   margin-bottom: 32px;
   padding-bottom: 32px;
-  border-bottom: 2px solid #f7fafc;
+  border-bottom: 2px solid var(--v-border);
 }
 .form-section:last-of-type {
   border-bottom: none;
@@ -837,7 +846,7 @@ onMounted(() => {
 .section-title {
   font-size: 18px;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--v-text);
   margin-bottom: 20px;
 }
 .form-row {
@@ -858,17 +867,17 @@ onMounted(() => {
 .form-group label {
   font-size: 14px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--v-text);
 }
 
 .form-group input,
 .form-group select,
 .form-group textarea {
   padding: 12px 14px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--v-border);
   border-radius: 10px;
   font-size: 14px;
-  color: #2d3748;
+  color: var(--v-text);
   transition: all 0.2s;
   font-family: "Poppins", sans-serif;
 }
@@ -893,13 +902,13 @@ onMounted(() => {
   position: absolute;
   left: 14px;
   font-size: 14px;
-  color: #718096;
+  color: var(--v-muted);
   font-weight: 600;
   pointer-events: none;
 }
 
 .justification-card {
-  background: #f0f7ff;
+  background: var(--v-blue-soft);
   border: 2px solid #4299e1;
   border-radius: 12px;
   padding: 20px;
@@ -911,13 +920,13 @@ onMounted(() => {
   gap: 8px;
   font-size: 15px;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--v-text);
   margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 2px solid rgba(66, 153, 225, 0.2);
 }
 .justification-title svg {
-  color: #4299e1;
+  color: var(--v-blue-text);
 }
 .brief-label {
   display: flex;
@@ -925,10 +934,10 @@ onMounted(() => {
   gap: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--v-text);
 }
 .brief-label.optional {
-  color: #718096;
+  color: var(--v-muted);
 }
 .label-icon {
   font-size: 16px;
@@ -937,7 +946,7 @@ onMounted(() => {
   display: block;
   text-align: right;
   font-size: 11px;
-  color: #a0aec0;
+  color: var(--v-faint);
   margin-top: -4px;
 }
 .justification-card .form-group {
@@ -948,7 +957,7 @@ onMounted(() => {
 }
 .justification-card input,
 .justification-card textarea {
-  background: #ffffff;
+  background: var(--v-input);
   border: 1px solid #bee3f8;
 }
 .justification-card input:focus,
@@ -963,7 +972,7 @@ onMounted(() => {
   justify-content: flex-end;
   margin-top: 32px;
   padding-top: 24px;
-  border-top: 2px solid #f7fafc;
+  border-top: 2px solid var(--v-border);
 }
 .btn-cancel,
 .btn-draft,
@@ -977,20 +986,20 @@ onMounted(() => {
   font-family: "Poppins", sans-serif;
 }
 .btn-cancel {
-  background: #f7fafc;
-  border: 1px solid #e2e8f0;
-  color: #4a5568;
+  background: var(--v-subtle);
+  border: 1px solid var(--v-border);
+  color: var(--v-text-2);
 }
 .btn-cancel:hover {
-  background: #e2e8f0;
+  background: var(--v-blue-soft);
 }
 .btn-draft {
-  background: #ffffff;
+  background: var(--v-surface);
   border: 1px solid #4299e1;
-  color: #4299e1;
+  color: var(--v-blue-text);
 }
 .btn-draft:hover:not(:disabled) {
-  background: #ebf8ff;
+  background: var(--v-blue-soft);
 }
 .btn-submit {
   background: #4299e1;

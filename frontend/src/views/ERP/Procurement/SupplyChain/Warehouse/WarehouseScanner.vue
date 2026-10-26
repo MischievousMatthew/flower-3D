@@ -114,7 +114,7 @@
       <div class="result-col">
         <!-- Loading -->
         <div v-if="looking" class="result-card loading-result">
-          <div class="spinner"></div>
+          <div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div>
           <span>Looking up batch…</span>
         </div>
 
@@ -598,6 +598,15 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.sk-line {
+  height: 12px;
+  margin: 6px auto;
+  border-radius: 6px;
+  width: 60%;
+}
+.sk-short {
+  width: 35%;
+}
 * {
   box-sizing: border-box;
   font-family: "Poppins", sans-serif;
@@ -617,22 +626,22 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #6b7280;
+  color: var(--v-muted);
   text-decoration: none;
   font-size: 13px;
 }
 .back-link:hover {
-  color: #111827;
+  color: var(--v-text);
 }
 .page-title {
   font-size: 22px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   margin: 0;
 }
 .page-sub {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin: 0;
 }
 
@@ -650,9 +659,9 @@ onMounted(async () => {
   gap: 14px;
 }
 .scanner-card {
-  background: #fff;
+  background: var(--v-surface);
   border-radius: 14px;
-  border: 1px solid #e8ecf0;
+  border: 1px solid var(--v-border);
   overflow: hidden;
 }
 
@@ -667,7 +676,7 @@ onMounted(async () => {
   width: 90px;
   height: 90px;
   border-radius: 20px;
-  background: #ecfdf5;
+  background: var(--v-green-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -675,7 +684,7 @@ onMounted(async () => {
 .idle-text {
   font-size: 15px;
   font-weight: 600;
-  color: #374151;
+  color: var(--v-text-2);
   margin: 0;
 }
 
@@ -706,7 +715,7 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   width: 100%;
-  color: #9ca3af;
+  color: var(--v-faint);
   font-size: 12.5px;
 }
 .or-divider::before,
@@ -714,13 +723,13 @@ onMounted(async () => {
   content: "";
   flex: 1;
   height: 1px;
-  background: #e5e7eb;
+  background: var(--v-subtle-2);
 }
 
 .manual-input {
   display: flex;
   width: 100%;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
   overflow: hidden;
 }
@@ -730,20 +739,20 @@ onMounted(async () => {
   border: none;
   outline: none;
   font-size: 13.5px;
-  color: #111827;
+  color: var(--v-text);
   font-family: inherit;
 }
 .manual-input button {
   padding: 0 16px;
-  background: #111827;
-  color: #fff;
+  background: var(--v-ink);
+  color: var(--v-ink-text);
   border: none;
   font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
 }
 .manual-input button:hover:not(:disabled) {
-  background: #1f2937;
+  background: var(--v-ink);
 }
 .manual-input button:disabled {
   opacity: 0.5;
@@ -752,15 +761,15 @@ onMounted(async () => {
 
 /* History */
 .history-card {
-  background: #fff;
+  background: var(--v-surface);
   border-radius: 12px;
-  border: 1px solid #e8ecf0;
+  border: 1px solid var(--v-border);
   padding: 16px;
 }
 .history-title {
   font-size: 12.5px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   margin-bottom: 10px;
 }
 .history-list {
@@ -778,7 +787,7 @@ onMounted(async () => {
   transition: background 0.15s;
 }
 .history-item:hover {
-  background: #f9fafb;
+  background: var(--v-subtle);
 }
 .hi-dot {
   width: 8px;
@@ -792,25 +801,25 @@ onMounted(async () => {
 .hi-product {
   font-size: 13px;
   font-weight: 500;
-  color: #374151;
+  color: var(--v-text-2);
 }
 .hi-batch {
   font-family: monospace;
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--v-faint);
 }
 .hi-time {
   font-size: 11.5px;
-  color: #9ca3af;
+  color: var(--v-faint);
 }
 
 /* Result col */
 .result-col {
 }
 .result-card {
-  background: #fff;
+  background: var(--v-surface);
   border-radius: 14px;
-  border: 1px solid #e8ecf0;
+  border: 1px solid var(--v-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -821,12 +830,12 @@ onMounted(async () => {
   gap: 14px;
   padding: 80px 24px;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--v-muted);
 }
 .spinner {
   width: 30px;
   height: 30px;
-  border: 3px solid #e5e7eb;
+  border: 3px solid var(--v-border);
   border-top-color: #10b981;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -846,17 +855,17 @@ onMounted(async () => {
 .nf-title {
   font-size: 16px;
   font-weight: 700;
-  color: #ef4444;
+  color: var(--v-red-text);
   margin: 0;
 }
 .nf-sub {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin: 0;
 }
 .nf-sub code {
   font-family: monospace;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -866,7 +875,7 @@ onMounted(async () => {
   gap: 12px;
   padding: 80px 24px;
   text-align: center;
-  color: #9ca3af;
+  color: var(--v-faint);
   font-size: 14px;
 }
 .empty-result p {
@@ -899,21 +908,21 @@ onMounted(async () => {
   font-weight: 600;
 }
 .rb-expiry.ok {
-  color: #16a34a;
+  color: var(--v-green-text);
 }
 .rb-expiry.warn {
   color: #ca8a04;
 }
 .rb-expiry.warn-red {
-  color: #ea580c;
+  color: var(--v-amber-text);
 }
 .rb-expiry.danger {
-  color: #dc2626;
+  color: var(--v-red-text);
 }
 
 .r-section {
   padding: 16px 20px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--v-border);
 }
 .r-product {
   display: flex;
@@ -924,13 +933,13 @@ onMounted(async () => {
   width: 52px;
   height: 52px;
   border-radius: 12px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
   font-weight: 700;
-  color: #374151;
+  color: var(--v-text-2);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -942,11 +951,11 @@ onMounted(async () => {
 .rp-name {
   font-size: 15px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
 }
 .rp-sku {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin-top: 2px;
 }
 .product-tags {
@@ -960,12 +969,12 @@ onMounted(async () => {
   font-weight: 500;
 }
 .tag.cold {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
 }
 .tag.fragile {
-  background: #fffbeb;
-  color: #92400e;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
 }
 
 .r-info {
@@ -979,42 +988,42 @@ onMounted(async () => {
   font-size: 13px;
 }
 .ri-row span:first-child {
-  color: #6b7280;
+  color: var(--v-muted);
 }
 .ri-row code {
   font-family: monospace;
   font-size: 12px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   padding: 1px 6px;
   border-radius: 4px;
 }
 .bold-val {
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
 }
 .ok {
-  color: #16a34a !important;
+  color: var(--v-green-text) !important;
 }
 .warn {
   color: #ca8a04 !important;
 }
 .warn-red {
-  color: #ea580c !important;
+  color: var(--v-amber-text) !important;
 }
 .danger {
-  color: #dc2626 !important;
+  color: var(--v-red-text) !important;
 }
 
 .fresh-label-row {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin-bottom: 5px;
 }
 .fresh-bar {
   height: 5px;
-  background: #f3f4f6;
+  background: var(--v-subtle);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -1029,7 +1038,7 @@ onMounted(async () => {
 .ra-title {
   font-size: 12px;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--v-faint);
   text-transform: uppercase;
   letter-spacing: 0.07em;
   margin-bottom: 10px;
@@ -1049,36 +1058,36 @@ onMounted(async () => {
   transition: all 0.15s;
 }
 .ra-btn.green {
-  background: #dcfce7;
-  color: #16a34a;
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
   border-color: #a7f3d0;
 }
 .ra-btn.green:hover {
-  background: #bbf7d0;
+  background: var(--v-green-soft);
 }
 .ra-btn.red {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
   border-color: #fca5a5;
 }
 .ra-btn.red:hover {
   background: #fecaca;
 }
 .ra-btn.blue {
-  background: #dbeafe;
-  color: #2563eb;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
   border-color: #93c5fd;
 }
 .ra-btn.blue:hover {
   background: #bfdbfe;
 }
 .ra-btn.gray {
-  background: #f3f4f6;
-  color: #374151;
-  border-color: #e5e7eb;
+  background: var(--v-subtle);
+  color: var(--v-text-2);
+  border-color: var(--v-border);
 }
 .ra-btn.gray:hover {
-  background: #e5e7eb;
+  background: var(--v-subtle-2);
 }
 
 /* Modal */
@@ -1092,7 +1101,7 @@ onMounted(async () => {
   justify-content: center;
 }
 .modal {
-  background: #fff;
+  background: var(--v-surface);
   border-radius: 14px;
   width: 440px;
   overflow: hidden;
@@ -1103,19 +1112,19 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   padding: 18px 20px;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--v-border);
 }
 .modal-header h3 {
   font-size: 16px;
   font-weight: 700;
-  color: #111827;
+  color: var(--v-text);
   margin: 0;
 }
 .modal-close {
   border: none;
   background: none;
   font-size: 22px;
-  color: #9ca3af;
+  color: var(--v-faint);
   cursor: pointer;
 }
 .modal-body {
@@ -1129,7 +1138,7 @@ onMounted(async () => {
   justify-content: flex-end;
   gap: 10px;
   padding: 14px 20px;
-  border-top: 1px solid #f0f2f5;
+  border-top: 1px solid var(--v-border);
 }
 
 .condition-options {
@@ -1143,12 +1152,12 @@ onMounted(async () => {
   gap: 6px;
   padding: 7px 13px;
   border-radius: 20px;
-  border: 1.5px solid #e5e7eb;
-  background: #fff;
+  border: 1.5px solid var(--v-border);
+  background: var(--v-surface);
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
-  color: #374151;
+  color: var(--v-text-2);
 }
 .cdot {
   width: 7px;
@@ -1157,7 +1166,7 @@ onMounted(async () => {
 }
 .action-note {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--v-muted);
   margin: 0;
 }
 
@@ -1169,16 +1178,16 @@ onMounted(async () => {
 .field label {
   font-size: 12.5px;
   font-weight: 600;
-  color: #374151;
+  color: var(--v-text-2);
 }
 .field input,
 .field select,
 .field textarea {
   padding: 9px 12px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--v-border);
   border-radius: 9px;
   font-size: 13.5px;
-  color: #111827;
+  color: var(--v-text);
   outline: none;
   font-family: inherit;
 }
@@ -1188,15 +1197,15 @@ onMounted(async () => {
   border-color: #10b981;
 }
 .req {
-  color: #ef4444;
+  color: var(--v-red-text);
 }
 
 .btn-cancel {
   padding: 9px 18px;
   border-radius: 8px;
-  border: 1.5px solid #e5e7eb;
-  background: #fff;
-  color: #374151;
+  border: 1.5px solid var(--v-border);
+  background: var(--v-surface);
+  color: var(--v-text-2);
   font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
@@ -1243,8 +1252,8 @@ onMounted(async () => {
   white-space: nowrap;
 }
 .toast.success {
-  background: #111827;
-  color: #fff;
+  background: var(--v-ink);
+  color: var(--v-ink-text);
 }
 .toast.error {
   background: #ef4444;
