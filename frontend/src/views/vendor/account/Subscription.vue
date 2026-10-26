@@ -120,7 +120,7 @@
 
         <div class="sb-plan-foot">
           <button v-if="isCurrent(p) && !canRenew" type="button" class="sp-btn sp-btn-ghost" disabled><span v-html="ICONS.check"></span>Current plan</button>
-          <router-link v-else-if="p.custom_pricing" :to="{ name: 'VendorSupport' }" class="sp-btn sp-btn-ghost">Talk to us</router-link>
+          <button v-else-if="p.custom_pricing" type="button" class="sp-btn sp-btn-ghost" @click="talkOpen = true">Talk to us</button>
           <button v-else-if="trialFor(p)" type="button" class="sp-btn sp-btn-primary" :disabled="!!busy" @click="startTrial">
             {{ busy === "trial" ? "Starting…" : "Start 1-month free trial" }}
           </button>
@@ -150,6 +150,7 @@
         </div>
       </div>
     </Transition>
+    <EnterpriseInquiryForm :open="talkOpen" vendor :prefill="talkPrefill" @close="talkOpen = false" />
   </ShopLayout>
 </template>
 
@@ -163,6 +164,16 @@ import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { LIMIT_ROWS, PLAN_STATUS, limitText, longDate, pesoWhole, startPlanCheckout } from "../../../components/vendor/account/accountUi";
 import { loadSubscriptionAccess } from "../../../composables/useSubscriptionAccess";
+import { useAuth } from "../../../composables/useAuth";
+import EnterpriseInquiryForm from "../../../components/pricing/EnterpriseInquiryForm.vue";
+
+// Enterprise "Talk to us": an inquiry linked to this shop
+const { user } = useAuth();
+const talkOpen = ref(false);
+const talkPrefill = computed(() => {
+  const u = user.value ?? {};
+  return { name: [u.name, u.surname].filter(Boolean).join(" "), shop_name: u.store_name, email: u.email, phone: u.contact_number };
+});
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
 import "../../../components/vendor/account/account.css";

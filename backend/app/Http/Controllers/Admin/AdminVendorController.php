@@ -14,8 +14,10 @@ use App\Models\VendorApplication;
 use App\Models\VendorSubscription;
 use App\Models\VendorSubscriptionCheckout;
 use App\Services\AccountSuspensionService;
+use App\Services\VendorSubscriptionService;
 use App\Subscriptions\SubscriptionPlans;
 use App\Support\PaymentLedger;
+use App\Support\VendorDirectory;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -166,6 +168,68 @@ class AdminVendorController extends Controller
         $notices->toUser($vendor->id, 'Your shop is active again', !empty($data['note']) ? trim($data['note']) : 'Customers can see your shop and order again.');
 
         return response()->json(['success' => true, 'message' => 'Vendor reactivated. Their store is visible again.']);
+    }
+
+    /**
+     * POST /api/admin/vendors/{id}/plan
+     * Puts the shop on any plan (or none). The admin confirms by typing the
+     * shop's name; the vendor is told what changed and why.
+     */
+    public function changePlan(Request $request, int $id, VendorSubscriptionService $subscriptions, PlatformNotices $notices): JsonResponse
+    {
+        $data = $request->validate([
+            'plan_key' => ['required', 'string', function ($attribute, $value, $fail) {
+                if ($value !== 'none' && !SubscriptionPlans::exists($value)) {
+                    $fail('Choose a plan.');
+                }
+            }],
+            'months' => 'nullable|integer|in:1,3,6,12,24',
+            'reason' => 'required|string|min:5|max:1000',
+            'confirm' => 'required|string|max:200',
+        ], ['reason.required' => 'Say why the plan is changing.', 'reason.min' => 'Say a little more about why.']);
+
+        $vendor = User::query()->where('role', User::ROLE_VENDOR)->find($id);
+        if (!$vendor) {
+            return response()->json(['success' => false, 'message' => 'Vendor not found.'], 404);
+        }
+
+        $shopName = VendorDirectory::details([$vendor->id])[$vendor->id]['store_name'] ?? PaymentLedger::personName($vendor);
+        if (mb_strtolower(trim($data['confirm'])) !== mb_strtolower(trim((string) $shopName))) {
+            return response()->json([
+                'success' => false,
+                'message' => "Type the shop name exactly to confirm.",
+                'errors' => ['confirm' => ["Type “{$shopName}” to confirm."]],
+            ], 422);
+        }
+
+        $before = $this->planBadge(VendorSubscription::query()->where('vendor_id', $vendor->id)->first());
+        $planKey = $data['plan_key'] === 'none' ? null : $data['plan_key'];
+        $months = $planKey ? ($data['months'] ?? null) : null;
+        $sub = $subscriptions->setPlanByAdmin($vendor, $planKey, $months);
+
+        $fromName = $before ? $before['plan_name'] . ($before['status'] !== 'active' && $before['status'] !== 'trialing' ? ' (' . $before['status'] . ')' : '') : 'No plan';
+        $toName = $planKey ? SubscriptionPlans::get($planKey)['name'] : 'No plan';
+        $until = $planKey ? ($sub?->subscription_ends_at ? 'until ' . $sub->subscription_ends_at->format('M j, Y') : 'with no end date') : null;
+        $summary = trim("{$fromName} → {$toName}" . ($until ? " {$until}" : ''));
+
+        AccountEvent::create([
+            'user_id' => $vendor->id,
+            'admin_id' => $request->user()->id,
+            'action' => AccountEvent::PLAN_CHANGED,
+            'reason' => "{$summary}. " . trim($data['reason']),
+        ]);
+        $notices->toUser(
+            $vendor->id,
+            $planKey ? "Your plan is now {$toName}" : 'Your plan was removed',
+            ($planKey ? "BloomCraft moved your shop to {$toName} {$until}. " : 'BloomCraft removed your plan. ') . 'Reason: ' . trim($data['reason']),
+            '/vendor/account/subscription',
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => $planKey ? "{$shopName} is now on {$toName} {$until}." : "{$shopName} no longer has a plan.",
+            'data' => ['subscription' => $this->subscription($vendor)],
+        ]);
     }
 
     // ── Pieces ───────────────────────────────────────────────────────────

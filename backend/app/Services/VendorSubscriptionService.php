@@ -14,6 +14,51 @@ use LogicException;
 class VendorSubscriptionService
 {
     /** Start the single, calendar-month Business trial for an approved vendor. */
+    /**
+     * An admin puts a vendor on any plan (or none), starting now. Months null
+     * means no end date (e.g. an Enterprise contract). No payment is taken.
+     */
+    public function setPlanByAdmin(User $vendor, ?string $planKey, ?int $months): ?VendorSubscription
+    {
+        return DB::transaction(function () use ($vendor, $planKey, $months) {
+            $subscription = VendorSubscription::query()->where('vendor_id', $vendor->id)->lockForUpdate()->first();
+            $now = now();
+
+            if ($planKey === null) {
+                $subscription?->forceFill([
+                    'status' => SubscriptionStatus::Cancelled,
+                    'cancelled_at' => $now,
+                    'subscription_ends_at' => $now,
+                    'current_period_ends_at' => $now,
+                    'trial_ends_at' => $subscription->status === SubscriptionStatus::Trialing ? $now : $subscription->trial_ends_at,
+                    'next_billing_at' => null,
+                ])->save();
+
+                return $subscription;
+            }
+
+            $end = $months ? $now->copy()->addMonthsNoOverflow($months) : null;
+            $subscription ??= new VendorSubscription(['vendor_id' => $vendor->id]);
+            $subscription->fill([
+                'plan_key' => $planKey,
+                'status' => SubscriptionStatus::Active,
+                'subscription_started_at' => $now,
+                'subscription_ends_at' => $end,
+                'trial_started_at' => null,
+                'trial_ends_at' => null,
+                'current_period_started_at' => $now,
+                'current_period_ends_at' => $end,
+                'next_billing_at' => $end,
+                'cancelled_at' => null,
+                'expired_at' => null,
+                'payment_status' => 'set_by_admin',
+                'billing_period' => $months ? "{$months}_months" : 'no_end_date',
+            ])->save();
+
+            return $subscription;
+        });
+    }
+
     public function startBusinessTrial(User $vendor, ?CarbonInterface $startedAt = null): VendorSubscription
     {
         if (! $vendor->isVendor()) {

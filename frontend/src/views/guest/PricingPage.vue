@@ -56,8 +56,11 @@
         <li>Higher or custom operational limits</li>
         <li>Custom integrations and workflows</li>
         <li>Dedicated support for enterprise-scale teams</li>
+        <li class="enterprise-note-action"><button type="button" class="button" @click="talkOpen = true">Talk to us</button></li>
       </ul>
     </section>
+
+    <EnterpriseInquiryForm :open="talkOpen" :vendor="isVendor" :prefill="talkPrefill" @close="talkOpen = false" />
 
     <section class="pricing-cta">
       <p class="eyebrow">Ready when you are</p>
@@ -73,6 +76,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import PricingPlanCard from "../../components/pricing/PricingPlanCard.vue";
+import EnterpriseInquiryForm from "../../components/pricing/EnterpriseInquiryForm.vue";
 import api from "../../plugins/axios";
 import { useAuth } from "../../composables/useAuth";
 import { getStoredUserToken } from "../../utils/authSession";
@@ -91,19 +95,25 @@ const isVendor = computed(() => user.value?.role === "vendor" && !!getStoredUser
 const actionLabel = (plan) => {
   if (!isVendor.value) return plan.action;
   if (plan.key === "business" && subscriptionAccess.value?.business_trial_eligible) return "Start 1-Month Free Trial";
-  if (plan.key === "enterprise") return "Contact BloomCraft";
+  if (plan.key === "enterprise") return plan.action;
   return "Continue to Payment";
 };
 
 const plans = SUBSCRIPTION_PLANS;
+const talkOpen = ref(false);
+const talkPrefill = computed(() => {
+  const u = isVendor.value ? user.value : null;
+  return u ? { name: [u.name, u.surname].filter(Boolean).join(" "), shop_name: u.store_name, email: u.email, phone: u.contact_number } : {};
+});
 
 async function selectPlan(plan) {
   subscriptionMessage.value = "";
-  if (!isVendor.value) return router.push("/guest/vendor_register");
+  // Enterprise pricing is custom: anyone can ask, signed in or not
   if (plan.key === "enterprise") {
-    subscriptionMessage.value = "Enterprise pricing is custom. Please contact BloomCraft to arrange your plan.";
+    talkOpen.value = true;
     return;
   }
+  if (!isVendor.value) return router.push("/guest/vendor_register");
   processingPlan.value = plan.key;
   try {
     if (plan.key === "business" && subscriptionAccess.value?.business_trial_eligible && !subscriptionAccess.value?.subscription_active) {
@@ -244,6 +254,11 @@ h1, h2, h3, p { margin-top: 0; }
 .enterprise-note ul { display: grid; gap: 13px; margin: 0; padding: 0; list-style: none; color: rgba(250,248,245,.78); font-size: 14px; line-height: 1.55; }
 .enterprise-note li { display: flex; gap: 10px; }
 .enterprise-note li::before { color: var(--gold); content: "✓"; }
+.enterprise-note-action { margin-top: 8px; }
+.enterprise-note .enterprise-note-action::before { content: none; }
+.enterprise-note-action .button { min-height: 44px; padding: 12px 26px; color: var(--ink); background: var(--ivory); border-color: var(--ivory); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.enterprise-note-action .button:hover { color: var(--ivory); }
+.enterprise-note-action .button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .pricing-cta { padding: 120px 24px; text-align: center; }
 .pricing-cta h2 { max-width: 560px; margin-right: auto; margin-left: auto; }
 .button--large { padding: 15px 32px; }

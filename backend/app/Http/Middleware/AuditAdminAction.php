@@ -20,7 +20,7 @@ class AuditAdminAction
 {
     private const KEPT_FIELDS = [
         'reason', 'note', 'status', 'priority', 'audience', 'title', 'action', 'type',
-        'admin_role_id', 'name', 'kind', 'range', 'is_active', 'label',
+        'admin_role_id', 'name', 'kind', 'range', 'is_active', 'label', 'plan_key', 'months',
     ];
 
     public function handle(Request $request, Closure $next): Response

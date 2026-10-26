@@ -393,6 +393,10 @@
 
             <!-- Subscription -->
             <template v-else-if="drawer.tab === 'subscription'">
+              <div v-if="canManagePlans" class="plan-actions">
+                <span class="sub">Put this shop on any plan. You'll confirm before anything changes.</span>
+                <button type="button" class="primary-btn" @click="askPlan(profile)">Change plan</button>
+              </div>
               <div v-if="profile.subscription.current" class="plan-card" :class="`sub-${profile.subscription.current.status}`">
                 <div>
                   <span class="card-label">Current plan</span>
@@ -446,7 +450,7 @@
                 <li v-for="e in profile.history" :key="e.id" :class="`ev-${e.action}`">
                   <span class="ev-dot"></span>
                   <div>
-                    <span class="cell-main">{{ e.action === "suspended" ? "Suspended" : "Reactivated" }} by {{ e.by }}</span>
+                    <span class="cell-main">{{ HISTORY_LABEL[e.action] ?? "Changed" }} by {{ e.by }}</span>
                     <span v-if="e.reason" class="ev-reason">“{{ e.reason }}”</span>
                     <span class="sub">{{ formatDateTime(e.at) }}</span>
                   </div>
@@ -533,6 +537,32 @@
             <textarea v-model="dialog.text" rows="2" placeholder="Note for the history (optional)"></textarea>
           </template>
 
+          <!-- Change plan -->
+          <template v-else-if="dialog.type === 'plan'">
+            <h3>Change {{ dialog.target.store_name }}'s plan</h3>
+            <p>Now: <b>{{ dialog.target.current ? `${dialog.target.current.plan_name} (${SUB_STATUS[dialog.target.current.status] ?? dialog.target.current.status})` : "No plan" }}</b>. The change starts right away, and no payment is taken.</p>
+            <div class="plan-form">
+              <label class="plan-field">
+                <span>New plan</span>
+                <select v-model="dialog.planKey">
+                  <option v-for="o in PLAN_CHOICES" :key="o.key" :value="o.key">{{ o.label }}</option>
+                </select>
+              </label>
+              <label v-if="dialog.planKey !== 'none'" class="plan-field">
+                <span>For how long</span>
+                <select v-model="dialog.months">
+                  <option v-for="o in PLAN_LENGTHS" :key="String(o.months)" :value="o.months">{{ o.label }}</option>
+                </select>
+              </label>
+            </div>
+            <p class="plan-summary" :class="{ danger: dialog.planKey === 'none' }">{{ planSummary }}</p>
+            <textarea v-model="dialog.text" rows="2" placeholder="Reason (the vendor sees it, and it's kept in their history)" :class="{ invalid: dialog.error && dialog.text.trim().length < 5 }"></textarea>
+            <label class="plan-field plan-confirm">
+              <span>Type <b>{{ dialog.target.store_name }}</b> to confirm</span>
+              <input v-model="dialog.confirm" autocomplete="off" spellcheck="false" :placeholder="dialog.target.store_name" />
+            </label>
+          </template>
+
           <p v-if="dialog.error" class="dialog-error">{{ dialog.error }}</p>
           <div class="dialog-actions">
             <button type="button" class="ghost-btn" :disabled="dialog.busy" @click="closeDialog">Cancel</button>
@@ -575,6 +605,7 @@ import api from "../../plugins/axios";
 import ShowMore from "../../components/common/ShowMore.vue";
 import { useShowMoreLocal, useShowMoreRows } from "../../composables/useShowMore";
 import { linkedId } from "../../utils/hiddenIds";
+import { useAdminAccess } from "../../composables/useAdminAccess";
 
 const { toggleMobile } = useSidebarState();
 const route = useRoute();
@@ -607,7 +638,24 @@ const ORDER_STATUS = { pending: "Pending", processing: "Processing", out_for_del
 const SUB_STATUS = { active: "Paid", trialing: "Free trial", expired: "Expired", cancelled: "Cancelled", past_due: "Past due", pending: "Pending" };
 const PAYMENT_STATUS = { paid: "Paid", pending: "Not completed", failed: "Failed", cancelled: "Cancelled" };
 const LIMIT_LABELS = { branches: "branches", warehouses: "warehouses", staff_employees: "staff" };
-const DIALOG_CONFIRM = { approve: "Approve", reject: "Reject application", resubmission: "Send request", again: "Ask again", suspend: "Suspend vendor", reactivate: "Reactivate" };
+const DIALOG_CONFIRM = { approve: "Approve", reject: "Reject application", resubmission: "Send request", again: "Ask again", suspend: "Suspend vendor", reactivate: "Reactivate", plan: "Change plan" };
+const HISTORY_LABEL = { suspended: "Suspended", reactivated: "Reactivated", plan_changed: "Plan changed" };
+// Admin → change a shop's plan (AdminVendorController@changePlan)
+const PLAN_CHOICES = [
+  { key: "starter", label: "Starter" },
+  { key: "business", label: "Business" },
+  { key: "professional", label: "Professional" },
+  { key: "enterprise", label: "Enterprise" },
+  { key: "none", label: "No plan (remove it)" },
+];
+const PLAN_LENGTHS = [
+  { months: 1, label: "1 month" },
+  { months: 3, label: "3 months" },
+  { months: 6, label: "6 months" },
+  { months: 12, label: "12 months" },
+  { months: 24, label: "24 months" },
+  { months: null, label: "No end date" },
+];
 
 // ── Summary ──────────────────────────────────────────────────────
 const summary = ref(null);
@@ -815,10 +863,25 @@ const openDocument = (url, title) => {
 };
 
 // ── Dialogs ──────────────────────────────────────────────────────
-const blankDialog = () => ({ type: null, target: null, text: "", error: "", busy: false, loading: false, fields: [], selected: [], reasons: {} });
+const blankDialog = () => ({ type: null, target: null, text: "", error: "", busy: false, loading: false, fields: [], selected: [], reasons: {}, planKey: "starter", months: 1, confirm: "" });
 const dialog = reactive(blankDialog());
-const dialogTone = computed(() => (["reject", "suspend"].includes(dialog.type) ? "danger" : ["approve", "reactivate"].includes(dialog.type) ? "ok" : ""));
-const dialogDisabled = computed(() => dialog.type === "resubmission" && !dialog.selected.length);
+const dialogTone = computed(() => (["reject", "suspend"].includes(dialog.type) || (dialog.type === "plan" && dialog.planKey === "none") ? "danger" : ["approve", "reactivate"].includes(dialog.type) ? "ok" : ""));
+const sameName = (a, b) => String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
+const dialogDisabled = computed(
+  () => (dialog.type === "resubmission" && !dialog.selected.length) || (dialog.type === "plan" && !sameName(dialog.confirm, dialog.target?.store_name)),
+);
+const planSummary = computed(() => {
+  if (dialog.type !== "plan") return "";
+  const from = dialog.target.current?.plan_name ?? "No plan";
+  if (dialog.planKey === "none") return `${from} → No plan. Plan features stop working for this shop right away.`;
+  const to = PLAN_CHOICES.find((o) => o.key === dialog.planKey)?.label;
+  if (!dialog.months) return `${from} → ${to}, with no end date.`;
+  const end = new Date();
+  end.setMonth(end.getMonth() + dialog.months);
+  return `${from} → ${to}, until ${formatDate(end.toISOString())}.`;
+});
+const { can: adminCan } = useAdminAccess();
+const canManagePlans = computed(() => adminCan("subscriptions.manage"));
 
 const openDialog = (type, target, extra = {}) => Object.assign(dialog, blankDialog(), { type, target }, extra);
 const closeDialog = () => {
@@ -828,6 +891,11 @@ const closeDialog = () => {
 const askApprove = (a) => openDialog("approve", a);
 const askReject = (a) => openDialog("reject", a);
 const askSuspend = (v) => openDialog("suspend", v);
+const askPlan = (p) => {
+  const current = p.subscription.current;
+  const next = PLAN_CHOICES.find((o) => o.key !== "none" && o.key !== current?.plan_key)?.key ?? "starter";
+  openDialog("plan", { id: p.vendor.id, store_name: p.vendor.store_name, current }, { planKey: next, months: 1 });
+};
 const askReactivate = (v) => openDialog("reactivate", v);
 const askAgain = (item) => openDialog("again", item, { text: item.rejection_reason || "" });
 const askResubmission = async (a) => {
@@ -857,6 +925,8 @@ const confirmDialog = async () => {
 
   if (type === "reject" && text.length < 10) return (dialog.error = "Give a reason of at least 10 characters.");
   if (type === "suspend" && text.length < 5) return (dialog.error = "Give a reason of at least 5 characters.");
+  if (type === "plan" && text.length < 5) return (dialog.error = "Say why the plan is changing (at least 5 characters).");
+  if (type === "plan" && !sameName(dialog.confirm, target.store_name)) return (dialog.error = `Type “${target.store_name}” to confirm.`);
 
   dialog.busy = true;
   try {
@@ -876,6 +946,14 @@ const confirmDialog = async () => {
       ({ data: { message } } = await api.post(`/admin/vendor-application-resubmissions/${target.id}/request-again`, { rejection_reason: text || null }));
       await reloadResubmissions();
       appList.refresh();
+    } else if (type === "plan") {
+      ({ data: { message } } = await api.post(`/admin/vendors/${target.id}/plan`, {
+        plan_key: dialog.planKey,
+        months: dialog.planKey === "none" ? null : dialog.months,
+        reason: text,
+        confirm: dialog.confirm.trim(),
+      }));
+      await Promise.all([appList.load(), fetchSummary(), drawer.vendorId === target.id ? loadVendor(target.id) : null]);
     } else if (type === "suspend" || type === "reactivate") {
       const body = type === "suspend" ? { reason: text } : { note: text || null };
       ({ data: { message } } = await api.post(`/admin/vendors/${target.id}/${type}`, body));
@@ -1967,6 +2045,7 @@ textarea:focus {
 }
 .ev-suspended { --dot: #dc2626; }
 .ev-reactivated { --dot: #16a34a; }
+.ev-plan_changed { --dot: #2563eb; }
 .ev-joined { --dot: #7c6ff7; }
 .ev-reason {
   display: block;
@@ -2029,6 +2108,68 @@ textarea:focus {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
+}
+.plan-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.plan-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.plan-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #334155;
+}
+.plan-field select,
+.plan-field input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #1e2739;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+}
+.plan-field select:focus-visible,
+.plan-field input:focus-visible {
+  outline: 2px solid #7c6ff7;
+  outline-offset: 1px;
+}
+.plan-confirm {
+  margin-top: 10px;
+}
+.plan-confirm b {
+  color: #1e2739;
+}
+.dialog .plan-summary {
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+.dialog .plan-summary.danger {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+@media (max-width: 480px) {
+  .plan-form {
+    grid-template-columns: 1fr;
+  }
 }
 .impact {
   margin: 0 0 12px;

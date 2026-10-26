@@ -28,6 +28,7 @@ class AdminRole extends Model
         'Vendors & customers' => [
             'vendors.view' => 'See vendors and applications',
             'vendors.manage' => 'Approve, reject, suspend and reactivate vendors',
+            'subscriptions.manage' => 'Change a vendor\'s plan and handle Enterprise inquiries',
             'customers.view' => 'See customers (personal details masked)',
             'customers.reveal' => 'Reveal customers\' personal details',
             'customers.manage' => 'Suspend and reactivate customers',

@@ -54,6 +54,7 @@ class AuditTargets
                     ? self::column('broadcasts', $id, 'title', '“%s”')
                     : self::ticket($id),
                 'VendorApplicationController' => self::column('vendor_applications', $id, 'store_name', '%s'),
+                'EnterpriseInquiryController' => self::column('enterprise_inquiries', $id, 'shop_name', 'Enterprise inquiry from %s'),
                 'VendorApplicationResubmissionController' => self::application(
                     $method === 'requestResubmission'
                         ? $id

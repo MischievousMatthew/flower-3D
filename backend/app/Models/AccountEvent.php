@@ -14,6 +14,7 @@ class AccountEvent extends Model
     public const SUSPENDED = 'suspended';
     public const REACTIVATED = 'reactivated';
     public const CONTACT_VIEWED = 'contact_viewed';
+    public const PLAN_CHANGED = 'plan_changed';
 
     protected $fillable = ['user_id', 'admin_id', 'action', 'reason'];
 
