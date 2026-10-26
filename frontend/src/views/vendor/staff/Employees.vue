@@ -93,7 +93,7 @@
               <col style="width: 8%" />
             </colgroup>
             <thead>
-              <tr><th>Person</th><th>Role</th><th>Status</th><th>Joined</th><th>Last change</th><th><span class="sr-only">Actions</span></th></tr>
+              <tr><th>Person</th><th>Role</th><th>Status</th><th>Joined</th><th title="The last time this person changed something in your shop">Last activity</th><th><span class="sr-only">Actions</span></th></tr>
             </thead>
             <tbody>
               <tr v-for="a in accounts" :key="a.id" class="clickable" @click="openAccount(a)">
@@ -112,7 +112,7 @@
                 </td>
                 <td data-label="Status"><span class="sp-chip" :class="STATUS_TONE[a.status] ?? 'slate'">{{ STATUS_LABEL[a.status] ?? a.status }}</span></td>
                 <td data-label="Joined">{{ a.joining_date ? formatDate(a.joining_date) : "—" }}</td>
-                <td data-label="Last change" :class="{ muted: !a.last_active_at }">{{ a.last_active_at ? relativeTime(a.last_active_at) : "None yet" }}</td>
+                <td data-label="Last activity" :class="{ muted: !a.last_active_at }">{{ a.last_active_at ? relativeTime(a.last_active_at) : "No activity yet" }}</td>
                 <td class="num">
                   <button type="button" class="sp-icon-btn" :aria-label="`Edit ${a.name}`" @click.stop="openAccount(a)"><span v-html="ICONS.edit"></span></button>
                 </td>
