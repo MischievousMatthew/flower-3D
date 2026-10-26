@@ -156,7 +156,7 @@
                     {{ t.subject }}
                   </span>
                   <span class="ticket-meta">
-                    <span class="mono">{{ t.reference }}</span> · {{ t.category_label }}
+                    <span class="mono">{{ t.reference }}</span> · {{ t.issue_label || t.category_label }}
                     <span class="status" :class="`st-${t.status}`">{{ STATUS[t.status] }}</span>
                   </span>
                 </button>
@@ -172,7 +172,7 @@
             <template v-else>
               <div class="view-head">
                 <div>
-                  <span class="sub mono">{{ ticket.reference }} · {{ ticket.category_label }}</span>
+                  <span class="sub mono">{{ ticket.reference }} · {{ ticket.category_label }}<template v-if="ticket.issue_label">: {{ ticket.issue_label }}</template><template v-if="ticket.desired_outcome_label"> · wants {{ ticket.desired_outcome_label.toLowerCase() }}</template></span>
                   <h2>{{ ticket.subject }}</h2>
                   <span class="sub">
                     From <strong>{{ ticket.requester.name }}</strong>

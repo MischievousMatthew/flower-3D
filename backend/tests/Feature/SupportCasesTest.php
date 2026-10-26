@@ -62,6 +62,7 @@ class SupportCasesTest extends TestCase
             $t->timestamps();
         });
         (require base_path('database/migrations/2026_10_24_300000_add_shop_cases_to_support_tickets.php'))->up();
+        (require base_path('database/migrations/2026_10_27_100000_add_issue_to_support_tickets.php'))->up();
         Schema::create('conversations', function (Blueprint $t) {
             $t->id();
             $t->unsignedBigInteger('owner_id')->nullable();
@@ -184,5 +185,48 @@ class SupportCasesTest extends TestCase
 
         // Shop accounts can't use the complaint topics on their own Help page
         $this->as($shop)->postJson('/api/support/tickets', ['subject' => 'Something', 'category' => 'complaint', 'message' => 'Testing the shop topics.'])->assertStatus(422);
+    }
+
+    public function test_people_pick_the_exact_problem_and_what_they_want_done(): void
+    {
+        $shop = $this->shop('Petal & Stem');
+        $ana = User::create(['name' => 'Ana', 'surname' => 'Reyes', 'email' => 'ana@example.com', 'password' => 'x', 'role' => 'customer']);
+        $order = $this->order($shop, ['user_id' => $ana->id, 'order_number' => 'ORD-88', 'total_amount' => 1200]);
+
+        // Customers get the complaint topics with their issues, but not the vendor-only ones
+        $list = $this->as($ana)->getJson('/api/support/tickets')->assertOk();
+        $topics = collect($list->json('topics'))->keyBy('key');
+        $this->assertTrue($topics['delivery']['to_shop']);
+        $this->assertContains('not_arrived', collect($topics['delivery']['issues'])->pluck('key'));
+        $this->assertContains('refund_missing', collect($topics['payments']['issues'])->pluck('key'));
+        $this->assertNotContains('payout_late', collect($topics['payments']['issues'])->pluck('key'));
+        $this->assertArrayNotHasKey('subscription', $topics->all());
+        $this->assertNotEmpty($list->json('outcomes'));
+
+        // An issue from another topic is refused
+        $this->postJson('/api/support/tickets', ['subject' => 'Never came', 'category' => 'delivery', 'issue' => 'wilted', 'message' => 'The bouquet never arrived.', 'order_id' => $order])
+            ->assertStatus(422)->assertJsonValidationErrors('issue');
+        $this->postJson('/api/support/tickets', ['subject' => 'Never came', 'category' => 'subscription', 'message' => 'The bouquet never arrived.'])
+            ->assertStatus(422)->assertJsonValidationErrors('category');
+
+        $id = $this->postJson('/api/support/tickets', ['subject' => 'It never arrived', 'category' => 'delivery', 'issue' => 'not_arrived', 'desired_outcome' => 'redeliver', 'message' => 'The bouquet never arrived.', 'order_id' => $order])
+            ->assertCreated()
+            ->assertJsonPath('data.issue_label', 'It never arrived')
+            ->assertJsonPath('data.desired_outcome_label', 'Deliver it again')
+            ->json('data.id');
+        // A missed delivery goes to the top of the queue
+        $this->assertSame('high', DB::table('support_tickets')->where('id', $id)->value('priority'));
+
+        // The shop sees the exact problem and what the customer wants
+        $this->as($this->staff($shop, 'Mara', ['view']))->getJson("/api/crm/cases/{$id}")->assertOk()
+            ->assertJsonPath('data.issue_label', 'It never arrived')
+            ->assertJsonPath('data.desired_outcome_label', 'Deliver it again');
+
+        // Vendors get their own issues; a complaint outcome is ignored outside complaints
+        $vendorTopics = collect($this->as($shop)->getJson('/api/support/tickets')->json('topics'))->keyBy('key');
+        $this->assertArrayNotHasKey('quality', $vendorTopics->all());
+        $this->assertContains('payout_late', collect($vendorTopics['payments']['issues'])->pluck('key'));
+        $this->postJson('/api/support/tickets', ['subject' => 'Payout late', 'category' => 'payments', 'issue' => 'payout_late', 'desired_outcome' => 'refund', 'message' => 'My payout from last week is missing.'])
+            ->assertCreated()->assertJsonPath('data.desired_outcome_label', null);
     }
 }

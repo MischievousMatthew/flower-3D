@@ -72,7 +72,7 @@
               </span>
               <span class="grow">
                 <strong>{{ c.subject }}</strong>
-                <small><span class="mono">{{ c.reference }}</span> · {{ c.customer?.name || "Customer" }} · {{ c.category_label }}<template v-if="c.order_number"> · {{ c.order_number }}</template></small>
+                <small><span class="mono">{{ c.reference }}</span> · {{ c.customer?.name || "Customer" }} · {{ c.issue_label || c.category_label }}<template v-if="c.order_number"> · {{ c.order_number }}</template></small>
               </span>
               <span class="ca-who hide-sm">
                 <span v-if="c.assignee" class="ca-assignee"><span class="ca-avatar" aria-hidden="true">{{ initials(c.assignee.name) }}</span><span class="ca-assignee-name">{{ c.assignee.name.split(" ")[0] }}</span></span>
@@ -97,7 +97,7 @@
           <div class="sp-drawer-head">
             <div>
               <h3 id="ca-title">{{ detail?.subject || "Loading…" }}</h3>
-              <p v-if="detail"><span class="mono">{{ detail.reference }}</span> · {{ detail.category_label }} · {{ detail.recorded_by_shop ? "recorded by the shop" : "filed by the customer" }} {{ ago(detail.created_at) }}</p>
+              <p v-if="detail"><span class="mono">{{ detail.reference }}</span> · {{ detail.category_label }}<template v-if="detail.issue_label">: {{ detail.issue_label }}</template><template v-if="detail.desired_outcome_label"> · wants {{ detail.desired_outcome_label.toLowerCase() }}</template> · {{ detail.recorded_by_shop ? "recorded by the shop" : "filed by the customer" }} {{ ago(detail.created_at) }}</p>
             </div>
             <button type="button" class="sp-icon-btn" aria-label="Close" @click="selectedId = null"><span v-html="ICONS.close"></span></button>
           </div>

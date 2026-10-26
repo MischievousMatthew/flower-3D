@@ -472,6 +472,8 @@ class AdminSupportController extends Controller
             'subject' => $t->subject,
             'category' => $t->category,
             'category_label' => SupportTicket::CATEGORIES[$t->category] ?? $t->category,
+            'issue_label' => SupportTicket::issueLabel($t->category, $t->issue),
+            'desired_outcome_label' => SupportTicket::OUTCOMES[$t->desired_outcome] ?? null,
             'priority' => $t->priority,
             'status' => $t->status,
             'requester' => [

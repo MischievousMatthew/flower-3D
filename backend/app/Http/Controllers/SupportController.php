@@ -27,16 +27,33 @@ class SupportController extends Controller
 
         $tickets = SupportTicket::query()->where('requester_id', $request->user()->id)
             ->orderByDesc('last_activity_at')->get();
+        $categories = $this->categoriesFor($request->user());
+        $role = $request->user()->role;
 
         return response()->json([
             'success' => true,
             'data' => $tickets->map(fn ($t) => $this->row($t)),
-            // Complaint categories go to a shop, so only customers get them
-            'categories' => $request->user()->role === User::ROLE_CUSTOMER
-                ? SupportTicket::CATEGORIES
-                : array_diff_key(SupportTicket::CATEGORIES, array_flip(SupportTicket::SHOP_CATEGORIES)),
+            'categories' => $categories,
             'shop_categories' => SupportTicket::SHOP_CATEGORIES,
+            // Each topic with the exact problems under it, for the "what happened" picker
+            'topics' => collect($categories)->map(fn ($label, $key) => [
+                'key' => $key,
+                'label' => $label,
+                'hint' => SupportTicket::HINTS[$key] ?? '',
+                'to_shop' => in_array($key, SupportTicket::SHOP_CATEGORIES, true),
+                'issues' => collect(SupportTicket::issuesFor($key, $role))
+                    ->map(fn ($issueLabel, $issueKey) => ['key' => $issueKey, 'label' => $issueLabel])->values(),
+            ])->values(),
+            'outcomes' => collect(SupportTicket::OUTCOMES)->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values(),
         ]);
+    }
+
+    /** Complaint topics go to a shop, so only customers get them; listings and plans are vendors' only */
+    private function categoriesFor(User $user): array
+    {
+        $hidden = $user->role === User::ROLE_CUSTOMER ? SupportTicket::VENDOR_CATEGORIES : SupportTicket::SHOP_CATEGORIES;
+
+        return array_diff_key(SupportTicket::CATEGORIES, array_flip($hidden));
     }
 
     /** POST /api/support/tickets */
@@ -50,9 +67,21 @@ class SupportController extends Controller
         $data = $request->validate([
             'subject' => 'required|string|min:4|max:160',
             'category' => ['required', Rule::in(array_keys(SupportTicket::CATEGORIES))],
+            'issue' => 'nullable|string|max:40',
+            'desired_outcome' => ['nullable', Rule::in(array_keys(SupportTicket::OUTCOMES))],
             'message' => 'required|string|min:10|max:5000',
             'order_id' => 'nullable|integer',
         ]);
+
+        if (! array_key_exists($data['category'], $this->categoriesFor($user))) {
+            return response()->json(['success' => false, 'errors' => ['category' => ['Pick another topic.']]], 422);
+        }
+        $issue = $data['issue'] ?? null;
+        if ($issue !== null && ! array_key_exists($issue, SupportTicket::issuesFor($data['category'], $user->role))) {
+            return response()->json(['success' => false, 'errors' => ['issue' => ['Pick what happened from the list.']]], 422);
+        }
+        // "What would you like done" only applies to a complaint to a shop
+        $outcome = in_array($data['category'], SupportTicket::SHOP_CATEGORIES, true) ? ($data['desired_outcome'] ?? null) : null;
 
         // An order can only be attached by someone involved in it
         $orderId = null;
@@ -77,13 +106,16 @@ class SupportController extends Controller
             $vendorId = (int) Order::withoutGlobalScopes()->whereKey($orderId)->value('vendor_id') ?: null;
         }
 
-        $ticket = DB::transaction(function () use ($user, $data, $orderId, $vendorId) {
+        $ticket = DB::transaction(function () use ($user, $data, $orderId, $vendorId, $issue, $outcome) {
             $ticket = SupportTicket::create([
                 'requester_id' => $user->id,
                 'requester_role' => $user->role,
                 'subject' => trim($data['subject']),
                 'category' => $data['category'],
-                'priority' => in_array($data['category'], ['payments', 'account'], true) ? 'high' : 'normal',
+                'issue' => $issue,
+                'desired_outcome' => $outcome,
+                'priority' => in_array($data['category'], ['payments', 'account'], true)
+                    || in_array($issue, SupportTicket::HIGH_PRIORITY_ISSUES, true) ? 'high' : 'normal',
                 'status' => 'open',
                 'order_id' => $orderId,
                 'vendor_id' => $vendorId,
@@ -177,6 +209,9 @@ class SupportController extends Controller
             'subject' => $t->subject,
             'category' => $t->category,
             'category_label' => SupportTicket::CATEGORIES[$t->category] ?? $t->category,
+            'issue' => $t->issue,
+            'issue_label' => SupportTicket::issueLabel($t->category, $t->issue),
+            'desired_outcome_label' => SupportTicket::OUTCOMES[$t->desired_outcome] ?? null,
             'status' => $t->status,
             // Who is handling it: the shop, or BloomCraft support
             'handled_by' => $t->vendor_id ? VendorDirectory::nameOf($t->vendor_id) : 'BloomCraft Support',

@@ -243,6 +243,8 @@ class CrmCasesController extends Controller
             'subject' => $t->subject,
             'category' => $t->category,
             'category_label' => SupportTicket::CATEGORIES[$t->category] ?? $t->category,
+            'issue_label' => SupportTicket::issueLabel($t->category, $t->issue),
+            'desired_outcome_label' => SupportTicket::OUTCOMES[$t->desired_outcome] ?? null,
             'status' => $t->status,
             'priority' => $t->priority,
             'customer' => $t->requester ? ['id' => $t->requester->id, 'name' => trim("{$t->requester->name} {$t->requester->surname}"), 'email' => $t->requester->email] : null,
