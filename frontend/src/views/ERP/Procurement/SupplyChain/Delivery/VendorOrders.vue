@@ -185,26 +185,7 @@
       </div>
     </div>
 
-    <!-- Pagination -->
-    <div class="pagination" v-if="meta.last_page > 1">
-      <button
-        class="page-btn"
-        :disabled="meta.current_page === 1"
-        @click="fetchOrders(meta.current_page - 1)"
-      >
-        ‹
-      </button>
-      <span class="page-info"
-        >{{ meta.current_page }} / {{ meta.last_page }}</span
-      >
-      <button
-        class="page-btn"
-        :disabled="meta.current_page === meta.last_page"
-        @click="fetchOrders(meta.current_page + 1)"
-      >
-        ›
-      </button>
-    </div>
+    <ShowMore v-if="orders.length" tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="orders.length" :total="pager.total.value" @more="pager.showMore()" />
 
     <!-- ── Scanner Modal ────────────────────────────────────────────────────── -->
     <teleport to="body">
@@ -321,7 +302,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from "vue";
+import { ref, onMounted, nextTick, watch } from "vue";
+import ShowMore from "../../../../../components/common/ShowMore.vue";
+import { useShowMorePaged } from "../../../../../composables/useShowMore";
 import { deliveryService } from "../../../../../services/deliveryService";
 
 const orders = ref([]);
@@ -380,20 +363,30 @@ function debouncedFetch() {
   fetchTimer = setTimeout(() => fetchOrders(), 400);
 }
 
-async function fetchOrders(page = 1) {
-  loading.value = true;
-  try {
+/** One page of deliveries from the server, for the scrolling list */
+async function fetchOrderPage(page) {
+  {
     const params = { page, per_page: 12 };
     if (activeTab.value !== "all") params.status = activeTab.value;
     if (search.value) params.search = search.value;
 
     const res = await deliveryService.vendorOrders(params);
     const raw = Array.isArray(res) ? res : (res.data ?? []);
-    orders.value = raw.filter((d) => d != null);
     meta.value = res.meta ?? meta.value;
     counts.value = res.status_counts ?? {};
+    return { items: raw.filter((d) => d != null), lastPage: meta.value.last_page ?? 1, total: meta.value.total };
+  }
+}
+const pager = useShowMorePaged(fetchOrderPage);
+watch(() => pager.visible.value, (rows) => (orders.value = rows));
+
+async function fetchOrders() {
+  loading.value = true;
+  try {
+    await pager.load();
+    if (pager.failure.value) throw pager.failure.value;
   } catch {
-    showToast("Failed to load orders", "error");
+    showToast("Couldn't load the deliveries", "error");
   } finally {
     loading.value = false;
   }

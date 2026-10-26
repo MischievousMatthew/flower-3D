@@ -407,25 +407,7 @@
           </tbody>
         </table>
       </div>
-      <div class="pagination" v-if="meta.last_page > 1">
-        <button
-          class="page-btn"
-          :disabled="meta.current_page === 1"
-          @click="fetchOrders(meta.current_page - 1)"
-        >
-          ‹
-        </button>
-        <span class="page-info"
-          >{{ meta.current_page }} / {{ meta.last_page }}</span
-        >
-        <button
-          class="page-btn"
-          :disabled="meta.current_page === meta.last_page"
-          @click="fetchOrders(meta.current_page + 1)"
-        >
-          ›
-        </button>
-      </div>
+      <ShowMore v-if="orders.length" tone="vendor" :has-more="orderPager.hasMore.value" :loading="orderPager.loadingMore.value" :shown="orders.length" :total="orderPager.total.value" @more="orderPager.showMore()" />
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════════
@@ -741,25 +723,7 @@
       </div>
 
       <!-- Pagination -->
-      <div class="pagination" v-if="reqMeta.last_page > 1">
-        <button
-          class="page-btn"
-          :disabled="reqMeta.current_page === 1"
-          @click="fetchRequests(reqMeta.current_page - 1)"
-        >
-          ‹
-        </button>
-        <span class="page-info"
-          >{{ reqMeta.current_page }} / {{ reqMeta.last_page }}</span
-        >
-        <button
-          class="page-btn"
-          :disabled="reqMeta.current_page === reqMeta.last_page"
-          @click="fetchRequests(reqMeta.current_page + 1)"
-        >
-          ›
-        </button>
-      </div>
+      <ShowMore v-if="requests.length" tone="vendor" :has-more="reqPager.hasMore.value" :loading="reqPager.loadingMore.value" :shown="requests.length" :total="reqPager.total.value" @more="reqPager.showMore()" />
     </div>
 
     <!-- ── Existing modals (unchanged) ────────────────────────────────── -->
@@ -1177,7 +1141,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import ShowMore from "../../../../../components/common/ShowMore.vue";
+import { useShowMorePaged } from "../../../../../composables/useShowMore";
+import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { toast } from "@/utils/snackbar";
 import { deliveryService } from "../../../../../services/deliveryService";
 import ReturnCasePanel from "../../../../../components/returns/ReturnCasePanel.vue";
@@ -1378,9 +1345,10 @@ function startPolling() {
       calendarLoaded.value = false;
       fetchCalendarOrders();
     } else if (currentView.value === "requests") {
-      fetchRequests(reqMeta.value.current_page, true);
+      // Not while the next rows are still loading as they scroll
+      if (!reqPager.loadingMore.value) fetchRequests(reqMeta.value.current_page, true);
     } else {
-      fetchOrders(meta.value.current_page, true);
+      if (!orderPager.loadingMore.value) fetchOrders(meta.value.current_page, true);
     }
   }, 10_000);
 }
@@ -1394,9 +1362,9 @@ function debouncedFetchRequests() {
   reqFetchTimer = setTimeout(() => fetchRequests(), 400);
 }
 
-async function fetchOrders(page = 1, silent = false) {
-  if (!silent) loading.value = true;
-  try {
+/** One page of deliveries from the server, for the scrolling list */
+async function fetchOrderPage(page) {
+  {
     const params = { page, per_page: 20 };
     if (activeTab.value !== "all") params.status = activeTab.value;
     if (search.value) params.search = search.value;
@@ -1405,7 +1373,6 @@ async function fetchOrders(page = 1, silent = false) {
     if (Array.isArray(res)) raw = res;
     else if (Array.isArray(res?.data?.data)) raw = res.data.data;
     else if (Array.isArray(res?.data)) raw = res.data;
-    orders.value = raw.filter(Boolean);
     meta.value = res?.meta ??
       res?.data?.meta ?? { current_page: 1, last_page: 1 };
     const sc = res?.status_counts ?? res?.data?.status_counts ?? {};
@@ -1420,21 +1387,32 @@ async function fetchOrders(page = 1, silent = false) {
       refunded: sc.refunded ?? 0,
     };
     lastRefreshed.value = new Date().toLocaleTimeString();
+    return { items: raw.filter(Boolean), lastPage: meta.value.last_page ?? 1, total: meta.value.total };
+  }
+}
+const orderPager = useShowMorePaged(fetchOrderPage);
+watch(() => orderPager.visible.value, (rows) => (orders.value = rows));
+
+// The first rows again (a new tab or search), or a quiet refresh that keeps
+// as many rows showing as before (polling, after a change)
+async function fetchOrders(_page = 1, silent = false) {
+  if (!silent) loading.value = true;
+  try {
+    if (silent) await orderPager.refresh();
+    else await orderPager.load();
+    if (!silent && orderPager.failure.value) throw orderPager.failure.value;
   } catch (err) {
     if (!silent)
-      toast.error(err?.message ?? "Failed to load orders.", {
-        position: toast.POSITION.TOP_RIGHT,
-        autoClose: 6000,
-      });
+      toast.error(apiMessage(err, "Couldn't load the deliveries."), { autoClose: 6000 });
   } finally {
     loading.value = false;
   }
 }
 
 // ─── Requests fetch (NEW) ─────────────────────────────────────────────────────
-async function fetchRequests(page = 1, silent = false) {
-  if (!silent) reqLoading.value = true;
-  try {
+/** One page of return and refund requests, for the scrolling list */
+async function fetchRequestPage(page) {
+  {
     const params = { page, per_page: reqMeta.value.per_page ?? 20 };
     if (
       reqActiveFilter.value !== "all" &&
@@ -1464,22 +1442,27 @@ async function fetchRequests(page = 1, silent = false) {
         ? body
         : [];
 
-    requests.value = items.map((r) => ({
-      ...r,
-      status: r.status ?? "pending",
-      type: r.type ?? "return",
-    }));
-
     if (body?.meta) Object.assign(reqMeta.value, body.meta);
     if (body?.counts) Object.assign(reqCounts.value, body.counts);
+    return {
+      items: items.map((r) => ({ ...r, status: r.status ?? "pending", type: r.type ?? "return" })),
+      lastPage: reqMeta.value.last_page ?? 1,
+      total: reqMeta.value.total,
+    };
+  }
+}
+const reqPager = useShowMorePaged(fetchRequestPage);
+watch(() => reqPager.visible.value, (rows) => (requests.value = rows));
+
+async function fetchRequests(_page = 1, silent = false) {
+  if (!silent) reqLoading.value = true;
+  try {
+    if (silent) await reqPager.refresh();
+    else await reqPager.load();
+    if (!silent && reqPager.failure.value) throw reqPager.failure.value;
   } catch (err) {
-    console.error("[fetchRequests] error:", err);
-    const msg =
-      err?.response?.data?.message ??
-      err?.message ??
-      "Failed to load requests.";
     if (!silent)
-      toast.error(msg, { position: toast.POSITION.TOP_RIGHT, autoClose: 6000 });
+      toast.error(apiMessage(err, "Couldn't load the requests."), { autoClose: 6000 });
   } finally {
     reqLoading.value = false;
   }
