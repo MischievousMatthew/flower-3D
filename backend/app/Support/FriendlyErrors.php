@@ -81,7 +81,8 @@ class FriendlyErrors
     }
 
     /** "Unauthenticated.", "The route api/x could not be found." and similar */
-    public static function isFrameworkDefault(?string $message): bool
+    // Any value: a successful response's "message" can be data (e.g. the chat message just sent)
+    public static function isFrameworkDefault(mixed $message): bool
     {
         return is_string($message)
             && (in_array(trim($message), self::FRAMEWORK_DEFAULTS, true) || preg_match('/^The route .+ could not be found\.$/', trim($message)));
