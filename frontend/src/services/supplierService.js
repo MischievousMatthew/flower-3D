@@ -27,6 +27,18 @@ export const supplierService = {
   deactivate: (id) => api.patch(`${BASE}/${id}/deactivate`),
   blacklist: (id) => api.patch(`${BASE}/${id}/blacklist`),
 
+  // Profile: details, catalog, ratings and performance history in one call
+  profile: (id) => api.get(`${BASE}/${id}/profile`),
+
+  // Catalog (what the supplier sells, and for how much)
+  addProduct: (supplierId, data) => api.post(`${BASE}/${supplierId}/products`, data),
+  updateProduct: (supplierId, id, data) => api.put(`${BASE}/${supplierId}/products/${id}`, data),
+  removeProduct: (supplierId, id) => api.delete(`${BASE}/${supplierId}/products/${id}`),
+
+  // Ratings
+  rate: (supplierId, data) => api.post(`${BASE}/${supplierId}/ratings`, data),
+  removeRating: (supplierId, id) => api.delete(`${BASE}/${supplierId}/ratings/${id}`),
+
   // Contacts (nested under supplier)
   listContacts: (supplierId) => api.get(`${BASE}/${supplierId}/contacts`),
   addContact: (supplierId, data) =>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Supplier;
 use App\Services\SupplierService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,10 +30,15 @@ class SupplierController extends Controller
         $filters = $request->validate([
             'search'   => ['nullable', 'string', 'max:100'],
             'status'   => ['nullable', 'string', Rule::in(['active', 'inactive', 'blacklisted'])],
+            'type'     => ['nullable', 'string', Rule::in([...Supplier::TYPES, 'none'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        return response()->json($this->service->listSuppliers($this->getOwnerId(), $filters));
+        // The paginator's own fields stay as they were; counts are added beside them
+        return response()->json([
+            ...$this->service->listSuppliers($this->getOwnerId(), $filters)->toArray(),
+            'counts' => $this->service->supplierCounts($this->getOwnerId()),
+        ]);
     }
 
     /** GET /suppliers/{id} */
@@ -44,6 +50,7 @@ class SupplierController extends Controller
     /** POST /suppliers */
     public function store(Request $request): JsonResponse
     {
+        $this->decodeJsonFields($request);
         $data = $request->validate([
             'company_name'   => ['required', 'string', 'max:255'],
             'contact_person' => ['required', 'string', 'max:255'],
@@ -52,7 +59,9 @@ class SupplierController extends Controller
             'address'        => ['required', 'string'],
             'status'         => ['nullable', Rule::in(['active', 'inactive', 'blacklisted'])],
             'logo'           => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
+            ...$this->profileRules(),
         ]);
+        $data = $this->withContactDefaults($data);
 
         $uploadedLogoId = null;
 
@@ -88,6 +97,7 @@ class SupplierController extends Controller
     /** PUT /suppliers/{id} */
     public function update(Request $request, int $id): JsonResponse
     {
+        $this->decodeJsonFields($request);
         $data = $request->validate([
             'company_name'   => ['sometimes', 'string', 'max:255'],
             'contact_person' => ['sometimes', 'string', 'max:255'],
@@ -96,7 +106,9 @@ class SupplierController extends Controller
             'address'        => ['sometimes', 'string'],
             'status'         => ['sometimes', Rule::in(['active', 'inactive', 'blacklisted'])],
             'logo'           => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
+            ...$this->profileRules(),
         ]);
+        $data = $this->withContactDefaults($data);
 
         $uploadedLogoId = null;
 
@@ -175,12 +187,92 @@ class SupplierController extends Controller
     /** DELETE /suppliers/{id} */
     public function destroy(int $id): JsonResponse
     {
-        $this->service->deleteSupplier($id, $this->getOwnerId());
+        try {
+            $this->service->deleteSupplier($id, $this->getOwnerId());
+        } catch (\RuntimeException $e) {
+            // Has purchase orders: keep the history, suggest the other options
+            return response()->json([
+                'message' => "This supplier has purchase orders, so it can't be deleted. Deactivate or blacklist it instead to keep its history.",
+            ], 422);
+        }
 
         return response()->json(['message' => 'Supplier deleted successfully.']);
     }
 
+    // ─── Profile fields ───────────────────────────────────────────────────────
+
+    /** Fields the supplier forms send as JSON text inside multipart uploads */
+    private function decodeJsonFields(Request $request): void
+    {
+        // The forms send type, schedule and terms together as `profile`, so a
+        // field cleared on the form still reaches the server (as null)
+        $profile = $request->input('profile');
+        if (is_string($profile) && is_array($decoded = json_decode($profile, true))) {
+            $request->merge(array_intersect_key($decoded, array_flip(['supplier_type', 'delivery_days', 'lead_time_days', 'order_cutoff', 'minimum_order', 'payment_terms', 'notes'])));
+        }
+
+        foreach (['contacts', 'delivery_days'] as $field) {
+            $value = $request->input($field);
+            if (is_string($value)) {
+                $decoded = json_decode($value, true);
+                $request->merge([$field => is_array($decoded) ? $decoded : []]);
+            }
+        }
+        // Empty optional fields arrive as "" from FormData
+        foreach (['supplier_type', 'lead_time_days', 'order_cutoff', 'minimum_order', 'payment_terms', 'notes'] as $field) {
+            if ($request->input($field) === '') {
+                $request->merge([$field => null]);
+            }
+        }
+    }
+
+    /** Type, delivery schedule, terms and additional contacts */
+    private function profileRules(): array
+    {
+        return [
+            'supplier_type'             => ['nullable', Rule::in(Supplier::TYPES)],
+            'delivery_days'             => ['nullable', 'array'],
+            'delivery_days.*'           => ['string', Rule::in(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])],
+            'lead_time_days'            => ['nullable', 'integer', 'min:0', 'max:180'],
+            'order_cutoff'              => ['nullable', 'date_format:H:i'],
+            'minimum_order'             => ['nullable', 'numeric', 'min:0', 'max:99999999'],
+            'payment_terms'             => ['nullable', 'string', 'max:60'],
+            'notes'                     => ['nullable', 'string', 'max:2000'],
+            'contacts'                  => ['sometimes', 'array', 'max:20'],
+            'contacts.*.contact_person' => ['required', 'string', 'max:255'],
+            'contacts.*.email'          => ['required', 'email', 'distinct'],
+            'contacts.*.phone'          => ['required', 'string', 'max:20'],
+            'contacts.*.company_name'   => ['nullable', 'string', 'max:255'],
+            'contacts.*.address'        => ['nullable', 'string'],
+            'contacts.*.status'         => ['nullable', Rule::in(['active', 'inactive'])],
+        ];
+    }
+
+    /** A contact without its own company or address uses the supplier's */
+    private function withContactDefaults(array $data): array
+    {
+        if (! isset($data['contacts'])) {
+            return $data;
+        }
+        $data['contacts'] = array_map(fn ($c) => [
+            'contact_person' => $c['contact_person'],
+            'email'          => $c['email'],
+            'phone'          => $c['phone'],
+            'company_name'   => ($c['company_name'] ?? '') ?: ($data['company_name'] ?? ''),
+            'address'        => ($c['address'] ?? '') ?: ($data['address'] ?? ''),
+            'status'         => $c['status'] ?? 'active',
+        ], $data['contacts']);
+
+        return $data;
+    }
+
     // ─── Contacts ─────────────────────────────────────────────────────────────
+
+    /** GET /suppliers/{id}/contacts */
+    public function contacts(int $supplierId): JsonResponse
+    {
+        return response()->json($this->service->findSupplier($supplierId, $this->getOwnerId())->contacts);
+    }
 
     /** POST /suppliers/{id}/contacts */
     public function storeContact(Request $request, int $supplierId): JsonResponse

@@ -20,12 +20,25 @@ class Supplier extends Model
         'address', 
         'status', 
         'logo',
+        'supplier_type',
+        'delivery_days',
+        'lead_time_days',
+        'order_cutoff',
+        'minimum_order',
+        'payment_terms',
+        'notes',
     ];
+
+    /** What a supplier mainly provides */
+    public const TYPES = ['flower_farm', 'wholesaler', 'packaging', 'supplies'];
 
     protected $appends = ['logo_url'];
 
     protected $casts = [
-        'status' => 'string',
+        'status'         => 'string',
+        'delivery_days'  => 'array',
+        'lead_time_days' => 'integer',
+        'minimum_order'  => 'decimal:2',
     ];
 
     public function getLogoUrlAttribute(): ?string
@@ -50,6 +63,22 @@ class Supplier extends Model
     public function purchaseOrders(): HasMany
     {
         return $this->hasMany(PurchaseOrder::class);
+    }
+
+    /**
+     * What the supplier sells and for how much.
+     */
+    public function products(): HasMany
+    {
+        return $this->hasMany(SupplierProduct::class);
+    }
+
+    /**
+     * The shop's ratings of this supplier.
+     */
+    public function ratings(): HasMany
+    {
+        return $this->hasMany(SupplierRating::class);
     }
 
     // ─── Scopes ───────────────────────────────────────────────────────────────

@@ -23,18 +23,47 @@ class SupplierService
             ->when(
                 isset($filters['search']),
                 fn ($q) => $q->where(function ($q) use ($filters) {
-                    $q->where('company_name', 'like', "%{$filters['search']}%")
-                      ->orWhere('contact_person', 'like', "%{$filters['search']}%")
-                      ->orWhere('email', 'like', "%{$filters['search']}%");
+                    // Case-insensitive on Postgres too
+                    $term = '%' . mb_strtolower($filters['search']) . '%';
+                    $q->whereRaw('LOWER(company_name) LIKE ?', [$term])
+                      ->orWhereRaw('LOWER(contact_person) LIKE ?', [$term])
+                      ->orWhereRaw('LOWER(email) LIKE ?', [$term]);
                 })
             )
             ->when(
                 isset($filters['status']),
                 fn ($q) => $q->where('status', $filters['status'])
             )
+            ->when(
+                isset($filters['type']),
+                fn ($q) => $filters['type'] === 'none' ? $q->whereNull('supplier_type') : $q->where('supplier_type', $filters['type'])
+            )
             ->with('contacts')
+            ->withCount(['purchaseOrders', 'products', 'ratings'])
+            ->addSelect(['rating' => DB::table('supplier_ratings')
+                ->selectRaw('ROUND(AVG((quality + timeliness + communication) / 3.0), 1)')
+                ->whereColumn('supplier_ratings.supplier_id', 'suppliers.id')])
+            ->addSelect(['last_order_at' => DB::table('purchase_orders')
+                ->selectRaw('MAX(created_at)')
+                ->whereColumn('purchase_orders.supplier_id', 'suppliers.id')])
             ->latest()
             ->paginate($filters['per_page'] ?? 15);
+    }
+
+    /**
+     * How many suppliers the shop has, by status and by type, for the list's
+     * summary and filter counts (not limited to the current page).
+     */
+    public function supplierCounts(int $ownerId): array
+    {
+        $rows = Supplier::where('owner_id', $ownerId)->get(['status', 'supplier_type']);
+
+        return [
+            'total'     => $rows->count(),
+            'by_status' => collect(['active', 'inactive', 'blacklisted'])->mapWithKeys(fn ($s) => [$s => $rows->where('status', $s)->count()]),
+            'by_type'   => collect(Supplier::TYPES)->mapWithKeys(fn ($t) => [$t => $rows->where('supplier_type', $t)->count()])
+                ->put('none', $rows->whereNull('supplier_type')->count()),
+        ];
     }
 
     /**

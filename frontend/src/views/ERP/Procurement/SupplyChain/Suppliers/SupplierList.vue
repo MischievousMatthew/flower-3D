@@ -1,874 +1,604 @@
 <template>
-  <div class="supplier-list-page">
-    
-    <!-- Page Header -->
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">Suppliers</h1>
-        <p class="page-sub">Manage your supply chain partners</p>
+  <HrPage title="Suppliers" subtitle="The farms, wholesalers, packaging and supply vendors the shop buys from: who to call, what they sell, when they deliver and how they've done.">
+    <template #actions>
+      <router-link v-if="can('suppliers', 'create')" :to="{ name: 'SupplierCreate' }" class="sp-btn sp-btn-primary"><span v-html="ICONS.plus"></span>Add supplier</router-link>
+    </template>
+
+    <!-- Kinds of supplier, with counts; also the type filter -->
+    <section class="sl-types" aria-label="Kinds of supplier">
+      <template v-if="!counts">
+        <div v-for="n in 5" :key="n" class="sp-card sl-type"><div class="bc-skeleton sl-type-ic"></div><div class="grow"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div></div>
+      </template>
+      <template v-else>
+        <button v-for="t in typeTiles" :key="t.value" type="button" class="sp-card sl-type" :class="{ on: type === t.value }" :aria-pressed="type === t.value" @click="setType(t.value)">
+          <span class="sl-type-ic" :class="`tone-${t.tone}`" v-html="ICONS[t.icon]"></span>
+          <span class="grow">
+            <span class="sl-type-label">{{ t.label }}</span>
+            <strong>{{ t.count }}</strong>
+          </span>
+        </button>
+      </template>
+    </section>
+
+    <div class="sp-card sl-bar">
+      <div class="sp-seg" role="group" aria-label="Status">
+        <button v-for="s in STATUS_TABS" :key="s.value" type="button" :class="{ on: status === s.value }" :aria-pressed="status === s.value" @click="setStatus(s.value)">
+          {{ s.label }}<span v-if="counts" class="count">{{ statusCount(s.value) }}</span>
+        </button>
       </div>
-      <router-link
-        to="/erp/procurement/supply-chain/suppliers/create"
-        class="btn-primary"
-      >
-        <svg viewBox="0 0 20 20" fill="currentColor" width="16">
-          <path
-            d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-          />
-        </svg>
-        Add Supplier
-      </router-link>
+      <label class="sp-search sl-search">
+        <span v-html="ICONS.search"></span>
+        <input v-model="search" class="sp-input" type="search" placeholder="Search name, contact person or email" aria-label="Search suppliers" @input="debouncedLoad" />
+      </label>
     </div>
 
-    <!-- Stats Strip -->
-    <div class="stats-strip">
-      <div class="stat-card" v-for="s in stats" :key="s.label">
-        <span class="stat-num" :style="{ color: s.color }">{{ s.value }}</span>
-        <span class="stat-label">{{ s.label }}</span>
-      </div>
+    <div v-if="loadError" class="sp-banner error">
+      <span v-html="ICONS.alert"></span>{{ loadError }}
+      <button type="button" @click="load">Try again</button>
     </div>
 
-    <!-- Filters & Table Card -->
-    <div class="card">
-      <div class="card-toolbar">
-        <div class="filter-tabs">
-          <button
-            v-for="tab in statusTabs"
-            :key="tab.value"
-            class="filter-tab"
-            :class="{ active: activeTab === tab.value }"
-            @click="
-              activeTab = tab.value;
-              fetchSuppliers();
-            "
-          >
-            {{ tab.label }}
-          </button>
-        </div>
-        <div class="toolbar-right">
-          <div class="search-box">
-            <svg
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              width="15"
-            >
-              <circle cx="9" cy="9" r="6" />
-              <path d="m14 14 3 3" />
-            </svg>
-            <input
-              v-model="searchQuery"
-              placeholder="Search anything…"
-              @input="debouncedSearch"
-            />
+    <!-- Suppliers -->
+    <div v-if="suppliers === null" class="sl-grid">
+      <div v-for="n in 6" :key="n" class="sp-card sl-card">
+        <div class="sl-top"><div class="bc-skeleton sl-logo"></div><div class="grow"><div class="bc-skeleton sp-sk-line w70"></div><div class="bc-skeleton sp-sk-line w30"></div></div></div>
+        <div class="bc-skeleton sp-sk-line w50"></div>
+        <div class="bc-skeleton sl-sk-facts"></div>
+      </div>
+    </div>
+    <div v-else-if="!suppliers.length" class="sp-card sp-empty">
+      <span class="sp-empty-icon" v-html="ICONS.store"></span>
+      <h3>{{ filtered ? "No suppliers match" : "No suppliers yet" }}</h3>
+      <p>{{ filtered ? "Try another kind, status or search." : "Add the farms, wholesalers and packaging vendors you buy from, so ordering and comparing prices is one click away." }}</p>
+      <button v-if="filtered" type="button" class="sp-btn sp-btn-ghost" @click="clearFilters">Clear filters</button>
+      <router-link v-else-if="can('suppliers', 'create')" :to="{ name: 'SupplierCreate' }" class="sp-btn sp-btn-primary"><span v-html="ICONS.plus"></span>Add supplier</router-link>
+    </div>
+    <template v-else>
+      <ul class="sl-grid" :class="{ dim: pager.loading.value }">
+        <li v-for="s in suppliers" :key="s.id" class="sp-card sl-card" :class="{ muted: s.status !== 'active' }">
+          <div class="sl-top">
+            <Logo :name="s.company_name" :src="s.logo_url" />
+            <div class="grow">
+              <router-link :to="{ name: 'SupplierProfile', params: { id: s.id } }" class="sl-name">{{ s.company_name }}</router-link>
+              <span class="sl-chips">
+                <span v-if="typeOf(s.supplier_type)" class="sp-chip" :class="typeOf(s.supplier_type).tone">{{ typeOf(s.supplier_type).label }}</span>
+                <span v-else class="sp-chip slate">Kind not set</span>
+                <span v-if="s.status !== 'active'" class="sp-chip" :class="STATUS[s.status]?.tone">{{ STATUS[s.status]?.label ?? s.status }}</span>
+              </span>
+            </div>
+            <div class="sl-menu-wrap">
+              <button type="button" class="sp-icon-btn" :aria-label="`More for ${s.company_name}`" :aria-expanded="menuFor === s.id" @click.stop="menuFor = menuFor === s.id ? null : s.id"><span v-html="ICONS.more"></span></button>
+              <div v-if="menuFor === s.id" class="sl-menu" role="menu" @click.stop>
+                <router-link role="menuitem" :to="{ name: 'SupplierProfile', params: { id: s.id } }"><span v-html="ICONS.eye"></span>View profile</router-link>
+                <router-link v-if="canEdit('suppliers')" role="menuitem" :to="{ name: 'SupplierEdit', params: { id: s.id } }"><span v-html="ICONS.edit"></span>Edit details</router-link>
+                <template v-if="canEdit('suppliers')">
+                  <button v-if="s.status !== 'active'" type="button" role="menuitem" @click="setSupplierStatus(s, 'active')"><span v-html="ICONS.check"></span>Mark active</button>
+                  <button v-if="s.status === 'active'" type="button" role="menuitem" @click="setSupplierStatus(s, 'inactive')"><span v-html="ICONS.pause"></span>Mark inactive</button>
+                  <button v-if="s.status !== 'blacklisted'" type="button" role="menuitem" class="danger" @click="ask('blacklist', s)"><span v-html="ICONS.lock"></span>Blacklist</button>
+                </template>
+                <button v-if="can('suppliers', 'delete')" type="button" role="menuitem" class="danger" @click="ask('delete', s)"><span v-html="ICONS.trash"></span>Delete</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="sl-contact">
+            <span class="sl-person"><span v-html="ICONS.user"></span>{{ s.contact_person }}</span>
+            <a v-if="s.phone" :href="`tel:${s.phone}`" class="sl-link"><span v-html="ICONS.phone"></span>{{ s.phone }}</a>
+            <a v-if="s.email" :href="`mailto:${s.email}`" class="sl-link"><span v-html="ICONS.send"></span>{{ s.email }}</a>
+          </div>
+
+          <dl class="sl-facts">
+            <div><dt>Lead time</dt><dd>{{ leadText(s.lead_time_days) || "—" }}</dd></div>
+            <div><dt>Delivers</dt><dd>{{ daysText(s.delivery_days) || "—" }}</dd></div>
+            <div>
+              <dt>Rating</dt>
+              <dd v-if="s.rating !== null && s.rating !== undefined" class="sl-rating" :aria-label="`${s.rating} out of 5 from ${s.ratings_count} ratings`"><span v-html="ICONS.star"></span>{{ Number(s.rating).toFixed(1) }}<small>({{ s.ratings_count }})</small></dd>
+              <dd v-else>—</dd>
+            </div>
+            <div><dt>Orders</dt><dd>{{ s.purchase_orders_count ?? 0 }}</dd></div>
+          </dl>
+
+          <div class="sl-foot">
+            <span class="sl-meta">{{ s.products_count ? `${s.products_count} ${s.products_count === 1 ? "item" : "items"} in catalog` : "No catalog yet" }} · {{ s.last_order_at ? `last order ${shortDate(s.last_order_at)}` : "no orders yet" }}</span>
+            <router-link :to="{ name: 'SupplierProfile', params: { id: s.id } }" class="sp-btn sp-btn-ghost sp-btn-sm">View profile</router-link>
+          </div>
+        </li>
+      </ul>
+      <ShowMore tone="vendor" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="suppliers.length" :total="pager.total.value" @more="pager.showMore()" />
+    </template>
+
+    <!-- Blacklist / delete -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="confirm" class="sp-backdrop" @click="confirm = null"></div></Transition>
+      <Transition name="sp-pop">
+        <div v-if="confirm" class="sp-modal-wrap">
+          <div class="sp-modal" role="alertdialog" aria-modal="true" aria-labelledby="sl-confirm-title" aria-describedby="sl-confirm-text">
+            <div class="sp-modal-head">
+              <div>
+                <h3 id="sl-confirm-title">{{ confirm.kind === "delete" ? `Delete ${confirm.supplier.company_name}?` : `Blacklist ${confirm.supplier.company_name}?` }}</h3>
+                <p id="sl-confirm-text">{{ confirm.kind === "delete"
+                  ? "Its details, contacts, catalog and ratings are removed for good. A supplier with purchase orders can't be deleted; blacklist it instead to keep the history."
+                  : "It stays in your records with its orders and ratings, marked so no one orders from it again. You can mark it active later." }}</p>
+              </div>
+              <button type="button" class="sp-icon-btn" aria-label="Close" @click="confirm = null"><span v-html="ICONS.close"></span></button>
+            </div>
+            <p v-if="confirm.error" class="sp-error">{{ confirm.error }}</p>
+            <div class="sp-modal-foot">
+              <button type="button" class="sp-btn sp-btn-ghost" @click="confirm = null">Keep it</button>
+              <button type="button" class="sp-btn sp-btn-danger" :disabled="confirm.busy" @click="runConfirm">{{ confirm.busy ? "Working…" : confirm.kind === "delete" ? "Delete supplier" : "Blacklist" }}</button>
+            </div>
           </div>
         </div>
-      </div>
-
-      <!-- Table -->
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>
-                <input
-                  type="checkbox"
-                  @change="toggleSelectAll"
-                  :checked="allSelected"
-                />
-              </th>
-              <th>Supplier Name</th>
-              <th>Contact</th>
-              <th>Status</th>
-              <th>Last Order</th>
-              <th>Orders</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="loading">
-              <td colspan="7" class="loading-row">
-                <div class="spinner"></div>
-              </td>
-            </tr>
-            <tr v-else-if="!suppliers.length">
-              <td colspan="7" class="empty-row">No suppliers found</td>
-            </tr>
-            <tr
-              v-for="s in suppliers"
-              :key="s.id"
-              class="data-row"
-              :class="{ selected: selectedIds.includes(s.id) }"
-            >
-              <td>
-                <input type="checkbox" :value="s.id" v-model="selectedIds" />
-              </td>
-              <td>
-                <div class="supplier-name-cell">
-                  <div class="supplier-avatar-wrap">
-                    <img
-                      v-if="s.logo_url"
-                      :src="s.logo_url"
-                      :alt="s.company_name"
-                      class="supplier-avatar-img"
-                      @error="$event.target.style.display = 'none'"
-                    />
-                    <div
-                      v-else
-                      class="supplier-avatar"
-                      :style="{ background: avatarColor(s.company_name) }"
-                    >
-                      {{ s.company_name?.[0]?.toUpperCase() ?? "?" }}
-                    </div>
-                  </div>
-                  <div>
-                    <div class="supplier-name">{{ s.company_name }}</div>
-                    <div class="supplier-loc">
-                      <svg viewBox="0 0 12 16" fill="currentColor" width="9">
-                        <path
-                          d="M6 0C3.24 0 1 2.24 1 5c0 3.75 5 11 5 11s5-7.25 5-11c0-2.76-2.24-5-5-5zm0 7.5A2.5 2.5 0 113.5 5 2.5 2.5 0 016 7.5z"
-                        />
-                      </svg>
-                      {{
-                        s.address?.split(",").slice(-2).join(",").trim() || "—"
-                      }}
-                    </div>
-                  </div>
-                </div>
-              </td>
-              <td>
-                <div class="contact-cell">
-                  <div class="contact-name">{{ s.contact_person }}</div>
-                  <a
-                    :href="`mailto:${s.email}`"
-                    class="contact-email contact-email-link"
-                  >
-                    {{ s.email }}
-                  </a>
-                </div>
-              </td>
-              <td>
-                <span class="status-badge" :class="s.status">{{
-                  s.status
-                }}</span>
-              </td>
-              <td class="muted-cell">{{ formatDate(s.updated_at) }}</td>
-              <td class="muted-cell">{{ s.purchase_orders_count ?? "—" }}</td>
-              <td>
-                <div class="action-cell">
-                  <router-link
-                    :to="`/erp/procurement/supply-chain/suppliers/${s.id}/edit`"
-                    class="action-btn edit-btn"
-                    title="Edit"
-                  >
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      width="15"
-                    >
-                      <path d="M13.5 3.5l3 3L7 16H4v-3L13.5 3.5z" />
-                    </svg>
-                  </router-link>
-                  <button
-                    v-if="s.status === 'active'"
-                    @click="deactivate(s)"
-                    class="action-btn warn-btn"
-                    title="Deactivate"
-                  >
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      width="15"
-                    >
-                      <circle cx="10" cy="10" r="7" />
-                      <path d="M7 10h6" />
-                    </svg>
-                  </button>
-                  <button
-                    v-else
-                    @click="activate(s)"
-                    class="action-btn ok-btn"
-                    title="Activate"
-                  >
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      width="15"
-                    >
-                      <circle cx="10" cy="10" r="7" />
-                      <path d="M7 10l2 2 4-4" />
-                    </svg>
-                  </button>
-                  <button @click="openMenu(s)" class="action-btn">
-                    <svg viewBox="0 0 20 20" fill="currentColor" width="15">
-                      <circle cx="10" cy="4" r="1.5" />
-                      <circle cx="10" cy="10" r="1.5" />
-                      <circle cx="10" cy="16" r="1.5" />
-                    </svg>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Pagination -->
-      <div class="pagination" v-if="meta.last_page > 1">
-        <button
-          class="page-btn"
-          :disabled="meta.current_page === 1"
-          @click="goPage(meta.current_page - 1)"
-        >
-          ‹
-        </button>
-        <span class="page-info"
-          >Page {{ meta.current_page }} of {{ meta.last_page }}</span
-        >
-        <button
-          class="page-btn"
-          :disabled="meta.current_page === meta.last_page"
-          @click="goPage(meta.current_page + 1)"
-        >
-          ›
-        </button>
-      </div>
-    </div>
-
-    <!-- Context Menu -->
-    <div
-      v-if="menuSupplier"
-      class="context-menu"
-      :style="menuStyle"
-      @mouseleave="menuSupplier = null"
-    >
-      <button @click="blacklist(menuSupplier)">🚫 Blacklist</button>
-      <button @click="deleteSupplier(menuSupplier)" class="danger">
-        🗑 Delete
-      </button>
-    </div>
-
-    <!-- Toast -->
-    <transition name="toast-slide">
-      <div v-if="toast.show" class="toast" :class="toast.type">
-        {{ toast.message }}
-      </div>
-    </transition>
-  </div>
+      </Transition>
+    </Teleport>
+  </HrPage>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { toast } from "@/utils/snackbar";
+import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import HrPage from "../../../../../components/hr/HrPage.vue";
+import ShowMore from "../../../../../components/common/ShowMore.vue";
+import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopIcons";
+import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";
+import { SUPPLIER_TYPES, STATUS, typeOf, daysText, leadText, initials } from "../../../../../components/procurement/supplierUi";
+import { useShowMorePaged } from "../../../../../composables/useShowMore";
+import { useAssignment } from "../../../../../composables/useAssignment";
 import { supplierService } from "../../../../../services/supplierService";
+import { toast } from "@/utils/snackbar";
 
-
-const suppliers = ref([]);
-const loading = ref(false);
-const searchQuery = ref("");
-const activeTab = ref("all");
-const selectedIds = ref([]);
-const menuSupplier = ref(null);
-const menuStyle = ref({});
-const meta = ref({ current_page: 1, last_page: 1 });
-
-const statusTabs = [
-  { label: "All", value: "all" },
-  { label: "Active", value: "active" },
-  { label: "Inactive", value: "inactive" },
-  { label: "Pending", value: "blacklisted" },
+const STATUS_TABS = [
+  { value: "", label: "All" },
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+  { value: "blacklisted", label: "Blacklisted" },
 ];
 
-const stats = ref([
-  { label: "Total Suppliers", value: 0, color: "#111827" },
-  { label: "Active", value: 0, color: "#10b981" },
-  { label: "Inactive", value: 0, color: "#f59e0b" },
-  { label: "Blacklisted", value: 0, color: "#ef4444" },
+const { can, canEdit } = useAssignment();
+const suppliers = ref(null);
+const counts = ref(null);
+const loadError = ref("");
+const type = ref("");
+const status = ref("");
+const search = ref("");
+const menuFor = ref(null);
+const confirm = ref(null);
+
+const Logo = defineComponent({
+  props: { name: String, src: String },
+  setup(p) {
+    const failed = ref(false);
+    return () =>
+      p.src && !failed.value
+        ? h("img", { class: "sl-logo", src: p.src, alt: "", onError: () => (failed.value = true) })
+        : h("span", { class: "sl-logo", "aria-hidden": "true" }, initials(p.name));
+  },
+});
+
+const filtered = computed(() => !!(type.value || status.value || search.value.trim()));
+const typeTiles = computed(() => [
+  { value: "", label: "All suppliers", icon: "store", tone: "slate", count: counts.value.total },
+  ...SUPPLIER_TYPES.map((t) => ({ value: t.value, label: t.plural, icon: t.icon, tone: t.tone, count: counts.value.by_type?.[t.value] ?? 0 })),
 ]);
+const statusCount = (s) => (s ? counts.value.by_status?.[s] ?? 0 : counts.value.total);
 
-const allSelected = computed(
-  () =>
-    suppliers.value.length &&
-    selectedIds.value.length === suppliers.value.length,
-);
+async function fetchPage(page) {
+  const res = await supplierService.list({
+    page,
+    per_page: 20,
+    type: type.value || undefined,
+    status: status.value || undefined,
+    search: search.value.trim() || undefined,
+  });
+  const body = res.data ?? {};
+  counts.value = body.counts ?? counts.value;
+  return { items: (body.data ?? []).filter((s) => s?.id), lastPage: body.last_page ?? 1, total: body.total };
+}
+const pager = useShowMorePaged(fetchPage);
+watch(() => pager.visible.value, (rows) => {
+  if (suppliers.value !== null) suppliers.value = rows;
+});
 
-let searchTimeout = null;
-const debouncedSearch = () => {
-  clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(fetchSuppliers, 400);
-};
-
-async function fetchSuppliers(page = 1) {
-  loading.value = true;
+async function load() {
+  loadError.value = "";
   try {
-    const params = { page, per_page: 12 };
-    if (activeTab.value !== "all") params.status = activeTab.value;
-    if (searchQuery.value) params.search = searchQuery.value;
-
-    const res = await supplierService.list(params);
-
-    const raw = res?.data?.data ?? res?.data ?? res ?? [];
-    suppliers.value = Array.isArray(raw) ? raw.filter((s) => s?.id) : [];
-    meta.value = res?.data?.meta ?? res?.meta ?? meta.value;
-
-    stats.value[0].value = res?.data?.meta?.total ?? suppliers.value.length;
-    const counts = { active: 0, inactive: 0, blacklisted: 0 };
-    suppliers.value.forEach((s) => {
-      if (counts[s.status] !== undefined) counts[s.status]++;
-    });
-    stats.value[1].value = counts.active;
-    stats.value[2].value = counts.inactive;
-    stats.value[3].value = counts.blacklisted;
+    await pager.load();
+    if (pager.failure.value) throw pager.failure.value;
+    suppliers.value = pager.visible.value;
   } catch (e) {
-    console.error(e);
-    showToast("Failed to load suppliers", "error");
-  } finally {
-    loading.value = false;
+    suppliers.value = suppliers.value ?? [];
+    counts.value = counts.value ?? { total: 0, by_status: {}, by_type: {} };
+    loadError.value = apiMessage(e, "Couldn't load the suppliers.");
   }
 }
 
-async function activate(s) {
+let timer = null;
+function debouncedLoad() {
+  clearTimeout(timer);
+  timer = setTimeout(load, 350);
+}
+function setType(v) {
+  if (type.value === v) return;
+  type.value = v;
+  load();
+}
+function setStatus(v) {
+  if (status.value === v) return;
+  status.value = v;
+  load();
+}
+function clearFilters() {
+  type.value = "";
+  status.value = "";
+  search.value = "";
+  load();
+}
+
+const shortDate = (d) => new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+
+async function setSupplierStatus(s, next) {
+  menuFor.value = null;
+  const call = { active: "activate", inactive: "deactivate", blacklisted: "blacklist" }[next];
   try {
-    await supplierService.activate(s.id);
-    s.status = "active";
-    showToast(`${s.company_name} activated`);
-  } catch {
-    showToast("Failed to activate supplier", "error");
+    await supplierService[call](s.id);
+    const before = s.status;
+    s.status = next;
+    if (counts.value?.by_status) {
+      counts.value.by_status[before] = Math.max(0, (counts.value.by_status[before] ?? 1) - 1);
+      counts.value.by_status[next] = (counts.value.by_status[next] ?? 0) + 1;
+    }
+    toast.success(next === "active" ? `${s.company_name} is active again.` : next === "inactive" ? `${s.company_name} is marked inactive.` : `${s.company_name} is blacklisted.`);
+    return true;
+  } catch (e) {
+    toast.error(apiMessage(e, "Couldn't change the supplier's status."));
+    return false;
   }
 }
 
-async function deactivate(s) {
+function ask(kind, supplier) {
+  menuFor.value = null;
+  confirm.value = { kind, supplier, busy: false, error: "" };
+}
+async function runConfirm() {
+  const c = confirm.value;
+  c.busy = true;
+  c.error = "";
+  if (c.kind === "blacklist") {
+    if (await setSupplierStatus(c.supplier, "blacklisted")) confirm.value = null;
+    else c.busy = false;
+    return;
+  }
   try {
-    await supplierService.deactivate(s.id);
-    s.status = "inactive";
-    showToast(`${s.company_name} deactivated`, "warn");
-  } catch {
-    showToast("Failed to deactivate supplier", "error");
+    await supplierService.remove(c.supplier.id);
+    toast.success(`${c.supplier.company_name} was deleted.`);
+    confirm.value = null;
+    load();
+  } catch (e) {
+    c.busy = false;
+    c.error = apiMessage(e, "Couldn't delete the supplier.");
   }
 }
 
-async function blacklist(s) {
-  try {
-    await supplierService.blacklist(s.id);
-    s.status = "blacklisted";
-    menuSupplier.value = null;
-    showToast(`${s.company_name} blacklisted`, "error");
-  } catch {
-    showToast("Failed to blacklist supplier", "error");
-  }
-}
-
-async function deleteSupplier(s) {
-  if (!confirm(`Delete ${s.company_name}?`)) return;
-  try {
-    await supplierService.remove(s.id);
-    suppliers.value = suppliers.value.filter((x) => x.id !== s.id);
-    menuSupplier.value = null;
-    showToast("Supplier deleted");
-  } catch {
-    showToast("Failed to delete supplier", "error");
-  }
-}
-
-function openMenu(s) {
-  menuSupplier.value = s;
-  menuStyle.value = { top: "80px", right: "40px" };
-}
-
-function toggleSelectAll(e) {
-  selectedIds.value = e.target.checked ? suppliers.value.map((s) => s.id) : [];
-}
-
-function goPage(p) {
-  fetchSuppliers(p);
-}
-
-function avatarColor(name) {
-  const colors = [
-    "#dbeafe",
-    "#dcfce7",
-    "#fef3c7",
-    "#fce7f3",
-    "#ede9fe",
-    "#e0f2fe",
-  ];
-  if (!name) return colors[0];
-  return colors[name.charCodeAt(0) % colors.length];
-}
-
-function formatDate(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function showToast(msg, type = "success") {
-  const map = {
-    success: toast.success,
-    error: toast.error,
-    warn: toast.warning,
-  };
-  (map[type] ?? toast.success)(msg, {
-    autoClose: 3000,
-    position: toast.POSITION.TOP_RIGHT,
-  });
-}
-
-onMounted(fetchSuppliers);
+const closeMenu = () => (menuFor.value = null);
+const onKey = (e) => {
+  if (e.key === "Escape") menuFor.value = null;
+};
+onMounted(() => {
+  load();
+  document.addEventListener("click", closeMenu);
+  document.addEventListener("keydown", onKey);
+});
+onBeforeUnmount(() => {
+  clearTimeout(timer);
+  document.removeEventListener("click", closeMenu);
+  document.removeEventListener("keydown", onKey);
+});
 </script>
 
 <style scoped>
-* {
-  box-sizing: border-box;
-  font-family: "Poppins", sans-serif;
-}
-
-.supplier-list-page {
+.grow {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 2px;
 }
 
-.page-header {
+/* Kinds */
+.sl-types {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.sl-type {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--v-border);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.sl-type:hover {
+  border-color: var(--v-border-strong);
+}
+.sl-type.on {
+  border-color: var(--bc-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 18%, transparent);
+}
+.sl-type:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.sl-type-ic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+}
+.sl-type-ic :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+.sl-type-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--v-text-2);
+}
+.sl-type strong {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--v-text);
+}
+
+/* Filter bar */
+.sl-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+.sl-search {
+  flex: 1;
+  max-width: 360px;
+  min-width: 220px;
+}
+
+/* Cards */
+.sl-grid {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+  transition: opacity 0.2s;
+}
+.sl-grid.dim {
+  opacity: 0.55;
+}
+.sl-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.sl-card:hover {
+  border-color: var(--v-border-strong);
+  box-shadow: 0 10px 24px -16px rgba(15, 23, 42, 0.35);
+}
+.sl-card.muted .sl-logo {
+  filter: grayscale(0.7);
+  opacity: 0.75;
+}
+.sl-top {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  gap: 12px;
 }
-.page-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #111827;
-  margin: 0;
+:deep(.sl-logo) {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  object-fit: cover;
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
+  font-size: 14px;
+  font-weight: 600;
 }
-.page-sub {
+.sl-name {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v-text);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sl-name:hover {
+  color: var(--bc-accent-deep);
+  text-decoration: underline;
+}
+.sl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.sl-menu-wrap {
+  position: relative;
+  flex: none;
+}
+.sl-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid var(--v-border-strong);
+  border-radius: 12px;
+  background: var(--v-raised);
+  box-shadow: 0 14px 30px -12px rgba(15, 23, 42, 0.35);
+}
+.sl-menu a,
+.sl-menu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--v-text);
+  font: inherit;
   font-size: 13px;
-  color: #6b7280;
-  margin: 2px 0 0;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
 }
-
-.btn-primary {
+.sl-menu a:hover,
+.sl-menu button:hover,
+.sl-menu a:focus-visible,
+.sl-menu button:focus-visible {
+  background: var(--v-subtle);
+  outline: none;
+}
+.sl-menu .danger {
+  color: var(--v-red-text);
+}
+.sl-menu :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
+.sl-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+}
+.sl-person,
+.sl-link {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 9px 18px;
-  background: #10b981;
-  color: #fff;
-  border: none;
-  border-radius: 9px;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  transition:
-    background 0.15s,
-    transform 0.1s;
-}
-.btn-primary:hover {
-  background: #059669;
-  transform: translateY(-1px);
-}
-
-/* Stats Strip */
-.stats-strip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-}
-.stat-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 18px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  border: 1px solid #e8ecf0;
-}
-.stat-num {
-  font-size: 26px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.stat-label {
-  font-size: 12px;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-/* Card */
-.card {
-  background: #fff;
-  border-radius: 14px;
-  border: 1px solid #e8ecf0;
+  min-width: 0;
   overflow: hidden;
+  color: var(--v-text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.card-toolbar {
+.sl-link {
+  width: fit-content;
+  max-width: 100%;
+  text-decoration: none;
+}
+.sl-link:hover {
+  color: var(--bc-accent-deep);
+  text-decoration: underline;
+}
+.sl-person :deep(svg),
+.sl-link :deep(svg) {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--v-faint);
+}
+.sl-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--v-subtle);
+}
+.sl-facts dt {
+  font-size: 11px;
+  color: var(--v-muted);
+}
+.sl-facts dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--v-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sl-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.sl-rating :deep(svg) {
+  width: 13px;
+  height: 13px;
+  color: #f5b301;
+  fill: #f5b301;
+}
+.sl-rating small {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--v-faint);
+}
+.sl-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid #f0f2f5;
+  gap: 10px;
+  margin-top: auto;
 }
-
-.filter-tabs {
-  display: flex;
-  gap: 4px;
-}
-.filter-tab {
-  padding: 6px 14px;
-  border-radius: 7px;
-  border: none;
-  background: none;
-  font-size: 13px;
-  font-weight: 500;
-  color: #6b7280;
-  cursor: pointer;
-  transition:
-    background 0.15s,
-    color 0.15s;
-}
-.filter-tab:hover {
-  background: #f3f4f6;
-  color: #374151;
-}
-.filter-tab.active {
-  background: #ecfdf5;
-  color: #10b981;
-}
-
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-}
-.search-box input {
-  border: none;
-  background: none;
-  outline: none;
-  font-size: 13px;
-  color: #374151;
-  width: 200px;
-}
-.search-box input::placeholder {
-  color: #9ca3af;
-}
-.search-box svg {
-  color: #9ca3af;
-  flex-shrink: 0;
-}
-
-/* Table */
-.table-wrap {
-  overflow-x: auto;
-}
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13.5px;
-}
-.data-table thead tr {
-  background: #f9fafb;
-}
-.data-table th {
-  padding: 10px 16px;
-  text-align: left;
+.sl-meta {
   font-size: 11.5px;
-  font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-bottom: 1px solid #e8ecf0;
+  color: var(--v-faint);
 }
-.data-row td {
-  padding: 13px 16px;
-  border-bottom: 1px solid #f3f4f6;
-  vertical-align: middle;
-}
-.data-row:last-child td {
-  border-bottom: none;
-}
-.data-row:hover td {
-  background: #fafafa;
-}
-.data-row.selected td {
-  background: #f0fdf4;
+.sl-sk-facts {
+  height: 54px;
+  border-radius: 12px;
 }
 
-.loading-row,
-.empty-row {
-  text-align: center;
-  padding: 48px 16px !important;
-  color: #9ca3af;
-  font-size: 14px;
-}
-.spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid #e5e7eb;
-  border-top-color: #10b981;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  margin: 0 auto;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+@media (max-width: 1100px) {
+  .sl-types {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
-
-.supplier-name-cell {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+@media (max-width: 640px) {
+  .sl-types {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sl-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sl-search {
+    max-width: none;
+  }
+  .sl-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sl-foot {
+    flex-wrap: wrap;
+  }
 }
-
-.supplier-avatar-wrap {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  overflow: hidden;
-  flex-shrink: 0;
-  border: 1px solid #e8ecf0;
-  background: #f3f4f6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #b0b1b1;
-}
-
-.supplier-avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 10px;
-}
-.supplier-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 16px;
-  color: #374151;
-  flex-shrink: 0;
-}
-
-.supplier-name {
-  font-weight: 600;
-  color: #111827;
-  font-size: 13.5px;
-}
-.supplier-loc {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #9ca3af;
-  margin-top: 2px;
-}
-
-.contact-name {
-  font-weight: 500;
-  color: #374151;
-}
-.contact-email {
-  font-size: 12px;
-  color: #9ca3af;
-  margin-top: 2px;
-}
-
-.contact-email-link {
-  color: #6b7280;
-  text-decoration: none;
-  transition: color 0.15s;
-}
-
-.contact-email-link:hover {
-  color: #2563eb;
-  text-decoration: underline;
-}
-
-.muted-cell {
-  color: #6b7280;
-}
-
-/* Status Badge */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-.status-badge.active {
-  background: #dcfce7;
-  color: #16a34a;
-}
-.status-badge.inactive {
-  background: #fef3c7;
-  color: #92400e;
-}
-.status-badge.blacklisted {
-  background: #fee2e2;
-  color: #dc2626;
-}
-.status-badge.pending {
-  background: #ede9fe;
-  color: #7c3aed;
-}
-
-/* Actions */
-.action-cell {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.action-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: #6b7280;
-  transition: all 0.15s;
-  text-decoration: none;
-}
-.action-btn:hover {
-  border-color: #d1d5db;
-  background: #f9fafb;
-  color: #374151;
-}
-.edit-btn:hover {
-  border-color: #a5f3fc;
-  color: #0891b2;
-  background: #ecfeff;
-}
-.warn-btn:hover {
-  border-color: #fde68a;
-  color: #d97706;
-  background: #fffbeb;
-}
-.ok-btn:hover {
-  border-color: #a7f3d0;
-  color: #059669;
-  background: #ecfdf5;
-}
-
-/* Pagination */
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 20px;
-  border-top: 1px solid #f0f2f5;
-}
-.page-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  cursor: pointer;
-  font-size: 16px;
-  color: #374151;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.page-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.page-info {
-  font-size: 13px;
-  color: #6b7280;
-}
-
-/* Context Menu */
-.context-menu {
-  position: fixed;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-  overflow: hidden;
-  z-index: 100;
-  min-width: 160px;
-}
-.context-menu button {
-  width: 100%;
-  text-align: left;
-  padding: 10px 16px;
-  background: none;
-  border: none;
-  font-size: 13.5px;
-  cursor: pointer;
-  color: #374151;
-}
-.context-menu button:hover {
-  background: #f9fafb;
-}
-.context-menu button.danger {
-  color: #ef4444;
-}
-.context-menu button.danger:hover {
-  background: #fff5f5;
-}
-
-/* Toast */
-.toast {
-  position: fixed;
-  bottom: 28px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 12px 24px;
-  border-radius: 10px;
-  font-size: 13.5px;
-  font-weight: 500;
-  z-index: 500;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-}
-.toast.success {
-  background: #111827;
-  color: #fff;
-}
-.toast.error {
-  background: #ef4444;
-  color: #fff;
-}
-.toast.warn {
-  background: #f59e0b;
-  color: #fff;
-}
-.toast-slide-enter-active,
-.toast-slide-leave-active {
-  transition: all 0.3s;
-}
-.toast-slide-enter-from,
-.toast-slide-leave-to {
-  opacity: 0;
-  transform: translateX(-50%) translateY(12px);
+@media (prefers-reduced-motion: reduce) {
+  .sl-type,
+  .sl-card,
+  .sl-grid {
+    transition: none;
+  }
 }
 </style>
