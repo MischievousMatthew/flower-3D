@@ -14,7 +14,7 @@
         <div v-for="n in 4" :key="n" class="sp-stat"><div class="bc-skeleton sp-stat-icon"></div><div class="grow"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div></div>
       </template>
       <template v-else>
-        <button v-for="s in statTiles" :key="s.label" type="button" class="sp-stat" :class="{ on: filters.status === s.status }" @click="setStatus(s.status)">
+        <button v-for="s in statTiles" :key="s.label" type="button" class="sp-stat" :class="{ on: filters.access === s.access }" :aria-pressed="filters.access === s.access" @click="setAccess(s.access)">
           <span class="sp-stat-icon" :class="`tone-${s.tone}`" v-html="ICONS[s.icon]"></span>
           <div><strong>{{ s.count }}</strong><span>{{ s.label }}</span></div>
         </button>
@@ -28,6 +28,10 @@
           <input v-model="search" class="sp-input" type="search" placeholder="Name, ID, email or mobile" aria-label="Search profiles" />
         </label>
         <div class="pf-filters">
+          <select v-model="filters.access" class="sp-select" aria-label="Account">
+            <option value="">Everyone</option>
+            <option v-for="a in ACCESS_FILTERS" :key="a.value" :value="a.value">{{ a.label }}</option>
+          </select>
           <select v-model="filters.department" class="sp-select" aria-label="Department">
             <option value="">All departments</option>
             <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
@@ -81,6 +85,10 @@
                     <div>
                       <strong>{{ e.full_name }}</strong>
                       <small>{{ e.employee_id }} · added by {{ e.added_by || "HR" }}</small>
+                      <span v-if="e.account || e.missing_details?.length" class="pf-badges">
+                        <span v-if="e.account" class="sp-chip blue" :title="`Signs in to the ERP as @${e.account.username || e.account.name}`"><span v-html="ICONS.user"></span>Has an account</span>
+                        <span v-if="e.missing_details?.length" class="sp-chip amber" :title="`Still missing: ${e.missing_details.join(', ')}`"><span v-html="ICONS.alert"></span>New · details missing</span>
+                      </span>
                     </div>
                   </div>
                 </td>
@@ -133,6 +141,7 @@
                 <div class="pf-tags">
                   <span class="sp-chip" :class="statusTone(selected.employment_status)">{{ selected.employment_status }}</span>
                   <span class="sp-chip slate">{{ selected.employee_id }}</span>
+                  <span v-if="selected.account" class="sp-chip blue"><span v-html="ICONS.user"></span>Has an account</span>
                 </div>
               </div>
             </div>
@@ -143,6 +152,15 @@
           </div>
 
           <div class="sp-drawer-body">
+            <div v-if="selected.missing_details?.length" class="sp-banner warn pf-missing">
+              <span v-html="ICONS.alert"></span>
+              <div>
+                <strong>New team member: finish their profile</strong>
+                <p>Still missing: {{ selected.missing_details.join(", ") }}.</p>
+              </div>
+              <button v-if="canEdit" type="button" class="sp-btn sp-btn-primary sp-btn-sm" @click="openForm(selected)">Complete details</button>
+            </div>
+            <p v-if="selected.account" class="pf-account"><span v-html="ICONS.user"></span>Signs in to the ERP as <b>@{{ selected.account.username || selected.account.name }}</b>. Their QR code for attendance is under QR code.</p>
             <div class="pf-quick">
               <a v-if="selected.work_email" class="sp-btn sp-btn-ghost sp-btn-sm" :href="`mailto:${selected.work_email}`"><span v-html="ICONS.send"></span>Email</a>
               <a v-if="selected.mobile_number" class="sp-btn sp-btn-ghost sp-btn-sm" :href="`tel:${selected.mobile_number}`"><span v-html="ICONS.phone"></span>Call</a>
@@ -434,7 +452,7 @@ import { personColor, time12 } from "../../../../components/vendor/staff/staffUi
 import EmployeePhoto from "../../../../components/hr/EmployeePhoto.vue";
 import { buildMultipartFormData, getSelectedFile, readImagePreview, validateImageFile } from "../../../../utils/imageUpload";
 import {
-  CONTACT_FIELDS, DAYS, EMERGENCY_FIELDS, EMPLOYEE_TABS, EMPLOYMENT_STATUSES, JOB_FIELDS, PER, PERSONAL_FIELDS, PROFILE_KEYS,
+  ACCESS_FILTERS, CONTACT_FIELDS, DAYS, EMERGENCY_FIELDS, EMPLOYEE_TABS, EMPLOYMENT_STATUSES, JOB_FIELDS, PER, PERSONAL_FIELDS, PROFILE_KEYS,
   REQUIRED_FIELDS, day10, hm5, hourlyRate, initialsOf, restDaysList, statusTone,
 } from "../../../../components/hr/hrUi";
 
@@ -466,7 +484,7 @@ const loadError = ref("");
 const page = ref({ current_page: 1, last_page: 1, total: 0, from: 0, to: 0 });
 const stats = ref(null);
 const search = ref("");
-const filters = reactive({ status: "", department: "", location: "" });
+const filters = reactive({ access: route.query.access || "", status: "", department: "", location: "" });
 const menuId = ref(null);
 const selected = ref(null);
 
@@ -484,16 +502,16 @@ const saving = ref(false);
 const deleting = ref(null);
 const busy = ref(false);
 
-const filtered = computed(() => !!(search.value.trim() || filters.status || filters.department || filters.location));
+const filtered = computed(() => !!(search.value.trim() || filters.access || filters.status || filters.department || filters.location));
 const departments = computed(() => (stats.value?.by_department ?? []).map((d) => d.department).filter(Boolean));
 const locations = computed(() => (stats.value?.by_location ?? []).map((l) => l.work_location).filter(Boolean));
 const statTiles = computed(() => {
-  const s = stats.value?.by_status ?? {};
+  const a = stats.value?.by_access ?? {};
   return [
-    { label: "Everyone", status: "", count: stats.value?.total_employees ?? 0, tone: "blue", icon: "users" },
-    { label: "Regular", status: "Regular", count: s.regular ?? 0, tone: "green", icon: "check" },
-    { label: "Probationary", status: "Probationary", count: s.probationary ?? 0, tone: "amber", icon: "clock" },
-    { label: "Contractual", status: "Contractual", count: s.contractual ?? 0, tone: "violet", icon: "note" },
+    { label: "Everyone", access: "", count: stats.value?.total_employees ?? 0, tone: "blue", icon: "users" },
+    { label: "Has an account", access: "account", count: a.account ?? 0, tone: "green", icon: "user" },
+    { label: "Information only", access: "info", count: a.info ?? 0, tone: "violet", icon: "note" },
+    { label: "Details missing", access: "incomplete", count: a.incomplete ?? 0, tone: "amber", icon: "alert" },
   ];
 });
 
@@ -506,6 +524,7 @@ async function fetchPage(p) {
     page: p,
     per_page: 15,
     search: search.value.trim() || undefined,
+    access: filters.access || undefined,
     status: filters.status || undefined,
     department: filters.department || undefined,
     location: filters.location || undefined,
@@ -539,8 +558,8 @@ async function loadStats() {
   }
 }
 
-function setStatus(status) {
-  filters.status = filters.status === status ? "" : status;
+function setAccess(access) {
+  filters.access = filters.access === access ? "" : access;
 }
 
 let searchTimer;
@@ -883,6 +902,57 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
+}
+.pf-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+.pf-badges .sp-chip,
+.pf-tags .sp-chip {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.pf-badges .sp-chip :deep(svg),
+.pf-tags .sp-chip :deep(svg) {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+.pf-missing {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.pf-missing > div {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.pf-missing strong {
+  display: block;
+  font-weight: 600;
+}
+.pf-missing p {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+.pf-missing .sp-btn {
+  align-self: center;
+}
+.pf-account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--v-blue-soft);
+  color: var(--v-blue-text);
+  font-size: 12.5px;
+}
+.pf-account :deep(svg) {
+  width: 15px;
+  height: 15px;
 }
 .pf-head-actions {
   display: flex;

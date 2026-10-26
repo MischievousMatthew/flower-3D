@@ -56,6 +56,16 @@ export const PROFILE_KEYS = [...PERSONAL_FIELDS, ...CONTACT_FIELDS, ...EMERGENCY
     "working_days_per_week", "working_days_per_month", "payment_method", "bank_name", "account_number", "tax_status", "allowance",
   ]);
 
+// Who has a team account (signs in to the ERP) and whose profile still has blanks (EmployeeInfo::scopeByAccess)
+export const ACCESS_FILTERS = [
+  { value: "account", label: "Has an account" },
+  { value: "info", label: "Information only" },
+  { value: "incomplete", label: "Details missing" },
+];
+/** "Birthday, Address and 3 more" */
+export const missingSummary = (list = [], shown = 2) =>
+  list.length <= shown ? list.join(", ") : `${list.slice(0, shown).join(", ")} and ${list.length - shown} more`;
+
 export const STATUS_TONES = { Active: "green", Regular: "green", Probationary: "amber", Contractual: "blue", "Part-time": "violet", Inactive: "slate" };
 export const statusTone = (status) => STATUS_TONES[status] ?? "slate";
 export const PER = { daily: "a day", weekly: "a week", monthly: "a month", hourly: "an hour" };

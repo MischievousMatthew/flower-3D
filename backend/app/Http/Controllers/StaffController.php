@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Attendance\AttendanceCalculator;
 use App\Services\Attendance\AttendanceLocationService;
 use App\Services\ResourceLimitService;
+use App\Services\Staff\AccountProfileService;
 use App\Services\StaffAccessService;
 use App\Services\SubscriptionAccessService;
 use App\Subscriptions\SubscriptionPlans;
@@ -173,7 +174,8 @@ class StaffController extends Controller
                         'salary_type' => $p->salary_type,
                         'usual_hours' => $this->usualHours($p),
                         'rest_days' => $this->restDays($p),
-                        'account' => $account ? ['id' => $account->id, 'name' => $account->name, 'role' => $account->staffRole?->name] : null,
+                        'account' => $account ? ['id' => $account->id, 'name' => $account->name, 'username' => $account->username, 'role' => $account->staffRole?->name] : null,
+                        'missing_details' => $p->missing_details,
                         'today' => $att ? ['time_in' => $this->hm($att->time_in), 'time_out' => $this->hm($att->time_out)] : null,
                         'added_by' => $p->added_by,
                     ];
@@ -223,6 +225,8 @@ class StaffController extends Controller
             ]);
             $employee->forceFill(['staff_role_id' => $data['staff_role_id']])->save();
             $this->access->syncEmployee($employee);
+            // Their HR profile, for the attendance QR code and HR
+            app(AccountProfileService::class)->ensureProfile($employee);
 
             return $employee;
         });
@@ -274,6 +278,7 @@ class StaffController extends Controller
             }
             $employee->forceFill(['staff_role_id' => $data['staff_role_id']])->save();
             $this->access->syncEmployee($employee);
+            app(AccountProfileService::class)->ensureProfile($employee);
         });
 
         return response()->json(['success' => true, 'message' => 'Saved.']);
@@ -690,12 +695,20 @@ class StaffController extends Controller
         ];
     }
 
-    /** Sign-in accounts and HR profiles are separate records; they belong together when the emails match. */
+    /** Sign-in accounts and HR profiles are separate records, linked by account_id (older profiles: by matching email). */
     private function accountProfileLinks(Collection $accounts, Collection $profiles): array
     {
         $byEmail = $accounts->filter(fn ($a) => $a->email)->keyBy(fn ($a) => strtolower(trim($a->email)));
+        $byId = $accounts->keyBy('id');
         $links = ['account_to_profile' => [], 'profile_to_account' => [], 'profile_role' => []];
         foreach ($profiles as $p) {
+            $account = $p->account_id ? $byId->get($p->account_id) : null;
+            if ($account && ! isset($links['account_to_profile'][$account->id])) {
+                $links['account_to_profile'][$account->id] = $p->id;
+                $links['profile_to_account'][$p->id] = $account->id;
+                $links['profile_role'][$p->id] = $account->staffRole ? ['name' => $account->staffRole->name, 'color' => $account->staffRole->color] : null;
+                continue;
+            }
             foreach ([$p->work_email, $p->personal_email] as $email) {
                 $account = $email ? $byEmail->get(strtolower(trim($email))) : null;
                 if ($account && ! isset($links['account_to_profile'][$account->id])) {

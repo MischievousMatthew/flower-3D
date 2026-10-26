@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\EmployeeInfo;
 use App\Models\User;
+use App\Services\Staff\AccountProfileService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -71,6 +73,7 @@ class SharedEmployeeProfilesTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('owner_id');
             $table->unsignedBigInteger('created_by_employee_id')->nullable();
+            $table->unsignedBigInteger('account_id')->nullable();
             $table->string('employee_id', 20);
             foreach (['first_name', 'middle_name', 'last_name', 'gender', 'civil_status', 'avatar', 'personal_email', 'work_email',
                 'mobile_number', 'address', 'emergency_contact_name', 'emergency_contact_number', 'emergency_relationship',
@@ -230,5 +233,67 @@ class SharedEmployeeProfilesTest extends TestCase
 
         $this->signIn($other)->getJson("/api/employees-info/{$id}")->assertNotFound();
         $this->signIn($other)->getJson("/api/employees-info/{$id}/documents")->assertNotFound();
+    }
+    public function test_a_team_account_gets_a_draft_hr_profile_that_shows_what_is_missing(): void
+    {
+        $vendor = $this->vendor();
+        $account = $this->employee($vendor, 'Finance', []);
+        $account->forceFill(['joining_date' => '2026-10-20'])->save();
+
+        $profile = app(AccountProfileService::class)->ensureProfile($account);
+        // Running it again (e.g. after an account edit) never makes a second profile
+        app(AccountProfileService::class)->ensureProfile($account->fresh());
+
+        $this->assertSame(1, EmployeeInfo::where('account_id', $account->id)->count());
+        $this->assertSame('Finance', $profile->first_name);
+        $this->assertSame('Person', $profile->last_name);
+
+        $row = $this->signIn($vendor)->getJson('/api/employees-info?access=account')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.account.id', $account->id)
+            ->json('data.0');
+        $this->assertContains('Birthday', $row['missing_details']);
+        $this->assertContains('Emergency contact', $row['missing_details']);
+
+        $this->signIn($vendor)->getJson('/api/employees-info?access=info')->assertOk()->assertJsonCount(0, 'data');
+        $this->signIn($vendor)->getJson('/api/employees-info?access=incomplete')->assertOk()->assertJsonCount(1, 'data');
+        $this->signIn($vendor)->getJson('/api/employees-info/statistics')
+            ->assertOk()
+            ->assertJsonPath('data.by_access.account', 1)
+            ->assertJsonPath('data.by_access.info', 0)
+            ->assertJsonPath('data.by_access.incomplete', 1);
+    }
+
+    public function test_hr_completing_the_profile_clears_the_missing_details(): void
+    {
+        $vendor = $this->vendor();
+        $account = $this->employee($vendor, 'Delivery', []);
+        $profile = app(AccountProfileService::class)->ensureProfile($account);
+
+        $this->signIn($vendor)->putJson("/api/employees-info/{$profile->id}", $this->profilePayload(['work_email' => $account->email]))
+            ->assertOk();
+
+        $this->signIn($vendor)->getJson("/api/employees-info/{$profile->id}")
+            ->assertOk()
+            ->assertJsonPath('data.missing_details', [])
+            ->assertJsonPath('data.account_id', $account->id);
+        $this->signIn($vendor)->getJson('/api/employees-info?access=incomplete')->assertOk()->assertJsonCount(0, 'data');
+    }
+
+    public function test_a_profile_hr_adds_with_an_accounts_email_belongs_to_that_account(): void
+    {
+        $vendor = $this->vendor();
+        $account = $this->employee($vendor, 'Sales', []);
+
+        $id = $this->signIn($vendor)->postJson('/api/employees-info', $this->profilePayload(['work_email' => strtoupper($account->email)]))
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->assertSame($account->id, EmployeeInfo::find($id)->account_id);
+        // The account now has its profile, so no draft is added for it
+        app(AccountProfileService::class)->ensureProfile($account);
+        $this->assertSame(1, EmployeeInfo::where('owner_id', $vendor->id)->count());
+        $this->signIn($vendor)->getJson('/api/employees-info?access=info')->assertOk()->assertJsonCount(0, 'data');
     }
 }

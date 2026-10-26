@@ -12,6 +12,10 @@
           <input v-model="search" class="sp-input" type="search" placeholder="Name, position, department or location" aria-label="Search people" />
         </label>
         <div class="dr-filters">
+          <select v-model="access" class="sp-select" aria-label="Account">
+            <option value="">Everyone</option>
+            <option v-for="a in ACCESS_FILTERS" :key="a.value" :value="a.value">{{ a.label }}</option>
+          </select>
           <select v-model="department" class="sp-select" aria-label="Department">
             <option value="">All departments</option>
             <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
@@ -35,43 +39,59 @@
         <p>{{ employees.length ? "Try another search or filter." : "Profiles that HR or the shop owner add show up here." }}</p>
       </div>
 
-      <div v-else class="dr-grid">
-        <article v-for="e in shown" :key="e.id" class="dr-card" :class="{ inactive: e.employment_status === 'Inactive' }">
-          <div class="dr-menu-wrap">
-            <button type="button" class="sp-icon-btn" :aria-label="`More for ${e.full_name}`" :aria-expanded="menuId === e.id" @click.stop="menuId = menuId === e.id ? null : e.id"><span v-html="ICONS.more"></span></button>
-            <div v-if="menuId === e.id" class="dr-menu" role="menu" @click.stop>
-              <button type="button" role="menuitem" @click="view(e)"><span v-html="ICONS.eye"></span>View profile</button>
-              <button type="button" role="menuitem" :disabled="!canEdit" :title="canEdit ? '' : 'Your role can\'t edit profiles.'" @click="edit(e)"><span v-html="ICONS.edit"></span>Edit</button>
-              <button type="button" role="menuitem" :disabled="!canEdit" @click="toggleActive(e)"><span v-html="ICONS.check"></span>Mark as {{ e.employment_status === "Inactive" ? "Active" : "Inactive" }}</button>
-              <button type="button" role="menuitem" class="danger" :disabled="!canDelete" :title="canDelete ? '' : 'Your role can\'t delete profiles.'" @click="askDelete(e)"><span v-html="ICONS.trash"></span>Delete</button>
-            </div>
+      <template v-else>
+        <section v-for="g in groups" :key="g.key" class="dr-group" :aria-labelledby="`dr-g-${g.key}`">
+          <header class="dr-group-head">
+            <h3 :id="`dr-g-${g.key}`"><span :class="`tone-${g.tone}`" v-html="ICONS[g.icon]"></span>{{ g.title }}<span class="dr-count">{{ g.people.length }}</span></h3>
+            <p>{{ g.hint }}</p>
+          </header>
+          <div class="dr-grid">
+            <article v-for="e in g.people" :key="e.id" class="dr-card" :class="{ inactive: e.employment_status === 'Inactive' }">
+              <div class="dr-menu-wrap">
+                <button type="button" class="sp-icon-btn" :aria-label="`More for ${e.full_name}`" :aria-expanded="menuId === e.id" @click.stop="menuId = menuId === e.id ? null : e.id"><span v-html="ICONS.more"></span></button>
+                <div v-if="menuId === e.id" class="dr-menu" role="menu" @click.stop>
+                  <button type="button" role="menuitem" @click="view(e)"><span v-html="ICONS.eye"></span>View profile</button>
+                  <button type="button" role="menuitem" :disabled="!canEdit" :title="canEdit ? '' : 'Your role can\'t edit profiles.'" @click="edit(e)"><span v-html="ICONS.edit"></span>Edit</button>
+                  <button type="button" role="menuitem" :disabled="!canEdit" @click="toggleActive(e)"><span v-html="ICONS.check"></span>Mark as {{ e.employment_status === "Inactive" ? "Active" : "Inactive" }}</button>
+                  <button type="button" role="menuitem" class="danger" :disabled="!canDelete" :title="canDelete ? '' : 'Your role can\'t delete profiles.'" @click="askDelete(e)"><span v-html="ICONS.trash"></span>Delete</button>
+                </div>
+              </div>
+    
+              <button type="button" class="dr-main" @click="view(e)">
+                <span class="dr-avatar" :style="{ background: personColor(e.full_name) }">
+                  <img v-if="e.avatar_url" :src="e.avatar_url" alt="" />
+                  <template v-else>{{ initialsOf(e.full_name) }}</template>
+                  <i :class="statusTone(e.employment_status)" aria-hidden="true"></i>
+                </span>
+                <strong>{{ e.full_name }}</strong>
+                <small>{{ e.position || "No position set" }}</small>
+                <span class="dr-badges">
+                  <span class="sp-chip" :class="statusTone(e.employment_status)">{{ e.employment_status }}</span>
+                  <span v-if="e.account_id" class="sp-chip blue" :title="e.account ? `Signs in as @${e.account.username || e.account.name}` : 'Signs in to the ERP'"><span v-html="ICONS.user"></span>Has an account</span>
+                </span>
+              </button>
+    
+              <button v-if="e.missing_details?.length" type="button" class="dr-missing" :disabled="!canEdit" :title="canEdit ? 'Complete their profile' : 'Your role can\'t edit profiles.'" @click="edit(e)">
+                <span v-html="ICONS.alert"></span>
+                <span><b>New · details missing</b><small>{{ missingSummary(e.missing_details) }}</small></span>
+              </button>
+    
+              <dl class="dr-facts">
+                <div><dt>Department</dt><dd>{{ e.department || "—" }}</dd></div>
+                <div><dt>Reports to</dt><dd>{{ e.reporting_manager || "—" }}</dd></div>
+                <div><dt>Location</dt><dd>{{ e.work_location || "—" }}</dd></div>
+                <div><dt>Hired</dt><dd>{{ e.date_hired ? formatDate(day10(e.date_hired)) : "—" }}</dd></div>
+              </dl>
+    
+              <div class="dr-contact">
+                <a v-if="e.mobile_number" :href="`tel:${e.mobile_number}`"><span v-html="ICONS.phone"></span>{{ e.mobile_number }}</a>
+                <a v-if="e.work_email" :href="`mailto:${e.work_email}`"><span v-html="ICONS.send"></span>{{ e.work_email }}</a>
+              </div>
+              <small class="dr-by">Added by {{ e.added_by || "HR" }}</small>
+            </article>
           </div>
-
-          <button type="button" class="dr-main" @click="view(e)">
-            <span class="dr-avatar" :style="{ background: personColor(e.full_name) }">
-              <img v-if="e.avatar_url" :src="e.avatar_url" alt="" />
-              <template v-else>{{ initialsOf(e.full_name) }}</template>
-              <i :class="statusTone(e.employment_status)" aria-hidden="true"></i>
-            </span>
-            <strong>{{ e.full_name }}</strong>
-            <small>{{ e.position || "No position set" }}</small>
-            <span class="sp-chip" :class="statusTone(e.employment_status)">{{ e.employment_status }}</span>
-          </button>
-
-          <dl class="dr-facts">
-            <div><dt>Department</dt><dd>{{ e.department || "—" }}</dd></div>
-            <div><dt>Reports to</dt><dd>{{ e.reporting_manager || "—" }}</dd></div>
-            <div><dt>Location</dt><dd>{{ e.work_location || "—" }}</dd></div>
-            <div><dt>Hired</dt><dd>{{ e.date_hired ? formatDate(day10(e.date_hired)) : "—" }}</dd></div>
-          </dl>
-
-          <div class="dr-contact">
-            <a v-if="e.mobile_number" :href="`tel:${e.mobile_number}`"><span v-html="ICONS.phone"></span>{{ e.mobile_number }}</a>
-            <a v-if="e.work_email" :href="`mailto:${e.work_email}`"><span v-html="ICONS.send"></span>{{ e.work_email }}</a>
-          </div>
-          <small class="dr-by">Added by {{ e.added_by || "HR" }}</small>
-        </article>
-      </div>
+        </section>
+      </template>
     </section>
 
     <!-- Delete -->
@@ -107,7 +127,7 @@ import { useAssignment } from "../../../../composables/useAssignment";
 import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcons";
 import { formatDate } from "../../../../components/vendor/finance/financeUi";
 import { personColor } from "../../../../components/vendor/staff/staffUi";
-import { EMPLOYEE_TABS, EMPLOYMENT_STATUSES, day10, initialsOf, statusTone } from "../../../../components/hr/hrUi";
+import { ACCESS_FILTERS, EMPLOYEE_TABS, EMPLOYMENT_STATUSES, day10, initialsOf, missingSummary, statusTone } from "../../../../components/hr/hrUi";
 
 const router = useRouter();
 const { can } = useAssignment();
@@ -121,6 +141,7 @@ const error = ref("");
 const search = ref("");
 const department = ref("");
 const status = ref("");
+const access = ref("");
 const menuId = ref(null);
 const deleting = ref(null);
 const busy = ref(false);
@@ -130,11 +151,29 @@ const shown = computed(() => {
   const q = search.value.trim().toLowerCase();
   return (employees.value ?? []).filter(
     (e) =>
-      (!department.value || e.department === department.value)
+      matchesAccess(e)
+      && (!department.value || e.department === department.value)
       && (!status.value || e.employment_status === status.value)
       && (!q || [e.full_name, e.position, e.department, e.work_location].some((v) => v && v.toLowerCase().includes(q))),
   );
 });
+
+// New people with blanks first, then team accounts, then people HR only keeps information on
+const CATEGORIES = [
+  { key: "incomplete", title: "New · details missing", hint: "Open one to fill in what's missing. Their QR code already works.", tone: "amber", icon: "alert" },
+  { key: "account", title: "Has an account", hint: "They sign in to the ERP and use their QR code for attendance.", tone: "blue", icon: "user" },
+  { key: "info", title: "Information only", hint: "HR keeps their details; they don't sign in.", tone: "violet", icon: "note" },
+];
+const categoryOf = (e) => (e.missing_details?.length ? "incomplete" : e.account_id ? "account" : "info");
+const groups = computed(() =>
+  CATEGORIES.map((c) => ({ ...c, people: shown.value.filter((e) => categoryOf(e) === c.key) })).filter((g) => g.people.length),
+);
+function matchesAccess(e) {
+  if (access.value === "account") return !!e.account_id;
+  if (access.value === "info") return !e.account_id;
+  if (access.value === "incomplete") return !!e.missing_details?.length;
+  return true;
+}
 
 async function load() {
   if (loading.value) return;
@@ -230,6 +269,99 @@ onBeforeUnmount(() => {
 .dr-filters .sp-select {
   width: auto;
   min-width: 150px;
+}
+.dr-group + .dr-group {
+  margin-top: 26px;
+}
+.dr-group-head {
+  margin-bottom: 12px;
+}
+.dr-group-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v-text);
+}
+.dr-group-head h3 > span:first-child {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+.dr-group-head h3 :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
+.dr-count {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--v-subtle);
+  color: var(--v-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.dr-group-head p {
+  margin: 4px 0 0 38px;
+  font-size: 12.5px;
+  color: var(--v-muted);
+}
+.dr-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+}
+.dr-badges .sp-chip :deep(svg) {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+.dr-missing {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px dashed var(--v-amber-text);
+  border-radius: 12px;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.dr-missing:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+.dr-missing:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.dr-missing:disabled {
+  cursor: default;
+}
+.dr-missing :deep(svg) {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+.dr-missing b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.dr-missing small {
+  display: block;
+  margin-top: 1px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 .dr-grid {
   display: grid;

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Models\Employee;
 use App\Models\SalaryRecord;
 use App\Services\Payroll\PayAccess;
+use App\Services\Staff\AccountProfileService;
 
 use App\Traits\ScopesOwner;
 
@@ -36,6 +37,12 @@ class EmployeeInfoController extends Controller
             ]);
 
             $query = EmployeeInfo::forOwner($ownerId)->with('createdBy:id,name')->withCount('documents');
+            if (AccountProfileService::ready()) {
+                $query->with('account:id,name,username,status');
+                if ($request->filled('access')) {
+                    $query->byAccess($request->access);
+                }
+            }
 
             if ($request->filled('search')) {
                 $query->search($request->search);
@@ -229,7 +236,7 @@ class EmployeeInfoController extends Controller
                 Log::info('Avatar stored successfully to Cloudinary:', ['path' => $avatarPath]);
             }
 
-            $employeeId = $this->generateEmployeeId($ownerId);
+            $employeeId = app(AccountProfileService::class)->nextEmployeeId($ownerId);
 
             $shiftStart = $request->shift_start;
             $shiftEnd = $request->shift_end;
@@ -307,6 +314,7 @@ class EmployeeInfoController extends Controller
             $employeeInfoData = $this->filterExistingEmployeeInfoColumns($employeeInfoData);
             $employeeInfo = EmployeeInfo::create($employeeInfoData);
             $this->recordSalary($employeeInfo, $user, 'Starting pay');
+            app(AccountProfileService::class)->linkByEmail($employeeInfo);
 
             DB::commit();
 
@@ -773,31 +781,6 @@ class EmployeeInfoController extends Controller
         }
     }
 
-    /**
-     * Generate a unique Employee ID for the given owner.
-     */
-    private function generateEmployeeId(int $ownerId): string
-    {
-        $lastEmployee = EmployeeInfo::forOwner($ownerId)
-            ->orderBy('id', 'desc')
-            ->first();
-
-        if ($lastEmployee && $lastEmployee->employee_id) {
-            preg_match('/EMP-(\d+)/', $lastEmployee->employee_id, $matches);
-            
-            if (isset($matches[1])) {
-                $lastNumber = (int) $matches[1];
-                $newNumber = $lastNumber + 1;
-            } else {
-                $newNumber = 10001;
-            }
-        } else {
-            $newNumber = 10001;
-        }
-
-        return 'EMP-' . $newNumber;
-    }
-
     private function filterExistingEmployeeInfoColumns(array $data): array
     {
         static $columns = null;
@@ -863,6 +846,10 @@ class EmployeeInfoController extends Controller
             $contractual = EmployeeInfo::forOwner($ownerId)->byStatus('Contractual')->count();
             $partTime = EmployeeInfo::forOwner($ownerId)->byStatus('Part-time')->count();
 
+            $linked = AccountProfileService::ready();
+            $withAccount = $linked ? EmployeeInfo::forOwner($ownerId)->byAccess('account')->count() : 0;
+            $needsDetails = $linked ? EmployeeInfo::forOwner($ownerId)->byAccess('incomplete')->count() : 0;
+
             $departments = EmployeeInfo::forOwner($ownerId)
                 ->select('department', DB::raw('count(*) as count'))
                 ->groupBy('department')
@@ -882,6 +869,11 @@ class EmployeeInfoController extends Controller
                         'regular' => $regular,
                         'contractual' => $contractual,
                         'part_time' => $partTime,
+                    ],
+                    'by_access' => [
+                        'account' => $withAccount,
+                        'info' => $total - $withAccount,
+                        'incomplete' => $needsDetails,
                     ],
                     'by_department' => $departments,
                     'by_location' => $locations,

@@ -93,6 +93,26 @@ class EmployeeInfo extends Model
         'full_name',
         'avatar_url',
         'added_by',
+        'missing_details',
+    ];
+
+    /** What HR still has to fill in before a profile is complete (column => what people call it) */
+    public const DETAILS = [
+        'last_name' => 'Last name',
+        'gender' => 'Gender',
+        'date_of_birth' => 'Birthday',
+        'civil_status' => 'Civil status',
+        'personal_email' => 'Personal email',
+        'mobile_number' => 'Mobile',
+        'address' => 'Address',
+        'emergency_contact_name' => 'Emergency contact',
+        'emergency_contact_number' => 'Emergency number',
+        'emergency_relationship' => 'Emergency relationship',
+        'position' => 'Position',
+        'department' => 'Department',
+        'work_location' => 'Work location',
+        'reporting_manager' => 'Reports to',
+        'shift_start' => 'Usual hours',
     ];
 
     // Accessor for full_name
@@ -147,7 +167,22 @@ class EmployeeInfo extends Model
         return $this->relationLoaded('createdBy') ? ($this->createdBy?->name ?? 'HR') : 'HR';
     }
 
+    /** ["Birthday", "Address", …] — empty once the profile is complete */
+    public function getMissingDetailsAttribute(): array
+    {
+        return array_values(array_filter(
+            self::DETAILS,
+            fn ($label, $column) => array_key_exists($column, $this->attributes) && blank($this->attributes[$column]),
+            ARRAY_FILTER_USE_BOTH,
+        ));
+    }
+
     // Relationships
+    public function account()
+    {
+        return $this->belongsTo(Employee::class, 'account_id');
+    }
+
     public function documents()
     {
         return $this->hasMany(EmployeeDocument::class, 'employee_info_id');
@@ -179,6 +214,24 @@ class EmployeeInfo extends Model
                 ->orWhere('personal_email', 'like', "%{$search}%")
                 ->orWhere('mobile_number', 'like', "%{$search}%");
         });
+    }
+
+    /** account: has a team account · info: information only · incomplete: details still missing */
+    public function scopeByAccess($query, string $access)
+    {
+        return match ($access) {
+            'account' => $query->whereNotNull('account_id'),
+            'info' => $query->whereNull('account_id'),
+            'incomplete' => $query->where(function ($q) {
+                foreach (array_keys(self::DETAILS) as $column) {
+                    $q->orWhereNull($column);
+                }
+                foreach (['last_name', 'personal_email', 'mobile_number', 'address', 'position', 'department', 'work_location', 'reporting_manager'] as $column) {
+                    $q->orWhere($column, '');
+                }
+            }),
+            default => $query,
+        };
     }
 
     public function scopeByStatus($query, string $status)

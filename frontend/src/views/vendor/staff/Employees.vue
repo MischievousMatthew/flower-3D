@@ -65,6 +65,10 @@
             <option value="On Leave">On leave</option>
             <option value="Resign">Left the shop</option>
           </select>
+          <select v-if="tab === 'profiles'" v-model="profileAccess" class="sp-select" aria-label="Account">
+            <option value="">Everyone</option>
+            <option v-for="a in ACCESS_FILTERS" :key="a.value" :value="a.value">{{ a.label }}</option>
+          </select>
           <label class="sp-search">
             <span v-html="ICONS.search"></span>
             <input v-model="search" class="sp-input" type="search" :placeholder="tab === 'accounts' ? 'Name, username or email' : 'Name, position or department'" aria-label="Search people" />
@@ -151,8 +155,10 @@
             <div class="em-tags">
               <span class="sp-chip" :class="isActiveProfile(p) ? 'green' : 'slate'">{{ p.employment_status || "Active" }}</span>
               <span v-if="p.employment_type" class="sp-chip slate">{{ p.employment_type }}</span>
+              <span v-if="p.account" class="sp-chip blue" :title="`Signs in as @${p.account.username || p.account.name}`"><span v-html="ICONS.user"></span>Has an account</span>
               <span v-if="p.account?.role" class="st-role">{{ p.account.role }}</span>
             </div>
+            <p v-if="p.missing_details?.length" class="em-missing"><span v-html="ICONS.alert"></span><span><b>New · details missing</b>{{ missingSummary(p.missing_details) }}</span></p>
             <dl class="em-facts">
               <div><dt>Usual hours</dt><dd>{{ p.usual_hours ? range12(p.usual_hours) : "Not set" }}</dd></div>
               <div><dt>Rest days</dt><dd>{{ p.rest_days.length ? shortDays(p.rest_days) : "None" }}</dd></div>
@@ -299,6 +305,14 @@
             </div>
           </div>
           <div class="sp-drawer-body">
+            <div v-if="profile.missing_details?.length" class="sp-banner warn em-missing-banner">
+              <span v-html="ICONS.alert"></span>
+              <div>
+                <strong>New team member: finish their profile</strong>
+                <p>Still missing: {{ profile.missing_details.join(", ") }}. Their QR code for attendance already works.</p>
+              </div>
+              <button v-if="data?.hr_available" type="button" class="sp-btn sp-btn-primary sp-btn-sm" :disabled="!full" @click="openProfileForm(full)">Complete details</button>
+            </div>
             <p class="em-by">{{ full?.employee_id ? `${full.employee_id} · ` : "" }}Added by {{ full?.added_by || profile.added_by || "HR" }}</p>
             <h4 class="st-section-title first">Work</h4>
             <dl class="st-dl">
@@ -536,7 +550,7 @@ import { formatDate, money, ymd } from "../../../components/vendor/finance/finan
 import { STATUS_LABEL, STATUS_TONE, personColor, range12, relativeTime, time12 } from "../../../components/vendor/staff/staffUi";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
-import { CONTACT_FIELDS as CONTACT, DAYS, EMERGENCY_FIELDS as EMERGENCY, JOB_FIELDS as JOB, PER, PERSONAL_FIELDS as PERSONAL, PROFILE_KEYS, REQUIRED_FIELDS as REQUIRED, day10, hm5 } from "../../../components/hr/hrUi";
+import { ACCESS_FILTERS, CONTACT_FIELDS as CONTACT, DAYS, EMERGENCY_FIELDS as EMERGENCY, JOB_FIELDS as JOB, PER, PERSONAL_FIELDS as PERSONAL, PROFILE_KEYS, REQUIRED_FIELDS as REQUIRED, day10, hm5, missingSummary } from "../../../components/hr/hrUi";
 
 const today = ymd(new Date());
 
@@ -548,6 +562,7 @@ const settingUp = ref("");
 const tab = ref("accounts");
 const search = ref("");
 const status = ref("");
+const profileAccess = ref("");
 const roleFilter = ref(typeof route.query.role === "string" ? route.query.role : "");
 const form = ref(null);
 const errors = reactive({});
@@ -578,7 +593,11 @@ const accounts = computed(() => {
 });
 const profiles = computed(() => {
   const q = search.value.trim().toLowerCase();
-  return (data.value?.profiles ?? []).filter((p) => !q || [p.name, p.position, p.department].some((v) => v && v.toLowerCase().includes(q)));
+  return (data.value?.profiles ?? []).filter(
+    (p) =>
+      (profileAccess.value === "account" ? p.account : profileAccess.value === "info" ? !p.account : profileAccess.value === "incomplete" ? p.missing_details?.length : true)
+      && (!q || [p.name, p.position, p.department].some((v) => v && v.toLowerCase().includes(q))),
+  );
 });
 
 const isActiveProfile = (p) => !/resign|terminat|inactive/i.test(p.employment_status ?? "");
@@ -851,6 +870,53 @@ button.em-profile:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+.em-tags .sp-chip :deep(svg) {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+.em-missing {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px dashed var(--v-amber-text);
+  border-radius: 10px;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.em-missing b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.em-missing :deep(svg) {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+}
+.em-missing-banner {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.em-missing-banner > div {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.em-missing-banner strong {
+  display: block;
+  font-weight: 600;
+}
+.em-missing-banner p {
+  margin: 2px 0 0;
+}
+.em-missing-banner .sp-btn {
+  align-self: center;
 }
 .em-facts {
   display: grid;
