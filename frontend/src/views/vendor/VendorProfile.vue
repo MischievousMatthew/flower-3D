@@ -320,9 +320,9 @@
                 <input
                   type="tel"
                   v-model="formData.general.contact_number"
+                  v-phone
                   class="form-input"
                   :class="{ 'is-invalid': generalForm.errors.contact_number }"
-                  placeholder="+63 912 345 6789"
                   required
                   @input="generalForm.clearError('contact_number')"
                 />

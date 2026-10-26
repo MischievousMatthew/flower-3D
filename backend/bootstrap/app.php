@@ -46,6 +46,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Staff & operations → Activity logs: what employees change
         $middleware->api(append: [\App\Http\Middleware\LogStaffActivity::class]);
+
+        // Every contact number is saved as "0917 123 4567"
+        $middleware->api(append: [\App\Http\Middleware\FormatPhoneNumbers::class]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // API errors in plain words, even with APP_DEBUG on. The full error

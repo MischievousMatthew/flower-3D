@@ -28,15 +28,12 @@ class VendorController extends Controller
         'pwd' => 'PWD ID',
     ];
 
-    /** Philippine mobile (09XX XXX XXXX / +63 9XX…) or landline (area code + 7–8 digits) */
+    /** A Philippine mobile number, 09XX XXX XXXX (App\Support\Phone) */
     private static function phonePattern(): \Closure
     {
         return function (string $attribute, mixed $value, \Closure $fail) {
-            $digits = preg_replace('/[^\d+]/', '', (string) $value);
-            $mobile = preg_match('/^(\+?63|0)9\d{9}$/', $digits);
-            $landline = preg_match('/^(\+?63|0)\d{8,10}$/', $digits);
-            if (! $mobile && ! $landline) {
-                $fail('Enter a Philippine number, like 0917 123 4567 or (046) 123 4567.');
+            if (\App\Support\Phone::format((string) $value) === null) {
+                $fail(\App\Support\Phone::MESSAGE);
             }
         };
     }

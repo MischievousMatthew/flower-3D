@@ -41,7 +41,7 @@
           </label>
           <label class="sp-field">
             <span class="sp-label">Phone</span>
-            <input v-model.trim="form.phone" class="sp-input" :class="{ invalid: err.phone }" type="tel" inputmode="tel" maxlength="20" placeholder="0917 123 4567" :aria-invalid="!!err.phone" />
+            <input v-model.trim="form.phone" v-phone class="sp-input" :class="{ invalid: err.phone }" type="tel" :aria-invalid="!!err.phone" />
             <small v-if="err.phone" class="sp-error">{{ err.phone }}</small>
           </label>
           <label class="sp-field sp-span-all">
@@ -117,7 +117,7 @@
             </label>
             <label class="sp-field">
               <span class="sp-label">Phone</span>
-              <input v-model.trim="c.phone" class="sp-input" :class="{ invalid: err[`contacts.${i}.phone`] }" type="tel" maxlength="20" />
+              <input v-model.trim="c.phone" v-phone class="sp-input" :class="{ invalid: err[`contacts.${i}.phone`] }" type="tel" />
               <small v-if="err[`contacts.${i}.phone`]" class="sp-error">{{ err[`contacts.${i}.phone`] }}</small>
             </label>
             <label class="sp-field">
@@ -166,6 +166,7 @@ import { SHOP_ICONS as ICONS } from "../vendor/shop/shopIcons";
 import { SUPPLIER_TYPES, STATUS, DAYS, shortDay, daysText } from "./supplierUi";
 import { buildMultipartFormData, clearFileInput, getSelectedFile, readImagePreview, validateImageFile } from "../../utils/imageUpload";
 import { toast } from "@/utils/snackbar";
+import { PHONE_MESSAGE, isPhone } from "../../utils/phone";
 
 const props = defineProps({
   initial: { type: Object, default: null },
@@ -256,6 +257,7 @@ function validate() {
   if (!form.company_name) err.company_name = "Enter the business name.";
   if (!form.contact_person) err.contact_person = "Enter who to talk to.";
   if (!form.phone) err.phone = "Enter a phone number.";
+  else if (!isPhone(form.phone)) err.phone = PHONE_MESSAGE;
   if (!form.email) err.email = "Enter an email address.";
   else if (!EMAIL.test(form.email)) err.email = "That email doesn't look right. Check for typos.";
   if (!form.address) err.address = "Enter the supplier's address.";
@@ -264,6 +266,7 @@ function validate() {
   form.contacts.forEach((c, i) => {
     if (!c.contact_person) err[`contacts.${i}.contact_person`] = "Enter a name.";
     if (!c.phone) err[`contacts.${i}.phone`] = "Enter a phone number.";
+    else if (!isPhone(c.phone)) err[`contacts.${i}.phone`] = PHONE_MESSAGE;
     if (!c.email) err[`contacts.${i}.email`] = "Enter an email address.";
     else if (!EMAIL.test(c.email)) err[`contacts.${i}.email`] = "That email doesn't look right.";
   });

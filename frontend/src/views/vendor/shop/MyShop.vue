@@ -43,7 +43,7 @@
             <div class="sp-grid-2">
               <label class="sp-field">
                 <span>Phone</span>
-                <input v-model.trim="form.contact_number" class="sp-input" :class="{ invalid: errors.contact_number }" maxlength="20" inputmode="tel" required />
+                <input v-model.trim="form.contact_number" v-phone type="tel" class="sp-input" :class="{ invalid: errors.contact_number }" required />
                 <small v-if="errors.contact_number" class="sp-error">{{ errors.contact_number }}</small>
               </label>
               <label class="sp-field">
@@ -168,6 +168,7 @@ import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { useVendorProfile } from "../../../composables/useVendorProfile";
 import { hoursText as describeHours, openNow as isOpenNow, weekFrom, weekFromText } from "../../../components/vendor/shop/businessHours";
 import "../../../components/vendor/shop/shop.css";
+import { PHONE_MESSAGE, isPhone } from "../../../utils/phone";
 
 const FIELDS = ["store_name", "store_description", "store_street", "store_address", "service_areas", "contact_number", "email", "facebook_page", "instagram_page", "store_latitude", "store_longitude"];
 
@@ -216,6 +217,7 @@ function validate() {
   if (!f.store_name) errors.store_name = "Your shop needs a name.";
   if (!f.store_address) errors.store_address = "Add your shop's address.";
   if (!f.contact_number) errors.contact_number = "Add a phone number.";
+  else if (!isPhone(f.contact_number)) errors.contact_number = PHONE_MESSAGE;
   for (const key of ["facebook_page", "instagram_page"]) {
     if (f[key] && !/^https?:\/\/\S+\.\S+/.test(f[key])) errors[key] = "Use a full link starting with https://";
   }

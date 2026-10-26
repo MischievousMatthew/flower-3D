@@ -194,17 +194,15 @@
               </span>
               <div class="detail-content">
                 <label :for="isEditing ? 'pf-number' : undefined">Number</label>
-                <!-- Numbers only, capped at 11 digits -->
+                <!-- Types as 09XX XXX XXXX -->
                 <input
                   v-if="isEditing"
                   id="pf-number"
                   v-model="editData.contact_number"
+                  v-phone
                   type="tel"
                   class="input-field"
                   :class="{ 'input-error': contactNumberError }"
-                  placeholder="e.g. 09123456789"
-                  maxlength="11"
-                  @input="sanitizeContactNumber"
                 />
                 <span v-if="isEditing && contactNumberError" class="field-error">
                   {{ contactNumberError }}
@@ -476,6 +474,7 @@ import {
 } from "../../utils/serviceArea";
 import { useRouter } from "vue-router";
 import api from "../../plugins/axios";
+import { PHONE_MESSAGE, isPhone } from "../../utils/phone";
 import NavHeader from "../../layouts/NavHeader.vue";
 import ProfilePreferences from "../../components/customer/ProfilePreferences.vue";
 import { useAuth } from "../../composables/useAuth";
@@ -495,20 +494,11 @@ const { logout } = useAuth();
 
 // ─── Contact number helpers ───────────────────────────────────────────────────
 
-/** Strip any non-digit character and enforce 11-digit max in real time */
-const sanitizeContactNumber = () => {
-  editData.contact_number = editData.contact_number
-    .replace(/\D/g, "")
-    .slice(0, 11);
-};
-
 /** Live error message shown beneath the field */
 const contactNumberError = computed(() => {
   const val = editData.contact_number;
   if (!val) return ""; // empty is allowed (nullable on backend)
-  if (val.length > 0 && val.length < 11)
-    return "Contact number must be exactly 11 digits.";
-  return "";
+  return isPhone(val) ? "" : PHONE_MESSAGE;
 });
 
 // ─── Delivery location (map pin → region, city, postal code) ──────────────────
@@ -929,9 +919,9 @@ const cancelEdit = () => {
 };
 
 const saveProfile = async () => {
-  // ✅ Contact number must be empty or exactly 11 digits
-  if (editData.contact_number && editData.contact_number.length !== 11) {
-    toast.error("Contact number must be exactly 11 digits.");
+  // Contact number must be empty or 09XX XXX XXXX
+  if (editData.contact_number && !isPhone(editData.contact_number)) {
+    toast.error(PHONE_MESSAGE);
     return;
   }
 

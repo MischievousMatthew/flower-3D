@@ -522,7 +522,7 @@
               <label class="field"><span>Tagline</span><input v-model="website.tagline" class="input" maxlength="140" /></label>
               <label class="field full"><span>About (footer text)</span><textarea v-model="website.about" class="input" rows="3" maxlength="600"></textarea></label>
               <label class="field"><span>Contact email</span><input v-model="website.contact_email" type="email" class="input" /></label>
-              <label class="field"><span>Contact phone</span><input v-model="website.contact_phone" class="input" maxlength="40" /></label>
+              <label class="field"><span>Contact phone</span><input v-model="website.contact_phone" v-phone type="tel" class="input" /></label>
               <label class="field full"><span>Address</span><input v-model="website.address" class="input" maxlength="255" /></label>
               <label class="field"><span>Business hours</span><input v-model="website.business_hours" class="input" placeholder="Mon–Sat, 8 AM–6 PM" maxlength="120" /></label>
               <label class="field"><span>Footer note</span><input v-model="website.footer_note" class="input" placeholder="All rights reserved." maxlength="200" /></label>

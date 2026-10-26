@@ -174,7 +174,7 @@
             </div>
             <div class="vr-field">
               <label class="vr-label" for="vr-phone">Mobile or landline</label>
-              <input id="vr-phone" v-model="formData.contactNumber" name="contactNumber" type="tel" inputmode="tel" autocomplete="tel" class="vr-input" :class="{ error: errors.contactNumber }" placeholder="0917 123 4567" />
+              <input id="vr-phone" v-model="formData.contactNumber" v-phone name="contactNumber" type="tel" autocomplete="tel" class="vr-input" :class="{ error: errors.contactNumber }" placeholder="0917 123 4567" />
               <p class="vr-error" aria-live="polite">{{ errors.contactNumber }}</p>
             </div>
             <div class="vr-field">
@@ -450,6 +450,7 @@ import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { findPlan, readPendingPlan } from "../../constants/subscriptionPlans";
+import { PHONE_MESSAGE, formatPhone, isPhone } from "../../utils/phone";
 
 const router = useRouter();
 
@@ -573,10 +574,7 @@ const formatTin = (value) => {
 };
 const tinOk = (value) => /^\d{9}(\d{3}|\d{5})?$/.test(String(value).replace(/-/g, ""));
 // Mobile (09XX… / +63 9XX…) or landline with area code
-const phoneOk = (value) => {
-  const d = String(value).replace(/[^\d+]/g, "");
-  return /^(\+?63|0)9\d{9}$/.test(d) || /^(\+?63|0)\d{8,10}$/.test(d);
-};
+const phoneOk = (value) => isPhone(formatPhone(value));
 
 const steps = [
   { number: 1, title: "Your shop" },
@@ -1583,7 +1581,7 @@ const validateStep = (step) => {
         errors.contactNumber = "Contact number is required";
         isValid = false;
       } else if (!phoneOk(formData.contactNumber)) {
-        errors.contactNumber = "Use a PH number, like 0917 123 4567";
+        errors.contactNumber = PHONE_MESSAGE;
         isValid = false;
       }
       if (!formData.governmentIdType) {

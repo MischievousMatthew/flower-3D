@@ -112,7 +112,8 @@ class VendorApplicationRequirementsTest extends TestCase
         $this->assertNotContains('bir_tin', $this->failing(['bir_tin' => '123456789']));
         $this->assertContains('bir_tin', $this->failing(['bir_tin' => '12345']));
         $this->assertNotContains('contact_number', $this->failing(['contact_number' => '+63 917 123 4567']));
-        $this->assertNotContains('contact_number', $this->failing(['contact_number' => '(046) 123 4567']));
+        // Every contact number is a mobile number (0917 123 4567); landlines are refused
+        $this->assertContains('contact_number', $this->failing(['contact_number' => '(046) 123 4567']));
         $this->assertContains('contact_number', $this->failing(['contact_number' => '12345']));
     }
 }

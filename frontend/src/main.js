@@ -7,6 +7,7 @@ import { applyVendorTheme } from "./composables/useVendorTheme";
 import "./styles/vendor-theme.css";
 import "./styles/float-fields.css";
 import { installModalCloseGuard } from "./utils/modalCloseGuard";
+import { vPhone } from "./utils/phone";
 
 configurePhilippineDateTimeDefaults();
 // Clicking outside a modal with typed info asks first (every modal on the site)
@@ -30,6 +31,8 @@ window.addEventListener("vite:preloadError", (event) => {
 const app = createApp(App);
 
 app.use(router);
+// v-phone: every contact number input types as "09XX XXX XXXX"
+app.directive("phone", vPhone);
 // Theme color and dark mode for the vendor pages
 applyVendorTheme(router);
 

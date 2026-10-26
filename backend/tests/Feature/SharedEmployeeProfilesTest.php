@@ -296,4 +296,21 @@ class SharedEmployeeProfilesTest extends TestCase
         $this->assertSame(1, EmployeeInfo::where('owner_id', $vendor->id)->count());
         $this->signIn($vendor)->getJson('/api/employees-info?access=info')->assertOk()->assertJsonCount(0, 'data');
     }
+    public function test_contact_numbers_are_saved_as_09xx_xxx_xxxx_and_other_numbers_are_refused(): void
+    {
+        $vendor = $this->vendor();
+
+        $id = $this->signIn($vendor)->postJson('/api/employees-info', $this->profilePayload([
+            'mobile_number' => '+63 917 123 4567',
+            'emergency_contact_number' => '09181234567',
+        ]))->assertCreated()->json('data.id');
+
+        $profile = EmployeeInfo::find($id);
+        $this->assertSame('0917 123 4567', $profile->mobile_number);
+        $this->assertSame('0918 123 4567', $profile->emergency_contact_number);
+
+        $this->signIn($vendor)->postJson('/api/employees-info', $this->profilePayload(['mobile_number' => '12345']))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['mobile_number']);
+    }
 }

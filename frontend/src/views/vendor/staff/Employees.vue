@@ -222,7 +222,8 @@
               </label>
               <label class="sp-field">
                 <span>Phone <small>(optional)</small></span>
-                <input v-model="form.phone" class="sp-input" maxlength="20" inputmode="tel" />
+                <input v-model="form.phone" v-phone type="tel" class="sp-input" :class="{ invalid: errors.phone }" />
+                <small v-if="errors.phone" class="sp-error">{{ errors.phone }}</small>
               </label>
               <label class="sp-field">
                 <span>Started on</span>
@@ -416,7 +417,8 @@
             <div class="sp-grid-2">
               <label v-for="f in CONTACT" :key="f.key" class="sp-field" :class="{ 'sp-span-all': f.wide }">
                 <span>{{ f.label }}</span>
-                <input v-model="pform[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: perrors[f.key] }" :maxlength="f.max" :inputmode="f.type === 'tel' ? 'tel' : undefined" />
+                <input v-if="f.type === 'tel'" v-model="pform[f.key]" v-phone type="tel" class="sp-input" :class="{ invalid: perrors[f.key] }" />
+                <input v-else v-model="pform[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: perrors[f.key] }" :maxlength="f.max" />
                 <small v-if="perrors[f.key]" class="sp-error">{{ perrors[f.key] }}</small>
               </label>
             </div>
@@ -425,7 +427,8 @@
             <div class="sp-grid-2">
               <label v-for="f in EMERGENCY" :key="f.key" class="sp-field" :class="{ 'sp-span-all': f.wide }">
                 <span>{{ f.label }}</span>
-                <input v-model="pform[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: perrors[f.key] }" :maxlength="f.max" :placeholder="f.placeholder" />
+                <input v-if="f.type === 'tel'" v-model="pform[f.key]" v-phone type="tel" class="sp-input" :class="{ invalid: perrors[f.key] }" />
+                <input v-else v-model="pform[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: perrors[f.key] }" :maxlength="f.max" :placeholder="f.placeholder" />
                 <small v-if="perrors[f.key]" class="sp-error">{{ perrors[f.key] }}</small>
               </label>
             </div>
@@ -550,6 +553,7 @@ import { formatDate, money, ymd } from "../../../components/vendor/finance/finan
 import { STATUS_LABEL, STATUS_TONE, personColor, range12, relativeTime, time12 } from "../../../components/vendor/staff/staffUi";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
+import { PHONE_MESSAGE, isPhone } from "../../../utils/phone";
 import { ACCESS_FILTERS, CONTACT_FIELDS as CONTACT, DAYS, EMERGENCY_FIELDS as EMERGENCY, JOB_FIELDS as JOB, PER, PERSONAL_FIELDS as PERSONAL, PROFILE_KEYS, REQUIRED_FIELDS as REQUIRED, day10, hm5, missingSummary } from "../../../components/hr/hrUi";
 
 const today = ymd(new Date());
@@ -645,6 +649,7 @@ function validate() {
   if (!f.name.trim()) errors.name = "Enter their name.";
   if (!/^\S+@\S+\.\S+$/.test(f.email.trim())) errors.email = "Enter a valid email.";
   if (!f.joining_date) errors.joining_date = "Pick the day they started.";
+  if (f.phone && !isPhone(f.phone)) errors.phone = PHONE_MESSAGE;
   // The same rule as every other account (the checklist shows what's missing)
   if ((!f.id || f.password) && !passwordOk(f.password)) errors.password = "The password needs every item on the list.";
   return !Object.keys(errors).length;
@@ -736,6 +741,7 @@ function validateProfile() {
   Object.keys(perrors).forEach((k) => delete perrors[k]);
   const f = pform.value;
   for (const k of REQUIRED) if (!String(f[k] ?? "").trim()) perrors[k] = "Required.";
+  for (const k of ["mobile_number", "emergency_contact_number"]) if (f[k] && !isPhone(f[k])) perrors[k] = PHONE_MESSAGE;
   for (const k of ["work_email", "personal_email"]) if (f[k] && !/^\S+@\S+\.\S+$/.test(f[k].trim())) perrors[k] = "Enter a valid email.";
   if (f.date_of_birth && f.date_of_birth >= today) perrors.date_of_birth = "Pick a day in the past.";
   if (f.shift_start && f.shift_end && f.shift_end <= f.shift_start) perrors.shift_end = "End after it starts.";

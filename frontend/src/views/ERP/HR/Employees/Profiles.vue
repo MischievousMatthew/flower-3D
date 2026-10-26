@@ -280,7 +280,8 @@
             <div class="sp-grid-2">
               <label v-for="f in CONTACT_FIELDS" :key="f.key" class="sp-field" :class="{ 'sp-span-all': f.wide }">
                 <span class="sp-label">{{ f.label }}</span>
-                <input v-model="form[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: errors[f.key] }" :maxlength="f.max" :inputmode="f.type === 'tel' ? 'tel' : undefined" />
+                <input v-if="f.type === 'tel'" v-model="form[f.key]" v-phone type="tel" class="sp-input" :class="{ invalid: errors[f.key] }" />
+                <input v-else v-model="form[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: errors[f.key] }" :maxlength="f.max" />
                 <small v-if="errors[f.key]" class="sp-error">{{ errors[f.key] }}</small>
               </label>
             </div>
@@ -289,7 +290,8 @@
             <div class="sp-grid-2">
               <label v-for="f in EMERGENCY_FIELDS" :key="f.key" class="sp-field">
                 <span class="sp-label">{{ f.label }}</span>
-                <input v-model="form[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: errors[f.key] }" :maxlength="f.max" :placeholder="f.placeholder" />
+                <input v-if="f.type === 'tel'" v-model="form[f.key]" v-phone type="tel" class="sp-input" :class="{ invalid: errors[f.key] }" />
+                <input v-else v-model="form[f.key]" :type="f.type || 'text'" class="sp-input" :class="{ invalid: errors[f.key] }" :maxlength="f.max" :placeholder="f.placeholder" />
                 <small v-if="errors[f.key]" class="sp-error">{{ errors[f.key] }}</small>
               </label>
             </div>
@@ -450,6 +452,7 @@ import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcon
 import { formatDate, money, ymd } from "../../../../components/vendor/finance/financeUi";
 import { personColor, time12 } from "../../../../components/vendor/staff/staffUi";
 import EmployeePhoto from "../../../../components/hr/EmployeePhoto.vue";
+import { PHONE_MESSAGE, isPhone } from "../../../../utils/phone";
 import { buildMultipartFormData, getSelectedFile, readImagePreview, validateImageFile } from "../../../../utils/imageUpload";
 import {
   ACCESS_FILTERS, CONTACT_FIELDS, DAYS, EMERGENCY_FIELDS, EMPLOYEE_TABS, EMPLOYMENT_STATUSES, JOB_FIELDS, PER, PERSONAL_FIELDS, PROFILE_KEYS,
@@ -670,6 +673,7 @@ function validate() {
   Object.keys(errors).forEach((k) => delete errors[k]);
   const f = form.value;
   for (const k of REQUIRED_FIELDS) if (!String(f[k] ?? "").trim()) errors[k] = "Required.";
+  for (const k of ["mobile_number", "emergency_contact_number"]) if (f[k] && !isPhone(f[k])) errors[k] = PHONE_MESSAGE;
   for (const k of ["work_email", "personal_email"]) if (f[k] && !/^\S+@\S+\.\S+$/.test(String(f[k]).trim())) errors[k] = "Enter a valid email.";
   if (f.date_of_birth && f.date_of_birth >= today) errors.date_of_birth = "Pick a day in the past.";
   if (f.shift_start && f.shift_end && f.shift_end <= f.shift_start) errors.shift_end = "End after it starts.";

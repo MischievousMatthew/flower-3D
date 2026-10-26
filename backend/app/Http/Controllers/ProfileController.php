@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\Phone;
 use App\Helpers\CloudinaryHelper;
 use App\Models\TwoFactorManagementChallenge;
 use App\Services\EmailOtpService;
@@ -61,7 +62,7 @@ class ProfileController extends Controller
                 'longitude'      => 'nullable|numeric|between:-180,180|required_with:latitude',
                 'contact_number' => [
                     'nullable',
-                    'digits:11',
+                    'regex:' . Phone::PATTERN,
                     Rule::unique('users', 'contact_number')->ignore($user->id),
                 ],
                 'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',

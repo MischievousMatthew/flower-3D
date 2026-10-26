@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\Phone;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\TwoFactorLoginChallenge;
@@ -179,7 +180,7 @@ class AuthController extends Controller
             'surname'               => 'required|string|max:255',
             'username'              => ['required', 'string', 'max:255', 'alpha_dash', $takenIgnoringCase('username', 'This username is taken. Try another one.')],
             'email'                 => ['required', 'email', 'max:255', $takenIgnoringCase('email', 'This email already has an account. Log in instead, or reset your password if you forgot it.')],
-            'contact_number'        => 'nullable|string|regex:/^[0-9]{10,15}$/',
+            'contact_number'        => ['nullable', 'string', 'regex:' . Phone::PATTERN],
             'password'              => 'required|string|min:8|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/',
             'otp'                   => 'required|string|size:6',
         ], [
