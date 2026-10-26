@@ -244,8 +244,7 @@ class WarehouseBatchService
             ->where('status', 'active')
             ->sum('qty_remaining');
 
-        Product::where('id', $productId)
-            ->update(['quantity_in_stock' => $total]);
+        Product::find($productId)?->update(['quantity_in_stock' => $total]);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────

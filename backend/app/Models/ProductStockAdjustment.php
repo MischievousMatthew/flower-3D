@@ -14,6 +14,7 @@ class ProductStockAdjustment extends Model
         'restock' => 'Restocked',
         'sold_offline' => 'Sold in store',
         'damaged' => 'Damaged or wilted',
+        'used' => 'Used in arrangements',
         'returned' => 'Customer return',
         'count' => 'Stock count',
         'other' => 'Other',

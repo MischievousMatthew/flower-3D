@@ -20,6 +20,9 @@ class Product extends Model
     public const MODERATION_RESUBMITTED = 'resubmitted'; // fixed by the vendor, still down until reviewed
     public const MODERATION_REMOVED = 'removed';         // taken down for good
     public const MODERATION_LIVE = [self::MODERATION_PENDING, self::MODERATION_APPROVED];
+    // A material the shop uses but doesn't sell (wrapping, ribbon, vases…):
+    // counted in stock, never shown to customers or in the shop's product lists
+    public const MODERATION_INTERNAL = 'internal';
 
     /**
      * Products customers may see: not taken down by BloomCraft and not from a
@@ -37,8 +40,51 @@ class Product extends Model
         return $this->hasMany(ProductReport::class);
     }
 
+    protected static function booted(): void
+    {
+        // Low-stock alert: tell the shop owner once, when stock drops to or
+        // below the minimum (not again until it has been refilled above it)
+        static::updated(function (Product $product) {
+            if (! $product->wasChanged('quantity_in_stock')) {
+                return;
+            }
+            $min = (int) $product->min_stock_level;
+            $before = (int) $product->getOriginal('quantity_in_stock');
+            $after = (int) $product->quantity_in_stock;
+            if ($min <= 0 || $before <= $min || $after > $min || ! $product->owner_id) {
+                return;
+            }
+            try {
+                app(\App\Services\NotificationService::class)->notify(
+                    [$product->owner_id],
+                    'low_stock',
+                    $after <= 0 ? "Out of stock: {$product->product_name}" : "Running low: {$product->product_name}",
+                    $after <= 0 ? "Nothing left. The minimum is {$min}." : "{$after} left, at or under the minimum of {$min}.",
+                    '/erp/procurement/inventory/stock',
+                );
+            } catch (\Throwable $e) {
+                // An alert must never stop the stock change itself
+                \Illuminate\Support\Facades\Log::warning('Low-stock alert not sent', ['product_id' => $product->id, 'error' => $e->getMessage()]);
+            }
+        });
+    }
+
+    /** Products the shop sells: everything except internal materials */
+    public function scopeForSale($query)
+    {
+        return $query->where(fn ($q) => $q->whereNull('moderation_status')->orWhere('moderation_status', '!=', self::MODERATION_INTERNAL));
+    }
+
+    public function isMaterial(): bool
+    {
+        return $this->moderation_status === self::MODERATION_INTERNAL;
+    }
+
     public function isTakenDown(): bool
     {
+        if ($this->isMaterial()) {
+            return false;
+        }
         return !in_array($this->moderation_status ?? self::MODERATION_APPROVED, self::MODERATION_LIVE, true);
     }
 
@@ -73,6 +119,8 @@ class Product extends Model
         'quantity_in_stock',
         'min_stock_level',
         'max_stock_level',
+        'stock_kind',
+        'stock_unit',
 
         // Supplier
         'supplier_id',

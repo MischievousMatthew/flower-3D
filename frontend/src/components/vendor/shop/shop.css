@@ -167,7 +167,9 @@
 .sp-textarea.invalid {
   border-color: #fc8181;
 }
-.sp-error {
+.sp-error,
+/* A message under a field stays red, not the grey of field hints */
+.sp-field small.sp-error {
   font-size: 12px;
   color: var(--v-red-text);
 }

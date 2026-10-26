@@ -39,19 +39,19 @@ class AdminProductController extends Controller
      */
     public function summary(): JsonResponse
     {
-        $byModeration = Product::query()->selectRaw('moderation_status, count(*) as total')->groupBy('moderation_status')->pluck('total', 'moderation_status');
+        $byModeration = Product::query()->forSale()->selectRaw('moderation_status, count(*) as total')->groupBy('moderation_status')->pluck('total', 'moderation_status');
 
         return response()->json([
             'success' => true,
             'data' => [
                 'all' => (int) $byModeration->sum(),
                 'review' => (int) (($byModeration[Product::MODERATION_PENDING] ?? 0) + ($byModeration[Product::MODERATION_RESUBMITTED] ?? 0)),
-                'live' => $this->live(Product::query())->count(),
+                'live' => $this->live(Product::query()->forSale())->count(),
                 'hidden' => (int) (($byModeration[Product::MODERATION_HIDDEN] ?? 0) + ($byModeration[Product::MODERATION_RESUBMITTED] ?? 0)),
                 'removed' => (int) ($byModeration[Product::MODERATION_REMOVED] ?? 0),
-                'reported' => Product::query()->whereHas('reports', fn ($q) => $q->where('status', 'pending'))->count(),
-                'out_of_stock' => $this->live(Product::query())->where('quantity_in_stock', '<=', 0)->count(),
-                'low_stock' => $this->live(Product::query())->where('quantity_in_stock', '>', 0)->whereColumn('quantity_in_stock', '<=', 'min_stock_level')->count(),
+                'reported' => Product::query()->forSale()->whereHas('reports', fn ($q) => $q->where('status', 'pending'))->count(),
+                'out_of_stock' => $this->live(Product::query()->forSale())->where('quantity_in_stock', '<=', 0)->count(),
+                'low_stock' => $this->live(Product::query()->forSale())->where('quantity_in_stock', '>', 0)->whereColumn('quantity_in_stock', '<=', 'min_stock_level')->count(),
             ],
         ]);
     }
@@ -61,7 +61,7 @@ class AdminProductController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Product::query()
+        $query = Product::query()->forSale()
             ->with(['images' => fn ($q) => $q->orderByDesc('is_primary')->orderBy('display_order')])
             ->withCount(['reports as open_reports' => fn ($q) => $q->where('status', 'pending')]);
 
@@ -126,7 +126,7 @@ class AdminProductController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $product = Product::query()
+        $product = Product::query()->forSale()
             ->with(['images' => fn ($q) => $q->orderByDesc('is_primary')->orderBy('display_order'), 'models'])
             ->withCount(['reports as open_reports' => fn ($q) => $q->where('status', 'pending')])
             ->find($id);
@@ -193,7 +193,7 @@ class AdminProductController extends Controller
             'reason' => [$needsReason ? 'required' : 'nullable', 'string', $needsReason ? 'min:5' : 'min:0', 'max:1000'],
         ]);
 
-        $product = Product::query()->find($id);
+        $product = Product::query()->forSale()->find($id);
         if (!$product) {
             return response()->json(['success' => false, 'message' => 'Product not found.'], 404);
         }
@@ -236,7 +236,7 @@ class AdminProductController extends Controller
      */
     public function taxonomies(): JsonResponse
     {
-        $products = Product::query()->get(['category', 'flower_type', 'occasion_tags']);
+        $products = Product::query()->forSale()->get(['category', 'flower_type', 'occasion_tags']);
         $usage = [
             ProductTaxonomy::CATEGORY => $products->countBy('category'),
             ProductTaxonomy::FLOWER_TYPE => $products->countBy('flower_type'),
@@ -342,8 +342,8 @@ class AdminProductController extends Controller
         }
 
         $inUse = match ($item->type) {
-            ProductTaxonomy::OCCASION => Product::query()->get(['occasion_tags'])->contains(fn ($p) => in_array($item->value, (array) $p->occasion_tags, true)),
-            default => Product::query()->where($item->type, $item->value)->exists(),
+            ProductTaxonomy::OCCASION => Product::query()->forSale()->get(['occasion_tags'])->contains(fn ($p) => in_array($item->value, (array) $p->occasion_tags, true)),
+            default => Product::query()->forSale()->where($item->type, $item->value)->exists(),
         };
         if ($inUse) {
             return response()->json(['success' => false, 'message' => 'Products still use this, so it can only be switched off.'], 422);

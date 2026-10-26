@@ -58,7 +58,7 @@ class ProductController extends Controller
             }
 
             $ownerId  = $this->resolveOwnerId($request);
-            $products = Product::where('owner_id', $ownerId)
+            $products = Product::forSale()->where('owner_id', $ownerId)
                 ->where('status', 'active')
                 ->with(['primaryImage', 'images', 'models'])
                 ->orderBy('created_at', 'desc')
@@ -83,7 +83,7 @@ class ProductController extends Controller
             }
 
             $ownerId  = $this->resolveOwnerId($request);
-            $products = Product::where('owner_id', $ownerId)
+            $products = Product::forSale()->where('owner_id', $ownerId)
                 ->where('status', 'draft')
                 ->with(['primaryImage', 'images', 'models'])
                 ->orderBy('created_at', 'desc')
@@ -104,7 +104,7 @@ class ProductController extends Controller
             }
 
             $ownerId  = $this->resolveOwnerId($request);
-            $products = Product::where('owner_id', $ownerId)
+            $products = Product::forSale()->where('owner_id', $ownerId)
                 ->where('status', 'inactive')
                 ->with(['primaryImage', 'images', 'models'])
                 ->orderBy('updated_at', 'desc')

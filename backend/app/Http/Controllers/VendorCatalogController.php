@@ -266,7 +266,8 @@ class VendorCatalogController extends Controller
     {
         return Product::withoutGlobalScopes()
             ->whereNull('deleted_at')
-            ->where('owner_id', $ownerId);
+            ->where('owner_id', $ownerId)
+            ->forSale();
     }
 
     private function format(Product $p): array
