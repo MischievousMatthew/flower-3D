@@ -1412,7 +1412,7 @@ async function placeFlowerOnBouquet(flower, placement) {
     );
     wrapper.userData.sceneId = sceneId;
     flowerLayer.add(wrapper);
-    if (filler) keepInsideBouquet(wrapper, { exact: true });
+    if (filler) settleNewFiller(wrapper);
     const at = wrapper.position;
     placedObjects.set(sceneId, wrapper);
     selectedFlowers.value.push({
@@ -1428,6 +1428,7 @@ async function placeFlowerOnBouquet(flower, placement) {
       scale: Math.round(wrapper.scale.x * 100) / 100,
       locked: false,
     });
+    if (filler) commitObjectState(sceneId); // its lean and size were set by settleNewFiller
     selectedSceneId.value = sceneId;
     showToast(`${flower.product_name} placed on bouquet.`, "success");
   } catch (error) {
@@ -1716,10 +1717,18 @@ async function fillWithFlower(flower) {
 // ── Arrangement suggestions ──────────────────────────────────────────────
 const NESTLE = 0.15; // suggested items sink this far into the bed so they sit in the wrap, not on it
 const DOME_LIFT = 0.3; // how far the middle of a suggested dome rises
-const MAX_LEAN = { flower: 22, filler: 30 }; // degrees outward at the rim
-const FILLER_REACH = 0.8; // fillers stay within this share of the bed, so they never poke out of the wrap
-const FILLER_RISE = 0.5; // and no higher than this above it
+const MAX_LEAN = { flower: 22, filler: 35 }; // degrees outward at the rim
+// Fillers are sprays of greenery growing up out of the wrap, as in the original
+// bouquet model: about 1.25 bed radii across, centred a little above the bed so
+// their lower leaves sit down inside the paper and nothing hangs in the air
+const FILLER_SIZE = 1.25;
+const FILLER_LIFT = 0.1;
+const FILLER_DEPTH = { low: -0.4, high: 0.3 }; // how far a filler may be moved down or up from there
+const FILLER_REACH = 0.95; // a spray's centre stays over the bed; its leaves are checked against the paper
 const surfaceRay = new THREE.Raycaster();
+
+/** A filler's size for this wrap (the model is normalised to 0.9 across) */
+const fillerScale = (frame) => THREE.MathUtils.clamp((frame.radius * FILLER_SIZE) / 0.9, 0.8, 1.8);
 
 // The latest suggestion per kind, with the layout from before the first one for Undo
 const suggestion = reactive({ flower: null, filler: null });
@@ -1755,7 +1764,8 @@ function bedSurface(frame, x, z) {
 function keepInsideBouquet(object, { exact = false, wall = null } = {}) {
   const frame = bedFrame();
   if (!frame) return;
-  const reach = frame.radius * FILLER_REACH;
+  wall ??= wrapWall(frame);
+  const reach = fillerSpan(frame, wall) * FILLER_REACH;
   const dx = object.position.x - frame.center.x;
   const dz = object.position.z - frame.center.z;
   const r = Math.hypot(dx, dz);
@@ -1763,34 +1773,61 @@ function keepInsideBouquet(object, { exact = false, wall = null } = {}) {
     object.position.x = frame.center.x + (dx / r) * reach;
     object.position.z = frame.center.z + (dz / r) * reach;
   }
-  const surface = bedSurface(frame, object.position.x, object.position.z);
-  object.position.y = r > reach ? surface - NESTLE : THREE.MathUtils.clamp(object.position.y, surface - 0.3, surface + FILLER_RISE);
-  if (exact) fitInsideWrap(object, frame, wall ?? wrapWall(frame));
+  const rest = bedSurface(frame, object.position.x, object.position.z) + FILLER_LIFT;
+  object.position.y = THREE.MathUtils.clamp(object.position.y, rest + FILLER_DEPTH.low, rest + FILLER_DEPTH.high);
+  if (exact) fitInsideWrap(object, frame, wall);
+}
+
+/**
+ * How far from the middle fillers can go. The flower bed can be much narrower
+ * than the wrap's opening (the Korean wrap), and fillers belong out to the paper.
+ */
+const fillerSpan = (frame, wall) => (wall && Number.isFinite(wall.gapWidth) ? Math.max(frame.radius, wall.gapWidth * 0.85) : frame.radius);
+
+/** A newly placed filler: full size, its base down in the wrap, leaning out toward the paper */
+function settleNewFiller(object) {
+  const frame = bedFrame();
+  if (!frame) return;
+  const span = fillerSpan(frame, wrapWall(frame));
+  const dx = (object.position.x - frame.center.x) / span;
+  const dz = (object.position.z - frame.center.z) / span;
+  object.scale.setScalar(fillerScale(frame));
+  object.quaternion.copy(leanPose(dx, dz, Math.min(1, Math.hypot(dx, dz)) * MAX_LEAN.filler, Math.random() * 360 - 180));
+  object.position.y = bedSurface(frame, object.position.x, object.position.z) + FILLER_LIFT;
+  keepInsideBouquet(object, { exact: true });
 }
 
 // The paper's inside, as the innermost radius per direction and height band
 const WALL_ANGLES = 36;
 const WALL_BAND = 0.1;
-const MIN_FILLER_SCALE = 0.4; // a petite wrap is narrow, so a wide filler may need to shrink this far
+const MIN_FILLER_SHRINK = 0.6; // a filler too wide for a narrow wrap shrinks to no less than this share of its size
 
 function wallCell(center, point) {
   const turn = (Math.atan2(point.z - center.z, point.x - center.x) + Math.PI) / (Math.PI * 2);
   return [Math.floor(turn * WALL_ANGLES) % WALL_ANGLES, Math.floor(point.y / WALL_BAND)];
 }
 
-/** The wrap's inner wall around the bed, or null when the occasion has no wrap */
+/**
+ * The wrap's inner wall around the bed, or null when the occasion has no wrap.
+ * It's in the arrangement's own frame, so it holds while the bouquet is moved
+ * or turned, and is measured again only when the base or its size changes.
+ */
+let wallCache = null;
 function wrapWall(frame) {
   const meshes = (dressing?.wrapMeshes || []).filter(isShown);
   if (!meshes.length) return null;
-  const center = flowerLayer.localToWorld(frame.center.clone());
+  const key = `${bouquetRoot?.uuid}:${wrapperScale.value}:${meshes.length}`;
+  if (wallCache?.key === key) return wallCache.wall;
+  const center = frame.center.clone();
   const radius = new Map();
   const top = Array(WALL_ANGLES).fill(-Infinity); // the paper's highest band per direction
   const point = new THREE.Vector3();
+  arrangement.updateMatrixWorld(true);
+  const toLocal = flowerLayer.matrixWorld.clone().invert();
   for (const mesh of meshes) {
-    mesh.updateMatrixWorld(true);
     const position = mesh.geometry.attributes.position;
     for (let i = 0; i < position.count; i++) {
-      point.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld);
+      point.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld).applyMatrix4(toLocal);
       const [angle, band] = wallCell(center, point);
       const r = Math.hypot(point.x - center.x, point.z - center.z);
       const key = `${angle}:${band}`;
@@ -1808,7 +1845,9 @@ function wrapWall(frame) {
     if (r != null) openings.push(r);
   }
   openings.sort((a, b) => a - b);
-  return { center, radius, top, bedBand, gapWidth: openings.length ? openings[Math.floor(openings.length / 2)] : Infinity };
+  const wall = { center, radius, top, bedBand, gapWidth: openings.length ? openings[Math.floor(openings.length / 2)] : Infinity };
+  wallCache = { key, wall };
+  return wall;
 }
 
 // The top of the paper can curl in over the opening (the Korean wrap's petals),
@@ -1837,14 +1876,15 @@ function wallLimit(wall, angle, band) {
 
 /** How far the item's furthest leaf sticks out through the paper (0 when it's all inside) */
 function wallOvershoot(wall, object) {
-  object.updateMatrixWorld(true);
+  arrangement.updateMatrixWorld(true);
+  const toLocal = flowerLayer.matrixWorld.clone().invert();
   const point = new THREE.Vector3();
   let worst = 0;
   object.traverse((mesh) => {
     if (!mesh.isMesh) return;
     const position = mesh.geometry.attributes.position;
     for (let i = 0; i < position.count; i += 2) {
-      point.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld);
+      point.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld).applyMatrix4(toLocal);
       const limit = wallLimit(wall, ...wallCell(wall.center, point));
       if (limit === Infinity) continue; // below the paper, inside the stems
       worst = Math.max(worst, Math.hypot(point.x - wall.center.x, point.z - wall.center.z) - limit);
@@ -1856,6 +1896,7 @@ function wallOvershoot(wall, object) {
 /** Moves a filler toward the middle, then shrinks it a little, until no leaf crosses the paper */
 function fitInsideWrap(object, frame, wall) {
   if (!wall) return;
+  const smallest = Math.min(object.scale.x, fillerScale(frame) * MIN_FILLER_SHRINK);
   for (let step = 0; step < 16; step++) {
     const over = wallOvershoot(wall, object);
     if (over <= 0.005) return;
@@ -1863,14 +1904,16 @@ function fitInsideWrap(object, frame, wall) {
     const dz = object.position.z - frame.center.z;
     const r = Math.hypot(dx, dz);
     if (r > 0.02) {
+      // Keep its height over the bed as it slides in
+      const rise = object.position.y - bedSurface(frame, object.position.x, object.position.z);
       const k = Math.max(0, r - over - 0.02) / r;
       object.position.x = frame.center.x + dx * k;
       object.position.z = frame.center.z + dz * k;
-      object.position.y = bedSurface(frame, object.position.x, object.position.z) - NESTLE;
+      object.position.y = bedSurface(frame, object.position.x, object.position.z) + rise;
     }
     // Already in the middle, or still out after a few moves: it's too wide for this wrap
-    if ((r <= 0.02 || step >= 3) && object.scale.x > MIN_FILLER_SCALE) {
-      object.scale.setScalar(Math.max(MIN_FILLER_SCALE, object.scale.x * 0.9));
+    if ((r <= 0.02 || step >= 3) && object.scale.x > smallest) {
+      object.scale.setScalar(Math.max(smallest, object.scale.x * 0.92));
     }
   }
 }
@@ -1899,21 +1942,28 @@ function suggestArrangement(kind) {
 
   const last = suggestion[kind];
   const before = last?.before ?? items.map((item) => poseOf(item.sceneId));
-  const toDisc = (object) => ({ x: (object.position.x - frame.center.x) / frame.radius, z: (object.position.z - frame.center.z) / frame.radius });
+  // Fillers spread out to the paper; flowers stay over the bed
+  const wall = kind === "filler" ? wrapWall(frame) : null;
+  const span = kind === "filler" ? fillerSpan(frame, wall) : frame.radius;
+  const toDisc = (object) => ({ x: (object.position.x - frame.center.x) / span, z: (object.position.z - frame.center.z) / span });
   const result =
     kind === "filler"
       ? suggestFillers(items, placedFlowers.value.map((f) => placedObjects.get(f.sceneId)).filter(Boolean).map(toDisc), { avoid: last?.style })
       : suggestFlowers(items, { avoid: last?.style });
-  const wall = kind === "filler" ? wrapWall(frame) : null;
 
   for (const spot of result.spots) {
     const object = placedObjects.get(spot.sceneId);
-    const x = frame.center.x + spot.x * frame.radius;
-    const z = frame.center.z + spot.z * frame.radius;
-    object.position.set(x, bedSurface(frame, x, z) - NESTLE + (spot.lift || 0) * DOME_LIFT, z);
+    const x = frame.center.x + spot.x * span;
+    const z = frame.center.z + spot.z * span;
+    const surface = bedSurface(frame, x, z);
     object.quaternion.copy(leanPose(spot.x, spot.z, (spot.tilt || 0) * MAX_LEAN[kind], spot.turn || 0));
-    if (spot.scale) object.scale.setScalar(spot.scale);
-    if (kind === "filler") keepInsideBouquet(object, { exact: true, wall });
+    if (kind === "filler") {
+      object.position.set(x, surface + FILLER_LIFT + (spot.lift || 0) * Math.abs(FILLER_DEPTH.low), z);
+      object.scale.setScalar(fillerScale(frame) * (spot.scale || 1));
+      keepInsideBouquet(object, { exact: true, wall });
+    } else {
+      object.position.set(x, surface - NESTLE + (spot.lift || 0) * DOME_LIFT, z);
+    }
     commitObjectState(spot.sceneId);
   }
   suggestion[kind] = { style: result.style, label: result.label, before };
@@ -1984,8 +2034,13 @@ function moveSelectedFlower(clientX, clientY, sceneId = selectedSceneId.value) {
   const object = sceneId ? placedObjects.get(sceneId) : null;
   const flower = selectedFlowers.value.find((entry) => entry.sceneId === sceneId);
   if (!placement || !object || flower?.locked) return;
+  const frame = isFiller(flower) ? bedFrame() : null;
+  if (!frame) return object.position.copy(placement.local);
+  // A filler slides at its own depth in the wrap, not up onto the paper
+  const rise = object.position.y - bedSurface(frame, object.position.x, object.position.z);
   object.position.copy(placement.local);
-  if (isFiller(flower)) keepInsideBouquet(object);
+  object.position.y = bedSurface(frame, object.position.x, object.position.z) + rise;
+  keepInsideBouquet(object);
 }
 
 function updateSelectedRotation(axis, degrees) {
@@ -2027,8 +2082,12 @@ function resetSelectedTransform() {
     THREE.MathUtils.degToRad(resetRotation.yDeg),
     THREE.MathUtils.degToRad(resetRotation.zDeg),
   );
-  object.scale.setScalar(1);
-  updateFlowerState(flower.sceneId, { rotation: resetRotation, scale: 1 });
+  const frame = isFiller(flower) ? bedFrame() : null;
+  const scale = frame ? Math.round(fillerScale(frame) * 100) / 100 : 1;
+  object.scale.setScalar(scale);
+  if (frame) keepInsideBouquet(object, { exact: true });
+  updateFlowerState(flower.sceneId, { rotation: resetRotation, scale: object.scale.x });
+  if (frame) commitObjectState(flower.sceneId); // the fit may have moved it
 }
 
 function toggleSelectedLock() {

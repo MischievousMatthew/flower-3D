@@ -142,12 +142,12 @@ function interleave(groups) {
 export function suggestFillers(fillers, flowers, { avoid = null, rand = Math.random } = {}) {
   const choices = FILLER_STYLES.filter((style) => style.key !== avoid);
   const style = choices[Math.floor(rand() * choices.length)];
-  const reach = 0.8; // fillers are wider than a bloom, so they stay well inside the rim
 
-  // Candidates: a ring near the rim and a spiral over the middle
+  // Candidates: a ring against the paper (the caller pulls each spray in until
+  // its leaves clear the wall) and a spiral between the flowers
   const spin = rand() * TAU;
-  const ring = Array.from({ length: 24 }, (_, i) => ({ ...polar(reach - rand() * 0.08, spin + (i / 24) * TAU), edge: true }));
-  const inner = spiral(40, reach * 0.85, spin).map((p) => ({ ...p, edge: false }));
+  const ring = Array.from({ length: 24 }, (_, i) => ({ ...polar(0.95 - rand() * 0.1, spin + (i / 24) * TAU), edge: true }));
+  const inner = spiral(40, 0.65, spin).map((p) => ({ ...p, edge: false }));
 
   // Prefer spots away from the flowers and from each other
   const taken = flowers.map((p) => ({ ...p }));
@@ -171,14 +171,16 @@ export function suggestFillers(fillers, flowers, { avoid = null, rand = Math.ran
   return {
     style: style.key,
     label: style.label,
+    // Sprays rise out of the wrap: around the edge they lean out over the rim,
+    // between the flowers they sit lower so only their tips show
     spots: spots.map((p, i) => ({
       sceneId: fillers[i].sceneId,
       x: p.x,
       z: p.z,
-      lift: p.edge ? 0 : 0.2,
-      tilt: p.edge ? 0.9 : 0.4,
+      lift: p.edge ? 0 : -0.5,
+      tilt: p.edge ? 0.7 + rand() * 0.3 : 0.2 + rand() * 0.3,
       turn: rand() * 360 - 180,
-      scale: 0.85 + rand() * 0.2,
+      scale: 0.9 + rand() * 0.2,
     })),
   };
 }
