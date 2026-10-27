@@ -1,24 +1,32 @@
 <template>
   <footer class="or">
-    <div class="or-stems">
-      <span>Stems</span>
-      <span>{{ stems }} of {{ maxStems }}</span>
+    <div class="or-head">
+      <button
+        type="button"
+        class="or-toggle"
+        :aria-expanded="open"
+        aria-controls="or-breakdown"
+        :disabled="!extras.length"
+        @click="open = !open"
+      >
+        <span class="or-label">Total</span>
+        <strong>{{ peso(total) }}</strong>
+        <svg v-if="extras.length" class="or-chev" :class="{ 'is-open': open }" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M4 10l4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <span class="or-stems">{{ stems }} of {{ maxStems }} stems</span>
     </div>
     <div class="or-meter" role="progressbar" :aria-valuenow="stems" aria-valuemin="0" :aria-valuemax="maxStems" aria-label="Stems placed">
       <i :style="{ width: `${maxStems ? Math.min(stems / maxStems, 1) * 100 : 0}%` }"></i>
     </div>
 
-    <dl class="or-lines">
+    <dl v-show="open" id="or-breakdown" class="or-lines">
       <div v-for="line in extras" :key="line.label">
         <dt>{{ line.label }}</dt>
         <dd>{{ line.amount ? peso(line.amount) : "Included" }}</dd>
       </div>
     </dl>
-
-    <div class="or-total">
-      <span>Total</span>
-      <strong>{{ peso(total) }}</strong>
-    </div>
 
     <div class="or-actions">
       <button type="button" class="or-btn or-btn-outline" :disabled="disabled || busy" @click="$emit('add-to-cart')">
@@ -33,7 +41,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 const props = defineProps({
   stems: { type: Number, required: true },
@@ -47,6 +55,9 @@ const props = defineProps({
 });
 defineEmits(["add-to-cart", "checkout"]);
 
+// The breakdown stays folded so the step list above keeps its room
+const open = ref(false);
+
 // The stems line already shows above the meter; the rest are the extras
 const extras = computed(() => props.lines.slice(1));
 const peso = (value) => (props.format ? props.format(value) : `₱${Number(value || 0).toFixed(2)}`);
@@ -54,28 +65,85 @@ const peso = (value) => (props.format ? props.format(value) : `₱${Number(value
 
 <style scoped>
 .or {
-  padding: 16px 26px 20px;
+  padding: 12px 26px 14px;
   border-top: 1px solid var(--line);
   background: var(--paper);
   font-size: 12.5px;
   color: var(--ink-soft);
 }
 
-.or-stems,
+.or-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.or-toggle {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.or-toggle:disabled {
+  cursor: default;
+}
+
+.or-toggle:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.or-label {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.or-toggle strong {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.or-chev {
+  width: 14px;
+  height: 14px;
+  align-self: center;
+  transform: rotate(180deg);
+  transition: transform 0.2s ease;
+}
+
+.or-chev.is-open {
+  transform: none;
+}
+
+.or-stems {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .or-lines > div {
   display: flex;
   justify-content: space-between;
   gap: 12px;
 }
 
-.or-stems span:last-child {
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-
 .or-meter {
   height: 2px;
-  margin: 9px 0 10px;
+  margin: 6px 0 10px;
   background: var(--line);
 }
 
@@ -104,28 +172,6 @@ const peso = (value) => (props.format ? props.format(value) : `₱${Number(value
   color: var(--ink);
 }
 
-.or-total {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.or-total span {
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.or-total strong {
-  font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 500;
-  line-height: 1;
-  color: var(--ink);
-}
-
 .or-actions {
   display: grid;
   grid-template-columns: 1fr 1.35fr;
@@ -133,7 +179,7 @@ const peso = (value) => (props.format ? props.format(value) : `₱${Number(value
 }
 
 .or-btn {
-  height: 42px;
+  height: 40px;
   padding: 0 14px;
   border-radius: 10px;
   font-family: var(--font-sans);
@@ -176,8 +222,15 @@ const peso = (value) => (props.format ? props.format(value) : `₱${Number(value
 }
 
 .or-hint {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   font-size: 11.5px;
   text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .or-chev,
+  .or-meter i {
+    transition: none;
+  }
 }
 </style>
