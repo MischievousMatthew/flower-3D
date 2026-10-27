@@ -84,6 +84,17 @@
             <section v-else-if="activeStep === 'flowers'" class="fc-step-panel">
               <h2>Choose your flowers</h2>
               <p class="fc-step-lede">Pick a flower, then click where it goes on the bouquet. Or drag it on.</p>
+              <div class="fc-suggest">
+                <button type="button" class="fc-suggest-btn" :disabled="placedFlowers.length < 2" @click="suggestArrangement('flower')">
+                  <BcIcon name="sparkle" />
+                  {{ suggestion.flower ? "Try another" : "Suggest an arrangement" }}
+                </button>
+                <template v-if="suggestion.flower">
+                  <span class="fc-suggest-name">{{ suggestion.flower.label }}</span>
+                  <button type="button" class="fc-suggest-undo" @click="undoSuggestion('flower')">Undo</button>
+                </template>
+                <span v-else-if="placedFlowers.length < 2" class="fc-suggest-name">Place two or more flowers first.</span>
+              </div>
               <StemPicker
                 kind="flower"
                 :items="filteredFlowers"
@@ -107,6 +118,17 @@
             <section v-else-if="activeStep === 'fillers'" class="fc-step-panel">
               <h2>Add fillers</h2>
               <p class="fc-step-lede">Greenery and small blooms between the stems. {{ placedFillers.length }} of {{ maxFillers }} used.</p>
+              <div class="fc-suggest">
+                <button type="button" class="fc-suggest-btn" :disabled="!placedFillers.length" @click="suggestArrangement('filler')">
+                  <BcIcon name="sparkle" />
+                  {{ suggestion.filler ? "Try another" : "Suggest filler positions" }}
+                </button>
+                <template v-if="suggestion.filler">
+                  <span class="fc-suggest-name">{{ suggestion.filler.label }}</span>
+                  <button type="button" class="fc-suggest-undo" @click="undoSuggestion('filler')">Undo</button>
+                </template>
+                <span v-else-if="!placedFillers.length" class="fc-suggest-name">Add a filler first.</span>
+              </div>
               <StemPicker
                 kind="filler"
                 :items="filteredFillers"
@@ -531,6 +553,7 @@ import {
   setCardSize,
 } from "../../utils/bouquetCard.js";
 import { anchorCard, buildSteps, keyAction, receiptLines } from "../../utils/customizerUi.js";
+import { suggestFillers, suggestFlowers } from "../../utils/arrangementSuggest.js";
 import NavHeader from "../../layouts/NavHeader.vue";
 import BcIcon from "../../components/customizer/CustomizerIcon.js";
 import CustomizerSteps from "../../components/customizer/CustomizerSteps.vue";
@@ -1190,6 +1213,8 @@ function commitGizmoChange() {
     bouquetTurn.value = Math.round(THREE.MathUtils.radToDeg(arrangement.rotation.y));
     return;
   }
+  const item = selectedFlowers.value.find((entry) => entry.sceneId === object.userData.sceneId);
+  if (isFiller(item)) keepInsideBouquet(object);
   commitObjectState(object.userData.sceneId);
 }
 
@@ -1376,8 +1401,9 @@ async function placeFlowerOnBouquet(flower, placement) {
     };
     fitFlowerModel(instance);
     wrapper.add(instance);
-    const at = placement.local ?? placement.point;
-    wrapper.position.copy(at);
+    wrapper.position.copy(placement.local ?? placement.point);
+    if (filler) keepInsideBouquet(wrapper);
+    const at = wrapper.position;
     wrapper.rotation.set(
       THREE.MathUtils.degToRad(initialRotation.xDeg),
       THREE.MathUtils.degToRad(initialRotation.yDeg),
@@ -1684,6 +1710,116 @@ async function fillWithFlower(flower) {
   );
 }
 
+// ── Arrangement suggestions ──────────────────────────────────────────────
+const NESTLE = 0.15; // suggested items sink this far into the bed so they sit in the wrap, not on it
+const DOME_LIFT = 0.3; // how far the middle of a suggested dome rises
+const MAX_LEAN = { flower: 22, filler: 30 }; // degrees outward at the rim
+const FILLER_REACH = 0.8; // fillers stay within this share of the bed, so they never poke out of the wrap
+const FILLER_RISE = 0.5; // and no higher than this above it
+const surfaceRay = new THREE.Raycaster();
+
+// The latest suggestion per kind, with the layout from before the first one for Undo
+const suggestion = reactive({ flower: null, filler: null });
+
+/** The flower bed's centre and radius in the arrangement's frame */
+function bedFrame() {
+  const bed = shownTargets().find((mesh) => mesh.name === "FlowerBed");
+  if (!bed) return null;
+  arrangement.updateMatrixWorld(true);
+  if (!bed.geometry.boundingBox) bed.geometry.computeBoundingBox();
+  const { min, max } = bed.geometry.boundingBox;
+  const scale = bed.getWorldScale(new THREE.Vector3()).x;
+  return {
+    bed,
+    center: flowerLayer.worldToLocal(bed.getWorldPosition(new THREE.Vector3())),
+    radius: (Math.min(max.x - min.x, max.z - min.z) / 2) * scale,
+  };
+}
+
+/** Height of the bed's top at a point, or the bed centre's height if missed */
+function bedSurface(frame, x, z) {
+  const origin = flowerLayer.localToWorld(new THREE.Vector3(x, frame.center.y + 5, z));
+  surfaceRay.set(origin, new THREE.Vector3(0, -1, 0));
+  const hit = surfaceRay.intersectObject(frame.bed, false)[0];
+  return hit ? flowerLayer.worldToLocal(hit.point.clone()).y : frame.center.y;
+}
+
+/** Pulls a filler back over the bed if it was moved past the wrap */
+function keepInsideBouquet(object) {
+  const frame = bedFrame();
+  if (!frame) return;
+  const reach = frame.radius * FILLER_REACH;
+  const dx = object.position.x - frame.center.x;
+  const dz = object.position.z - frame.center.z;
+  const r = Math.hypot(dx, dz);
+  if (r > reach) {
+    object.position.x = frame.center.x + (dx / r) * reach;
+    object.position.z = frame.center.z + (dz / r) * reach;
+  }
+  const surface = bedSurface(frame, object.position.x, object.position.z);
+  object.position.y = r > reach ? surface - NESTLE : THREE.MathUtils.clamp(object.position.y, surface - 0.3, surface + FILLER_RISE);
+}
+
+// Upright with a small turn, leaning outward from the centre by `lean` degrees
+function leanPose(dx, dz, lean, turn) {
+  const rad = THREE.MathUtils.degToRad;
+  const pose = new THREE.Quaternion().setFromEuler(new THREE.Euler(rad(-5), rad(180 + turn), 0));
+  const r = Math.hypot(dx, dz);
+  if (r < 1e-4 || !lean) return pose;
+  return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(dz / r, 0, -dx / r), rad(lean)).multiply(pose);
+}
+
+const poseOf = (sceneId) => {
+  const object = placedObjects.get(sceneId);
+  return { sceneId, position: object.position.clone(), quaternion: object.quaternion.clone(), scale: object.scale.x };
+};
+
+/** Lays out the unlocked flowers or fillers in a new suggested arrangement; each call gives a different one */
+function suggestArrangement(kind) {
+  const frame = bedFrame();
+  if (!frame) return showToast("The bouquet is still loading. Try again in a moment.", "error");
+  const placed = kind === "filler" ? placedFillers.value : placedFlowers.value;
+  const items = placed.filter((item) => !item.locked && placedObjects.has(item.sceneId));
+  if (!items.length) return showToast(`Every ${kind} is locked. Unlock some to rearrange them.`, "error");
+
+  const last = suggestion[kind];
+  const before = last?.before ?? items.map((item) => poseOf(item.sceneId));
+  const toDisc = (object) => ({ x: (object.position.x - frame.center.x) / frame.radius, z: (object.position.z - frame.center.z) / frame.radius });
+  const result =
+    kind === "filler"
+      ? suggestFillers(items, placedFlowers.value.map((f) => placedObjects.get(f.sceneId)).filter(Boolean).map(toDisc), { avoid: last?.style })
+      : suggestFlowers(items, { avoid: last?.style });
+
+  for (const spot of result.spots) {
+    const object = placedObjects.get(spot.sceneId);
+    const x = frame.center.x + spot.x * frame.radius;
+    const z = frame.center.z + spot.z * frame.radius;
+    object.position.set(x, bedSurface(frame, x, z) - NESTLE + (spot.lift || 0) * DOME_LIFT, z);
+    object.quaternion.copy(leanPose(spot.x, spot.z, (spot.tilt || 0) * MAX_LEAN[kind], spot.turn || 0));
+    if (spot.scale) object.scale.setScalar(spot.scale);
+    if (kind === "filler") keepInsideBouquet(object);
+    commitObjectState(spot.sceneId);
+  }
+  suggestion[kind] = { style: result.style, label: result.label, before };
+}
+
+/** Puts things back the way they were before the first suggestion */
+function undoSuggestion(kind) {
+  for (const pose of suggestion[kind]?.before || []) {
+    const object = placedObjects.get(pose.sceneId);
+    if (!object) continue;
+    object.position.copy(pose.position);
+    object.quaternion.copy(pose.quaternion);
+    object.scale.setScalar(pose.scale);
+    commitObjectState(pose.sceneId);
+  }
+  suggestion[kind] = null;
+}
+
+// Adding or removing items starts suggestions afresh
+watch(() => placedFlowers.value.length, () => (suggestion.flower = null));
+watch(() => placedFillers.value.length, () => (suggestion.filler = null));
+
 function resetDesign() {
   gizmo?.detach();
   selectedFlowers.value.forEach((flower) => {
@@ -1733,6 +1869,7 @@ function moveSelectedFlower(clientX, clientY, sceneId = selectedSceneId.value) {
   const flower = selectedFlowers.value.find((entry) => entry.sceneId === sceneId);
   if (!placement || !object || flower?.locked) return;
   object.position.copy(placement.local);
+  if (isFiller(flower)) keepInsideBouquet(object);
 }
 
 function updateSelectedRotation(axis, degrees) {
@@ -1823,6 +1960,7 @@ function nudgeSelectedPosition(direction, event = null) {
   if (!flower || !object || flower.locked) return;
   // Items sit inside the arrangement, which may be turned
   object.position.add(delta.applyQuaternion(arrangement.quaternion.clone().invert()));
+  if (isFiller(flower)) keepInsideBouquet(object);
   commitObjectState(flower.sceneId);
 }
 
@@ -3295,6 +3433,69 @@ function showToast(message, type = "success") {
   color: var(--ink-soft);
   font-size: 12.5px;
   line-height: 1.6;
+}
+
+.fc-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-bottom: 14px;
+}
+
+.fc-suggest-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--leaf);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--leaf) 10%, transparent);
+  color: var(--leaf-deep);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.fc-suggest-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--leaf) 20%, transparent);
+}
+
+.fc-suggest-btn:disabled {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.fc-suggest-btn:focus-visible,
+.fc-suggest-undo:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+.fc-suggest-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.fc-suggest-name {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.fc-suggest-undo {
+  padding: 0 0 1px;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: none;
+  color: var(--ink);
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .fc-segment {
