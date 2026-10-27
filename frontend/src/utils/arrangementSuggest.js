@@ -89,11 +89,15 @@ const FLOWER_STYLES = [
   },
 ];
 
-/** Filler layouts: around the edge, tucked between the flowers, or both */
+/**
+ * Filler layouts. `minBack` keeps sprays to where the paper is at least that
+ * tall (0 = all round, higher = only the back), `edge` is the share of
+ * sprays against the paper rather than between the flowers.
+ */
 const FILLER_STYLES = [
-  { key: "collar", label: "Green collar", edge: 1 },
-  { key: "tucked", label: "Tucked between", edge: 0 },
-  { key: "mixed", label: "Edge and gaps", edge: 0.5 },
+  { key: "fan", label: "Fan behind", minBack: 0.15, edge: 0.85 },
+  { key: "frame", label: "Framed all round", minBack: 0, edge: 1 },
+  { key: "woven", label: "Woven through", minBack: 0, edge: 0.35 },
 ];
 
 const keepInside = (p, reach) => {
@@ -138,29 +142,33 @@ function interleave(groups) {
 /**
  * @param fillers  [{ sceneId }]
  * @param flowers  where the flowers are now, as disc offsets [{ x, z }]
+ * @param backness (angle) => 0..1, how tall the paper is that way (1 = the back);
+ *                 sprays gather and stand taller where the paper is tall
+ * @returns spots: { x, z, rise (0 low .. 1 tall), lean (0..1 extra outward), twist, scale }
  */
-export function suggestFillers(fillers, flowers, { avoid = null, rand = Math.random } = {}) {
+export function suggestFillers(fillers, flowers, { avoid = null, rand = Math.random, backness = () => 0.5 } = {}) {
   const choices = FILLER_STYLES.filter((style) => style.key !== avoid);
   const style = choices[Math.floor(rand() * choices.length)];
 
   // Candidates: a ring against the paper (the caller pulls each spray in until
   // its leaves clear the wall) and a spiral between the flowers
   const spin = rand() * TAU;
-  const ring = Array.from({ length: 24 }, (_, i) => ({ ...polar(0.95 - rand() * 0.1, spin + (i / 24) * TAU), edge: true }));
-  const inner = spiral(40, 0.65, spin).map((p) => ({ ...p, edge: false }));
+  const ring = Array.from({ length: 30 }, (_, i) => ({ ...polar(0.92 - rand() * 0.12, spin + (i / 30) * TAU), edge: true }));
+  const inner = spiral(40, 0.6, spin).map((p) => ({ ...p, edge: false }));
+  for (const c of [...ring, ...inner]) c.back = backness(Math.atan2(c.z, c.x));
 
-  // Prefer spots away from the flowers and from each other
+  // Each pick: away from flowers and other sprays, toward the back as the style wants
   const taken = flowers.map((p) => ({ ...p }));
   const spots = [];
   for (let n = 0; n < fillers.length; n++) {
-    const wantEdge = style.edge === 1 || (style.edge > 0 && n % 2 === 0);
-    const pool = style.edge === 0 ? inner : wantEdge ? ring : inner;
+    const pool = (rand() < style.edge ? ring : inner).filter((c) => c.back >= style.minBack);
     let best = null;
     let bestScore = -Infinity;
     for (const c of pool) {
       if (spots.includes(c)) continue;
       const near = taken.reduce((min, t) => Math.min(min, Math.hypot(t.x - c.x, t.z - c.z)), 2);
-      const score = near + rand() * 0.15;
+      // Spacing always counts, so sprays spread across the back instead of stacking up
+      const score = Math.min(near, 0.9) + c.back * 0.25 + rand() * 0.15;
       if (score > bestScore) [best, bestScore] = [c, score];
     }
     if (!best) break;
@@ -171,16 +179,18 @@ export function suggestFillers(fillers, flowers, { avoid = null, rand = Math.ran
   return {
     style: style.key,
     label: style.label,
-    // Sprays rise out of the wrap: around the edge they lean out over the rim,
-    // between the flowers they sit lower so only their tips show
+    // The flowers stay the front of the bouquet: at the back a spray stands
+    // as tall as the paper lets it (rise 1) and is the biggest; toward the
+    // open front it's lower and smaller; between the flowers it sits deep so
+    // only its tips show. Sprays at the paper lean out a little past the fan.
     spots: spots.map((p, i) => ({
       sceneId: fillers[i].sceneId,
       x: p.x,
       z: p.z,
-      lift: p.edge ? 0 : -0.5,
-      tilt: p.edge ? 0.7 + rand() * 0.3 : 0.2 + rand() * 0.3,
-      turn: rand() * 360 - 180,
-      scale: 0.9 + rand() * 0.2,
+      rise: p.edge ? 0.35 + p.back * 0.55 + rand() * 0.1 : rand() * 0.15,
+      lean: p.edge ? 0.6 + rand() * 0.4 : rand() * 0.3,
+      twist: (rand() - 0.5) * 50,
+      scale: p.edge ? 0.8 + p.back * 0.3 + rand() * 0.1 : 0.75 + rand() * 0.1,
     })),
   };
 }

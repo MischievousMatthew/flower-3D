@@ -1726,13 +1726,14 @@ async function fillWithFlower(flower) {
 // ── Arrangement suggestions ──────────────────────────────────────────────
 const NESTLE = 0.15; // suggested items sink this far into the bed so they sit in the wrap, not on it
 const DOME_LIFT = 0.3; // how far the middle of a suggested dome rises
-const MAX_LEAN = { flower: 22, filler: 35 }; // degrees outward at the rim
+const MAX_LEAN = { flower: 22, filler: 20 }; // degrees outward at the rim (fillers lean this much past their line from the tie)
 // Fillers are bunches of greenery growing up out of the wrap, as in the original
 // bouquet model: about 1.3 bed radii across, centred a little above the bed so
 // their lower leaves sit down inside the paper and nothing hangs in the air
 const FILLER_SIZE = 1.3;
 const FILLER_LIFT = 0.1;
-const FILLER_DEPTH = { low: -0.4, high: 0.3 }; // how far a filler may be moved down or up from there
+const FILLER_DEPTH = { low: -0.4, high: 0.7 }; // how far a filler may be moved down or up from there
+const FILLER_TUCK = 0.15; // a suggested spray's middle sits this far below the paper's top edge
 const FILLER_REACH = 0.95; // a spray's centre stays over the bed; its leaves are checked against the paper
 const surfaceRay = new THREE.Raycaster();
 
@@ -1797,13 +1798,13 @@ const fillerSpan = (frame, wall) => (wall && Number.isFinite(wall.gapWidth) ? Ma
 function settleNewFiller(object) {
   const frame = bedFrame();
   if (!frame) return;
-  const span = fillerSpan(frame, wrapWall(frame));
-  const dx = (object.position.x - frame.center.x) / span;
-  const dz = (object.position.z - frame.center.z) / span;
+  const wall = wrapWall(frame);
+  const span = fillerSpan(frame, wall);
+  const r = Math.hypot(object.position.x - frame.center.x, object.position.z - frame.center.z) / span;
   object.scale.setScalar(fillerScale(frame));
-  object.quaternion.copy(leanPose(dx, dz, Math.min(1, Math.hypot(dx, dz)) * MAX_LEAN.filler, Math.random() * 360 - 180));
   object.position.y = bedSurface(frame, object.position.x, object.position.z) + FILLER_LIFT;
-  keepInsideBouquet(object, { exact: true });
+  object.quaternion.copy(sprayPose(frame, wrapShape(frame, wall), object.position, Math.min(1, r) * MAX_LEAN.filler * 0.6, (Math.random() - 0.5) * 50));
+  keepInsideBouquet(object, { exact: true, wall });
 }
 
 // The wrap, as the outer paper's radius per direction and height band: a leaf
@@ -1932,6 +1933,75 @@ function fitInsideWrap(object, frame, wall) {
   }
 }
 
+/**
+ * Where a bouquet's stems meet (the tie, where the wrap is narrowest) and how
+ * tall the paper stands in each direction, 0 at the open front to 1 at the back.
+ * Without a wrap the stems meet a little below the flowers, and every side is alike.
+ */
+function wrapShape(frame, wall) {
+  if (!wall) {
+    return { tie: frame.center.clone().add(new THREE.Vector3(0, -2 * frame.radius, 0)), backness: () => 0.5, rimY: () => Infinity };
+  }
+  // The tie: the narrowest band of paper below the bed that goes most of the way round
+  let tieBand = wall.bedBand - 10;
+  let narrowest = Infinity;
+  for (let band = wall.bedBand - 4; band >= 0; band--) {
+    const widths = [];
+    for (let angle = 0; angle < WALL_ANGLES; angle++) {
+      const r = wall.radius.get(`${angle}:${band}`);
+      if (r != null) widths.push(r);
+    }
+    if (widths.length < WALL_ANGLES / 2) continue;
+    widths.sort((a, b) => a - b);
+    const median = widths[widths.length >> 1];
+    if (median < narrowest) [narrowest, tieBand] = [median, band];
+  }
+  // Paper height per direction, smoothed over neighbours; gaps count as the front
+  const height = wall.top.map((top) => Math.max(top, wall.bedBand));
+  const smooth = height.map((_, a) => {
+    let sum = 0;
+    for (let d = -2; d <= 2; d++) sum += height[(a + d + WALL_ANGLES) % WALL_ANGLES];
+    return sum / 5;
+  });
+  const high = Math.max(...smooth);
+  const bin = (angle) => Math.floor(((angle + Math.PI) / (Math.PI * 2)) * WALL_ANGLES) % WALL_ANGLES;
+  // The open front is where the paper is lowest overall (weighted toward the
+  // lowest stretch); the back is the half facing away from it
+  let fx = 0;
+  let fz = 0;
+  smooth.forEach((h, a) => {
+    const angle = ((a + 0.5) / WALL_ANGLES) * Math.PI * 2 - Math.PI;
+    fx += (high - h) * Math.cos(angle);
+    fz += (high - h) * Math.sin(angle);
+  });
+  const level = Math.hypot(fx, fz) < WALL_ANGLES * 0.3; // paper about the same height all round
+  const front = Math.atan2(fz, fx);
+  return {
+    tie: new THREE.Vector3(frame.center.x, (tieBand + 0.5) * WALL_BAND, frame.center.z),
+    backness: (angle) => (level ? 0.5 : (1 - Math.cos(angle - front)) / 2),
+    rimY: (angle) => smooth[bin(angle)] * WALL_BAND, // the top of the paper that way
+  };
+}
+
+/**
+ * A filler spray growing up from the tie through `position`, as stems do in a
+ * hand-tied bouquet, leaning `lean` degrees further out, its fan facing out of
+ * the bouquet and turned `twist` degrees about its stem.
+ */
+function sprayPose(frame, shape, position, lean, twist) {
+  const rad = THREE.MathUtils.degToRad;
+  const up = position.clone().sub(shape.tie).normalize();
+  const out = new THREE.Vector3(position.x - frame.center.x, 0, position.z - frame.center.z);
+  if (out.lengthSq() < 1e-6) out.set(Math.cos(rad(twist * 7)), 0, Math.sin(rad(twist * 7)));
+  out.normalize();
+  if (lean) up.applyAxisAngle(new THREE.Vector3(out.z, 0, -out.x), rad(lean));
+  const face = out.clone().sub(up.clone().multiplyScalar(out.dot(up))).normalize();
+  const side = new THREE.Vector3().crossVectors(up, face);
+  return new THREE.Quaternion()
+    .setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, up, face))
+    .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rad(twist)));
+}
+
 // Upright with a small turn, leaning outward from the centre by `lean` degrees
 function leanPose(dx, dz, lean, turn) {
   const rad = THREE.MathUtils.degToRad;
@@ -1959,10 +2029,14 @@ function suggestArrangement(kind) {
   // Fillers spread out to the paper; flowers stay over the bed
   const wall = kind === "filler" ? wrapWall(frame) : null;
   const span = kind === "filler" ? fillerSpan(frame, wall) : frame.radius;
+  const shape = kind === "filler" ? wrapShape(frame, wall) : null;
   const toDisc = (object) => ({ x: (object.position.x - frame.center.x) / span, z: (object.position.z - frame.center.z) / span });
   const result =
     kind === "filler"
-      ? suggestFillers(items, placedFlowers.value.map((f) => placedObjects.get(f.sceneId)).filter(Boolean).map(toDisc), { avoid: last?.style })
+      ? suggestFillers(items, placedFlowers.value.map((f) => placedObjects.get(f.sceneId)).filter(Boolean).map(toDisc), {
+          avoid: last?.style,
+          backness: shape.backness,
+        })
       : suggestFlowers(items, { avoid: last?.style });
 
   for (const spot of result.spots) {
@@ -1970,12 +2044,18 @@ function suggestArrangement(kind) {
     const x = frame.center.x + spot.x * span;
     const z = frame.center.z + spot.z * span;
     const surface = bedSurface(frame, x, z);
-    object.quaternion.copy(leanPose(spot.x, spot.z, (spot.tilt || 0) * MAX_LEAN[kind], spot.turn || 0));
     if (kind === "filler") {
-      object.position.set(x, surface + FILLER_LIFT + (spot.lift || 0) * Math.abs(FILLER_DEPTH.low), z);
+      // At most as tall as the paper there allows: the spray's middle just below
+      // its top edge, so the lower leaves stay in the wrap and the tips show
+      const rest = surface + FILLER_LIFT;
+      const rim = shape.rimY(Math.atan2(z - frame.center.z, x - frame.center.x));
+      const tallest = THREE.MathUtils.clamp(rim - FILLER_TUCK, rest, rest + FILLER_DEPTH.high);
+      object.position.set(x, THREE.MathUtils.lerp(rest + FILLER_DEPTH.low, tallest, spot.rise), z);
+      object.quaternion.copy(sprayPose(frame, shape, object.position, spot.lean * MAX_LEAN.filler, spot.twist));
       object.scale.setScalar(fillerScale(frame) * (spot.scale || 1));
       keepInsideBouquet(object, { exact: true, wall });
     } else {
+      object.quaternion.copy(leanPose(spot.x, spot.z, (spot.tilt || 0) * MAX_LEAN[kind], spot.turn || 0));
       object.position.set(x, surface - NESTLE + (spot.lift || 0) * DOME_LIFT, z);
     }
     commitObjectState(spot.sceneId);

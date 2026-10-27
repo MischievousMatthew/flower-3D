@@ -1,11 +1,16 @@
-// One filler shows as a bunch of sprigs fanned out from a shared base, like the
-// greenery in the original bouquet model, instead of a single sprig. The
-// customizer and the 3D viewer (cart, orders) both build it here, seeded by the
-// filler's scene id, so a saved bouquet shows the same bunch everywhere.
+// One filler shows as a spray of sprigs fanned out from a shared base, like the
+// greenery in a hand-tied bouquet, instead of a single sprig. The customizer
+// and the 3D viewer (cart, orders) both build it here, seeded by the filler's
+// scene id, so a saved bouquet shows the same spray everywhere.
+//
+// The spray grows up its local +Y and fans out sideways along local X, so it
+// reads as an open fan when its face (local +Z) looks out of the bouquet.
 import * as THREE from "three";
 import { seeded } from "./bouquetDesigns/common.js";
 
-export const BUNCH_SPRIGS = 5;
+export const BUNCH_SPRIGS = 4;
+const FAN = 0.5; // radians from the middle to the outermost sprig
+const BASE = -0.35; // where the sprigs meet, below the spray's centre
 
 function hash(text) {
   let h = 2166136261;
@@ -22,25 +27,20 @@ function hash(text) {
 export function buildFillerBunch(makeSprig, seedKey) {
   const rand = seeded(hash(String(seedKey || "filler")));
   const bunch = new THREE.Group();
-  const spin = rand() * Math.PI * 2;
   for (let i = 0; i < BUNCH_SPRIGS; i++) {
-    // The first sprig stands in the middle; the rest fan out around it
-    const middle = i === 0;
-    const angle = spin + ((i - 1) / (BUNCH_SPRIGS - 1)) * Math.PI * 2 + (rand() - 0.5) * 0.6;
-    const dx = Math.cos(angle);
-    const dz = Math.sin(angle);
-    const lean = middle ? rand() * 0.2 : 0.55 + rand() * 0.3; // radians outward
-
-    // Each sprig turns about its own base, low in the bunch, so they all grow from one point
+    // Spread across the fan, a little uneven so no two sprays match
+    const across = BUNCH_SPRIGS === 1 ? 0 : (i / (BUNCH_SPRIGS - 1)) * 2 - 1;
+    const middle = 1 - Math.abs(across); // 1 in the middle, 0 at the edges
     const pivot = new THREE.Group();
-    pivot.position.set(middle ? 0 : dx * 0.15, -0.3, middle ? 0 : dz * 0.15);
-    pivot.quaternion
-      .setFromAxisAngle(new THREE.Vector3(dz, 0, -dx), lean)
-      .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI * 2));
-    const size = middle ? 1 : 0.75 + rand() * 0.2;
+    pivot.position.set(across * 0.06, BASE, 0);
+    pivot.rotation.set((rand() - 0.5) * 0.35, rand() * Math.PI * 2, 0, "ZXY");
+    pivot.rotation.z = -across * FAN + (rand() - 0.5) * 0.2;
+
+    // Middle sprigs stand taller; outer ones are a little smaller
+    const size = 0.7 + middle * 0.25 + rand() * 0.1;
     const holder = new THREE.Group();
     holder.scale.setScalar(size);
-    holder.position.y = 0.3 * size;
+    holder.position.y = (0.35 + middle * 0.3) * size;
     holder.add(makeSprig());
     pivot.add(holder);
     bunch.add(pivot);
