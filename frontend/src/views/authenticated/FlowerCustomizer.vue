@@ -555,6 +555,7 @@ import {
 import { anchorCard, buildSteps, keyAction, receiptLines } from "../../utils/customizerUi.js";
 import { suggestFillers, suggestFlowers } from "../../utils/arrangementSuggest.js";
 import { buildFillerBunch } from "../../utils/fillerBunch.js";
+import { FILLER_STYLES, ORIGINAL_FRONT, SPAN_PER_BED_RADIUS, buildFillerSprigs, fillerKind, placeSprig, planFillers, spillAt } from "../../utils/fillerLayout.js";
 import NavHeader from "../../layouts/NavHeader.vue";
 import BcIcon from "../../components/customizer/CustomizerIcon.js";
 import CustomizerSteps from "../../components/customizer/CustomizerSteps.vue";
@@ -1402,7 +1403,7 @@ async function placeFlowerOnBouquet(flower, placement) {
       yDeg: 180,
       zDeg: THREE.MathUtils.radToDeg((Math.random() - 0.5) * 0.14),
     };
-    wrapper.add(itemModel(template, filler, sceneId));
+    if (!filler) wrapper.add(itemModel(template, false, sceneId));
     wrapper.position.copy(placement.local ?? placement.point);
     wrapper.rotation.set(
       THREE.MathUtils.degToRad(initialRotation.xDeg),
@@ -1411,7 +1412,6 @@ async function placeFlowerOnBouquet(flower, placement) {
     );
     wrapper.userData.sceneId = sceneId;
     flowerLayer.add(wrapper);
-    if (filler) settleNewFiller(wrapper);
     const at = wrapper.position;
     placedObjects.set(sceneId, wrapper);
     selectedFlowers.value.push({
@@ -1427,7 +1427,10 @@ async function placeFlowerOnBouquet(flower, placement) {
       scale: Math.round(wrapper.scale.x * 100) / 100,
       locked: false,
     });
-    if (filler) commitObjectState(sceneId); // its lean and size were set by settleNewFiller
+    if (filler) {
+      // Its pieces go on free spots of the original bouquet, toward where it was put
+      layOutFillers();
+    }
     selectedSceneId.value = sceneId;
     showToast(`${flower.product_name} placed on bouquet.`, "success");
   } catch (error) {
@@ -1450,8 +1453,10 @@ async function loadFlowerTemplate(url) {
   return template;
 }
 
-// A placed item's model: a flower as is, a filler as a bunch of sprigs
-function itemModel(template, filler, sceneId) {
+// A placed item's model: a flower as is; a filler as its pieces on the
+// original bouquet's spots, or (saved before those) a bunch of sprigs
+function itemModel(template, filler, sceneId, sprigs = null) {
+  if (filler && sprigs?.length) return buildFillerSprigs(template, sprigs, () => SkeletonUtils.clone(template));
   const fitted = () => {
     const copy = SkeletonUtils.clone(template);
     fitFlowerModel(copy);
@@ -1615,6 +1620,8 @@ function removeFlower(sceneId) {
     placedObjects.delete(sceneId);
   }
   if (cardEditor.sceneId === sceneId) closeCardEditor();
+  // The other fillers take over its spots
+  if (object?.userData.sprigs) layOutFillers();
 }
 
 // ── Occasion presets ───────────────────────────────────────────────────
@@ -1646,8 +1653,9 @@ function setWrapperScale(next) {
   bouquetRoot.position.multiplyScalar(k);
   for (const [sceneId, object] of placedObjects) {
     object.position.multiplyScalar(k);
+    if (object.userData.sprigs) object.scale.multiplyScalar(k); // greenery fills the wrap, so it grows with it
     const item = selectedFlowers.value.find((f) => f.sceneId === sceneId);
-    if (item) item.position = { x: object.position.x, y: object.position.y, z: object.position.z };
+    if (item) Object.assign(item, { position: { x: object.position.x, y: object.position.y, z: object.position.z }, scale: object.scale.x });
   }
 }
 
@@ -1775,6 +1783,7 @@ function keepInsideBouquet(object, { exact = false, wall = null } = {}) {
   const frame = bedFrame();
   if (!frame) return;
   wall ??= wrapWall(frame);
+  if (object.userData.sprigs) return keepFillerGroup(object, frame, wall, exact);
   const reach = fillerSpan(frame, wall) * FILLER_REACH;
   const dx = object.position.x - frame.center.x;
   const dz = object.position.z - frame.center.z;
@@ -1789,23 +1798,28 @@ function keepInsideBouquet(object, { exact = false, wall = null } = {}) {
 }
 
 /**
+ * A filler of pieces is centred on the bed; moving it shifts the whole group,
+ * so it may slide only part way out and up or down, then each piece is fitted.
+ */
+function keepFillerGroup(object, frame, wall, exact) {
+  const span = fillerSpan(frame, wall);
+  const offset = object.position.clone().sub(frame.center);
+  const sideways = Math.hypot(offset.x, offset.z);
+  if (sideways > span * 0.5) {
+    offset.x *= (span * 0.5) / sideways;
+    offset.z *= (span * 0.5) / sideways;
+  }
+  offset.y = THREE.MathUtils.clamp(offset.y, -0.4 * span, 0.4 * span);
+  object.position.copy(frame.center).add(offset);
+  if (exact) fitSprigs(object, wall);
+}
+
+/**
  * How far from the middle fillers can go. The flower bed can be much narrower
  * than the wrap's opening (the Korean wrap), and fillers belong out to the paper.
  */
 const fillerSpan = (frame, wall) => (wall && Number.isFinite(wall.gapWidth) ? Math.max(frame.radius, wall.gapWidth * 0.85) : frame.radius);
 
-/** A newly placed filler: full size, its base down in the wrap, leaning out toward the paper */
-function settleNewFiller(object) {
-  const frame = bedFrame();
-  if (!frame) return;
-  const wall = wrapWall(frame);
-  const span = fillerSpan(frame, wall);
-  const r = Math.hypot(object.position.x - frame.center.x, object.position.z - frame.center.z) / span;
-  object.scale.setScalar(fillerScale(frame));
-  object.position.y = bedSurface(frame, object.position.x, object.position.z) + FILLER_LIFT;
-  object.quaternion.copy(sprayPose(frame, wrapShape(frame, wall), object.position, Math.min(1, r) * MAX_LEAN.filler * 0.6, (Math.random() - 0.5) * 50));
-  keepInsideBouquet(object, { exact: true, wall });
-}
 
 // The wrap, as the outer paper's radius per direction and height band: a leaf
 // tucked between two layers is still inside the wrapper
@@ -2011,9 +2025,12 @@ function leanPose(dx, dz, lean, turn) {
   return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(dz / r, 0, -dx / r), rad(lean)).multiply(pose);
 }
 
+const copySprigs = (sprigs) => (sprigs ? sprigs.map(({ i, a, r, k, p }) => ({ i, a, r, k, p })) : null);
+
 const poseOf = (sceneId) => {
   const object = placedObjects.get(sceneId);
-  return { sceneId, position: object.position.clone(), quaternion: object.quaternion.clone(), scale: object.scale.x };
+  const item = selectedFlowers.value.find((entry) => entry.sceneId === sceneId);
+  return { sceneId, position: object.position.clone(), quaternion: object.quaternion.clone(), scale: object.scale.x, sprigs: copySprigs(item?.sprigs) };
 };
 
 /** Lays out the unlocked flowers or fillers in a new suggested arrangement; each call gives a different one */
@@ -2026,38 +2043,19 @@ function suggestArrangement(kind) {
 
   const last = suggestion[kind];
   const before = last?.before ?? items.map((item) => poseOf(item.sceneId));
-  // Fillers spread out to the paper; flowers stay over the bed
-  const wall = kind === "filler" ? wrapWall(frame) : null;
-  const span = kind === "filler" ? fillerSpan(frame, wall) : frame.radius;
-  const shape = kind === "filler" ? wrapShape(frame, wall) : null;
-  const toDisc = (object) => ({ x: (object.position.x - frame.center.x) / span, z: (object.position.z - frame.center.z) / span });
-  const result =
-    kind === "filler"
-      ? suggestFillers(items, placedFlowers.value.map((f) => placedObjects.get(f.sceneId)).filter(Boolean).map(toDisc), {
-          avoid: last?.style,
-          backness: shape.backness,
-        })
-      : suggestFlowers(items, { avoid: last?.style });
+  if (kind === "filler") {
+    const look = suggestFillerLayout(items, last?.style);
+    suggestion.filler = { ...look, before };
+    return;
+  }
 
+  const result = suggestFlowers(items, { avoid: last?.style });
   for (const spot of result.spots) {
     const object = placedObjects.get(spot.sceneId);
-    const x = frame.center.x + spot.x * span;
-    const z = frame.center.z + spot.z * span;
-    const surface = bedSurface(frame, x, z);
-    if (kind === "filler") {
-      // At most as tall as the paper there allows: the spray's middle just below
-      // its top edge, so the lower leaves stay in the wrap and the tips show
-      const rest = surface + FILLER_LIFT;
-      const rim = shape.rimY(Math.atan2(z - frame.center.z, x - frame.center.x));
-      const tallest = THREE.MathUtils.clamp(rim - FILLER_TUCK, rest, rest + FILLER_DEPTH.high);
-      object.position.set(x, THREE.MathUtils.lerp(rest + FILLER_DEPTH.low, tallest, spot.rise), z);
-      object.quaternion.copy(sprayPose(frame, shape, object.position, spot.lean * MAX_LEAN.filler, spot.twist));
-      object.scale.setScalar(fillerScale(frame) * (spot.scale || 1));
-      keepInsideBouquet(object, { exact: true, wall });
-    } else {
-      object.quaternion.copy(leanPose(spot.x, spot.z, (spot.tilt || 0) * MAX_LEAN[kind], spot.turn || 0));
-      object.position.set(x, surface - NESTLE + (spot.lift || 0) * DOME_LIFT, z);
-    }
+    const x = frame.center.x + spot.x * frame.radius;
+    const z = frame.center.z + spot.z * frame.radius;
+    object.quaternion.copy(leanPose(spot.x, spot.z, (spot.tilt || 0) * MAX_LEAN.flower, spot.turn || 0));
+    object.position.set(x, bedSurface(frame, x, z) - NESTLE + (spot.lift || 0) * DOME_LIFT, z);
     commitObjectState(spot.sceneId);
   }
   suggestion[kind] = { style: result.style, label: result.label, before };
@@ -2067,13 +2065,128 @@ function suggestArrangement(kind) {
 function undoSuggestion(kind) {
   for (const pose of suggestion[kind]?.before || []) {
     const object = placedObjects.get(pose.sceneId);
-    if (!object) continue;
+    const item = selectedFlowers.value.find((entry) => entry.sceneId === pose.sceneId);
+    if (!object || !item) continue;
+    if (pose.sprigs) showSprigs(object, item, copySprigs(pose.sprigs));
     object.position.copy(pose.position);
     object.quaternion.copy(pose.quaternion);
     object.scale.setScalar(pose.scale);
     commitObjectState(pose.sceneId);
   }
   suggestion[kind] = null;
+}
+
+// ── Filler greenery on the original bouquet's spots (see utils/fillerLayout.js) ──
+
+// The original's paper top stands this far above its flower bed (median, in filler spans)
+const ORIGINAL_RIM_RISE = 0.075;
+
+/**
+ * The bed, wrap and filler span right now; the turn that puts the original
+ * bouquet's open front at this wrap's (none on the classic cone, which is the
+ * original's own wrap, or on a wrap that's level all round); and how much to
+ * raise the greenery so it comes out of a taller wrap the way it does from
+ * the original's.
+ */
+function fillerGround() {
+  const frame = bedFrame();
+  if (!frame) return null;
+  const wall = wrapWall(frame);
+  let align = 0;
+  let lift = 0;
+  if (!["classic", LEGACY_DESIGN].includes(baseDesign.value)) {
+    const span = fillerSpan(frame, wall);
+    const rims = wall ? wall.top.filter((top) => top >= wall.bedBand).map((top) => top * WALL_BAND - frame.center.y).sort((a, b) => a - b) : [];
+    if (rims.length) lift = Math.max(0, rims[rims.length >> 1] - ORIGINAL_RIM_RISE * span);
+    const shape = wrapShape(frame, wall);
+    let front = 0;
+    let lowest = Infinity;
+    let highest = -Infinity;
+    for (let d = -180; d < 180; d += 5) {
+      const back = shape.backness(THREE.MathUtils.degToRad(d));
+      highest = Math.max(highest, back);
+      if (back < lowest) [lowest, front] = [back, THREE.MathUtils.degToRad(d)];
+    }
+    if (highest - lowest > 0.2) align = ORIGINAL_FRONT - front;
+  }
+  const classic = ["classic", LEGACY_DESIGN].includes(baseDesign.value);
+  return { frame, wall, span: classic ? frame.radius * SPAN_PER_BED_RADIUS : fillerSpan(frame, wall), align, lift };
+}
+
+/** Swaps a filler's pieces for `sprigs` (in place, keeping where the filler is) */
+function showSprigs(object, item, sprigs) {
+  const template = modelCache.get(item.model_3d_url);
+  if (!template) return;
+  object.clear();
+  object.add(buildFillerSprigs(template, sprigs, () => SkeletonUtils.clone(template)));
+  object.userData.sprigs = true;
+  item.sprigs = sprigs;
+}
+
+/** Sets a filler's pieces and puts it over the bed, sized to this wrap, every piece inside the paper */
+function layFiller(object, item, sprigs, ground) {
+  showSprigs(object, item, sprigs);
+  object.position.copy(ground.frame.center).add(new THREE.Vector3(0, ground.lift, 0));
+  object.quaternion.identity();
+  object.scale.setScalar(ground.span);
+  fitSprigs(object, ground.wall);
+}
+
+/**
+ * Brings each piece of a filler that hangs further past the paper than the
+ * original's piece on that spot back toward the middle, then makes it a
+ * little smaller if it's still too wide for the wrap. A piece that still
+ * pokes out at its smallest is left out, so nothing ever shows outside.
+ */
+function fitSprigs(object, wall) {
+  if (!wall) return;
+  const item = selectedFlowers.value.find((entry) => entry.sceneId === object.userData.sceneId);
+  const template = modelCache.get(item?.model_3d_url);
+  if (!template) return;
+  const allowed = (piece) => wallOvershoot(wall, piece) <= spillAt(piece.userData.sprig.i) * object.scale.x + 0.005;
+  const group = object.children[0];
+  for (const piece of [...(group?.children || [])]) {
+    const sprig = piece.userData.sprig;
+    for (let step = 0; step < 22 && !allowed(piece); step++) {
+      if (sprig.p > 0.35 && step < 10) sprig.p = Math.round((sprig.p - 0.07) * 100) / 100;
+      else if (sprig.k > 0.45) sprig.k = Math.round(sprig.k * 0.9 * 100) / 100;
+      else break; // as small as it goes
+      placeSprig(piece, template);
+    }
+    if (!allowed(piece)) {
+      group.remove(piece);
+      item.sprigs = item.sprigs.filter((other) => other !== sprig);
+    }
+  }
+}
+
+/**
+ * Shares the original bouquet's spots out again among the unlocked fillers.
+ * Runs as fillers are added or removed, so the greenery always looks like the
+ * original's, as full as the fillers placed allow. Returns the look's { style, label }.
+ */
+function layOutFillers(style = "original") {
+  const ground = fillerGround();
+  const look = FILLER_STYLES.find((entry) => entry.key === style) || FILLER_STYLES[0];
+  if (!ground) return { style: look.key, label: look.label };
+  const ready = placedFillers.value.filter((item) => !item.locked && placedObjects.has(item.sceneId) && modelCache.has(item.model_3d_url));
+  // Locked fillers keep their spots
+  const keep = placedFillers.value.filter((item) => item.locked).flatMap((item) => (item.sprigs || []).map((sprig) => sprig.i));
+  const plans = planFillers(
+    ready.map((item) => ({ kind: fillerKind(modelCache.get(item.model_3d_url)) })),
+    { align: ground.align, style: look.key, keep },
+  );
+  ready.forEach((item, index) => {
+    layFiller(placedObjects.get(item.sceneId), item, plans[index], ground);
+    commitObjectState(item.sceneId);
+  });
+  return { style: look.key, label: look.label };
+}
+
+/** A new look for the fillers, different from the last one */
+function suggestFillerLayout(items, avoid) {
+  const choices = FILLER_STYLES.filter((style) => style.key !== avoid);
+  return layOutFillers(choices[Math.floor(Math.random() * choices.length)].key);
 }
 
 // Adding or removing items starts suggestions afresh
@@ -2130,6 +2243,13 @@ function moveSelectedFlower(clientX, clientY, sceneId = selectedSceneId.value) {
   if (!placement || !object || flower?.locked) return;
   const frame = isFiller(flower) ? bedFrame() : null;
   if (!frame) return object.position.copy(placement.local);
+  if (object.userData.sprigs) {
+    // A group of pieces moves by how far the pointer moved, not to the pointer
+    if (transformDrag && !transformDrag.from) transformDrag.from = { pointer: placement.local.clone(), object: object.position.clone() };
+    const from = transformDrag?.from;
+    if (from) object.position.copy(from.object).add(placement.local.clone().sub(from.pointer).setY(0));
+    return keepInsideBouquet(object);
+  }
   // A filler slides at its own depth in the wrap, not up onto the paper
   const rise = object.position.y - bedSurface(frame, object.position.x, object.position.z);
   object.position.copy(placement.local);
@@ -2170,6 +2290,16 @@ function resetSelectedTransform() {
   const flower = selectedFlower.value;
   const object = flower ? placedObjects.get(flower.sceneId) : null;
   if (!flower || !object) return;
+  if (object.userData.sprigs) {
+    // Back over the middle of the bed, sized to the wrap
+    const ground = fillerGround();
+    if (!ground) return;
+    object.position.copy(ground.frame.center);
+    object.quaternion.identity();
+    object.scale.setScalar(ground.span);
+    fitSprigs(object, ground.wall);
+    return commitObjectState(flower.sceneId);
+  }
   const resetRotation = flower.kind === "card" ? { ...CARD_ROTATION } : { xDeg: -5, yDeg: 180, zDeg: 0 };
   object.rotation.set(
     THREE.MathUtils.degToRad(resetRotation.xDeg),
@@ -2449,6 +2579,8 @@ function buildBouquetCustomization() {
       rotation: { ...filler.rotation },
       scale: Number(filler.scale ?? 1),
       locked: filler.locked,
+      // Its pieces on the original bouquet's spots
+      ...(filler.sprigs ? { sprigs: copySprigs(filler.sprigs) } : {}),
     })),
     flowers: placedFlowers.value.map((flower, index) => {
       const object = placedObjects.get(flower.sceneId);
@@ -2538,7 +2670,9 @@ async function restoreBouquet(customization) {
       const position = savedFlower.position || { x: 0, y: 0, z: 0 };
       const rotation = savedFlower.rotation || { xDeg: 0, yDeg: 0, zDeg: 0 };
       const scale = Number(savedFlower.scale ?? 1);
-      wrapper.add(itemModel(template, isFiller(savedFlower), sceneId));
+      const sprigs = isFiller(savedFlower) && Array.isArray(savedFlower.sprigs) && savedFlower.sprigs.length ? copySprigs(savedFlower.sprigs) : null;
+      wrapper.add(itemModel(template, isFiller(savedFlower), sceneId, sprigs));
+      wrapper.userData.sprigs = Boolean(sprigs);
       wrapper.position.set(Number(position.x || 0), Number(position.y || 0), Number(position.z || 0));
       wrapper.rotation.set(
         THREE.MathUtils.degToRad(Number(rotation.xDeg || 0)),
@@ -2565,6 +2699,7 @@ async function restoreBouquet(customization) {
         rotation: { xDeg: Number(rotation.xDeg || 0), yDeg: Number(rotation.yDeg || 0), zDeg: Number(rotation.zDeg || 0) },
         scale,
         locked: Boolean(savedFlower.locked),
+        ...(sprigs ? { sprigs } : {}),
       });
     } catch (error) {
       console.error("Failed to restore saved flower:", error);

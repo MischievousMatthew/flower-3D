@@ -50,6 +50,7 @@ import * as THREE from "three";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { LEGACY_DESIGN, createBouquetBase } from "../../utils/bouquetDesigns/index.js";
 import { buildFillerBunch } from "../../utils/fillerBunch.js";
+import { buildFillerSprigs } from "../../utils/fillerLayout.js";
 import { createCard } from "../../utils/bouquetCard.js";
 
 const props = defineProps({
@@ -392,8 +393,21 @@ const loadBouquetArrangement = async (arrangement) => {
       fitFlowerModel(copy);
       return copy;
     };
+    const copy = () => {
+      const raw = SkeletonUtils.clone(template);
+      prepareModel(raw);
+      return raw;
+    };
     const placement = new THREE.Group();
-    placement.add(flower.filler ? buildFillerBunch(fitted, flower.scene_id) : fitted());
+    // Fillers: their pieces on the original bouquet's spots, or (saved before
+    // those) the bunch the customizer drew then
+    placement.add(
+      flower.filler && flower.sprigs?.length
+        ? buildFillerSprigs(template, flower.sprigs, copy)
+        : flower.filler
+          ? buildFillerBunch(fitted, flower.scene_id)
+          : fitted(),
+    );
     placement.position.set(
       Number(flower.position?.x || 0),
       Number(flower.position?.y || 0),

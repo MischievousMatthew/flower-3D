@@ -174,6 +174,7 @@ class BouquetCustomizationOption extends Model
                 'rotation' => (array) data_get($filler, 'rotation', []),
                 'scale' => (float) data_get($filler, 'scale', 1),
                 'locked' => (bool) data_get($filler, 'locked', false),
+                'sprigs' => self::cleanSprigs(data_get($filler, 'sprigs')),
             ];
             $total += $option->price;
         }
@@ -231,5 +232,38 @@ class BouquetCustomizationOption extends Model
     private static function failure(string $message, array $customizations): array
     {
         return ['ok' => false, 'message' => $message, 'total' => 0.0, 'customizations' => $customizations];
+    }
+
+    /**
+     * A filler's pieces of greenery on the original bouquet's spots, each
+     * { i: spot, a: turn, r: spin, k: size, p: how far out } (see frontend
+     * utils/fillerLayout.js). Anything else is dropped, so a filler without
+     * valid pieces just shows the older way.
+     */
+    private static function cleanSprigs($sprigs): ?array
+    {
+        if (!is_array($sprigs)) {
+            return null;
+        }
+
+        $clean = [];
+        foreach (array_slice(array_values($sprigs), 0, 60) as $sprig) {
+            $spot = data_get($sprig, 'i');
+            if (!is_numeric($spot) || $spot < 0 || $spot > 200) {
+                continue;
+            }
+            $number = fn ($key, $default, $min, $max) => is_numeric(data_get($sprig, $key))
+                ? max($min, min($max, round((float) data_get($sprig, $key), 4)))
+                : $default;
+            $clean[] = [
+                'i' => (int) $spot,
+                'a' => $number('a', 0.0, -10.0, 10.0),
+                'r' => $number('r', 0.0, -10.0, 10.0),
+                'k' => $number('k', 1.0, 0.2, 2.0),
+                'p' => $number('p', 1.0, 0.0, 1.5),
+            ];
+        }
+
+        return $clean ?: null;
     }
 }
