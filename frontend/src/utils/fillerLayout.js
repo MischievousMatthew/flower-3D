@@ -122,17 +122,56 @@ export function placeSprig(copy, template) {
   if (mesh) sprigMatrix(copy.userData.sprig, mesh).decompose(copy.position, copy.quaternion, copy.scale);
 }
 
-// `spin` and `size` are the most a piece turns (share of a full turn) and
-// grows or shrinks; `turn` is the most the whole greenery turns (radians).
-// Kept small: a big turn swings a low leaf through the side of the paper.
+// `spin` and `size` are the most a piece turns about its own stem (share of a
+// full turn) and grows or shrinks. Every look but the first moves each piece
+// to a new side of the bouquet: a turn about the middle keeps the piece's
+// height, reach and outward lean, so it still grows out of the wrap the way
+// it did in the original. Taller pieces go toward the back.
 export const FILLER_STYLES = [
-  // Each kind on its own spots, each piece turned a little
-  { key: "original", label: "Like the original", swap: 0, spin: 0.05, size: 0.05, turn: 0.04 },
-  // Small blooms trade places with one another; pieces turned a bit more
-  { key: "mixed", label: "Blooms swapped", swap: 1, spin: 0.1, size: 0.08, turn: 0.04 },
-  // The greenery turned a little about the middle, so the back stays the back
-  { key: "turned", label: "Turned a little", swap: 0.5, spin: 0.07, size: 0.06, turn: 0.22 },
+  // As the original, each piece turned a little (used when fillers are added)
+  { key: "original", label: "Like the original", spin: 0.05, size: 0.05, first: true },
+  { key: "collar", label: "Even collar", spin: 0.08, size: 0.08 },
+  { key: "fan", label: "Fan at the back", spin: 0.08, size: 0.08 },
+  { key: "sweep", label: "Side sweep", spin: 0.08, size: 0.08 },
+  { key: "clusters", label: "Grouped by kind", spin: 0.08, size: 0.08 },
+  { key: "mirror", label: "Mirrored", spin: 0.08, size: 0.06 },
 ];
+
+const TAU = Math.PI * 2;
+const angleOf = (slot) => Math.atan2(slot.m[14], slot.m[12]);
+const heightOf = (slot) => slot.m[13];
+
+/**
+ * Where each piece goes round the bouquet, as an angle from the open front
+ * (0 = front, π = back), for the chosen look.
+ */
+function sidesFor(look, pieces, rand) {
+  const jitter = (amount) => (rand() - 0.5) * 2 * amount;
+  const fromFront = (slot) => angleOf(slot) - ORIGINAL_FRONT;
+  if (look === "original") return pieces.map(({ slot }) => fromFront(slot) + jitter(0.04));
+  if (look === "mirror") return pieces.map(({ slot }) => -fromFront(slot) + jitter(0.15));
+
+  const n = pieces.length;
+  // Even places across an arc centred on the back (or one side, for a sweep)
+  const arc = { collar: TAU * 0.95, fan: 3.8, sweep: 3.3, clusters: 4.8 }[look];
+  const centre = Math.PI + (look === "sweep" ? (rand() < 0.5 ? -1 : 1) * 0.9 : 0);
+  const places = Array.from({ length: n }, (_, j) => centre + ((j + 0.5) / n - 0.5) * arc + jitter((arc / n) * 0.35));
+
+  if (look === "clusters") {
+    // Each kind keeps to its own stretch, the kinds in a new order each time
+    const order = [...new Set(pieces.map(({ slot }) => slot.k))].sort(() => rand() - 0.5);
+    const ranked = pieces.map((piece, index) => ({ index, key: order.indexOf(piece.slot.k) + rand() * 0.5 })).sort((a, b) => a.key - b.key);
+    const sides = new Array(n);
+    ranked.forEach(({ index }, j) => (sides[index] = places[j]));
+    return sides;
+  }
+  // Tallest pieces to the places nearest the back, so the front stays open
+  const byBack = places.map((side, j) => ({ side, j, back: -Math.cos(side) })).sort((a, b) => b.back - a.back);
+  const byHeight = pieces.map((piece, index) => ({ index, h: heightOf(piece.slot) + jitter(0.08) })).sort((a, b) => b.h - a.h);
+  const sides = new Array(n);
+  byHeight.forEach(({ index }, j) => (sides[index] = byBack[j].side));
+  return sides;
+}
 
 /**
  * Shares the original's spots among fillers and returns each one's sprigs.
@@ -142,37 +181,39 @@ export const FILLER_STYLES = [
  */
 export function planFillers(entries, { align = 0, style = "original", keep = [], rand = Math.random } = {}) {
   const look = FILLER_STYLES.find((s) => s.key === style) || FILLER_STYLES[0];
-  const result = entries.map(() => []);
   const held = new Set(keep);
-  const groupTurn = (rand() - 0.5) * 2 * look.turn;
+  const pieces = []; // { index: which filler, slot }
 
   for (const family of ["leaf", "small", "spike", "sepal"]) {
     // Fillers that take this family's spots (or borrow them when none are placed)
     let takers = entries.map((entry, index) => ({ entry, index })).filter(({ entry }) => entry.kind.family === family);
     if (!takers.length && BORROW[family]) takers = entries.map((entry, index) => ({ entry, index })).filter(({ entry }) => entry.kind.family === BORROW[family]);
     if (!takers.length) continue;
-    const spots = SLOTS.filter((slot) => slot.f === family && !held.has(slot.i));
-
     // Each spot goes to a filler of its own kind when there is one (shared out
-    // in turn among several of that kind), otherwise to whichever taker has
-    // the fewest so far. Swapping hands some spots to other kinds.
+    // in turn among several of that kind), otherwise to whichever taker has the fewest
     const counts = new Map(takers.map(({ index }) => [index, 0]));
-    const turnOf = new Map();
-    for (const slot of [...spots].sort(() => rand() - 0.5)) {
+    for (const slot of SLOTS.filter((s) => s.f === family && !held.has(s.i)).sort(() => rand() - 0.5)) {
       const ownKind = takers.filter(({ entry }) => entry.kind.own === slot.k);
-      const pool = ownKind.length && rand() >= look.swap ? ownKind : takers;
+      const pool = ownKind.length ? ownKind : takers;
       const pick = pool.reduce((best, taker) => (counts.get(taker.index) < counts.get(best.index) ? taker : best), pool[Math.floor(rand() * pool.length)]);
       counts.set(pick.index, counts.get(pick.index) + 1);
-      if (!turnOf.has(pick.index)) turnOf.set(pick.index, (rand() - 0.5) * look.turn);
-      result[pick.index].push({
-        i: slot.i,
-        a: round(align + groupTurn + turnOf.get(pick.index)),
-        r: round((rand() - 0.5) * 2 * Math.PI * look.spin),
-        k: round(1 + (rand() - 0.5) * 2 * look.size),
-        p: 1,
-      });
+      pieces.push({ index: pick.index, slot });
     }
   }
+
+  const sides = sidesFor(look.key, pieces, rand);
+  const result = entries.map(() => []);
+  pieces.forEach(({ index, slot }, j) => {
+    // A turn about the middle moves the piece from its own side to the new one
+    const target = ORIGINAL_FRONT + sides[j];
+    result[index].push({
+      i: slot.i,
+      a: round(Math.atan2(Math.sin(angleOf(slot) - target), Math.cos(angleOf(slot) - target)) + align),
+      r: round((rand() - 0.5) * 2 * Math.PI * look.spin),
+      k: round(1 + (rand() - 0.5) * 2 * look.size),
+      p: 1,
+    });
+  });
   return result;
 }
 

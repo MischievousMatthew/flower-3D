@@ -1732,6 +1732,10 @@ async function fillWithFlower(flower) {
 }
 
 // ── Arrangement suggestions ──────────────────────────────────────────────
+const FRONT_LEAN = 70; // extra degrees a flower in the front row leans out to face the viewer
+const FRONT_REACH = 1.2; // and how much further out it comes (share of its distance from the middle)
+const BACK_RISE = 0.25; // how much higher a flower at the back stands
+const FRONT_DROP = 0.45; // and how much lower one at the front sits
 const NESTLE = 0.15; // suggested items sink this far into the bed so they sit in the wrap, not on it
 const DOME_LIFT = 0.3; // how far the middle of a suggested dome rises
 const MAX_LEAN = { flower: 22, filler: 20 }; // degrees outward at the rim (fillers lean this much past their line from the tie)
@@ -2050,12 +2054,22 @@ function suggestArrangement(kind) {
   }
 
   const result = suggestFlowers(items, { avoid: last?.style });
+  // Like a hand-tied bouquet: flowers on the side facing you lean out toward
+  // you, stepping down; the back ones stand taller and more upright
+  const eye = flowerLayer.worldToLocal(camera.position.clone());
+  const front = Math.atan2(eye.z - frame.center.z, eye.x - frame.center.x);
   for (const spot of result.spots) {
     const object = placedObjects.get(spot.sceneId);
-    const x = frame.center.x + spot.x * frame.radius;
-    const z = frame.center.z + spot.z * frame.radius;
-    object.quaternion.copy(leanPose(spot.x, spot.z, (spot.tilt || 0) * MAX_LEAN.flower, spot.turn || 0));
-    object.position.set(x, bedSurface(frame, x, z) - NESTLE + (spot.lift || 0) * DOME_LIFT, z);
+    const reach = Math.min(1, Math.hypot(spot.x, spot.z) / 0.8);
+    const frontness = reach > 0.05 ? Math.max(0, Math.cos(Math.atan2(spot.z, spot.x) - front)) ** 2 : 0;
+    // The front row comes forward over the rim so its faces show
+    const out = 1 + FRONT_REACH * frontness * reach;
+    const x = frame.center.x + spot.x * out * frame.radius;
+    const z = frame.center.z + spot.z * out * frame.radius;
+    const lean = (spot.tilt || 0) * MAX_LEAN.flower + frontness * reach * FRONT_LEAN;
+    object.quaternion.copy(leanPose(spot.x, spot.z, lean, spot.turn || 0));
+    const step = (1 - frontness) * reach * BACK_RISE - frontness * reach * FRONT_DROP;
+    object.position.set(x, bedSurface(frame, x, z) - NESTLE + (spot.lift || 0) * DOME_LIFT + step, z);
     commitObjectState(spot.sceneId);
   }
   suggestion[kind] = { style: result.style, label: result.label, before };
@@ -2185,7 +2199,8 @@ function layOutFillers(style = "original") {
 
 /** A new look for the fillers, different from the last one */
 function suggestFillerLayout(items, avoid) {
-  const choices = FILLER_STYLES.filter((style) => style.key !== avoid);
+  // Every suggestion is a new arrangement, never the original again
+  const choices = FILLER_STYLES.filter((style) => !style.first && style.key !== avoid);
   return layOutFillers(choices[Math.floor(Math.random() * choices.length)].key);
 }
 
