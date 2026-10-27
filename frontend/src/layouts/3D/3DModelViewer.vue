@@ -47,7 +47,9 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from "vue";
 import * as THREE from "three";
+import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { LEGACY_DESIGN, createBouquetBase } from "../../utils/bouquetDesigns/index.js";
+import { buildFillerBunch } from "../../utils/fillerBunch.js";
 import { createCard } from "../../utils/bouquetCard.js";
 
 const props = defineProps({
@@ -371,20 +373,27 @@ const loadBouquetArrangement = async (arrangement) => {
   model = new THREE.Group();
   model.add(bouquet);
 
-  const flowers = [...arrangement.flowers].sort(
-    (first, second) => Number(first.placement_order || 0) - Number(second.placement_order || 0),
-  );
+  const byOrder = (first, second) => Number(first.placement_order || 0) - Number(second.placement_order || 0);
+  // Fillers show as the same bunches of sprigs the customizer drew
+  const items = [
+    ...[...(arrangement.flowers || [])].sort(byOrder),
+    ...[...(arrangement.fillers || [])].sort(byOrder).map((filler) => ({ ...filler, filler: true })),
+  ];
 
-  for (const flower of flowers) {
+  for (const flower of items) {
     if (!flower.model_3d_url) continue;
     const flowerResult = await loadGltf(flower.model_3d_url);
-    const flowerModel = flowerResult.scene || flowerResult.scenes?.[0];
-    if (!flowerModel) continue;
+    const template = flowerResult.scene || flowerResult.scenes?.[0];
+    if (!template) continue;
 
-    prepareModel(flowerModel);
-    fitFlowerModel(flowerModel);
+    const fitted = () => {
+      const copy = SkeletonUtils.clone(template);
+      prepareModel(copy);
+      fitFlowerModel(copy);
+      return copy;
+    };
     const placement = new THREE.Group();
-    placement.add(flowerModel);
+    placement.add(flower.filler ? buildFillerBunch(fitted, flower.scene_id) : fitted());
     placement.position.set(
       Number(flower.position?.x || 0),
       Number(flower.position?.y || 0),

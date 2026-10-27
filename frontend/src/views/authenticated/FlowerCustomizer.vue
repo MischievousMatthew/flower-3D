@@ -554,6 +554,7 @@ import {
 } from "../../utils/bouquetCard.js";
 import { anchorCard, buildSteps, keyAction, receiptLines } from "../../utils/customizerUi.js";
 import { suggestFillers, suggestFlowers } from "../../utils/arrangementSuggest.js";
+import { buildFillerBunch } from "../../utils/fillerBunch.js";
 import NavHeader from "../../layouts/NavHeader.vue";
 import BcIcon from "../../components/customizer/CustomizerIcon.js";
 import CustomizerSteps from "../../components/customizer/CustomizerSteps.vue";
@@ -1394,7 +1395,6 @@ async function placeFlowerOnBouquet(flower, placement) {
 
   try {
     const template = await loadFlowerTemplate(flower.model);
-    const instance = SkeletonUtils.clone(template);
     const wrapper = new THREE.Group();
     const sceneId = `${filler ? "filler-" : ""}${flower.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const initialRotation = {
@@ -1402,8 +1402,7 @@ async function placeFlowerOnBouquet(flower, placement) {
       yDeg: 180,
       zDeg: THREE.MathUtils.radToDeg((Math.random() - 0.5) * 0.14),
     };
-    fitFlowerModel(instance);
-    wrapper.add(instance);
+    wrapper.add(itemModel(template, filler, sceneId));
     wrapper.position.copy(placement.local ?? placement.point);
     wrapper.rotation.set(
       THREE.MathUtils.degToRad(initialRotation.xDeg),
@@ -1449,6 +1448,16 @@ async function loadFlowerTemplate(url) {
   });
   modelCache.set(url, template);
   return template;
+}
+
+// A placed item's model: a flower as is, a filler as a bunch of sprigs
+function itemModel(template, filler, sceneId) {
+  const fitted = () => {
+    const copy = SkeletonUtils.clone(template);
+    fitFlowerModel(copy);
+    return copy;
+  };
+  return filler ? buildFillerBunch(fitted, sceneId) : fitted();
 }
 
 function fitFlowerModel(model) {
@@ -1718,10 +1727,10 @@ async function fillWithFlower(flower) {
 const NESTLE = 0.15; // suggested items sink this far into the bed so they sit in the wrap, not on it
 const DOME_LIFT = 0.3; // how far the middle of a suggested dome rises
 const MAX_LEAN = { flower: 22, filler: 35 }; // degrees outward at the rim
-// Fillers are sprays of greenery growing up out of the wrap, as in the original
-// bouquet model: about 1.25 bed radii across, centred a little above the bed so
+// Fillers are bunches of greenery growing up out of the wrap, as in the original
+// bouquet model: about 1.3 bed radii across, centred a little above the bed so
 // their lower leaves sit down inside the paper and nothing hangs in the air
-const FILLER_SIZE = 1.25;
+const FILLER_SIZE = 1.3;
 const FILLER_LIFT = 0.1;
 const FILLER_DEPTH = { low: -0.4, high: 0.3 }; // how far a filler may be moved down or up from there
 const FILLER_REACH = 0.95; // a spray's centre stays over the bed; its leaves are checked against the paper
@@ -1797,7 +1806,8 @@ function settleNewFiller(object) {
   keepInsideBouquet(object, { exact: true });
 }
 
-// The paper's inside, as the innermost radius per direction and height band
+// The wrap, as the outer paper's radius per direction and height band: a leaf
+// tucked between two layers is still inside the wrapper
 const WALL_ANGLES = 36;
 const WALL_BAND = 0.1;
 const MIN_FILLER_SHRINK = 0.6; // a filler too wide for a narrow wrap shrinks to no less than this share of its size
@@ -1831,7 +1841,7 @@ function wrapWall(frame) {
       const [angle, band] = wallCell(center, point);
       const r = Math.hypot(point.x - center.x, point.z - center.z);
       const key = `${angle}:${band}`;
-      if (!(radius.get(key) <= r)) radius.set(key, r);
+      if (!(radius.get(key) >= r)) radius.set(key, r);
       top[angle] = Math.max(top[angle], band);
     }
   }
@@ -1879,25 +1889,29 @@ function wallOvershoot(wall, object) {
   arrangement.updateMatrixWorld(true);
   const toLocal = flowerLayer.matrixWorld.clone().invert();
   const point = new THREE.Vector3();
-  let worst = 0;
+  let over = 0;
   object.traverse((mesh) => {
     if (!mesh.isMesh) return;
     const position = mesh.geometry.attributes.position;
-    for (let i = 0; i < position.count; i += 2) {
+    for (let i = 0; i < position.count; i += 6) {
       point.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld).applyMatrix4(toLocal);
       const limit = wallLimit(wall, ...wallCell(wall.center, point));
       if (limit === Infinity) continue; // below the paper, inside the stems
-      worst = Math.max(worst, Math.hypot(point.x - wall.center.x, point.z - wall.center.z) - limit);
+      const out = Math.hypot(point.x - wall.center.x, point.z - wall.center.z) - limit;
+      over = Math.max(over, out);
     }
   });
-  return worst;
+  return over;
 }
 
-/** Moves a filler toward the middle, then shrinks it a little, until no leaf crosses the paper */
+/**
+ * Keeps every leaf of a filler inside the wrapper: it slides toward the
+ * middle, and only if it's still too wide does it shrink.
+ */
 function fitInsideWrap(object, frame, wall) {
   if (!wall) return;
   const smallest = Math.min(object.scale.x, fillerScale(frame) * MIN_FILLER_SHRINK);
-  for (let step = 0; step < 16; step++) {
+  for (let step = 0; step < 20; step++) {
     const over = wallOvershoot(wall, object);
     if (over <= 0.005) return;
     const dx = object.position.x - frame.center.x;
@@ -1912,7 +1926,7 @@ function fitInsideWrap(object, frame, wall) {
       object.position.y = bedSurface(frame, object.position.x, object.position.z) + rise;
     }
     // Already in the middle, or still out after a few moves: it's too wide for this wrap
-    if ((r <= 0.02 || step >= 3) && object.scale.x > smallest) {
+    if ((r <= 0.02 || step >= 8) && object.scale.x > smallest) {
       object.scale.setScalar(Math.max(smallest, object.scale.x * 0.92));
     }
   }
@@ -2439,14 +2453,12 @@ async function restoreBouquet(customization) {
     if (!savedFlower.model_3d_url) continue;
     try {
       const template = await loadFlowerTemplate(savedFlower.model_3d_url);
-      const instance = SkeletonUtils.clone(template);
-      fitFlowerModel(instance);
       const wrapper = new THREE.Group();
       const sceneId = savedFlower.scene_id || `restored-${savedFlower.product_id}-${index}`;
       const position = savedFlower.position || { x: 0, y: 0, z: 0 };
       const rotation = savedFlower.rotation || { xDeg: 0, yDeg: 0, zDeg: 0 };
       const scale = Number(savedFlower.scale ?? 1);
-      wrapper.add(instance);
+      wrapper.add(itemModel(template, isFiller(savedFlower), sceneId));
       wrapper.position.set(Number(position.x || 0), Number(position.y || 0), Number(position.z || 0));
       wrapper.rotation.set(
         THREE.MathUtils.degToRad(Number(rotation.xDeg || 0)),
