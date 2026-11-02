@@ -18,6 +18,9 @@
         <span class="sp-empty-icon" v-html="ICONS.lock"></span>
         <h3>{{ blocked.title }}</h3>
         <p>{{ blocked.text }}</p>
+        <ol v-if="blocked.steps" class="ks-steps">
+          <li v-for="step in blocked.steps" :key="step">{{ step }}</li>
+        </ol>
         <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="check"><span v-html="ICONS.history"></span>Check again</button>
       </div>
 
@@ -31,6 +34,9 @@
           <input v-model="deviceName" class="sp-input" maxlength="80" placeholder="e.g. Front counter tablet" />
         </label>
         <p v-if="requestError" class="sp-error">{{ requestError }}</p>
+        <ol v-if="requestSteps" class="ks-steps">
+          <li v-for="step in requestSteps" :key="step">{{ step }}</li>
+        </ol>
         <button type="submit" class="sp-btn sp-btn-primary" :disabled="busy || !deviceName.trim()">{{ busy ? "Checking your location…" : "Ask the owner to approve" }}</button>
       </form>
 
@@ -92,7 +98,7 @@ import KioskFaceCheck from "../../../../components/hr/attendance/KioskFaceCheck.
 import { ATTENDANCE_TABS } from "../../../../components/hr/hrUi";
 import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcons";
 import { useAssignment } from "../../../../composables/useAssignment";
-import attendanceKiosk, { currentPosition, deviceToken, kioskMessage } from "../../../../services/attendanceKiosk";
+import attendanceKiosk, { currentPosition, deviceToken, kioskMessage, unblockLocationSteps } from "../../../../services/attendanceKiosk";
 
 const DEVICE_LABEL = { pending: "waiting for approval", approved: "approved", revoked: "removed" };
 const DEVICE_TONE = { pending: "amber", approved: "green", revoked: "red" };
@@ -106,6 +112,7 @@ const blocked = ref({ title: "", text: "" });
 const position = ref(null);
 const deviceName = ref("");
 const requestError = ref("");
+const requestSteps = ref(null);
 const busy = ref(false);
 const mode = ref("attendance");
 const qrVideo = ref(null);
@@ -141,27 +148,29 @@ async function check() {
   try {
     position.value = await currentPosition();
   } catch (e) {
-    return block("Location is needed", e.message);
+    return block("Location is needed", e.message, e.blocked ? unblockLocationSteps() : null);
   }
   state.value = "scan";
   startQr();
 }
 
-function block(title, text) {
+function block(title, text, steps = null) {
   stopQr();
-  blocked.value = { title, text };
+  blocked.value = { title, text, steps };
   state.value = "blocked";
 }
 
 async function requestDevice() {
   busy.value = true;
   requestError.value = "";
+  requestSteps.value = null;
   try {
     const pos = await currentPosition();
     await attendanceKiosk.requestDevice(deviceName.value.trim(), pos);
     await check();
   } catch (e) {
     requestError.value = kioskMessage(e, "Couldn't send the request.");
+    requestSteps.value = e?.blocked ? unblockLocationSteps() : null;
   } finally {
     busy.value = false;
   }
@@ -276,6 +285,16 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* How to allow location again */
+.ks-steps {
+  max-width: 440px;
+  margin: 4px auto 8px;
+  padding-left: 20px;
+  color: var(--v-text-2);
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: left;
+}
 .ks {
   max-width: 640px;
   margin: 0 auto;

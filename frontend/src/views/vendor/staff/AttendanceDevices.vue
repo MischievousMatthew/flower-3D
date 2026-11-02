@@ -32,7 +32,14 @@
             <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="locating" @click="useHere"><span v-html="ICONS.pin"></span>{{ locating ? "Finding you…" : "Use where I am now" }}</button>
             <a v-if="hasPin" class="st-link" :href="`https://www.google.com/maps?q=${form.latitude},${form.longitude}`" target="_blank" rel="noopener">Check on Google Maps</a>
           </div>
-          <p v-if="locateNote" class="sp-hint">{{ locateNote }}</p>
+          <div v-if="locateBlocked" class="ad-help" role="status">
+            <strong>Location is blocked for this site</strong>
+            <ol>
+              <li v-for="step in unblockSteps" :key="step">{{ step }}</li>
+            </ol>
+            <p>Or skip this: use your store pin, or type the coordinates from Google Maps.</p>
+          </div>
+          <p v-else-if="locateNote" class="sp-hint">{{ locateNote }}</p>
 
           <div class="sp-grid-2 ad-fields">
             <label class="sp-field">
@@ -97,10 +104,28 @@
         <div class="sp-card-head">
           <div>
             <h2>Devices</h2>
-            <p>HR asks from the ERP scanner page while at the shop. You approve here.</p>
+            <p>Add the device you're on, or HR asks from the ERP scanner on another one and you approve it here.</p>
           </div>
           <span v-if="data" class="sp-chip" :class="approvedCount >= data.max_devices ? 'amber' : 'green'">{{ approvedCount }} / {{ data.max_devices }} approved</span>
         </div>
+
+        <!-- The owner sets up the device they're using -->
+        <form v-if="data && canAddHere" class="ad-add" novalidate @submit.prevent="addThisDevice">
+          <div class="ad-add-text">
+            <strong>Use this device for attendance</strong>
+            <span>Good for the shop's counter tablet or computer. It's approved right away, and it only takes attendance while it's at the shop.</span>
+          </div>
+          <div class="ad-add-row">
+            <label class="sp-field grow">
+              <span class="sp-label">Name this device</span>
+              <input v-model="addName" class="sp-input" :class="{ invalid: addError }" maxlength="80" placeholder="e.g. Front counter tablet" @input="addError = ''" />
+            </label>
+            <button type="submit" class="sp-btn sp-btn-primary" :disabled="adding || !addName.trim()">
+              <span v-html="ICONS.plus"></span>{{ adding ? "Adding…" : "Add this device" }}
+            </button>
+          </div>
+          <p v-if="addError" class="sp-error">{{ addError }}</p>
+        </form>
 
         <ul v-if="!data" class="ad-list">
           <li v-for="n in 3" :key="n" class="ad-device"><div class="bc-skeleton st-avatar"></div><div class="grow"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div></li>
@@ -108,7 +133,7 @@
         <div v-else-if="!data.devices.length" class="sp-empty">
           <span class="sp-empty-icon" v-html="ICONS.lock"></span>
           <h3>No devices yet</h3>
-          <p>On the shop's tablet or computer, HR opens ERP → HR → Attendance → Scanner and taps "Ask the owner to approve".</p>
+          <p>Add this device above, or on the shop's tablet HR opens ERP → HR → Attendance → Scanner and taps "Ask the owner to approve".</p>
         </div>
         <ul v-else class="ad-list">
           <li v-for="d in data.devices" :key="d.id" class="ad-device" :class="d.status">
@@ -118,9 +143,10 @@
                 <input v-if="renaming === d.id" v-model="newName" class="sp-input ad-rename" maxlength="80" aria-label="Device name" @keydown.enter.prevent="rename(d)" @keydown.esc="renaming = null" />
                 <strong v-else>{{ d.name }}</strong>
                 <span class="sp-chip" :class="STATUS[d.status].tone">{{ STATUS[d.status].label }}</span>
+                <span v-if="d.id === hereId" class="sp-chip blue">This device</span>
               </div>
               <small>
-                {{ d.browser || "Unknown browser" }} · asked by {{ d.requested_by || "someone" }} {{ relativeTime(d.requested_at) }}
+                {{ d.browser || "Unknown browser" }} · {{ d.request_distance_m === null && d.status === "approved" ? "added" : "asked" }} by {{ d.requested_by || "someone" }} {{ relativeTime(d.requested_at) }}
                 <template v-if="d.request_distance_m !== null"> · {{ d.request_distance_m }} m from the pin</template>
               </small>
               <small v-if="d.last_used_at">Last scan {{ relativeTime(d.last_used_at) }}</small>
@@ -153,7 +179,7 @@ import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { relativeTime } from "../../../components/vendor/staff/staffUi";
-import { currentPosition } from "../../../services/attendanceKiosk";
+import { currentPosition, deviceToken, thisDeviceId, unblockLocationSteps } from "../../../services/attendanceKiosk";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
 
@@ -174,6 +200,18 @@ const locateNote = ref("");
 const busyId = ref(null);
 const renaming = ref(null);
 const newName = ref("");
+const locateBlocked = ref(false);
+const unblockSteps = unblockLocationSteps();
+const hereId = ref(thisDeviceId());
+const addName = ref("");
+const addError = ref("");
+const adding = ref(false);
+
+// Offer "Add this device" unless this browser already is one, or the limit is reached
+const canAddHere = computed(() => {
+  const here = (data.value?.devices ?? []).find((d) => d.id === hereId.value);
+  return approvedCount.value < (data.value?.max_devices ?? 0) && !(here && here.status !== "revoked");
+});
 
 const hasPin = computed(() => Number.isFinite(form.latitude) && Number.isFinite(form.longitude));
 const approvedCount = computed(() => (data.value?.devices ?? []).filter((d) => d.status === "approved").length);
@@ -211,6 +249,7 @@ function useStorePin() {
 async function useHere() {
   locating.value = true;
   locateNote.value = "";
+  locateBlocked.value = false;
   try {
     const p = await currentPosition();
     form.latitude = Math.round(p.latitude * 1e6) / 1e6;
@@ -219,9 +258,28 @@ async function useHere() {
       ? `Your location is only accurate to about ${p.accuracy} m. Try near a window or on your phone, or use the store pin.`
       : `Accurate to about ${p.accuracy} m. Save to use it.`;
   } catch (e) {
+    locateBlocked.value = !!e.blocked;
     locateNote.value = e.message;
   } finally {
     locating.value = false;
+  }
+}
+
+async function addThisDevice() {
+  if (!addName.value.trim()) return;
+  adding.value = true;
+  addError.value = "";
+  try {
+    const res = await api.post("vendor/staff/attendance/devices", { name: addName.value.trim() });
+    deviceToken.set(res.data.data.device_token);
+    hereId.value = res.data.data.device_id;
+    data.value.devices = res.data.data.devices;
+    addName.value = "";
+    toast.success(res.data.message);
+  } catch (e) {
+    addError.value = e?.response?.data?.errors?.name?.[0] ?? apiMessage(e, "Couldn't add this device.");
+  } finally {
+    adding.value = false;
   }
 }
 
@@ -433,6 +491,60 @@ onMounted(load);
 .ad-note {
   margin-top: 12px;
 }
+/* Add this device */
+.ad-add {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px dashed var(--v-border-strong);
+  border-radius: 14px;
+  background: var(--v-subtle);
+}
+.ad-add-text {
+  display: grid;
+  gap: 2px;
+}
+.ad-add-text strong {
+  font-size: 14px;
+  color: var(--v-text);
+}
+.ad-add-text span {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--v-text-2);
+}
+.ad-add-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.ad-add-row .grow {
+  flex: 1;
+  min-width: 0;
+}
+/* Location blocked: how to allow it */
+.ad-help {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--v-amber-soft);
+  color: var(--v-amber-text);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.ad-help strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.ad-help ol {
+  margin: 0;
+  padding-left: 18px;
+}
+.ad-help p {
+  margin: 6px 0 0;
+  opacity: 0.9;
+}
 @media (max-width: 980px) {
   .ad-grid {
     grid-template-columns: 1fr;
@@ -445,6 +557,10 @@ onMounted(load);
   .ad-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+  .ad-add-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

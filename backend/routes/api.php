@@ -615,6 +615,7 @@ Route::middleware('token.auth')->group(function () {
                 // Shop location, scanner devices (up to 3), reviews and reports
                 Route::get('/attendance/setup',                  [VendorAttendanceController::class, 'setup']);
                 Route::put('/attendance/setup',                  [VendorAttendanceController::class, 'saveSetup']);
+                Route::post('/attendance/devices',               [VendorAttendanceController::class, 'addDevice']);
                 Route::post('/attendance/devices/{id}/approve',  [VendorAttendanceController::class, 'approveDevice'])->whereNumber('id');
                 Route::post('/attendance/devices/{id}/revoke',   [VendorAttendanceController::class, 'revokeDevice'])->whereNumber('id');
                 Route::put('/attendance/devices/{id}',           [VendorAttendanceController::class, 'renameDevice'])->whereNumber('id');

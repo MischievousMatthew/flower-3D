@@ -10,6 +10,7 @@ use App\Traits\ResolvesOwner;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -71,6 +72,41 @@ class VendorAttendanceController extends Controller
         $this->location->settings($this->resolveOwnerId($request))->update($data);
 
         return response()->json(['success' => true, 'message' => 'Saved. Scanners must be within ' . $data['radius_m'] . ' m of this spot.']);
+    }
+
+    /**
+     * POST /vendor/staff/attendance/devices {name}
+     * The owner adds the device they're using, approved straight away. Every
+     * scan still checks the device is at the shop, so where it's added from
+     * doesn't matter. The token stays in this browser only.
+     */
+    public function addDevice(Request $request): JsonResponse
+    {
+        $ownerId = $this->resolveOwnerId($request);
+        $data = $request->validate(
+            ['name' => 'required|string|max:80'],
+            ['name.required' => 'Give this device a name, like "Front counter tablet".'],
+        );
+        if (AttendanceDevice::where('owner_id', $ownerId)->where('status', 'approved')->count() >= AttendanceDevice::MAX_APPROVED) {
+            throw ValidationException::withMessages(['name' => 'You already have ' . AttendanceDevice::MAX_APPROVED . ' devices. Remove one first.']);
+        }
+
+        $secret = Str::random(48);
+        $device = AttendanceDevice::create([
+            'owner_id' => $ownerId,
+            'name' => trim($data['name']),
+            'token_hash' => hash('sha256', $secret),
+            'status' => 'approved',
+            'requested_by' => $request->user()?->name ?? 'Shop owner',
+            'user_agent' => $request->userAgent() ? Str::limit($request->userAgent(), 250, '') : null,
+            'approved_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$device->name} is ready. Open ERP → HR → Attendance → Scanner on this device to take attendance.",
+            'data' => ['device_token' => "{$device->id}.{$secret}", 'device_id' => $device->id, 'devices' => $this->devices($ownerId)],
+        ], 201);
     }
 
     /** POST /vendor/staff/attendance/devices/{id}/approve */

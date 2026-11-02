@@ -129,6 +129,27 @@ class AttendanceSecurityTest extends TestCase
         $this->assertSame(3, AttendanceDevice::where('status', 'approved')->count());
     }
 
+    public function test_the_owner_can_add_the_device_they_are_on_and_it_still_only_works_at_the_shop(): void
+    {
+        $vendor = $this->shopOwner();
+        $hr = $this->hrStaff($vendor);
+        $p = $this->profile($vendor, ['avatar' => 'https://example.test/rosa.jpg']);
+
+        $token = $this->signIn($vendor)->postJson('/api/vendor/staff/attendance/devices', ['name' => 'Counter PC'])
+            ->assertCreated()->assertJsonPath('data.devices.0.status', 'approved')->json('data.device_token');
+
+        $this->startScan($hr, $token, $p, $this->farAway())->assertStatus(422)->assertJsonValidationErrors('location');
+        $this->startScan($hr, $token, $p)->assertOk()->assertJsonPath('data.purpose', 'time_in');
+
+        // Staff can't add devices this way, and the owner's limit still holds
+        $this->signIn($hr)->postJson('/api/vendor/staff/attendance/devices', ['name' => 'Sneaky'])->assertStatus(403);
+        foreach ([2, 3] as $n) {
+            $this->signIn($vendor)->postJson('/api/vendor/staff/attendance/devices', ['name' => "Tablet {$n}"])->assertCreated();
+        }
+        $this->signIn($vendor)->postJson('/api/vendor/staff/attendance/devices', ['name' => 'Tablet 4'])
+            ->assertStatus(422)->assertJsonValidationErrors('name');
+    }
+
     public function test_an_approved_device_cannot_take_attendance_away_from_the_shop(): void
     {
         $vendor = $this->shopOwner();
