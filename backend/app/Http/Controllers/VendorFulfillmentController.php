@@ -99,21 +99,46 @@ class VendorFulfillmentController extends Controller
     public function show(Request $request, int $id): JsonResponse
     {
         $vendorId = $this->resolveOwnerId($request);
-        $order = $this->visibleOrders($vendorId)
-            ->whereKey($id)
-            ->with([
-                'user:id,name,surname,email,contact_number',
-                'delivery.logs' => fn ($q) => $q->orderBy('scanned_at'),
-                'orderRequests',
-                'items.product' => fn ($q) => $q->withoutGlobalScopes()->with(['images', 'models']),
-            ])
-            ->first();
+        $with = [
+            'user:id,name,surname,email,contact_number',
+            'delivery.logs' => fn ($q) => $q->orderBy('scanned_at'),
+            'orderRequests',
+            'items.product' => fn ($q) => $q->withoutGlobalScopes()->with(['images', 'models']),
+        ];
+        $order = $this->visibleOrders($vendorId)->whereKey($id)->with($with)->first();
+
+        // A customer can share an e-wallet checkout they never paid for (in
+        // chat, for example). It isn't an order the shop works on, but the
+        // shop may still open it, read-only, to help the customer.
+        $unpaidCheckout = null;
+        if (! $order) {
+            $order = Order::query()
+                ->where('vendor_id', $vendorId)
+                ->where('payment_method', 'ewallet')
+                ->whereIn('payment_status', ['unpaid', 'failed'])
+                ->whereKey($id)
+                ->with($with)
+                ->first();
+            $unpaidCheckout = $order ? $this->unpaidCheckoutNote($order) : null;
+        }
 
         if (! $order) {
             return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
         }
 
         $summary = $this->summary($order);
+        if ($unpaidCheckout) {
+            $summary = array_merge($summary, [
+                'status' => 'unpaid_checkout',
+                'status_label' => 'Payment not completed',
+                'next' => [],
+                'can_cancel' => false,
+                'needs_action' => false,
+                'blocked_reason' => null,
+                'prepare_by' => null,
+                'unpaid_checkout' => $unpaidCheckout,
+            ]);
+        }
         $application = VendorApplication::findApprovedForVendorUser($order->vendor);
 
         $items = $order->items->map(function ($item) {
@@ -154,6 +179,9 @@ class VendorFulfillmentController extends Controller
         }
         if ($order->cancelled_at) {
             $timeline->push(['status' => 'cancelled', 'label' => 'Cancelled', 'at' => $order->cancelled_at->toIso8601String()]);
+        }
+        if ($unpaidCheckout && $order->payment_status === 'failed') {
+            $timeline->push(['status' => 'cancelled', 'label' => 'Payment not completed', 'at' => $order->updated_at?->toIso8601String()]);
         }
 
         return response()->json([
@@ -303,6 +331,24 @@ class VendorFulfillmentController extends Controller
             ->where(fn ($q) => $q->where('payment_method', '!=', 'ewallet')->orWhereNull('payment_method')
                 ->orWhereIn('payment_status', ['paid', 'refunded'])
                 ->orWhereNotNull('paid_at'));
+    }
+
+    /** What the shop should know about a checkout the customer didn't pay for */
+    private function unpaidCheckoutNote(Order $order): array
+    {
+        $what = match ($order->paymentFailure()['reason'] ?? null) {
+            'cancelled' => 'The customer left the PayMongo page before paying.',
+            'declined' => "The customer's bank or e-wallet declined the payment.",
+            'not_started' => "PayMongo couldn't open the payment page for the customer.",
+            'unconfirmed' => "PayMongo didn't confirm the customer's payment.",
+            default => "The customer hasn't finished paying for this checkout yet.",
+        };
+
+        return [
+            'title' => $order->payment_status === 'failed' ? 'The customer didn’t complete payment' : 'Waiting for the customer to pay',
+            'reason' => $what,
+            'meaning' => "This isn't an order yet. There's nothing to prepare, the delivery date isn't held for it, and no money was received. If the customer pays, it moves into your orders on its own.",
+        ];
     }
 
     private function displayStatus(Order $order): string

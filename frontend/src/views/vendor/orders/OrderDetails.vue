@@ -27,6 +27,16 @@
     <template v-else-if="order">
       <div v-if="order.blocked_reason" class="sp-banner warn"><span v-html="ICONS.lock"></span>{{ order.blocked_reason }}</div>
 
+      <!-- A checkout the customer never paid for: read-only, nothing to do -->
+      <section v-if="order.unpaid_checkout" class="sp-card od-unpaid" role="status">
+        <span class="od-unpaid-icon" v-html="ICONS.alert"></span>
+        <div>
+          <h2>{{ order.unpaid_checkout.title }}</h2>
+          <p class="od-unpaid-reason">{{ order.unpaid_checkout.reason }}</p>
+          <p>{{ order.unpaid_checkout.meaning }}</p>
+        </div>
+      </section>
+
       <!-- Status -->
       <section class="sp-card od-status" aria-label="Order status">
         <div class="od-status-head">
@@ -49,7 +59,7 @@
         <div class="od-col">
           <section class="sp-card" aria-label="Items">
             <div class="sp-card-head">
-              <div><h2>Items</h2><p>{{ order.items_count }} {{ order.items_count === 1 ? "item" : "items" }} to prepare</p></div>
+              <div><h2>Items</h2><p>{{ order.items_count }} {{ order.items_count === 1 ? "item" : "items" }} {{ order.unpaid_checkout ? "in this checkout" : "to prepare" }}</p></div>
               <button v-if="bouquet" type="button" class="sp-btn sp-btn-dark sp-btn-sm" @click="show3D(null)"><span v-html="ICONS.cube"></span>View 3D bouquet</button>
             </div>
             <ul class="items">
@@ -119,8 +129,8 @@
           <section class="sp-card" aria-label="Payment">
             <div class="sp-card-head">
               <div><h2>Payment</h2><p>{{ PAYMENT_LABEL[order.payment_method] ?? order.payment_method }}</p></div>
-              <span class="sp-chip" :class="order.payment_status === 'paid' ? 'green' : order.payment_status === 'refunded' ? 'red' : 'amber'">
-                {{ order.payment_status === "paid" ? "Paid" : order.payment_status === "refunded" ? "Refunded" : order.payment_method === "cod" ? "Collect on delivery" : "Unpaid" }}
+              <span class="sp-chip" :class="order.payment_status === 'paid' ? 'green' : order.payment_status === 'refunded' ? 'red' : order.payment_status === 'failed' ? 'slate' : 'amber'">
+                {{ order.payment_status === "paid" ? "Paid" : order.payment_status === "refunded" ? "Refunded" : order.payment_status === "failed" ? "Not completed" : order.payment_method === "cod" ? "Collect on delivery" : "Unpaid" }}
               </span>
             </div>
             <dl class="totals">
@@ -167,7 +177,7 @@ import "../../../components/vendor/shop/shop.css";
 import { DEFAULT_PRESETS } from "../../../constants/bouquetPresets";
 
 const router = useRouter();
-const ENDED = ["cancelled", "returned", "refunded"];
+const ENDED = ["cancelled", "returned", "refunded", "unpaid_checkout"];
 // Keys stored with each customization that aren't worth showing
 const HIDDEN_CUSTOM = ["type", "store_id", "vendor_id", "placement", "paper_color", "ribbon_color", "flowers", "bouquet_model_url", "model_3d_url", "scene_id", "preset"];
 
@@ -516,6 +526,45 @@ onMounted(() => {
   color: var(--v-amber-text);
 }
 .note-icon :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+
+/* Unpaid checkout: neutral, not alarming; nothing is wrong on the shop's side */
+.od-unpaid {
+  display: flex;
+  gap: 14px;
+  background: var(--v-subtle);
+  border-color: var(--v-border);
+}
+.od-unpaid h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v-text);
+}
+.od-unpaid p {
+  margin: 0;
+  max-width: 68ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--v-text-2);
+}
+.od-unpaid .od-unpaid-reason {
+  margin-bottom: 4px;
+  color: var(--v-text);
+}
+.od-unpaid-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--v-subtle-2);
+  color: var(--v-text-2);
+}
+.od-unpaid-icon :deep(svg) {
   width: 18px;
   height: 18px;
 }

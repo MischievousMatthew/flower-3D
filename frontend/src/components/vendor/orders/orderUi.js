@@ -9,6 +9,7 @@ export const STATUS_TONE = {
   cancelled: "slate",
   returned: "red",
   refunded: "red",
+  unpaid_checkout: "slate",
 };
 
 // One line explaining each stage, shown under the status on the details page
@@ -21,6 +22,7 @@ export const STATUS_HINT = {
   cancelled: "This order was cancelled.",
   returned: "The customer sent this order back.",
   refunded: "This order was refunded.",
+  unpaid_checkout: "Not an order yet. The customer didn't finish paying online, so there's nothing for you to do.",
 };
 
 export const CASE_STAGE = {
@@ -84,7 +86,7 @@ export const formatDateTime = (iso) =>
 
 /** Is this order late for its delivery date? */
 export const isLate = (o) =>
-  !!o.delivery_date && !["completed", "cancelled", "returned", "refunded"].includes(o.status) && daysFromToday(o.delivery_date) < 0;
+  !!o.delivery_date && !["completed", "cancelled", "returned", "refunded", "unpaid_checkout"].includes(o.status) && daysFromToday(o.delivery_date) < 0;
 
 /** Should preparation have started by now? */
 export const shouldPrepare = (o) =>
