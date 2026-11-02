@@ -77,29 +77,29 @@ class VendorController extends Controller
             ],
             'government_id_type'        => 'required|in:' . implode(',', array_keys(self::GOVERNMENT_IDS)),
             'government_id_number'      => 'required|string|max:255',
-            'government_id'             => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
-            'selfie_with_id'            => 'required|file|mimes:jpg,jpeg,png|max:5120',
-            'proof_of_address'          => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
+            'government_id'             => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:' . VendorApplication::DOCUMENT_MAX_KB, VendorApplication::pdfSizeRule()],
+            'selfie_with_id'            => 'required|file|mimes:jpg,jpeg,png|max:' . VendorApplication::DOCUMENT_MAX_KB,
+            'proof_of_address'          => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:' . VendorApplication::DOCUMENT_MAX_KB, VendorApplication::pdfSizeRule()],
             // One registration, depending on how the business is set up
             'dti_number'                => ['required_if:business_type,individual', 'nullable', 'string', 'max:40', 'regex:/^[A-Za-z0-9-]{5,40}$/'],
             'sec_number'                => ['required_if:business_type,partnership,corporation', 'nullable', 'string', 'max:40', 'regex:/^[A-Za-z0-9-]{5,40}$/'],
             'cda_number'                => ['required_if:business_type,cooperative', 'nullable', 'string', 'max:40', 'regex:/^[A-Za-z0-9-]{5,40}$/'],
-            'business_registration'     => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'business_registration'     => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:' . VendorApplication::DOCUMENT_MAX_KB, VendorApplication::pdfSizeRule()],
             'barangay_clearance_number' => 'required|string|max:255',
-            'barangay_clearance'        => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'barangay_clearance'        => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:' . VendorApplication::DOCUMENT_MAX_KB, VendorApplication::pdfSizeRule()],
             'mayor_permit_number'       => 'required|string|max:255',
-            'mayor_permit'              => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'mayor_permit'              => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:' . VendorApplication::DOCUMENT_MAX_KB, VendorApplication::pdfSizeRule()],
             'mayor_permit_valid_until'  => 'required|date|after_or_equal:today',
             // 9-digit TIN, plus a 3- or 5-digit branch code
             'bir_tin'                   => ['required', 'string', 'max:20', 'regex:/^\d{3}-?\d{3}-?\d{3}(-?\d{3}|-?\d{5})?$/'],
-            'bir_certificate'           => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'bir_certificate'           => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:' . VendorApplication::DOCUMENT_MAX_KB, VendorApplication::pdfSizeRule()],
             'accept_terms'              => 'required|in:1,true,on,accepted',
             'accept_vendor_agreement'   => 'required|in:1,true,on,accepted',
             'accept_data_privacy'       => 'required|in:1,true,on,accepted',
             'confirm_accuracy'          => 'required|in:1,true,on,accepted',
-            'store_logo'                => 'nullable|file|mimes:jpg,jpeg,png|max:2048',
+            'store_logo'                => 'nullable|file|mimes:jpg,jpeg,png|max:' . VendorApplication::DOCUMENT_MAX_KB,
             'portfolio_photos'          => 'nullable|array',
-            'portfolio_photos.*'        => 'file|mimes:jpg,jpeg,png|max:5120',
+            'portfolio_photos.*'        => 'file|mimes:jpg,jpeg,png|max:' . VendorApplication::DOCUMENT_MAX_KB,
             'facebook_page'             => 'nullable|url',
             'instagram_page'            => 'nullable|url',
             'application_date'          => 'required|date',
@@ -131,7 +131,10 @@ class VendorController extends Controller
             'mayor_permit_number.required'    => 'Mayor\'s Permit Number is required.',
             'mayor_permit.required'           => 'Mayor\'s Permit document is required.',
             'bir_tin.required'                => 'BIR Registration / TIN is required.',
-        ]);
+        ] + array_fill_keys(
+            array_map(fn ($f) => "{$f}.max", ['government_id', 'selfie_with_id', 'proof_of_address', 'business_registration', 'barangay_clearance', 'mayor_permit', 'bir_certificate', 'store_logo', 'portfolio_photos.*']),
+            'This file is too large. Files can be up to 12 MB (PDFs up to 10 MB).',
+        ));
 
         if ($validator->fails()) {
             \Log::error('Validation failed:', $validator->errors()->toArray());

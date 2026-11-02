@@ -16,7 +16,7 @@
     >
       <template v-if="!info">
         <svg class="dd-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4" /><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>
-        <span class="dd-text"><b>Upload {{ label }}</b><small>{{ hint || "Photo or PDF of the original · up to 10 MB" }}</small></span>
+        <span class="dd-text"><b>Upload {{ label }}</b><small>{{ hint || "Photo up to 12 MB, or PDF up to 10 MB" }}</small></span>
       </template>
       <template v-else>
         <img v-if="info.url && /^image\//.test(info.type || '')" :src="info.url" alt="" class="dd-thumb" />

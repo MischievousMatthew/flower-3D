@@ -41,14 +41,14 @@ class VendorApplicationResubmission extends Model
     public static function fieldDefinitions(): array
     {
         return [
-            'government_id_path' => ['label' => 'Valid Government ID', 'type' => 'file', 'input' => 'government_id_path', 'mimes' => 'jpg,jpeg,png,pdf', 'max' => 5120, 'folder' => 'ids', 'resource_type' => 'auto'],
-            'selfie_with_id_path' => ['label' => 'Selfie with Government ID', 'type' => 'file', 'input' => 'selfie_with_id_path', 'mimes' => 'jpg,jpeg,png', 'max' => 5120, 'folder' => 'selfies', 'resource_type' => 'image'],
-            'proof_of_address_path' => ['label' => 'Proof of Address', 'type' => 'file', 'input' => 'proof_of_address_path', 'mimes' => 'jpg,jpeg,png,pdf', 'max' => 5120, 'folder' => 'address-proof', 'resource_type' => 'auto'],
-            'barangay_clearance_path' => ['label' => 'Barangay Clearance', 'type' => 'file', 'input' => 'barangay_clearance_path', 'mimes' => 'jpg,jpeg,png,pdf', 'max' => 10240, 'folder' => 'barangay', 'resource_type' => 'auto'],
-            'mayor_permit_path' => ['label' => "Mayor's / Business Permit", 'type' => 'file', 'input' => 'mayor_permit_path', 'mimes' => 'jpg,jpeg,png,pdf', 'max' => 10240, 'folder' => 'permits', 'resource_type' => 'auto'],
-            'business_registration_path' => ['label' => 'DTI / SEC / CDA Registration Certificate', 'type' => 'file', 'input' => 'business_registration_path', 'mimes' => 'jpg,jpeg,png,pdf', 'max' => 10240, 'folder' => 'registration', 'resource_type' => 'auto'],
-            'bir_certificate_path' => ['label' => 'BIR Certificate of Registration (Form 2303)', 'type' => 'file', 'input' => 'bir_certificate_path', 'mimes' => 'jpg,jpeg,png,pdf', 'max' => 10240, 'folder' => 'bir', 'resource_type' => 'auto'],
-            'store_logo_path' => ['label' => 'Store Logo', 'type' => 'file', 'input' => 'store_logo_path', 'mimes' => 'jpg,jpeg,png', 'max' => 2048, 'folder' => 'store-logos', 'resource_type' => 'image', 'store_public_id' => true],
+            'government_id_path' => ['label' => 'Valid Government ID', 'type' => 'file', 'input' => 'government_id_path', 'mimes' => 'jpg,jpeg,png,pdf', 'max' => 12288, 'folder' => 'ids', 'resource_type' => 'auto'],
+            'selfie_with_id_path' => ['label' => 'Selfie with Government ID', 'type' => 'file', 'input' => 'selfie_with_id_path', 'mimes' => 'jpg,jpeg,png', 'max' => 12288, 'folder' => 'selfies', 'resource_type' => 'image'],
+            'proof_of_address_path' => ['label' => 'Proof of Address', 'type' => 'file', 'input' => 'proof_of_address_path', 'mimes' => 'jpg,jpeg,png,pdf', 'max' => 12288, 'folder' => 'address-proof', 'resource_type' => 'auto'],
+            'barangay_clearance_path' => ['label' => 'Barangay Clearance', 'type' => 'file', 'input' => 'barangay_clearance_path', 'mimes' => 'jpg,jpeg,png,pdf', 'max' => 12288, 'folder' => 'barangay', 'resource_type' => 'auto'],
+            'mayor_permit_path' => ['label' => "Mayor's / Business Permit", 'type' => 'file', 'input' => 'mayor_permit_path', 'mimes' => 'jpg,jpeg,png,pdf', 'max' => 12288, 'folder' => 'permits', 'resource_type' => 'auto'],
+            'business_registration_path' => ['label' => 'DTI / SEC / CDA Registration Certificate', 'type' => 'file', 'input' => 'business_registration_path', 'mimes' => 'jpg,jpeg,png,pdf', 'max' => 12288, 'folder' => 'registration', 'resource_type' => 'auto'],
+            'bir_certificate_path' => ['label' => 'BIR Certificate of Registration (Form 2303)', 'type' => 'file', 'input' => 'bir_certificate_path', 'mimes' => 'jpg,jpeg,png,pdf', 'max' => 12288, 'folder' => 'bir', 'resource_type' => 'auto'],
+            'store_logo_path' => ['label' => 'Store Logo', 'type' => 'file', 'input' => 'store_logo_path', 'mimes' => 'jpg,jpeg,png', 'max' => 12288, 'folder' => 'store-logos', 'resource_type' => 'image', 'store_public_id' => true],
             'government_id_number' => ['label' => 'Government ID Number', 'type' => 'text', 'input' => 'government_id_number', 'max' => 255],
             'registered_business_name' => ['label' => 'Registered Business Name', 'type' => 'text', 'input' => 'registered_business_name', 'max' => 255],
             'cda_number' => ['label' => 'CDA Registration Number', 'type' => 'text', 'input' => 'cda_number', 'max' => 255],

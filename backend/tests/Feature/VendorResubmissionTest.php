@@ -92,7 +92,7 @@ class VendorResubmissionTest extends TestCase
         $this->getJson('/api/vendor/resubmission/' . self::TOKEN)
             ->assertOk()
             ->assertJsonPath('store_name', 'Flux Flower Store')
-            ->assertJsonPath('items.0.max', 10240)
+            ->assertJsonPath('items.0.max', 12288)
             ->assertJsonPath('items.0.mimes', 'jpg,jpeg,png,pdf');
     }
 
@@ -112,11 +112,23 @@ class VendorResubmissionTest extends TestCase
         $this->requestFor('barangay_clearance_path');
 
         $response = $this->post('/api/vendor/resubmission/' . self::TOKEN, [
+            'fields' => ['barangay_clearance_path' => UploadedFile::fake()->create('clearance.pdf', 13000, 'application/pdf')],
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(422);
+
+        $this->assertSame('The Barangay Clearance must be 12 MB or smaller.', $response->json('errors')['fields.barangay_clearance_path'][0]);
+    }
+
+    public function test_pdfs_stop_at_the_storage_limit_of_10_mb(): void
+    {
+        $this->requestFor('barangay_clearance_path');
+
+        $response = $this->post('/api/vendor/resubmission/' . self::TOKEN, [
             'fields' => ['barangay_clearance_path' => UploadedFile::fake()->create('clearance.pdf', 11000, 'application/pdf')],
         ], ['Accept' => 'application/json'])
             ->assertStatus(422);
 
-        $this->assertSame('The Barangay Clearance must be 10 MB or smaller.', $response->json('errors')['fields.barangay_clearance_path'][0]);
+        $this->assertStringStartsWith('PDFs can be up to 10 MB.', $response->json('errors')['fields.barangay_clearance_path'][0]);
     }
 
     public function test_failed_upload_leaves_nothing_half_submitted(): void

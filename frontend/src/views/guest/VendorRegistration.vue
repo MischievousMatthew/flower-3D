@@ -322,7 +322,7 @@
           <div class="vr-docs two">
             <div class="vr-doc">
               <span class="vr-label">Logo</span>
-              <DocDrop field="store_logo" label="your logo" hint="Square works best · up to 2 MB" accept=".jpg,.jpeg,.png,image/*" :info="fileInfo.store_logo" :over="!!dragOver.store_logo" :error="errors.store_logo" @change="handleFileUpload($event, 'store_logo')" @drop="handleDrop($event, 'store_logo')" @dragenter="handleDragEnter($event, 'store_logo')" @dragover="handleDragOver($event, 'store_logo')" @dragleave="handleDragLeave($event, 'store_logo')" @remove="removeFile('store_logo')" />
+              <DocDrop field="store_logo" label="your logo" hint="Square works best · up to 12 MB" accept=".jpg,.jpeg,.png,image/*" :info="fileInfo.store_logo" :over="!!dragOver.store_logo" :error="errors.store_logo" @change="handleFileUpload($event, 'store_logo')" @drop="handleDrop($event, 'store_logo')" @dragenter="handleDragEnter($event, 'store_logo')" @dragover="handleDragOver($event, 'store_logo')" @dragleave="handleDragLeave($event, 'store_logo')" @remove="removeFile('store_logo')" />
             </div>
             <div class="vr-doc">
               <span class="vr-label">Sample work</span>
@@ -1378,17 +1378,10 @@ const handleFileUpload = async (event, fieldName) => {
 };
 
 const validateFile = (file, fieldName) => {
-  const maxSizes = {
-    government_id: 5 * 1024 * 1024,
-    selfie_with_id: 5 * 1024 * 1024,
-    proof_of_address: 5 * 1024 * 1024,
-    barangay_clearance: 10 * 1024 * 1024,
-    mayor_permit: 10 * 1024 * 1024,
-    business_registration: 10 * 1024 * 1024,
-    bir_certificate: 10 * 1024 * 1024,
-    store_logo: 2 * 1024 * 1024,
-    portfolio_photos: 5 * 1024 * 1024,
-  };
+  // Every document up to 12 MB; PDFs up to 10 MB, the most our file storage keeps
+  // (photos are shrunk before this check, so they rarely come near it)
+  const PHOTO_MAX = 12 * 1024 * 1024;
+  const PDF_MAX = 10 * 1024 * 1024;
 
   const allowedTypes = {
     government_id: ["image/jpeg", "image/jpg", "image/png", "application/pdf"],
@@ -1410,7 +1403,8 @@ const validateFile = (file, fieldName) => {
     portfolio_photos: ["image/jpeg", "image/jpg", "image/png"],
   };
 
-  const maxSize = maxSizes[fieldName] || 5 * 1024 * 1024;
+  const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+  const maxSize = isPdf ? PDF_MAX : PHOTO_MAX;
   const allowed = allowedTypes[fieldName] || [
     "image/jpeg",
     "image/jpg",
@@ -1421,7 +1415,9 @@ const validateFile = (file, fieldName) => {
   if (file.size > maxSize) {
     return {
       valid: false,
-      message: `File size exceeds ${formatFileSize(maxSize)} limit`,
+      message: isPdf
+        ? `This PDF is ${formatFileSize(file.size)}. PDFs can be up to 10 MB — take a clear photo of the page instead (photos can be up to 12 MB), or save the PDF smaller.`
+        : `This file is ${formatFileSize(file.size)}. Files can be up to 12 MB.`,
     };
   }
 

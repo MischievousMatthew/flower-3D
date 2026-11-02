@@ -133,6 +133,8 @@ import AuthNotice from "../../components/auth/AuthNotice.vue";
 import DocDrop from "../../components/vendor/register/DocDrop.vue";
 import { shrinkPhoto } from "../../utils/shrinkPhoto";
 
+const PDF_MAX = 10 * 1024 * 1024;
+
 const route = useRoute();
 const token = computed(() => route.params.token);
 
@@ -179,7 +181,8 @@ const sizeLabel = (kb) => `${Math.round(kb / 1024)} MB`;
 function fileHint(item) {
   const types = mimesOf(item).filter((m) => m !== "jpeg").map((m) => m.toUpperCase());
   const last = types.pop();
-  return `${types.length ? `${types.join(", ")} or ` : ""}${last}${item.max ? ` · up to ${sizeLabel(item.max)}` : ""}`;
+  const size = item.max ? ` · up to ${sizeLabel(item.max)}` : "";
+  return `${types.length ? `${types.join(", ")} or ` : ""}${last}${size}${mimesOf(item).includes("pdf") ? " (PDF up to 10 MB)" : ""}`;
 }
 
 async function load() {
@@ -218,6 +221,11 @@ async function pickFile(item, picked, input) {
   const file = await shrinkPhoto(picked);
   preparing.value = false;
 
+  // Our file storage keeps PDFs up to 10 MB, and PDFs can't be shrunk here
+  if (ext === "pdf" && file.size > PDF_MAX) {
+    errors[item.field_name] = `This PDF is ${(file.size / 1048576).toFixed(1)} MB. PDFs can be up to 10 MB — take a clear photo of the page instead (photos can be up to 12 MB), or save the PDF smaller.`;
+    return;
+  }
   if (item.max && file.size > item.max * 1024) {
     errors[item.field_name] = `This file is ${(file.size / 1048576).toFixed(1)} MB. Please choose one up to ${sizeLabel(item.max)}, or a clear photo of the page.`;
     return;

@@ -551,6 +551,23 @@ class VendorApplication extends Model
         ],
     ];
 
+    /** Vendor documents: photos up to 12 MB (the browser shrinks them before sending) */
+    public const DOCUMENT_MAX_KB = 12288;
+
+    /** Cloudinary's plan stores files up to 10 MB, and PDFs can't be shrunk on the way */
+    public const PDF_MAX_KB = 10240;
+
+    public static function pdfSizeRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) {
+            if ($value instanceof \Illuminate\Http\UploadedFile
+                && strtolower($value->getClientOriginalExtension()) === 'pdf'
+                && $value->getSize() > self::PDF_MAX_KB * 1024) {
+                $fail('PDFs can be up to 10 MB. Take a clear photo of the page instead (photos can be up to 12 MB), or save the PDF smaller.');
+            }
+        };
+    }
+
     /** Validation for the comma-separated service_areas string: only places on the list. */
     public static function serviceAreaRule(): \Closure
     {

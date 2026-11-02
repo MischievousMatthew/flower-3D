@@ -142,7 +142,7 @@ class VendorApplicationResubmissionController extends Controller
             $key = "fields.{$item->field_name}";
             $names[$key] = $definition['label'] ?? $item->field_name;
             if (($definition['type'] ?? null) === 'file') {
-                $rules[$key] = ['required', 'file', 'mimes:' . $definition['mimes'], 'max:' . $definition['max']];
+                $rules[$key] = ['required', 'file', 'mimes:' . $definition['mimes'], 'max:' . $definition['max'], VendorApplication::pdfSizeRule()];
                 $messages["{$key}.max"] = 'The :attribute must be ' . round($definition['max'] / 1024) . ' MB or smaller.';
                 $types = array_map('strtoupper', array_values(array_diff(explode(',', $definition['mimes']), ['jpeg'])));
                 $last = array_pop($types);
