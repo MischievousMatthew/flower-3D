@@ -95,12 +95,12 @@ class VendorProfileController extends Controller
 
         $vendorApplication->fill([
             'store_name'          => trim($data['store_name']),
-            'store_description'   => isset($data['store_description']) ? trim($data['store_description']) : null,
+            'store_description'   => trim((string) ($data['store_description'] ?? '')), // the column can't be null
             'store_address'       => trim($data['store_address']),
             'store_street'        => isset($data['store_street']) ? trim($data['store_street']) : null,
             'store_latitude'      => $data['store_latitude'] ?? $vendorApplication->store_latitude,
             'store_longitude'     => $data['store_longitude'] ?? $vendorApplication->store_longitude,
-            'service_areas'       => isset($data['service_areas']) ? trim($data['service_areas']) : null,
+            'service_areas'       => trim((string) ($data['service_areas'] ?? '')), // the column can't be null
             'contact_number'      => trim($data['contact_number']),
             'facebook_page'       => $data['facebook_page'] ?? null,
             'instagram_page'      => $data['instagram_page'] ?? null,
@@ -520,14 +520,15 @@ class VendorProfileController extends Controller
                 return response()->json(['success' => false, 'message' => 'Vendor application not found'], 404);
             }
 
+            // Text columns here can't be null in the database, so empty means ''
             $payload = [
                 'store_name'        => trim((string) $request->input('store_name', '')),
-                'store_description' => $request->filled('store_description') ? trim((string) $request->input('store_description')) : null,
+                'store_description' => trim((string) $request->input('store_description', '')),
                 'store_address'     => trim((string) $request->input('store_address', '')),
-                'service_areas'     => $request->filled('service_areas') ? trim((string) $request->input('service_areas')) : null,
-                'operating_hours'   => $request->filled('operating_hours') ? trim((string) $request->input('operating_hours')) : null,
+                'service_areas'     => trim((string) $request->input('service_areas', '')),
+                'operating_hours'   => trim((string) $request->input('operating_hours', '')),
                 'owner_name'        => trim((string) $request->input('owner_name', '')),
-                'position'          => $request->filled('position') ? trim((string) $request->input('position')) : null,
+                'position'          => trim((string) $request->input('position', '')),
                 'contact_number'    => trim((string) $request->input('contact_number', '')),
                 'facebook_page'     => $request->filled('facebook_page') ? trim((string) $request->input('facebook_page')) : null,
                 'instagram_page'    => $request->filled('instagram_page') ? trim((string) $request->input('instagram_page')) : null,

@@ -25,16 +25,23 @@ export const SERVICE_AREA_GROUPS = [
 
 const KNOWN = new Set(SERVICE_AREA_GROUPS.flatMap((g) => [g.province, ...g.places]));
 
+// Region names the old registration form saved, read as the provinces we list
+const LEGACY = {
+  "Region IV-A (CALABARZON)": "Cavite",
+  "NCR (National Capital Region)": "Metro Manila",
+};
+const name = (s) => LEGACY[String(s).trim()] ?? String(s).trim();
+
 /** "Cavite, Makati" → ["Cavite", "Makati"], keeping only places on the list */
 export function parseServiceAreas(value) {
   const list = Array.isArray(value) ? value : String(value ?? "").split(",");
-  return [...new Set(list.map((s) => String(s).trim()).filter((s) => KNOWN.has(s)))];
+  return [...new Set(list.map(name).filter((s) => KNOWN.has(s)))];
 }
 
 /** Places stored before the list existed, which the picker can't show */
 export function unknownServiceAreas(value) {
   const list = Array.isArray(value) ? value : String(value ?? "").split(",");
-  return list.map((s) => String(s).trim()).filter((s) => s && !KNOWN.has(s));
+  return list.map(name).filter((s) => s && !KNOWN.has(s));
 }
 
 /** Back to the stored string; a whole province replaces its individual places */

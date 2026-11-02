@@ -303,7 +303,7 @@ class VendorAccountController extends Controller
             'same_day_delivery'   => $data['same_day_delivery'],
             'lead_time'           => $days === 0 ? 'Same day' : ($days === 1 ? '1 day' : "{$days} days"),
             'max_orders_per_day'  => $data['max_orders_per_day'],
-            'service_areas'       => isset($data['service_areas']) ? trim($data['service_areas']) : null,
+            'service_areas'       => trim((string) ($data['service_areas'] ?? '')), // the column can't be null
             'cancellation_policy' => trim($data['cancellation_policy']),
             'operating_schedules' => $schedules,
             'operating_hours'     => VendorProfileController::describeSchedules($schedules),
