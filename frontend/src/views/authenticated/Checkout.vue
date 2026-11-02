@@ -489,6 +489,15 @@
         </aside>
       </div>
     </main>
+
+    <!-- Back from PayMongo without paying: say why -->
+    <PaymentFailedModal
+      :show="paymentFailure.show"
+      :failure="paymentFailure.failure"
+      :order-number="paymentFailure.orderNumber"
+      primary-label="Choose how to pay"
+      @close="paymentFailure.show = false"
+    />
   </div>
 </template>
 
@@ -496,6 +505,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import NavHeader from "../../layouts/NavHeader.vue";
+import PaymentFailedModal from "../../components/customer/PaymentFailedModal.vue";
 import "../../styles/bloomcraft.css";
 import api from "../../plugins/axios.js";
 import { showCheckoutPaused } from "../../composables/usePlatformStatus";
@@ -542,6 +552,7 @@ async function saveOfferOptIn() {
 const isDirectCheckout = ref(false);
 const directCheckoutData = ref(null);
 const pendingOnlineOrderId = ref(null);
+const paymentFailure = ref({ show: false, failure: null, orderNumber: "" });
 const CHECKOUT_DRAFT_KEY = "checkout_payment_draft";
 
 // Reservation state
@@ -958,6 +969,11 @@ async function restorePendingOnlineOrderState() {
       `/checkout/orders/${pendingOnlineOrderId.value}`,
     );
     const order = response.data?.data;
+    paymentFailure.value = {
+      show: false,
+      failure: order?.payment_failure || null,
+      orderNumber: order?.order_number || "",
+    };
     const reservationDate = String(order?.reservation_date || "").slice(0, 10);
 
     // Session storage is a convenience, not the source of truth. Returning
@@ -1254,7 +1270,9 @@ onMounted(async () => {
 
   if (route.query.payment === "cancelled" || pendingOnlineOrderId.value) {
     currentStep.value = 3;
-    if (route.query.payment === "cancelled") {
+    if (route.query.payment && paymentFailure.value.failure) {
+      paymentFailure.value.show = true;
+    } else if (route.query.payment === "cancelled") {
       toast.info("Payment was not completed. Choose E-Wallet to try again.");
     }
   }

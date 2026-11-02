@@ -246,6 +246,8 @@ class CustomerOrderTrackingController extends Controller
             'order_number' => $order->order_number,
             'status' => $order->status,
             'payment_status' => $order->payment_status,
+            // Why an online payment didn't go through, shown when the customer taps "Failed"
+            'payment_failure' => $order->paymentFailure(),
             'payment_method' => $order->payment_method,
             'subtotal' => (float) ($order->subtotal ?? 0),
             'delivery_fee' => (float) ($order->delivery_fee ?? 0),

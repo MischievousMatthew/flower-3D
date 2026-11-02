@@ -168,7 +168,24 @@
                     ₱{{ fmt(order.total_amount) }}
                   </div>
                 </div>
+                <button
+                  v-if="order.payment_failure"
+                  type="button"
+                  class="ot-pay-chip ot-pay-chip--why"
+                  :class="payChip(order.payment_status)"
+                  :aria-label="`Payment failed. See why order ${order.order_number} didn't go through`"
+                  @click.stop="openPaymentFailure(order)"
+                  @keydown.enter.stop
+                  @keydown.space.stop
+                >
+                  {{ order.payment_status }}
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <circle cx="8" cy="8" r="6.25" />
+                    <path d="M8 7.25v3.5M8 5.1v.05" />
+                  </svg>
+                </button>
                 <span
+                  v-else
                   class="ot-pay-chip"
                   :class="payChip(order.payment_status)"
                   >{{ order.payment_status }}</span
@@ -838,6 +855,16 @@
       </div>
     </Transition>
 
+    <!-- Why an online payment didn't go through -->
+    <PaymentFailedModal
+      :show="paymentFailure.show"
+      :failure="paymentFailure.order?.payment_failure"
+      :order-number="paymentFailure.order?.order_number || ''"
+      :secondary-label="paymentFailure.order?.vendor_id ? 'Ask the shop' : ''"
+      @close="paymentFailure.show = false"
+      @secondary="askShop(paymentFailure.order)"
+    />
+
     <!-- ③ Review modal -->
     <ReviewModal
       :show="reviewModal.show"
@@ -859,6 +886,7 @@ import api from "../../plugins/axios";
 import { useAuth } from "../../composables/useAuth";
 import NavHeader from "../../layouts/NavHeader.vue";
 import ReviewModal from "../../layouts/components/ReviewModal.vue";
+import PaymentFailedModal from "../../components/customer/PaymentFailedModal.vue";
 import ReturnCasePanel from "../../components/returns/ReturnCasePanel.vue";
 import ProductQuestions from "../../layouts/components/ProductQuestions.vue";
 import "../../styles/bloomcraft.css";
@@ -1018,6 +1046,12 @@ const canCancel = (o) =>
   !isPaidEWallet(o);
 const showActions = (o) =>
   !!o.vendor_id || canCancel(o) || canComplete(o) || o.can_open_return_case || o.return_case || canReview(o);
+
+const paymentFailure = reactive({ show: false, order: null });
+const openPaymentFailure = (order) => {
+  paymentFailure.order = order;
+  paymentFailure.show = true;
+};
 
 // Opens the shop's chat; the question is sent with a card for this order
 const askShop = (order) =>
@@ -1912,6 +1946,43 @@ onMounted(async () => {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+/* "Failed" opens the reason, so it reads as a button */
+.ot-pay-chip--why {
+  position: relative;
+  gap: 5px;
+  min-height: 28px;
+  border: 1px solid currentColor;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.3s var(--ease-out), color 0.3s var(--ease-out);
+}
+
+.ot-pay-chip--why svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.ot-pay-chip--why:hover {
+  background: var(--bad);
+  color: var(--paper);
+}
+
+.ot-pay-chip--why:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 3px;
+}
+
+/* A bigger tap area than the chip itself */
+.ot-pay-chip--why::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
 }
 
 .chip--green,

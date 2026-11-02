@@ -970,7 +970,7 @@ class CheckoutController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $order
+                'data' => $order->toArray() + ['payment_failure' => $order->paymentFailure()],
             ]);
 
         } catch (\Exception $e) {
@@ -1250,9 +1250,17 @@ class CheckoutController extends Controller
         $order = $this->resolveWebhookOrder($attributes, $metadata);
 
         if ($order && $this->isActivePayMongoAttempt($order, $paymentData, $attributes, $metadata)) {
+            // Keep PayMongo's reason so the customer can see why it didn't go through
+            $error = $attributes['last_payment_error'] ?? $attributes;
+            $previous = is_array($order->paymongo_response) ? $order->paymongo_response : [];
             $order->update([
                 'payment_status' => 'failed',
                 'status' => 'failed',
+                'paymongo_response' => array_merge($previous, array_filter([
+                    'failed_code' => $error['failed_code'] ?? $error['code'] ?? null,
+                    'failed_message' => $error['failed_message'] ?? $error['detail'] ?? null,
+                    'failed_at' => now()->toIso8601String(),
+                ])),
             ]);
             $webhookEvent?->update(['order_id' => $order->id]);
             Log::info('Order marked as failed via webhook', ['order_id' => $order->id]);
