@@ -96,7 +96,10 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    console.error("[Response Error]", {
+    // Requests that expect a "no" as a normal answer (e.g. the staff sign-in
+    // tried before the customer/vendor one) stay out of the console
+    const expected = error.config?.quietStatuses?.includes(error.response?.status);
+    if (!expected) console.error("[Response Error]", {
       status: error.response?.status,
       url: error.config?.url,
       data: error.response?.data,

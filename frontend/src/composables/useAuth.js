@@ -106,6 +106,10 @@ export function useAuth() {
         username: credentials.username,
         password: credentials.password,
         login_context: loginContext,
+      }, {
+        // 401 here usually just means "not a staff account"; the customer and
+        // vendor sign-in is tried next
+        quietStatuses: [401],
       });
 
       if (!data?.success) {

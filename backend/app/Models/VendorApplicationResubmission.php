@@ -77,6 +77,9 @@ class VendorApplicationResubmission extends Model
             'field_name' => $this->field_name,
             'label' => $definition['label'] ?? $this->field_name,
             'type' => $definition['type'] ?? 'text',
+            // Limits the form checks before sending (the server checks them again)
+            'max' => $definition['max'] ?? null,
+            'mimes' => $definition['mimes'] ?? null,
             'status' => $this->status,
             'rejection_reason' => $this->rejection_reason,
             'original_value' => $this->original_value,

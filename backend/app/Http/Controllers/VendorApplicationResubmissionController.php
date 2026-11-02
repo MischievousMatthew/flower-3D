@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\VendorApplication;
 use App\Models\VendorApplicationResubmission;
 use App\Models\VendorApplicationResubmissionRequest;
+use App\Support\FriendlyErrors;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -112,6 +113,7 @@ class VendorApplicationResubmissionController extends Controller
 
         return response()->json([
             'vendor_name' => $request->application->owner_name ?: $request->application->store_name,
+            'store_name' => $request->application->store_name,
             'expires_at' => $request->expires_at,
             'items' => $items,
         ]);
@@ -133,39 +135,66 @@ class VendorApplicationResubmissionController extends Controller
         }
 
         $rules = [];
+        $names = [];
+        $messages = [];
         foreach ($pendingItems as $item) {
             $definition = VendorApplicationResubmission::definition($item->field_name);
+            $key = "fields.{$item->field_name}";
+            $names[$key] = $definition['label'] ?? $item->field_name;
             if (($definition['type'] ?? null) === 'file') {
-                $rules["fields.{$item->field_name}"] = ['required', 'file', 'mimes:' . $definition['mimes'], 'max:' . $definition['max']];
+                $rules[$key] = ['required', 'file', 'mimes:' . $definition['mimes'], 'max:' . $definition['max']];
+                $messages["{$key}.max"] = 'The :attribute must be ' . round($definition['max'] / 1024) . ' MB or smaller.';
+                $types = array_map('strtoupper', array_values(array_diff(explode(',', $definition['mimes']), ['jpeg'])));
+                $last = array_pop($types);
+                $messages["{$key}.mimes"] = 'The :attribute must be a ' . ($types ? implode(', ', $types) . ' or ' : '') . $last . ' file.';
+                $messages["{$key}.uploaded"] = "The :attribute didn't finish uploading. Please choose it again.";
             } else {
-                $rules["fields.{$item->field_name}"] = ['required', 'string', 'max:' . $definition['max']];
+                $rules[$key] = ['required', 'string', 'max:' . $definition['max']];
             }
         }
-        $request->validate($rules);
+        $request->validate($rules, $messages, $names);
 
+        // Large phone photos on a slow connection can take a while to reach Cloudinary
+        @set_time_limit(120);
+
+        // Upload everything first, so a failed upload leaves nothing half-submitted
+        $newValues = [];
         foreach ($pendingItems as $item) {
             $definition = VendorApplicationResubmission::definition($item->field_name);
-            $newValue = $request->input("fields.{$item->field_name}");
+            $newValues[$item->id] = $request->input("fields.{$item->field_name}");
 
             if (($definition['type'] ?? null) === 'file') {
-                $file = $request->file("fields.{$item->field_name}");
-                $upload = CloudinaryHelper::upload($file, [
-                    'folder' => 'vendor-applications/resubmissions/' . $resubmissionRequest->application->application_id . '/' . $definition['folder'],
-                    'resource_type' => $definition['resource_type'],
-                    'public_id' => 'resubmission_' . $resubmissionRequest->id . '_' . $item->field_name . '_' . Str::random(8),
-                ]);
-                $newValue = !empty($definition['store_public_id']) ? $upload['public_id'] : $upload['secure_url'];
-            }
+                try {
+                    $upload = CloudinaryHelper::upload($request->file("fields.{$item->field_name}"), [
+                        'folder' => 'vendor-applications/resubmissions/' . $resubmissionRequest->application->application_id . '/' . $definition['folder'],
+                        'resource_type' => $definition['resource_type'],
+                        'public_id' => 'resubmission_' . $resubmissionRequest->id . '_' . $item->field_name . '_' . Str::random(8),
+                    ]);
+                } catch (\Throwable $e) {
+                    FriendlyErrors::remember($request, 'Resubmission upload failed: ' . $e->getMessage(), $e);
+                    Log::error('Vendor resubmission upload failed', ['request_id' => $resubmissionRequest->id, 'field' => $item->field_name, 'error' => $e->getMessage()]);
 
-            $item->update([
-                'resubmitted_value' => $newValue,
-                'status' => VendorApplicationResubmission::RESUBMITTED,
-                'resubmitted_at' => now(),
-            ]);
+                    return response()->json([
+                        'message' => "We couldn't save your {$definition['label']}. Please try again in a moment.",
+                        'reference' => FriendlyErrors::reference($request),
+                    ], 502);
+                }
+                $newValues[$item->id] = !empty($definition['store_public_id']) ? $upload['public_id'] : $upload['secure_url'];
+            }
         }
 
-        $resubmissionRequest->update(['status' => 'submitted', 'submitted_at' => now()]);
-        $resubmissionRequest->application->update(['resubmission_status' => 'pending_review']);
+        DB::transaction(function () use ($pendingItems, $newValues, $resubmissionRequest) {
+            foreach ($pendingItems as $item) {
+                $item->update([
+                    'resubmitted_value' => $newValues[$item->id],
+                    'status' => VendorApplicationResubmission::RESUBMITTED,
+                    'resubmitted_at' => now(),
+                ]);
+            }
+
+            $resubmissionRequest->update(['status' => 'submitted', 'submitted_at' => now()]);
+            $resubmissionRequest->application->update(['resubmission_status' => 'pending_review']);
+        });
         $this->notifyAdministrators($resubmissionRequest->fresh('application'));
 
         return response()->json(['message' => 'Your updated requirements have been submitted for review.']);

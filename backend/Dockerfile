@@ -17,6 +17,17 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install zip pdo_pgsql gd opcache pcntl
 
+# PHP's defaults (2 MB per file, 8 MB per request, 30 s) are below what the
+# vendor document forms accept (10 MB per file), and phone photos sent from a
+# slow connection need longer than 30 s to reach Cloudinary
+RUN { \
+        echo 'upload_max_filesize = 12M'; \
+        echo 'post_max_size = 64M'; \
+        echo 'max_file_uploads = 30'; \
+        echo 'max_execution_time = 120'; \
+        echo 'memory_limit = 256M'; \
+    } > /usr/local/etc/php/conf.d/uploads.ini
+
 # Point Apache to Laravel's public/ folder
 RUN sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/public|g' \
         /etc/apache2/sites-enabled/000-default.conf \
