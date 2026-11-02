@@ -865,6 +865,9 @@ function selectDate(day) {
 }
 
 async function loadCalendarData() {
+  // The calendar belongs to the shop; there is nothing to ask for without one
+  if (!checkoutData.value.vendor?.id) return;
+
   try {
     const startDate = formatDateString(
       new Date(currentYear.value, currentMonth.value, 1),
@@ -970,6 +973,10 @@ async function restorePendingOnlineOrderState() {
     }
   } catch (error) {
     // The draft is still usable if the pending order no longer exists.
+    if (error.response?.status === 404) {
+      pendingOnlineOrderId.value = null;
+      sessionStorage.removeItem("pending_online_order_id");
+    }
     console.warn("Unable to restore cancelled checkout order", error);
   }
 }
@@ -1235,6 +1242,8 @@ onMounted(async () => {
     route.query.order_id || sessionStorage.getItem("pending_online_order_id"),
   ) || null;
   await loadCheckoutData();
+  // A failed load already sent the customer back to the cart
+  if (!checkoutData.value.vendor?.id) return;
   // This covers both PayMongo's Cancel action and the browser Back action.
   // Neither path may leave an online order active while payment is unfinished.
   if (pendingOnlineOrderId.value) {

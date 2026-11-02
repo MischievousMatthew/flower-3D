@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Models\BouquetCustomizationOption;
 use App\Models\Order;
 use App\Support\BouquetPresets;
 use App\Models\PayMongoWebhookEvent;
@@ -542,7 +543,7 @@ class CheckoutController extends Controller
                     $itemsData[] = [
                         'product_id'          => $item->product_id,
                         'product_name'        => $isCustomBouquet ? 'Custom Bouquet' : ($item->product->product_name ?? 'Unknown Product'),
-                        'product_description' => $item->product->product_description ?? '',
+                        'product_description' => $item->product->description ?? '',
                         'product_image'       => $item->product->primary_image->image_url ??
                                                 ($item->product->images[0]->image_url ?? ''),
                         'quantity'            => $item->quantity,
@@ -953,7 +954,7 @@ class CheckoutController extends Controller
 
             $order = Order::with([
                 'items', 
-                'items.product:id,product_name,product_description', // Add this line
+                'items.product:id,product_name,description',
                 'vendor:id,name,email',
             ])
                 ->where('id', $orderId)
