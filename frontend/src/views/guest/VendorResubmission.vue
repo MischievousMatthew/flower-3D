@@ -131,11 +131,7 @@ import api from "../../plugins/axios";
 import AuthShell from "../../components/auth/AuthShell.vue";
 import AuthNotice from "../../components/auth/AuthNotice.vue";
 import DocDrop from "../../components/vendor/register/DocDrop.vue";
-
-// Phone photos are often 4–12 MB. Documents stay readable at this size, and
-// the upload is much quicker on mobile data.
-const MAX_SIDE = 2400;
-const SHRINK_OVER = 1.5 * 1024 * 1024;
+import { shrinkPhoto } from "../../utils/shrinkPhoto";
 
 const route = useRoute();
 const token = computed(() => route.params.token);
@@ -202,28 +198,6 @@ async function load() {
     loadError.value = error.response?.data?.message || error.message || "This link may have expired.";
   } finally {
     loading.value = false;
-  }
-}
-
-// Large photos are redrawn smaller as JPEG; PDFs and small files go as they are
-async function shrinkPhoto(file) {
-  if (!/^image\/(jpeg|png)$/.test(file.type) || file.size <= SHRINK_OVER) return file;
-  try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close?.();
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
-    if (!blob || blob.size >= file.size) return file;
-    return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
-  } catch {
-    return file;
   }
 }
 

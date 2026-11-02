@@ -40,6 +40,9 @@ class VendorController extends Controller
 
     public function register(Request $request)
     {
+        // Up to ten documents and photos go to Cloudinary one after another
+        @set_time_limit(180);
+
         // Never log the application itself: it holds ID and bank account numbers
         \Log::info('Vendor Registration received', [
             'store_name'     => $request->input('store_name'),

@@ -404,7 +404,7 @@
           {{ currentStep === 4 ? "Review application" : "Continue" }}
         </button>
         <button v-else type="button" class="af-btn" :class="{ busy: isSubmitting }" :disabled="isSubmitting" @click="handleSubmit">
-          {{ isSubmitting ? "Sending your application…" : "Send application" }}
+          {{ submitLabel }}
         </button>
       </footer>
     </div>
@@ -443,6 +443,7 @@ import { usePlatformStatus } from "../../composables/usePlatformStatus";
 import AuthShell from "../../components/auth/AuthShell.vue";
 import AuthNotice from "../../components/auth/AuthNotice.vue";
 import DocDrop from "../../components/vendor/register/DocDrop.vue";
+import { shrinkPhoto } from "../../utils/shrinkPhoto";
 import { toast } from "@/utils/snackbar";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -490,6 +491,14 @@ const jumpToProblem = () => {
 const currentStep = ref(1);
 const totalSteps = 5;
 const isSubmitting = ref(false);
+const uploadProgress = ref(0);
+// Uploading shows how far along it is; after that the server saves the documents
+const submitLabel = computed(() => {
+  if (!isSubmitting.value) return "Send application";
+  if (uploadProgress.value > 0 && uploadProgress.value < 100) return `Uploading your documents… ${uploadProgress.value}%`;
+  if (uploadProgress.value >= 100) return "Saving your documents… this can take a minute";
+  return "Sending your application…";
+});
 const showApplicationModal = ref(false);
 const applicationId = ref("");
 // Plan picked on the landing page before registering (see subscriptionPlans.js).
@@ -1312,7 +1321,8 @@ const handleFileUpload = async (event, fieldName) => {
 
   try {
     if (fieldName !== "portfolio_photos") {
-      const file = files[0];
+      // A big phone photo is checked (and sent) as its smaller copy
+      const file = await shrinkPhoto(files[0]);
       const validation = validateFile(file, fieldName);
       if (!validation.valid) {
         explain("That file can't be used", validation.message, { tone: "info", field: fieldName });
@@ -1333,7 +1343,8 @@ const handleFileUpload = async (event, fieldName) => {
       const validFiles = [];
       const fileInfos = [];
 
-      for (const file of uploadedFiles) {
+      for (const picked of uploadedFiles) {
+        const file = await shrinkPhoto(picked);
         const validation = validateFile(file, fieldName);
         if (validation.valid) {
           validFiles.push(file);
@@ -1961,9 +1972,19 @@ const handleSubmit = async () => {
     const today = new Date().toISOString().split("T")[0];
     submitData.append("application_date", today);
 
-    const response = await api.post("/vendor/register", submitData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
+    // Large phone photos go much smaller first: the whole application is sent
+    // at once, and on mobile data a 30–50 MB upload often never arrives
+    const sized = new FormData();
+    for (const [key, value] of submitData.entries()) {
+      sized.append(key, value instanceof File ? await shrinkPhoto(value) : value);
+    }
+
+    uploadProgress.value = 0;
+    const response = await api.post("/vendor/register", sized, {
+      // Every document goes on to Cloudinary, which takes a while on a slow line
+      timeout: 240000,
+      onUploadProgress: (e) => {
+        if (e.total) uploadProgress.value = Math.round((e.loaded / e.total) * 100);
       },
     });
 
