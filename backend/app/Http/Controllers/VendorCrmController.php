@@ -102,6 +102,9 @@ class VendorCrmController extends Controller
             'customer_seen_at' => null,
         ]);
 
+        // Asked in chat: the answer goes into that chat too
+        $inChat = \App\Services\ChatQuestions::postAnswer($inquiry, $inquiry->answer);
+
         // Tell the customer
         UserNotification::create([
             'user_id' => $inquiry->customer_id,
@@ -111,7 +114,7 @@ class VendorCrmController extends Controller
             'link_url' => $inquiry->order_id ? '/customer/orders' : null,
         ]);
 
-        return response()->json(['success' => true, 'message' => $first ? 'Answer sent. The customer has been notified.' : 'Answer updated.', 'data' => $this->formatInquiry($inquiry->fresh(['customer', 'product.images', 'order']))]);
+        return response()->json(['success' => true, 'message' => ($first ? 'Answer sent. The customer has been notified' : 'Answer updated') . ($inChat ? ", and it's in your chat with them too." : '.'), 'data' => $this->formatInquiry($inquiry->fresh(['customer', 'product.images', 'order']))]);
     }
 
     /** POST /vendor/crm/inquiries/{id}/status {status: closed|open, is_public?} */
@@ -377,6 +380,8 @@ class VendorCrmController extends Controller
             'answered_at' => $q->answered_at?->toIso8601String(),
             'status' => $q->status,
             'is_public' => (bool) $q->is_public,
+            // Asked with "Ask the shop" in chat (answers go to that chat too)
+            'from_chat' => (bool) $q->conversation_id,
             'seen_by_customer' => $q->customer_seen_at !== null,
             'created_at' => $q->created_at?->toIso8601String(),
         ];

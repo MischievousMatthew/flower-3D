@@ -11,6 +11,7 @@ class CustomerInquiry extends Model
     protected $fillable = [
         'vendor_id', 'customer_id', 'product_id', 'order_id', 'question',
         'answer', 'answered_by', 'answered_at', 'status', 'is_public', 'customer_seen_at',
+        'conversation_id', 'message_id',
     ];
 
     protected $casts = [

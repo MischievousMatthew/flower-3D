@@ -90,6 +90,24 @@ class ChatAboutProductOrOrderTest extends TestCase
             $t->timestamps();
         });
 
+        Schema::dropIfExists('customer_inquiries');
+        Schema::create('customer_inquiries', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('vendor_id');
+            $t->unsignedBigInteger('customer_id');
+            $t->unsignedBigInteger('product_id')->nullable();
+            $t->unsignedBigInteger('order_id')->nullable();
+            $t->text('question');
+            $t->text('answer')->nullable();
+            $t->string('answered_by', 120)->nullable();
+            $t->timestamp('answered_at')->nullable();
+            $t->string('status', 12)->default('open');
+            $t->boolean('is_public')->default(true);
+            $t->timestamp('customer_seen_at')->nullable();
+            $t->timestamps();
+        });
+        (require database_path('migrations/2026_11_03_700000_link_customer_inquiries_to_chat.php'))->up();
+
         $this->shop = User::create(['name' => 'Flux', 'email' => 'flux@example.com', 'password' => 'x', 'role' => User::ROLE_VENDOR]);
         $this->customer = User::create(['name' => 'Ana', 'email' => 'ana@example.com', 'password' => 'x', 'role' => User::ROLE_CUSTOMER]);
     }
@@ -161,5 +179,55 @@ class ChatAboutProductOrOrderTest extends TestCase
 
         $this->signIn($this->customer)->postJson('/api/chat/messages/send', ['conversation_id' => $chat, 'about_product_id' => $productId])
             ->assertStatus(422)->assertJsonValidationErrors(['message']);
+    }
+    public function test_a_chat_question_is_also_on_the_questions_page_and_a_chat_reply_answers_it(): void
+    {
+        $productId = DB::table('products')->insertGetId(['owner_id' => $this->shop->id, 'product_name' => 'Red Roses', 'selling_price' => 1200]);
+        $chat = $this->openChat();
+
+        $this->signIn($this->customer)->postJson('/api/chat/messages/send', [
+            'conversation_id' => $chat, 'message' => 'Do you have these in pink?', 'about_product_id' => $productId,
+        ])->assertOk();
+
+        $q = DB::table('customer_inquiries')->sole();
+        $this->assertSame('Do you have these in pink?', $q->question);
+        $this->assertSame($productId, (int) $q->product_id);
+        $this->assertSame($chat, (int) $q->conversation_id);
+        $this->assertSame('open', $q->status);
+        $this->assertFalse((bool) $q->is_public);
+
+        // The shop answers in the chat (its plan includes chat): the question is answered
+        $this->mock(\App\Services\SubscriptionAccessService::class)->shouldReceive('canAccess')->andReturn(true);
+        $this->app['auth']->forgetGuards();
+        $this->signIn($this->shop)->postJson('/api/chat/messages/send', ['conversation_id' => $chat, 'message' => 'Yes! Pink ones arrive Friday.'])->assertOk();
+
+        $q = DB::table('customer_inquiries')->sole();
+        $this->assertSame('answered', $q->status);
+        $this->assertSame('Yes! Pink ones arrive Friday.', $q->answer);
+    }
+
+    public function test_an_answer_on_the_questions_page_is_posted_in_the_chat(): void
+    {
+        $productId = DB::table('products')->insertGetId(['owner_id' => $this->shop->id, 'product_name' => 'Red Roses', 'selling_price' => 1200]);
+        $chat = $this->openChat();
+        $this->signIn($this->customer)->postJson('/api/chat/messages/send', [
+            'conversation_id' => $chat, 'message' => 'Is there a card?', 'about_product_id' => $productId,
+        ])->assertOk();
+
+        $inquiry = \App\Models\CustomerInquiry::sole();
+        $this->assertTrue(\App\Services\ChatQuestions::postAnswer($inquiry, 'Yes, a free card comes with it.'));
+
+        $reply = DB::table('messages')->orderByDesc('id')->first();
+        $this->assertSame($this->shop->id, (int) $reply->sender_id);
+        $this->assertSame('Yes, a free card comes with it.', $reply->message);
+        $this->assertSame(1, (int) DB::table('conversations')->value('unread_count_customer'));
+    }
+
+    public function test_an_ordinary_chat_message_is_not_a_question(): void
+    {
+        $chat = $this->openChat();
+        $this->signIn($this->customer)->postJson('/api/chat/messages/send', ['conversation_id' => $chat, 'message' => 'Hello!'])->assertOk();
+
+        $this->assertSame(0, DB::table('customer_inquiries')->count());
     }
 }

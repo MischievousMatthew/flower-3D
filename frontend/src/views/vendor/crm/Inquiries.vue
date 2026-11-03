@@ -69,6 +69,7 @@
               <strong>{{ q.customer.name }}</strong>
               <span class="st-sub">asked {{ timeAgo(q.created_at) }}</span>
               <span class="sp-chip" :class="STATUS[q.status][1]">{{ STATUS[q.status][0] }}</span>
+              <span v-if="q.from_chat" class="sp-chip blue" title="Asked with “Ask the shop”. Your answer here is posted in that chat too, and a reply in the chat answers it.">Asked in chat</span>
             </div>
 
             <button v-if="q.product" type="button" class="iq-about" :disabled="erp" @click="openProduct(q)">

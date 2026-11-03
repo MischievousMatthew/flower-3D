@@ -313,6 +313,14 @@ class ChatController extends Controller
 
             $message = Message::create($messageData);
 
+            // A customer's question about a product or order is also kept in CRM → Questions;
+            // the shop's text reply answers whatever is still waiting from this chat
+            if ($about && ! $actor['is_vendor_context']) {
+                \App\Services\ChatQuestions::recordQuestion($conversation, $message, $about, $messageText);
+            } elseif ($actor['is_vendor_context'] && $hasText) {
+                \App\Services\ChatQuestions::answeredInChat($conversation, $messageText, $actor['auth_user']?->name ?? $this->getSenderDisplayName($actor));
+            }
+
             $senderDisplayName = $this->getSenderDisplayName($actor);
 
             if ($hasAttachments) {
