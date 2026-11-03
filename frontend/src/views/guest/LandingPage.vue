@@ -76,7 +76,7 @@
         <template v-if="!isAuthenticated">
           <router-link to="/guest/login" class="btn-login bc-nav-login">Sign in</router-link>
           <router-link to="/guest/register" class="btn-register bc-nav-register"
-            >Create account</router-link
+            >Get started</router-link
           >
         </template>
         <button
@@ -2922,7 +2922,7 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 370px) {
-  /* The logo alone leaves room for "Create account" */
+  /* The logo alone leaves room for "Get started" */
   .bc-logo-text {
     display: none;
   }

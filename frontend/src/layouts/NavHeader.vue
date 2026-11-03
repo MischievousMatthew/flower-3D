@@ -42,7 +42,7 @@
       <template v-if="!isAuthenticated">
         <router-link to="/guest/login" class="bc-nav-login">Sign in</router-link>
         <router-link to="/guest/register" class="bc-nav-register"
-          >Create account</router-link
+          >Get started</router-link
         >
       </template>
       <template v-else>
