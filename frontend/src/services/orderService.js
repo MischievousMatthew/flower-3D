@@ -17,6 +17,7 @@ export const orderService = {
   submit: (id) => api.post(`${BASE}/${id}/submit`),
   approve: (id, data = {}) => api.post(`${BASE}/${id}/approve`, data),
   sendBack: (id, reason) => api.post(`${BASE}/${id}/send-back`, { reason }),
+  cancel: (id, reason) => api.post(`${BASE}/${id}/cancel`, { reason }),
   email: (id) => api.post(`${BASE}/${id}/email`),
   // What arrived: [{ id, qty }]
   receive: (id, items, note) => api.post(`${BASE}/${id}/receive`, { items, note }),

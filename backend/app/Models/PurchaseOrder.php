@@ -34,6 +34,9 @@ class PurchaseOrder extends Model
         'supplier_shipped_at',
         'supplier_declined_at',
         'supplier_note',
+        'cancelled_at',
+        'cancel_reason',
+        'cancelled_by_name',
     ];
 
     protected $casts = [
@@ -47,6 +50,7 @@ class PurchaseOrder extends Model
         'supplier_confirmed_at' => 'datetime',
         'supplier_shipped_at'   => 'datetime',
         'supplier_declined_at'  => 'datetime',
+        'cancelled_at'          => 'datetime',
     ];
 
     /** The five stages people see, and the stored statuses each one covers */
@@ -56,7 +60,11 @@ class PurchaseOrder extends Model
         'ordered'            => ['pending', 'processing', 'shipped', 'received'],
         'partially_received' => ['partially_received'],
         'completed'          => ['completed'],
+        'cancelled'          => ['cancelled'],
     ];
+
+    /** Can still be cancelled: nothing has arrived yet */
+    public const CANCELLABLE = ['draft', 'pending_approval', 'pending', 'processing', 'shipped'];
 
     /** Still being written or waiting for approval: not yet with the supplier */
     public const EDITABLE = ['draft', 'pending_approval'];

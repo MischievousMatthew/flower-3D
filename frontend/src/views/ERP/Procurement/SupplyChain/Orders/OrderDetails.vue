@@ -11,7 +11,7 @@
     </div>
 
     <!-- Stages -->
-    <section class="sp-card od-steps" aria-label="Stage">
+    <section v-if="o?.status !== 'cancelled'" class="sp-card od-steps" aria-label="Stage">
       <template v-if="!o"><div class="bc-skeleton sp-sk-line w70"></div></template>
       <ol v-else class="od-stepper">
         <li v-for="(s, i) in PO_STAGES" :key="s.key" :class="{ done: i < stageIndex, now: i === stageIndex }" :aria-current="i === stageIndex ? 'step' : undefined">
@@ -45,6 +45,8 @@
           <button v-if="canEdit('sc_orders') && NEXT_STEPS[o.status]" type="button" class="sp-btn sp-btn-ghost" @click="stepModal = { next: NEXT_STEPS[o.status][0].status, busy: false }">Update progress</button>
           <router-link v-if="canReceive" :to="{ name: 'BatchesToReceive', query: { order: o.id } }" class="sp-btn sp-btn-primary"><span v-html="ICONS.box"></span>Receive &amp; inspect</router-link>
         </template>
+        <!-- Stop the order while nothing has arrived -->
+        <button v-if="canApprove && isCancellable(o)" type="button" class="sp-btn sp-btn-ghost od-cancel-btn" :disabled="busy" @click="openCancel">Cancel order</button>
       </div>
     </section>
 
@@ -200,6 +202,38 @@
       </Transition>
     </Teleport>
 
+    <!-- Cancel -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="cancelModal" class="sp-backdrop" @click="cancelModal = null"></div></Transition>
+      <Transition name="sp-pop">
+        <div v-if="cancelModal" class="sp-modal-wrap">
+          <form class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="od-cx-title" novalidate @submit.prevent="cancelOrder">
+            <div class="sp-modal-head">
+              <div>
+                <h3 id="od-cx-title">Cancel {{ o.order_number }}?</h3>
+                <p>
+                  {{ money(o.total_amount) }} from {{ o.supplier?.company_name }}.
+                  <template v-if="o.sent_at && o.supplier?.email">We'll email {{ o.supplier.email }} that it's cancelled, with your reason, and their link stops working.</template>
+                  <template v-else>It hasn't been sent to the supplier, so they won't be emailed.</template>
+                  This can't be undone.
+                </p>
+              </div>
+              <button type="button" class="sp-icon-btn" aria-label="Close" @click="cancelModal = null"><span v-html="ICONS.close"></span></button>
+            </div>
+            <label class="sp-field">
+              <span class="sp-label">Why is it cancelled?</span>
+              <textarea v-model.trim="cancelModal.reason" class="sp-textarea" :class="{ invalid: cancelModal.error }" rows="3" maxlength="500" placeholder="e.g. Ordered at the wrong price; a new order follows"></textarea>
+              <small v-if="cancelModal.error" class="sp-error">{{ cancelModal.error }}</small>
+            </label>
+            <div class="sp-modal-foot">
+              <button type="button" class="sp-btn sp-btn-ghost" @click="cancelModal = null">Keep the order</button>
+              <button type="submit" class="sp-btn sp-btn-danger" :disabled="cancelModal.busy">{{ cancelModal.busy ? "Cancelling…" : "Cancel order" }}</button>
+            </div>
+          </form>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- Send back -->
     <Teleport to="body">
       <Transition name="sp-fade"><div v-if="sendBackModal" class="sp-backdrop" @click="sendBackModal = null"></div></Transition>
@@ -279,7 +313,7 @@ import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopI
 import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";
 import { money } from "../../../../../components/vendor/finance/financeUi";
 import { initials } from "../../../../../components/procurement/supplierUi";
-import { PO_STAGES, NEXT_STEPS, EVENT_TONE, stageOf, statusText, eventText, isEditable, isReceivable, poDate, poDateTime, dueText, daysUntil } from "../../../../../components/procurement/poUi";
+import { PO_STAGES, NEXT_STEPS, EVENT_TONE, stageOf, statusText, eventText, isEditable, isReceivable, isCancellable, poDate, poDateTime, dueText, daysUntil } from "../../../../../components/procurement/poUi";
 import { useAssignment } from "../../../../../composables/useAssignment";
 import { orderService } from "../../../../../services/orderService";
 import { toast } from "@/utils/snackbar";
@@ -295,6 +329,7 @@ const loadError = ref("");
 const busy = ref(false);
 const approveModal = ref(null);
 const sendBackModal = ref(null);
+const cancelModal = ref(null);
 const stepModal = ref(null);
 const confirmDelete = ref(false);
 const openReceipt = ref(null);
@@ -308,7 +343,8 @@ const received = computed(() => ({ done: (o.value?.items ?? []).reduce((s, i) =>
 const showReceived = computed(() => ["partially_received", "completed"].includes(o.value?.status) || received.value.done > 0);
 const late = computed(() => isReceivable(o.value?.status) && daysUntil(o.value?.expected_date) < 0);
 const subtitle = computed(() => [o.value.supplier?.company_name, `${money(o.value.total_amount)}`, statusText(o.value.status)].filter(Boolean).join(" · "));
-const lastSentBack = computed(() => (o.value?.events ?? []).find((e) => e.event === "sent_back"));
+// Why it's a draft again: sent back by an approver, or declined by the supplier (newest first)
+const lastSentBack = computed(() => (o.value?.events ?? []).find((e) => e.event === "sent_back" || e.event === "supplier_declined"));
 
 function stepNote(key) {
   const x = o.value;
@@ -324,6 +360,9 @@ const nextAction = computed(() => {
   const x = o.value;
   switch (x.status) {
     case "draft":
+      if (lastSentBack.value?.event === "supplier_declined") {
+        return { tone: "amber", icon: "restore", title: `${lastSentBack.value.actor_name || "The supplier"} can't supply it`, text: `“${lastSentBack.value.note}” Pick another supplier or change the order, then approve it again. Or cancel it.` };
+      }
       return lastSentBack.value
         ? { tone: "amber", icon: "restore", title: "Sent back to you", text: `${lastSentBack.value.actor_name || "The approver"}: “${lastSentBack.value.note}” Make the change, then send it for approval again.` }
         : { tone: "slate", icon: "edit", title: "This is a draft", text: canApprove.value ? "Finish it, then approve it to send it to the supplier." : "Finish it, then send it for approval." };
@@ -333,6 +372,8 @@ const nextAction = computed(() => {
       return { tone: "violet", icon: "box", title: "Part of it has arrived", text: `${received.value.done.toLocaleString("en-PH")} of ${units.value.toLocaleString("en-PH")} units are in stock. Receive the rest when it comes.` };
     case "completed":
       return null;
+    case "cancelled":
+      return { tone: "red", icon: "close", title: "Cancelled", text: `${x.cancelled_by_name ? `${x.cancelled_by_name}, ` : ""}${poDate(x.cancelled_at)}${x.cancel_reason ? `: “${x.cancel_reason}”` : ""}` };
     default:
       return late.value
         ? { tone: "red", icon: "alert", title: `${dueText(x.expected_date, x.status)}`, text: `It was expected ${poDate(x.expected_date)}. Contact ${x.supplier?.company_name ?? "the supplier"}, or receive it if it came.` }
@@ -378,6 +419,28 @@ async function approve() {
   } catch (e) {
     m.busy = false;
     m.error = apiMessage(e, "Couldn't approve the order.");
+  }
+}
+
+function openCancel() {
+  cancelModal.value = { reason: "", busy: false, error: "" };
+}
+async function cancelOrder() {
+  const m = cancelModal.value;
+  if (!m.reason || m.reason.length < 3) {
+    m.error = "Say why it's cancelled.";
+    return;
+  }
+  m.busy = true;
+  try {
+    const res = await orderService.cancel(o.value.id, m.reason);
+    cancelModal.value = null;
+    if (res.data.supplier_told === false) toast.warning(res.data.message);
+    else toast.success(res.data.message);
+    await load();
+  } catch (e) {
+    m.busy = false;
+    m.error = apiMessage(e, "Couldn't cancel the order.");
   }
 }
 

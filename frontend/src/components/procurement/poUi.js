@@ -18,9 +18,20 @@ const STAGE_OF = {
   received: "ordered",
   partially_received: "partially_received",
   completed: "completed",
+  cancelled: "cancelled",
 };
 
-export const stageOf = (status) => PO_STAGES.find((s) => s.key === STAGE_OF[status]) ?? PO_STAGES[2];
+/** Not one of the five steps: an order stopped before anything arrived */
+export const CANCELLED_STAGE = { key: "cancelled", label: "Cancelled", tone: "red", icon: "close", hint: "Stopped before anything arrived" };
+
+/** The stages to filter the order list by: the five steps, plus cancelled */
+export const PO_FILTER_STAGES = [...PO_STAGES, CANCELLED_STAGE];
+
+export const stageOf = (status) => PO_FILTER_STAGES.find((s) => s.key === STAGE_OF[status]) ?? PO_STAGES[2];
+
+/** Can still be cancelled: nothing has arrived yet */
+export const isCancellable = (o) =>
+  ["draft", "pending_approval", "pending", "processing", "shipped"].includes(o?.status) && !(o?.items ?? []).some((i) => Number(i.received_qty) > 0);
 
 /** Where an "Ordered" order is right now, in words */
 export const ORDERED_STEP = {
@@ -57,6 +68,10 @@ export function eventText(e) {
       return "Emailed it to the supplier";
     case "email_failed":
       return "Tried to email the supplier, but it didn't go through";
+    case "cancelled":
+      return "Cancelled the order";
+    case "cancel_emailed":
+      return "Told the supplier it's cancelled";
     case "supplier_confirmed":
       return "Supplier confirmed the order";
     case "supplier_declined":
@@ -76,7 +91,7 @@ export function eventText(e) {
   }
 }
 
-export const EVENT_TONE = { inspected: "violet", approved: "green", emailed: "blue", sent_back: "amber", email_failed: "red", received: "violet", created: "slate", edited: "slate", status: "slate", supplier_confirmed: "green", supplier_declined: "red", supplier_shipped: "blue" };
+export const EVENT_TONE = { inspected: "violet", approved: "green", emailed: "blue", sent_back: "amber", email_failed: "red", received: "violet", created: "slate", edited: "slate", status: "slate", supplier_confirmed: "green", supplier_declined: "red", supplier_shipped: "blue", cancelled: "red", cancel_emailed: "blue" };
 
 export const poDate = (d) => (d ? new Date(String(d).length === 10 ? `${d}T00:00:00` : d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—");
 export const poDateTime = (d) => (d ? new Date(d).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "—");

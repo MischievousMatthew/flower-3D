@@ -203,7 +203,7 @@ class PurchaseOrderManagementTest extends TestCase
 
         $res = $this->getJson(self::BASE . '?stage=ordered')->assertOk();
         $this->assertCount(2, $res->json('data'));
-        $this->assertSame(['draft' => 1, 'pending_approval' => 1, 'ordered' => 2, 'partially_received' => 0, 'completed' => 0], $res->json('counts.stages'));
+        $this->assertSame(['draft' => 1, 'pending_approval' => 1, 'ordered' => 2, 'partially_received' => 0, 'completed' => 0, 'cancelled' => 0], $res->json('counts.stages'));
         $this->assertSame(1, $res->json('counts.overdue'));
         $this->assertCount(1, $this->getJson(self::BASE . '?overdue=1')->json('data'));
         $this->assertCount(1, $this->getJson(self::BASE . '?search=tulip')->json('data'));

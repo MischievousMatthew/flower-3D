@@ -8,7 +8,7 @@
     <!-- Stages: also the filter -->
     <section class="ol-stages" aria-label="Stages">
       <template v-if="!counts">
-        <div v-for="n in 6" :key="n" class="sp-card ol-stage"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton fx-sk-big"></div></div>
+        <div v-for="n in 7" :key="n" class="sp-card ol-stage"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton fx-sk-big"></div></div>
       </template>
       <template v-else>
         <button type="button" class="sp-card ol-stage" :class="{ on: !stage && !overdue }" :aria-pressed="!stage && !overdue" @click="setStage('')">
@@ -141,7 +141,7 @@ import ShowMore from "../../../../../components/common/ShowMore.vue";
 import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";
 import { money } from "../../../../../components/vendor/finance/financeUi";
-import { PO_STAGES, ORDERED_STEP, stageOf, poDate, dueText, daysUntil, isReceivable } from "../../../../../components/procurement/poUi";
+import { PO_FILTER_STAGES as PO_STAGES, ORDERED_STEP, stageOf, poDate, dueText, daysUntil, isReceivable } from "../../../../../components/procurement/poUi";
 import { useShowMorePaged } from "../../../../../composables/useShowMore";
 import { useAssignment } from "../../../../../composables/useAssignment";
 import { orderService } from "../../../../../services/orderService";
@@ -283,7 +283,7 @@ onBeforeUnmount(() => clearTimeout(timer));
 /* Stages */
 .ol-stages {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 14px;
 }
@@ -334,6 +334,7 @@ onBeforeUnmount(() => clearTimeout(timer));
 .t-blue .ol-dot { background: #3b82f6; }
 .t-violet .ol-dot { background: #8b5cf6; }
 .t-green .ol-dot { background: #10b981; }
+.t-red .ol-dot { background: #ef4444; }
 
 /* Filters */
 .ol-bar {

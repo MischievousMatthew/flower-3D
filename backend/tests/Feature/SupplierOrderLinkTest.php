@@ -170,6 +170,51 @@ class SupplierOrderLinkTest extends TestCase
         $this->getJson('/api/supplier-orders/' . str_repeat('x', 48))->assertNotFound();
     }
 
+    public function test_cancelling_a_sent_order_tells_the_supplier_and_ends_their_link(): void
+    {
+        \Illuminate\Support\Facades\Http::fake(['api.brevo.com/*' => \Illuminate\Support\Facades\Http::response(['messageId' => 'x'], 201)]);
+        DB::table('purchase_orders')->where('id', $this->orderId)->update(['sent_at' => now()]);
+        $token = $this->token();
+
+        $result = app(OrderService::class)->cancel($this->orderId, 3, 'Ordered at the wrong price');
+
+        $this->assertTrue($result['supplier_told']);
+        $order = PurchaseOrder::findOrFail($this->orderId);
+        $this->assertSame('cancelled', $order->status);
+        $this->assertSame('Ordered at the wrong price', $order->cancel_reason);
+        // Nothing is expected any more
+        $this->assertSame(1100, (int) DB::table('purchase_order_items')->value('cancelled_qty'));
+        $this->assertDatabaseHas('purchase_order_events', ['event' => 'cancelled', 'from_status' => 'pending', 'to_status' => 'cancelled']);
+        \Illuminate\Support\Facades\Http::assertSent(fn ($r) => str_contains($r['subject'], 'Cancelled') && str_contains((string) $r['htmlContent'], 'Ordered at the wrong price'));
+        $this->getJson("/api/supplier-orders/{$token}")->assertStatus(410);
+    }
+
+    public function test_an_order_not_yet_sent_is_cancelled_without_emailing(): void
+    {
+        \Illuminate\Support\Facades\Http::fake();
+        DB::table('purchase_orders')->where('id', $this->orderId)->update(['status' => 'draft']);
+
+        $this->assertNull(app(OrderService::class)->cancel($this->orderId, 3, 'Not needed')['supplier_told']);
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
+    public function test_an_order_that_has_started_arriving_cannot_be_cancelled(): void
+    {
+        DB::table('purchase_order_items')->update(['received_qty' => 100]);
+
+        $this->expectExceptionMessage('already arrived');
+        app(OrderService::class)->cancel($this->orderId, 3, 'Too late');
+    }
+
+    public function test_a_cancelled_order_cannot_be_cancelled_again(): void
+    {
+        \Illuminate\Support\Facades\Http::fake();
+        app(OrderService::class)->cancel($this->orderId, 3, 'Not needed');
+
+        $this->expectExceptionMessage('already cancelled');
+        app(OrderService::class)->cancel($this->orderId, 3, 'Again');
+    }
+
     public function test_an_order_at_zero_pesos_is_never_approved(): void
     {
         DB::table('purchase_orders')->where('id', $this->orderId)->update(['status' => 'pending_approval']);

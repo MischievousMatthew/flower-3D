@@ -1012,6 +1012,7 @@ Route::middleware('token.auth')->group(function () {
             Route::middleware('employee.module:sc_orders,approve')->group(function () {
                 Route::post('/{id}/approve',   [OrderController::class, 'approve']);
                 Route::post('/{id}/send-back', [OrderController::class, 'sendBack']);
+                Route::post('/{id}/cancel',    [OrderController::class, 'cancel']);
             });
             Route::middleware('employee.module:sc_orders,edit')->group(function () {
                 Route::put('/{id}',                             [OrderController::class, 'update']);

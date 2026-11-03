@@ -235,6 +235,56 @@ class OrderService
         return $order->fresh(['supplier', 'items']);
     }
 
+    /**
+     * Cancel an order nothing has arrived for yet. Expected stock is cleared,
+     * the supplier's link stops working, a linked funding request is freed,
+     * and a supplier who was sent the order is emailed that it's cancelled.
+     *
+     * @return array{order: PurchaseOrder, supplier_told: ?bool}
+     */
+    public function cancel(int $orderId, int $ownerId, string $reason): array
+    {
+        $order = DB::transaction(function () use ($orderId, $ownerId, $reason) {
+            $order = PurchaseOrder::where('owner_id', $ownerId)->with('items', 'supplier')->lockForUpdate()->findOrFail($orderId);
+            if ($order->status === 'cancelled') {
+                throw new \RuntimeException('This order is already cancelled.');
+            }
+            if (! in_array($order->status, PurchaseOrder::CANCELLABLE, true) || $order->items->sum('received_qty') > 0) {
+                throw new \RuntimeException('Part of this order has already arrived, so it can\'t be cancelled. Receive what came, then close the rest from receiving.');
+            }
+
+            $from = $order->status;
+            foreach ($order->items as $item) {
+                $item->update(['cancelled_qty' => max(0, (int) $item->quantity - (int) $item->received_qty)]);
+            }
+            $order->quietlyMoveTo([
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+                'cancel_reason' => $reason,
+                'cancelled_by_name' => PurchaseOrderEvent::nameOf(auth()->user()),
+            ]);
+            PurchaseOrderEvent::record($order, 'cancelled', $from, 'cancelled', $reason);
+            \App\Models\PurchaseOrderSupplierLink::revokeFor($order);
+            FundingRequest::where('linked_order_id', $order->id)->update(['linked_order_id' => null]);
+
+            return $order;
+        });
+
+        // Only a supplier who received the order needs to hear it's off
+        $told = null;
+        if ($order->sent_at && $order->supplier?->email) {
+            try {
+                $told = (new \App\Mail\PurchaseOrderCancelledMail($order, $reason))->send();
+            } catch (\Throwable $e) {
+                Log::warning('Purchase order cancellation email failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+                $told = false;
+            }
+            PurchaseOrderEvent::record($order, $told ? 'cancel_emailed' : 'email_failed', null, null, $order->supplier->email);
+        }
+
+        return ['order' => $order->fresh(['supplier', 'items', 'events']), 'supplier_told' => $told];
+    }
+
     /** Email the order to the supplier (again). Null when there's no email to send to. */
     public function emailSupplier(PurchaseOrder $order): ?bool
     {

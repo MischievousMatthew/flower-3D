@@ -133,10 +133,37 @@ class OrderController extends Controller
         }
     }
 
+    /** POST /orders/{id}/cancel  { reason }: cancel an order nothing has arrived for yet */
+    public function cancel(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:500']], [
+            'reason.required' => 'Say why it\'s cancelled. The supplier sees this too if they were sent the order.',
+            'reason.min'      => 'Say why it\'s cancelled. The supplier sees this too if they were sent the order.',
+        ]);
+
+        try {
+            $result = $this->service->cancel($id, $this->getOwnerId(), trim($data['reason']));
+        } catch (\RuntimeException $e) {
+            return $this->sayWhy($e);
+        }
+
+        $order = $result['order'];
+        $message = match ($result['supplier_told']) {
+            true    => "Cancelled. {$order->supplier?->company_name} has been emailed.",
+            false   => "Cancelled, but the email to {$order->supplier?->company_name} didn't go through. Let them know yourself.",
+            default => 'Order cancelled.',
+        };
+
+        return response()->json(['message' => $message, 'order' => $order, 'supplier_told' => $result['supplier_told']]);
+    }
+
     /** POST /orders/{id}/email: send the order to the supplier again */
     public function email(int $id): JsonResponse
     {
         $order = $this->service->findOrder($id, $this->getOwnerId());
+        if ($order->status === 'cancelled') {
+            return response()->json(['message' => 'This order is cancelled, so it can\'t be sent.'], 422);
+        }
         if (in_array($order->status, PurchaseOrder::EDITABLE, true)) {
             return response()->json(['message' => 'Approve the order before sending it to the supplier.'], 422);
         }
@@ -184,7 +211,7 @@ class OrderController extends Controller
         return response()->json(['message' => 'Order deleted.']);
     }
 
-    private const STATUSES = ['draft', 'pending_approval', 'pending', 'processing', 'shipped', 'partially_received', 'received', 'completed'];
+    private const STATUSES = ['draft', 'pending_approval', 'pending', 'processing', 'shipped', 'partially_received', 'received', 'completed', 'cancelled'];
 
     private function detailRules(): array
     {
