@@ -835,6 +835,46 @@
                 }}</span>
               </div>
             </div>
+            <!-- A custom 3D bouquet: what to make, and the design in 3D -->
+            <section v-if="detailBouquet" class="dm-bouquet" aria-labelledby="dm-bouquet-title">
+              <div class="dm-bouquet-head">
+                <div>
+                  <span class="dm-bouquet-tag">Custom 3D bouquet</span>
+                  <h3 id="dm-bouquet-title">
+                    {{ detailRecipe.flowerTotal }} flower{{ detailRecipe.flowerTotal === 1 ? "" : "s" }}<template v-if="detailRecipe.occasion"> · {{ detailRecipe.occasion }}</template>
+                  </h3>
+                </div>
+                <button type="button" class="dm-bouquet-btn" @click="openBouquet3d">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="15" aria-hidden="true"><path d="M10 2l7 4v8l-7 4-7-4V6z" /><path d="M10 2v14M3 6l7 4 7-4" /></svg>
+                  View 3D bouquet
+                </button>
+              </div>
+              <dl class="dm-recipe">
+                <div>
+                  <dt>Flowers</dt>
+                  <dd>
+                    <span v-for="f in detailRecipe.flowers" :key="f.name" class="dm-recipe-chip">{{ f.count }} × {{ f.name }}</span>
+                  </dd>
+                </div>
+                <div v-if="detailRecipe.wrapper">
+                  <dt>Wrapper</dt>
+                  <dd><span class="dm-swatch"><i :style="{ background: detailRecipe.wrapper.color }"></i>{{ detailRecipe.wrapper.name || "Wrapper" }}</span></dd>
+                </div>
+                <div v-if="detailRecipe.innerWrapper">
+                  <dt>Inner wrapper</dt>
+                  <dd><span class="dm-swatch"><i :style="{ background: detailRecipe.innerWrapper.color }"></i>{{ detailRecipe.innerWrapper.name || "Inner wrapper" }}</span></dd>
+                </div>
+                <div v-if="detailRecipe.ribbon">
+                  <dt>Ribbon</dt>
+                  <dd><span class="dm-swatch"><i :style="{ background: detailRecipe.ribbon.color }"></i>{{ detailRecipe.ribbon.name || "Ribbon" }}</span></dd>
+                </div>
+                <div v-if="detailRecipe.fillers.length">
+                  <dt>Fillers</dt>
+                  <dd>{{ detailRecipe.fillers.join(", ") }}</dd>
+                </div>
+              </dl>
+            </section>
+
             <div class="dm-section-title">
               Order Items
               <span class="dm-item-count">{{
@@ -870,7 +910,10 @@
                   </div>
                 </div>
                 <div class="dm-item-info">
-                  <div class="dm-item-name">{{ item.product_name }}</div>
+                  <div class="dm-item-name">
+                    {{ item.product_name }}
+                    <span v-if="isBouquetItem(item)" class="dm-recipe-chip">Custom 3D bouquet</span>
+                  </div>
                   <div class="dm-item-desc" v-if="item.product_description">
                     {{ item.product_description }}
                   </div>
@@ -886,7 +929,7 @@
                     >
                   </div>
                   <button
-                    v-if="item.model_3d_url"
+                    v-if="item.model_3d_url && !isBouquetItem(item)"
                     class="dm-3d-toggle"
                     @click="open3dModal(item.model_3d_url, item.product_name)"
                   >
@@ -957,31 +1000,11 @@
 
     <!-- 3D Model Modal -->
     <teleport to="body">
-      <div
-        v-if="model3d.open"
-        class="modal-backdrop"
-        @click.self="model3d.open = false"
-      >
-        <div class="model3d-modal">
-          <div class="modal-header">
-            <h2>{{ model3d.name }}</h2>
-            <button class="modal-close" @click="model3d.open = false">✕</button>
-          </div>
-          <div class="model3d-body">
-            <iframe
-              :src="model3d.url"
-              class="model3d-iframe"
-              frameborder="0"
-            ></iframe>
-          </div>
-          <div class="model3d-footer">
-            <span>🖱 Drag to rotate · Scroll to zoom</span
-            ><a :href="model3d.url" download class="dm-3d-download"
-              >↓ Download .glb</a
-            >
-          </div>
-        </div>
-      </div>
+      <!-- A real 3D viewer (an iframe can't show a .glb file) -->
+      <Order3DModal
+        :model="model3d.open ? { title: model3d.name, url: model3d.url, type: 'glb', arrangement: model3d.arrangement || null } : null"
+        @close="model3d.open = false"
+      />
     </teleport>
 
     <!-- Logs Modal -->
@@ -1150,6 +1173,9 @@ import { deliveryService } from "../../../../../services/deliveryService";
 import ReturnCasePanel from "../../../../../components/returns/ReturnCasePanel.vue";
 import LoadingOverlay from "../../../../../layouts/components/LoadingOverlay.vue";
 import BarcodeModal from "../../../../../layouts/components/BarcodeModal.vue";
+import Order3DModal from "../../../../../components/vendor/orders/Order3DModal.vue";
+import { bouquetFromItems, bouquetRecipe, isBouquetItem } from "../../../../../components/vendor/orders/orderUi";
+import "../../../../../components/vendor/shop/shop.css";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DAY_HEADERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -1569,7 +1595,14 @@ function openDetail(delivery) {
   detailModal.value = { open: true, delivery };
 }
 function open3dModal(url, name) {
-  model3d.value = { open: true, url, name: name || "3D Model" };
+  model3d.value = { open: true, url: new URL(url, window.location.origin).href, name: name || "3D Model", arrangement: null };
+}
+
+// The custom 3D bouquet in the open order, and what staff need to make it
+const detailBouquet = computed(() => bouquetFromItems(detailModal.value.delivery?.order?.items ?? []));
+const detailRecipe = computed(() => bouquetRecipe(detailBouquet.value));
+function openBouquet3d() {
+  model3d.value = { open: true, url: "/Boquet.glb", name: "Custom bouquet", arrangement: detailBouquet.value };
 }
 async function openLogs(delivery) {
   logsModal.value = { open: true, delivery, logs: [], loading: true };
@@ -2770,6 +2803,110 @@ onUnmounted(() => clearInterval(pollTimer));
 .dm-meta-val.bold {
   font-weight: 700;
 }
+/* Custom 3D bouquet: what to make */
+.dm-bouquet {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--v-border);
+  border-radius: 14px;
+  background: var(--v-purple-soft);
+}
+.dm-bouquet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.dm-bouquet-tag {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--v-purple-text);
+}
+.dm-bouquet h3 {
+  margin: 2px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v-text);
+}
+.dm-bouquet-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--v-ink);
+  color: var(--v-ink-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dm-bouquet-btn:focus-visible {
+  outline: 2px solid var(--v-purple-text);
+  outline-offset: 2px;
+}
+.dm-recipe {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.dm-recipe > div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.dm-recipe dt {
+  font-size: 12px;
+  color: var(--v-muted);
+}
+.dm-recipe dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--v-text);
+}
+.dm-recipe-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--v-surface);
+  border: 1px solid var(--v-border);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--v-text);
+}
+.dm-item-name .dm-recipe-chip {
+  margin-left: 6px;
+  color: var(--v-purple-text);
+}
+.dm-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dm-swatch i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--v-border-strong);
+}
+@media (max-width: 560px) {
+  .dm-recipe > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
 .dm-section-title {
   display: flex;
   align-items: center;

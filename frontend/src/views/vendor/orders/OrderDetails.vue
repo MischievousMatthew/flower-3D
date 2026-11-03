@@ -171,7 +171,7 @@ import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { linkedId } from "../../../utils/hiddenIds";
 import {
-  PAYMENT_LABEL, STATUS_HINT, STATUS_TONE, dayLabel, daysFromToday, formatDateTime, isLate, money, parseCustomizations, shouldPrepare,
+  PAYMENT_LABEL, STATUS_HINT, STATUS_TONE, bouquetFromItems, dayLabel, daysFromToday, formatDateTime, isLate, money, parseCustomizations, shouldPrepare,
 } from "../../../components/vendor/orders/orderUi";
 import "../../../components/vendor/shop/shop.css";
 import { DEFAULT_PRESETS } from "../../../constants/bouquetPresets";
@@ -236,28 +236,7 @@ const hasDetails = (item) =>
   item.is_custom_bouquet || item.color || item.size || Object.keys(extraCustom(item)).length > 0;
 
 // A custom 3D bouquet: either one item carrying the whole arrangement, or one item per placed flower
-const bouquet = computed(() => {
-  const items = order.value?.items ?? [];
-  const whole = items.map(custom).find((c) => c?.type === "custom_flower_bouquet" && Array.isArray(c.flowers));
-  if (whole) return whole;
-  const placed = items.filter((i) => custom(i)?.type === "custom_flower_bouquet" && custom(i)?.placement);
-  if (!placed.length) return null;
-  const first = custom(placed[0]);
-  return {
-    type: "custom_flower_bouquet",
-    bouquet_model_url: "/Boquet.glb",
-    paper_color: first.paper_color,
-    ribbon_color: first.ribbon_color,
-    flowers: placed.map((i, index) => ({
-      ...custom(i).placement,
-      product_id: i.product_id,
-      product_name: i.name,
-      quantity: i.quantity,
-      placement_order: index,
-      scale: custom(i).placement.scale || { x: 1, y: 1, z: 1 },
-    })),
-  };
-});
+const bouquet = computed(() => bouquetFromItems(order.value?.items ?? []));
 function show3D(item) {
   viewer.value = item
     ? { title: item.name, url: new URL(item.model_3d_url, window.location.origin).href, type: item.model_type || "glb", arrangement: null }

@@ -100,3 +100,55 @@ export function parseCustomizations(value) {
     return {};
   }
 }
+
+/**
+ * The custom 3D bouquet in an order, or null. Either one item carries the
+ * whole arrangement (flowers, wrapper, ribbon, fillers), or older orders have
+ * one item per placed flower. `name` and `product_name` are both accepted.
+ */
+export function bouquetFromItems(items = []) {
+  const custom = (i) => parseCustomizations(i?.customizations) ?? {};
+  const whole = items.map(custom).find((c) => c?.type === "custom_flower_bouquet" && Array.isArray(c.flowers));
+  if (whole) return whole;
+  const placed = items.filter((i) => custom(i)?.type === "custom_flower_bouquet" && custom(i)?.placement);
+  if (!placed.length) return null;
+  const first = custom(placed[0]);
+  return {
+    type: "custom_flower_bouquet",
+    bouquet_model_url: "/Boquet.glb",
+    paper_color: first.paper_color,
+    ribbon_color: first.ribbon_color,
+    flowers: placed.map((i, index) => ({
+      ...custom(i).placement,
+      product_id: i.product_id,
+      product_name: i.name ?? i.product_name,
+      quantity: i.quantity,
+      placement_order: index,
+      scale: custom(i).placement.scale || { x: 1, y: 1, z: 1 },
+    })),
+  };
+}
+
+/** Whether an order item is (part of) a custom 3D bouquet */
+export const isBouquetItem = (item) => parseCustomizations(item?.customizations)?.type === "custom_flower_bouquet";
+
+/** What staff need to make a bouquet: flowers by count, wrappers, ribbon, fillers, size */
+export function bouquetRecipe(bouquet) {
+  if (!bouquet) return null;
+  const counts = new Map();
+  for (const f of bouquet.flowers ?? []) {
+    const name = f.product_name || "Flower";
+    counts.set(name, (counts.get(name) ?? 0) + Number(f.quantity || 1));
+  }
+  const swatch = (part, fallbackColor) =>
+    part || fallbackColor ? { name: part?.name ?? null, color: part?.color_hex ?? fallbackColor ?? null } : null;
+  return {
+    flowers: [...counts].map(([name, count]) => ({ name, count })),
+    flowerTotal: [...counts.values()].reduce((a, b) => a + b, 0),
+    wrapper: swatch(bouquet.wrapper, bouquet.paper_color),
+    innerWrapper: swatch(bouquet.inner_wrapper, bouquet.inner_paper_color),
+    ribbon: swatch(bouquet.ribbon, bouquet.ribbon_color),
+    fillers: [...new Set((bouquet.fillers ?? []).map((f) => f.name).filter(Boolean))],
+    occasion: bouquet.preset?.label ?? null,
+  };
+}
