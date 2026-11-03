@@ -64,6 +64,7 @@ class SupportCasesTest extends TestCase
         (require base_path('database/migrations/2026_10_24_300000_add_shop_cases_to_support_tickets.php'))->up();
         (require base_path('database/migrations/2026_10_27_100000_add_issue_to_support_tickets.php'))->up();
         (require base_path('database/migrations/2026_11_03_800000_add_automatic_support_replies.php'))->up();
+        (require base_path('database/migrations/2026_11_03_900000_add_requester_seen_at_to_support_tickets.php'))->up();
         Schema::create('conversations', function (Blueprint $t) {
             $t->id();
             $t->unsignedBigInteger('owner_id')->nullable();
@@ -313,5 +314,28 @@ class SupportCasesTest extends TestCase
         $this->assertSame('My shop page will not load.', $data['messages'][0]['body']);
         $this->assertTrue($data['messages'][1]['automated']);
         $this->assertSame('Automatic reply', $data['messages'][1]['author']);
+    }
+    public function test_a_reply_shows_as_unread_until_the_request_is_opened(): void
+    {
+        $shop = $this->shop('Petal & Stem');
+        $id = $this->as($shop)->postJson('/api/support/tickets', ['subject' => 'Something else', 'category' => 'other', 'message' => 'My shop page will not load.'])
+            ->assertCreated()->json('data.id');
+
+        // Their own message and the automatic reply are not unread replies
+        $this->getJson('/api/support/unread')->assertOk()->assertJsonPath('unread', 0);
+
+        // BloomCraft replies (and notifies them)
+        Carbon::setTestNow(now()->addMinutes(5));
+        DB::table('support_messages')->insert(['ticket_id' => $id, 'from_admin' => true, 'body' => 'We are looking into it.', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('user_notifications')->insert(['user_id' => $shop->id, 'type' => 'support_reply', 'title' => 'BloomCraft Support replied', 'link_url' => "/vendor/support?ticket={$id}", 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->getJson('/api/support/unread')->assertOk()->assertJsonPath('unread', 1);
+        $this->getJson('/api/support/tickets')->assertOk()->assertJsonPath('unread', 1)->assertJsonPath('data.0.unread', true);
+
+        // Opening it reads the reply and its notification
+        Carbon::setTestNow(now()->addMinutes(1));
+        $this->getJson("/api/support/tickets/{$id}")->assertOk();
+        $this->getJson('/api/support/unread')->assertOk()->assertJsonPath('unread', 0);
+        $this->assertNotNull(DB::table('user_notifications')->where('user_id', $shop->id)->value('read_at'));
     }
 }

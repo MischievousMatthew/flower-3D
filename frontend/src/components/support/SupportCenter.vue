@@ -24,7 +24,7 @@
           <li v-for="t in tickets" :key="t.id">
             <button type="button" class="ticket" :class="{ active: active?.id === t.id }" @click="open(t.id)">
               <span class="ticket-top">
-                <span class="ref">{{ t.reference }}</span>
+                <span class="ref">{{ t.reference }}<span v-if="t.unread" class="unread-dot" aria-label="New reply"></span></span>
                 <span class="status" :class="`s-${t.status}`">{{ STATUS[t.status] }}</span>
               </span>
               <span class="ticket-subject">{{ t.subject }}</span>
@@ -188,6 +188,7 @@ import { useRoute, useRouter } from "vue-router";
 import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
 import { linkedId } from "../../utils/hiddenIds";
+import { refreshSupportUnread } from "../../composables/useSupportUnread";
 
 /** Raise and follow support requests (used by vendors and customers) */
 const props = defineProps({
@@ -334,6 +335,10 @@ const open = async (id) => {
   try {
     const { data } = await api.get(`/support/tickets/${id}`);
     active.value = data.data;
+    // Opening it reads the reply: clear its dot here and on the header
+    const row = tickets.value.find((t) => t.id === id);
+    if (row) row.unread = false;
+    refreshSupportUnread();
   } catch {
     toast.error("That request couldn't be opened.");
     mode.value = "none";
@@ -730,6 +735,15 @@ onMounted(async () => {
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.unread-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: #e53e3e;
+  vertical-align: middle;
 }
 .mine .bubble {
   background: var(--mine);

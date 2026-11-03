@@ -143,7 +143,7 @@ class CrmCasesController extends Controller
         });
 
         $shop = VendorDirectory::nameOf($vendorId);
-        $this->notifications->notify([$customerId], 'support', "{$shop} opened a support case for you", "{$ticket->reference}: {$ticket->subject}", '/customer/support');
+        $this->notifications->notify([$customerId], 'support', "{$shop} opened a support case for you", "{$ticket->reference}: {$ticket->subject}", '/customer/support?ticket=' . $ticket->id);
 
         return response()->json(['success' => true, 'message' => "Case {$ticket->reference} recorded.", 'data' => $this->detail($ticket->fresh())], 201);
     }
@@ -164,7 +164,7 @@ class CrmCasesController extends Controller
             // Answering moves a new case along; the customer is told there's a reply
             $ticket->update(['status' => $ticket->status === 'open' ? 'in_progress' : $ticket->status, 'last_activity_at' => now()]);
             $shop = VendorDirectory::nameOf($vendorId);
-            $this->notifications->notify([$ticket->requester_id], 'support', "{$shop} replied to {$ticket->reference}", $ticket->subject, '/customer/support');
+            $this->notifications->notify([$ticket->requester_id], 'support', "{$shop} replied to {$ticket->reference}", $ticket->subject, '/customer/support?ticket=' . $ticket->id);
         }
 
         return response()->json(['success' => true, 'data' => $this->detail($ticket->fresh())]);
@@ -216,7 +216,7 @@ class CrmCasesController extends Controller
 
         if ($statusChanged && in_array($data['status'], ['resolved', 'closed'], true)) {
             $shop = VendorDirectory::nameOf($vendorId);
-            $this->notifications->notify([$ticket->requester_id], 'support', "{$shop} marked {$ticket->reference} as {$data['status']}", 'Reply on your Help page if you still need help.', '/customer/support');
+            $this->notifications->notify([$ticket->requester_id], 'support', "{$shop} marked {$ticket->reference} as {$data['status']}", 'Reply on your Help page if you still need help.', '/customer/support?ticket=' . $ticket->id);
         }
 
         return response()->json(['success' => true, 'data' => $this->detail($ticket->fresh())]);

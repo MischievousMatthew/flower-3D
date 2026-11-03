@@ -178,6 +178,8 @@
               <span v-else>{{ avatarInitial }}</span>
             </span>
             <span class="user-name">{{ userName }}</span>
+            <!-- A support reply waiting: the dot moves to "Help & support" while the menu is open -->
+            <span v-if="unreadSupport > 0 && !showUserDropdown" class="nav-red-dot" role="status" aria-label="New reply in Help & support"></span>
             <svg
               class="dropdown-icon"
               :class="{ open: showUserDropdown }"
@@ -241,6 +243,7 @@
                 <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" />
               </svg>
               <span>Help &amp; support</span>
+              <span v-if="unreadSupport > 0" class="nav-red-dot inline" :aria-label="`${unreadSupport} new ${unreadSupport === 1 ? 'reply' : 'replies'}`"></span>
             </router-link>
 
             <router-link
@@ -296,6 +299,9 @@ import { useRouter } from "vue-router";
 import { useAuth } from "../composables/useAuth";
 import { useCart } from "../composables/useCart";
 import { useChatNotifications } from "../composables/useChatNotifications";
+import { useSupportUnread } from "../composables/useSupportUnread";
+
+const { unreadSupport, start: watchSupport, stop: unwatchSupport } = useSupportUnread();
 import api from "../plugins/axios";
 import { toast } from "@/utils/snackbar";
 import "../styles/bloomcraft.css";
@@ -758,6 +764,7 @@ onMounted(() => {
     loadOrderNotifications();
 
     if (user.value?.role === "customer") {
+      watchSupport();
       loadNotices();
       notificationInterval = window.setInterval(() => {
         loadOrderNotifications();
@@ -773,6 +780,7 @@ onUnmounted(() => {
   if (notificationInterval) {
     window.clearInterval(notificationInterval);
   }
+  if (user.value?.role === "customer") unwatchSupport();
 });
 </script>
 
@@ -1049,7 +1057,26 @@ onUnmounted(() => {
 }
 
 /* ---- Account ---- */
+/* A support reply waiting: on the name, then on "Help & support" in the menu */
+.nav-red-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #e53e3e;
+}
+.nav-red-dot.inline {
+  position: static;
+  margin-left: auto;
+  border: 0;
+  width: 8px;
+  height: 8px;
+}
 .btn-user {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 10px;

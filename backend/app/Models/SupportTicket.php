@@ -178,10 +178,22 @@ class SupportTicket extends Model
     protected $fillable = [
         'reference', 'requester_id', 'requester_role', 'subject', 'category', 'issue', 'desired_outcome', 'priority',
         'status', 'order_id', 'last_activity_at', 'resolved_at',
-        'vendor_id', 'assigned_employee_id', 'order_request_id', 'recorded_by_shop',
+        'vendor_id', 'assigned_employee_id', 'order_request_id', 'recorded_by_shop', 'requester_seen_at',
     ];
 
-    protected $casts = ['last_activity_at' => 'datetime', 'resolved_at' => 'datetime', 'recorded_by_shop' => 'boolean'];
+    protected $casts = ['last_activity_at' => 'datetime', 'resolved_at' => 'datetime', 'recorded_by_shop' => 'boolean', 'requester_seen_at' => 'datetime'];
+
+    /**
+     * Requests with a reply (from BloomCraft or the shop, not an automatic one
+     * or a team note) that the person who asked hasn't opened since.
+     */
+    public function scopeUnreadFor($query, int $requesterId)
+    {
+        return $query->where('requester_id', $requesterId)
+            ->whereHas('messages', fn ($m) => $m->where('is_automated', false)
+                ->where(fn ($w) => $w->where('from_admin', true)->orWhere(fn ($s) => $s->where('from_shop', true)->where('is_internal', false)))
+                ->where(fn ($t) => $t->whereNull('support_tickets.requester_seen_at')->orWhereColumn('support_messages.created_at', '>', 'support_tickets.requester_seen_at')));
+    }
 
     protected static function booted(): void
     {

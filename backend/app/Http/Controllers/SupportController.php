@@ -33,9 +33,13 @@ class SupportController extends Controller
         $categories = $this->categoriesFor($request->user());
         $role = $request->user()->role;
 
+        $unread = SupportTicket::query()->unreadFor($request->user()->id)->pluck('id')->all();
+
         return response()->json([
             'success' => true,
-            'data' => $tickets->map(fn ($t) => $this->row($t)),
+            // unread: a reply they haven't opened yet (red dot on their name and on Help & support)
+            'data' => $tickets->map(fn ($t) => $this->row($t) + ['unread' => in_array($t->id, $unread, true)]),
+            'unread' => count($unread),
             'categories' => $categories,
             'shop_categories' => SupportTicket::SHOP_CATEGORIES,
             // Each topic with the exact problems under it, for the "what happened" picker
@@ -145,12 +149,39 @@ class SupportController extends Controller
         ], 201);
     }
 
-    /** GET /api/support/tickets/{id} */
+    /** GET /api/support/tickets/{id}: opening it reads the replies (and their notifications) */
     public function show(Request $request, int $id): JsonResponse
     {
         $ticket = $this->mine($request, $id);
+        if (! $ticket) {
+            return $this->notFound();
+        }
+        $this->markSeen($ticket, $request->user()->id);
 
-        return $ticket ? response()->json(['success' => true, 'data' => $this->detail($ticket)]) : $this->notFound();
+        return response()->json(['success' => true, 'data' => $this->detail($ticket)]);
+    }
+
+    /** GET /api/support/unread: how many requests have a reply not opened yet */
+    public function unread(Request $request): JsonResponse
+    {
+        if ($this->deny($request)) {
+            return response()->json(['success' => true, 'unread' => 0]);
+        }
+
+        return response()->json(['success' => true, 'unread' => SupportTicket::query()->unreadFor($request->user()->id)->count()]);
+    }
+
+    private function markSeen(SupportTicket $ticket, int $userId): void
+    {
+        try {
+            $ticket->forceFill(['requester_seen_at' => now()])->saveQuietly();
+            // Its reply notifications are read too
+            \App\Models\UserNotification::query()->where('user_id', $userId)->whereNull('read_at')
+                ->where('link_url', 'like', '%support?ticket=' . $ticket->id)
+                ->update(['read_at' => now()]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::info('Support request not marked seen: ' . $e->getMessage());
+        }
     }
 
     /** POST /api/support/tickets/{id}/messages */
@@ -171,7 +202,8 @@ class SupportController extends Controller
             'from_admin' => false,
             'body' => trim($data['message']),
         ]);
-        // Writing back reopens a resolved request
+        // Writing back means they've read it; it also reopens a resolved request
+        $this->markSeen($ticket, $request->user()->id);
         $ticket->update(['status' => 'open', 'last_activity_at' => now(), 'resolved_at' => null]);
 
         return response()->json(['success' => true, 'data' => $this->detail($ticket->fresh())]);

@@ -249,6 +249,7 @@ Route::middleware('token.auth')->group(function () {
         Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->whereNumber('id');
 
         Route::get('/support/tickets', [SupportController::class, 'index']);
+        Route::get('/support/unread', [SupportController::class, 'unread']);
         Route::post('/support/tickets', [SupportController::class, 'store']);
         // Enterprise "Talk to us" from a signed-in vendor (linked to their shop)
         Route::post('/vendor/enterprise-inquiries', [EnterpriseInquiryController::class, 'store'])->middleware('throttle:5,60');

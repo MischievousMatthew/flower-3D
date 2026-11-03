@@ -42,6 +42,8 @@
             <img v-if="resolvedAvatar" :src="resolvedAvatar" :alt="displayName" @error="avatarFailed = true" />
             <span v-else>{{ initials }}</span>
           </span>
+          <!-- A support reply waiting: the dot moves to "Help & support" while the menu is open -->
+          <span v-if="unreadSupport > 0 && !showDropdown" class="vh-red-dot" role="status" aria-label="New reply in Help & support"></span>
           <span class="vh-user-text">
             <b>{{ shortName }}</b>
             <small>{{ planLabel }}</small>
@@ -65,6 +67,7 @@
             <nav class="vh-menu-links">
               <router-link v-for="l in MENU" :key="l.name" :to="{ name: l.name }" class="vh-menu-item" role="menuitem" @click="showDropdown = false">
                 <span v-html="ICONS[l.icon]"></span>{{ l.label }}
+                <span v-if="l.name === 'VendorSupport' && unreadSupport > 0" class="vh-red-dot inline" :aria-label="`${unreadSupport} new ${unreadSupport === 1 ? 'reply' : 'replies'}`"></span>
               </router-link>
             </nav>
             <label class="vh-menu-item vh-dark" role="menuitemcheckbox" :aria-checked="isDark">
@@ -86,6 +89,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "../composables/useAuth";
 import { useChatNotifications } from "../composables/useChatNotifications";
+import { useSupportUnread } from "../composables/useSupportUnread";
 import { useSidebarState } from "../composables/useSidebarState";
 import { useSubscriptionAccess } from "../composables/useSubscriptionAccess";
 import { useVendorProfile } from "../composables/useVendorProfile";
@@ -102,6 +106,8 @@ defineProps({
   modelValue: { type: String, default: "" },
 });
 defineEmits(["update:modelValue"]);
+
+const { unreadSupport, start: watchSupport, stop: unwatchSupport } = useSupportUnread();
 
 const MENU = [
   { name: "VendorProfile", label: "Profile", icon: "user" },
@@ -190,10 +196,12 @@ onMounted(() => {
   document.addEventListener("click", onOutsideClick);
   document.addEventListener("keydown", onKey);
   loadSubscriptionAccess({ maxAge: ACCESS_REUSE_MS }).catch(() => {});
+  watchSupport();
 });
 onUnmounted(() => {
   document.removeEventListener("click", onOutsideClick);
   document.removeEventListener("keydown", onKey);
+  unwatchSupport();
 });
 watch(user, (u) => u && loadVendorProfile(), { immediate: true });
 
@@ -348,6 +356,7 @@ const handleLogout = async () => {
   position: relative;
 }
 .vh-user {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -469,6 +478,24 @@ const handleLogout = async () => {
   display: grid;
   padding: 6px 0;
   border-bottom: 1px solid var(--v-border);
+}
+/* A support reply waiting: on the name, then on "Help & support" in the menu */
+.vh-red-dot {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--v-surface);
+  border-radius: 50%;
+  background: #e53e3e;
+}
+.vh-red-dot.inline {
+  position: static;
+  margin-left: auto;
+  border: 0;
+  width: 8px;
+  height: 8px;
 }
 .vh-menu-item {
   display: flex;
