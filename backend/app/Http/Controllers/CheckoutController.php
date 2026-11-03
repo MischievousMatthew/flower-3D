@@ -305,6 +305,14 @@ class CheckoutController extends Controller
                 $request->request->remove('retry_order_id');
             }
 
+            // A retry pays again for the same unpaid order, so it must be for the
+            // same items. A browser holding an older order (e.g. last night's
+            // cart) would otherwise charge for those items instead of today's.
+            if ($request->filled('retry_order_id') && ! $this->retryMatchesItems($request, $user)) {
+                $this->closeUnfinishedOnlineOrder((int) $request->input('retry_order_id'), $user->id);
+                $request->request->remove('retry_order_id');
+            }
+
             $validator = Validator::make($request->all(), [
                 'payment_method' => 'required|in:ewallet,cod',
                 'delivery_address' => 'required|string',
@@ -506,6 +514,7 @@ class CheckoutController extends Controller
             $ordersCount = Order::where('vendor_id', $vendorId)
                 ->whereDate('reservation_date', $reservationDate)
                 ->whereNotIn('status', ['cancelled', 'failed'])
+                ->placed()
                 ->count();
 
             if ($ordersCount >= $maxOrders) {
@@ -716,6 +725,66 @@ class CheckoutController extends Controller
                 'message' => 'Failed to create order: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /** Whether the items sent with a retry are the items of the order being retried */
+    private function retryMatchesItems(Request $request, $user): bool
+    {
+        $requested = collect();
+        if ($request->filled('custom_items')) {
+            foreach ((array) $request->input('custom_items') as $item) {
+                $requested->push([(int) ($item['product_id'] ?? 0), (int) ($item['quantity'] ?? 1)]);
+            }
+        } elseif ($request->filled('product_id')) {
+            $requested->push([(int) $request->input('product_id'), (int) $request->input('quantity', 1)]);
+        } elseif ($request->filled('cart_item_ids')) {
+            Cart::where('user_id', $user->id)->whereIn('id', (array) $request->input('cart_item_ids'))->get(['product_id', 'quantity'])
+                ->each(fn ($c) => $requested->push([(int) $c->product_id, (int) $c->quantity]));
+        } else {
+            // Nothing sent: the order's own items are what gets paid for
+            return true;
+        }
+
+        $order = Order::with('items:id,order_id,product_id,quantity')
+            ->whereKey($request->input('retry_order_id'))
+            ->where('user_id', $user->id)
+            ->first();
+        if (! $order) {
+            return false;
+        }
+
+        $tally = fn ($pairs) => collect($pairs)
+            ->groupBy(0)
+            ->map(fn ($rows) => $rows->sum(1))
+            ->sortKeys()
+            ->all();
+
+        return $tally($requested) == $tally($order->items->map(fn ($i) => [(int) $i->product_id, (int) $i->quantity]));
+    }
+
+    /** Closes an unpaid e-wallet attempt nobody will finish (it never reached the shop) */
+    private function closeUnfinishedOnlineOrder(int $orderId, int $userId): void
+    {
+        $order = Order::whereKey($orderId)->where('user_id', $userId)->first();
+        if (! $order
+            || $order->payment_method !== 'ewallet'
+            || $order->payment_status === 'paid'
+            || ! in_array($order->status, ['pending', 'payment_failed', 'failed'], true)) {
+            return;
+        }
+
+        $previous = is_array($order->paymongo_response) ? $order->paymongo_response : [];
+        $order->update([
+            'payment_status' => 'failed',
+            'status' => 'failed',
+            'paymongo_payment_intent_id' => null,
+            'paymongo_source_id' => null,
+            'paymongo_checkout_url' => null,
+            'paymongo_response' => array_merge($previous, [
+                'cancelled_at' => $previous['cancelled_at'] ?? now()->toIso8601String(),
+                'replaced_by_new_checkout' => true,
+            ]),
+        ]);
     }
 
     private function retryOnlinePayment(Request $request, $user)
@@ -1009,6 +1078,20 @@ class CheckoutController extends Controller
                 'success' => true,
                 'data' => ['order' => $order],
             ]);
+        }
+
+        // The customer may have paid and come back before PayMongo told us:
+        // ask PayMongo first, so a real payment is never closed as unfinished
+        if ($order->status === 'pending' && $order->payment_status === 'unpaid' && $this->confirmPaidCheckoutSession($order)) {
+            $this->markOrderPaidFromWebhook($order, [
+                'checkout_session_id' => $order->paymongo_payment_intent_id,
+                'reference_number' => data_get($order->paymongo_response, 'reference_number') ?: $this->buildPayMongoReference($order),
+                'payment_attempt' => data_get($order->paymongo_response, 'payment_attempt'),
+                'resource' => 'abandon.paymongo_lookup',
+                'payment' => $this->confirmedPayment,
+            ]);
+
+            return response()->json(['success' => true, 'data' => ['order' => $order->fresh()]]);
         }
 
         $previous = is_array($order->paymongo_response) ? $order->paymongo_response : [];

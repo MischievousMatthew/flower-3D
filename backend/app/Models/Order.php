@@ -117,6 +117,18 @@ class Order extends Model
 
     // ─── Scopes ────────────────────────────────────────────────────────────────
 
+    /**
+     * Real orders: cash on delivery, or e-wallet that PayMongo confirmed. An
+     * e-wallet checkout nobody paid for never reached the shop, so it isn't
+     * listed, counted toward a day's limit or shown to the customer as pending.
+     */
+    public function scopePlaced($query)
+    {
+        return $query->where(fn ($q) => $q->where('payment_method', '!=', 'ewallet')
+            ->orWhereNull('payment_method')
+            ->orWhereIn('payment_status', ['paid', 'refunded']));
+    }
+
     public function scopePending($query)    { return $query->where('status', 'pending'); }
     public function scopeProcessing($query) { return $query->where('status', 'processing'); }
     public function scopeCompleted($query)  { return $query->where('status', 'completed'); }

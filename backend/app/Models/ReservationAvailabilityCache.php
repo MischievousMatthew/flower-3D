@@ -56,6 +56,7 @@ class ReservationAvailabilityCache extends Model
         $ordersCount = Order::where('vendor_id', $vendorId)
             ->where('reservation_date', $date)
             ->whereNotIn('status', ['cancelled', 'failed'])
+            ->placed()
             ->count();
 
         if ($maxOrders === null) {

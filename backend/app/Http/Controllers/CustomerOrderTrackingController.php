@@ -39,6 +39,9 @@ class CustomerOrderTrackingController extends Controller
         ]);
 
         $query = Order::where('user_id', Auth::id())
+            // Same as the shop sees: an e-wallet checkout that was never paid
+            // isn't an order (it would show as "pending" here and nowhere else)
+            ->placed()
             ->with(['delivery.logs', 'vendor:id,name,email', 'items', 'orderRequests']);
 
         if ($request->input('delivery_status') === 'returns') {

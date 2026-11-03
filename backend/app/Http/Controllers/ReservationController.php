@@ -72,6 +72,7 @@ class ReservationController extends Controller
                     ->where('vendor_id', $vendorId)
                     ->whereBetween('reservation_date', [$startDate, $endDate])
                     ->whereNotIn('status', ['cancelled', 'failed'])
+                    ->placed()
                     ->pluck('reservation_date')
                     ->map(fn ($d) => Carbon::parse($d)->format('Y-m-d'))
                     ->toArray();

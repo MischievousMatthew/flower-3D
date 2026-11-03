@@ -502,7 +502,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import NavHeader from "../../layouts/NavHeader.vue";
 import PaymentFailedModal from "../../components/customer/PaymentFailedModal.vue";
@@ -554,6 +554,59 @@ const directCheckoutData = ref(null);
 const pendingOnlineOrderId = ref(null);
 const paymentFailure = ref({ show: false, failure: null, orderNumber: "" });
 const CHECKOUT_DRAFT_KEY = "checkout_payment_draft";
+
+// The unpaid e-wallet order this tab sent to PayMongo. It belongs to one set of
+// items: a later checkout with different items must never reuse it (that
+// charged for an old cart). `atPayMongo` is set while the customer is on
+// PayMongo, so coming back (Cancel or the Back button) always explains it.
+const PENDING_ORDER_KEY = "pending_online_order";
+const PAYMENT_FALLBACK = {
+  reason: "cancelled",
+  title: "Payment wasn't finished",
+  message: "You came back from the PayMongo page before the payment went through.",
+  next: "Nothing was charged. Choose how to pay to try again.",
+  code: null,
+};
+
+function checkoutItemsKey() {
+  try {
+    const direct = sessionStorage.getItem("directCheckout");
+    if (isDirectCheckout.value && direct) {
+      const d = JSON.parse(direct);
+      return "direct:" + JSON.stringify(d.custom_items ?? d.items?.map((i) => [i.product_id, i.quantity]) ?? []);
+    }
+    const ids = JSON.parse(localStorage.getItem("checkout_data") || "null")?.cart_item_ids ?? [];
+    return "cart:" + [...ids].map(Number).sort((a, b) => a - b).join(",");
+  } catch {
+    return "";
+  }
+}
+
+function readPendingOrder() {
+  try {
+    return JSON.parse(sessionStorage.getItem(PENDING_ORDER_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function savePendingOrder(id, atPayMongo) {
+  try {
+    sessionStorage.setItem(PENDING_ORDER_KEY, JSON.stringify({ id: Number(id), key: checkoutItemsKey(), atPayMongo }));
+  } catch {
+    // storage unavailable: a retry simply starts a new order
+  }
+}
+
+function forgetPendingOrder() {
+  pendingOnlineOrderId.value = null;
+  try {
+    sessionStorage.removeItem(PENDING_ORDER_KEY);
+    sessionStorage.removeItem("pending_online_order_id"); // older pages saved it here
+  } catch {
+    // nothing to clear
+  }
+}
 
 // Reservation state
 const selectedDate = ref(null);
@@ -969,6 +1022,12 @@ async function restorePendingOnlineOrderState() {
       `/checkout/orders/${pendingOnlineOrderId.value}`,
     );
     const order = response.data?.data;
+    // Paid after all (PayMongo confirmed it before the customer came back)
+    if (order?.payment_status === "paid") {
+      forgetPendingOrder();
+      router.replace({ path: "/customer/orders", query: { payment: "success" } });
+      return "paid";
+    }
     paymentFailure.value = {
       show: false,
       failure: order?.payment_failure || null,
@@ -990,19 +1049,18 @@ async function restorePendingOnlineOrderState() {
   } catch (error) {
     // The draft is still usable if the pending order no longer exists.
     if (error.response?.status === 404) {
-      pendingOnlineOrderId.value = null;
-      sessionStorage.removeItem("pending_online_order_id");
+      forgetPendingOrder();
     }
     console.warn("Unable to restore cancelled checkout order", error);
   }
 }
 
-async function abandonPendingOnlinePayment() {
-  if (!pendingOnlineOrderId.value) return;
+async function abandonPendingOnlinePayment(orderId = pendingOnlineOrderId.value) {
+  if (!orderId) return;
 
   try {
     await api.post(
-      `/checkout/orders/${pendingOnlineOrderId.value}/abandon-payment`,
+      `/checkout/orders/${orderId}/abandon-payment`,
     );
   } catch (error) {
     console.warn("Unable to retire unfinished PayMongo checkout", error);
@@ -1118,8 +1176,7 @@ async function placeOrder() {
     const isOnlineRetry = Boolean(pendingOnlineOrderId.value)
       && selectedPaymentMethod.value === "ewallet";
     if (!isOnlineRetry) {
-      pendingOnlineOrderId.value = null;
-      sessionStorage.removeItem("pending_online_order_id");
+      forgetPendingOrder();
     }
 
     const orderData = {
@@ -1158,10 +1215,7 @@ async function placeOrder() {
     if (checkoutUrl) {
       saveCheckoutDraft();
       pendingOnlineOrderId.value = response.data.order_id;
-      sessionStorage.setItem(
-        "pending_online_order_id",
-        String(response.data.order_id),
-      );
+      savePendingOrder(response.data.order_id, true);
 
       window.location.href = checkoutUrl;
       return;
@@ -1180,7 +1234,7 @@ async function placeOrder() {
         } else {
           localStorage.removeItem("checkout_data");
         }
-        sessionStorage.removeItem("pending_online_order_id");
+        forgetPendingOrder();
         sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
 
         // Show confirmation after the destination has rendered, instead of
@@ -1202,7 +1256,7 @@ async function placeOrder() {
     const retryOrderId = error.response?.data?.data?.order?.id;
     if (retryOrderId) {
       pendingOnlineOrderId.value = retryOrderId;
-      sessionStorage.setItem("pending_online_order_id", String(retryOrderId));
+      savePendingOrder(retryOrderId, false);
     }
     // Checkout was paused while the customer was on this page
     if (error.response?.status === 503) showCheckoutPaused(error.response.data?.message);
@@ -1252,30 +1306,62 @@ function formatCutoffTime(value) {
   });
 }
 
+// The browser's Back button can bring this page back from its cache without
+// running it again, so nothing would be checked or explained: load it fresh
+function onPageShow(event) {
+  if (event.persisted && readPendingOrder()?.atPayMongo) window.location.reload();
+}
+onMounted(() => window.addEventListener("pageshow", onPageShow));
+onBeforeUnmount(() => window.removeEventListener("pageshow", onPageShow));
+
 onMounted(async () => {
   loadOfferConsent();
-  pendingOnlineOrderId.value = Number(
-    route.query.order_id || sessionStorage.getItem("pending_online_order_id"),
-  ) || null;
+  // PayMongo's return link names the order; otherwise this tab's saved one
+  const stored = readPendingOrder();
+  const fromPayMongo = Number(route.query.order_id) || null;
+  try {
+    sessionStorage.removeItem("pending_online_order_id"); // older pages: not tied to any items, never reused
+  } catch {
+    // storage unavailable
+  }
+  pendingOnlineOrderId.value = fromPayMongo || Number(stored?.id) || null;
   await loadCheckoutData();
   // A failed load already sent the customer back to the cart
   if (!checkoutData.value.vendor?.id) return;
-  // This covers both PayMongo's Cancel action and the browser Back action.
-  // Neither path may leave an online order active while payment is unfinished.
-  if (pendingOnlineOrderId.value) {
-    await abandonPendingOnlinePayment();
-  }
-  await restorePendingOnlineOrderState();
-  await loadCalendarData();
 
-  if (route.query.payment === "cancelled" || pendingOnlineOrderId.value) {
-    currentStep.value = 3;
-    if (route.query.payment && paymentFailure.value.failure) {
-      paymentFailure.value.show = true;
-    } else if (route.query.payment === "cancelled") {
-      toast.info("Payment was not completed. Choose E-Wallet to try again.");
+  // A saved order for different items (an older checkout) is closed, not reused
+  if (!fromPayMongo && stored && stored.key !== checkoutItemsKey()) {
+    abandonPendingOnlinePayment(stored.id);
+    forgetPendingOrder();
+  }
+
+  if (pendingOnlineOrderId.value) {
+    const cameBack = Boolean(route.query.payment) || stored?.atPayMongo === true;
+
+    // PayMongo said "paid" but hadn't confirmed yet: give it a moment before
+    // treating the payment as unfinished, so a real payment is never closed
+    if (route.query.payment === "pending") {
+      for (let i = 0; i < 4; i++) {
+        if ((await restorePendingOnlineOrderState()) === "paid") return;
+        await new Promise((r) => setTimeout(r, 2500));
+      }
+    }
+    if ((await restorePendingOnlineOrderState()) === "paid") return;
+
+    // Cancel and the browser Back button both land here: close the unfinished
+    // payment so nothing stays "pending", then say what happened
+    await abandonPendingOnlinePayment();
+    if ((await restorePendingOnlineOrderState()) === "paid") return;
+    if (pendingOnlineOrderId.value) {
+      savePendingOrder(pendingOnlineOrderId.value, false);
+      currentStep.value = 3;
+      if (cameBack) {
+        paymentFailure.value.failure = paymentFailure.value.failure || PAYMENT_FALLBACK;
+        paymentFailure.value.show = true;
+      }
     }
   }
+  await loadCalendarData();
 });
 </script>
 
