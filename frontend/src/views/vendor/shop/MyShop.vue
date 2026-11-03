@@ -393,6 +393,8 @@ onMounted(fetch);
   position: absolute;
   right: 10px;
   bottom: 10px;
+  /* Above the card body, which the logo's negative margin pulls up over the cover */
+  z-index: 2;
   display: flex;
   gap: 6px;
 }
