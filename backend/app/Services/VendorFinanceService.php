@@ -38,6 +38,31 @@ class VendorFinanceService
     }
 
     /**
+     * Puts back the stock an order was holding (an e-wallet payment that was
+     * cancelled, failed or never finished). Safe to call more than once.
+     */
+    public function releaseOrderStock(Order $order): void
+    {
+        DB::transaction(function () use ($order) {
+            $locked = Order::query()->with('items')->whereKey($order->id)->lockForUpdate()->first();
+            if (! $locked || ! $locked->stock_deducted_at || $locked->stock_restored_at) {
+                return;
+            }
+
+            $quantities = $locked->items
+                ->filter(fn ($item) => $item->product_id)
+                ->groupBy('product_id')
+                ->map(fn ($items) => (int) $items->sum('quantity'))
+                ->sortKeys();
+            foreach ($quantities as $productId => $quantity) {
+                Product::withTrashed()->whereKey($productId)->increment('quantity_in_stock', $quantity);
+            }
+
+            $locked->update(['stock_restored_at' => now()]);
+        });
+    }
+
+    /**
      * Cancel an Ordered (not yet Packed) order and restore its previously
      * deducted quantities.
      * Row locks and stock timestamps make retries/double-clicks safe.
@@ -314,14 +339,26 @@ class VendorFinanceService
             ->groupBy('product_id')
             ->map(fn ($items) => (int) $items->sum('quantity'));
 
-        foreach ($quantities as $productId => $quantity) {
+        // Lock in id order so two checkouts of the same products can't deadlock
+        foreach ($quantities->sortKeys() as $productId => $quantity) {
             $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
-
-            if (! $product || $product->quantity_in_stock < $quantity) {
-                throw new \RuntimeException("Insufficient stock for product [{$productId}].");
+            if (! $product) {
+                throw new \App\Exceptions\OutOfStockException('This item', 0);
             }
 
-            $product->decrement('quantity_in_stock', $quantity);
+            // Only takes stock that is there: when two people check out the last
+            // ones at once, one gets them and the other is told, never below zero
+            $taken = Product::query()
+                ->whereKey($productId)
+                ->where('quantity_in_stock', '>=', $quantity)
+                ->decrement('quantity_in_stock', $quantity);
+
+            if (! $taken) {
+                throw new \App\Exceptions\OutOfStockException(
+                    $product->product_name ?? 'This item',
+                    max(0, (int) $product->quantity_in_stock),
+                );
+            }
 
             Log::info('Stock deducted', [
                 'product_id' => $productId,

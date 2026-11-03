@@ -2,20 +2,22 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\OutOfStockException;
 use App\Http\Controllers\CheckoutController;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\User;
+use App\Services\VendorFinanceService;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
- * Retrying an unpaid e-wallet order pays for that order's items, so a
- * checkout for different items (e.g. today's cart while last night's attempt
- * was still saved in the tab) starts a new order instead. Unpaid e-wallet
- * attempts aren't orders: customers don't see them as pending.
+ * Checkout safety: every order holds its stock when it's made (so two people
+ * can't both buy the last one and stock never goes below zero), a cancelled
+ * or failed e-wallet payment ends the order for good and gives the stock
+ * back, and a checkout key never makes the same order twice.
  */
 class CheckoutRetryTest extends TestCase
 {
@@ -24,7 +26,8 @@ class CheckoutRetryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        foreach (['order_items', 'orders', 'carts', 'users'] as $t) {
+        config(['services.paymongo.secret_key' => null]);
+        foreach (['order_items', 'orders', 'products', 'reservation_availability_cache', 'users'] as $t) {
             Schema::dropIfExists($t);
         }
         Schema::create('users', function (Blueprint $t) {
@@ -35,6 +38,13 @@ class CheckoutRetryTest extends TestCase
             $t->string('role')->default('customer');
             $t->timestamps();
         });
+        Schema::create('products', function (Blueprint $t) {
+            $t->id();
+            $t->string('product_name');
+            $t->integer('quantity_in_stock');
+            $t->softDeletes();
+            $t->timestamps();
+        });
         Schema::create('orders', function (Blueprint $t) {
             $t->id();
             $t->unsignedBigInteger('user_id');
@@ -43,10 +53,15 @@ class CheckoutRetryTest extends TestCase
             $t->string('payment_method')->nullable();
             $t->string('payment_status')->default('unpaid');
             $t->string('status')->default('pending');
+            $t->date('reservation_date')->nullable();
             $t->string('paymongo_payment_intent_id')->nullable();
             $t->string('paymongo_source_id')->nullable();
             $t->text('paymongo_checkout_url')->nullable();
             $t->json('paymongo_response')->nullable();
+            $t->timestamp('stock_deducted_at')->nullable();
+            $t->timestamp('stock_restored_at')->nullable();
+            $t->string('checkout_key', 64)->nullable();
+            $t->unique(['user_id', 'checkout_key']);
             $t->timestamps();
         });
         Schema::create('order_items', function (Blueprint $t) {
@@ -56,88 +71,124 @@ class CheckoutRetryTest extends TestCase
             $t->integer('quantity');
             $t->timestamps();
         });
-        Schema::create('carts', function (Blueprint $t) {
-            $t->id();
-            $t->unsignedBigInteger('user_id');
-            $t->unsignedBigInteger('product_id');
-            $t->integer('quantity');
-            $t->timestamps();
-        });
         $this->user = User::forceCreate(['name' => 'Ana', 'email' => 'ana@example.com', 'password' => 'x']);
     }
 
-    private function unpaidOrder(array $items): int
+    private function product(int $stock): int
     {
-        $id = DB::table('orders')->insertGetId(['user_id' => $this->user->id, 'order_number' => 'ORD-1', 'payment_method' => 'ewallet', 'paymongo_payment_intent_id' => 'cs_1']);
-        foreach ($items as [$product, $qty]) {
-            DB::table('order_items')->insert(['order_id' => $id, 'product_id' => $product, 'quantity' => $qty]);
+        return DB::table('products')->insertGetId(['product_name' => 'Red Roses', 'quantity_in_stock' => $stock]);
+    }
+
+    private function order(int $productId, int $qty, array $values = []): Order
+    {
+        $id = DB::table('orders')->insertGetId(array_merge([
+            'user_id' => $this->user->id, 'order_number' => 'ORD-' . uniqid(), 'payment_method' => 'ewallet', 'created_at' => now(),
+        ], $values));
+        DB::table('order_items')->insert(['order_id' => $id, 'product_id' => $productId, 'quantity' => $qty]);
+
+        return Order::findOrFail($id);
+    }
+
+    private function stock(int $productId): int
+    {
+        return (int) DB::table('products')->where('id', $productId)->value('quantity_in_stock');
+    }
+
+    private function invokeCheckout(string $method, ...$args)
+    {
+        return (new \ReflectionMethod(CheckoutController::class, $method))->invoke(app(CheckoutController::class), ...$args);
+    }
+
+    public function test_only_one_of_two_checkouts_gets_the_last_item(): void
+    {
+        $roses = $this->product(1);
+        $first = $this->order($roses, 1);
+        $second = $this->order($roses, 1);
+
+        app(VendorFinanceService::class)->deductOrderStock($first);
+
+        try {
+            app(VendorFinanceService::class)->deductOrderStock($second);
+            $this->fail('The second checkout should have been told it sold out.');
+        } catch (OutOfStockException $e) {
+            $this->assertStringContainsString('sold out', $e->getMessage());
         }
-
-        return $id;
+        $this->assertSame(0, $this->stock($roses));
+        $this->assertNull($second->fresh()->stock_deducted_at);
     }
 
-    private function cart(int $product, int $qty = 1): int
+    public function test_asking_for_more_than_is_left_says_how_many_remain(): void
     {
-        return DB::table('carts')->insertGetId(['user_id' => $this->user->id, 'product_id' => $product, 'quantity' => $qty]);
+        $roses = $this->product(2);
+
+        $this->expectExceptionMessage('Only 2 Red Roses left');
+        app(VendorFinanceService::class)->deductOrderStock($this->order($roses, 5));
     }
 
-    private function retryAllowed(array $input): bool
+    public function test_stock_is_given_back_once(): void
     {
-        $method = new \ReflectionMethod(CheckoutController::class, 'retryMatchesItems');
+        $roses = $this->product(3);
+        $order = $this->order($roses, 2);
+        app(VendorFinanceService::class)->deductOrderStock($order);
 
-        return $method->invoke(app(CheckoutController::class), new Request($input), $this->user);
+        app(VendorFinanceService::class)->releaseOrderStock($order);
+        app(VendorFinanceService::class)->releaseOrderStock($order);
+
+        $this->assertSame(3, $this->stock($roses));
     }
 
-    public function test_retrying_the_same_cart_items_reuses_the_order(): void
+    public function test_a_cancelled_payment_ends_the_order_and_puts_the_stock_back(): void
     {
-        $order = $this->unpaidOrder([[10, 1], [11, 2]]);
-        $ids = [$this->cart(10), $this->cart(11, 2)];
+        $roses = $this->product(1);
+        $order = $this->order($roses, 1, ['paymongo_payment_intent_id' => 'cs_test']);
+        app(VendorFinanceService::class)->deductOrderStock($order);
 
-        $this->assertTrue($this->retryAllowed(['retry_order_id' => $order, 'cart_item_ids' => $ids]));
+        $this->assertSame('closed', $this->invokeCheckout('closeUnfinishedOnlineOrder', $order));
+
+        $order->refresh();
+        $this->assertSame('failed', $order->status);
+        $this->assertSame('failed', $order->payment_status);
+        $this->assertNull($order->paymongo_checkout_url);
+        $this->assertSame('cancelled', $order->paymentFailure()['reason']);
+        $this->assertSame(1, $this->stock($roses));
     }
 
-    public function test_a_different_cart_never_pays_for_an_older_order(): void
+    public function test_the_same_key_after_a_failed_payment_says_it_failed(): void
     {
-        // Last night: products 10 and 11. Today: only product 12 selected.
-        $order = $this->unpaidOrder([[10, 1], [11, 1]]);
-        $today = $this->cart(12);
+        $order = $this->order($this->product(1), 1, ['status' => 'failed', 'payment_status' => 'failed', 'checkout_key' => 'key-12345678']);
 
-        $this->assertFalse($this->retryAllowed(['retry_order_id' => $order, 'cart_item_ids' => [$today]]));
+        $response = $this->invokeCheckout('existingOrderResponse', $order);
+
+        $this->assertSame(409, $response->getStatusCode());
+        $this->assertSame('payment_failed', $response->getData(true)['code']);
     }
 
-    public function test_a_different_quantity_is_a_new_order(): void
+    public function test_the_same_key_while_paying_returns_the_same_payment_page(): void
     {
-        $order = $this->unpaidOrder([[10, 1]]);
+        $order = $this->order($this->product(1), 1, ['paymongo_checkout_url' => 'https://checkout.paymongo.com/cs_1', 'checkout_key' => 'key-12345678']);
 
-        $this->assertFalse($this->retryAllowed(['retry_order_id' => $order, 'product_id' => 10, 'quantity' => 3]));
-        $this->assertTrue($this->retryAllowed(['retry_order_id' => $order, 'product_id' => 10, 'quantity' => 1]));
+        $data = $this->invokeCheckout('existingOrderResponse', $order)->getData(true);
+
+        $this->assertSame($order->id, $data['order_id']);
+        $this->assertSame('https://checkout.paymongo.com/cs_1', $data['checkout_url']);
     }
 
-    public function test_someone_elses_order_never_matches(): void
+    public function test_one_key_can_only_make_one_order(): void
     {
-        $order = $this->unpaidOrder([[10, 1]]);
-        DB::table('orders')->where('id', $order)->update(['user_id' => 999]);
+        $this->order($this->product(1), 1, ['checkout_key' => 'key-12345678']);
 
-        $this->assertFalse($this->retryAllowed(['retry_order_id' => $order, 'product_id' => 10, 'quantity' => 1]));
+        $this->expectException(\Illuminate\Database\UniqueConstraintViolationException::class);
+        $this->order($this->product(1), 1, ['checkout_key' => 'key-12345678']);
     }
 
-    public function test_the_replaced_attempt_is_closed(): void
+    public function test_an_unpaid_hold_runs_out(): void
     {
-        $order = $this->unpaidOrder([[10, 1]]);
-        $method = new \ReflectionMethod(CheckoutController::class, 'closeUnfinishedOnlineOrder');
-        $method->invoke(app(CheckoutController::class), $order, $this->user->id);
+        $roses = $this->product(1);
+        $this->order($roses, 1);
+        $this->assertSame(1, Order::takingSlot()->count());
 
-        $closed = Order::find($order);
-        $this->assertSame('failed', $closed->status);
-        $this->assertNull($closed->paymongo_payment_intent_id);
-    }
-
-    public function test_unpaid_e_wallet_attempts_are_not_placed_orders(): void
-    {
-        $this->unpaidOrder([[10, 1]]);
-        DB::table('orders')->insert(['user_id' => $this->user->id, 'payment_method' => 'ewallet', 'payment_status' => 'paid', 'status' => 'processing']);
-        DB::table('orders')->insert(['user_id' => $this->user->id, 'payment_method' => 'cod', 'status' => 'pending']);
-
-        $this->assertSame(2, Order::placed()->count());
+        $this->travel(Order::PAYMENT_HOLD_MINUTES + 1)->minutes();
+        $this->assertSame(0, Order::takingSlot()->count());
+        $this->assertSame(0, Order::placed()->count());
     }
 }

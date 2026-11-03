@@ -40,6 +40,7 @@ class Order extends Model
         'paid_at',
         'stock_deducted_at',
         'stock_restored_at',
+        'checkout_key',
         'delivered_at',
         'cancelled_at',
         'reservation_date',
@@ -127,6 +128,19 @@ class Order extends Model
         return $query->where(fn ($q) => $q->where('payment_method', '!=', 'ewallet')
             ->orWhereNull('payment_method')
             ->orWhereIn('payment_status', ['paid', 'refunded']));
+    }
+
+    /** How long an unpaid e-wallet checkout holds its stock and date before it's released */
+    public const PAYMENT_HOLD_MINUTES = 30;
+
+    /** Placed orders, plus e-wallet checkouts still within their payment time (they hold a slot) */
+    public function scopeTakingSlot($query)
+    {
+        return $query->whereNotIn('status', ['cancelled', 'failed'])
+            ->where(fn ($q) => $q->where('payment_method', '!=', 'ewallet')
+                ->orWhereNull('payment_method')
+                ->orWhereIn('payment_status', ['paid', 'refunded'])
+                ->orWhere('created_at', '>=', now()->subMinutes(self::PAYMENT_HOLD_MINUTES)));
     }
 
     public function scopePending($query)    { return $query->where('status', 'pending'); }
@@ -234,6 +248,16 @@ class Order extends Model
                 'message' => self::PAYMENT_FAILURE_REASONS[$code] ?? 'Your bank or e-wallet declined the payment.',
                 'next' => 'Nothing was charged. Check your balance or use another e-wallet, then place the order again.',
                 'code' => $code,
+            ];
+        }
+
+        if (! empty($response['expired_at'])) {
+            return [
+                'reason' => 'expired',
+                'title' => 'Payment time ran out',
+                'message' => 'The payment wasn\'t finished within ' . self::PAYMENT_HOLD_MINUTES . ' minutes, so the order was cancelled and its items were put back.',
+                'next' => 'Nothing was charged. Place the order again when you are ready to pay.',
+                'code' => null,
             ];
         }
 

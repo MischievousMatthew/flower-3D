@@ -582,6 +582,42 @@ function checkoutItemsKey() {
   }
 }
 
+// One key per checkout attempt, shared by tabs with the same items: sending
+// the same checkout twice (double click, a second tab) returns the order
+// already made instead of making another. A new key after each result.
+const CHECKOUT_KEYS = "bc_checkout_keys";
+
+function readCheckoutKeys() {
+  try {
+    return JSON.parse(localStorage.getItem(CHECKOUT_KEYS) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function checkoutKeyFor(itemsKey) {
+  const keys = readCheckoutKeys();
+  if (!keys[itemsKey]) {
+    keys[itemsKey] = crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+    try {
+      localStorage.setItem(CHECKOUT_KEYS, JSON.stringify(keys));
+    } catch {
+      // storage unavailable: the key still covers a double click on this page
+    }
+  }
+  return keys[itemsKey];
+}
+
+function finishCheckoutKey(itemsKey) {
+  const keys = readCheckoutKeys();
+  delete keys[itemsKey];
+  try {
+    localStorage.setItem(CHECKOUT_KEYS, JSON.stringify(keys));
+  } catch {
+    // nothing to clear
+  }
+}
+
 function readPendingOrder() {
   try {
     return JSON.parse(sessionStorage.getItem(PENDING_ORDER_KEY) || "null");
@@ -1168,16 +1204,14 @@ async function placeOrder() {
     return;
   }
 
+  if (isProcessing.value) return;
+  const itemsKey = checkoutItemsKey();
   try {
     isProcessing.value = true;
 
-    // A cancelled online order can be retried only through E-Wallet. Selecting
-    // COD deliberately starts a fresh order instead of submitting the old one.
-    const isOnlineRetry = Boolean(pendingOnlineOrderId.value)
-      && selectedPaymentMethod.value === "ewallet";
-    if (!isOnlineRetry) {
-      forgetPendingOrder();
-    }
+    // A payment that was cancelled or failed is finished; paying again is
+    // always a new order (never the old one)
+    forgetPendingOrder();
 
     const orderData = {
       reservation_date: selectedDate.value,
@@ -1185,9 +1219,7 @@ async function placeOrder() {
       delivery_address: checkoutData.value.user?.address || "",
       contact_number: checkoutData.value.user?.contact_number || "",
       customer_notes: customerNotes.value,
-      ...(isOnlineRetry
-        ? { retry_order_id: pendingOnlineOrderId.value }
-        : {}),
+      checkout_key: checkoutKeyFor(itemsKey),
 
       ...(isDirectCheckout.value
         ? directCheckoutData.value.custom_items
@@ -1235,6 +1267,7 @@ async function placeOrder() {
           localStorage.removeItem("checkout_data");
         }
         forgetPendingOrder();
+        finishCheckoutKey(itemsKey);
         sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
 
         // Show confirmation after the destination has rendered, instead of
@@ -1253,14 +1286,30 @@ async function placeOrder() {
   } catch (error) {
     console.log("Validation errors:", error.response?.data?.errors);
     console.error("Checkout error:", error.response?.data || error);
-    const retryOrderId = error.response?.data?.data?.order?.id;
-    if (retryOrderId) {
-      pendingOnlineOrderId.value = retryOrderId;
-      savePendingOrder(retryOrderId, false);
+    const data = error.response?.data ?? {};
+    // The order this checkout made has ended (its payment failed, or the
+    // payment page couldn't open): it is never paid again, the next try is new
+    if (data.data?.order?.id) {
+      finishCheckoutKey(itemsKey);
     }
     // Checkout was paused while the customer was on this page
-    if (error.response?.status === 503) showCheckoutPaused(error.response.data?.message);
-    else toast.error(error.response?.data?.message || "Failed to place order");
+    if (error.response?.status === 503) showCheckoutPaused(data.message);
+    else if (data.code === "payment_failed" || error.response?.status === 502) {
+      paymentFailure.value = {
+        show: true,
+        failure: data.data?.payment_failure || {
+          reason: "not_started",
+          title: "We couldn't open the payment page",
+          message: data.message || "PayMongo didn't respond when we tried to start your payment.",
+          next: "Nothing was charged. Please try again in a few minutes.",
+          code: null,
+        },
+        orderNumber: data.data?.order?.order_number || "",
+      };
+    }
+    // Someone else bought the last ones first: nothing was ordered
+    else if (data.code === "out_of_stock") toast.error(data.message);
+    else toast.error(data.message || "Failed to place order");
   } finally {
     isProcessing.value = false;
   }
@@ -1353,7 +1402,9 @@ onMounted(async () => {
     await abandonPendingOnlinePayment();
     if ((await restorePendingOnlineOrderState()) === "paid") return;
     if (pendingOnlineOrderId.value) {
-      savePendingOrder(pendingOnlineOrderId.value, false);
+      // That order is finished for good: paying again places a new order
+      forgetPendingOrder();
+      finishCheckoutKey(checkoutItemsKey());
       currentStep.value = 3;
       if (cameBack) {
         paymentFailure.value.failure = paymentFailure.value.failure || PAYMENT_FALLBACK;
