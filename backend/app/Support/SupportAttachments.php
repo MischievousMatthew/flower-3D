@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Photos attached to a Help & support message (up to 4, JPG/PNG/WebP, 5 MB
+ * Photos attached to a Help & support message (up to 4, JPG/PNG/WebP, 10 MB
  * each; the page shrinks big phone photos before sending). Stored on
  * Cloudinary. A message can be photos only, or words only, or both.
  */
@@ -18,7 +18,8 @@ final class SupportAttachments
 
     /** Tests swap the Cloudinary upload for this (receives the file, returns ['secure_url' => ...]) */
     public static ?\Closure $uploader = null;
-    public const MAX_KB = 5120;
+    // 10 MB: the most Cloudinary's Free plan takes per image
+    public const MAX_KB = 10240;
 
     /** Validation for a message with optional photos */
     public static function rules(int $minWords = 2): array
@@ -35,7 +36,7 @@ final class SupportAttachments
         'attachments.max' => 'Add up to ' . self::MAX_FILES . ' photos at a time.',
         'attachments.*.image' => 'Only photos can be attached (JPG, PNG or WebP).',
         'attachments.*.mimes' => 'Only photos can be attached (JPG, PNG or WebP).',
-        'attachments.*.max' => 'Each photo can be up to 5 MB.',
+        'attachments.*.max' => 'Each photo can be up to 10 MB.',
     ];
 
     /**

@@ -378,4 +378,18 @@ class SupportCasesTest extends TestCase
 
         $this->assertSame($before, DB::table('support_messages')->where('ticket_id', $id)->count());
     }
+    public function test_photos_can_be_up_to_10_mb(): void
+    {
+        \App\Support\SupportAttachments::$uploader = fn ($file) => ['secure_url' => 'https://res.cloudinary.test/' . $file->getClientOriginalName()];
+        $shop = $this->shop('Petal & Stem');
+        $id = $this->as($shop)->postJson('/api/support/tickets', ['subject' => 'Something else', 'category' => 'other', 'message' => 'My shop page will not load.'])
+            ->assertCreated()->json('data.id');
+
+        $this->post("/api/support/tickets/{$id}/messages", ['attachments' => [\Illuminate\Http\UploadedFile::fake()->image('big.jpg')->size(9 * 1024)]], ['Accept' => 'application/json'])
+            ->assertOk();
+        $this->post("/api/support/tickets/{$id}/messages", ['attachments' => [\Illuminate\Http\UploadedFile::fake()->image('huge.jpg')->size(11 * 1024)]], ['Accept' => 'application/json'])
+            ->assertStatus(422)->assertJsonPath('errors', ['attachments.0' => ['Each photo can be up to 10 MB.']]);
+
+        \App\Support\SupportAttachments::$uploader = null;
+    }
 }

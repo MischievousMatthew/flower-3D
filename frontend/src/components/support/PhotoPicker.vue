@@ -22,7 +22,7 @@ import { onBeforeUnmount, ref } from "vue";
 import { shrinkPhoto } from "../../utils/shrinkPhoto";
 
 /**
- * Photos for a Help & support message: up to 4 JPG/PNG/WebP, 5 MB each after
+ * Photos for a Help & support message: up to 4 JPG/PNG/WebP, 10 MB each after
  * big phone photos are shrunk. v-model is [{ file, url }] (url is a preview).
  */
 const props = defineProps({
@@ -32,7 +32,7 @@ const props = defineProps({
 });
 const emit = defineEmits(["update:modelValue"]);
 
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_BYTES = 10 * 1024 * 1024;
 const preparing = ref(false);
 const problem = ref("");
 
@@ -54,7 +54,7 @@ async function pick(event) {
     }
     const file = await shrinkPhoto(picked);
     if (file.size > MAX_BYTES) {
-      problem.value = `${picked.name} is ${(file.size / 1048576).toFixed(1)} MB. Each photo can be up to 5 MB.`;
+      problem.value = `${picked.name} is ${(file.size / 1048576).toFixed(1)} MB. Each photo can be up to 10 MB.`;
       continue;
     }
     added.push({ file, url: URL.createObjectURL(file) });
