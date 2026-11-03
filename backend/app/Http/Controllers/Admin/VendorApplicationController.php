@@ -202,7 +202,7 @@ class VendorApplicationController extends Controller
     {
         try {
             $result = DB::transaction(function () use ($application) {
-                $existingUser = User::where('email', $application->email)->lockForUpdate()->first();
+                $existingUser = User::whereRaw('LOWER(email) = ?', [strtolower(trim($application->email))])->lockForUpdate()->first();
 
                 if ($existingUser) {
                     $this->syncVendorUser($existingUser, $application);
@@ -282,7 +282,8 @@ class VendorApplicationController extends Controller
                 'store_name'            => $application->store_name,
                 'application_id'        => $application->id,
                 'approved_at'           => now()->toDateTimeString(),
-                'needs_password_change' => true,
+                // They keep the password they already use
+                'needs_password_change' => false,
             ]),
         ])->save();
     }
@@ -541,12 +542,26 @@ class VendorApplicationController extends Controller
         $email = trim((string) $application->email);
         $contactNumber = trim((string) $application->contact_number);
 
-        if ($email !== '' && User::where('email', $email)->exists()) {
-            return 'Email already exists.';
+        // Applicants often already have a customer account with this email. That
+        // account becomes the vendor account (createVendorAccount), so it's only a
+        // conflict when the account can't become this shop's.
+        $existing = $email !== '' ? User::whereRaw('LOWER(email) = ?', [strtolower($email)])->first() : null;
+        if ($existing) {
+            if ($existing->role === User::ROLE_ADMIN) {
+                return "This email belongs to a BloomCraft admin account, so it can't run a shop. Ask the applicant to apply with another email.";
+            }
+            $otherShopId = (int) (($existing->vendor_data ?? [])['application_id'] ?? 0);
+            if ($existing->role === User::ROLE_VENDOR && $otherShopId && $otherShopId !== (int) $application->id) {
+                $otherShop = VendorApplication::where('id', $otherShopId)->where('status', 'approved')->value('store_name');
+                if ($otherShop) {
+                    return "This email already runs another shop ({$otherShop}). Ask the applicant to apply with another email.";
+                }
+            }
         }
 
-        if ($contactNumber !== '' && User::where('contact_number', $contactNumber)->exists()) {
-            return 'Contact number already exists.';
+        // A new account needs a phone number nobody else uses; an existing account keeps its own
+        if (! $existing && $contactNumber !== '' && User::where('contact_number', $contactNumber)->exists()) {
+            return "Another BloomCraft account already uses this phone number ({$contactNumber}). Ask the applicant to apply with their own number.";
         }
 
         if ($email !== '' && VendorApplication::where('email', $email)
