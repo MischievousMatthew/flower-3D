@@ -82,6 +82,9 @@ class TokenAuth
                 ], 401);
             }
             SingleSession::touch($authenticatable);
+        } elseif ($authenticatable instanceof Employee) {
+            // So a sign-in on another browser can tell this one is in use
+            SingleSession::touch($authenticatable);
         }
 
         Auth::setUser($authenticatable);

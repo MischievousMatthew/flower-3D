@@ -73,11 +73,23 @@ class EmployeeAuthController extends Controller
                 ], 403);
             }
 
+            // One browser at a time: in use somewhere else, ask before taking over
+            $device = \App\Support\SingleSession::deviceFrom($request->input('device_id'));
+            if (! $request->boolean('continue_here') && \App\Support\SingleSession::isActiveElsewhere($employee, $device)) {
+                return response()->json([
+                    'success' => false,
+                    'code' => 'session_active',
+                    'message' => \App\Support\SingleSession::ACTIVE_MESSAGE,
+                ], 409);
+            }
+
             $token = Str::random(80);
-            // One device at a time: the browser signed in before is told why it was signed out
+            // The browser signed in before is told why it was signed out
             \App\Support\EndedSessions::endFor($employee, \App\Support\EndedSessions::REPLACED, \App\Support\SingleSession::REPLACED_MESSAGE);
             $employee->forceFill([
                 'api_token' => hash('sha256', $token),
+                'last_seen_at' => now(),
+                'session_device' => $device,
             ])->save();
             $this->loginAuditService->logEmployeeLogin($employee, $request);
 

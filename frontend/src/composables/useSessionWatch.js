@@ -5,10 +5,10 @@ import { sessionReplaced } from "../utils/sessionReplaced";
 // still the current one, so a sign-in elsewhere shows up within a minute.
 const CHECK_EVERY_MS = 60_000;
 
-// Customer, vendor and admin sessions only; staff accounts work as before
+// Every kind of account: customers, vendors, admins and ERP staff
 const signedInAsUser = () => {
   try {
-    return !!(localStorage.getItem("auth_token") || localStorage.getItem("vendor_token")) && localStorage.getItem("user_type") !== "employee";
+    return !!(localStorage.getItem("auth_token") || localStorage.getItem("vendor_token") || localStorage.getItem("employee_token"));
   } catch {
     return false;
   }

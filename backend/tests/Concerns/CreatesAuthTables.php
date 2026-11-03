@@ -43,6 +43,8 @@ trait CreatesAuthTables
             $table->string('password')->nullable();
             $table->string('status')->default('Active');
             $table->string('api_token', 80)->nullable();
+            $table->timestamp('last_seen_at')->nullable();
+            $table->string('session_device', 64)->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

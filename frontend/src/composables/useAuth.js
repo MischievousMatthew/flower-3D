@@ -106,10 +106,13 @@ export function useAuth() {
         username: credentials.username,
         password: credentials.password,
         login_context: loginContext,
+        device_id: getDeviceId(),
+        // Set after the person chose "Continue logging in" in the "already logged in" modal
+        continue_here: credentials.continueHere ? true : undefined,
       }, {
         // 401 here usually just means "not a staff account"; the customer and
-        // vendor sign-in is tried next
-        quietStatuses: [401],
+        // vendor sign-in is tried next. 409: signed in elsewhere, the page asks.
+        quietStatuses: [401, 409],
       });
 
       if (!data?.success) {

@@ -70,9 +70,9 @@ class EndedSessionsTest extends TestCase
         DB::table('employees')->insert(['owner_id' => 1, 'name' => 'Joy', 'username' => 'joy.staff', 'email' => 'joy@example.com', 'password' => Hash::make('Staff-pass1'), 'status' => 'Active']);
     }
 
-    private function staffLogin(): string
+    private function staffLogin(array $extra = ['device_id' => 'office-pc']): string
     {
-        return $this->postJson('/api/auth/employee-login', ['username' => 'joy.staff', 'password' => 'Staff-pass1'])->assertOk()->json('token');
+        return $this->postJson('/api/auth/employee-login', ['username' => 'joy.staff', 'password' => 'Staff-pass1'] + $extra)->assertOk()->json('token');
     }
 
     private function asToken(string $token, string $url)
@@ -86,11 +86,35 @@ class EndedSessionsTest extends TestCase
     {
         $this->staff();
         $first = $this->staffLogin();
-        $second = $this->staffLogin();
+
+        // A second browser is asked first
+        $this->postJson('/api/auth/employee-login', ['username' => 'joy.staff', 'password' => 'Staff-pass1', 'device_id' => 'tablet'])
+            ->assertStatus(409)->assertJson(['code' => 'session_active']);
+        $this->asToken($first, '/api/auth/employee-me')->assertOk();
+
+        // …and takes over only when the person chooses to
+        $second = $this->staffLogin(['device_id' => 'tablet', 'continue_here' => true]);
 
         $this->asToken($first, '/api/auth/employee-me')
             ->assertStatus(401)->assertJson(['code' => 'session_replaced']);
         $this->asToken($second, '/api/auth/employee-me')->assertOk();
+    }
+
+    public function test_staff_signing_in_again_on_the_same_browser_are_not_asked(): void
+    {
+        $this->staff();
+        $this->staffLogin();
+
+        $this->staffLogin();
+    }
+
+    public function test_a_staff_sign_in_left_idle_does_not_block_another_browser(): void
+    {
+        $this->staff();
+        $this->staffLogin();
+        $this->travel(16)->minutes();
+
+        $this->staffLogin(['device_id' => 'tablet']);
     }
 
     public function test_staff_of_a_suspended_shop_are_told_why(): void
@@ -110,7 +134,7 @@ class EndedSessionsTest extends TestCase
         $this->staff();
         $token = $this->staffLogin();
 
-        $this->asToken($token, '/api/auth/session')
+        $this->asToken($token, '/api/auth/me')
             ->assertStatus(401)->assertJson(['code' => 'wrong_account_type']);
         $this->asToken($token, '/api/auth/employee-me')->assertOk();
     }

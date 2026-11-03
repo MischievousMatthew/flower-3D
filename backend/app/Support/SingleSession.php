@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 
@@ -45,8 +46,8 @@ final class SingleSession
         return $device === '' ? null : substr($device, 0, 64);
     }
 
-    /** Signed in and recently used somewhere other than this browser */
-    public static function isActiveElsewhere(User $user, ?string $device): bool
+    /** Signed in and recently used somewhere other than this browser (customers, vendors, admins and ERP staff) */
+    public static function isActiveElsewhere(User|Employee $user, ?string $device): bool
     {
         if (!$user->api_token || !$user->last_seen_at) {
             return false;
@@ -83,14 +84,14 @@ final class SingleSession
     }
 
     /** Keeps "last seen" fresh while the account is being used */
-    public static function touch(User $user): void
+    public static function touch(User|Employee $user): void
     {
         if ($user->last_seen_at && $user->last_seen_at->gt(now()->subSeconds(self::TOUCH_EVERY_SECONDS))) {
             return;
         }
 
         try {
-            User::query()->whereKey($user->id)->update(['last_seen_at' => now()]);
+            $user::query()->whereKey($user->id)->update(['last_seen_at' => now()]);
             $user->last_seen_at = now();
         } catch (\Throwable $e) {
             // Bookkeeping must never fail the request it rides on

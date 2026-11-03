@@ -44,6 +44,7 @@ class Employee extends Authenticatable
 
     protected $casts = [
         'joining_date' => 'date',
+        'last_seen_at' => 'datetime',
     ];
 
     protected $appends = [

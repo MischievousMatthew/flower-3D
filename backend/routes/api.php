@@ -213,6 +213,9 @@ Route::prefix('public/leave')->group(function () {
 });
 
 Route::middleware('token.auth')->group(function () {
+    // Open tabs check their sign-in is still the current one (every kind of account)
+    Route::get('/auth/session', [AuthController::class, 'session']);
+
 
     // Read-only company subscription data for the shared route guard. It is
     // intentionally outside module protection so expired vendors can be
@@ -252,7 +255,6 @@ Route::middleware('token.auth')->group(function () {
 
     Route::middleware('token.auth:user')->group(function () {
         Route::get('/auth/me',      [AuthController::class, 'me']);
-        Route::get('/auth/session', [AuthController::class, 'session']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
     });
 
