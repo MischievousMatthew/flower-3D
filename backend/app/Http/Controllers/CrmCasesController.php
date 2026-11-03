@@ -43,6 +43,8 @@ class CrmCasesController extends Controller
             'page' => 'nullable|integer|min:1',
         ]);
         $vendorId = $this->resolveOwnerId($request);
+        // Cases nobody answered in time: the customer gets a follow-up and the shop a reminder
+        \App\Services\SupportAutoReplies::followUpOverdue(null, $vendorId);
         $base = SupportTicket::query()->where('vendor_id', $vendorId);
 
         $query = (clone $base)->with(['requester:id,name,surname,email', 'order:id,order_number', 'assignee:id,name']);
@@ -275,9 +277,10 @@ class CrmCasesController extends Controller
             ] : null,
             'messages' => $t->messages->map(fn ($m) => [
                 'id' => $m->id,
-                'side' => $m->from_admin ? 'admin' : ($m->from_shop ? 'shop' : 'customer'),
+                'side' => $m->is_automated ? 'system' : ($m->from_admin ? 'admin' : ($m->from_shop ? 'shop' : 'customer')),
+                'automated' => (bool) $m->is_automated,
                 'internal' => (bool) $m->is_internal,
-                'author' => $m->from_admin ? 'BloomCraft Support' : ($m->from_shop ? ($m->author_name ?? 'Shop') : trim(($t->requester?->name ?? 'Customer') . ' ' . ($t->requester?->surname ?? ''))),
+                'author' => $m->is_automated ? 'Automatic reply to the customer' : ($m->from_admin ? 'BloomCraft Support' : ($m->from_shop ? ($m->author_name ?? 'Shop') : trim(($t->requester?->name ?? 'Customer') . ' ' . ($t->requester?->surname ?? '')))),
                 'body' => $m->body,
                 'created_at' => $m->created_at?->toIso8601String(),
             ])->values(),

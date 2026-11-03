@@ -200,7 +200,7 @@
                 <span v-if="ticket.other_requests.length" class="sub">{{ ticket.other_requests.length }} earlier request{{ ticket.other_requests.length === 1 ? "" : "s" }}</span>
               </div>
               <ol class="messages">
-                <li v-for="m in ticket.messages" :key="m.id" :class="{ admin: m.from_admin }">
+                <li v-for="m in ticket.messages" :key="m.id" :class="{ admin: m.from_admin, auto: m.automated }">
                   <span class="msg-who">{{ m.author }} · {{ formatDateTime(m.created_at) }}</span>
                   <p class="bubble">{{ m.body }}</p>
                 </li>
@@ -1208,6 +1208,18 @@ textarea.input {
   flex-direction: column;
   gap: 4px;
   max-width: 85%;
+}
+/* Automatic replies the requester was sent */
+.messages li.auto {
+  align-self: center;
+  align-items: center;
+  max-width: 92%;
+}
+.messages li.auto .bubble {
+  background: transparent;
+  border: 1px dashed #cbd5e1;
+  color: #64748b;
+  font-size: 13px;
 }
 .messages li.admin {
   align-self: flex-end;

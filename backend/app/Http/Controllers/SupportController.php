@@ -25,6 +25,9 @@ class SupportController extends Controller
             return $denied;
         }
 
+        // Requests nobody has answered in time get a follow-up first
+        \App\Services\SupportAutoReplies::followUpOverdue($request->user()->id);
+
         $tickets = SupportTicket::query()->where('requester_id', $request->user()->id)
             ->orderByDesc('last_activity_at')->get();
         $categories = $this->categoriesFor($request->user());
@@ -130,6 +133,9 @@ class SupportController extends Controller
             return $ticket;
         });
 
+        // An answer straight away: the reference, who handles it, and when to expect a reply
+        \App\Services\SupportAutoReplies::acknowledge($ticket->fresh(['order']), $user);
+
         return response()->json([
             'success' => true,
             'message' => $vendorId
@@ -231,9 +237,10 @@ class SupportController extends Controller
             'messages' => $t->messages->reject(fn ($m) => $m->is_internal)->values()->map(fn ($m) => [
                 'id' => $m->id,
                 // "Not mine": a reply from support or from the shop
-                'from_admin' => $m->from_admin || $m->from_shop,
+                'from_admin' => $m->from_admin || $m->from_shop || $m->is_automated,
+                'automated' => (bool) $m->is_automated,
                 // Individual admin and staff names aren't shown to vendors/customers
-                'author' => $m->from_admin ? 'BloomCraft Support' : ($m->from_shop ? ($shop ?? 'The shop') : 'You'),
+                'author' => $m->is_automated ? 'BloomCraft (automatic reply)' : ($m->from_admin ? 'BloomCraft Support' : ($m->from_shop ? ($shop ?? 'The shop') : 'You')),
                 'body' => $m->body,
                 'created_at' => $m->created_at?->toIso8601String(),
             ]),

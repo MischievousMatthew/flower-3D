@@ -157,7 +157,7 @@
             <span class="status" :class="`s-${active.status}`">{{ STATUS[active.status] }}</span>
           </div>
           <ol class="messages">
-            <li v-for="m in active.messages" :key="m.id" :class="{ mine: !m.from_admin }">
+            <li v-for="m in active.messages" :key="m.id" :class="{ mine: !m.from_admin, auto: m.automated }">
               <span class="who">{{ m.author }} · {{ formatDateTime(m.created_at) }}</span>
               <p class="bubble">{{ m.body }}</p>
             </li>
@@ -733,6 +733,18 @@ onMounted(async () => {
 }
 .mine .bubble {
   background: var(--mine);
+}
+/* Automatic replies: a note from BloomCraft, not a person */
+.messages li.auto {
+  align-self: center;
+  align-items: center;
+  max-width: 92%;
+}
+.auto .bubble {
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 13px;
 }
 .reply {
   display: flex;

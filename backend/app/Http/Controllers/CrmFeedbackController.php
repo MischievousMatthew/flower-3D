@@ -47,7 +47,7 @@ class CrmFeedbackController extends Controller
         $reviews = ProductReview::query()->whereIn('product_id', $productIds->keys())->whereNull('hidden_at')
             ->where('created_at', '>=', $from)->get(['id', 'product_id', 'rating', 'comment', 'vendor_reply', 'is_anonymous', 'user_id', 'created_at']);
         $cases = SupportTicket::query()->where('vendor_id', $vendorId)->where('created_at', '>=', $from)
-            ->with(['messages' => fn ($q) => $q->where('from_shop', false)->where('from_admin', false)->orderBy('id')])
+            ->with(['messages' => fn ($q) => $q->where('from_shop', false)->where('from_admin', false)->where('is_automated', false)->orderBy('id')])
             ->get(['id', 'reference', 'subject', 'category', 'status', 'created_at']);
 
         return response()->json(['success' => true, 'data' => [

@@ -816,6 +816,14 @@ li > .ca-row:hover,
   border-color: color-mix(in srgb, var(--v-blue-text) 30%, transparent);
   background: var(--v-blue-soft);
 }
+/* Automatic replies the customer was sent */
+.ca-thread li.system {
+  justify-self: center;
+  border-style: dashed;
+  background: transparent;
+  color: var(--v-muted);
+  font-size: 13px;
+}
 .ca-thread li.internal {
   justify-self: stretch;
   max-width: none;

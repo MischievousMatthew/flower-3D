@@ -63,6 +63,7 @@ class SupportCasesTest extends TestCase
         });
         (require base_path('database/migrations/2026_10_24_300000_add_shop_cases_to_support_tickets.php'))->up();
         (require base_path('database/migrations/2026_10_27_100000_add_issue_to_support_tickets.php'))->up();
+        (require base_path('database/migrations/2026_11_03_800000_add_automatic_support_replies.php'))->up();
         Schema::create('conversations', function (Blueprint $t) {
             $t->id();
             $t->unsignedBigInteger('owner_id')->nullable();
@@ -228,5 +229,75 @@ class SupportCasesTest extends TestCase
         $this->assertContains('payout_late', collect($vendorTopics['payments']['issues'])->pluck('key'));
         $this->postJson('/api/support/tickets', ['subject' => 'Payout late', 'category' => 'payments', 'issue' => 'payout_late', 'desired_outcome' => 'refund', 'message' => 'My payout from last week is missing.'])
             ->assertCreated()->assertJsonPath('data.desired_outcome_label', null);
+    }
+    public function test_a_complaint_gets_an_automatic_reply_straight_away(): void
+    {
+        $shop = $this->shop('Petal & Stem');
+        $ana = User::create(['name' => 'Ana', 'surname' => 'Reyes', 'email' => 'ana@example.com', 'password' => 'x', 'role' => 'customer']);
+        $order = $this->order($shop, ['user_id' => $ana->id, 'order_number' => 'ORD-77', 'total_amount' => 1850]);
+
+        $sent = $this->as($ana)->postJson('/api/support/tickets', ['subject' => 'Wilted roses', 'category' => 'quality', 'message' => 'Half the roses arrived wilted.', 'order_id' => $order, 'desired_outcome' => 'replacement'])
+            ->assertCreated();
+
+        $messages = $sent->json('data.messages');
+        $this->assertCount(2, $messages);
+        $auto = $messages[1];
+        $this->assertTrue($auto['automated']);
+        $this->assertSame('BloomCraft (automatic reply)', $auto['author']);
+        $this->assertStringContainsString('Hi Ana', $auto['body']);
+        $this->assertStringContainsString('sent to Petal & Stem', $auto['body']);
+        $this->assertStringContainsString('ORD-77', $auto['body']);
+        $this->assertStringContainsString('You asked for: A replacement', $auto['body']);
+        // Still waiting for a person: the automatic reply is not an answer
+        $this->assertSame('open', DB::table('support_tickets')->value('status'));
+    }
+
+    public function test_a_request_to_bloomcraft_is_told_when_to_expect_an_answer(): void
+    {
+        $shop = $this->shop('Petal & Stem');
+        $sent = $this->as($shop)->postJson('/api/support/tickets', ['subject' => 'Payout missing', 'category' => 'payments', 'message' => 'My payout for last week has not arrived.'])
+            ->assertCreated();
+
+        $body = $sent->json('data.messages.1.body');
+        $this->assertStringContainsString('top of our queue', $body);
+        $this->assertStringContainsString('within a few hours', $body);
+    }
+
+    public function test_an_unanswered_complaint_is_followed_up_once_and_the_shop_reminded(): void
+    {
+        $shop = $this->shop('Petal & Stem');
+        $ana = User::create(['name' => 'Ana', 'email' => 'ana@example.com', 'password' => 'x', 'role' => 'customer']);
+        $order = $this->order($shop, ['user_id' => $ana->id, 'order_number' => 'ORD-77']);
+        $id = $this->as($ana)->postJson('/api/support/tickets', ['subject' => 'Late delivery', 'category' => 'delivery', 'message' => 'My order is two hours late.', 'order_id' => $order])
+            ->assertCreated()->json('data.id');
+
+        // Not yet due
+        Carbon::setTestNow(now()->addHours(10));
+        $this->as($ana)->getJson('/api/support/tickets')->assertOk();
+        $this->assertSame(2, DB::table('support_messages')->where('ticket_id', $id)->count());
+
+        // A day later with no reply: one follow-up, and the shop is reminded
+        Carbon::setTestNow(now()->addHours(20));
+        $this->as($ana)->getJson('/api/support/tickets')->assertOk();
+        $this->as($ana)->getJson('/api/support/tickets')->assertOk();
+        $auto = DB::table('support_messages')->where('ticket_id', $id)->where('is_automated', true)->orderBy('id')->pluck('body');
+        $this->assertCount(2, $auto);
+        $this->assertStringContainsString('reminded Petal & Stem', $auto[1]);
+        $this->assertDatabaseHas('user_notifications', ['user_id' => $shop->id, 'type' => 'support_reminder']);
+    }
+
+    public function test_a_complaint_the_shop_answered_gets_no_follow_up(): void
+    {
+        $shop = $this->shop('Petal & Stem');
+        $ana = User::create(['name' => 'Ana', 'email' => 'ana@example.com', 'password' => 'x', 'role' => 'customer']);
+        $order = $this->order($shop, ['user_id' => $ana->id, 'order_number' => 'ORD-77']);
+        $id = $this->as($ana)->postJson('/api/support/tickets', ['subject' => 'Late delivery', 'category' => 'delivery', 'message' => 'My order is two hours late.', 'order_id' => $order])
+            ->assertCreated()->json('data.id');
+        DB::table('support_messages')->insert(['ticket_id' => $id, 'from_shop' => true, 'author_name' => 'Mara', 'body' => 'On its way now!', 'created_at' => now(), 'updated_at' => now()]);
+
+        Carbon::setTestNow(now()->addDays(2));
+        $this->as($ana)->getJson('/api/support/tickets')->assertOk();
+
+        $this->assertSame(1, DB::table('support_messages')->where('ticket_id', $id)->where('is_automated', true)->count());
     }
 }
