@@ -128,6 +128,7 @@ class AdminSupportController extends Controller
                         : ($m->from_shop ? ($m->author_name ?? 'Shop') . ' (shop' . ($m->is_internal ? ', internal note' : '') . ')' : $this->requesterName($ticket, $stores))),
                     'from_shop' => (bool) $m->from_shop,
                     'body' => $m->body,
+                    'attachments' => \App\Support\SupportAttachments::present($m->attachments),
                     'created_at' => $m->created_at?->toIso8601String(),
                 ]),
                 'other_requests' => $history,
@@ -142,14 +143,15 @@ class AdminSupportController extends Controller
         if (!$ticket) {
             return $this->notFound();
         }
-        $data = $request->validate([
-            'message' => 'required|string|min:2|max:5000',
+        $data = $request->validate(\App\Support\SupportAttachments::rules() + [
             'status' => ['nullable', Rule::in(['waiting', 'resolved', 'open'])],
-        ]);
+        ], \App\Support\SupportAttachments::MESSAGES);
 
         $status = $data['status'] ?? 'waiting';
-        DB::transaction(function () use ($ticket, $data, $status, $request) {
-            SupportMessage::create(['ticket_id' => $ticket->id, 'author_id' => $request->user()->id, 'from_admin' => true, 'body' => trim($data['message'])]);
+        $photos = \App\Support\SupportAttachments::upload($request);
+        $text = trim((string) ($data['message'] ?? ''));
+        DB::transaction(function () use ($ticket, $text, $photos, $status, $request) {
+            SupportMessage::create(['ticket_id' => $ticket->id, 'author_id' => $request->user()->id, 'from_admin' => true, 'body' => $text, 'attachments' => $photos ?: null]);
             $ticket->update([
                 'status' => $status,
                 'last_activity_at' => now(),
@@ -159,7 +161,7 @@ class AdminSupportController extends Controller
                 [$ticket->requester_id],
                 'support_reply',
                 "BloomCraft Support replied to {$ticket->reference}",
-                mb_strimwidth(trim($data['message']), 0, 160, '…'),
+                $text !== '' ? mb_strimwidth($text, 0, 160, '…') : (count($photos) === 1 ? 'Sent a photo' : 'Sent ' . count($photos) . ' photos'),
                 $this->requesterLink($ticket),
             );
         });

@@ -78,7 +78,9 @@ class SupportController extends Controller
             'desired_outcome' => ['nullable', Rule::in(array_keys(SupportTicket::OUTCOMES))],
             'message' => 'required|string|min:10|max:5000',
             'order_id' => 'nullable|integer',
-        ]);
+            'attachments' => \App\Support\SupportAttachments::rules()['attachments'],
+            'attachments.*' => \App\Support\SupportAttachments::rules()['attachments.*'],
+        ], \App\Support\SupportAttachments::MESSAGES);
 
         if (! array_key_exists($data['category'], $this->categoriesFor($user))) {
             return response()->json(['success' => false, 'errors' => ['category' => ['Pick another topic.']]], 422);
@@ -113,7 +115,10 @@ class SupportController extends Controller
             $vendorId = (int) Order::withoutGlobalScopes()->whereKey($orderId)->value('vendor_id') ?: null;
         }
 
-        $ticket = DB::transaction(function () use ($user, $data, $orderId, $vendorId, $issue, $outcome) {
+        // Photos go up first: if one fails, nothing is created and they can try again
+        $photos = \App\Support\SupportAttachments::upload($request);
+
+        $ticket = DB::transaction(function () use ($user, $data, $orderId, $vendorId, $issue, $outcome, $photos) {
             $ticket = SupportTicket::create([
                 'requester_id' => $user->id,
                 'requester_role' => $user->role,
@@ -132,6 +137,7 @@ class SupportController extends Controller
                 'author_id' => $user->id,
                 'from_admin' => false,
                 'body' => trim($data['message']),
+                'attachments' => $photos ?: null,
             ]);
 
             return $ticket;
@@ -195,12 +201,14 @@ class SupportController extends Controller
             return response()->json(['success' => false, 'message' => 'This request is closed. Start a new one if you still need help.'], 422);
         }
 
-        $data = $request->validate(['message' => 'required|string|min:2|max:5000']);
+        $data = $request->validate(\App\Support\SupportAttachments::rules(), \App\Support\SupportAttachments::MESSAGES);
+        $photos = \App\Support\SupportAttachments::upload($request);
         SupportMessage::create([
             'ticket_id' => $ticket->id,
             'author_id' => $request->user()->id,
             'from_admin' => false,
-            'body' => trim($data['message']),
+            'body' => trim((string) ($data['message'] ?? '')),
+            'attachments' => $photos ?: null,
         ]);
         // Writing back means they've read it; it also reopens a resolved request
         $this->markSeen($ticket, $request->user()->id);
@@ -274,6 +282,7 @@ class SupportController extends Controller
                 // Individual admin and staff names aren't shown to vendors/customers
                 'author' => $m->is_automated ? 'BloomCraft (automatic reply)' : ($m->from_admin ? 'BloomCraft Support' : ($m->from_shop ? ($shop ?? 'The shop') : 'You')),
                 'body' => $m->body,
+                'attachments' => \App\Support\SupportAttachments::present($m->attachments),
                 'created_at' => $m->created_at?->toIso8601String(),
             ]),
         ];

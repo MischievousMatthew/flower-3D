@@ -202,11 +202,13 @@
               <ol class="messages">
                 <li v-for="m in ticket.messages" :key="m.id" :class="{ admin: m.from_admin, auto: m.automated }">
                   <span class="msg-who">{{ m.author }} · {{ formatDateTime(m.created_at) }}</span>
-                  <p class="bubble">{{ m.body }}</p>
+                  <p v-if="m.body" class="bubble">{{ m.body }}</p>
+                  <MessagePhotos :photos="m.attachments" :align-end="m.from_admin" />
                 </li>
               </ol>
               <form v-if="ticket.status !== 'closed'" class="reply" @submit.prevent="sendReply">
                 <textarea v-model="replyText" class="input" rows="4" maxlength="5000" placeholder="Write a reply. They'll get a notification."></textarea>
+                <PhotoPicker v-model="replyPhotos" :disabled="busy" />
                 <div class="reply-row">
                   <label class="sub">
                     After sending:
@@ -216,7 +218,7 @@
                       <option value="open">Keep it open</option>
                     </select>
                   </label>
-                  <button type="submit" class="primary-btn" :disabled="busy || replyText.trim().length < 2">{{ busy ? "Sending…" : "Send reply" }}</button>
+                  <button type="submit" class="primary-btn" :disabled="busy || (replyText.trim().length < 2 && !replyPhotos.length)">{{ busy ? "Sending…" : "Send reply" }}</button>
                 </div>
               </form>
               <p v-else class="sub">This request is closed. Reopen it to reply.</p>
@@ -343,6 +345,8 @@ import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import api from "../../plugins/axios";
 import { linkedId } from "../../utils/hiddenIds";
+import PhotoPicker from "../../components/support/PhotoPicker.vue";
+import MessagePhotos from "../../components/support/MessagePhotos.vue";
 
 const { toggleMobile } = useSidebarState();
 const route = useRoute();
@@ -429,6 +433,7 @@ const ticket = ref(null);
 const openTicketId = ref(linkedId("ticket"));
 const ticketFilters = reactive({ search: "", status: "active", role: "" });
 const replyText = ref("");
+const replyPhotos = ref([]);
 const replyStatus = ref("waiting");
 
 let ticketRequest = 0;
@@ -473,9 +478,15 @@ const openTicket = (id) => {
 const sendReply = async () => {
   busy.value = true;
   try {
-    const { data } = await api.post(`/admin/support/tickets/${ticket.value.id}/reply`, { message: replyText.value, status: replyStatus.value });
+    // Photos can't go as JSON: send a form
+    const form = new FormData();
+    if (replyText.value.trim()) form.append("message", replyText.value.trim());
+    form.append("status", replyStatus.value);
+    replyPhotos.value.forEach((p) => form.append("attachments[]", p.file));
+    const { data } = await api.post(`/admin/support/tickets/${ticket.value.id}/reply`, form, { timeout: 120000 });
     toast.success(data.message);
     replyText.value = "";
+    replyPhotos.value = [];
     await Promise.all([loadTicket(ticket.value.id), fetchTickets(), fetchSummary()]);
   } catch (e) {
     toast.error(e.response?.data?.message || "The reply couldn't be sent.");

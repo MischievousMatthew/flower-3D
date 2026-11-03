@@ -175,7 +175,8 @@
                     <b>{{ m.author }}</b>
                     <small>{{ shortDate(m.created_at, true) }}</small>
                   </div>
-                  <p>{{ m.body }}</p>
+                  <p v-if="m.body">{{ m.body }}</p>
+                  <MessagePhotos :photos="m.attachments" />
                 </li>
               </ol>
 
@@ -188,9 +189,10 @@
                   <span class="sp-label">{{ internal ? "Note for your team (the customer won't see it)" : `Message to ${firstName}` }}</span>
                   <textarea v-model="draft" class="sp-textarea" rows="3" maxlength="5000" :placeholder="internal ? 'e.g. Checked the cooler, batch was fine. Rider left it in the sun.' : 'e.g. We are so sorry. A fresh bouquet is on its way today.'"></textarea>
                 </label>
+                <PhotoPicker v-model="replyPhotos" :disabled="busy === 'reply'" />
                 <div class="ca-reply-foot">
                   <small class="sp-hint">{{ internal ? "Saved to the case history only." : `${firstName} gets a notification and sees it on their Help page.` }}</small>
-                  <button type="submit" class="sp-btn sp-btn-primary" :disabled="busy === 'reply' || draft.trim().length < 2"><span v-html="ICONS.send"></span>{{ busy === "reply" ? "Saving…" : internal ? "Add note" : "Send reply" }}</button>
+                  <button type="submit" class="sp-btn sp-btn-primary" :disabled="busy === 'reply' || (draft.trim().length < 2 && !replyPhotos.length)"><span v-html="ICONS.send"></span>{{ busy === "reply" ? "Saving…" : internal ? "Add note" : "Send reply" }}</button>
                 </div>
               </form>
               <p v-else-if="detail.status === 'closed'" class="sp-hint">This case is closed. Change its status to reply again.</p>
@@ -300,6 +302,8 @@ import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { money } from "../../../components/vendor/finance/financeUi";
 import { useAssignment } from "../../../composables/useAssignment";
 import { useAuth } from "../../../composables/useAuth";
+import PhotoPicker from "../../../components/support/PhotoPicker.vue";
+import MessagePhotos from "../../../components/support/MessagePhotos.vue";
 import "../../../components/vendor/finance/finance.css";
 
 const arrow = (d) => `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -347,6 +351,7 @@ const detail = ref(null);
 const detailError = ref("");
 const busy = ref("");
 const draft = ref("");
+const replyPhotos = ref([]);
 const internal = ref(false);
 const form = ref(null);
 
@@ -433,10 +438,16 @@ async function update(changes) {
 async function reply() {
   busy.value = "reply";
   try {
-    const res = await api.post(`crm/cases/${selectedId.value}/reply`, { message: draft.value.trim(), internal: internal.value });
+    // Photos can't go as JSON: send a form
+    const form = new FormData();
+    if (draft.value.trim()) form.append("message", draft.value.trim());
+    form.append("internal", internal.value ? "1" : "0");
+    replyPhotos.value.forEach((p) => form.append("attachments[]", p.file));
+    const res = await api.post(`crm/cases/${selectedId.value}/reply`, form, { timeout: 120000 });
     detail.value = res.data.data;
     toast.success(internal.value ? "Note added." : `Sent. ${firstName.value} will be notified.`);
     draft.value = "";
+    replyPhotos.value = [];
     refresh();
   } catch (e) {
     toast.error(apiMessage(e, "Couldn't save that."));

@@ -151,7 +151,7 @@ class CrmCasesController extends Controller
     /** POST /crm/cases/{id}/reply {message, internal} */
     public function reply(Request $request, int $id): JsonResponse
     {
-        $data = $request->validate(['message' => 'required|string|min:2|max:5000', 'internal' => 'boolean']);
+        $data = $request->validate(\App\Support\SupportAttachments::rules() + ['internal' => 'boolean'], \App\Support\SupportAttachments::MESSAGES);
         $vendorId = $this->resolveOwnerId($request);
         $ticket = $this->case($vendorId, $id);
         if ($ticket->status === 'closed') {
@@ -159,7 +159,7 @@ class CrmCasesController extends Controller
         }
         $internal = (bool) ($data['internal'] ?? false);
 
-        $this->post($request, $ticket, trim($data['message']), $internal);
+        $this->post($request, $ticket, trim((string) ($data['message'] ?? '')), $internal, \App\Support\SupportAttachments::upload($request));
         if (! $internal) {
             // Answering moves a new case along; the customer is told there's a reply
             $ticket->update(['status' => $ticket->status === 'open' ? 'in_progress' : $ticket->status, 'last_activity_at' => now()]);
@@ -222,7 +222,7 @@ class CrmCasesController extends Controller
         return response()->json(['success' => true, 'data' => $this->detail($ticket->fresh())]);
     }
 
-    private function post(Request $request, SupportTicket $ticket, string $body, bool $internal): void
+    private function post(Request $request, SupportTicket $ticket, string $body, bool $internal, array $photos = []): void
     {
         $user = $request->user();
         SupportMessage::create([
@@ -233,6 +233,7 @@ class CrmCasesController extends Controller
             'is_internal' => $internal,
             'author_name' => $user instanceof Employee ? $user->name : trim("{$user->name} {$user->surname}") . ' (owner)',
             'body' => $body,
+            'attachments' => $photos ?: null,
         ]);
         $ticket->update(['last_activity_at' => now()]);
     }
@@ -282,6 +283,7 @@ class CrmCasesController extends Controller
                 'internal' => (bool) $m->is_internal,
                 'author' => $m->is_automated ? 'Automatic reply to the customer' : ($m->from_admin ? 'BloomCraft Support' : ($m->from_shop ? ($m->author_name ?? 'Shop') : trim(($t->requester?->name ?? 'Customer') . ' ' . ($t->requester?->surname ?? '')))),
                 'body' => $m->body,
+                'attachments' => \App\Support\SupportAttachments::present($m->attachments),
                 'created_at' => $m->created_at?->toIso8601String(),
             ])->values(),
             'links' => $t->requester_id ? $this->linkOptions($t->vendor_id, $t->requester_id) : ['orders' => [], 'refunds' => []],

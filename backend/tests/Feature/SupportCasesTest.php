@@ -65,6 +65,7 @@ class SupportCasesTest extends TestCase
         (require base_path('database/migrations/2026_10_27_100000_add_issue_to_support_tickets.php'))->up();
         (require base_path('database/migrations/2026_11_03_800000_add_automatic_support_replies.php'))->up();
         (require base_path('database/migrations/2026_11_03_900000_add_requester_seen_at_to_support_tickets.php'))->up();
+        (require base_path('database/migrations/2026_11_04_100000_add_attachments_to_support_messages.php'))->up();
         Schema::create('conversations', function (Blueprint $t) {
             $t->id();
             $t->unsignedBigInteger('owner_id')->nullable();
@@ -337,5 +338,44 @@ class SupportCasesTest extends TestCase
         $this->getJson("/api/support/tickets/{$id}")->assertOk();
         $this->getJson('/api/support/unread')->assertOk()->assertJsonPath('unread', 0);
         $this->assertNotNull(DB::table('user_notifications')->where('user_id', $shop->id)->value('read_at'));
+    }
+    public function test_photos_can_be_sent_and_are_shown_to_both_sides(): void
+    {
+        \App\Support\SupportAttachments::$uploader = fn ($file) => ['secure_url' => 'https://res.cloudinary.test/' . $file->getClientOriginalName()];
+        $shop = $this->shop('Petal & Stem');
+
+        // A new request with a screenshot
+        $id = $this->as($shop)->post('/api/support/tickets', [
+            'subject' => 'Order status looks wrong', 'category' => 'orders', 'message' => 'The status says delivered but it is not.',
+            'attachments' => [\Illuminate\Http\UploadedFile::fake()->image('status.png', 800, 600)],
+        ], ['Accept' => 'application/json'])->assertCreated()->assertJsonPath('data.messages.0.attachments.0.url', 'https://res.cloudinary.test/status.png')->json('data.id');
+
+        // A reply that is only a photo
+        $this->post("/api/support/tickets/{$id}/messages", ['attachments' => [\Illuminate\Http\UploadedFile::fake()->image('more.jpg')]], ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonPath('data.messages.2.body', '')->assertJsonPath('data.messages.2.attachments.0.url', 'https://res.cloudinary.test/more.jpg');
+
+        // The admin sees them too
+        $data = app(\App\Http\Controllers\Admin\AdminSupportController::class)->ticket($id)->getData(true)['data'];
+        $this->assertSame('https://res.cloudinary.test/status.png', $data['messages'][0]['attachments'][0]['url']);
+
+        \App\Support\SupportAttachments::$uploader = null;
+    }
+
+    public function test_only_photos_can_be_attached_and_a_failed_upload_sends_nothing(): void
+    {
+        $shop = $this->shop('Petal & Stem');
+        $id = $this->as($shop)->postJson('/api/support/tickets', ['subject' => 'Something else', 'category' => 'other', 'message' => 'My shop page will not load.'])
+            ->assertCreated()->json('data.id');
+        $before = DB::table('support_messages')->where('ticket_id', $id)->count();
+
+        $this->post("/api/support/tickets/{$id}/messages", ['message' => 'Here', 'attachments' => [\Illuminate\Http\UploadedFile::fake()->create('virus.exe', 10)]], ['Accept' => 'application/json'])
+            ->assertStatus(422);
+
+        \App\Support\SupportAttachments::$uploader = fn () => throw new \RuntimeException('Cloudinary is down');
+        $this->post("/api/support/tickets/{$id}/messages", ['message' => 'See photo', 'attachments' => [\Illuminate\Http\UploadedFile::fake()->image('a.jpg')]], ['Accept' => 'application/json'])
+            ->assertStatus(422)->assertJsonValidationErrors('attachments');
+        \App\Support\SupportAttachments::$uploader = null;
+
+        $this->assertSame($before, DB::table('support_messages')->where('ticket_id', $id)->count());
     }
 }

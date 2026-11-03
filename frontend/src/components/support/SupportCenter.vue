@@ -128,6 +128,12 @@
                 <small class="muted count">{{ draft.message.length }}/5000</small>
               </span>
             </label>
+            <div class="field">
+              <span>Photos <small class="muted">(optional)</small></span>
+              <PhotoPicker v-model="draftPhotos" :disabled="busy" />
+              <small v-if="fieldErrors.attachments" class="error">{{ fieldErrors.attachments }}</small>
+              <small v-else class="muted">A photo of the problem, or a screenshot, helps it get sorted faster.</small>
+            </div>
           </fieldset>
 
           <p v-if="error" class="error" role="alert">{{ error }}</p>
@@ -159,15 +165,17 @@
           <ol class="messages">
             <li v-for="m in active.messages" :key="m.id" :class="{ mine: !m.from_admin, auto: m.automated }">
               <span class="who">{{ m.author }} · {{ formatDateTime(m.created_at) }}</span>
-              <p class="bubble">{{ m.body }}</p>
+              <p v-if="m.body" class="bubble">{{ m.body }}</p>
+              <MessagePhotos :photos="m.attachments" :align-end="!m.from_admin" />
             </li>
           </ol>
           <form v-if="active.status !== 'closed'" class="reply" @submit.prevent="sendReply">
             <textarea v-model="reply" rows="3" maxlength="5000" :placeholder="active.status === 'resolved' ? 'Still need help? Writing here reopens the request.' : 'Write a reply…'"></textarea>
+            <PhotoPicker v-model="replyPhotos" :disabled="busy" />
             <p v-if="error" class="error">{{ error }}</p>
             <div class="actions">
               <button v-if="['open', 'in_progress', 'waiting'].includes(active.status)" type="button" class="btn" :disabled="busy" @click="resolve">My issue is solved</button>
-              <button type="submit" class="btn primary" :disabled="busy || reply.trim().length < 2">{{ busy ? "Sending…" : "Send" }}</button>
+              <button type="submit" class="btn primary" :disabled="busy || (reply.trim().length < 2 && !replyPhotos.length)">{{ busy ? "Sending…" : "Send" }}</button>
             </div>
           </form>
           <p v-else class="muted closed-note">This request is closed. Start a new one if you need more help.</p>
@@ -188,6 +196,21 @@ import { useRoute, useRouter } from "vue-router";
 import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
 import { linkedId } from "../../utils/hiddenIds";
+import PhotoPicker from "./PhotoPicker.vue";
+import MessagePhotos from "./MessagePhotos.vue";
+
+const draftPhotos = ref([]);
+const replyPhotos = ref([]);
+
+/** The fields plus photos as a form (photos can't go as JSON); empty values are left out */
+function withPhotos(fields, photos) {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== null && value !== undefined && value !== "") form.append(key, value);
+  }
+  photos.forEach((p) => form.append("attachments[]", p.file));
+  return form;
+}
 import { refreshSupportUnread } from "../../composables/useSupportUnread";
 
 /** Raise and follow support requests (used by vendors and customers) */
@@ -379,12 +402,13 @@ const submit = async () => {
   if (!validate()) return;
   busy.value = true;
   try {
-    const { data } = await api.post("/support/tickets", {
+    const { data } = await api.post("/support/tickets", withPhotos({
       ...draft,
       issue: draft.issue || null,
       desired_outcome: (toShop.value && draft.desired_outcome) || null,
       order_id: draft.order_id || null,
-    });
+    }, draftPhotos.value), { timeout: 120000 });
+    draftPhotos.value = [];
     toast.success(data.message);
     await loadList();
     active.value = data.data;
@@ -393,8 +417,8 @@ const submit = async () => {
   } catch (e) {
     // The server's field problems go beside their fields
     const errors = e.response?.data?.errors;
-    if (errors) Object.entries(errors).forEach(([k, v]) => (fieldErrors[k] = v?.[0]));
-    if (!errors || Object.keys(errors).some((k) => !["category", "issue", "order_id", "subject", "message"].includes(k))) error.value = firstError(e);
+    if (errors) Object.entries(errors).forEach(([k, v]) => (fieldErrors[k.split(".")[0]] = v?.[0]));
+    if (!errors || Object.keys(errors).some((k) => !["category", "issue", "order_id", "subject", "message", "attachments"].includes(k))) error.value = firstError(e);
   } finally {
     busy.value = false;
   }
@@ -404,9 +428,10 @@ const sendReply = async () => {
   busy.value = true;
   error.value = "";
   try {
-    const { data } = await api.post(`/support/tickets/${active.value.id}/messages`, { message: reply.value });
+    const { data } = await api.post(`/support/tickets/${active.value.id}/messages`, withPhotos({ message: reply.value.trim() }, replyPhotos.value), { timeout: 120000 });
     active.value = data.data;
     reply.value = "";
+    replyPhotos.value = [];
     loadList();
   } catch (e) {
     error.value = firstError(e);
