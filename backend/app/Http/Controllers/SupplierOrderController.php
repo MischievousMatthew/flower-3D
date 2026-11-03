@@ -95,6 +95,7 @@ class SupplierOrderController extends Controller
                 $note ?: null,
             ])->filter()->implode(' · ');
             PurchaseOrderEvent::recordForSupplier($order, 'supplier_confirmed', 'pending', 'processing', $summary);
+            $this->logActivity($order, 'Confirmed a supplier order', "Confirmed supplier order {$order->order_number}: {$summary}");
             $this->tellShop($order, "{$order->supplier?->company_name} confirmed {$order->order_number}", $summary);
 
             return response()->json(['message' => 'Order confirmed. Thank you!', 'data' => $this->present($link->fresh())]);
@@ -121,6 +122,7 @@ class SupplierOrderController extends Controller
             // Back to a draft: the shop picks another supplier and sends it again
             $order->quietlyMoveTo(['status' => 'draft', 'supplier_declined_at' => now(), 'supplier_note' => $reason, 'submitted_at' => null]);
             PurchaseOrderEvent::recordForSupplier($order, 'supplier_declined', 'pending', 'draft', $reason);
+            $this->logActivity($order, "Declined a supplier order", "Can't supply supplier order {$order->order_number}: “{$reason}”");
             $this->tellShop($order, "{$order->supplier?->company_name} can't supply {$order->order_number}", $reason);
 
             $present = $this->present($link->fresh());
@@ -149,6 +151,7 @@ class SupplierOrderController extends Controller
 
             $order->quietlyMoveTo(['status' => 'shipped', 'supplier_shipped_at' => now()]);
             PurchaseOrderEvent::recordForSupplier($order, 'supplier_shipped', 'processing', 'shipped', $note ?: null);
+            $this->logActivity($order, 'Sent a supplier order on its way', "Sent supplier order {$order->order_number} on its way" . ($note ? ": {$note}" : ''));
             $this->tellShop($order, "{$order->order_number} is on its way", $note ?: "{$order->supplier?->company_name} has sent the order.");
 
             return response()->json(['message' => 'Marked as shipped.', 'data' => $this->present($link->fresh())]);
@@ -216,6 +219,31 @@ class SupplierOrderController extends Controller
                 'price' => (float) $i->price,
             ])->values(),
         ];
+    }
+
+    /** The supplier's answer in the shop's activity log, next to staff and owner changes */
+    private function logActivity(PurchaseOrder $order, string $action, string $details): void
+    {
+        try {
+            $supplier = $order->supplier?->company_name ?: 'Supplier';
+            \App\Models\StaffActivityLog::create([
+                'owner_id' => $order->owner_id,
+                'employee_id' => null,
+                'actor_name' => \Illuminate\Support\Str::limit("{$supplier} (supplier)", 117),
+                'action' => \Illuminate\Support\Str::limit($action, 157),
+                'area' => 'Supplier orders',
+                ...(\Illuminate\Support\Facades\Schema::hasColumn('staff_activity_logs', 'details') ? [
+                    'details' => \Illuminate\Support\Str::limit($details, 497),
+                    'subject' => \Illuminate\Support\Str::limit($supplier, 147),
+                ] : []),
+                'method' => 'POST',
+                'status' => 200,
+                'ip' => request()->ip(),
+            ]);
+        } catch (\Throwable $e) {
+            // The answer itself is saved; the log line must never undo it
+            Log::warning('Supplier activity log failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+        }
     }
 
     private function tellShop(PurchaseOrder $order, string $title, ?string $body): void

@@ -197,6 +197,21 @@ class LogStaffActivity
         'OrderController@removeItem' => ['Supplier orders', 'Removed an item from a supplier order'],
         'OrderController@recalculateTotals' => ['Supplier orders', "Recalculated a supplier order's total"],
         'OrderController@updateStatus' => ['Supplier orders', "Updated a supplier order's status"],
+        'OrderController@submit' => ['Supplier orders', 'Sent a supplier order for approval'],
+        'OrderController@approve' => ['Supplier orders', 'Approved a supplier order'],
+        'OrderController@sendBack' => ['Supplier orders', 'Sent a supplier order back to draft'],
+        'OrderController@email' => ['Supplier orders', 'Emailed a supplier order to the supplier'],
+        'OrderController@receive' => ['Supplier orders', 'Received items from a supplier order'],
+        'OrderController@cancel' => ['Supplier orders', 'Cancelled a supplier order'],
+        'ReceivingController@store' => ['Supplier orders', 'Received and inspected a delivery'],
+        'SupplierProfileController@storeProduct' => ['Suppliers', "Added an item to a supplier's catalog"],
+        'SupplierProfileController@updateProduct' => ['Suppliers', "Edited an item in a supplier's catalog"],
+        'SupplierProfileController@destroyProduct' => ['Suppliers', "Removed an item from a supplier's catalog"],
+        'SupplierProfileController@storeRating' => ['Suppliers', 'Rated a supplier'],
+        'SupplierProfileController@destroyRating' => ['Suppliers', "Removed a supplier's rating"],
+        'InventoryStockController@storeMaterial' => ['Inventory', 'Added a stock item'],
+        'InventoryStockController@adjust' => ['Inventory', 'Changed stock'],
+        'InventoryStockController@levels' => ['Inventory', 'Changed low-stock alerts'],
         'ShipmentController@store' => ['Shipments', 'Added a shipment'],
         'ShipmentController@update' => ['Shipments', 'Edited a shipment'],
         'ShipmentController@destroy' => ['Shipments', 'Deleted a shipment'],
@@ -287,6 +302,9 @@ class LogStaffActivity
         'replacement-sent' => 'Sent a replacement',
     ];
 
+    /** Areas where the shop owner's own changes are logged too, next to their staff's */
+    public const OWNER_AREAS = ['Supplier orders', 'Suppliers', 'Shipments', 'Warehouse', 'Funding', 'Inventory'];
+
     /** Set when logging fails (e.g. before the migration has run) so it isn't retried on every request. */
     private static bool $disabled = false;
 
@@ -302,16 +320,22 @@ class LogStaffActivity
 
         try {
             $user = $request->user();
-            if ($user instanceof Employee
+            $isOwner = $user instanceof \App\Models\User && $user->role === \App\Models\User::ROLE_VENDOR;
+            if (($user instanceof Employee || $isOwner)
                 && in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)
                 && $response->getStatusCode() < 400
                 && $request->route()
                 && ! $this->ignored($request)) {
                 [$area, $action] = $this->describe($request);
+                // The owner's own changes are logged for the supply chain, so the
+                // log shows everything that happened to a supplier order
+                if ($isOwner && ! in_array($area, self::OWNER_AREAS, true)) {
+                    return $response;
+                }
                 StaffActivityLog::create([
-                    'owner_id' => $user->owner_id,
-                    'employee_id' => $user->id,
-                    'actor_name' => $user->name,
+                    'owner_id' => $isOwner ? $user->id : $user->owner_id,
+                    'employee_id' => $isOwner ? null : $user->id,
+                    'actor_name' => $isOwner ? trim($user->name . ' (owner)') : $user->name,
                     'action' => Str::limit($action, 157),
                     'area' => Str::limit($area, 37),
                     ...($specific && self::hasDetails() ? [
@@ -336,13 +360,24 @@ class LogStaffActivity
     private function specific(Request $request): ?array
     {
         try {
-            if (! $request->user() instanceof Employee
+            // This runs before the route's own sign-in check, so who is signed in
+            // has to be read from the token here (otherwise details were never saved)
+            $user = $request->user() ?? $this->signedIn($request);
+            $isOwner = $user instanceof \App\Models\User && $user->role === \App\Models\User::ROLE_VENDOR;
+            if (! ($user instanceof Employee || $isOwner)
                 || ! in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)
                 || ! $request->route()
                 || $this->ignored($request)) {
                 return null;
             }
             $full = $request->route()->getActionName();
+            if ($isOwner) {
+                $controller = class_basename(Str::before($full, '@'));
+                $area = self::ACTIONS["{$controller}@" . Str::after($full, '@')][0] ?? self::areaFor($controller);
+                if (! in_array($area, self::OWNER_AREAS, true)) {
+                    return null;
+                }
+            }
 
             return StaffActivityDetails::describe(class_basename(Str::before($full, '@')) . '@' . Str::after($full, '@'), $request);
         } catch (\Throwable $e) {
@@ -351,6 +386,18 @@ class LogStaffActivity
 
             return null;
         }
+    }
+
+    /** The staff member or shop owner the request's token belongs to (only writes are looked up) */
+    private function signedIn(Request $request): \App\Models\User|Employee|null
+    {
+        $token = trim((string) $request->bearerToken());
+        if ($token === '' || ! in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+            return null;
+        }
+        $hash = hash('sha256', $token);
+
+        return \App\Models\User::where('api_token', $hash)->first() ?? Employee::where('api_token', $hash)->first();
     }
 
     private static function hasDetails(): bool

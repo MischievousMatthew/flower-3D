@@ -232,6 +232,23 @@ class StaffActivityDetails
                     'OrderController@recalculateTotals' => "Recalculated the total of supplier order {$n}",
                     default => "Changed supplier order {$n} to " . $d->status($r->input('status')),
                 }, null]),
+            // Approval, sending, receiving and cancelling: the order number and supplier
+            'OrderController@submit', 'OrderController@approve', 'OrderController@sendBack', 'OrderController@email', 'OrderController@receive', 'OrderController@cancel', 'ReceivingController@store' =>
+                $d->row('purchase_orders', $key === 'ReceivingController@store' ? $r->input('purchase_order_id') : $id, function ($po) use ($d, $key, $r) {
+                    $n = $d->text($po->order_number);
+                    $from = $d->supplierName($po->supplier_id);
+                    $why = $d->text($r->input('reason'), 120);
+
+                    return [match ($key) {
+                        'OrderController@submit' => "Sent supplier order {$n}{$from} for approval",
+                        'OrderController@approve' => "Approved supplier order {$n}{$from}" . ($r->boolean('send_email') ? ' and emailed it to the supplier' : ''),
+                        'OrderController@sendBack' => "Sent supplier order {$n} back to draft: “{$why}”",
+                        'OrderController@email' => "Emailed supplier order {$n} to the supplier{$from}",
+                        'OrderController@receive' => "Received items from supplier order {$n}{$from}",
+                        'OrderController@cancel' => "Cancelled supplier order {$n}{$from}: “{$why}”",
+                        default => "Received and inspected a delivery for supplier order {$n}{$from}",
+                    }, trim($from, ' ()') ?: null];
+                }),
             'ShipmentController@store' => ['Added a shipment' . $d->suffix($r->input('tracking_number'), ' (tracking ', ')'), null],
             'ShipmentController@update', 'ShipmentController@destroy', 'ShipmentController@markShipped', 'ShipmentController@markReceived', 'ShipmentController@updateStatus', 'ShipmentController@updateTracking' =>
                 $d->row('shipments', $id, function ($s) use ($d, $key, $r) {
@@ -438,6 +455,14 @@ class StaffActivityDetails
         $name = $id ? DB::table('suppliers')->where('id', $id)->value('company_name') : null;
 
         return $name ? ' with "' . $this->text($name) . '"' : '';
+    }
+
+    /** " (Blooms)" for a purchase order's supplier, or "" */
+    private function supplierName($id): string
+    {
+        $name = $id ? DB::table('suppliers')->where('id', $id)->value('company_name') : null;
+
+        return $name ? ' (' . $this->text($name) . ')' : '';
     }
 
     private function order($id, callable $then): ?array

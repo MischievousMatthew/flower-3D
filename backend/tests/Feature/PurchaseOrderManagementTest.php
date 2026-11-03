@@ -237,4 +237,53 @@ class PurchaseOrderManagementTest extends TestCase
         $this->postJson(self::BASE . "/{$sent}/email")->assertStatus(422)
             ->assertJsonPath('message', "Dangwa Stall 4 has no email address. Add one on the supplier's details, or print the order instead.");
     }
+    public function test_every_step_of_a_supplier_order_is_in_the_shops_activity_log(): void
+    {
+        Schema::dropIfExists('staff_activity_logs');
+        Schema::create('staff_activity_logs', function ($t) {
+            $t->id();
+            $t->unsignedBigInteger('owner_id');
+            $t->unsignedBigInteger('employee_id')->nullable();
+            $t->string('actor_name', 120)->nullable();
+            $t->string('action', 160);
+            $t->string('details', 500)->nullable();
+            $t->string('subject', 150)->nullable();
+            $t->string('area', 40);
+            $t->string('method', 8);
+            $t->unsignedSmallInteger('status');
+            $t->string('ip', 45)->nullable();
+            $t->timestamp('created_at')->useCurrent();
+        });
+        (new \ReflectionProperty(\App\Http\Middleware\LogStaffActivity::class, 'disabled'))->setValue(null, false);
+
+        $vendor = $this->shopOwner();
+        $supplier = $this->supplier($vendor);
+        $buyer = $this->staff($vendor, ['view', 'create', 'edit']);
+
+        // Staff draft it and ask for approval
+        $id = $this->signIn($buyer)->postJson(self::BASE, $this->newOrder($vendor, $supplier, 'draft'))->assertCreated()->json('id');
+        $this->postJson(self::BASE . "/{$id}/submit")->assertOk();
+        $number = PurchaseOrder::findOrFail($id)->order_number;
+
+        // The owner approves and emails it
+        $this->signIn($vendor)->postJson(self::BASE . "/{$id}/approve", ['send_email' => true])->assertOk();
+
+        // The supplier confirms it from their link
+        $token = DB::table('purchase_order_supplier_links')->where('purchase_order_id', $id)->exists() ? \App\Models\PurchaseOrderSupplierLink::issue(PurchaseOrder::findOrFail($id))[1] : null;
+        $this->app['auth']->forgetGuards();
+        $items = DB::table('purchase_order_items')->where('purchase_order_id', $id)->get()->map(fn ($i) => ['id' => $i->id, 'qty' => $i->quantity])->all();
+        $this->withHeaders(['Authorization' => ''])->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items])->assertOk();
+
+        // The owner cancels it
+        $this->signIn($vendor)->postJson(self::BASE . "/{$id}/cancel", ['reason' => 'Found a cheaper supplier'])->assertOk();
+
+        $log = DB::table('staff_activity_logs')->where('owner_id', $vendor->id)->orderBy('id')->get();
+        $this->assertTrue($log->contains(fn ($l) => $l->actor_name === 'Mark' && $l->details === "Sent supplier order {$number} (Bloom Farms) for approval"));
+        $this->assertTrue($log->contains(fn ($l) => str_ends_with($l->actor_name, '(owner)') && $l->details === "Approved supplier order {$number} (Bloom Farms) and emailed it to the supplier"));
+        $this->assertTrue($log->contains(fn ($l) => $l->actor_name === 'Bloom Farms (supplier)' && str_starts_with($l->details, "Confirmed supplier order {$number}")));
+        $this->assertTrue($log->contains(fn ($l) => str_ends_with($l->actor_name, '(owner)') && $l->details === "Cancelled supplier order {$number} (Bloom Farms): “Found a cheaper supplier”"));
+        // Details are saved even on the first request a person makes (read from their token)
+        $this->assertSame('Created a supplier order with "Bloom Farms"', $log->first()->details);
+        $this->assertTrue($log->every(fn ($l) => $l->area === 'Supplier orders'));
+    }
 }
