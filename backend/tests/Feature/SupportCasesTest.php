@@ -300,4 +300,18 @@ class SupportCasesTest extends TestCase
 
         $this->assertSame(1, DB::table('support_messages')->where('ticket_id', $id)->where('is_automated', true)->count());
     }
+    public function test_the_admin_sees_the_whole_conversation_of_a_ticket(): void
+    {
+        $shop = $this->shop('Petal & Stem');
+        $id = $this->as($shop)->postJson('/api/support/tickets', ['subject' => 'Something else', 'category' => 'other', 'message' => 'My shop page will not load.'])
+            ->assertCreated()->json('data.id');
+
+        $data = app(\App\Http\Controllers\Admin\AdminSupportController::class)->ticket($id)->getData(true)['data'];
+
+        // The list's message count must not replace the conversation itself
+        $this->assertIsArray($data['messages']);
+        $this->assertSame('My shop page will not load.', $data['messages'][0]['body']);
+        $this->assertTrue($data['messages'][1]['automated']);
+        $this->assertSame('Automatic reply', $data['messages'][1]['author']);
+    }
 }

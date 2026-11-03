@@ -115,7 +115,8 @@ class AdminSupportController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $this->ticketRow($ticket, $stores, collect()) + [
+            // array_merge, not +: the row's "messages" (a count) must give way to the conversation
+            'data' => array_merge($this->ticketRow($ticket, $stores, collect()), [
                 'requester_suspended' => (bool) $ticket->requester?->is_suspended,
                 'order' => $ticket->order ? $ticket->order->only(['id', 'order_number', 'status']) + ['total_amount' => (float) $ticket->order->total_amount] : null,
                 'messages' => $ticket->messages->map(fn ($m) => [
@@ -130,7 +131,7 @@ class AdminSupportController extends Controller
                     'created_at' => $m->created_at?->toIso8601String(),
                 ]),
                 'other_requests' => $history,
-            ],
+            ]),
         ]);
     }
 
