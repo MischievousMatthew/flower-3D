@@ -801,6 +801,8 @@ li > .ca-row:hover,
   gap: 10px;
 }
 .ca-thread li {
+  /* Fit the words, not the whole width (shop replies sit on the right, notes span it) */
+  justify-self: start;
   max-width: 92%;
   padding: 10px 14px;
   border: 1px solid var(--v-border);

@@ -717,6 +717,9 @@ onMounted(async () => {
   flex-direction: column;
   gap: 4px;
   max-width: 85%;
+  /* Fit the words, not the whole width (own messages and notes are aligned below) */
+  align-self: flex-start;
+  align-items: flex-start;
 }
 .messages li.mine {
   align-self: flex-end;
