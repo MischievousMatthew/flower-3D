@@ -11,7 +11,16 @@ use App\Services\BrevoService;
  */
 class PurchaseOrderMail
 {
-    public function __construct(private readonly PurchaseOrder $order, private readonly ?string $sentBy = null) {}
+    /**
+     * @param string|null $respondUrl The supplier's private link to confirm, decline or mark it shipped
+     * @param \DateTimeInterface|null $linkExpires When that link stops working
+     */
+    public function __construct(
+        private readonly PurchaseOrder $order,
+        private readonly ?string $sentBy = null,
+        private readonly ?string $respondUrl = null,
+        private readonly ?\DateTimeInterface $linkExpires = null,
+    ) {}
 
     /** True when the email service accepted it */
     public function send(): bool
@@ -29,6 +38,8 @@ class PurchaseOrderMail
             'order'    => $order,
             'shopName' => $shopName,
             'sentBy'   => $this->sentBy,
+            'respondUrl' => $this->respondUrl,
+            'linkExpires' => $this->linkExpires,
         ])->render();
 
         $response = (new BrevoService())->send($to, $order->supplier->company_name, "Purchase order {$order->order_number} from {$shopName}", $html);

@@ -102,5 +102,7 @@ trait CreatesPurchasingTables
         (require database_path('migrations/2026_10_26_200000_purchase_order_management.php'))->up();
         (require database_path('migrations/2026_10_26_100000_add_supplier_management.php'))->up();
         (require database_path('migrations/2026_10_26_300000_receiving_and_inspection.php'))->up();
+        Schema::dropIfExists('purchase_order_supplier_links');
+        (require database_path('migrations/2026_11_03_500000_create_purchase_order_supplier_links.php'))->up();
     }
 }

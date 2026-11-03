@@ -30,6 +30,10 @@ class PurchaseOrder extends Model
         'sent_at',
         'sent_to_email',
         'completed_at',
+        'supplier_confirmed_at',
+        'supplier_shipped_at',
+        'supplier_declined_at',
+        'supplier_note',
     ];
 
     protected $casts = [
@@ -40,6 +44,9 @@ class PurchaseOrder extends Model
         'approved_at'   => 'datetime',
         'sent_at'       => 'datetime',
         'completed_at'  => 'datetime',
+        'supplier_confirmed_at' => 'datetime',
+        'supplier_shipped_at'   => 'datetime',
+        'supplier_declined_at'  => 'datetime',
     ];
 
     /** The five stages people see, and the stored statuses each one covers */

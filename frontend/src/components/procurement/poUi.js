@@ -57,6 +57,12 @@ export function eventText(e) {
       return "Emailed it to the supplier";
     case "email_failed":
       return "Tried to email the supplier, but it didn't go through";
+    case "supplier_confirmed":
+      return "Supplier confirmed the order";
+    case "supplier_declined":
+      return "Supplier can't supply it; back to draft";
+    case "supplier_shipped":
+      return "Supplier sent it on its way";
     case "received":
       return e.to_status === "completed" ? "Received the last of it" : "Received part of it";
     case "inspected":
@@ -70,7 +76,7 @@ export function eventText(e) {
   }
 }
 
-export const EVENT_TONE = { inspected: "violet", approved: "green", emailed: "blue", sent_back: "amber", email_failed: "red", received: "violet", created: "slate", edited: "slate", status: "slate" };
+export const EVENT_TONE = { inspected: "violet", approved: "green", emailed: "blue", sent_back: "amber", email_failed: "red", received: "violet", created: "slate", edited: "slate", status: "slate", supplier_confirmed: "green", supplier_declined: "red", supplier_shipped: "blue" };
 
 export const poDate = (d) => (d ? new Date(String(d).length === 10 ? `${d}T00:00:00` : d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—");
 export const poDateTime = (d) => (d ? new Date(d).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "—");

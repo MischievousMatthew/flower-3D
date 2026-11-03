@@ -180,7 +180,7 @@ const sendEmail = ref(true);
 const err = reactive({});
 
 let keySeed = 0;
-const blankLine = (extra = {}) => ({ _key: ++keySeed, product_name: "", product_id: null, quantity: 1, unit: "stem", price: 0, supplier_product_id: null, ...extra });
+const blankLine = (extra = {}) => ({ _key: ++keySeed, product_name: "", product_id: null, quantity: 1, unit: "stem", price: "", supplier_product_id: null, ...extra });
 const form = reactive({ supplier_id: "", order_date: todayYmd(), expected_date: "", notes: "", items: [] });
 
 const supplier = computed(() => supplierInfo.value ?? suppliers.value.find((s) => s.id === form.supplier_id) ?? null);
@@ -257,7 +257,8 @@ function validate(action) {
   form.items.forEach((l, i) => {
     if (!l.product_name) err[`items.${i}.product_name`] = "Name the item.";
     if (!(Number(l.quantity) >= 1)) err[`items.${i}.quantity`] = "1 or more.";
-    if (!(Number(l.price) >= 0) || l.price === "") err[`items.${i}.price`] = "Enter the price.";
+    // A supplier is never sent an order at ₱0
+    if (!(Number(l.price) > 0)) err[`items.${i}.price`] = "Enter the price you agreed on.";
     // Received stock needs to know which product it is
     if (action !== "draft" && !l.product_id) err[`items.${i}.product_id`] = "Pick the stock item, so it can be received.";
   });
@@ -341,7 +342,13 @@ async function init() {
           form.supplier_id = prefill.supplier_id;
           await pickSupplier();
         }
-        form.items = (prefill.lines ?? []).map((l) => blankLine({ product_name: l.product_name, product_id: l.product_id, quantity: l.quantity, unit: l.unit || "stem", price: Number(l.price) || 0 }));
+        // Never bought before (no last price): use the supplier's catalog price
+        // if they list it; otherwise the price is left for the person to fill in
+        form.items = (prefill.lines ?? []).map((l) => {
+          const c = catalog.value.find((x) => x.name.toLowerCase() === String(l.product_name || "").toLowerCase());
+          const price = Number(l.price) || Number(c?.price) || "";
+          return blankLine({ product_name: l.product_name, product_id: l.product_id, quantity: l.quantity, unit: l.unit || c?.unit || "stem", price, supplier_product_id: c && !Number(l.price) ? c.id : null });
+        });
       } catch {
         // A broken prefill just means starting from a blank order
       }

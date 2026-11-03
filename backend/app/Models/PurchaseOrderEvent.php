@@ -42,6 +42,29 @@ class PurchaseOrderEvent extends Model
         }
     }
 
+    /** Write an event made by the supplier from their order link (nobody is signed in) */
+    public static function recordForSupplier(PurchaseOrder $order, string $event, ?string $from = null, ?string $to = null, ?string $note = null): ?self
+    {
+        try {
+            return static::create([
+                'owner_id'          => $order->owner_id,
+                'purchase_order_id' => $order->id,
+                'event'             => $event,
+                'from_status'       => $from,
+                'to_status'         => $to,
+                'note'              => $note,
+                'actor_type'        => 'Supplier',
+                'actor_id'          => $order->supplier_id,
+                'actor_name'        => $order->supplier?->company_name ?: 'Supplier',
+                'created_at'        => now(),
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Purchase order history not written', ['order_id' => $order->id, 'event' => $event, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
     private static function createEvent(PurchaseOrder $order, string $event, ?string $from, ?string $to, ?string $note, $actor): self
     {
         return static::create([

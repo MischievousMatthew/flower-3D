@@ -158,6 +158,14 @@
             <div><dt>Created by</dt><dd>{{ o.created_by_name || "—" }}</dd></div>
             <div><dt>Approved by</dt><dd>{{ o.approved_by_name || (isEditable(o.status) ? "Not yet" : "—") }}<small v-if="o.approved_at">{{ poDateTime(o.approved_at) }}</small></dd></div>
             <div><dt>Sent to supplier</dt><dd>{{ o.sent_at ? poDateTime(o.sent_at) : isEditable(o.status) ? "Not yet" : "Not emailed" }}<small v-if="o.sent_to_email">{{ o.sent_to_email }}</small></dd></div>
+            <div v-if="o.sent_at || o.supplier_declined_at">
+              <dt>Supplier's answer</dt>
+              <dd>
+                {{ o.supplier_declined_at ? "Can't supply it" : o.supplier_shipped_at ? "Sent it on its way" : o.supplier_confirmed_at ? "Confirmed" : "Waiting for the supplier" }}
+                <small v-if="o.supplier_declined_at || o.supplier_shipped_at || o.supplier_confirmed_at">{{ poDateTime(o.supplier_declined_at || o.supplier_shipped_at || o.supplier_confirmed_at) }}</small>
+                <small v-if="o.supplier_note">“{{ o.supplier_note }}”</small>
+              </dd>
+            </div>
           </dl>
         </section>
       </div>

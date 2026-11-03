@@ -202,6 +202,10 @@ class OrderService
             if (! $order->items_count) {
                 throw new \RuntimeException('Add at least one item before approving it.');
             }
+            $unpriced = $order->items()->where('price', '<=', 0)->pluck('product_name');
+            if ($unpriced->isNotEmpty()) {
+                throw new \RuntimeException('Add the agreed price for ' . $unpriced->implode(', ') . ' before approving. An order at ₱0 is never sent to a supplier.');
+            }
             if ($order->supplier?->status !== 'active') {
                 throw new \RuntimeException("{$order->supplier?->company_name} isn't active any more. Pick another supplier first.");
             }
@@ -238,8 +242,16 @@ class OrderService
         if (! $order->supplier?->email) {
             return null;
         }
+        // Never send a supplier an order at ₱0
+        if ($order->items->contains(fn ($i) => (float) $i->price <= 0)) {
+            PurchaseOrderEvent::record($order, 'email_failed', null, null, 'Not sent: an item has no price');
+            return false;
+        }
         try {
-            $ok = (new PurchaseOrderMail($order, PurchaseOrderEvent::nameOf(auth()->user())))->send();
+            // A fresh private link for the supplier; older links stop working
+            [$link, $token] = \App\Models\PurchaseOrderSupplierLink::issue($order);
+            $url = rtrim((string) config('app.frontend_url'), '/') . config('frontend_routes.supplier_order_path') . '/' . $token;
+            $ok = (new PurchaseOrderMail($order, PurchaseOrderEvent::nameOf(auth()->user()), $url, $link->expires_at))->send();
         } catch (\Throwable $e) {
             Log::warning('Purchase order email failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
             $ok = false;

@@ -108,6 +108,9 @@ class PurchaseOrderManagementTest extends TestCase
         $this->assertNotNull($order->approved_at);
         $this->assertSame('orders@bloom.ph', $order->sent_to_email);
         Http::assertSent(fn ($r) => str_contains($r->url(), 'brevo') && str_contains($r['subject'], $order->order_number));
+        // The email carries the supplier's private link to answer it
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'brevo') && str_contains((string) $r['htmlContent'], 'View and confirm the order'));
+        $this->assertSame(1, DB::table('purchase_order_supplier_links')->where('purchase_order_id', $id)->whereNull('revoked_at')->count());
 
         // Sent orders can't be changed or deleted
         $this->putJson(self::BASE . "/{$id}", ['notes' => 'x'])->assertStatus(422);

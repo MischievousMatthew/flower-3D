@@ -22,8 +22,24 @@
             <p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#3b4250;">
                 Hello {{ $order->supplier?->contact_person ?: 'there' }},<br>
                 {{ $shopName }} would like to order the following from {{ $order->supplier?->company_name }}.
-                Please reply to this email to confirm, or if anything is unavailable.
+                @if ($respondUrl)
+                    Please open the order to confirm it, tell us if anything is unavailable, and mark it shipped when it's on the way.
+                @else
+                    Please reply to this email to confirm, or if anything is unavailable.
+                @endif
             </p>
+
+            @if ($respondUrl)
+                <p style="margin:0 0 8px;">
+                    <a href="{{ $respondUrl }}" style="display:inline-block;padding:13px 26px;border-radius:10px;background:#363F4E;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">View and confirm the order</a>
+                </p>
+                <p style="margin:0 0 22px;font-size:12.5px;color:#7a8290;">
+                    No account needed. This link is only for you
+                    @if ($linkExpires)
+                        and works until {{ \Carbon\Carbon::parse($linkExpires)->format('F j, Y') }}
+                    @endif.
+                </p>
+            @endif
 
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;margin:0 0 18px;">
                 <thead>

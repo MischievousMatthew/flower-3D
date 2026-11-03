@@ -17,6 +17,8 @@ export const opaqueRouteTokens = Object.freeze({
   Register: "Dzmp0ewDKLjAU5slWSgNaKl0Vck6xwRqrldQx620f8O",
   Vendor_Register: "MqeBsK1OZNqF835i3Y5SBqrORWUMMIh435XcP7EOh6L",
   VendorResubmission: "2WdltqdnifeIvG7lZJgNIiFmkbYoyfAIbqGzMhVmWWN",
+  // Must match config/frontend_routes.php supplier_order_path (the email link)
+  SupplierOrder: "pQ7xR2mVb9KsT4nLw8cY3fHd6gJz1aEuN5oBiZqWk0S",
   PublicLeaveQRRequest: "hfbxf6JshMDNHBoFD7tl8ZgtkYL0ZskkdUyMeEfo8a7",
   Profile: "KYKTMXR7YuPOjXjPcI4bx2gwPLo9AIcQj5cF66VH0Kp",
   Cart: "eNbZplBn8p9IwRABZX9hrl9LVUyphxUCy5ekVl2XBGd",

@@ -131,6 +131,14 @@ Route::get('/vendor/status/{applicationId}', [VendorController::class, 'checkSta
 Route::get('/vendor/resubmission/{token}', [VendorApplicationResubmissionController::class, 'showForVendor']);
 Route::post('/vendor/resubmission/{token}', [VendorApplicationResubmissionController::class, 'submitForVendor'])->middleware('throttle:vendor-apply');
 
+// Suppliers answer a purchase order from the private link in its email (no account)
+Route::prefix('supplier-orders/{token}')->middleware('throttle:30,1')->group(function () {
+    Route::get('/',          [\App\Http\Controllers\SupplierOrderController::class, 'show']);
+    Route::post('/confirm',  [\App\Http\Controllers\SupplierOrderController::class, 'confirm']);
+    Route::post('/decline',  [\App\Http\Controllers\SupplierOrderController::class, 'decline']);
+    Route::post('/shipped',  [\App\Http\Controllers\SupplierOrderController::class, 'shipped']);
+});
+
 // ============================================================
 // 3. PUBLIC — CUSTOMER STOREFRONT
 // ============================================================

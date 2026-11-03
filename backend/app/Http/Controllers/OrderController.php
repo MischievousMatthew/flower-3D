@@ -55,7 +55,7 @@ class OrderController extends Controller
             ...$this->detailRules(),
             'items'                => ['required', 'array', 'min:1'],
             ...$this->itemRules(),
-        ]);
+        ], self::ITEM_MESSAGES);
 
         // Without an action, orders start with the supplier, as they always did
         $action = $data['action'] ?? null;
@@ -83,7 +83,7 @@ class OrderController extends Controller
             ...$this->detailRules(),
             'items'       => ['sometimes', 'array', 'min:1'],
             ...$this->itemRules(),
-        ]);
+        ], self::ITEM_MESSAGES);
 
         try {
             return response()->json($this->service->updateDraft($id, $data, $this->getOwnerId()));
@@ -140,6 +140,10 @@ class OrderController extends Controller
         if (in_array($order->status, PurchaseOrder::EDITABLE, true)) {
             return response()->json(['message' => 'Approve the order before sending it to the supplier.'], 422);
         }
+        $unpriced = $order->items()->where('price', '<=', 0)->pluck('product_name');
+        if ($unpriced->isNotEmpty()) {
+            return response()->json(['message' => 'Add the agreed price for ' . $unpriced->implode(', ') . ' before sending. A supplier is never sent an order at ₱0.'], 422);
+        }
         $ok = $this->service->emailSupplier($order);
         if ($ok === null) {
             return response()->json(['message' => "{$order->supplier?->company_name} has no email address. Add one on the supplier's details, or print the order instead."], 422);
@@ -191,12 +195,17 @@ class OrderController extends Controller
         ];
     }
 
+    private const ITEM_MESSAGES = [
+        'items.*.price.required' => 'Enter the price you agreed with the supplier.',
+        'items.*.price.gt'       => 'Enter the price you agreed with the supplier (more than ₱0).',
+    ];
+
     private function itemRules(): array
     {
         return [
             'items.*.product_name'        => ['required', 'string', 'max:255'],
             'items.*.quantity'            => ['required', 'integer', 'min:1'],
-            'items.*.price'               => ['required', 'numeric', 'min:0'],
+            'items.*.price'               => ['required', 'numeric', 'gt:0'],
             'items.*.unit'                => ['nullable', 'string', 'max:20'],
             'items.*.product_id'          => ['nullable', 'integer'],
             'items.*.supplier_product_id' => ['nullable', 'integer'],
@@ -252,8 +261,8 @@ class OrderController extends Controller
             'items'                => ['required', 'array', 'min:1'],
             'items.*.product_name' => ['required', 'string', 'max:255'],
             'items.*.quantity'     => ['required', 'integer', 'min:1'],
-            'items.*.price'        => ['required', 'numeric', 'min:0'],
-        ]);
+            'items.*.price'        => ['required', 'numeric', 'gt:0'],
+        ], self::ITEM_MESSAGES);
 
         return response()->json($this->service->attachItems($id, $data['items'], $this->getOwnerId()));
     }

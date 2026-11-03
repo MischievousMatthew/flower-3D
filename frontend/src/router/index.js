@@ -100,6 +100,13 @@ const routes = [
         meta: { public: true },
       },
       {
+        // A supplier answers a purchase order from the link in its email (no account)
+        path: "supplier/order/:token",
+        name: "SupplierOrder",
+        component: () => import("../views/guest/SupplierOrder.vue"),
+        meta: { public: true },
+      },
+      {
         path: "leaves",
         name: "PublicLeaveQRRequest",
         component: () =>
