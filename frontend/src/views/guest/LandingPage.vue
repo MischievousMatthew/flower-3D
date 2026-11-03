@@ -983,6 +983,9 @@ function onIntroFinished() {
   pageCtx?.add(() => setupSectionReveals());
   initSmoothScroll();
   ScrollTrigger.refresh();
+  // Arrived from another page's navbar (e.g. Shop → "How It Works"): go to that section
+  const target = decodeURIComponent(window.location.hash.slice(1));
+  if (target) requestAnimationFrame(() => scrollToSection(target));
 }
 
 // ==========================================================

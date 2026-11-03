@@ -21,28 +21,28 @@
     </router-link>
 
     <div id="customer-nav" class="bc-nav-links">
+      <!-- Guests keep the landing page's navbar on every shop page -->
       <template v-if="!isAuthenticated">
-        <router-link to="/" @click="closeMobileMenu">Home</router-link>
+        <router-link to="/shop" @click="closeMobileMenu">Shop</router-link>
+        <router-link to="/pricing" @click="closeMobileMenu">Pricing</router-link>
+        <router-link v-for="s in LANDING_SECTIONS" :key="s.id" :to="{ name: 'Home', hash: `#${s.id}` }" @click="closeMobileMenu">{{ s.label }}</router-link>
+        <router-link to="/guest/login" class="bc-nav-menu-only" @click="closeMobileMenu">Sign in</router-link>
       </template>
-      <router-link to="/shop" @click="closeMobileMenu">Shop</router-link>
-      <a href="#occasions" @click.prevent="navigateTo('occasions')"
-        >Occasions</a
-      >
-      <a href="#sale" @click.prevent="navigateTo('sale')">Sales</a>
-      <router-link
-        v-if="!isAuthenticated"
-        to="/guest/login"
-        class="bc-nav-menu-only"
-        @click="closeMobileMenu"
-        >Login</router-link
-      >
+      <!-- Signed in: the shop's own navbar -->
+      <template v-else>
+        <router-link to="/shop" @click="closeMobileMenu">Shop</router-link>
+        <a href="#occasions" @click.prevent="navigateTo('occasions')"
+          >Occasions</a
+        >
+        <a href="#sale" @click.prevent="navigateTo('sale')">Sales</a>
+      </template>
     </div>
 
     <div class="nav-actions">
       <template v-if="!isAuthenticated">
-        <router-link to="/guest/login" class="bc-nav-login">Login</router-link>
+        <router-link to="/guest/login" class="bc-nav-login">Sign in</router-link>
         <router-link to="/guest/register" class="bc-nav-register"
-          >Register</router-link
+          >Create account</router-link
         >
       </template>
       <template v-else>
@@ -310,6 +310,15 @@ import NotificationDetail from "../components/support/NotificationDetail.vue";
 
 const router = useRouter();
 const { isAuthenticated, logout, user } = useAuth();
+
+// The landing page's sections, linked from the guest navbar (same as the landing page's own)
+const LANDING_SECTIONS = [
+  { id: "features", label: "Features" },
+  { id: "how-it-works", label: "How It Works" },
+  { id: "plans", label: "For Vendors" },
+  { id: "blog", label: "Blog" },
+  { id: "about", label: "About" },
+];
 const { unreadChatCount, chatRoute } = useChatNotifications();
 
 const showUserDropdown = ref(false);
