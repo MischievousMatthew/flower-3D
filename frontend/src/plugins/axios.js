@@ -26,6 +26,10 @@ const shouldForceLogout = (error) => {
   if (error.response?.status !== 401) {
     return false;
   }
+  // A working sign-in used on the other kind of page: nothing to sign out
+  if (error.response?.data?.code === "wrong_account_type") {
+    return false;
+  }
 
   const url = error.config?.url ?? "";
   const normalizedUrl = url.startsWith("/") ? url : `/${url}`;
@@ -48,6 +52,22 @@ const shouldForceLogout = (error) => {
   }
 
   return true;
+};
+
+// Server answers that mean "this sign-in has ended", with the modal's heading
+const ENDED_CODES = {
+  session_expired: "You were away for a while",
+  session_ended: "You've been signed out",
+};
+
+const sentCurrentToken = (config) => {
+  const sent = String(config?.headers?.Authorization ?? "").replace(/^Bearer\s+/i, "");
+  if (!sent) return false;
+  try {
+    return [localStorage.getItem("auth_token"), localStorage.getItem("vendor_token"), localStorage.getItem("employee_token")].includes(sent);
+  } catch {
+    return false;
+  }
 };
 
 // ================= REQUEST INTERCEPTOR =================
@@ -144,12 +164,23 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // ================= EXPIRED ON THE SERVER =================
-    // The token went unused too long: sign out here too and say why
-    if (error.response?.status === 401 && error.response?.data?.code === "session_expired") {
-      clearStoredAuth();
-      delete api.defaults.headers.common["Authorization"];
-      markSessionExpired();
+    // ================= SIGN-IN ENDED =================
+    // Any account (customer, vendor, admin, ERP staff): the server says this
+    // sign-in no longer works and why. Sign out here and show the reason,
+    // never a silent jump to the login page.
+    const endedCode = error.response?.data?.code;
+    if (error.response?.status === 401 && ENDED_CODES[endedCode]) {
+      // Only when it's the sign-in this browser still uses (not a request
+      // that was sent before signing in again)
+      if (sentCurrentToken(error.config)) {
+        clearStoredAuth();
+        delete api.defaults.headers.common["Authorization"];
+        markSessionExpired({
+          kind: endedCode === "session_expired" ? "away" : "ended",
+          title: ENDED_CODES[endedCode],
+          message: error.response.data.message,
+        });
+      }
       return Promise.reject(error);
     }
 

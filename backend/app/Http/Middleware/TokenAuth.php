@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\AccountSuspensionService;
+use App\Support\EndedSessions;
 use App\Support\SingleSession;
 use Closure;
 use Illuminate\Http\Request;
@@ -37,19 +38,28 @@ class TokenAuth
         }
 
         if (!$authenticatable) {
-            // Signed out because the account logged in on another browser: say so
-            if ($type !== 'employee' && SingleSession::replacedBy($hashedToken)) {
+            // A working sign-in of the other kind (staff token on a customer route,
+            // or the reverse): a wrong-route call, not a sign-out
+            $otherKind = match ($type) {
+                'employee' => $this->resolveByToken(User::query(), $hashedToken),
+                'user' => $this->resolveByToken(Employee::query(), $hashedToken),
+                default => null,
+            };
+            if ($otherKind) {
                 return response()->json([
                     'success' => false,
-                    'code' => 'session_replaced',
-                    'message' => SingleSession::REPLACED_MESSAGE,
+                    'code' => 'wrong_account_type',
+                    'message' => 'This page is for a different kind of account.',
                 ], 401);
             }
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated',
-            ], 401);
+            // This sign-in has ended: say why, so the browser can tell the person
+            $ended = EndedSessions::lookup($hashedToken)
+                ?? (SingleSession::replacedBy($hashedToken)
+                    ? ['code' => EndedSessions::REPLACED, 'message' => SingleSession::REPLACED_MESSAGE]
+                    : ['code' => EndedSessions::ENDED, 'message' => EndedSessions::MSG_GENERIC]);
+
+            return response()->json(['success' => false] + $ended, 401);
         }
 
         if (AccountSuspensionService::isBlocked($authenticatable)) {
@@ -63,7 +73,7 @@ class TokenAuth
         if ($authenticatable instanceof User) {
             // A token left unused too long stops working here too, not only in the browser
             if (SingleSession::isExpired($authenticatable)) {
-                SingleSession::end($authenticatable);
+                SingleSession::end($authenticatable, EndedSessions::EXPIRED, SingleSession::EXPIRED_MESSAGE);
 
                 return response()->json([
                     'success' => false,

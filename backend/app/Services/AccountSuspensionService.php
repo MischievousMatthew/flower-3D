@@ -37,8 +37,12 @@ class AccountSuspensionService
 
         DB::transaction(function () use ($user, $admin, $reason) {
             // Clearing the tokens signs everyone out straight away
+            // Their browsers are told why
+            \App\Support\EndedSessions::endFor($user, \App\Support\EndedSessions::ENDED, $user->role === User::ROLE_VENDOR ? self::VENDOR_MESSAGE : self::CUSTOMER_MESSAGE);
             $user->forceFill(['is_suspended' => true, 'api_token' => null])->save();
             if ($user->role === User::ROLE_VENDOR) {
+                Employee::query()->where('owner_id', $user->id)->whereNotNull('api_token')->pluck('api_token')
+                    ->each(fn ($hash) => \App\Support\EndedSessions::record($hash, \App\Support\EndedSessions::ENDED, \App\Support\EndedSessions::MSG_SUSPENDED_STORE));
                 Employee::query()->where('owner_id', $user->id)->update(['api_token' => null]);
             }
 

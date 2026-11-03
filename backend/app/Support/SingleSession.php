@@ -73,8 +73,12 @@ final class SingleSession
         ])->save();
     }
 
-    public static function end(User $user): void
+    /** Ends the account's session; with a reason, a browser still using it is told why */
+    public static function end(User $user, ?string $code = null, ?string $message = null): void
     {
+        if ($code) {
+            EndedSessions::endFor($user, $code, $message ?? EndedSessions::MSG_GENERIC);
+        }
         $user->forceFill(['api_token' => null, 'last_seen_at' => null, 'session_device' => null])->save();
     }
 

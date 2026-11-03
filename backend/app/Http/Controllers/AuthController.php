@@ -145,7 +145,7 @@ class AuthController extends Controller
         }
         $user->save();
         // Signed out everywhere, and the wrong-password count starts over
-        SingleSession::end($user);
+        SingleSession::end($user, \App\Support\EndedSessions::ENDED, \App\Support\EndedSessions::MSG_PASSWORD);
         app(LoginGuard::class)->clear([$user->username, $user->email, $data['identifier']]);
 
         return response()->json([

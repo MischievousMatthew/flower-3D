@@ -271,9 +271,11 @@ class StaffController extends Controller
             // A new password, or leaving the shop, signs them out everywhere
             if (! empty($data['password'])) {
                 $employee->password = Hash::make($data['password']);
+                \App\Support\EndedSessions::endFor($employee, \App\Support\EndedSessions::ENDED, \App\Support\EndedSessions::MSG_STAFF_PASSWORD);
                 $employee->api_token = null;
             }
             if ($data['status'] === 'Resign') {
+                \App\Support\EndedSessions::endFor($employee, \App\Support\EndedSessions::ENDED, \App\Support\EndedSessions::MSG_STAFF_CLOSED);
                 $employee->api_token = null;
             }
             $employee->forceFill(['staff_role_id' => $data['staff_role_id']])->save();

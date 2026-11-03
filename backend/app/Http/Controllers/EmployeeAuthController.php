@@ -74,6 +74,8 @@ class EmployeeAuthController extends Controller
             }
 
             $token = Str::random(80);
+            // One device at a time: the browser signed in before is told why it was signed out
+            \App\Support\EndedSessions::endFor($employee, \App\Support\EndedSessions::REPLACED, \App\Support\SingleSession::REPLACED_MESSAGE);
             $employee->forceFill([
                 'api_token' => hash('sha256', $token),
             ])->save();

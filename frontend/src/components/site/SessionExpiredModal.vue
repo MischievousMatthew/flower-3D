@@ -4,11 +4,12 @@
       <div v-if="state.open" class="sem-backdrop">
         <div class="sem" role="alertdialog" aria-modal="true" aria-labelledby="sem-title" aria-describedby="sem-message">
           <span class="sem-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
+            <svg v-if="state.kind === 'away'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
+            <svg v-else viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5M12 14.5v2" /></svg>
           </span>
           <p class="sem-label">Signed out</p>
-          <h2 id="sem-title">You were away for a while</h2>
-          <p id="sem-message" class="sem-message">To keep your account safe, we sign you out after 15 minutes without any activity.</p>
+          <h2 id="sem-title">{{ state.title }}</h2>
+          <p id="sem-message" class="sem-message">{{ state.message }}</p>
           <button ref="loginButton" type="button" class="sem-btn" @click="go('/guest/login')">Log in again</button>
           <button type="button" class="sem-link" @click="go('/')">Back to homepage</button>
         </div>
@@ -21,7 +22,7 @@
 import { nextTick, ref, watch } from "vue";
 import { clearSessionExpired, sessionExpired as state } from "../../utils/sessionExpired";
 
-/** Shown when the inactivity timeout signs someone out while the page is open (mounted once in App.vue) */
+/** Shown whenever any account is signed out while the page is open, with the reason (mounted once in App.vue) */
 const loginButton = ref(null);
 
 // Already signed out by now; a full load leaves nothing from the old session on screen

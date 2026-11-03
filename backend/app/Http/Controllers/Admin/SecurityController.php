@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\PlatformNotices;
 use App\Support\ApiAreas;
 use App\Support\AuditTargets;
+use App\Support\EndedSessions;
 use App\Support\PaymentLedger;
 use App\Support\PlatformSettings;
 use App\Support\ShowMore;
@@ -189,6 +190,7 @@ class SecurityController extends Controller
             DB::transaction(fn () => $admin->delete());
         } catch (\Illuminate\Database\QueryException) {
             // Other records still point at this account: keep it, but with no way in
+            EndedSessions::endFor($admin, EndedSessions::ENDED, EndedSessions::MSG_ACCESS_OFF);
             $admin->forceFill(['is_suspended' => true, 'api_token' => null])->save();
 
             return response()->json(['success' => true, 'message' => "{$name} is linked to other records, so their access was turned off instead of removing the account."]);
@@ -219,6 +221,9 @@ class SecurityController extends Controller
         }
 
         // Turning access off also signs them out
+        if (!$active) {
+            EndedSessions::endFor($admin, EndedSessions::ENDED, EndedSessions::MSG_ACCESS_OFF);
+        }
         $admin->forceFill(['is_suspended' => !$active] + ($active ? [] : ['api_token' => null]))->save();
 
         return response()->json(['success' => true, 'message' => $active ? 'Access turned back on.' : 'Access turned off. They have been signed out.']);
@@ -236,6 +241,9 @@ class SecurityController extends Controller
         }
         $data = $request->validate(['password' => ['required', 'string', Password::min(10)->letters()->mixedCase()->numbers()]]);
 
+        if ($admin->id !== $request->user()->id) {
+            EndedSessions::endFor($admin, EndedSessions::ENDED, EndedSessions::MSG_PASSWORD);
+        }
         $admin->forceFill(['password' => Hash::make($data['password'])] + ($admin->id === $request->user()->id ? [] : ['api_token' => null]))->save();
 
         return response()->json(['success' => true, 'message' => $admin->id === $request->user()->id ? 'Your password was changed.' : 'Password changed. They have been signed out.']);
