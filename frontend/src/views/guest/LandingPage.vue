@@ -52,9 +52,6 @@
       </router-link>
       <div id="primary-nav" class="nav-links bc-nav-links">
         <router-link to="/shop" @click="closeMobileMenu">Shop</router-link>
-        <router-link to="/pricing" @click="closeMobileMenu"
-          >Pricing</router-link
-        >
         <a href="#features" @click.prevent="navigateTo('features')"
           >Features</a
         >
@@ -64,6 +61,7 @@
         <a href="#plans" @click.prevent="navigateTo('plans')">For Vendors</a>
         <a href="#blog" @click.prevent="navigateTo('blog')">Blog</a>
         <a href="#about" @click.prevent="navigateTo('about')">About</a>
+        <router-link to="/journal" @click="closeMobileMenu">Journal</router-link>
         <router-link
           v-if="!isAuthenticated"
           to="/guest/login"

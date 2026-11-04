@@ -24,8 +24,8 @@
       <!-- Guests keep the landing page's navbar on every shop page -->
       <template v-if="!isAuthenticated">
         <router-link to="/shop" @click="closeMobileMenu">Shop</router-link>
-        <router-link to="/pricing" @click="closeMobileMenu">Pricing</router-link>
         <router-link v-for="s in LANDING_SECTIONS" :key="s.id" :to="{ name: 'Home', hash: `#${s.id}` }" @click="closeMobileMenu">{{ s.label }}</router-link>
+        <router-link to="/journal" @click="closeMobileMenu">Journal</router-link>
         <router-link to="/guest/login" class="bc-nav-menu-only" @click="closeMobileMenu">Sign in</router-link>
       </template>
       <!-- Signed in: the shop's own navbar -->
