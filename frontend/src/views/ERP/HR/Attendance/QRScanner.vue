@@ -58,8 +58,11 @@
           <span v-if="position" class="ks-loc"><span v-html="ICONS.pin"></span>Location ±{{ position.accuracy }} m</span>
         </div>
         <div class="ks-camera">
-          <video ref="qrVideo" class="ks-video" playsinline muted></video>
+          <video ref="qrVideo" class="ks-video" :class="{ mirrored: facing === 'user' }" playsinline muted></video>
           <div class="ks-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <button v-if="manyCameras && state === 'scan'" type="button" class="ks-flip" :aria-label="facing === 'user' ? 'Use the back camera' : 'Use the front camera'" :title="facing === 'user' ? 'Use the back camera' : 'Use the front camera'" @click="flipCamera">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-3l-2-3H9L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M9 13a3 3 0 0 1 5.2-2"/><path d="M15 13a3 3 0 0 1-5.2 2"/><path d="M14.5 9.5v1.7h-1.7"/><path d="M9.5 16.5v-1.7h1.7"/></svg>
+          </button>
           <div v-if="state === 'starting'" class="ks-cover">Checking the QR code and your location…</div>
         </div>
         <p class="ks-tip">{{ mode === "enroll" ? "Scan the QR code of the person whose face you're enrolling. They must be here in person." : "Hold the employee's QR code up to the camera." }}</p>
@@ -120,6 +123,40 @@ const cameraError = ref("");
 const session = ref(null);
 const result = ref(null);
 const autoReset = ref(0);
+
+// Front or back camera for reading badges; the device remembers the last choice.
+// The face check always uses the front camera (its screen-flash check needs the screen facing the person).
+const FACING_KEY = "bc-attendance-camera";
+const facing = ref(readFacing());
+const manyCameras = ref(false);
+
+function readFacing() {
+  try {
+    return localStorage.getItem(FACING_KEY) === "environment" ? "environment" : "user";
+  } catch (_) {
+    return "user";
+  }
+}
+
+async function countCameras() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    manyCameras.value = devices.filter((d) => d.kind === "videoinput").length > 1;
+  } catch (_) {
+    manyCameras.value = false;
+  }
+}
+
+function flipCamera() {
+  facing.value = facing.value === "user" ? "environment" : "user";
+  try {
+    localStorage.setItem(FACING_KEY, facing.value);
+  } catch (_) {
+    // private window: it just won't be remembered
+  }
+  stopQr();
+  startQr();
+}
 
 let qrStream = null;
 let scanTimer = null;
@@ -182,9 +219,10 @@ async function startQr() {
   cameraError.value = "";
   await nextTick();
   try {
-    qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+    qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing.value } }, audio: false });
     qrVideo.value.srcObject = qrStream;
     await qrVideo.value.play();
+    countCameras(); // labels and the full list are only known once the camera is allowed
   } catch (e) {
     cameraError.value = e?.name === "NotAllowedError" ? "Allow the camera for this site to scan QR codes." : "Couldn't start the camera.";
     return;
@@ -367,7 +405,37 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+/* The front camera reads like a mirror; the back camera shows the world as it is */
+.ks-video.mirrored {
   transform: scaleX(-1);
+}
+.ks-flip {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.6);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: background-color 0.15s;
+}
+.ks-flip:hover {
+  background: rgba(15, 23, 42, 0.8);
+}
+.ks-flip:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.ks-flip svg {
+  width: 24px;
+  height: 24px;
 }
 .ks-frame {
   position: absolute;
