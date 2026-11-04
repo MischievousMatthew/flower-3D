@@ -39,3 +39,6 @@ backend/.env              # Environment file
 /backend/_ide_helper_models.php
 # Brainstorming mockups and plan scratch
 .superpowers/
+
+# Impeccable overlay server state (local only)
+.impeccable/live/
