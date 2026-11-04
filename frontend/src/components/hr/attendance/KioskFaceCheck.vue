@@ -20,6 +20,10 @@
       </div>
       <div v-if="direction" class="kf-arrow" :class="direction" aria-hidden="true">{{ direction === "left" ? "←" : "→" }}</div>
     </div>
+    <p class="kf-front">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      Only the front camera can be used for the face check. Face the screen.
+    </p>
 
     <ol class="kf-steps" aria-label="Checks">
       <li v-for="(id, i) in session.challenges" :key="i" :class="{ on: phase === 'challenge' && step === i, done: doneSteps > i }">
@@ -367,6 +371,21 @@ onBeforeUnmount(stop);
   50% {
     transform: translateY(-50%) scale(1.15);
   }
+}
+.kf-front {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--v-muted);
+  text-align: center;
+}
+.kf-front svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
 }
 .kf-steps {
   display: flex;

@@ -60,9 +60,10 @@
         <div class="ks-camera">
           <video ref="qrVideo" class="ks-video" :class="{ mirrored: facing === 'user' }" playsinline muted></video>
           <div class="ks-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-          <button v-if="manyCameras && state === 'scan'" type="button" class="ks-flip" :aria-label="facing === 'user' ? 'Use the back camera' : 'Use the front camera'" :title="facing === 'user' ? 'Use the back camera' : 'Use the front camera'" @click="flipCamera">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-3l-2-3H9L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M9 13a3 3 0 0 1 5.2-2"/><path d="M15 13a3 3 0 0 1-5.2 2"/><path d="M14.5 9.5v1.7h-1.7"/><path d="M9.5 16.5v-1.7h1.7"/></svg>
+          <button v-if="state === 'scan'" type="button" class="ks-flip" :aria-label="facing === 'user' ? 'Switch to the back camera' : 'Switch to the front camera'" :title="facing === 'user' ? 'Switch to the back camera' : 'Switch to the front camera'" @click="flipCamera">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>
           </button>
+          <span v-if="flipNote" class="ks-flip-note" role="status">{{ flipNote }}</span>
           <div v-if="state === 'starting'" class="ks-cover">Checking the QR code and your location…</div>
         </div>
         <p class="ks-tip">{{ mode === "enroll" ? "Scan the QR code of the person whose face you're enrolling. They must be here in person." : "Hold the employee's QR code up to the camera." }}</p>
@@ -147,8 +148,22 @@ async function countCameras() {
   }
 }
 
+const flipNote = ref("");
+let flipNoteTimer = null;
+
+function showFlipNote(text) {
+  flipNote.value = text;
+  clearTimeout(flipNoteTimer);
+  flipNoteTimer = setTimeout(() => (flipNote.value = ""), 2500);
+}
+
 function flipCamera() {
+  if (!manyCameras.value) {
+    showFlipNote("This device has only one camera.");
+    return;
+  }
   facing.value = facing.value === "user" ? "environment" : "user";
+  showFlipNote(facing.value === "user" ? "Front camera" : "Back camera");
   try {
     localStorage.setItem(FACING_KEY, facing.value);
   } catch (_) {
@@ -319,6 +334,7 @@ onMounted(check);
 onBeforeUnmount(() => {
   stopQr();
   clearInterval(resetTimer);
+  clearTimeout(flipNoteTimer);
 });
 </script>
 
@@ -436,6 +452,18 @@ onBeforeUnmount(() => {
 .ks-flip svg {
   width: 24px;
   height: 24px;
+}
+.ks-flip-note {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.7);
+  color: #fff;
+  font-size: 12.5px;
+  white-space: nowrap;
 }
 .ks-frame {
   position: absolute;
