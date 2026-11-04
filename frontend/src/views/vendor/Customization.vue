@@ -293,24 +293,6 @@
             <span v-if="errors.model_file" class="cz-error">{{ errors.model_file }}</span>
           </div>
 
-          <label v-if="!current.isCard" class="cz-field">
-            <span class="cz-label">Price <small>(added to the bouquet, optional)</small></span>
-            <div class="cz-money">
-              <span aria-hidden="true">₱</span>
-              <input
-                v-model="form.price"
-                class="cz-input"
-                :class="{ invalid: errors.price }"
-                type="number"
-                min="0"
-                step="0.01"
-                inputmode="decimal"
-                placeholder="0.00"
-              />
-            </div>
-            <span v-if="errors.price" class="cz-error">{{ errors.price }}</span>
-          </label>
-
           <label class="cz-field">
             <span class="cz-label">Description</span>
             <textarea
@@ -375,7 +357,7 @@
               <div class="cz-item-body">
                 <div class="cz-item-title">
                   <h3>{{ item.name }}</h3>
-                  <span class="cz-price">{{ itemPriceLabel(item) }}</span>
+                  <span v-if="item.type === 'card'" class="cz-price">{{ itemPriceLabel(item) }}</span>
                 </div>
                 <p v-if="item.color_hex" class="cz-hexline">{{ item.color_hex.toUpperCase() }}</p>
                 <div v-if="item.type === 'card'" class="cz-meta">
@@ -751,7 +733,8 @@ function itemPriceLabel(item) {
     if (!lowest) return prices.some(Boolean) ? "From free" : "Free";
     return prices.length > 1 ? `From ${formatPrice(lowest)}` : `+ ${formatPrice(lowest)}`;
   }
-  return Number(item.price) ? `+ ${formatPrice(item.price)}` : "Free";
+  // Wrappers, ribbons and fillers are included in each occasion's base price
+  return "";
 }
 
 function validate() {
@@ -772,9 +755,6 @@ function validate() {
   }
   if (current.value.hasColor && !/^#[0-9a-f]{6}$/i.test(form.color)) errors.color_hex = "Enter a 6-digit hex code.";
   if (current.value.hasModel && !form.modelFile && !form.modelUrl) errors.model_file = "Upload a 3D model for this filler.";
-  if (form.price !== "" && (Number.isNaN(Number(form.price)) || Number(form.price) < 0)) {
-    errors.price = "Enter 0 or a positive amount.";
-  }
   return !Object.keys(errors).length;
 }
 
@@ -794,8 +774,6 @@ async function submitForm() {
       payload.append(`card_sizes[${index}][label]`, size.label);
       payload.append(`card_sizes[${index}][price]`, String(Number(size.price)));
     });
-  } else {
-    payload.append("price", form.price === "" ? "0" : String(Number(form.price)));
   }
   if (current.value.hasColor) payload.append("color_hex", form.color);
   if (form.modelFile) payload.append("model_file", form.modelFile);

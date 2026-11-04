@@ -84,9 +84,10 @@ class BouquetCustomizationOption extends Model
     }
 
     /**
-     * Price the wrapper, ribbon and fillers chosen in a custom bouquet from the
-     * vendor's saved options, never from client-sent prices. Returns the extra
-     * total and the customizations with the server's names, colours and prices.
+     * Price a custom bouquet's extras from the vendor's saved settings, never
+     * from client-sent prices: the occasion's base price plus the message card.
+     * Wrappers, ribbons and fillers are included in the base price. Returns the
+     * extra total and the customizations with the server's names and colours.
      *
      * @return array{ok: bool, message?: string, total: float, customizations: array}
      */
@@ -100,6 +101,7 @@ class BouquetCustomizationOption extends Model
         }
         $customizations = $preset['customizations'];
         $maxFillers = $preset['filler_limit'];
+        $base = (float) ($preset['base_price'] ?? 0);
 
         // 'wrapper' is the outer paper; 'inner_wrapper' the inner layer.
         $wrapperId = (int) data_get($customizations, 'wrapper.id', 0);
@@ -121,13 +123,13 @@ class BouquetCustomizationOption extends Model
         if (!$ids) {
             unset($customizations['wrapper'], $customizations['inner_wrapper'], $customizations['ribbon'], $customizations['card']);
             $customizations['fillers'] = [];
-            $customizations['extras_total'] = 0;
+            $customizations['extras_total'] = round($base, 2);
 
-            return ['ok' => true, 'total' => 0.0, 'customizations' => $customizations];
+            return ['ok' => true, 'total' => round($base, 2), 'customizations' => $customizations];
         }
 
         $options = self::forOwner($ownerId)->available()->whereIn('id', array_unique($ids))->get()->keyBy('id');
-        $total = 0.0;
+        $total = $base;
 
         $selections = [
             'wrapper' => [$wrapperId, self::TYPE_WRAPPER, 'paper_color'],
@@ -150,10 +152,9 @@ class BouquetCustomizationOption extends Model
                 'id' => $option->id,
                 'name' => $option->name,
                 'color_hex' => $option->color_hex,
-                'price' => $option->price,
+                'price' => 0.0, // part of the occasion's base price
             ];
             $customizations[$colorKey] = $option->color_hex;
-            $total += $option->price;
         }
 
         $resolvedFillers = [];
@@ -168,7 +169,7 @@ class BouquetCustomizationOption extends Model
                 'id' => $option->id,
                 'name' => $option->name,
                 'model_3d_url' => $option->model_url,
-                'price' => $option->price,
+                'price' => 0.0, // part of the occasion's base price
                 'placement_order' => $index,
                 'position' => (array) data_get($filler, 'position', []),
                 'rotation' => (array) data_get($filler, 'rotation', []),
@@ -176,7 +177,6 @@ class BouquetCustomizationOption extends Model
                 'locked' => (bool) data_get($filler, 'locked', false),
                 'sprigs' => self::cleanSprigs(data_get($filler, 'sprigs')),
             ];
-            $total += $option->price;
         }
 
         $customizations['fillers'] = $resolvedFillers;

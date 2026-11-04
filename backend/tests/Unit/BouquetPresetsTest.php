@@ -153,4 +153,55 @@ class BouquetPresetsTest extends TestCase
         $this->assertSame(24, BouquetPresets::largestSize(BouquetPresets::merge(null)));
         $this->assertSame(36, BouquetPresets::MAX_SIZE);
     }
+
+    public function test_shops_change_a_built_in_occasions_style_price_and_parts(): void
+    {
+        $saved = BouquetPresets::normalize(['sympathy' => [
+            'enabled' => true, 'sizes' => [6], 'base_price' => '499.5', 'design' => 'basket', 'wrapper' => false, 'ribbon' => true,
+        ], 'graduation' => ['enabled' => true, 'sizes' => [3], 'design' => 'korean']]);
+        $presets = collect(BouquetPresets::merge($saved))->keyBy('key');
+
+        $this->assertSame(499.5, $presets['sympathy']['base_price']);
+        // A basket can be left in its own colour, and it has no ribbon to switch on
+        $this->assertFalse($presets['sympathy']['wrapper']);
+        $this->assertFalse($presets['sympathy']['ribbon']);
+        $this->assertSame('korean', $presets['graduation']['design']);
+        $this->assertSame('Graduation', $presets['graduation']['label']);
+        $this->assertSame(0.0, $presets['wedding']['base_price']);
+
+        $result = BouquetPresets::check($presets->values()->all(), $this->bouquet(['key' => 'sympathy', 'size' => 6], 2, ['wrapper' => ['id' => 5]]));
+        $this->assertArrayNotHasKey('wrapper', $result['customizations']);
+        $this->assertSame(499.5, $result['base_price']);
+
+        $this->expectException(ValidationException::class);
+        BouquetPresets::normalize(['wedding' => ['sizes' => [6], 'base_price' => -1]]);
+    }
+
+    public function test_shops_add_and_remove_their_own_occasions(): void
+    {
+        $saved = BouquetPresets::normalize([
+            'wedding' => ['enabled' => true, 'sizes' => [6]],
+            'custom_debut18' => ['label' => ' Debut ', 'icon' => 'gift', 'description' => 'For an 18th birthday', 'design' => 'hand_tied', 'sizes' => [18], 'base_price' => 1800, 'wrapper' => true],
+            'made_up' => ['label' => 'Ignored', 'sizes' => [3]],
+        ]);
+        $debut = collect(BouquetPresets::merge($saved))->firstWhere('key', 'custom_debut18');
+
+        $this->assertSame('Debut', $debut['label']);
+        $this->assertTrue($debut['custom']);
+        $this->assertSame('gift', $debut['icon']);
+        $this->assertSame([18], $debut['sizes']);
+        $this->assertFalse($debut['wrapper'], 'a hand-tied bouquet has no wrapper');
+        $this->assertArrayNotHasKey('made_up', $saved);
+        $this->assertTrue(BouquetPresets::check(BouquetPresets::merge($saved), $this->bouquet(['key' => 'custom_debut18', 'size' => 18], 18))['ok']);
+
+        // Saving without it removes it
+        $this->assertNull(collect(BouquetPresets::merge(BouquetPresets::normalize(['wedding' => ['sizes' => [6]]])))->firstWhere('key', 'custom_debut18'));
+
+        try {
+            BouquetPresets::normalize(['custom_nameless' => ['label' => '  ', 'sizes' => [3]]]);
+            $this->fail('A custom occasion needs a name');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('custom_nameless.label', $e->errors());
+        }
+    }
 }

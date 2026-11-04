@@ -3,13 +3,26 @@
 // backend/app/Support/BouquetPresets.php for shops that send none.
 // (Birthday is left out until the shop has a model for it.)
 
+const builtIn = (p) => ({ base_price: 0, custom: false, ...p });
 export const DEFAULT_PRESETS = [
-  { key: "wedding", label: "Wedding", design: "hand_tied", wrapper: false, ribbon: true, sizes: [6, 12, 24] },
-  { key: "romance", label: "Anniversary / Valentine's", design: "korean", wrapper: true, ribbon: true, sizes: [6, 12, 24] },
-  { key: "graduation", label: "Graduation", design: "classic", wrapper: true, ribbon: true, sizes: [3, 6, 9] },
-  { key: "sympathy", label: "Sympathy", design: "basket", wrapper: true, ribbon: false, sizes: [6, 12] },
-  { key: "just_because", label: "Just because", design: "classic", wrapper: true, ribbon: true, sizes: [3, 6, 12] },
+  builtIn({ key: "wedding", label: "Wedding", design: "hand_tied", wrapper: false, ribbon: true, sizes: [6, 12, 24], icon: "rings" }),
+  builtIn({ key: "romance", label: "Anniversary / Valentine's", design: "korean", wrapper: true, ribbon: true, sizes: [6, 12, 24], icon: "heart" }),
+  builtIn({ key: "graduation", label: "Graduation", design: "classic", wrapper: true, ribbon: true, sizes: [3, 6, 9], icon: "cap" }),
+  builtIn({ key: "sympathy", label: "Sympathy", design: "basket", wrapper: true, ribbon: false, sizes: [6, 12], icon: "dove" }),
+  builtIn({ key: "just_because", label: "Just because", design: "classic", wrapper: true, ribbon: true, sizes: [3, 6, 12], icon: "flower" }),
 ];
+
+// What each 3D design's model has (mirrors BouquetPresets::DESIGNS): a wrapper
+// customers can recolour (the basket's wicker counts) and a ribbon
+export const DESIGN_PARTS = {
+  classic: { wrapper: true, ribbon: true },
+  korean: { wrapper: true, ribbon: true },
+  hand_tied: { wrapper: false, ribbon: true },
+  basket: { wrapper: true, ribbon: false },
+};
+
+// Icons a shop can give its own occasions
+export const OCCASION_ICON_KEYS = ["flower", "heart", "rings", "gift", "cap", "dove"];
 
 // Words and icons for the occasion cards
 export const OCCASION_INFO = {
@@ -22,6 +35,10 @@ export const OCCASION_INFO = {
 
 // Names for sizes, by their place in the occasion's list
 const SIZE_NAMES = [["Classic"], ["Petite", "Grand"], ["Petite", "Classic", "Grand"], ["Petite", "Classic", "Grand", "Luxe"]];
+// Icon and words for an occasion card: the shop's own, or the built-in ones
+export const occasionIcon = (p) => p?.icon || OCCASION_INFO[p?.key]?.icon || "flower";
+export const occasionBlurb = (p) => (p?.custom ? p.description : OCCASION_INFO[p?.key]?.blurb || p?.description) || "";
+
 export const sizeName = (sizes, index) => (SIZE_NAMES[sizes.length - 1] ?? [])[index] ?? `${sizes[index]} stems`;
 
 /** Bouquets saved before presets existed open as this */

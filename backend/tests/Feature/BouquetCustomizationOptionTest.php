@@ -25,6 +25,7 @@ class BouquetCustomizationOptionTest extends TestCase
             $table->id();
             $table->string('email')->index();
             $table->string('status')->default('pending');
+            $table->json('bouquet_presets')->nullable();
             $table->timestamps();
         });
 
@@ -137,15 +138,21 @@ class BouquetCustomizationOptionTest extends TestCase
             ->assertJsonCount(1, 'data.ribbons');
     }
 
-    public function test_bouquet_extras_are_priced_from_saved_options_not_client_prices(): void
+    public function test_a_bouquet_costs_its_occasions_base_price_and_wrappers_ribbons_fillers_are_included(): void
     {
         $vendor = $this->vendor();
+        \App\Models\VendorApplication::query()->insert([
+            'email' => $vendor->email,
+            'bouquet_presets' => json_encode(['romance' => ['enabled' => true, 'sizes' => [6, 12], 'base_price' => 350]]),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
         $wrapper = BouquetCustomizationOption::create(['owner_id' => $vendor->id, 'type' => 'wrapper', 'name' => 'Kraft', 'color_hex' => '#c8a27a', 'price' => 40]);
         $ribbon = BouquetCustomizationOption::create(['owner_id' => $vendor->id, 'type' => 'ribbon', 'name' => 'Satin', 'color_hex' => '#d95f76', 'price' => 15]);
         $filler = BouquetCustomizationOption::create(['owner_id' => $vendor->id, 'type' => 'filler', 'name' => 'Eucalyptus', 'model_url' => 'https://example.com/e.glb', 'price' => 20]);
 
         $result = BouquetCustomizationOption::resolveSelections($vendor->id, [
             'type' => 'custom_flower_bouquet',
+            'preset' => ['key' => 'romance', 'size' => 6, 'base_price' => 1],
             'paper_color' => '#000000',
             'wrapper' => ['id' => $wrapper->id, 'price' => 0],
             'ribbon' => ['id' => $ribbon->id, 'price' => 0],
@@ -156,10 +163,13 @@ class BouquetCustomizationOptionTest extends TestCase
         ]);
 
         $this->assertTrue($result['ok']);
-        $this->assertSame(95.0, $result['total']);
+        // The saved base price only: the client's price and the options' old prices don't count
+        $this->assertSame(350.0, $result['total']);
+        $this->assertSame(350.0, $result['customizations']['preset']['base_price']);
         $this->assertSame('#c8a27a', $result['customizations']['paper_color']);
         $this->assertSame('#d95f76', $result['customizations']['ribbon_color']);
-        $this->assertSame(40.0, $result['customizations']['wrapper']['price']);
+        $this->assertSame(0.0, $result['customizations']['wrapper']['price']);
+        $this->assertSame(0.0, $result['customizations']['fillers'][0]['price']);
         $this->assertSame('https://example.com/e.glb', $result['customizations']['fillers'][0]['model_3d_url']);
         $this->assertSame(['x' => 1], $result['customizations']['fillers'][0]['position']);
 

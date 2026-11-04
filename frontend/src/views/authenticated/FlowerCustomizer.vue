@@ -24,10 +24,11 @@
                   :class="{ on: draftOccasion === p.key }"
                   @click="pickOccasion(p.key)"
                 >
-                  <span class="fc-occasion-icon" v-html="OCCASION_ICONS[OCCASION_INFO[p.key]?.icon] || OCCASION_ICONS.flower"></span>
+                  <span class="fc-occasion-icon" v-html="OCCASION_ICONS[occasionIcon(p)] || OCCASION_ICONS.flower"></span>
                   <strong>{{ p.label }}</strong>
-                  <span class="fc-occasion-blurb">{{ OCCASION_INFO[p.key]?.blurb }}</span>
-                  <span class="fc-occasion-meta">{{ p.sizes.join(" · ") }} flowers · {{ p.wrapper && p.ribbon ? "wrapper & ribbon" : p.wrapper ? "wrapper" : "ribbon, no wrapper" }}</span>
+                  <span v-if="Number(p.base_price) > 0" class="fc-occasion-price">From {{ formatPeso(p.base_price) }}</span>
+                  <span v-if="occasionBlurb(p)" class="fc-occasion-blurb">{{ occasionBlurb(p) }}</span>
+                  <span class="fc-occasion-meta">{{ p.sizes.join(" · ") }} flowers · {{ p.wrapper && p.ribbon ? "pick wrapper & ribbon" : p.wrapper ? "pick wrapper" : p.ribbon ? "pick ribbon" : "styled by the shop" }}</span>
                 </button>
               </div>
               <button v-if="preset" type="button" class="fc-text-btn fc-start-cancel" @click="startStep = null">Keep {{ presetLabel }}</button>
@@ -36,7 +37,7 @@
             <template v-else-if="draftPreset">
               <p class="fc-start-step">{{ presets.length > 1 ? "Step 2 of 2" : "Choose a size" }}</p>
               <h2>How many flowers?</h2>
-              <p class="fc-start-lede">{{ draftPreset.label }}: {{ OCCASION_INFO[draftPreset.key]?.blurb }} Bigger bouquets come in a bigger wrap.</p>
+              <p class="fc-start-lede">{{ draftPreset.label }}<template v-if="occasionBlurb(draftPreset)">: {{ occasionBlurb(draftPreset) }}</template>{{ Number(draftPreset.base_price) > 0 ? ` Starts at ${formatPeso(draftPreset.base_price)} plus the flowers.` : "" }} Bigger bouquets come in a bigger wrap.</p>
               <div class="fc-sizes">
                 <button
                   v-for="(size, i) in draftPreset.sizes"
@@ -137,7 +138,7 @@
                 :count-of="(id) => countOfFlower(id, 'filler')"
                 :can-use="canUseFlower"
                 :pending-id="pendingFlower?.kind === 'filler' ? pendingFlower.id : null"
-                :price-label="(item) => (item.price ? `+${formatPeso(item.price)}` : 'Free') + (item.description ? ` · ${item.description}` : '')"
+                :price-label="(item) => item.description || 'Included in the base price'"
                 :unavailable-text="() => 'Full'"
                 @update:search="search = $event"
                 @pick="selectFlower"
@@ -182,7 +183,6 @@
                     <strong>{{ option.name }}</strong>
                     <small v-if="option.description">{{ option.description }}</small>
                   </span>
-                  <span class="fc-option-price">{{ option.price ? `+${formatPeso(option.price)}` : "Free" }}</span>
                   <BcIcon v-if="activeWrap.id === option.id" name="check" class="fc-option-check" />
                 </button>
               </div>
@@ -190,7 +190,7 @@
 
             <section v-else-if="activeStep === 'ribbon'" class="fc-step-panel">
               <h2>Choose the ribbon</h2>
-              <p class="fc-step-lede">{{ hasWrapper ? "Tied around the wrap." : `${occasion?.label || "This"} bouquet is hand-tied: no wrapper, just the ribbon.` }}</p>
+              <p class="fc-step-lede">{{ hasWrapper ? "Tied around the wrap." : currentDesign === "hand_tied" ? `${occasion?.label || "This"} bouquet is hand-tied: no wrapper, just the ribbon.` : "Tied around the bouquet." }}</p>
               <div v-if="ribbonOptions.length" class="fc-options" role="radiogroup" aria-label="Ribbon">
                 <button
                   v-for="option in ribbonOptions"
@@ -207,7 +207,6 @@
                     <strong>{{ option.name }}</strong>
                     <small v-if="option.description">{{ option.description }}</small>
                   </span>
-                  <span class="fc-option-price">{{ option.price ? `+${formatPeso(option.price)}` : "Free" }}</span>
                   <BcIcon v-if="selectedRibbonId === option.id" name="check" class="fc-option-check" />
                 </button>
               </div>
@@ -293,7 +292,7 @@
                     </span>
                     <span class="fc-placed-copy">
                       <strong>{{ selection.product_name }}</strong>
-                      <small>{{ placedKindLabel(selection) }} · {{ formatPeso(selection.price) }}</small>
+                      <small>{{ placedKindLabel(selection) }}{{ selection.kind === "filler" ? "" : ` · ${formatPeso(selection.price)}` }}</small>
                     </span>
                   </button>
                   <button
@@ -535,7 +534,8 @@ import { LEGACY_DESIGN, createBouquetBase, designForOccasion } from "../../utils
 import {
   DEFAULT_PRESETS,
   LEGACY_PRESET,
-  OCCASION_INFO,
+  occasionBlurb,
+  occasionIcon,
   fillerLimitFor,
   presetsOrDefaults,
   sizeName,
@@ -707,11 +707,9 @@ const selectedOuterWrapper = computed(() => findWrapper(wrap.outer.id));
 const selectedInnerWrapper = computed(() => findWrapper(wrap.inner.id));
 const activeWrap = computed(() => wrap[activeWrapLayer.value]);
 const selectedRibbon = computed(() => ribbonOptions.value.find((option) => option.id === selectedRibbonId.value) || null);
-const extrasPrice = computed(
-  () =>
-    (hasWrapper.value ? Number(selectedOuterWrapper.value?.price || 0) + Number(selectedInnerWrapper.value?.price || 0) : 0) +
-    (hasRibbon.value ? Number(selectedRibbon.value?.price || 0) : 0),
-);
+// The occasion's base price covers the wrapper, ribbon and fillers
+const basePrice = computed(() => Number(occasion.value?.base_price || 0));
+const extrasPrice = computed(() => basePrice.value);
 const totalPrice = computed(() => selectedFlowers.value.reduce((sum, flower) => sum + flower.price, 0) + extrasPrice.value);
 const selectedFlower = computed(() => selectedFlowers.value.find((flower) => flower.sceneId === selectedSceneId.value) || null);
 const flowersSubtotal = computed(() => placedFlowers.value.reduce((sum, flower) => sum + flower.price, 0));
@@ -773,6 +771,7 @@ const orderLines = computed(() =>
     innerWrapper: hasWrapper.value ? selectedInnerWrapper.value : null,
     ribbon: hasRibbon.value ? selectedRibbon.value : null,
     card: placedCard.value,
+    base: occasion.value ? { label: occasion.value.label, amount: basePrice.value } : null,
   }),
 );
 const wrapSummary = computed(() =>
@@ -983,7 +982,8 @@ async function fetchCustomizationOptions() {
       params: vendorOwnerId.value ? { owner_id: vendorOwnerId.value } : {},
     });
     const data = response.data?.data || {};
-    const toOption = (option) => ({ ...option, id: Number(option.id), price: Number(option.price || 0) });
+    // Wrappers, ribbons and fillers are included in the occasion's base price
+    const toOption = (option) => ({ ...option, id: Number(option.id), price: 0 });
     presets.value = presetsOrDefaults(data.presets);
     wrapperOptions.value = (data.wrappers || []).map(toOption);
     ribbonOptions.value = (data.ribbons || []).map(toOption);
@@ -992,7 +992,7 @@ async function fetchCustomizationOptions() {
       id: Number(filler.id),
       product_name: filler.name,
       description: filler.description || "",
-      price: Number(filler.price || 0),
+      price: 0,
       model: filler.model_url,
       model_3d_url: filler.model_url,
     }));
@@ -1031,7 +1031,8 @@ function selectWrapper(layer, option) {
 
 function applyWrapColor(layer, color) {
   wrap[layer].color = color || null;
-  dressing?.[layer].apply(wrap[layer].color);
+  // When the shop doesn't let customers choose, the wrapper keeps the design's own colour
+  dressing?.[layer].apply(hasWrapper.value ? wrap[layer].color : null);
 }
 
 const cheapest = (options) => [...options].sort((first, second) => first.price - second.price)[0] || null;
@@ -1633,13 +1634,18 @@ function isShown(object) {
 }
 const shownTargets = () => bouquetTargets.filter(isShown);
 
-/** Shows or hides the wrapper and ribbon for the chosen occasion */
+/**
+ * Dresses the base for the chosen occasion: the wrapper in the customer's colour,
+ * or its own when the shop doesn't offer a choice (a natural basket); the ribbon
+ * only when the occasion has one. (A hand-tied design has no wrapper at all.)
+ */
 function applyOccasionBuild() {
   if (!dressing) return;
-  dressing.wrapMeshes.forEach((mesh) => (mesh.visible = hasWrapper.value));
+  dressing.wrapMeshes.forEach((mesh) => (mesh.visible = true));
+  for (const layer of ["outer", "inner"]) dressing[layer].apply(hasWrapper.value ? wrap[layer].color : null);
   dressing.applyRibbon(showsRibbon.value ? ribbonColor.value : null);
 }
-watch([occasion, showsRibbon], applyOccasionBuild);
+watch([occasion, showsRibbon, hasWrapper], applyOccasionBuild);
 
 /**
  * Resizes the wrapper for the bouquet size. Everything scales about the floor
@@ -2670,7 +2676,8 @@ async function restoreBouquet(customization) {
     ...[...customization.flowers].sort(byOrder),
     ...[...(Array.isArray(customization.fillers) ? customization.fillers : [])]
       .sort(byOrder)
-      .map((filler) => ({ ...filler, kind: "filler", product_id: filler.id, product_name: filler.name })),
+      // Fillers saved with an old price are now part of the base price
+      .map((filler) => ({ ...filler, price: 0, kind: "filler", product_id: filler.id, product_name: filler.name })),
   ];
   applyWrapColor("outer", selectedOuterWrapper.value?.color_hex || customization.paper_color || null);
   applyWrapColor("inner", selectedInnerWrapper.value?.color_hex || customization.inner_paper_color || null);
@@ -3631,6 +3638,11 @@ function showToast(message, type = "success") {
 }
 .fc-occasion strong {
   font-size: 15px;
+}
+.fc-occasion-price {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
 }
 .fc-occasion-blurb {
   color: var(--ink-soft);

@@ -22,12 +22,14 @@ export function buildSteps(parts = {}) {
 const sum = (items) => items.reduce((total, item) => total + Number(item.price || 0), 0);
 
 // One line per thing on the order, in the order the customer builds it
-export function receiptLines({ flowers = [], fillers = [], outerWrapper, innerWrapper, ribbon, card } = {}) {
+// The occasion's base price covers the wrapper, ribbon and fillers, so those show as included (0).
+export function receiptLines({ flowers = [], fillers = [], outerWrapper, innerWrapper, ribbon, card, base = null } = {}) {
   const lines = [{ label: `Stems (${flowers.length})`, amount: sum(flowers) }];
-  if (fillers.length) lines.push({ label: `Fillers (${fillers.length})`, amount: sum(fillers) });
-  if (outerWrapper) lines.push({ label: `Outer: ${outerWrapper.name}`, amount: Number(outerWrapper.price || 0) });
-  if (innerWrapper) lines.push({ label: `Inner: ${innerWrapper.name}`, amount: Number(innerWrapper.price || 0) });
-  if (ribbon) lines.push({ label: ribbon.name, amount: Number(ribbon.price || 0) });
+  if (base && Number(base.amount) > 0) lines.push({ label: `Base price: ${base.label}`, amount: Number(base.amount) });
+  if (fillers.length) lines.push({ label: `Fillers (${fillers.length})`, amount: 0 });
+  if (outerWrapper) lines.push({ label: `Outer: ${outerWrapper.name}`, amount: 0 });
+  if (innerWrapper) lines.push({ label: `Inner: ${innerWrapper.name}`, amount: 0 });
+  if (ribbon) lines.push({ label: ribbon.name, amount: 0 });
   if (card) lines.push({ label: `Card: ${card.product_name} (${card.size})`, amount: Number(card.price || 0) });
   return lines;
 }

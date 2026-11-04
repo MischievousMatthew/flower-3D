@@ -50,7 +50,19 @@ test("receipt names fillers, wrappers and the card", () => {
     card: { product_name: "Note", size: "Small", price: 30 },
   });
   assert.deepEqual(lines.map((l) => l.label), ["Stems (1)", "Fillers (2)", "Outer: Kraft", "Inner: Blush", "Card: Note (Small)"]);
-  assert.equal(lines[1].amount, 40);
+  // Included in the occasion's base price
+  assert.equal(lines[1].amount, 0);
+  assert.equal(lines[2].amount, 0);
+  assert.equal(lines[4].amount, 30);
+});
+
+test("receipt shows the occasion's base price after the stems", () => {
+  const lines = receiptLines({ flowers: [{ price: 100 }], base: { label: "Wedding", amount: 500 } });
+  assert.deepEqual(lines, [
+    { label: "Stems (1)", amount: 100 },
+    { label: "Base price: Wedding", amount: 500 },
+  ]);
+  assert.equal(receiptLines({ flowers: [], base: { label: "Wedding", amount: 0 } }).length, 1);
 });
 
 test("G R S F map to modes and focus", () => {

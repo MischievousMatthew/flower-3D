@@ -7,10 +7,13 @@ use Illuminate\Validation\ValidationException;
 /**
  * Occasion presets for the customer's 3D bouquet customizer.
  *
- * The occasions and how each is built (wrapper, ribbon) are fixed here. Each
- * vendor can turn occasions on or off and choose the sizes (number of flower
- * stems); that's stored in vendor_applications.bouquet_presets as
- * { key: { enabled, sizes[] } }, and anything missing falls back to DEFAULTS.
+ * BloomCraft provides the built-in occasions (KEYS) with a 3D design each. A
+ * vendor can turn any occasion on or off, set its sizes (number of flower
+ * stems) and base price, change its design, and choose whether customers pick
+ * a wrapper colour and a ribbon. Vendors can also add their own occasions
+ * (keys "custom_…") built on one of the designs. All of it is stored in
+ * vendor_applications.bouquet_presets as { key: {...} }; anything missing
+ * falls back to DEFAULTS.
  */
 class BouquetPresets
 {
@@ -20,42 +23,103 @@ class BouquetPresets
     public const MAX_SIZE = 36;
     public const MAX_SIZES_PER_OCCASION = 4;
     public const MIN_FILLERS = 5;
+    public const MAX_CUSTOM = 10;
+    public const MAX_BASE_PRICE = 100000;
 
     /** Bouquets saved before presets existed allowed this many flowers. */
     public const LEGACY_MAX_FLOWERS = 3;
 
-    public const DEFAULTS = [
-        'wedding' => ['label' => 'Wedding', 'design' => 'hand_tied', 'wrapper' => false, 'ribbon' => true, 'sizes' => [6, 12, 24]],
-        'romance' => ['label' => "Anniversary / Valentine's", 'design' => 'korean', 'wrapper' => true, 'ribbon' => true, 'sizes' => [6, 12, 24]],
-        'graduation' => ['label' => 'Graduation', 'design' => 'classic', 'wrapper' => true, 'ribbon' => true, 'sizes' => [3, 6, 9]],
-        'sympathy' => ['label' => 'Sympathy', 'design' => 'basket', 'wrapper' => true, 'ribbon' => false, 'sizes' => [6, 12]],
-        'just_because' => ['label' => 'Just because', 'design' => 'classic', 'wrapper' => true, 'ribbon' => true, 'sizes' => [3, 6, 12]],
+    /**
+     * The 3D designs and what each model has: a wrapper customers can recolour
+     * (the basket's wicker counts) and a ribbon.
+     */
+    public const DESIGNS = [
+        'classic' => ['label' => 'Classic cone', 'wrapper' => true, 'ribbon' => true],
+        'korean' => ['label' => 'Korean layered wrap', 'wrapper' => true, 'ribbon' => true],
+        'hand_tied' => ['label' => 'Round hand-tied', 'wrapper' => false, 'ribbon' => true],
+        'basket' => ['label' => 'Basket', 'wrapper' => true, 'ribbon' => false],
     ];
 
+    /** Icons a vendor can give their own occasions (frontend constants/occasionIcons.js) */
+    public const ICONS = ['rings', 'heart', 'gift', 'cap', 'dove', 'flower'];
+
+    public const DEFAULTS = [
+        'wedding' => ['label' => 'Wedding', 'design' => 'hand_tied', 'wrapper' => false, 'ribbon' => true, 'sizes' => [6, 12, 24], 'icon' => 'rings', 'description' => 'A hand-tied bridal bouquet finished with a satin ribbon.'],
+        'romance' => ['label' => "Anniversary / Valentine's", 'design' => 'korean', 'wrapper' => true, 'ribbon' => true, 'sizes' => [6, 12, 24], 'icon' => 'heart', 'description' => "A Korean-style layered wrap, open and airy, for anniversaries and Valentine's Day."],
+        'graduation' => ['label' => 'Graduation', 'design' => 'classic', 'wrapper' => true, 'ribbon' => true, 'sizes' => [3, 6, 9], 'icon' => 'cap', 'description' => 'The classic paper cone, for the big day.'],
+        'sympathy' => ['label' => 'Sympathy', 'design' => 'basket', 'wrapper' => true, 'ribbon' => false, 'sizes' => [6, 12], 'icon' => 'dove', 'description' => 'A woven basket of flowers to share your condolences.'],
+        'just_because' => ['label' => 'Just because', 'design' => 'classic', 'wrapper' => true, 'ribbon' => true, 'sizes' => [3, 6, 12], 'icon' => 'flower', 'description' => 'The classic paper cone. No reason needed.'],
+    ];
+
+    public static function isCustomKey(string $key): bool
+    {
+        return (bool) preg_match('/^custom_[a-z0-9]{6,24}$/', $key);
+    }
+
     /**
-     * Every occasion, in display order, with the vendor's saved choices applied.
+     * Every occasion, in display order (built-in first, then the shop's own),
+     * with the vendor's saved choices applied.
      *
-     * @return array<int, array{key: string, label: string, wrapper: bool, ribbon: bool, enabled: bool, sizes: int[]}>
+     * @return array<int, array{key: string, label: string, design: string, wrapper: bool, ribbon: bool, enabled: bool, sizes: int[], base_price: float, custom: bool, icon: string, description: string}>
      */
     public static function merge(?array $saved): array
     {
         $saved = $saved ?? [];
+        $list = [];
 
-        return array_map(function (string $key) use ($saved) {
-            $default = self::DEFAULTS[$key];
+        foreach (self::KEYS as $key) {
             $own = is_array($saved[$key] ?? null) ? $saved[$key] : [];
-            $sizes = self::cleanSizes($own['sizes'] ?? null);
+            $list[] = self::build($key, self::DEFAULTS[$key], $own, false);
+        }
+        $custom = 0;
+        foreach ($saved as $key => $own) {
+            if (! is_string($key) || ! self::isCustomKey($key) || ! is_array($own) || ++$custom > self::MAX_CUSTOM) {
+                continue;
+            }
+            $label = trim((string) ($own['label'] ?? ''));
+            if ($label === '') {
+                continue;
+            }
+            $design = self::validDesign($own['design'] ?? null) ?? 'classic';
+            $list[] = self::build($key, [
+                'label' => $label,
+                'design' => $design,
+                'wrapper' => self::DESIGNS[$design]['wrapper'],
+                'ribbon' => self::DESIGNS[$design]['ribbon'],
+                'sizes' => [6, 12],
+                'icon' => in_array($own['icon'] ?? null, self::ICONS, true) ? $own['icon'] : 'flower',
+                'description' => (string) ($own['description'] ?? ''),
+            ], $own, true);
+        }
 
-            return [
-                'key' => $key,
-                'label' => $default['label'],
-                'design' => $default['design'],
-                'wrapper' => $default['wrapper'],
-                'ribbon' => $default['ribbon'],
-                'enabled' => array_key_exists('enabled', $own) ? (bool) $own['enabled'] : true,
-                'sizes' => $sizes ?: $default['sizes'],
-            ];
-        }, self::KEYS);
+        return $list;
+    }
+
+    private static function build(string $key, array $default, array $own, bool $custom): array
+    {
+        $design = self::validDesign($own['design'] ?? null) ?? $default['design'];
+        $can = self::DESIGNS[$design];
+        $sizes = self::cleanSizes($own['sizes'] ?? null);
+
+        return [
+            'key' => $key,
+            'label' => $default['label'],
+            'design' => $design,
+            // Only what the design's model has can be switched on
+            'wrapper' => $can['wrapper'] && (array_key_exists('wrapper', $own) ? (bool) $own['wrapper'] : $default['wrapper']),
+            'ribbon' => $can['ribbon'] && (array_key_exists('ribbon', $own) ? (bool) $own['ribbon'] : $default['ribbon']),
+            'enabled' => array_key_exists('enabled', $own) ? (bool) $own['enabled'] : true,
+            'sizes' => $sizes ?: $default['sizes'],
+            'base_price' => is_numeric($own['base_price'] ?? null) ? round(max(0, min(self::MAX_BASE_PRICE, (float) $own['base_price'])), 2) : 0.0,
+            'custom' => $custom,
+            'icon' => $default['icon'],
+            'description' => $default['description'],
+        ];
+    }
+
+    private static function validDesign($design): ?string
+    {
+        return is_string($design) && isset(self::DESIGNS[$design]) ? $design : null;
     }
 
     /** The vendor's presets (defaults if they never saved any). */
@@ -71,7 +135,8 @@ class BouquetPresets
     }
 
     /**
-     * Validates a vendor's settings form and returns what to store.
+     * Validates a vendor's settings form and returns what to store. Custom
+     * occasions left out of the form are removed.
      *
      * @throws ValidationException
      */
@@ -79,15 +144,57 @@ class BouquetPresets
     {
         $errors = [];
         $out = [];
+        $custom = 0;
 
-        foreach (self::KEYS as $key) {
-            if (! array_key_exists($key, $input)) {
+        foreach ($input as $key => $row) {
+            $key = (string) $key;
+            $isCustom = self::isCustomKey($key);
+            if (! $isCustom && ! in_array($key, self::KEYS, true)) {
                 continue;
             }
-            $row = is_array($input[$key]) ? $input[$key] : [];
-            $raw = is_array($row['sizes'] ?? null) ? array_values($row['sizes']) : [];
-            $label = self::DEFAULTS[$key]['label'];
+            $row = is_array($row) ? $row : [];
+            $stored = [];
 
+            if ($isCustom) {
+                if (++$custom > self::MAX_CUSTOM) {
+                    $errors['presets'][] = 'You can add up to ' . self::MAX_CUSTOM . ' occasions of your own.';
+                    break;
+                }
+                $label = trim((string) ($row['label'] ?? ''));
+                if ($label === '' || mb_strlen($label) > 40) {
+                    $errors["$key.label"][] = 'Give the occasion a name of up to 40 characters.';
+                    continue;
+                }
+                $description = trim((string) ($row['description'] ?? ''));
+                if (mb_strlen($description) > 160) {
+                    $errors["$key.description"][] = "$label: keep the description under 160 characters.";
+                    continue;
+                }
+                $stored += [
+                    'label' => $label,
+                    'icon' => in_array($row['icon'] ?? null, self::ICONS, true) ? $row['icon'] : 'flower',
+                    'description' => $description,
+                ];
+            } else {
+                $label = self::DEFAULTS[$key]['label'];
+            }
+
+            $design = $row['design'] ?? ($isCustom ? 'classic' : self::DEFAULTS[$key]['design']);
+            if (! self::validDesign($design)) {
+                $errors["$key.design"][] = "$label: choose one of the bouquet styles.";
+                continue;
+            }
+
+            $price = $row['base_price'] ?? 0;
+            if ($price === '' || $price === null) {
+                $price = 0;
+            }
+            if (! is_numeric($price) || $price < 0 || $price > self::MAX_BASE_PRICE) {
+                $errors["$key.base_price"][] = "$label: the base price must be from 0 to " . number_format(self::MAX_BASE_PRICE) . '.';
+                continue;
+            }
+
+            $raw = is_array($row['sizes'] ?? null) ? array_values($row['sizes']) : [];
             $sizes = [];
             foreach ($raw as $size) {
                 if (! is_numeric($size) || (int) $size != $size || $size < 1 || $size > self::MAX_SIZE) {
@@ -109,7 +216,16 @@ class BouquetPresets
                 continue;
             }
             sort($sizes);
-            $out[$key] = ['enabled' => (bool) ($row['enabled'] ?? true), 'sizes' => $sizes];
+
+            $can = self::DESIGNS[$design];
+            $out[$key] = $stored + [
+                'enabled' => (bool) ($row['enabled'] ?? true),
+                'sizes' => $sizes,
+                'base_price' => round((float) $price, 2),
+                'design' => $design,
+                'wrapper' => $can['wrapper'] && (bool) ($row['wrapper'] ?? ($isCustom ? true : self::DEFAULTS[$key]['wrapper'])),
+                'ribbon' => $can['ribbon'] && (bool) ($row['ribbon'] ?? ($isCustom ? true : self::DEFAULTS[$key]['ribbon'])),
+            ];
         }
 
         if (! $errors) {
@@ -148,7 +264,7 @@ class BouquetPresets
      * Checks a custom bouquet against the vendor's presets and drops the parts
      * its occasion doesn't have (e.g. a wedding bouquet's wrapper).
      *
-     * @return array{ok: bool, message?: string, customizations: array, filler_limit: int}
+     * @return array{ok: bool, message?: string, customizations: array, filler_limit: int, base_price: float}
      */
     public static function check(array $presets, array $customizations): array
     {
@@ -161,7 +277,7 @@ class BouquetPresets
                 return self::fail('A custom bouquet can have up to ' . self::LEGACY_MAX_FLOWERS . ' flowers.', $customizations, self::MIN_FILLERS);
             }
 
-            return ['ok' => true, 'customizations' => $customizations, 'filler_limit' => self::MIN_FILLERS];
+            return ['ok' => true, 'customizations' => $customizations, 'filler_limit' => self::MIN_FILLERS, 'base_price' => 0.0];
         }
 
         $byKey = [];
@@ -185,17 +301,19 @@ class BouquetPresets
             return self::fail("This {$size}-flower bouquet has {$flowers} flowers. Remove some or choose a bigger size.", $customizations, $fillerLimit);
         }
 
-        $customizations['preset'] = ['key' => $occasion['key'], 'size' => $size, 'label' => $occasion['label']];
+        $base = (float) ($occasion['base_price'] ?? 0);
+        $customizations['preset'] = ['key' => $occasion['key'], 'size' => $size, 'label' => $occasion['label'], 'base_price' => $base];
         // The bouquet's design follows its occasion (the viewer rebuilds it from this)
         $customizations['design'] = $occasion['design'];
+        // Parts the customer can't choose keep the design's own colours (e.g. a natural basket)
         if (! $occasion['wrapper']) {
-            unset($customizations['wrapper'], $customizations['inner_wrapper']);
+            unset($customizations['wrapper'], $customizations['inner_wrapper'], $customizations['paper_color'], $customizations['inner_paper_color']);
         }
         if (! $occasion['ribbon']) {
-            unset($customizations['ribbon']);
+            unset($customizations['ribbon'], $customizations['ribbon_color']);
         }
 
-        return ['ok' => true, 'customizations' => $customizations, 'filler_limit' => $fillerLimit];
+        return ['ok' => true, 'customizations' => $customizations, 'filler_limit' => $fillerLimit, 'base_price' => $base];
     }
 
     private static function cleanSizes($sizes): array
@@ -214,6 +332,6 @@ class BouquetPresets
 
     private static function fail(string $message, array $customizations, int $fillerLimit): array
     {
-        return ['ok' => false, 'message' => $message, 'customizations' => $customizations, 'filler_limit' => $fillerLimit];
+        return ['ok' => false, 'message' => $message, 'customizations' => $customizations, 'filler_limit' => $fillerLimit, 'base_price' => 0.0];
     }
 }

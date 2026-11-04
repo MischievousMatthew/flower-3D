@@ -221,8 +221,10 @@ class VendorCustomizationOptionController extends Controller
                 $data[$field] = trim((string) $request->input($field)) ?: null;
             }
         }
-        if ($request->has('price')) {
-            $data['price'] = round((float) $request->input('price'), 2);
+        // Wrappers, ribbons and fillers have no price of their own: the occasion's
+        // base price covers them. Cards are priced per size below.
+        if ($type !== Option::TYPE_CARD) {
+            $data['price'] = 0;
         }
         if ($request->has('color_hex') && $type !== Option::TYPE_FILLER) {
             $data['color_hex'] = strtolower($request->input('color_hex'));
