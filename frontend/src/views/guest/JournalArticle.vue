@@ -1,6 +1,7 @@
 <template>
   <div class="article-page bc-theme">
-    <SiteTopBar />
+    <!-- The landing page's navbar (fixed at the top) -->
+    <NavHeader />
 
     <main class="bc-container">
       <template v-if="loading">
@@ -68,7 +69,7 @@
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import api from "../../plugins/axios";
-import SiteTopBar from "../../components/site/SiteTopBar.vue";
+import NavHeader from "../../layouts/NavHeader.vue";
 import SiteFooter from "../../components/site/SiteFooter.vue";
 import { useSiteContent } from "../../composables/useSiteContent";
 import { articleBlocks } from "../../utils/articleBlocks";
@@ -112,6 +113,10 @@ const formatDate = (v) => (v ? new Date(v).toLocaleDateString("en-PH", { month: 
 .article-page {
   min-height: 100vh;
   background: var(--ivory);
+}
+/* Room for the fixed navbar above */
+.article-page > main {
+  padding-top: clamp(110px, 10vw, 140px);
 }
 :global(body) {
   margin: 0;

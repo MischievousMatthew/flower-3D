@@ -1846,17 +1846,19 @@ onBeforeUnmount(() => {
   justify-content: center;
   min-height: 100vh;
   min-height: 100svh;
-  padding: 150px 0 140px;
+  /* Top room for the navbar, bottom room for the scroll cue; the content centres between */
+  padding: 110px 0 90px;
 }
 
 .hero-content {
-  max-width: 640px;
+  max-width: 760px;
   will-change: transform, opacity;
 }
 
 .hero-title {
-  margin: 28px 0 30px;
-  font-size: clamp(64px, 8.4vw, 136px);
+  margin: 22px 0 24px;
+  /* Two lines ("Create your" / "perfect bouquet") that fit the screen with the text below */
+  font-size: clamp(56px, min(6.6vw, 11.5vh), 112px);
   /* The heading defaults (line-height 1.02, -0.015em) are what the approved
      design renders; they come from the shared .bc-theme heading rule. */
 }
@@ -1872,8 +1874,8 @@ onBeforeUnmount(() => {
 }
 
 .hero-desc {
-  max-width: 440px;
-  margin-bottom: 44px;
+  max-width: 460px;
+  margin-bottom: 36px;
   color: var(--ink-soft);
   font-size: 16.5px;
   line-height: 1.8;

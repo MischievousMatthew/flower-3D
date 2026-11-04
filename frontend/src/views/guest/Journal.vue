@@ -1,6 +1,7 @@
 <template>
   <div class="journal-page bc-theme">
-    <SiteTopBar />
+    <!-- The landing page's navbar (fixed at the top) -->
+    <NavHeader />
 
     <main>
       <section class="journal-hero">
@@ -80,7 +81,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import api from "../../plugins/axios";
 import ShowMore from "../../components/common/ShowMore.vue";
-import SiteTopBar from "../../components/site/SiteTopBar.vue";
+import NavHeader from "../../layouts/NavHeader.vue";
 import SiteFooter from "../../components/site/SiteFooter.vue";
 import { useSiteContent } from "../../composables/useSiteContent";
 import "../../styles/bloomcraft.css";
@@ -137,7 +138,8 @@ onMounted(() => {
   margin: 0;
 }
 .journal-hero {
-  padding: clamp(60px, 8vw, 110px) 0 clamp(30px, 4vw, 50px);
+  /* Room for the fixed navbar above */
+  padding: clamp(130px, 12vw, 170px) 0 clamp(30px, 4vw, 50px);
 }
 .journal-hero h1 {
   margin: 18px 0 14px;
