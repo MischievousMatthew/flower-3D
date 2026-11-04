@@ -401,6 +401,40 @@ class VendorStorefrontController extends Controller
     }
 
     /**
+     * GET /api/stores/map
+     * Every open shop that pinned its location when it registered, for the
+     * shop map: just enough to draw its pin (logo) and link to it.
+     */
+    public function shopMap()
+    {
+        try {
+            $shops = VendorApplication::notSuspended()
+                ->where('status', 'approved')
+                ->whereNotNull('store_latitude')
+                ->whereNotNull('store_longitude')
+                ->orderBy('store_name')
+                ->get()
+                ->filter(fn ($v) => abs((float) $v->store_latitude) <= 90 && abs((float) $v->store_longitude) <= 180
+                    && ((float) $v->store_latitude !== 0.0 || (float) $v->store_longitude !== 0.0))
+                ->map(fn ($v) => [
+                    'id' => $v->id,
+                    'store_name' => $v->store_name ?? '',
+                    'store_logo_path' => $this->storageUrl($v->store_logo_path),
+                    'store_address' => $v->full_store_address,
+                    'latitude' => (float) $v->store_latitude,
+                    'longitude' => (float) $v->store_longitude,
+                    'taking_orders' => $v->isTakingOrders(),
+                ])
+                ->values();
+
+            return response()->json(['success' => true, 'data' => $shops]);
+        } catch (\Throwable $e) {
+            Log::error('VendorStorefrontController@shopMap: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'We could not load the shop map right now.'], 500);
+        }
+    }
+
+    /**
      * GET /api/stores/designer-ready
      * Shops a customer can build a 3D bouquet with: at least one 3D flower in
      * stock, and at least one filler, wrapper and ribbon. Each comes with how

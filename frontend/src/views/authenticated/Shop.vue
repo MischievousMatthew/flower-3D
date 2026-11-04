@@ -71,6 +71,18 @@
       @browse="scrollToSection('products')"
     />
 
+    <!-- Featured picks (Admin → Website), then every pinned shop on a map -->
+    <FeaturedPicks
+      v-if="featuredProducts.length"
+      :products="featuredProducts"
+      :adding-id="addingToCartProductId"
+      @open="openProductModal"
+      @add="addToCartDirect"
+      @buy="buyNowDirect"
+      @vendor="selectVendorById"
+    />
+    <ShopMap @visit="goToStorefront" />
+
     <!-- Top sellers and featured shops, with the bouquet finder beside them -->
     <section class="shop-picks" aria-label="Popular right now">
       <div class="bc-container shop-picks-grid">
@@ -154,29 +166,6 @@
       </div>
     </section>
 
-    <!-- Featured picks (Admin → Website) -->
-    <section v-if="featuredProducts.length" class="shop-featured" id="featured" aria-labelledby="featured-title">
-      <div class="bc-container">
-        <div class="bc-section-head shop-head">
-          <p class="bc-label">Featured picks</p>
-          <h2 id="featured-title">Chosen by <em>BloomCraft</em></h2>
-        </div>
-        <div class="products-grid">
-          <ProductCard
-            v-for="product in featuredProducts"
-            :key="`featured-${product.id}`"
-            :product="product"
-            :selected-vendor="selectedVendor"
-            :adding-to-cart="addingToCartProductId === product.id"
-            @open-modal="openProductModal"
-            @add-to-cart="addToCartDirect"
-            @buy-now="buyNowDirect"
-            @select-vendor="selectVendorById"
-          />
-        </div>
-      </div>
-    </section>
-
     <!-- Journal (Admin → Website → Journal) -->
     <JournalTeaser :articles="site.articles" />
 
@@ -198,7 +187,6 @@ import productService from "../../services/productService.js";
 import { useCart } from "../../composables/useCart";
 import { useFlyToCart } from "../../composables/useFlyToCart";
 import { toast } from "@/utils/snackbar";
-import ProductCard from "../../layouts/components/ProductCard.vue";
 import AnnouncementBar from "../../components/site/AnnouncementBar.vue";
 import ShopHero from "../../components/shop/ShopHero.vue";
 import ShopTrustStrip from "../../components/shop/ShopTrustStrip.vue";
@@ -207,6 +195,8 @@ import ShopProductTile from "../../components/shop/ShopProductTile.vue";
 import BouquetFinder from "../../components/shop/BouquetFinder.vue";
 import FeaturedShops from "../../components/shop/FeaturedShops.vue";
 import DesignerShopPicker from "../../components/shop/DesignerShopPicker.vue";
+import FeaturedPicks from "../../components/shop/FeaturedPicks.vue";
+import ShopMap from "../../components/shop/ShopMap.vue";
 import JournalTeaser from "../../components/site/JournalTeaser.vue";
 import SiteFooter from "../../components/site/SiteFooter.vue";
 import { useSiteContent } from "../../composables/useSiteContent";
@@ -937,7 +927,6 @@ onUnmounted(() => {
   font-size: 15px;
 }
 
-.shop-featured,
 .shop-categories {
   padding: clamp(24px, 3vw, 40px) 0;
 }
