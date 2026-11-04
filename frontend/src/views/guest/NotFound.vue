@@ -82,7 +82,7 @@
         <span aria-hidden="true">·</span>
         <router-link to="/journal">Journal</router-link>
         <span aria-hidden="true">·</span>
-        <router-link to="/pricing">Pricing</router-link>
+        <router-link :to="{ name: 'Vendor_Register' }">Sell on BloomCraft</router-link>
       </nav>
     </main>
 

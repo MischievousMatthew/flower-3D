@@ -26,11 +26,24 @@ const routes = [
         component: () => import("../views/guest/LandingPage.vue"),
       },
       {
+        // There's no Pricing page any more. The address stays because PayMongo
+        // returns here after a plan payment and older links point to it:
+        // vendors go to their Subscription page (checkout, payment returns),
+        // other signed-in people to the plans on the landing page, and
+        // everyone else to vendor registration.
         path: "pricing",
-        component: () => import("../views/guest/PricingPage.vue"),
-        // Pricing is a public landing-page URL, so it remains readable and
-        // does not need an opaque token registry entry.
         meta: { public: true, preservePublicPath: true },
+        redirect: (to) => {
+          let role = null;
+          try {
+            role = JSON.parse(localStorage.getItem("user") || "null")?.role || null;
+          } catch (_) {
+            role = null;
+          }
+          if (role === "vendor") return { name: "VendorSubscription", query: to.query };
+          if (role) return { path: "/", hash: "#plans" };
+          return { name: "Vendor_Register" };
+        },
       },
       {
         // The Journal keeps readable URLs so articles can be shared

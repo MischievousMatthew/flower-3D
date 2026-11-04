@@ -327,8 +327,8 @@
               Start with the essentials, then grow into a connected ERP
               workspace when your operations need more.
             </p>
-            <router-link to="/pricing" class="bc-link"
-              >Compare all features</router-link
+            <router-link :to="{ name: 'Vendor_Register' }" class="bc-link"
+              >Register your flower shop</router-link
             >
             <div class="plans-progress" aria-hidden="true">
               <span ref="plansProgressFill" class="plans-progress-fill"></span>
@@ -529,7 +529,7 @@
                 >
               </li>
               <li>
-                <router-link to="/pricing">Pricing</router-link>
+                <a href="#plans" @click.prevent="scrollToSection('plans')">Plans</a>
               </li>
             </ul>
           </div>
@@ -817,7 +817,7 @@ const scrollToSection = (sectionId) => {
 };
 
 // ---- Subscription plans ----
-// Logged-in vendors go straight to the existing checkout on /pricing. Guests
+// Logged-in vendors go straight to that plan's checkout on their Subscription page. Guests
 // are asked whether they have a vendor account; the chosen plan is kept so
 // their next vendor login lands on that checkout (see useAuth).
 const subscriptionPlans = SUBSCRIPTION_PLANS;
@@ -849,7 +849,7 @@ function handlePlanSelect(plan) {
   if (getStoredUserToken()) {
     const role = authUser.value?.role || storedUserRole();
     if (role === "vendor") {
-      router.push({ path: "/pricing", query: { plan: plan.key } });
+      router.push({ name: "VendorSubscription", query: { plan: plan.key } });
       return;
     }
     if (role) {

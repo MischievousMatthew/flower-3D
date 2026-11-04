@@ -164,6 +164,7 @@ import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { LIMIT_ROWS, PLAN_STATUS, limitText, longDate, pesoWhole, startPlanCheckout } from "../../../components/vendor/account/accountUi";
 import { loadSubscriptionAccess } from "../../../composables/useSubscriptionAccess";
+import { clearPendingPlan } from "../../../constants/subscriptionPlans";
 import { useAuth } from "../../../composables/useAuth";
 import EnterpriseInquiryForm from "../../../components/pricing/EnterpriseInquiryForm.vue";
 
@@ -284,9 +285,54 @@ async function confirmReturningCheckout() {
   }
 }
 
+// Back from PayMongo (it returns to /pricing, which forwards here)
+async function handlePaymentReturn(state, checkoutId) {
+  router.replace({ query: {} });
+  if (state === "cancelled") {
+    if (checkoutId) await api.post(`/vendor/subscription/checkout/${checkoutId}/cancel`).catch(() => {});
+    sessionStorage.removeItem("vendor_subscription_checkout");
+    toast.info("Payment was not completed. Your current plan is unchanged; you can try again any time.");
+    return;
+  }
+  if (checkoutId) sessionStorage.setItem("vendor_subscription_checkout", JSON.stringify({ checkoutId }));
+  // PayMongo can take a moment to confirm: check a few times
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      const { data: res } = await api.get(`/vendor/subscription/checkout/${checkoutId}`);
+      if (res?.data?.status === "paid") {
+        sessionStorage.removeItem("vendor_subscription_checkout");
+        toast.success(res.data.plan_key === "business_trial" ? "Your free month of Business has started." : "Payment received. Your plan is active.");
+        await Promise.all([load(), loadSubscriptionAccess().catch(() => {})]);
+        return;
+      }
+      if (["failed", "cancelled"].includes(res?.data?.status)) {
+        sessionStorage.removeItem("vendor_subscription_checkout");
+        toast.info("Payment was not completed. Your current plan is unchanged; you can try again any time.");
+        return;
+      }
+    } catch (_) {
+      return;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 1500));
+  }
+  toast.info("Your payment is still being confirmed. Your plan will update as soon as PayMongo confirms it.");
+}
+
 onMounted(async () => {
   await load();
-  // The pricing page already confirmed this payment before sending the vendor here
+  const { subscription_payment: paymentState, checkout_id: checkoutId, plan } = route.query;
+  if (paymentState) {
+    await handlePaymentReturn(String(paymentState), checkoutId ? String(checkoutId) : null);
+    return;
+  }
+  // A plan picked on the landing page (before or after logging in): open its payment
+  if (plan) {
+    clearPendingPlan();
+    router.replace({ query: {} });
+    const picked = (data.value?.plans ?? []).find((p) => p.key === String(plan));
+    if (picked && !isCurrent(picked)) choose(picked);
+    return;
+  }
   if (route.query.subscription_success) {
     sessionStorage.removeItem("vendor_subscription_checkout");
     toast.success(route.query.subscription_success === "business_trial" ? "Your free month of Business has started." : "Payment received. Your plan is active.");

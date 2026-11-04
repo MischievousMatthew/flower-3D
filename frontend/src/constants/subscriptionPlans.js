@@ -1,5 +1,5 @@
 // Vendor subscription plans shown on the pricing page and the landing page.
-// Checkout itself stays in PricingPage.selectPlan(); this module only holds
+// Checkout itself is on the vendor Subscription page (startPlanCheckout); this module only holds
 // the plan data plus the "pending plan" a visitor picked before logging in.
 
 export const SUBSCRIPTION_PLANS = [
@@ -14,7 +14,7 @@ export const findPlan = (key) => SUBSCRIPTION_PLANS.find((plan) => plan.key === 
 // ---- Pending plan ----------------------------------------------------------
 // A visitor without a session picks a plan on the landing page, then logs in
 // (or registers as a vendor and waits for approval). The first vendor login
-// afterwards sends them to /pricing?plan=<key>, which starts that checkout.
+// afterwards sends them to their Subscription page with ?plan=<key>, which starts that checkout.
 const PENDING_PLAN_KEY = "bloomcraft_pending_plan";
 // Vendor applications need admin approval, which can take days.
 const PENDING_PLAN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -24,7 +24,7 @@ export function savePendingPlan(key) {
   try {
     localStorage.setItem(PENDING_PLAN_KEY, JSON.stringify({ key, savedAt: Date.now() }));
   } catch (_) {
-    // Storage unavailable: the visitor can still pick the plan on /pricing.
+    // Storage unavailable: the vendor can still pick the plan on their Subscription page.
   }
 }
 

@@ -167,7 +167,7 @@
                 <div v-if="!l.unlimited" class="lim-bar"><span :class="{ full: l.usage >= l.limit }" :style="{ width: `${l.limit ? Math.min(100, (l.usage / l.limit) * 100) : 100}%` }"></span></div>
               </li>
             </ul>
-            <router-link to="/pricing" class="plan-btn">{{ sub.active ? "Compare plans" : "View plans" }}</router-link>
+            <router-link :to="{ name: 'VendorSubscription' }" class="plan-btn">{{ sub.active ? "Compare plans" : "View plans" }}</router-link>
           </template>
         </section>
 

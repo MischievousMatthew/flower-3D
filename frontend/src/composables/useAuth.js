@@ -84,12 +84,12 @@ export function useAuth() {
   };
 
   // A vendor who picked a plan on the landing page before logging in goes
-  // straight to that plan's checkout on /pricing. Every other user keeps the
+  // straight to that plan's checkout on their Subscription page. Every other user keeps the
   // server-provided redirect.
   const resolveUserRedirect = (userData, serverRedirect) => {
     if (userData?.role === "vendor") {
       const planKey = readPendingPlan();
-      if (planKey) return { path: "/pricing", query: { plan: planKey } };
+      if (planKey) return { name: "VendorSubscription", query: { plan: planKey } };
     }
     return serverRedirect || "/shop";
   };

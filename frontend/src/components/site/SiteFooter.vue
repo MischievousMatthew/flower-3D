@@ -26,7 +26,7 @@
         <ul>
           <li><router-link to="/shop">Shop</router-link></li>
           <li><router-link to="/journal">Journal</router-link></li>
-          <li><router-link to="/pricing">Sell on {{ settings.site_name || "BloomCraft" }}</router-link></li>
+          <li><router-link :to="{ name: 'Vendor_Register' }">Sell on {{ settings.site_name || "BloomCraft" }}</router-link></li>
         </ul>
       </div>
     </div>
