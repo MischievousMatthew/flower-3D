@@ -84,7 +84,7 @@ final class SubscriptionPlans
         self::PROFESSIONAL => [
             'key' => self::PROFESSIONAL,
             'name' => 'Professional',
-            'monthly_price' => 6999.00,
+            'monthly_price' => 4999.00,
             'currency' => 'PHP',
             'custom_pricing' => false,
             'included_modules' => self::MODULES,
@@ -96,7 +96,7 @@ final class SubscriptionPlans
             'key' => self::ENTERPRISE,
             'name' => 'Enterprise',
             'monthly_price' => null,
-            'minimum_monthly_price' => 15000.00,
+            'minimum_monthly_price' => 6999.00,
             'currency' => 'PHP',
             'custom_pricing' => true,
             'included_modules' => self::MODULES,

@@ -7,7 +7,7 @@
             <div>
               <p class="eq-eyebrow">Enterprise plan</p>
               <h2 id="eq-title">{{ sent ? "Thanks, we got it" : "Talk to us" }}</h2>
-              <p v-if="!sent">Tell us about your shop. Pricing starts at ₱15,000 a month and is set to your branches, warehouses and integrations.</p>
+              <p v-if="!sent">Tell us about your shop. Pricing starts at ₱6,999 a month and is set to your branches, warehouses and integrations.</p>
             </div>
             <button type="button" class="eq-close" aria-label="Close" @click="close">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>

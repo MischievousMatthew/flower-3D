@@ -462,7 +462,7 @@ class VendorSubscriptionTest extends TestCase
         $summary = app(\App\Services\SubscriptionAccessService::class)->accessSummary($vendor->fresh());
         $this->assertSame('professional', $summary['plan_key']);
         $this->assertSame('active', $summary['status']);
-        $this->assertSame(6999.00, $summary['monthly_price']);
+        $this->assertSame(4999.00, $summary['monthly_price']);
         $this->assertSame('PHP', $summary['currency']);
         $this->assertSame(SubscriptionPlans::STARTER, $otherVendor->fresh()->subscription->plan_key);
     }
@@ -502,7 +502,7 @@ class VendorSubscriptionTest extends TestCase
             'vendor_id' => $vendor->id,
             'plan_key' => SubscriptionPlans::PROFESSIONAL,
             'status' => 'pending',
-            'amount' => 6999,
+            'amount' => 4999,
             'currency' => 'PHP',
             'billing_period' => 'monthly',
             'reference_number' => 'BC-SUB-RETURN-1',
