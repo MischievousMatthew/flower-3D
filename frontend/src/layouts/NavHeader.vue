@@ -79,85 +79,94 @@
             </span>
           </button>
 
-          <div v-if="showNotificationDropdown" class="nav-menu notification-menu">
-            <template v-if="notices.length">
-              <div class="nav-menu-head">
-                <span class="bc-label">From BloomCraft</span>
-                <button v-if="noticeUnread" type="button" class="nav-menu-action" @click="readAllNotices">Mark read</button>
+          <div v-if="showNotificationDropdown" class="nav-menu notification-menu" role="dialog" aria-label="Notifications">
+            <header class="nt-head">
+              <div>
+                <h2 class="nt-title">Notifications</h2>
+                <p class="nt-sub">{{ freshCount ? `${freshCount} new` : "You're all caught up" }}</p>
               </div>
-              <div class="notification-list">
+              <button v-if="noticeUnread" type="button" class="nt-action" @click="readAllNotices">Mark all read</button>
+            </header>
+
+            <div class="nt-scroll">
+              <!-- From BloomCraft: announcements and support replies -->
+              <section v-if="notices.length" class="nt-section" aria-label="From BloomCraft">
+                <p class="nt-section-label">From BloomCraft</p>
                 <button
                   v-for="notice in notices"
                   :key="`notice-${notice.id}`"
                   type="button"
-                  class="notification-entry"
-                  :class="{ important: notice.important && !notice.read }"
+                  class="nt-item"
+                  :class="{ fresh: !notice.read, important: notice.important && !notice.read }"
                   @click="openNotice(notice)"
                 >
-                  <span class="notification-status-dot" :class="notice.read ? '' : notice.important ? 'alert' : 'info'"></span>
-                  <span class="notification-entry-content">
-                    <span class="notification-entry-title">{{ notice.title }} <span v-if="notice.important" class="notification-tag">Important</span></span>
-                    <span v-if="notice.body" class="notification-entry-message">{{ notice.body }}</span>
-                    <span class="notification-entry-time">{{ formatNoticeTime(notice.created_at) }}</span>
+                  <span class="nt-icon" :class="notice.important ? 'red' : 'leaf'" aria-hidden="true" v-html="NOTICE_ICON"></span>
+                  <span class="nt-body">
+                    <span class="nt-row">
+                      <span class="nt-item-title">{{ notice.title }}</span>
+                      <span class="nt-time">{{ relativeTime(notice.created_at) }}</span>
+                    </span>
+                    <span v-if="notice.body" class="nt-text">{{ notice.body }}</span>
+                    <span v-if="notice.important" class="nt-tag">Important</span>
                   </span>
+                  <span v-if="!notice.read" class="nt-unread" aria-label="Unread"></span>
                 </button>
-              </div>
-            </template>
-            <div class="nav-menu-head">
-              <span class="bc-label">Order updates</span>
-              <button
-                type="button"
-                class="nav-menu-action"
-                @click="loadOrderNotifications"
-              >
-                Refresh
+              </section>
+
+              <!-- Order updates -->
+              <section class="nt-section" aria-label="Order updates">
+                <div class="nt-section-head">
+                  <p class="nt-section-label">Your orders</p>
+                  <button type="button" class="nt-refresh" aria-label="Refresh order updates" title="Refresh" :disabled="loadingNotifications" @click="loadOrderNotifications">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7L20 8.5" /><path d="M20 4v4.5h-4.5" /></svg>
+                  </button>
+                </div>
+
+                <div v-if="loadingNotifications && !orderNotifications.length" class="notification-skeletons">
+                  <div v-for="n in 3" :key="n" class="notification-skeleton">
+                    <span class="bc-skeleton nt-icon-skel"></span>
+                    <span class="notification-skeleton-lines">
+                      <span class="bc-skeleton notification-skeleton-line"></span>
+                      <span class="bc-skeleton notification-skeleton-line notification-skeleton-line--short"></span>
+                    </span>
+                  </div>
+                </div>
+
+                <div v-else-if="orderNotifications.length === 0" class="nt-empty">
+                  <span class="nt-icon leaf" aria-hidden="true" v-html="ORDER_ICONS.box"></span>
+                  <strong>No order updates yet</strong>
+                  <span>When you order flowers, every step shows up here.</span>
+                </div>
+
+                <template v-else>
+                  <button
+                    v-for="notification in orderNotifications"
+                    :key="notification.id"
+                    type="button"
+                    class="nt-item"
+                    :class="{ fresh: freshIds.has(notification.id) }"
+                    @click="goToOrders(notification)"
+                  >
+                    <span class="nt-icon" :class="notification.tone" aria-hidden="true" v-html="ORDER_ICONS[notification.icon]"></span>
+                    <span class="nt-body">
+                      <span class="nt-row">
+                        <span class="nt-item-title">{{ notification.title }}</span>
+                        <span class="nt-time">{{ notification.time }}</span>
+                      </span>
+                      <span class="nt-text">Order <b>{{ notification.orderNumber }}</b> {{ notification.text }}</span>
+                    </span>
+                    <span v-if="freshIds.has(notification.id)" class="nt-unread" aria-label="New"></span>
+                  </button>
+                </template>
+              </section>
+            </div>
+
+            <footer class="nt-foot">
+              <button type="button" class="nt-all" @click="goToOrders()">
+                View all orders
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
               </button>
-            </div>
-
-            <div v-if="loadingNotifications" class="notification-skeletons">
-              <div v-for="n in 3" :key="n" class="notification-skeleton">
-                <span class="bc-skeleton notification-skeleton-dot"></span>
-                <span class="notification-skeleton-lines">
-                  <span class="bc-skeleton notification-skeleton-line"></span>
-                  <span
-                    class="bc-skeleton notification-skeleton-line notification-skeleton-line--short"
-                  ></span>
-                </span>
-              </div>
-            </div>
-
-            <div
-              v-else-if="orderNotifications.length === 0"
-              class="notification-empty"
-            >
-              No order updates yet.
-            </div>
-
-            <div v-else class="notification-list">
-              <button
-                v-for="notification in orderNotifications"
-                :key="notification.id"
-                type="button"
-                class="notification-entry"
-                @click="goToOrders(notification)"
-              >
-                <span
-                  class="notification-status-dot"
-                  :class="notification.variant"
-                ></span>
-                <span class="notification-entry-content">
-                  <span class="notification-entry-title">
-                    {{ notification.title }}
-                  </span>
-                  <span class="notification-entry-message">
-                    {{ notification.message }}
-                  </span>
-                  <span class="notification-entry-time">
-                    {{ notification.time }}
-                  </span>
-                </span>
-              </button>
-            </div>
+            </footer>
           </div>
         </div>
 
@@ -330,6 +339,38 @@ const loadingNotifications = ref(false);
 const isLoading = ref(null);
 const orderNotifications = ref([]);
 const seenOrderNotificationIds = ref(new Set());
+// Updates that were new when the panel opened (they stay highlighted while it's open)
+const freshIds = ref(new Set());
+const freshCount = computed(() => freshIds.value.size + noticeUnread.value);
+
+// Line icons for each kind of update (24px grid, stroke = currentColor)
+const lineIcon = (d) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ORDER_ICONS = {
+  receipt: lineIcon('<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>'),
+  flower: lineIcon('<circle cx="12" cy="9" r="2.5"/><path d="M12 6.5a3 3 0 1 1 3 3 3 3 0 1 1-3 3 3 3 0 1 1-3-3 3 3 0 1 1 3-3Z"/><path d="M12 13v8M12 18c2 0 3.5-1 4-3"/>'),
+  box: lineIcon('<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>'),
+  truck: lineIcon('<path d="M3 6h11v10H3zM14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17.5" cy="17.5" r="1.8"/>'),
+  home: lineIcon('<path d="M4 11 12 4l8 7v9H4z"/><path d="m9 15 2 2 4-4"/>'),
+  check: lineIcon('<circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16.5 9.5"/>'),
+  undo: lineIcon('<path d="M9 7 4 12l5 5"/><path d="M4 12h11a5 5 0 0 1 0 10h-2"/>'),
+  cross: lineIcon('<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/>'),
+};
+const NOTICE_ICON = lineIcon('<path d="M4 10v4h3l6 4V6L7 10z"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11"/>');
+
+// "Just now", "5m ago", "3h ago", "Yesterday", then the date
+function relativeTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const minutes = Math.round((Date.now() - date.getTime()) / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  if (hours < 48) return "Yesterday";
+  return date.toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+}
 let notificationInterval = null;
 
 const cartStore = useCart();
@@ -495,8 +536,6 @@ const readAllNotices = async () => {
     loadNotices();
   }
 };
-const formatNoticeTime = (value) =>
-  value ? new Date(value).toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
 
 const toggleNotificationDropdown = async () => {
   showNotificationDropdown.value = !showNotificationDropdown.value;
@@ -504,6 +543,7 @@ const toggleNotificationDropdown = async () => {
 
   if (showNotificationDropdown.value) {
     await Promise.all([loadOrderNotifications(), loadNotices(true)]);
+    freshIds.value = new Set(orderNotifications.value.filter((n) => !seenOrderNotificationIds.value.has(n.id)).map((n) => n.id));
     markOrderNotificationsAsSeen(orderNotifications.value);
   }
 };
@@ -620,62 +660,19 @@ const loadOrderNotifications = async () => {
 const mapOrderToNotification = (order) => {
   const status = order?.delivery?.status || order?.status;
 
+  // What the customer sees for each step (the shop's own wording stays on its side)
   const statusMap = {
-    pending: {
-      title: "To Process",
-      message: `Order ${order.order_number} is waiting for vendor processing.`,
-      variant: "warning",
-    },
-    to_processed: {
-      title: "To Process",
-      message: `Order ${order.order_number} is queued for processing.`,
-      variant: "warning",
-    },
-    processing: {
-      title: "To Process",
-      message: `Order ${order.order_number} is now being prepared.`,
-      variant: "warning",
-    },
-    to_ship: {
-      title: "To Ship",
-      message: `Order ${order.order_number} is ready to be shipped.`,
-      variant: "info",
-    },
-    shipped: {
-      title: "To Ship",
-      message: `Order ${order.order_number} is being dispatched.`,
-      variant: "info",
-    },
-    to_received: {
-      title: "To Receive",
-      message: `Order ${order.order_number} is out for delivery.`,
-      variant: "success",
-    },
-    delivered: {
-      title: "To Receive",
-      message: `Order ${order.order_number} is arriving for delivery.`,
-      variant: "success",
-    },
-    completed: {
-      title: "Completed",
-      message: `Order ${order.order_number} has been completed.`,
-      variant: "completed",
-    },
-    returned: {
-      title: "Returned",
-      message: `Order ${order.order_number} has a return request in progress.`,
-      variant: "warning",
-    },
-    refunded: {
-      title: "Refunded",
-      message: `Order ${order.order_number} has been refunded.`,
-      variant: "completed",
-    },
-    cancelled: {
-      title: "Cancelled",
-      message: `Order ${order.order_number} was cancelled.`,
-      variant: "warning",
-    },
+    pending: { title: "Order placed", text: "is waiting for the shop to accept it.", icon: "receipt", tone: "amber" },
+    to_processed: { title: "Order accepted", text: "is in the shop's queue.", icon: "receipt", tone: "amber" },
+    processing: { title: "Being prepared", text: "is being arranged by the florist.", icon: "flower", tone: "amber" },
+    to_ship: { title: "Ready to ship", text: "is packed and waiting for the rider.", icon: "box", tone: "blue" },
+    shipped: { title: "On the way", text: "has left the shop.", icon: "truck", tone: "blue" },
+    to_received: { title: "Out for delivery", text: "is on its way to you.", icon: "truck", tone: "leaf" },
+    delivered: { title: "Delivered", text: "has arrived. Enjoy your flowers!", icon: "home", tone: "leaf" },
+    completed: { title: "Completed", text: "is complete. Thank you for ordering!", icon: "check", tone: "slate" },
+    returned: { title: "Return in progress", text: "has a return being handled.", icon: "undo", tone: "amber" },
+    refunded: { title: "Refunded", text: "has been refunded.", icon: "undo", tone: "slate" },
+    cancelled: { title: "Cancelled", text: "was cancelled.", icon: "cross", tone: "red" },
   };
 
   const config = statusMap[status];
@@ -687,23 +684,11 @@ const mapOrderToNotification = (order) => {
   return {
     id: `${order.id}-${status}`,
     ...config,
-    time: formatNotificationTime(timestamp),
+    orderNumber: order.order_number ? `#${String(order.order_number).replace(/^#/, "")}` : "",
+    time: relativeTime(timestamp) || "Just now",
   };
 };
 
-const formatNotificationTime = (value) => {
-  if (!value) return "Just now";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Just now";
-
-  return date.toLocaleString("en-PH", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-};
 
 const handleClickOutside = (event) => {
   const dropdown = document.querySelector(".user-dropdown-wrapper");
@@ -915,126 +900,303 @@ onUnmounted(() => {
 }
 
 .notification-menu {
-  width: 340px;
+  width: 380px;
+  padding: 0;
+  overflow: hidden;
 }
 
-.nav-menu-head {
+.nt-head {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
-  align-items: center;
-  padding: 10px 12px 12px;
+  gap: 12px;
+  padding: 18px 20px 14px;
   border-bottom: 1px solid var(--line-soft);
 }
 
-.nav-menu-action {
+.nt-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.nt-sub {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.nt-action,
+.nt-refresh,
+.nt-all {
   border: none;
   background: none;
-  color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 12.5px;
-  font-weight: 500;
-  text-decoration: underline;
-  text-underline-offset: 3px;
   cursor: pointer;
 }
 
-.notification-empty {
-  padding: 22px 12px;
-  color: var(--ink-soft);
-  font-size: 13.5px;
-  text-align: center;
+.nt-action {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #e9f5ed;
+  color: var(--leaf-deep);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
-.notification-list {
-  max-height: 340px;
+.nt-action:hover {
+  background: #dcefe2;
+}
+
+.nt-scroll {
+  max-height: min(440px, 62vh);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
-/* Important notices from BloomCraft: tagged, with a red edge, and listed first by the server */
-.notification-entry.important {
-  box-shadow: inset 3px 0 0 #c2410c;
+.nt-section {
+  padding: 8px;
 }
-.notification-tag {
-  display: inline-block;
-  margin-left: 4px;
-  padding: 0 6px;
-  border-radius: 5px;
-  background: #fdecea;
-  color: #b42318;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  vertical-align: 1px;
+
+.nt-section + .nt-section {
+  border-top: 1px solid var(--line-soft);
 }
-.notification-status-dot.alert {
-  background: #c2410c;
+
+.nt-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
-.notification-entry {
+
+.nt-section-label {
+  margin: 6px 12px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.nt-refresh {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-right: 4px;
+  border-radius: 50%;
+  color: var(--ink-soft);
+}
+
+.nt-refresh:hover:not(:disabled) {
+  background: var(--ivory);
+  color: var(--ink);
+}
+
+.nt-refresh:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.nt-refresh svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nt-item {
+  position: relative;
   display: flex;
   gap: 12px;
   width: 100%;
   padding: 12px;
   border: none;
-  border-radius: 12px;
+  border-radius: 14px;
   background: none;
   font-family: var(--font-sans);
   text-align: left;
   cursor: pointer;
-  transition: background 0.25s;
+  transition: background 0.2s ease;
 }
 
-.notification-entry:hover {
+.nt-item:hover {
   background: var(--ivory);
 }
 
-.notification-status-dot {
-  flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  margin-top: 7px;
-  border-radius: 50%;
-  background: var(--gold);
+/* New since the last look: a soft green wash and a dot */
+.nt-item.fresh {
+  background: #f1f8f3;
 }
 
-.notification-status-dot.info {
+.nt-item.fresh:hover {
+  background: #e7f3eb;
+}
+
+.nt-item.important {
+  background: #fdf3f1;
+}
+
+.nt-item:focus-visible,
+.nt-action:focus-visible,
+.nt-refresh:focus-visible,
+.nt-all:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+.nt-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.nt-icon :deep(svg) {
+  width: 20px;
+  height: 20px;
+}
+
+.nt-icon.leaf { background: #e9f5ed; color: var(--leaf-deep); }
+.nt-icon.amber { background: #fbf0dd; color: #8a5a12; }
+.nt-icon.blue { background: #e8f0fb; color: #2b5d9b; }
+.nt-icon.red { background: #fbe9e7; color: #b42318; }
+.nt-icon.slate { background: #eef0f3; color: var(--ink-soft); }
+
+.nt-icon-skel {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.nt-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding-right: 10px;
+}
+
+.nt-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.nt-item-title {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nt-time {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.nt-text {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.nt-text b {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.nt-tag {
+  align-self: flex-start;
+  margin-top: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fbe9e7;
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.nt-unread {
+  position: absolute;
+  top: 18px;
+  right: 12px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   background: var(--leaf);
 }
 
-.notification-status-dot.success {
-  background: #7d8f69;
+.nt-empty {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 22px 16px 26px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-soft);
 }
 
-.notification-status-dot.completed {
-  background: var(--ink-soft);
-}
-
-.notification-entry-content {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.notification-entry-title {
+.nt-empty strong {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--ink);
+}
+
+.nt-foot {
+  padding: 8px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.nt-all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  border-radius: 12px;
+  color: var(--leaf-deep);
   font-size: 13.5px;
   font-weight: 500;
 }
 
-.notification-entry-message {
-  color: var(--ink-soft);
-  font-size: 12.5px;
-  line-height: 1.5;
+.nt-all:hover {
+  background: #e9f5ed;
 }
 
-.notification-entry-time {
-  color: var(--ink-soft);
-  font-size: 11.5px;
-  opacity: 0.8;
+.nt-all svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .notification-skeletons {
-  padding: 6px 4px;
+  padding: 0 4px 6px;
 }
 
 .notification-skeleton {
