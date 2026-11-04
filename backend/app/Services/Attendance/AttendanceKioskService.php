@@ -23,7 +23,7 @@ use Illuminate\Validation\ValidationException;
  */
 class AttendanceKioskService
 {
-    public const CHALLENGES = ['blink', 'smile', 'turn_left', 'turn_right', 'move_closer', 'move_back', 'nod'];
+    public const CHALLENGES = ['smile', 'turn_left', 'turn_right', 'move_closer', 'move_back', 'nod'];
     public const FLASH_COLORS = ['red', 'green', 'blue'];
 
     // Face distances (face-api 128-d descriptors): lower is more alike
@@ -586,7 +586,7 @@ class AttendanceKioskService
     {
         $pick = fn (array $list) => $list[random_int(0, count($list) - 1)];
         $chosen = [
-            $pick(['blink', 'smile']),
+            'smile', // no blinking step
             $pick(['turn_left', 'turn_right']),
             $pick(['move_closer', 'move_back']),
         ];

@@ -188,6 +188,7 @@ class AttendanceSecurityTest extends TestCase
 
         $session = $this->startScan($hr, $token, $p)->assertOk()->json('data');
         $this->assertCount(4, $session['challenges']);
+        $this->assertNotContains('blink', $session['challenges']);
         $this->assertNull($session['employee']['avatar_url'], 'enrolled faces stay on the server');
 
         Carbon::setTestNow(now()->addSeconds(12));
