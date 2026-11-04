@@ -71,11 +71,26 @@ const radiusKm = ref(3);
 let map = null;
 let circle = null;
 
+// The signed-in customer's own pin and photo (the session user doesn't carry them)
+const me = ref(null);
 const home = computed(() => {
-  const lat = Number(user.value?.latitude);
-  const lng = Number(user.value?.longitude);
-  return Number.isFinite(lat) && Number.isFinite(lng) && (lat || lng) && user.value?.latitude != null ? [lat, lng] : null;
+  const lat = Number(me.value?.latitude);
+  const lng = Number(me.value?.longitude);
+  return me.value?.has_pin && Number.isFinite(lat) && Number.isFinite(lng) ? [lat, lng] : null;
 });
+
+async function loadMe() {
+  if (!isAuthenticated.value) {
+    me.value = null;
+    return;
+  }
+  try {
+    const { data } = await api.get("/stores/map/me");
+    me.value = data?.success ? data : null;
+  } catch (_) {
+    me.value = null;
+  }
+}
 const hasPin = computed(() => !!home.value);
 
 // Straight-line distance in km
@@ -105,13 +120,20 @@ function shopIcon(shop) {
   });
 }
 
-const homeIcon = () =>
-  L.divIcon({
+// The customer's own pin: their profile picture (or initial) in a green ring
+function homeIcon() {
+  const name = me.value?.name || user.value?.name || "";
+  const face = me.value?.profile_picture
+    ? `<img src="${escapeHtml(me.value.profile_picture)}" alt="" />`
+    : `<span>${escapeHtml(name.charAt(0).toUpperCase() || "Y")}</span>`;
+  return L.divIcon({
     className: "smap-pin-wrap",
-    html: '<span class="smap-home" aria-hidden="true"></span>',
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
+    html: `<span class="smap-pin smap-pin--me">${face}<i>You</i></span>`,
+    iconSize: [52, 62],
+    iconAnchor: [26, 62],
+    popupAnchor: [0, -58],
   });
+}
 
 function popupFor(shop) {
   const box = document.createElement("div");
@@ -172,7 +194,9 @@ async function render() {
       .bindPopup(popupFor(shop), { closeButton: true });
   }
   if (home.value) {
-    L.marker(home.value, { icon: homeIcon(), title: "Your address", zIndexOffset: 1000, keyboard: false }).addTo(map).bindTooltip("Your address");
+    L.marker(home.value, { icon: homeIcon(), title: "Your address", alt: "Your address", zIndexOffset: 1000 })
+      .addTo(map)
+      .bindTooltip("Your pinned address", { direction: "top", offset: [0, -58] });
     drawCircle(false);
   }
   fitView();
@@ -194,7 +218,7 @@ async function load() {
   loading.value = true;
   error.value = false;
   try {
-    const { data } = await api.get("/stores/map");
+    const [{ data }] = await Promise.all([api.get("/stores/map"), loadMe()]);
     shops.value = Array.isArray(data?.data) ? data.data : [];
   } catch (_) {
     error.value = true;
@@ -205,8 +229,9 @@ async function load() {
 }
 
 watch(radiusKm, () => drawCircle(true));
-// Logging in or pinning an address redraws the map around it
-watch(home, () => {
+// Logging in or out redraws the map around the customer's pin
+watch(isAuthenticated, async () => {
+  await loadMe();
   if (!loading.value && !error.value) render();
 });
 
@@ -419,6 +444,43 @@ onBeforeUnmount(() => {
 
 .leaflet-marker-icon:hover .smap-pin {
   transform: translateY(-2px) scale(1.05);
+}
+
+.smap-pin--me {
+  width: 52px;
+  height: 52px;
+  border-color: #4db173;
+  background: #363f4e;
+}
+
+.smap-pin--me::after {
+  border-top-color: #4db173;
+}
+
+.leaflet-container .leaflet-marker-pane .smap-pin--me img {
+  width: 46px !important;
+  height: 46px !important;
+  max-width: 46px !important;
+  max-height: 46px !important;
+}
+
+.smap-pin--me span {
+  color: #fff;
+}
+
+.smap-pin--me i {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #2e7a4f;
+  color: #fff;
+  font: 600 10px/1.5 "Poppins", -apple-system, "Segoe UI", sans-serif;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 
 .smap-home {

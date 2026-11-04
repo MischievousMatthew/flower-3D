@@ -435,6 +435,33 @@ class VendorStorefrontController extends Controller
     }
 
     /**
+     * GET /api/stores/map/me  (auth)
+     * The signed-in customer's pinned address and photo, for their own pin
+     * on the shop map.
+     */
+    public function shopMapMe(Request $request)
+    {
+        $user = $request->user();
+        if (!$user instanceof User || $user->latitude === null || $user->longitude === null) {
+            return response()->json(['success' => true, 'has_pin' => false]);
+        }
+        $photo = $user->profile_picture;
+        if ($photo && !str_starts_with($photo, 'http')) {
+            $photo = CloudinaryHelper::getUrl($photo);
+        }
+
+        return response()->json([
+            'success' => true,
+            'has_pin' => true,
+            'latitude' => (float) $user->latitude,
+            'longitude' => (float) $user->longitude,
+            'name' => trim(($user->name ?? '') . ' ' . ($user->surname ?? '')),
+            // No photo (or the generated letter avatar): the map shows their initial
+            'profile_picture' => $photo && !str_contains($photo, 'ui-avatars.com') ? $photo : null,
+        ]);
+    }
+
+    /**
      * GET /api/stores/designer-ready
      * Shops a customer can build a 3D bouquet with: at least one 3D flower in
      * stock, and at least one filler, wrapper and ribbon. Each comes with how

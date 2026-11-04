@@ -371,6 +371,8 @@ Route::middleware('token.auth')->group(function () {
 
     // ── Stores near the customer's pinned location ────────────────────────
     Route::get('/stores/nearby', [VendorStoreFrontController::class, 'nearby']);
+    // The customer's own pin (and photo) on the shop map
+    Route::get('/stores/map/me', [VendorStoreFrontController::class, 'shopMapMe']);
 
     // ── Vendor follow/unfollow ────────────────────────────────────────────
     Route::post('/vendors/{vendorId}/follow',   [VendorStoreFrontController::class, 'follow']);
