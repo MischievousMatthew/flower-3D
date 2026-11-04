@@ -117,7 +117,7 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
   color: var(--leaf);
 }
 
-/* Product badge: Best seller, On sale, Sold out */
+/* Same badge as the featured cards (FeaturedPicks) */
 .pt-badge {
   position: absolute;
   top: 10px;
