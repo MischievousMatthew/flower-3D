@@ -166,6 +166,8 @@ Route::prefix('vendors')->group(function () {
     Route::get('/{vendorId}/products', [VendorStoreFrontController::class, 'getProducts']);
 });
 
+// Shops with everything the 3D designer needs (flowers, fillers, wrappers, ribbons)
+Route::get('/stores/designer-ready', [VendorStoreFrontController::class, 'designerReady']);
 Route::get('/stores/{storeId}/customizable-flowers', [VendorStoreFrontController::class, 'getCustomizableFlowers']);
 Route::get('/stores/{storeId}/customization-options', [VendorStoreFrontController::class, 'getCustomizationOptions']);
 

@@ -55,6 +55,7 @@
         <AnnouncementBar />
       </div>
       <ShopHero :banners="site.banners" @shop="scrollToSection('products')" @design="openDesigner" />
+      <DesignerShopPicker :open="designerPickerOpen" @close="designerPickerOpen = false" @choose="designWithShop" @browse="browseFlowerShops" />
     </div>
 
     <ShopTrustStrip variant="top" />
@@ -131,6 +132,7 @@
           </section>
 
           <FeaturedShops
+            id="flower-shops"
             class="shop-picks-shops"
             :shops="vendors"
             :loading="loadingVendors"
@@ -204,6 +206,7 @@ import ShopOccasions from "../../components/shop/ShopOccasions.vue";
 import ShopProductTile from "../../components/shop/ShopProductTile.vue";
 import BouquetFinder from "../../components/shop/BouquetFinder.vue";
 import FeaturedShops from "../../components/shop/FeaturedShops.vue";
+import DesignerShopPicker from "../../components/shop/DesignerShopPicker.vue";
 import JournalTeaser from "../../components/site/JournalTeaser.vue";
 import SiteFooter from "../../components/site/SiteFooter.vue";
 import { useSiteContent } from "../../composables/useSiteContent";
@@ -752,14 +755,23 @@ const showFinderMatches = ({ occasion, color, priceMin, priceMax }) => {
   scrollToSection("products");
 };
 
-// "Explore 3D Designer": the bouquet customizer of the first shop that offers it
+// "Explore 3D Designer": the customer chooses a shop that has everything a
+// bouquet needs (flowers, fillers, wraps and ribbons), over a blurred page
+const designerPickerOpen = ref(false);
 const openDesigner = () => {
-  const shop = vendors.value[0];
-  if (!shop) {
-    scrollToSection("vendors");
-    return;
-  }
-  router.push({ name: "FlowerCustomizer", params: { id: String(shop.id) }, query: { store_name: shop.store_name } });
+  designerPickerOpen.value = true;
+};
+const designWithShop = (shop) => {
+  designerPickerOpen.value = false;
+  router.push({
+    name: "FlowerCustomizer",
+    params: { id: String(shop.id) },
+    query: { store_name: shop.store_name, ...(shop.owner_id ? { owner_id: String(shop.owner_id) } : {}) },
+  });
+};
+const browseFlowerShops = () => {
+  designerPickerOpen.value = false;
+  scrollToSection("flower-shops");
 };
 
 // Shop by occasion: filter the grid to one occasion and jump to it.

@@ -401,6 +401,79 @@ class VendorStorefrontController extends Controller
     }
 
     /**
+     * GET /api/stores/designer-ready
+     * Shops a customer can build a 3D bouquet with: at least one 3D flower in
+     * stock, and at least one filler, wrapper and ribbon. Each comes with how
+     * many of each it has, for the "choose a shop" picker.
+     */
+    public function designerReady()
+    {
+        try {
+            $vendors = VendorApplication::notSuspended()->where('status', 'approved')->orderBy('store_name')->get();
+            $owners = $vendors->mapWithKeys(fn ($vendor) => [$vendor->id => $this->resolveVendorOwnerId($vendor)])->filter();
+            if ($owners->isEmpty()) {
+                return response()->json(['success' => true, 'data' => []]);
+            }
+            $ownerIds = $owners->unique()->values()->all();
+
+            $productQuery = Product::query();
+            if (!Schema::hasColumn('products', 'deleted_at')) {
+                $productQuery->withoutGlobalScope(SoftDeletingScope::class);
+            }
+            // Same rules as the flowers the customizer lists
+            $flowers = $productQuery->listedForCustomers()
+                ->whereIn('owner_id', $ownerIds)
+                ->where('status', 'active')
+                ->where('selling_type', 'per_piece_customizable')
+                ->where('quantity_in_stock', '>', 0)
+                ->whereHas('models', function ($query) {
+                    $query->where(fn ($q) => $q->whereNotNull('model_path')->where('model_path', '!=', ''))
+                        ->orWhere(fn ($q) => $q->whereNotNull('model_url')->where('model_url', '!=', ''));
+                })
+                ->selectRaw('owner_id, COUNT(*) as total')
+                ->groupBy('owner_id')
+                ->pluck('total', 'owner_id');
+
+            $options = BouquetCustomizationOption::query()
+                ->available()
+                ->whereIn('owner_id', $ownerIds)
+                ->whereIn('type', [
+                    BouquetCustomizationOption::TYPE_FILLER,
+                    BouquetCustomizationOption::TYPE_WRAPPER,
+                    BouquetCustomizationOption::TYPE_RIBBON,
+                ])
+                ->selectRaw('owner_id, type, COUNT(*) as total')
+                ->groupBy('owner_id', 'type')
+                ->get()
+                ->groupBy('owner_id');
+
+            $ready = $vendors->map(function ($vendor) use ($owners, $flowers, $options) {
+                $ownerId = $owners->get($vendor->id);
+                if (!$ownerId) {
+                    return null;
+                }
+                $count = fn (string $type) => (int) optional(($options->get($ownerId) ?? collect())->firstWhere('type', $type))->total;
+                $parts = [
+                    'flowers' => (int) ($flowers[$ownerId] ?? 0),
+                    'fillers' => $count(BouquetCustomizationOption::TYPE_FILLER),
+                    'wrappers' => $count(BouquetCustomizationOption::TYPE_WRAPPER),
+                    'ribbons' => $count(BouquetCustomizationOption::TYPE_RIBBON),
+                ];
+                if (min($parts) < 1) {
+                    return null;
+                }
+
+                return $this->formatVendor($vendor) + ['designer' => $parts];
+            })->filter()->values();
+
+            return response()->json(['success' => true, 'data' => $ready]);
+        } catch (Exception $e) {
+            Log::error('VendorStorefrontController@designerReady: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'We could not load the shops right now.'], 500);
+        }
+    }
+
+    /**
      * GET /api/stores/{storeId}/customization-options
      * The vendor's wrappers (switched on only), fillers and ribbons.
      */

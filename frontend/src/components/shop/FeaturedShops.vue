@@ -1,7 +1,7 @@
 <template>
   <section class="fs" aria-labelledby="fs-title">
     <div class="fs-head">
-      <h2 id="fs-title">Featured Flower Shops</h2>
+      <h2 id="fs-title">Flower Shops</h2>
     </div>
 
     <ul v-if="loading" class="fs-list" aria-label="Loading shops">
