@@ -108,14 +108,14 @@
           :class="{ active: activeTab === 'general' }"
           @click="activeTab = 'general'"
         >
-          <span class="tab-icon">🏪</span><span>General Info</span>
+          <span class="tab-icon" aria-hidden="true" v-html="ICONS.store"></span><span>General Info</span>
         </button>
         <button
           class="tab-button"
           :class="{ active: activeTab === 'payment' }"
           @click="activeTab = 'payment'"
         >
-          <span class="tab-icon">💳</span><span>Payment Details</span>
+          <span class="tab-icon" aria-hidden="true" v-html="ICONS.card"></span><span>Payment Details</span>
           <span v-if="!profileData.payment_details_completed" class="tab-badge"
             >!</span
           >
@@ -125,7 +125,7 @@
           :class="{ active: activeTab === 'product' }"
           @click="activeTab = 'product'"
         >
-          <span class="tab-icon">🌸</span><span>Product Details</span>
+          <span class="tab-icon" aria-hidden="true" v-html="ICONS.flower"></span><span>Product Details</span>
           <span v-if="!profileData.product_details_completed" class="tab-badge"
             >!</span
           >
@@ -135,7 +135,7 @@
           class="tab-button"
           @click="router.push({ name: 'VendorShopSettings' })"
         >
-          <span class="tab-icon">🚚</span><span>Delivery Details</span>
+          <span class="tab-icon" aria-hidden="true" v-html="ICONS.truck"></span><span>Delivery Details</span>
           <span v-if="!profileData.delivery_details_completed" class="tab-badge"
             >!</span
           >
@@ -144,7 +144,7 @@
           class="tab-button"
           @click="router.push({ name: 'VendorSecurity' })"
         >
-          <span class="tab-icon">🔒</span><span>Password &amp; Security</span>
+          <span class="tab-icon" aria-hidden="true" v-html="ICONS.lock"></span><span>Password &amp; Security</span>
         </button>
       </div>
 
@@ -233,7 +233,7 @@
 
           <transition name="alert-slide">
             <div v-if="generalForm.successMsg" class="alert-banner success">
-              <span class="alert-icon">✅</span>
+              <span class="alert-icon" aria-hidden="true" v-html="ICONS.check"></span>
               <span>{{ generalForm.successMsg }}</span>
               <button
                 class="alert-dismiss"
@@ -245,7 +245,7 @@
           </transition>
           <transition name="alert-slide">
             <div v-if="generalForm.errorMsg" class="alert-banner error">
-              <span class="alert-icon">❌</span>
+              <span class="alert-icon" aria-hidden="true" v-html="ICONS.alert"></span>
               <span>{{ generalForm.errorMsg }}</span>
               <button class="alert-dismiss" @click="generalForm.errorMsg = ''">
                 ✕
@@ -404,7 +404,7 @@
 
           <transition name="alert-slide">
             <div v-if="paymentForm.successMsg" class="alert-banner success">
-              <span class="alert-icon">✅</span>
+              <span class="alert-icon" aria-hidden="true" v-html="ICONS.check"></span>
               <span>{{ paymentForm.successMsg }}</span>
               <button
                 class="alert-dismiss"
@@ -416,7 +416,7 @@
           </transition>
           <transition name="alert-slide">
             <div v-if="paymentForm.errorMsg" class="alert-banner error">
-              <span class="alert-icon">❌</span>
+              <span class="alert-icon" aria-hidden="true" v-html="ICONS.alert"></span>
               <span>{{ paymentForm.errorMsg }}</span>
               <button class="alert-dismiss" @click="paymentForm.errorMsg = ''">
                 ✕
@@ -516,7 +516,7 @@
               </div>
             </div>
             <div class="info-box">
-              <span class="info-icon">ℹ️</span>
+              <span class="info-icon" aria-hidden="true" v-html="ICONS.help"></span>
               <p>
                 Your payment information is stored securely and used to process
                 vendor payouts and enable payment options for customers.
@@ -548,7 +548,7 @@
 
           <transition name="alert-slide">
             <div v-if="productForm.successMsg" class="alert-banner success">
-              <span class="alert-icon">✅</span>
+              <span class="alert-icon" aria-hidden="true" v-html="ICONS.check"></span>
               <span>{{ productForm.successMsg }}</span>
               <button
                 class="alert-dismiss"
@@ -560,7 +560,7 @@
           </transition>
           <transition name="alert-slide">
             <div v-if="productForm.errorMsg" class="alert-banner error">
-              <span class="alert-icon">❌</span>
+              <span class="alert-icon" aria-hidden="true" v-html="ICONS.alert"></span>
               <span>{{ productForm.errorMsg }}</span>
               <button class="alert-dismiss" @click="productForm.errorMsg = ''">
                 ✕
@@ -743,7 +743,7 @@
                 <img :src="imagePreview" alt="Preview" />
               </div>
               <div v-else class="photo-placeholder">
-                <span class="upload-icon">{{ uploadKind === "cover" ? "🖼️" : "🏪" }}</span>
+                <span class="upload-icon" aria-hidden="true" v-html="uploadKind === 'cover' ? ICONS.image : ICONS.store"></span>
                 <p class="upload-text">{{ uploadConfig.prompt }}</p>
                 <p class="upload-hint">{{ uploadConfig.hint }}</p>
               </div>
@@ -783,6 +783,7 @@ import { useRoute, useRouter } from "vue-router";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import "../../styles/bloomcraft.css";
 import api from "../../plugins/axios";
+import { SHOP_ICONS as ICONS } from "../../components/vendor/shop/shopIcons";
 import { toast } from "@/utils/snackbar";
 import { useFormSubmit } from "../../composables/useFormSubmit";
 import { useVendorProfile } from "../../composables/useVendorProfile";
@@ -1643,8 +1644,18 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
   color: var(--bc-accent-ink);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--bc-accent) 25%, transparent);
 }
-.tab-icon {
-  font-size: 18px;
+.tab-icon,
+.alert-icon,
+.info-icon {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.tab-icon :deep(svg),
+.alert-icon :deep(svg),
+.info-icon :deep(svg) {
+  width: 18px;
+  height: 18px;
 }
 .tab-badge {
   width: 18px;
@@ -1722,10 +1733,6 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
   background: var(--v-red-soft);
   color: var(--v-red-text);
   border-color: #fca5a5;
-}
-.alert-icon {
-  font-size: 18px;
-  flex-shrink: 0;
 }
 .alert-banner span:nth-child(2) {
   flex: 1;
@@ -1873,10 +1880,6 @@ select.form-input {
   border: 1px solid var(--v-blue-soft);
   border-radius: 10px;
   margin-bottom: 24px;
-}
-.info-icon {
-  font-size: 20px;
-  flex-shrink: 0;
 }
 .info-box p {
   margin: 0;
@@ -2210,9 +2213,14 @@ select.form-input {
   padding: 20px;
 }
 .upload-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  display: block;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 16px;
+  color: var(--v-muted, #94a3b8);
+}
+.upload-icon :deep(svg) {
+  width: 48px;
+  height: 48px;
 }
 .upload-text {
   font-size: 16px;
