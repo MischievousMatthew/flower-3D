@@ -860,6 +860,10 @@
                   <dt>Wrapper</dt>
                   <dd><span class="dm-swatch"><i :style="{ background: detailRecipe.wrapper.color }"></i>{{ detailRecipe.wrapper.name || "Wrapper" }}</span></dd>
                 </div>
+                <div v-if="detailRecipe.pattern">
+                  <dt>Wrapper pattern</dt>
+                  <dd>{{ detailRecipe.pattern }}</dd>
+                </div>
                 <div v-if="detailRecipe.innerWrapper">
                   <dt>Inner wrapper</dt>
                   <dd><span class="dm-swatch"><i :style="{ background: detailRecipe.innerWrapper.color }"></i>{{ detailRecipe.innerWrapper.name || "Inner wrapper" }}</span></dd>

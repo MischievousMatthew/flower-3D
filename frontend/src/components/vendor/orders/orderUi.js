@@ -133,6 +133,13 @@ export function bouquetFromItems(items = []) {
 export const isBouquetItem = (item) => parseCustomizations(item?.customizations)?.type === "custom_flower_bouquet";
 
 /** What staff need to make a bouquet: flowers by count, wrappers, ribbon, fillers, size */
+/** "Newspaper print" or "Words: “love”" for a wrapper pattern; "" for plain paper */
+export function wrapperPatternLabel(pattern) {
+  if (pattern?.type === "newspaper") return "Newspaper print";
+  if (pattern?.type === "words" && String(pattern.text || "").trim()) return `Words: “${String(pattern.text).trim()}”`;
+  return "";
+}
+
 export function bouquetRecipe(bouquet) {
   if (!bouquet) return null;
   const counts = new Map();
@@ -147,6 +154,7 @@ export function bouquetRecipe(bouquet) {
     flowerTotal: [...counts.values()].reduce((a, b) => a + b, 0),
     wrapper: swatch(bouquet.wrapper, bouquet.paper_color),
     innerWrapper: swatch(bouquet.inner_wrapper, bouquet.inner_paper_color),
+    pattern: wrapperPatternLabel(bouquet.wrapper_pattern),
     ribbon: swatch(bouquet.ribbon, bouquet.ribbon_color),
     fillers: [...new Set((bouquet.fillers ?? []).map((f) => f.name).filter(Boolean))],
     occasion: bouquet.preset?.label ?? null,

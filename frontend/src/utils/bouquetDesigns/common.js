@@ -14,7 +14,7 @@ export function seeded(seed) {
   };
 }
 
-export const emptyLayer = (defaultColor = "#ffffff") => ({ meshes: [], apply() {}, defaultColor });
+export const emptyLayer = (defaultColor = "#ffffff") => ({ meshes: [], apply() {}, setPattern() {}, defaultColor });
 
 /**
  * The flower bed: a soft, slightly lumpy moss dome filling an opening of

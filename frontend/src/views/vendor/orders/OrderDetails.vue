@@ -76,6 +76,7 @@
                     <span v-if="item.is_custom_bouquet" class="sp-chip violet">Part of a custom 3D bouquet</span>
                     <span v-if="presetOf(item)" class="sp-chip blue">{{ presetOf(item).label }} · {{ presetOf(item).size }} stems</span>
                     <span v-if="custom(item).paper_color && presetOf(item)?.wrapper !== false" class="swatch"><i :style="{ background: custom(item).paper_color }"></i>Wrapper</span>
+                    <span v-if="wrapperPatternLabel(custom(item).wrapper_pattern)" class="detail">Pattern: {{ wrapperPatternLabel(custom(item).wrapper_pattern) }}</span>
                     <span v-if="custom(item).ribbon_color && presetOf(item)?.ribbon !== false" class="swatch"><i :style="{ background: custom(item).ribbon_color }"></i>Ribbon</span>
                     <span v-if="item.color" class="detail">Colour: {{ item.color }}</span>
                     <span v-if="item.size" class="detail">Size: {{ item.size }}</span>
@@ -171,7 +172,7 @@ import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { linkedId } from "../../../utils/hiddenIds";
 import {
-  PAYMENT_LABEL, STATUS_HINT, STATUS_TONE, bouquetFromItems, dayLabel, daysFromToday, formatDateTime, isLate, money, parseCustomizations, shouldPrepare,
+  PAYMENT_LABEL, STATUS_HINT, STATUS_TONE, bouquetFromItems, dayLabel, daysFromToday, formatDateTime, isLate, money, parseCustomizations, shouldPrepare, wrapperPatternLabel,
 } from "../../../components/vendor/orders/orderUi";
 import "../../../components/vendor/shop/shop.css";
 import { DEFAULT_PRESETS } from "../../../constants/bouquetPresets";

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { wrapUv } from "./wrapperPatterns.js";
 
 /*
  * Wrapper and ribbon handling for the bouquet base model (/Boquet.glb).
@@ -36,22 +37,40 @@ export function createLayer(meshes) {
     mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0];
   });
 
+  let pattern = null; // a wrapping-paper pattern texture (utils/wrapperPatterns.js)
+  let lastHex = null;
+
+  const paint = (hex) => {
+    entries.forEach((entry) => {
+      const { material } = entry;
+      if (pattern) {
+        // The pattern carries its own colours
+        material.map = pattern;
+        material.color.set("#ffffff");
+      } else if (!hex) {
+        material.color.copy(entry.color);
+        material.map = entry.map;
+      } else {
+        if (entry.map && !entry.tintMap) entry.tintMap = createTintableMap(entry.map);
+        material.map = entry.tintMap || entry.map;
+        material.color.set(hex);
+      }
+      material.needsUpdate = true;
+    });
+  };
+
   return {
     meshes,
     // null restores the colour the model shipped with
     apply(hex) {
-      entries.forEach((entry) => {
-        const { material } = entry;
-        if (!hex) {
-          material.color.copy(entry.color);
-          material.map = entry.map;
-        } else {
-          if (entry.map && !entry.tintMap) entry.tintMap = createTintableMap(entry.map);
-          material.map = entry.tintMap || entry.map;
-          material.color.set(hex);
-        }
-        material.needsUpdate = true;
-      });
+      lastHex = hex || null;
+      paint(lastHex);
+    },
+    /** A pattern texture, or null for plain paper in the applied colour */
+    setPattern(texture) {
+      if (texture) wrapUv(meshes);
+      pattern = texture || null;
+      paint(lastHex);
     },
   };
 }

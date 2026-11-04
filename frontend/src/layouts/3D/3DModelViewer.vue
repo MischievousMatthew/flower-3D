@@ -49,6 +49,7 @@ import { ref, onMounted, onUnmounted, watch } from "vue";
 import * as THREE from "three";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { LEGACY_DESIGN, createBouquetBase } from "../../utils/bouquetDesigns/index.js";
+import { applyWrapPattern } from "../../utils/wrapperPatterns.js";
 import { buildFillerBunch } from "../../utils/fillerBunch.js";
 import { buildFillerSprigs } from "../../utils/fillerLayout.js";
 import { createCard } from "../../utils/bouquetCard.js";
@@ -368,6 +369,8 @@ const loadBouquetArrangement = async (arrangement) => {
   // Tint the two colour layers (empty = the design's own) and tie the ribbon.
   const dressing = base.dressing;
   dressing.outer.apply(arrangement.paper_color || null);
+  // Newspaper or words printed on the outer paper
+  await applyWrapPattern(dressing.outer, arrangement.wrapper_pattern, arrangement.paper_color || null);
   dressing.inner.apply(arrangement.inner_paper_color || null);
   dressing.applyRibbon(arrangement.ribbon_color || null);
 

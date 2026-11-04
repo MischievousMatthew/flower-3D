@@ -40,6 +40,10 @@ class BouquetPresets
         'basket' => ['label' => 'Basket', 'wrapper' => true, 'ribbon' => false],
     ];
 
+    /** Designs whose outer paper can carry a print (newspaper, words) */
+    public const PATTERN_DESIGNS = ['classic', 'korean'];
+    public const MAX_PATTERN_WORD = 16;
+
     /** Icons a vendor can give their own occasions (frontend constants/occasionIcons.js) */
     public const ICONS = ['rings', 'heart', 'gift', 'cap', 'dove', 'flower'];
 
@@ -312,8 +316,32 @@ class BouquetPresets
         if (! $occasion['ribbon']) {
             unset($customizations['ribbon'], $customizations['ribbon_color']);
         }
+        $pattern = self::cleanPattern($customizations['wrapper_pattern'] ?? null);
+        unset($customizations['wrapper_pattern']);
+        if ($pattern && $occasion['wrapper'] && in_array($occasion['design'], self::PATTERN_DESIGNS, true)) {
+            $customizations['wrapper_pattern'] = $pattern;
+        }
 
         return ['ok' => true, 'customizations' => $customizations, 'filler_limit' => $fillerLimit, 'base_price' => $base];
+    }
+
+    /** A print on the outer paper: newspaper, or a short word written over and over; null for plain */
+    public static function cleanPattern($pattern): ?array
+    {
+        if (! is_array($pattern)) {
+            return null;
+        }
+        if (($pattern['type'] ?? null) === 'newspaper') {
+            return ['type' => 'newspaper'];
+        }
+        if (($pattern['type'] ?? null) === 'words') {
+            $text = preg_replace('/[^\p{L}\p{N} \'&!♥.-]/u', '', (string) ($pattern['text'] ?? ''));
+            $text = mb_substr(trim(preg_replace('/\s+/u', ' ', (string) $text)), 0, self::MAX_PATTERN_WORD);
+
+            return $text !== '' ? ['type' => 'words', 'text' => $text] : null;
+        }
+
+        return null;
     }
 
     private static function cleanSizes($sizes): array

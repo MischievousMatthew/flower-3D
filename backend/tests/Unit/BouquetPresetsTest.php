@@ -204,4 +204,22 @@ class BouquetPresetsTest extends TestCase
             $this->assertArrayHasKey('custom_nameless.label', $e->errors());
         }
     }
+
+    public function test_paper_wraps_keep_a_clean_print_and_other_styles_drop_it(): void
+    {
+        $presets = BouquetPresets::merge(null);
+        $words = BouquetPresets::check($presets, $this->bouquet(['key' => 'romance', 'size' => 6], 2, ['wrapper_pattern' => ['type' => 'words', 'text' => '  Love   <you> forever and ever ']]));
+        $this->assertSame(['type' => 'words', 'text' => 'Love you forever'], $words['customizations']['wrapper_pattern']);
+
+        $news = BouquetPresets::check($presets, $this->bouquet(['key' => 'graduation', 'size' => 3], 1, ['wrapper_pattern' => ['type' => 'newspaper', 'text' => 'x']]));
+        $this->assertSame(['type' => 'newspaper'], $news['customizations']['wrapper_pattern']);
+
+        // A basket and a hand-tied bouquet have no paper to print on
+        foreach (['sympathy', 'wedding'] as $key) {
+            $result = BouquetPresets::check($presets, $this->bouquet(['key' => $key, 'size' => 6], 1, ['wrapper_pattern' => ['type' => 'newspaper']]));
+            $this->assertArrayNotHasKey('wrapper_pattern', $result['customizations'], $key);
+        }
+        $this->assertNull(BouquetPresets::cleanPattern(['type' => 'words', 'text' => '<>']));
+        $this->assertNull(BouquetPresets::cleanPattern(['type' => 'stripes']));
+    }
 }
