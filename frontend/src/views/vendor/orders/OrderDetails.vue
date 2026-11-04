@@ -77,6 +77,8 @@
                     <span v-if="presetOf(item)" class="sp-chip blue">{{ presetOf(item).label }} · {{ presetOf(item).size }} stems</span>
                     <span v-if="custom(item).paper_color && presetOf(item)?.wrapper !== false" class="swatch"><i :style="{ background: custom(item).paper_color }"></i>Wrapper</span>
                     <span v-if="wrapperPatternLabel(custom(item).wrapper_pattern)" class="detail">Pattern: {{ wrapperPatternLabel(custom(item).wrapper_pattern) }}</span>
+                    <span v-if="custom(item).inner_paper_color && presetOf(item)?.wrapper !== false" class="swatch"><i :style="{ background: custom(item).inner_paper_color }"></i>Inner wrapper</span>
+                    <span v-if="wrapperPatternLabel(custom(item).inner_wrapper_pattern)" class="detail">Inner pattern: {{ wrapperPatternLabel(custom(item).inner_wrapper_pattern) }}</span>
                     <span v-if="custom(item).ribbon_color && presetOf(item)?.ribbon !== false" class="swatch"><i :style="{ background: custom(item).ribbon_color }"></i>Ribbon</span>
                     <span v-if="item.color" class="detail">Colour: {{ item.color }}</span>
                     <span v-if="item.size" class="detail">Size: {{ item.size }}</span>
@@ -180,7 +182,7 @@ import { DEFAULT_PRESETS } from "../../../constants/bouquetPresets";
 const router = useRouter();
 const ENDED = ["cancelled", "returned", "refunded", "unpaid_checkout"];
 // Keys stored with each customization that aren't worth showing
-const HIDDEN_CUSTOM = ["type", "store_id", "vendor_id", "placement", "paper_color", "ribbon_color", "flowers", "bouquet_model_url", "model_3d_url", "scene_id", "preset"];
+const HIDDEN_CUSTOM = ["type", "store_id", "vendor_id", "placement", "paper_color", "inner_paper_color", "ribbon_color", "flowers", "bouquet_model_url", "model_3d_url", "scene_id", "preset"];
 
 // The bouquet's occasion and size, with whether it has a wrapper and ribbon
 const presetOf = (item) => {

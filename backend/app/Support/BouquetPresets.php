@@ -317,7 +317,7 @@ class BouquetPresets
             unset($customizations['ribbon'], $customizations['ribbon_color']);
         }
         // The print comes from the shop's chosen wrapper (resolveSelections), never the browser
-        unset($customizations['wrapper_pattern']);
+        unset($customizations['wrapper_pattern'], $customizations['inner_wrapper_pattern']);
 
         return ['ok' => true, 'customizations' => $customizations, 'filler_limit' => $fillerLimit, 'base_price' => $base];
     }

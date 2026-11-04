@@ -369,9 +369,12 @@ const loadBouquetArrangement = async (arrangement) => {
   // Tint the two colour layers (empty = the design's own) and tie the ribbon.
   const dressing = base.dressing;
   dressing.outer.apply(arrangement.paper_color || null);
-  // Newspaper or words printed on the outer paper
-  await applyWrapPattern(dressing.outer, arrangement.wrapper_pattern, arrangement.paper_color || null);
   dressing.inner.apply(arrangement.inner_paper_color || null);
+  // Newspaper or words printed on each paper
+  await Promise.all([
+    applyWrapPattern(dressing.outer, arrangement.wrapper_pattern, arrangement.paper_color || null),
+    applyWrapPattern(dressing.inner, arrangement.inner_wrapper_pattern, arrangement.inner_paper_color || null),
+  ]);
   dressing.applyRibbon(arrangement.ribbon_color || null);
 
   model = new THREE.Group();

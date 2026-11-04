@@ -4,23 +4,25 @@ import { wrapUv } from "./wrapperPatterns.js";
 /*
  * Wrapper and ribbon handling for the bouquet base model (/Boquet.glb).
  *
- * The model has two paper layers and no ribbon:
- *   - outer wrap: the textured kraft paper (material "paper04_05_06")
- *   - inner wrap: the plain pink paper (material "Pink")
+ * The model has two paper layers and no ribbon. Despite their names, the
+ * "Pink" paper is the big cone on the outside and the kraft paper
+ * ("paper04_05_06") is the layer tucked inside it:
+ *   - outer wrap: material "Pink"
+ *   - inner wrap: material "paper04_05_06"
  * Everything else (leaves, daisies, lavender, small plants) must keep its
  * own colours, so only these two layers are ever tinted. The ribbon is
  * generated here and tied around the narrowest part of the wrap.
  */
 
-const OUTER_MATCH = /paper|kraft|wrap.*outer|outer.*wrap/i;
-const INNER_MATCH = /^pink$|wrap.*inner|inner.*wrap|tissue/i;
+const OUTER_MATCH = /^pink$|wrap.*outer|outer.*wrap/i;
+const INNER_MATCH = /paper|kraft|wrap.*inner|inner.*wrap|tissue/i;
 
 const materialsOf = (mesh) => (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).filter(Boolean);
 
 function classifyMesh(mesh) {
-  const names = [mesh.name, ...materialsOf(mesh).map((material) => material.name)].join(" ");
-  if (INNER_MATCH.test(materialsOf(mesh).map((material) => material.name).join(" ")) || /inner/i.test(mesh.name)) return "inner";
-  if (OUTER_MATCH.test(names)) return "outer";
+  const materialNames = materialsOf(mesh).map((material) => material.name).join(" ");
+  if (OUTER_MATCH.test(materialNames) || /outer/i.test(mesh.name)) return "outer";
+  if (INNER_MATCH.test(`${mesh.name} ${materialNames}`)) return "inner";
   return null;
 }
 

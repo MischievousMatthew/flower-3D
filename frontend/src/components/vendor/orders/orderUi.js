@@ -155,6 +155,7 @@ export function bouquetRecipe(bouquet) {
     wrapper: swatch(bouquet.wrapper, bouquet.paper_color),
     innerWrapper: swatch(bouquet.inner_wrapper, bouquet.inner_paper_color),
     pattern: wrapperPatternLabel(bouquet.wrapper_pattern),
+    innerPattern: wrapperPatternLabel(bouquet.inner_wrapper_pattern),
     ribbon: swatch(bouquet.ribbon, bouquet.ribbon_color),
     fillers: [...new Set((bouquet.fillers ?? []).map((f) => f.name).filter(Boolean))],
     occasion: bouquet.preset?.label ?? null,

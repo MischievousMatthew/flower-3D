@@ -223,6 +223,16 @@ class BouquetCustomizationOptionTest extends TestCase
         ]);
         $this->assertArrayNotHasKey('wrapper_pattern', $result['customizations']);
 
+        // A printed wrapper picked for the inner layer keeps its print there
+        $result = BouquetCustomizationOption::resolveSelections($vendor->id, [
+            'type' => 'custom_flower_bouquet',
+            'wrapper' => ['id' => $plain->id],
+            'inner_wrapper' => ['id' => $love['id']],
+            'inner_wrapper_pattern' => ['type' => 'newspaper'],
+        ]);
+        $this->assertArrayNotHasKey('wrapper_pattern', $result['customizations']);
+        $this->assertSame(['type' => 'words', 'text' => 'love'], $result['customizations']['inner_wrapper_pattern']);
+
         // The storefront sends the print with the wrapper
         $this->getJson("/api/stores/{$vendor->id}/customization-options")->assertOk();
     }

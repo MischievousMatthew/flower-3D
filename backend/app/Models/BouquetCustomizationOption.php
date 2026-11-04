@@ -160,12 +160,14 @@ class BouquetCustomizationOption extends Model
             $customizations[$colorKey] = $option->color_hex;
         }
 
-        // The outer wrapper's print (newspaper, words), from the shop's wrapper, never the browser
-        unset($customizations['wrapper_pattern']);
-        $outer = $wrapperId ? $options->get($wrapperId) : null;
+        // Each layer's print (newspaper, words), from the shop's wrapper, never the browser
         $design = $customizations['design'] ?? 'classic';
-        if ($outer && $outer->patternData() && in_array($design, BouquetPresets::PATTERN_DESIGNS, true)) {
-            $customizations['wrapper_pattern'] = $outer->patternData();
+        foreach (['wrapper_pattern' => $wrapperId, 'inner_wrapper_pattern' => $innerWrapperId] as $patternKey => $id) {
+            unset($customizations[$patternKey]);
+            $wrapper = $id ? $options->get($id) : null;
+            if ($wrapper && $wrapper->patternData() && in_array($design, BouquetPresets::PATTERN_DESIGNS, true)) {
+                $customizations[$patternKey] = $wrapper->patternData();
+            }
         }
 
         $resolvedFillers = [];

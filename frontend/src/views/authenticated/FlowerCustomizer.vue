@@ -641,12 +641,13 @@ const maxFlowers = computed(() => preset.value?.size ?? LEGACY_PRESET.size);
 const maxFillers = computed(() => fillerLimitFor(maxFlowers.value));
 const hasWrapper = computed(() => occasion.value?.wrapper ?? true);
 const hasRibbon = computed(() => occasion.value?.ribbon ?? true);
-// The outer wrapper's print (newspaper, words) comes with the shop's wrapper.
-// Prints go on paper wraps only, not a basket or a hand-tied bouquet.
+// Each wrapper's print (newspaper, words) comes with the shop's wrapper, on
+// whichever layer it is picked for. Prints go on paper wraps only, not a
+// basket or a hand-tied bouquet.
 const canPattern = computed(() => hasWrapper.value && PATTERN_DESIGNS.includes(baseDesign.value));
-const savedPattern = computed(() =>
-  canPattern.value && selectedOuterWrapper.value ? normalizePattern({ type: selectedOuterWrapper.value.pattern, text: selectedOuterWrapper.value.pattern_text }) : null,
-);
+const printOf = (wrapper) => (canPattern.value && wrapper ? normalizePattern({ type: wrapper.pattern, text: wrapper.pattern_text }) : null);
+const savedPattern = computed(() => printOf(selectedOuterWrapper.value));
+const savedInnerPattern = computed(() => printOf(selectedInnerWrapper.value));
 const printLabel = (option) =>
   option.pattern === "newspaper" ? "Newspaper print" : option.pattern === "words" && option.pattern_text ? `“${option.pattern_text}” print` : "";
 // A ribbon only shows when the occasion has one and the shop stocks ribbons
@@ -1657,10 +1658,13 @@ function applyOccasionBuild() {
   dressing.applyRibbon(showsRibbon.value ? ribbonColor.value : null);
 }
 
+// Each layer shows its own wrapper's print
 function applyPattern() {
-  if (dressing) applyWrapPattern(dressing.outer, savedPattern.value, wrap.outer.color);
+  if (!dressing) return;
+  applyWrapPattern(dressing.outer, savedPattern.value, wrap.outer.color);
+  applyWrapPattern(dressing.inner, savedInnerPattern.value, wrap.inner.color);
 }
-watch([savedPattern, () => wrap.outer.color], applyPattern, { deep: true });
+watch([savedPattern, savedInnerPattern, () => wrap.outer.color, () => wrap.inner.color], applyPattern, { deep: true });
 watch([occasion, showsRibbon, hasWrapper], applyOccasionBuild);
 
 /**
@@ -2580,6 +2584,7 @@ function buildBouquetCustomization() {
     vendor_id: vendorOwnerId.value,
     paper_color: wrap.outer.color,
     wrapper_pattern: savedPattern.value,
+    inner_wrapper_pattern: savedInnerPattern.value,
     inner_paper_color: wrap.inner.color,
     ribbon_color: showsRibbon.value ? ribbonColor.value : null,
     wrapper_scale: wrapperScale.value,
