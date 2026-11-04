@@ -215,4 +215,29 @@ class BouquetPresetsTest extends TestCase
         $result = BouquetPresets::check(BouquetPresets::merge(null), $this->bouquet(['key' => 'romance', 'size' => 6], 1, ['wrapper_pattern' => ['type' => 'newspaper']]));
         $this->assertArrayNotHasKey('wrapper_pattern', $result['customizations']);
     }
+
+    public function test_an_occasion_can_use_the_shops_own_3d_wrapper(): void
+    {
+        $saved = BouquetPresets::normalize(['graduation' => ['design' => 'model_12', 'sizes' => [6], 'wrapper' => true, 'ribbon' => true]]);
+        $this->assertSame('model_12', $saved['graduation']['design']);
+        $this->assertTrue($saved['graduation']['wrapper']);
+        $this->assertTrue($saved['graduation']['ribbon']);
+        $this->assertSame(12, BouquetPresets::modelId('model_12'));
+        $this->assertNull(BouquetPresets::modelId('model_x'));
+
+        $this->expectException(ValidationException::class);
+        BouquetPresets::normalize(['graduation' => ['design' => 'model_', 'sizes' => [6]]]);
+    }
+
+    public function test_a_bouquet_on_a_3d_wrapper_records_where_the_model_is(): void
+    {
+        $presets = BouquetPresets::merge(['graduation' => ['design' => 'model_12']]);
+        $presets = array_map(fn ($p) => $p['key'] === 'graduation' ? $p + ['model_url' => 'https://example.com/wrap.glb'] : $p, $presets);
+        $result = BouquetPresets::check($presets, $this->bouquet(['key' => 'graduation', 'size' => 6], 1, ['design_model_url' => 'https://evil.example/x.glb']));
+        $this->assertSame('model_12', $result['customizations']['design']);
+        $this->assertSame('https://example.com/wrap.glb', $result['customizations']['design_model_url']);
+
+        $plain = BouquetPresets::check(BouquetPresets::merge(null), $this->bouquet(['key' => 'graduation', 'size' => 6], 1, ['design_model_url' => 'https://evil.example/x.glb']));
+        $this->assertArrayNotHasKey('design_model_url', $plain['customizations']);
+    }
 }

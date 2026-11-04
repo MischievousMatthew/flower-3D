@@ -1,7 +1,7 @@
 // Bouquet bases made from the shop's own models (public/bouquets/*.glb, built
 // by scripts/build-bouquet-bases.mjs without their flowers and fillers).
 import * as THREE from "three";
-import { createLayer } from "../bouquetDressing.js";
+import { createLayer, dressWholeModel } from "../bouquetDressing.js";
 import { emptyLayer, finish, makeBed } from "./common.js";
 
 const TARGET_SIZE = 3.5;
@@ -111,5 +111,57 @@ export async function buildFromModel(key, loadGltf) {
     targets: [bed, ...wrapMeshes],
     // The model's own paper colours, for the customizer's "Original" swatch
     defaults: { outer: colourOf(outerMeshes), inner: colourOf(innerMeshes), ribbon: spec.defaults.ribbon ?? null },
+  };
+}
+
+/**
+ * A shop's own 3D wrapper (Shop → 3D Bouquets → 3D wrappers). Any GLB of an
+ * empty wrapper standing upright: it's sized like the other bases, the whole
+ * model is the wrapper customers recolour, a ribbon is tied around its
+ * narrowest part, and flowers go on a bed near the top of its opening.
+ */
+export async function buildFromUpload(url, loadGltf) {
+  const gltf = await loadGltf(url);
+  const model = gltf.scene || gltf.scenes?.[0];
+  if (!model) throw new Error("The shop's 3D wrapper is unavailable.");
+
+  const box = new THREE.Box3().setFromObject(model);
+  if (box.isEmpty()) throw new Error("The shop's 3D wrapper is empty.");
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const scale = TARGET_SIZE / Math.max(size.x, size.y, size.z, 1e-6);
+  model.scale.multiplyScalar(scale);
+  model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
+
+  const root = new THREE.Group();
+  root.name = "ShopWrapperModel";
+  root.add(model);
+  root.updateMatrixWorld(true);
+
+  const meshes = [];
+  model.traverse((child) => child.isMesh && meshes.push(child));
+  const dressing = dressWholeModel(model, meshes);
+
+  // Flower bed (invisible) just inside the opening
+  const parts = new THREE.Box3();
+  meshes.forEach((mesh) => parts.expandByObject(mesh));
+  const partSize = parts.getSize(new THREE.Vector3());
+  const partCenter = parts.getCenter(new THREE.Vector3());
+  const bed = makeBed({
+    y: parts.min.y + partSize.y * 0.8,
+    radius: Math.min(partSize.x, partSize.z) * 0.3,
+    height: 0.38,
+    seed: 31,
+  });
+  bed.position.x = partCenter.x;
+  bed.position.z = partCenter.z;
+  root.add(bed);
+  finish(root);
+
+  return {
+    root,
+    dressing,
+    targets: [bed, ...meshes],
+    defaults: { outer: colourOf(meshes), inner: null, ribbon: "#caa6d9" },
   };
 }

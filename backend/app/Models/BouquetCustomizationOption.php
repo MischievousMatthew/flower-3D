@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A vendor's wrapper, filler, ribbon or message card for the 3D flower
- * customizer. Flowers stay regular products (selling_type =
+ * A vendor's wrapper, filler, ribbon, message card or own 3D wrapper model
+ * (a bouquet style for occasions) for the 3D flower customizer. Flowers stay regular products (selling_type =
  * per_piece_customizable).
  */
 class BouquetCustomizationOption extends Model
@@ -17,7 +17,11 @@ class BouquetCustomizationOption extends Model
     public const TYPE_FILLER = 'filler';
     public const TYPE_RIBBON = 'ribbon';
     public const TYPE_CARD = 'card';
-    public const TYPES = [self::TYPE_WRAPPER, self::TYPE_FILLER, self::TYPE_RIBBON, self::TYPE_CARD];
+    // The shop's own wrapper as a 3D model, picked as an occasion's bouquet style
+    public const TYPE_WRAP_MODEL = 'wrap_model';
+    public const TYPES = [self::TYPE_WRAPPER, self::TYPE_FILLER, self::TYPE_RIBBON, self::TYPE_CARD, self::TYPE_WRAP_MODEL];
+    /** Types that are a 3D model file */
+    public const MODEL_TYPES = [self::TYPE_FILLER, self::TYPE_WRAP_MODEL];
 
     public const MAX_FILLERS = 5;
 
@@ -84,7 +88,7 @@ class BouquetCustomizationOption extends Model
     {
         return $query
             ->where(fn ($q) => $q->where('type', '!=', self::TYPE_WRAPPER)->orWhere('is_active', true))
-            ->where(fn ($q) => $q->where('type', '!=', self::TYPE_FILLER)->orWhereNotNull('model_url'));
+            ->where(fn ($q) => $q->whereNotIn('type', self::MODEL_TYPES)->orWhereNotNull('model_url'));
     }
 
     /**

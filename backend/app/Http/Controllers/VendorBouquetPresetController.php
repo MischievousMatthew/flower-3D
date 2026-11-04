@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BouquetCustomizationOption;
 use App\Support\BouquetPresets;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Shop → 3D Bouquets → Presets: which occasions customers can pick in the
@@ -29,13 +31,36 @@ class VendorBouquetPresetController extends Controller
         }
 
         // Throws a 422 with per-occasion messages when something is off
-        $application->bouquet_presets = BouquetPresets::normalize($request->input('presets'));
+        $presets = BouquetPresets::normalize($request->input('presets'));
+
+        $ownerId = $request->user()->id;
+        $wanted = array_values(array_filter(array_map(fn ($p) => BouquetPresets::modelId($p['design'] ?? null), $presets)));
+        if ($wanted) {
+            $owned = BouquetCustomizationOption::forOwner($ownerId)
+                ->where('type', BouquetCustomizationOption::TYPE_WRAP_MODEL)
+                ->whereNotNull('model_url')
+                ->whereIn('id', $wanted)
+                ->pluck('id')
+                ->all();
+            $errors = [];
+            foreach ($presets as $key => $p) {
+                $id = BouquetPresets::modelId($p['design'] ?? null);
+                if ($id && ! in_array($id, $owned, true)) {
+                    $errors["$key.design"][] = 'That 3D wrapper was removed. Choose another bouquet style.';
+                }
+            }
+            if ($errors) {
+                throw ValidationException::withMessages($errors);
+            }
+        }
+
+        $application->bouquet_presets = $presets;
         $application->save();
 
         return response()->json([
             'success' => true,
             'message' => 'Occasion presets saved.',
-            'data' => BouquetPresets::merge($application->bouquet_presets),
+            'data' => BouquetPresets::withModels(BouquetPresets::merge($application->bouquet_presets), $ownerId),
         ]);
     }
 }

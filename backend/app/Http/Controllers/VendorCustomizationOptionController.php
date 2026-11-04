@@ -57,7 +57,7 @@ class VendorCustomizationOptionController extends Controller
             $option->type = $type;
             $option->sort_order = (int) Option::forOwner($ownerId)->where('type', $type)->max('sort_order') + 1;
 
-            if ($type === Option::TYPE_FILLER) {
+            if (in_array($type, Option::MODEL_TYPES, true)) {
                 $this->storeModel($option, $request->file('model_file'));
             }
             if ($type === Option::TYPE_CARD) {
@@ -66,7 +66,7 @@ class VendorCustomizationOptionController extends Controller
 
             $option->save();
 
-            return response()->json(['success' => true, 'data' => $option->refresh(), 'message' => ucfirst($type) . ' added.'], 201);
+            return response()->json(['success' => true, 'data' => $option->refresh(), 'message' => ($type === Option::TYPE_WRAP_MODEL ? '3D wrapper' : ucfirst($type)) . ' added.'], 201);
         } catch (\Throwable $e) {
             Log::error('VendorCustomizationOptionController@store: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => "The {$type} could not be saved."], 500);
@@ -96,7 +96,7 @@ class VendorCustomizationOptionController extends Controller
             $previousImagePath = $option->image_path;
             $option->fill($this->payload($request, $option->type));
 
-            if ($option->type === Option::TYPE_FILLER && $request->hasFile('model_file')) {
+            if (in_array($option->type, Option::MODEL_TYPES, true) && $request->hasFile('model_file')) {
                 $this->storeModel($option, $request->file('model_file'));
             }
             if ($option->type === Option::TYPE_CARD && $request->hasFile('image_file')) {
@@ -191,6 +191,11 @@ class VendorCustomizationOptionController extends Controller
             $rules['model_file'] = ($creating ? 'required' : 'nullable') . '|file|max:51200';
         }
 
+        if ($type === Option::TYPE_WRAP_MODEL) {
+            // Cloudinary's free plan takes files up to 10 MB
+            $rules['model_file'] = ($creating ? 'required' : 'nullable') . '|file|max:10240';
+        }
+
         if ($type === Option::TYPE_CARD) {
             // Each size the card comes in has its own price; the card's
             // `price` is kept as the lowest of them for listings.
@@ -231,7 +236,7 @@ class VendorCustomizationOptionController extends Controller
         if ($type !== Option::TYPE_CARD) {
             $data['price'] = 0;
         }
-        if ($request->has('color_hex') && $type !== Option::TYPE_FILLER) {
+        if ($request->has('color_hex') && !in_array($type, Option::MODEL_TYPES, true)) {
             $data['color_hex'] = strtolower($request->input('color_hex'));
         }
         if ($request->has('is_active') && $type === Option::TYPE_WRAPPER) {

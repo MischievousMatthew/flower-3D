@@ -552,7 +552,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import api from "../../plugins/axios.js";
-import { LEGACY_DESIGN, createBouquetBase, designForOccasion } from "../../utils/bouquetDesigns/index.js";
+import { LEGACY_DESIGN, createBouquetBase, designForOccasion, isModelDesign } from "../../utils/bouquetDesigns/index.js";
 import { PATTERN_DESIGNS, applyWrapPattern, normalizePattern } from "../../utils/wrapperPatterns.js";
 import {
   DEFAULT_PRESETS,
@@ -689,13 +689,25 @@ const originalWrap = computed(() => ({
   outer: baseDefaults.value.outer || ORIGINAL_WRAP.outer,
   inner: baseDefaults.value.inner || ORIGINAL_WRAP.inner,
 }));
+// A shop's own 3D wrapper is one layer, so only "Wrapper" shows
 const wrapLayers = computed(() => {
+  if (isModelDesign(baseDesign.value)) return [{ key: "outer", label: "Wrapper" }];
   const [outer, inner] = LAYER_NAMES[baseDesign.value] ?? LAYER_NAMES.classic;
   return [
     { key: "outer", label: outer },
     { key: "inner", label: inner },
   ];
 });
+watch(wrapLayers, (layers) => {
+  if (!layers.some((layer) => layer.key === activeWrapLayer.value)) activeWrapLayer.value = "outer";
+});
+
+/** Where a shop's own 3D wrapper style is: from the occasion, or from the saved bouquet */
+function modelUrlFor(design) {
+  if (!isModelDesign(design)) return null;
+  if (occasion.value?.design === design && occasion.value.model_url) return occasion.value.model_url;
+  return editingCustomization.value?.design === design ? editingCustomization.value.design_model_url || null : null;
+}
 const presetLabel = computed(() => (occasion.value ? `${occasion.value.label} · ${maxFlowers.value} stems` : `${maxFlowers.value} stems`));
 const isLoading3D = ref(true);
 const sceneReady = ref(false);
@@ -772,7 +784,9 @@ const stageHint = computed(() => {
 
 // What the bouquet is called in the occasion line under the title
 const DESIGN_NAMES = { classic: "classic wrap", korean: "Korean wrap", hand_tied: "hand-tied", basket: "basket", classic_full: "classic wrap" };
-const occasionLine = computed(() => [presetLabel.value, DESIGN_NAMES[baseDesign.value]].filter(Boolean).join(" · "));
+const occasionLine = computed(() =>
+  [presetLabel.value, isModelDesign(baseDesign.value) ? occasion.value?.model_name || "shop's own wrap" : DESIGN_NAMES[baseDesign.value]].filter(Boolean).join(" · "),
+);
 
 // One step's choices show at a time; steps for parts this bouquet doesn't have are left out
 const activeStep = ref("flowers");
@@ -952,7 +966,7 @@ async function loadBouquetModel(design = currentDesign.value) {
   isLoading3D.value = true;
   bouquetLoadError.value = "";
   try {
-    const base = await createBouquetBase(design, { loadGltf, wrapperScale: wrapperScale.value });
+    const base = await createBouquetBase(design, { loadGltf, wrapperScale: wrapperScale.value, modelUrl: modelUrlFor(design) });
     if (bouquetRoot) {
       arrangement.remove(bouquetRoot);
       disposeBase(bouquetRoot);

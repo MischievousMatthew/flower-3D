@@ -362,6 +362,7 @@ const loadBouquetArrangement = async (arrangement) => {
   const base = await createBouquetBase(arrangement.design || LEGACY_DESIGN, {
     loadGltf,
     wrapperScale: Number(arrangement.wrapper_scale ?? 1),
+    modelUrl: arrangement.design_model_url || null,
   });
   const bouquet = base.root;
   prepareModel(bouquet);

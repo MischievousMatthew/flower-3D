@@ -100,7 +100,13 @@
       </section>
 
       <!-- Occasions (Wedding, Sympathy, …) and their sizes for the customizer -->
-      <BouquetPresetsPanel v-else-if="activeTab === 'presets'" class="cz-panel" @count="(n) => (presetCount = n)" />
+      <BouquetPresetsPanel
+        v-else-if="activeTab === 'presets'"
+        class="cz-panel"
+        :wrap-models="options.wrap_model"
+        @count="(n) => (presetCount = n)"
+        @upload-wrapper="switchTab('wrap_model')"
+      />
 
       <!-- Wrappers, fillers and ribbons share one form and one list. -->
       <section
@@ -271,9 +277,10 @@
             </div>
           </div>
 
-          <!-- Filler 3D model -->
+          <!-- Filler or 3D wrapper model -->
           <div v-if="current.hasModel" class="cz-field">
             <span class="cz-label">3D model</span>
+            <small v-if="current.modelHint" class="cz-hint">{{ current.modelHint }}</small>
             <label class="cz-upload" :class="{ invalid: errors.model_file, filled: form.modelFile || form.modelUrl }">
               <input type="file" accept=".glb,.gltf" class="bc-sr-only" @change="onModelSelected" />
               <span class="cz-upload-icon" aria-hidden="true">⬆</span>
@@ -287,7 +294,7 @@
               </span>
               <span v-else class="cz-upload-text">
                 <strong>Upload a GLB or GLTF file</strong>
-                <small>Max 50 MB</small>
+                <small>Max {{ current.maxModelMb || 50 }} MB</small>
               </span>
             </label>
             <span v-if="errors.model_file" class="cz-error">{{ errors.model_file }}</span>
@@ -485,6 +492,7 @@ const TABS = [
   { key: "filler", label: "Fillers" },
   { key: "ribbon", label: "Ribbons" },
   { key: "card", label: "Cards" },
+  { key: "wrap_model", label: "3D wrappers" },
   { key: "presets", label: "Occasions" },
 ];
 
@@ -522,6 +530,16 @@ const TYPE_CONFIG = {
     descriptionPlaceholder: "e.g. 1-inch satin ribbon",
     defaultColor: "#caa6d9",
   },
+  wrap_model: {
+    label: "3D wrappers",
+    singular: "3D wrapper",
+    hasModel: true,
+    maxModelMb: 10,
+    hint: "Your own wrapper as a 3D model. Once it's added, choose it as an occasion's Bouquet style in Occasions, and customers build their bouquet in it.",
+    modelHint: "Upload only the empty wrapper (no flowers), standing upright with its opening at the top. Customers can recolour it if the occasion lets them choose the wrapper colour, and a ribbon is tied around its narrowest part.",
+    namePlaceholder: "e.g. Pleated paper cone",
+    descriptionPlaceholder: "e.g. Our signature cone, folded by hand",
+  },
   card: {
     label: "Cards",
     singular: "card",
@@ -541,7 +559,7 @@ const SLIDERS = [
 const MAX_MODEL_BYTES = 50 * 1024 * 1024;
 
 const activeTab = ref("wrapper");
-const options = reactive({ wrapper: [], filler: [], ribbon: [], card: [] });
+const options = reactive({ wrapper: [], filler: [], ribbon: [], card: [], wrap_model: [] });
 const flowers = ref([]);
 const loadingOptions = ref(true);
 const loadingFlowers = ref(true);
@@ -802,8 +820,9 @@ function onModelSelected(event) {
     errors.model_file = "Choose a GLB or GLTF file.";
     return;
   }
-  if (file.size > MAX_MODEL_BYTES) {
-    errors.model_file = "The file is larger than 50 MB.";
+  const maxMb = current.value.maxModelMb || MAX_MODEL_BYTES / 1024 / 1024;
+  if (file.size > maxMb * 1024 * 1024) {
+    errors.model_file = `The file is larger than ${maxMb} MB.`;
     return;
   }
   delete errors.model_file;
@@ -866,7 +885,7 @@ function validate() {
   }
   if (current.value.hasColor && !/^#[0-9a-f]{6}$/i.test(form.color)) errors.color_hex = "Enter a 6-digit hex code.";
   if (activeTab.value === "wrapper" && form.pattern === "words" && !form.patternText.trim()) errors.pattern_text = "Type the word to print, like love.";
-  if (current.value.hasModel && !form.modelFile && !form.modelUrl) errors.model_file = "Upload a 3D model for this filler.";
+  if (current.value.hasModel && !form.modelFile && !form.modelUrl) errors.model_file = `Upload a 3D model for this ${current.value.singular}.`;
   return !Object.keys(errors).length;
 }
 

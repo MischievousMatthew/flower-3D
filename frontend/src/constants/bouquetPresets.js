@@ -21,6 +21,10 @@ export const DESIGN_PARTS = {
   basket: { wrapper: true, ribbon: false },
 };
 
+// A shop's own 3D wrapper ("model_<id>") can be recoloured and gets a ribbon
+export const designParts = (design) =>
+  DESIGN_PARTS[design] ?? (/^model_\d+$/.test(String(design || "")) ? { wrapper: true, ribbon: true } : DESIGN_PARTS.classic);
+
 // Icons a shop can give its own occasions
 export const OCCASION_ICON_KEYS = ["flower", "heart", "rings", "gift", "cap", "dove"];
 

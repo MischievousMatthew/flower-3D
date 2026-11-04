@@ -423,8 +423,32 @@ export function dressBouquet(root) {
 
   const outer = createLayer(outerMeshes);
   const inner = createLayer(innerMeshes);
-  // Satin: low roughness plus a sheen tinted towards white
-  const ribbonMaterial = new THREE.MeshPhysicalMaterial({
+  const { ribbon, applyRibbon } = tieRibbon(root, [...outerMeshes, ...innerMeshes]);
+
+  return {
+    outer,
+    inner,
+    ribbon,
+    wrapMeshes: [...outerMeshes, ...innerMeshes],
+    applyRibbon,
+  };
+}
+
+/**
+ * A shop's own 3D wrapper (uploaded GLB): the whole model is one wrapper
+ * layer customers can recolour, with a satin ribbon tied around its
+ * narrowest part. There's no inner layer.
+ */
+export function dressWholeModel(root, meshes) {
+  const outer = createLayer(meshes);
+  const inner = { meshes: [], apply() {}, setPattern() {} };
+  const { ribbon, applyRibbon } = tieRibbon(root, meshes);
+  return { outer, inner, ribbon, wrapMeshes: meshes, applyRibbon };
+}
+
+// Satin: low roughness plus a sheen tinted towards white
+function tieRibbon(root, wrapMeshes) {
+  const material = new THREE.MeshPhysicalMaterial({
     color: "#caa6d9",
     roughness: 0.34,
     metalness: 0,
@@ -434,18 +458,14 @@ export function dressBouquet(root) {
     clearcoatRoughness: 0.45,
     side: THREE.DoubleSide,
   });
-  const tintSheen = () => ribbonMaterial.sheenColor.copy(ribbonMaterial.color).lerp(new THREE.Color("#ffffff"), 0.55);
+  const tintSheen = () => material.sheenColor.copy(material.color).lerp(new THREE.Color("#ffffff"), 0.55);
   tintSheen();
-  const ribbon = buildRibbon(root, [...outerMeshes, ...innerMeshes], ribbonMaterial);
-
+  const ribbon = buildRibbon(root, wrapMeshes, material);
   return {
-    outer,
-    inner,
     ribbon,
-    wrapMeshes: [...outerMeshes, ...innerMeshes],
     applyRibbon(hex) {
       if (hex) {
-        ribbonMaterial.color.set(hex);
+        material.color.set(hex);
         tintSheen();
       }
       if (ribbon) ribbon.visible = !!hex;

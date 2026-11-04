@@ -255,4 +255,35 @@ class BouquetCustomizationOptionTest extends TestCase
         $this->assertNull(BouquetCustomizationOption::cleanGroup(123));
         $this->assertNull(BouquetCustomizationOption::cleanGroup(str_repeat('a', 41)));
     }
+
+    public function test_a_3d_wrapper_needs_a_model_file_of_up_to_10_mb(): void
+    {
+        $vendor = $this->vendor();
+        $this->as($vendor)->postJson('/api/vendor/customization-options', ['type' => 'wrap_model', 'name' => 'My cone'])
+            ->assertStatus(422)->assertJsonValidationErrors('model_file', 'errors');
+        $this->as($vendor)->post('/api/vendor/customization-options', [
+            'type' => 'wrap_model', 'name' => 'My cone',
+            'model_file' => \Illuminate\Http\UploadedFile::fake()->create('cone.glb', 11000),
+        ], ['Accept' => 'application/json'])->assertStatus(422)->assertJsonValidationErrors('model_file', 'errors');
+    }
+
+    public function test_an_occasion_on_a_deleted_3d_wrapper_goes_back_to_its_usual_style(): void
+    {
+        $vendor = $this->vendor();
+        $model = BouquetCustomizationOption::create(['owner_id' => $vendor->id, 'type' => 'wrap_model', 'name' => 'My cone', 'model_url' => 'https://example.com/cone.glb']);
+        \App\Models\VendorApplication::query()->insert([
+            'email' => $vendor->email, 'status' => 'approved',
+            'bouquet_presets' => json_encode(['graduation' => ['design' => "model_{$model->id}"]]),
+        ]);
+
+        $graduation = collect(\App\Support\BouquetPresets::forOwner($vendor->id))->firstWhere('key', 'graduation');
+        $this->assertSame("model_{$model->id}", $graduation['design']);
+        $this->assertSame('https://example.com/cone.glb', $graduation['model_url']);
+        $this->assertSame('My cone', $graduation['model_name']);
+
+        $model->delete();
+        $graduation = collect(\App\Support\BouquetPresets::forOwner($vendor->id))->firstWhere('key', 'graduation');
+        $this->assertSame('classic', $graduation['design']);
+        $this->assertArrayNotHasKey('model_url', $graduation);
+    }
 }

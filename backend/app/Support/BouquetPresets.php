@@ -40,6 +40,9 @@ class BouquetPresets
         'basket' => ['label' => 'Basket', 'wrapper' => true, 'ribbon' => false],
     ];
 
+    /** A shop's own 3D wrapper as a style: "model_<option id>" */
+    public const MODEL_DESIGN = '/^model_(\d{1,10})$/';
+
     /** Designs whose outer paper can carry a print (newspaper, words) */
     public const PATTERN_DESIGNS = ['classic', 'korean'];
     public const MAX_PATTERN_WORD = 16;
@@ -91,8 +94,8 @@ class BouquetPresets
             $list[] = self::build($key, [
                 'label' => $label,
                 'design' => $design,
-                'wrapper' => self::DESIGNS[$design]['wrapper'],
-                'ribbon' => self::DESIGNS[$design]['ribbon'],
+                'wrapper' => self::parts($design)['wrapper'],
+                'ribbon' => self::parts($design)['ribbon'],
                 'sizes' => [6, 12],
                 'icon' => in_array($own['icon'] ?? null, self::ICONS, true) ? $own['icon'] : 'flower',
                 'description' => (string) ($own['description'] ?? ''),
@@ -105,7 +108,7 @@ class BouquetPresets
     private static function build(string $key, array $default, array $own, bool $custom): array
     {
         $design = self::validDesign($own['design'] ?? null) ?? $default['design'];
-        $can = self::DESIGNS[$design];
+        $can = self::parts($design);
         $sizes = self::cleanSizes($own['sizes'] ?? null);
 
         return [
@@ -126,7 +129,52 @@ class BouquetPresets
 
     private static function validDesign($design): ?string
     {
-        return is_string($design) && isset(self::DESIGNS[$design]) ? $design : null;
+        return is_string($design) && (isset(self::DESIGNS[$design]) || self::modelId($design)) ? $design : null;
+    }
+
+    /** The 3D wrapper option id of a "model_<id>" style, or null */
+    public static function modelId($design): ?int
+    {
+        return is_string($design) && preg_match(self::MODEL_DESIGN, $design, $m) ? (int) $m[1] : null;
+    }
+
+    /** What a style's model has. A shop's own 3D wrapper can be recoloured and gets a ribbon. */
+    public static function parts(string $design): array
+    {
+        return self::DESIGNS[$design] ?? ['label' => '3D wrapper', 'wrapper' => true, 'ribbon' => true];
+    }
+
+    /**
+     * Fills in each occasion that uses one of the shop's 3D wrappers with the
+     * model's link and name. If that wrapper was deleted (or never was the
+     * shop's), the occasion goes back to its usual style.
+     */
+    public static function withModels(array $presets, int $ownerId): array
+    {
+        $ids = array_values(array_filter(array_map(fn ($p) => self::modelId($p['design']), $presets)));
+        $models = $ids
+            ? \App\Models\BouquetCustomizationOption::forOwner($ownerId)
+                ->where('type', \App\Models\BouquetCustomizationOption::TYPE_WRAP_MODEL)
+                ->whereNotNull('model_url')
+                ->whereIn('id', $ids)
+                ->get(['id', 'name', 'model_url'])
+                ->keyBy('id')
+            : collect();
+
+        return array_map(function ($p) use ($models) {
+            $id = self::modelId($p['design']);
+            if (! $id) {
+                return $p;
+            }
+            $model = $models->get($id);
+            if ($model) {
+                return $p + ['model_url' => $model->model_url, 'model_name' => $model->name];
+            }
+            $design = self::DEFAULTS[$p['key']]['design'] ?? 'classic';
+            $can = self::DESIGNS[$design];
+
+            return array_merge($p, ['design' => $design, 'wrapper' => $p['wrapper'] && $can['wrapper'], 'ribbon' => $p['ribbon'] && $can['ribbon']]);
+        }, $presets);
     }
 
     /** The vendor's presets (defaults if they never saved any). */
@@ -138,7 +186,7 @@ class BouquetPresets
             ? \App\Models\VendorApplication::query()->where('email', $email)->latest('id')->first(['id', 'bouquet_presets'])
             : null;
 
-        return self::merge($application?->bouquet_presets);
+        return self::withModels(self::merge($application?->bouquet_presets), $ownerId);
     }
 
     /**
@@ -224,7 +272,7 @@ class BouquetPresets
             }
             sort($sizes);
 
-            $can = self::DESIGNS[$design];
+            $can = self::parts($design);
             $out[$key] = $stored + [
                 'enabled' => (bool) ($row['enabled'] ?? true),
                 'sizes' => $sizes,
@@ -312,6 +360,12 @@ class BouquetPresets
         $customizations['preset'] = ['key' => $occasion['key'], 'size' => $size, 'label' => $occasion['label'], 'base_price' => $base];
         // The bouquet's design follows its occasion (the viewer rebuilds it from this)
         $customizations['design'] = $occasion['design'];
+        // A shop's own 3D wrapper: the viewer loads it from here
+        if (! empty($occasion['model_url'])) {
+            $customizations['design_model_url'] = $occasion['model_url'];
+        } else {
+            unset($customizations['design_model_url']);
+        }
         // Parts the customer can't choose keep the design's own colours (e.g. a natural basket)
         if (! $occasion['wrapper']) {
             unset($customizations['wrapper'], $customizations['inner_wrapper'], $customizations['paper_color'], $customizations['inner_paper_color']);

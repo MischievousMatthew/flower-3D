@@ -31,7 +31,7 @@
           <span class="bp-icon" v-html="OCCASION_ICONS[occasionIcon(p)] || OCCASION_ICONS.flower"></span>
           <div class="bp-title">
             <h3>{{ p.label || "New occasion" }}</h3>
-            <small>{{ p.custom ? "Your occasion" : "BloomCraft occasion" }} · {{ DESIGNS[p.design]?.label ?? "Classic cone" }}</small>
+            <small>{{ p.custom ? "Your occasion" : "BloomCraft occasion" }} · {{ styleLabel(p.design) }}</small>
           </div>
           <label class="bp-toggle" :title="p.enabled && enabledCount === 1 ? 'Keep at least one occasion on' : p.enabled ? 'Customers can pick this occasion' : 'Hidden from customers'">
             <span class="sp-switch"><input type="checkbox" :checked="p.enabled" :aria-label="`Offer ${p.label || 'this occasion'}`" @change="toggle(p, $event)" /><span></span></span>
@@ -79,26 +79,34 @@
           <label class="bp-field">
             <span class="bp-label">Bouquet style</span>
             <select v-model="p.design" class="sp-select" :aria-label="`${p.label || 'Occasion'} bouquet style`" @change="fitParts(p)">
-              <option v-for="(d, key) in DESIGNS" :key="key" :value="key">{{ d.label }}</option>
+              <optgroup label="BloomCraft styles">
+                <option v-for="(d, key) in DESIGNS" :key="key" :value="key">{{ d.label }}</option>
+              </optgroup>
+              <optgroup v-if="wrapModels.length" label="Your 3D wrappers">
+                <option v-for="m in wrapModels" :key="m.id" :value="`model_${m.id}`">{{ m.name }}</option>
+              </optgroup>
             </select>
+            <button type="button" class="bp-upload-link" @click="emit('upload-wrapper')">
+              {{ wrapModels.length ? "Add another 3D wrapper" : "Upload your own 3D wrapper" }}
+            </button>
           </label>
         </div>
         <small v-if="errors[`${p.key}.base_price`] || errors[`${p.key}.design`]" class="sp-error">{{ errors[`${p.key}.base_price`] || errors[`${p.key}.design`] }}</small>
 
         <div class="bp-parts">
-          <label class="bp-part" :class="{ na: !DESIGN_PARTS[p.design]?.wrapper }">
+          <label class="bp-part" :class="{ na: !designParts(p.design).wrapper }">
             <span>
               <b>Customers choose the {{ p.design === "basket" ? "basket" : "wrapper" }} colour</b>
               <small>{{ wrapperHint(p) }}</small>
             </span>
-            <span class="sp-switch"><input v-model="p.wrapper" type="checkbox" :disabled="!DESIGN_PARTS[p.design]?.wrapper" :aria-label="`Customers choose the wrapper colour for ${p.label || 'this occasion'}`" /><span></span></span>
+            <span class="sp-switch"><input v-model="p.wrapper" type="checkbox" :disabled="!designParts(p.design).wrapper" :aria-label="`Customers choose the wrapper colour for ${p.label || 'this occasion'}`" /><span></span></span>
           </label>
-          <label class="bp-part" :class="{ na: !DESIGN_PARTS[p.design]?.ribbon }">
+          <label class="bp-part" :class="{ na: !designParts(p.design).ribbon }">
             <span>
               <b>Ribbon</b>
-              <small>{{ !DESIGN_PARTS[p.design]?.ribbon ? "This style has no ribbon." : p.ribbon ? "Customers pick a ribbon colour." : "No ribbon on this bouquet." }}</small>
+              <small>{{ !designParts(p.design).ribbon ? "This style has no ribbon." : p.ribbon ? "Customers pick a ribbon colour." : "No ribbon on this bouquet." }}</small>
             </span>
-            <span class="sp-switch"><input v-model="p.ribbon" type="checkbox" :disabled="!DESIGN_PARTS[p.design]?.ribbon" :aria-label="`Ribbon for ${p.label || 'this occasion'}`" /><span></span></span>
+            <span class="sp-switch"><input v-model="p.ribbon" type="checkbox" :disabled="!designParts(p.design).ribbon" :aria-label="`Ribbon for ${p.label || 'this occasion'}`" /><span></span></span>
           </label>
         </div>
 
@@ -145,12 +153,23 @@
 import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
-import { DESIGN_PARTS, OCCASION_ICON_KEYS, occasionIcon, sizeName } from "../../../constants/bouquetPresets";
+import { OCCASION_ICON_KEYS, designParts, occasionIcon, sizeName } from "../../../constants/bouquetPresets";
 import { OCCASION_ICONS } from "../../../constants/occasionIcons";
 import { DESIGNS } from "../../../utils/bouquetDesigns/index.js";
 import "./shop.css";
 
-const emit = defineEmits(["count"]);
+const props = defineProps({
+  // The shop's own 3D wrappers (Shop → 3D Bouquets → 3D wrappers), offered as styles
+  wrapModels: { type: Array, default: () => [] },
+});
+const emit = defineEmits(["count", "upload-wrapper"]);
+
+/** A style's name: a BloomCraft design, or one of the shop's 3D wrappers */
+function styleLabel(design) {
+  if (DESIGNS[design]) return DESIGNS[design].label;
+  const id = Number(String(design || "").replace("model_", ""));
+  return props.wrapModels.find((m) => Number(m.id) === id)?.name || "Your 3D wrapper";
+}
 
 const MAX_CUSTOM = 10;
 const EDITABLE = ["enabled", "sizes", "base_price", "design", "wrapper", "ribbon", "label", "icon", "description"];
@@ -170,14 +189,14 @@ const enabledCount = computed(() => presets.value?.filter((p) => p.enabled).leng
 const customCount = computed(() => presets.value?.filter((p) => p.custom).length ?? 0);
 
 function wrapperHint(p) {
-  if (!DESIGN_PARTS[p.design]?.wrapper) return "A hand-tied bouquet has no wrapper.";
+  if (!designParts(p.design).wrapper) return "A hand-tied bouquet has no wrapper.";
   if (p.wrapper) return "Customers pick from your wrappers.";
   return p.design === "basket" ? "The basket keeps its natural colour." : "The wrapper keeps the style's own colour.";
 }
 
 /** Switch off parts the chosen style's model doesn't have */
 function fitParts(p) {
-  const can = DESIGN_PARTS[p.design] ?? DESIGN_PARTS.classic;
+  const can = designParts(p.design);
   if (!can.wrapper) p.wrapper = false;
   if (!can.ribbon) p.ribbon = false;
 }
@@ -573,5 +592,25 @@ onMounted(load);
   .bp-row {
     grid-template-columns: 1fr;
   }
+}
+.bp-upload-link {
+  justify-self: start;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--v-accent, var(--bc-accent));
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.bp-upload-link:hover {
+  text-decoration: underline;
+}
+.bp-upload-link:focus-visible {
+  outline: 2px solid var(--v-accent, var(--bc-accent));
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 </style>
