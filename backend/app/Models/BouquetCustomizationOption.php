@@ -34,6 +34,7 @@ class BouquetCustomizationOption extends Model
         'color_hex',
         'pattern',
         'pattern_text',
+        'pattern_size',
         'price',
         'is_active',
         'model_url',
@@ -51,6 +52,7 @@ class BouquetCustomizationOption extends Model
         'is_active' => 'boolean',
         'sort_order' => 'integer',
         'card_limit' => 'integer',
+        'pattern_size' => 'integer',
         'card_sizes' => 'array',
     ];
 
@@ -188,6 +190,7 @@ class BouquetCustomizationOption extends Model
                 'rotation' => (array) data_get($filler, 'rotation', []),
                 'scale' => (float) data_get($filler, 'scale', 1),
                 'locked' => (bool) data_get($filler, 'locked', false),
+                'group' => self::cleanGroup(data_get($filler, 'group')),
                 'sprigs' => self::cleanSprigs(data_get($filler, 'sprigs')),
             ];
         }
@@ -231,6 +234,7 @@ class BouquetCustomizationOption extends Model
                 'rotation' => (array) data_get($customizations, 'card.rotation', []),
                 'scale' => (float) data_get($customizations, 'card.scale', 1),
                 'locked' => (bool) data_get($customizations, 'card.locked', false),
+                'group' => self::cleanGroup(data_get($customizations, 'card.group')),
             ];
             $total += (float) $size['price'];
         } else {
@@ -246,8 +250,14 @@ class BouquetCustomizationOption extends Model
     public function patternData(): ?array
     {
         return $this->type === self::TYPE_WRAPPER
-            ? BouquetPresets::cleanPattern(['type' => $this->pattern, 'text' => $this->pattern_text])
+            ? BouquetPresets::cleanPattern(['type' => $this->pattern, 'text' => $this->pattern_text, 'size' => $this->pattern_size])
             : null;
+    }
+
+    /** A group id from the customizer (items in a group move together), or null */
+    public static function cleanGroup($group): ?string
+    {
+        return is_string($group) && preg_match('/^[A-Za-z0-9_-]{1,40}$/', $group) ? $group : null;
     }
 
     private static function failure(string $message, array $customizations): array

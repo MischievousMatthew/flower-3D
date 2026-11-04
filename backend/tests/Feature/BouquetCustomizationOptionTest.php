@@ -41,6 +41,7 @@ class BouquetCustomizationOptionTest extends TestCase
 
         (include database_path('migrations/2026_10_10_000001_create_bouquet_customization_options_table.php'))->up();
         (include database_path('migrations/2026_11_04_130000_add_pattern_to_bouquet_customization_options.php'))->up();
+        (include database_path('migrations/2026_11_04_150000_add_pattern_size_to_bouquet_customization_options.php'))->up();
 
         $this->withoutMiddleware(EnsureSubscriptionModuleAccess::class);
     }
@@ -233,7 +234,25 @@ class BouquetCustomizationOptionTest extends TestCase
         $this->assertArrayNotHasKey('wrapper_pattern', $result['customizations']);
         $this->assertSame(['type' => 'words', 'text' => 'love'], $result['customizations']['inner_wrapper_pattern']);
 
+        // The shop can make the word bigger or smaller (kept between 50% and 200%)
+        $this->as($vendor)->postJson("/api/vendor/customization-options/{$love['id']}", ['pattern' => 'words', 'pattern_text' => 'love', 'pattern_size' => 150])
+            ->assertOk()->assertJsonPath('data.pattern_size', 150);
+        $this->as($vendor)->postJson("/api/vendor/customization-options/{$love['id']}", ['pattern' => 'words', 'pattern_text' => 'love', 'pattern_size' => 500])
+            ->assertStatus(422);
+        $result = BouquetCustomizationOption::resolveSelections($vendor->id, [
+            'type' => 'custom_flower_bouquet', 'wrapper' => ['id' => $love['id']],
+        ]);
+        $this->assertSame(['type' => 'words', 'text' => 'love', 'size' => 150], $result['customizations']['wrapper_pattern']);
+
         // The storefront sends the print with the wrapper
         $this->getJson("/api/stores/{$vendor->id}/customization-options")->assertOk();
+    }
+
+    public function test_group_ids_on_bouquet_items_are_kept_only_when_safe(): void
+    {
+        $this->assertSame('gm3k2abcd', BouquetCustomizationOption::cleanGroup('gm3k2abcd'));
+        $this->assertNull(BouquetCustomizationOption::cleanGroup('<script>'));
+        $this->assertNull(BouquetCustomizationOption::cleanGroup(123));
+        $this->assertNull(BouquetCustomizationOption::cleanGroup(str_repeat('a', 41)));
     }
 }

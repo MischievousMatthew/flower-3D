@@ -44,12 +44,21 @@ export const MOVE_KEYS = {
   q: "backward",
 };
 
-// Blender-style shortcuts: G move, R rotate, S size, F focus
+// Blender-style shortcuts: G move, R rotate, S size, F focus; Ctrl+Z / Ctrl+Y undo and redo
 export function keyAction(event, state) {
-  if (!state.ready || state.modalOpen || event.ctrlKey || event.metaKey || event.altKey || event.inField) return null;
+  if (!state.ready || state.modalOpen || event.altKey || event.inField) return null;
   const key = String(event.key || "").toLowerCase();
 
-  if (key === "escape") return state.placing ? "cancel-placing" : "deselect";
+  // Ctrl (⌘ on a Mac) + Z undo, + Y or Shift+Z redo, + G group, + Shift+G ungroup
+  if (event.ctrlKey || event.metaKey) {
+    if (key === "z") return event.shiftKey ? "redo" : "undo";
+    if (key === "y") return "redo";
+    if (key === "g" && event.shiftKey) return state.grouped ? "ungroup" : null;
+    if (key === "g") return state.grouping || state.hasSelectedFlower ? "group" : null;
+    return null;
+  }
+
+  if (key === "escape") return state.grouping ? "cancel-grouping" : state.placing ? "cancel-placing" : "deselect";
   if (!state.hasTarget) return null;
   if (key === "g") return "mode:translate";
   if (key === "r") return "mode:rotate";

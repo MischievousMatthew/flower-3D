@@ -22,6 +22,8 @@ const ICONS = {
   arrowRight: [["path", { d: "M5 12h14M13 6l6 6-6 6" }]],
   plus: [["path", { d: "M12 5v14M5 12h14" }]],
   minus: [["path", { d: "M5 12h14" }]],
+  group: [["rect", { x: 3, y: 3, width: 11, height: 11, rx: 2 }], ["rect", { x: 10, y: 10, width: 11, height: 11, rx: 2 }]],
+  ungroup: [["rect", { x: 3, y: 3, width: 8, height: 8, rx: 1.5 }], ["rect", { x: 13, y: 13, width: 8, height: 8, rx: 1.5 }]],
   check: [["path", { d: "m5 12.5 4.5 4.5L19 7.5" }]],
   x: [["path", { d: "M6 6l12 12M18 6 6 18" }]],
   info: [["circle", { cx: 12, cy: 12, r: 9 }], ["path", { d: "M12 11v5M12 8h.01" }]],

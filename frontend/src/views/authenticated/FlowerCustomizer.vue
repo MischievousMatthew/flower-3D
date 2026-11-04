@@ -387,10 +387,12 @@
           </div>
 
           <SelectionCard
-            v-if="sceneReady && hasTransformTarget"
+            v-if="sceneReady && hasTransformTarget && !groupPick"
             ref="selectionCardEl"
-            :title="bouquetSelected ? 'Whole bouquet' : selectedFlower.product_name"
-            :subtitle="selectionSubtitle"
+            :title="bouquetSelected ? 'Whole bouquet' : selectedGroup.length ? `Group of ${selectedGroup.length}` : selectedFlower.product_name"
+            :subtitle="selectedGroup.length ? '' : selectionSubtitle"
+            :grouped="selectedGroup.length > 1"
+            :group-count="selectedGroup.length"
             :mode="bouquetSelected ? 'bouquet' : 'flower'"
             :locked="!bouquetSelected && !!selectedFlower?.locked"
             :scale="Number(selectedFlower?.scale ?? 1)"
@@ -407,13 +409,30 @@
             @nudge-rotate="nudgeSelectedRotation"
             @nudge="nudgeSelectedPosition"
             @lock="toggleSelectedLock"
-            @remove="removeFlower(selectedFlower.sceneId)"
+            @remove="removeSelection"
+            @group="startGrouping()"
+            @ungroup="ungroupSelection"
             @reset="bouquetSelected ? resetBouquetPlacement() : resetSelectedTransform()"
             @close="clearSelection"
           />
 
-          <div v-if="sceneReady" class="fc-hint" :class="{ live: dragFeedback || pendingFlower }" role="status" aria-live="polite">
-            <template v-if="dragFeedback || pendingFlower || draggedFlower">
+          <div v-if="sceneReady" class="fc-hint" :class="{ live: dragFeedback || pendingFlower || groupPick || hintNote }" role="status" aria-live="polite">
+            <template v-if="groupPick">
+              <BcIcon name="group" />
+              <span class="fc-hint-copy">
+                <strong>Click the items to group</strong>
+                <span>{{ pickedCount }} picked · click a picked one to leave it out</span>
+              </span>
+              <button type="button" class="fc-hint-action" :disabled="pickedCount < 2" @click="confirmGroup">Group</button>
+              <button type="button" class="fc-hint-cancel" aria-label="Stop grouping (Esc)" @click="cancelGrouping">
+                <BcIcon name="x" />
+              </button>
+            </template>
+            <template v-else-if="hintNote">
+              <BcIcon :name="hintNote.ok ? 'check' : 'info'" />
+              <span class="fc-hint-copy"><strong>{{ hintNote.text }}</strong></span>
+            </template>
+            <template v-else-if="dragFeedback || pendingFlower || draggedFlower">
               <BcIcon name="target" />
               <span class="fc-hint-copy">
                 <strong>{{ dragFeedback || stageHint.title }}</strong>
@@ -426,6 +445,8 @@
             <span v-else class="fc-hint-keys">
               {{ selectedFlower?.kind === "card" ? stageHint.title : selectedFlower?.locked ? `${selectedFlower.product_name} is locked` : "Drag to look around" }}
               <span class="fc-hint-shortcuts">
+                <span class="fc-hint-sep" aria-hidden="true">·</span>
+                <kbd>{{ modKey }}</kbd><kbd>Z</kbd> undo <kbd>{{ modKey }}</kbd><kbd>Y</kbd> redo
                 <span class="fc-hint-sep" aria-hidden="true">·</span>
                 <kbd>G</kbd> move <kbd>R</kbd> rotate <kbd>S</kbd> size <kbd>F</kbd> focus
               </span>
@@ -555,6 +576,7 @@ import {
   setCardSize,
 } from "../../utils/bouquetCard.js";
 import { anchorCard, buildSteps, keyAction, receiptLines } from "../../utils/customizerUi.js";
+import { createHistory, pickUnit, tidyGroups, togglePick } from "../../utils/customizerHistory.js";
 import { suggestFillers, suggestFlowers } from "../../utils/arrangementSuggest.js";
 import { buildFillerBunch } from "../../utils/fillerBunch.js";
 import { FILLER_STYLES, ORIGINAL_FRONT, SPAN_PER_BED_RADIUS, buildFillerSprigs, fillerKind, placeSprig, planFillers, spillAt } from "../../utils/fillerLayout.js";
@@ -616,6 +638,7 @@ const selectedRibbonId = ref(null);
 const loadingFlowers = ref(false);
 const search = ref("");
 const pendingFlower = ref(null);
+const groupPick = ref(null); // { ids } while picking items to group (see Groups)
 const draggedFlower = ref(null);
 const selectedFlowers = ref([]);
 const selectedSceneId = ref(null);
@@ -645,7 +668,7 @@ const hasRibbon = computed(() => occasion.value?.ribbon ?? true);
 // whichever layer it is picked for. Prints go on paper wraps only, not a
 // basket or a hand-tied bouquet.
 const canPattern = computed(() => hasWrapper.value && PATTERN_DESIGNS.includes(baseDesign.value));
-const printOf = (wrapper) => (canPattern.value && wrapper ? normalizePattern({ type: wrapper.pattern, text: wrapper.pattern_text }) : null);
+const printOf = (wrapper) => (canPattern.value && wrapper ? normalizePattern({ type: wrapper.pattern, text: wrapper.pattern_text, size: wrapper.pattern_size }) : null);
 const savedPattern = computed(() => printOf(selectedOuterWrapper.value));
 const savedInnerPattern = computed(() => printOf(selectedInnerWrapper.value));
 const printLabel = (option) =>
@@ -867,6 +890,7 @@ onMounted(async () => {
   }
   applyStockDressing();
   applyOccasionBuild();
+  resetHistory(); // undo starts from the bouquet as it opened
   window.addEventListener("resize", handleResize);
   window.addEventListener("keydown", onKeydown);
   document.addEventListener("fullscreenchange", syncFullscreenState);
@@ -944,6 +968,7 @@ async function loadBouquetModel(design = currentDesign.value) {
     dressing.inner.apply(wrap.inner.color);
     applyOccasionBuild();
     sceneReady.value = true;
+    if (historyOn) resetHistory(); // a new design can't be undone back into the old one
   } catch (error) {
     console.error("Failed to load bouquet base model:", error);
     bouquetLoadError.value = "The bouquet couldn't be shown. Refresh the page to try again.";
@@ -1177,17 +1202,21 @@ function setupGizmo() {
     isTransformDragging.value = event.value;
     if (event.value) {
       gizmoStartScale = gizmo.object?.scale.x ?? 1;
+      if (gizmo.object !== arrangement) beginGroupMove();
       return;
     }
     commitGizmoChange();
+    endGroupMove();
   });
   gizmo.addEventListener("objectChange", () => {
     const object = gizmo.object;
-    if (!object || object === arrangement || gizmo.mode !== "scale") return;
-    // Items only scale evenly: follow whichever handle moved the most
-    const { x, y, z } = object.scale;
-    const pick = [x, y, z].reduce((best, value) => (Math.abs(value - gizmoStartScale) > Math.abs(best - gizmoStartScale) ? value : best), x);
-    object.scale.setScalar(THREE.MathUtils.clamp(pick, 0.25, 2));
+    if (object && object !== arrangement && gizmo.mode === "scale") {
+      // Items only scale evenly: follow whichever handle moved the most
+      const { x, y, z } = object.scale;
+      const pick = [x, y, z].reduce((best, value) => (Math.abs(value - gizmoStartScale) > Math.abs(best - gizmoStartScale) ? value : best), x);
+      object.scale.setScalar(THREE.MathUtils.clamp(pick, 0.25, 2));
+    }
+    followLead();
   });
   scene.add(gizmo.getHelper());
 }
@@ -1195,7 +1224,7 @@ function setupGizmo() {
 function updateGizmo() {
   if (!gizmo) return;
   const item = selectedFlower.value;
-  const target = pendingFlower.value || draggedFlower.value
+  const target = pendingFlower.value || draggedFlower.value || groupPick.value
     ? null
     : bouquetSelected.value
       ? arrangement
@@ -1218,7 +1247,7 @@ function updateGizmo() {
   gizmo.showY = true;
   if (gizmo.object !== target) gizmo.attach(target);
 }
-watch([selectedSceneId, bouquetSelected, transformMode, () => selectedFlower.value?.locked, pendingFlower, draggedFlower, sceneReady], updateGizmo, { flush: "post" });
+watch([selectedSceneId, bouquetSelected, transformMode, () => selectedFlower.value?.locked, pendingFlower, draggedFlower, sceneReady, groupPick], updateGizmo, { flush: "post" });
 
 function commitGizmoChange() {
   const object = gizmo?.object;
@@ -1255,8 +1284,10 @@ function flushPointer() {
   const next = queuedPointer;
   queuedPointer = null;
   if (!next) return;
-  if (transformDrag?.sceneId) moveSelectedFlower(next.x, next.y, transformDrag.sceneId);
-  else if (pendingFlower.value || draggedFlower.value) updateHoverMarker(next.x, next.y);
+  if (transformDrag?.sceneId) {
+    moveSelectedFlower(next.x, next.y, transformDrag.sceneId);
+    followLead();
+  } else if (pendingFlower.value || draggedFlower.value) updateHoverMarker(next.x, next.y);
 }
 
 function setupCanvasInteractions() {
@@ -1270,10 +1301,24 @@ function setupCanvasInteractions() {
     // Pressing on an item selects it and lets you slide it over the wrap.
     // Pressing the wrap or empty space only turns the view.
     const placedHit = getPlacedFlowerHit(event.clientX, event.clientY);
+    // Picking items for a group: a click adds or leaves out an item (or its group)
+    if (groupPick.value) {
+      if (placedHit?.sceneId) {
+        event.preventDefault();
+        pickForGroup(placedHit.sceneId);
+      }
+      return;
+    }
     if (!placedHit?.sceneId) return;
     event.preventDefault();
+    // Ctrl, ⌘ or Shift + click another item starts a group with the selected one
+    if ((event.ctrlKey || event.metaKey || event.shiftKey) && selectedFlower.value && !pickUnit(selectedFlowers.value, selectedSceneId.value).includes(placedHit.sceneId)) {
+      startGrouping(placedHit.sceneId);
+      return;
+    }
     selectPlacedFlower(placedHit.sceneId);
     if (selectedFlowers.value.find((entry) => entry.sceneId === placedHit.sceneId)?.locked) return;
+    beginGroupMove(placedHit.sceneId);
     transformDrag = { sceneId: placedHit.sceneId, pointerId: event.pointerId };
     isTransformDragging.value = true;
     canvas.setPointerCapture?.(event.pointerId);
@@ -1301,6 +1346,7 @@ function setupCanvasInteractions() {
     const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y) > 6;
     pointerDown = null;
     if (moved) return; // that was a view drag
+    if (groupPick.value) return; // clicks only pick items while grouping
 
     if (pendingFlower.value) {
       const placement = getPlacement(event.clientX, event.clientY);
@@ -1383,10 +1429,11 @@ function endTransformDrag(pointerId = null) {
   transformDrag = null;
   isTransformDragging.value = false;
   if (controls) controls.enabled = true;
-  if (!sceneId) return;
+  if (!sceneId) return endGroupMove();
   const object = placedObjects.get(sceneId);
   if (object && isFiller(selectedFlowers.value.find((entry) => entry.sceneId === sceneId))) keepInsideBouquet(object, { exact: true });
   commitObjectState(sceneId);
+  endGroupMove();
 }
 
 async function placeFlowerOnBouquet(flower, placement) {
@@ -1538,6 +1585,7 @@ function placeCardOnBouquet(card, placement, saved = null) {
     rotation,
     scale,
     locked: Boolean(saved?.locked),
+    group: typeof saved?.group === "string" ? saved.group : null,
   });
   selectedSceneId.value = sceneId;
 
@@ -1620,20 +1668,33 @@ function applyRibbonColor(color) {
 }
 
 function removeFlower(sceneId) {
-  selectedFlowers.value = selectedFlowers.value.filter((flower) => flower.sceneId !== sceneId);
+  // A group left with one item is no longer a group
+  selectedFlowers.value = tidyGroups(selectedFlowers.value.filter((flower) => flower.sceneId !== sceneId));
   if (selectedSceneId.value === sceneId) {
     selectedSceneId.value = selectedFlowers.value[0]?.sceneId ?? null;
   }
   const object = placedObjects.get(sceneId);
-  if (object && gizmo?.object === object) gizmo.detach();
-  if (object) {
-    flowerLayer.remove(object);
-    if (object.userData.isCard) disposeCard(object);
-    placedObjects.delete(sceneId);
-  }
-  if (cardEditor.sceneId === sceneId) closeCardEditor();
+  dropObject(sceneId);
   // The other fillers take over its spots
   if (object?.userData.sprigs) layOutFillers();
+}
+
+/** Takes an item's 3D object off the bouquet (its record is handled by the caller) */
+function dropObject(sceneId) {
+  const object = placedObjects.get(sceneId);
+  if (!object) return;
+  if (gizmo?.object === object) gizmo.detach();
+  flowerLayer.remove(object);
+  if (object.userData.isCard) disposeCard(object);
+  placedObjects.delete(sceneId);
+  if (cardEditor.sceneId === sceneId) closeCardEditor();
+}
+
+/** Removes the selected item, or its whole group */
+function removeSelection() {
+  const flower = selectedFlower.value;
+  if (!flower) return;
+  pickUnit(selectedFlowers.value, flower.sceneId).forEach(removeFlower);
 }
 
 // ── Occasion presets ───────────────────────────────────────────────────
@@ -1710,6 +1771,7 @@ function choosePreset(size) {
   legacyBase.value = false; // a chosen occasion gets its own design
   setWrapperScale(wrapperScaleFor(size));
   startStep.value = null;
+  if (historyOn) resetHistory();
 }
 
 /** Places copies of one flower evenly over the bouquet top, up to the size */
@@ -2264,6 +2326,7 @@ function selectBouquet() {
 function clearSelection() {
   selectedSceneId.value = null;
   bouquetSelected.value = false;
+  groupPick.value = null;
 }
 
 // Deselecting in any way (Esc, ×, empty space, Remove, Start over) undoes Focus
@@ -2299,6 +2362,10 @@ function moveSelectedFlower(clientX, clientY, sceneId = selectedSceneId.value) {
 }
 
 function updateSelectedRotation(axis, degrees) {
+  withGroup(() => rotateSelected(axis, degrees));
+}
+
+function rotateSelected(axis, degrees) {
   const sceneId = selectedSceneId.value;
   const object = sceneId ? placedObjects.get(sceneId) : null;
   const flower = selectedFlower.value;
@@ -2312,6 +2379,10 @@ function updateSelectedRotation(axis, degrees) {
 }
 
 function updateSelectedScale(scale) {
+  withGroup(() => scaleSelected(scale));
+}
+
+function scaleSelected(scale) {
   const flower = selectedFlower.value;
   const object = flower ? placedObjects.get(flower.sceneId) : null;
   if (!flower || !object || flower.locked) return;
@@ -2328,6 +2399,10 @@ function nudgeSelectedRotation(axis, delta) {
 }
 
 function resetSelectedTransform() {
+  withGroup(resetSelectedNow);
+}
+
+function resetSelectedNow() {
   const flower = selectedFlower.value;
   const object = flower ? placedObjects.get(flower.sceneId) : null;
   if (!flower || !object) return;
@@ -2355,10 +2430,12 @@ function resetSelectedTransform() {
   if (frame) commitObjectState(flower.sceneId); // the fit may have moved it
 }
 
+// Locks or unlocks the selected item, or its whole group
 function toggleSelectedLock() {
   const flower = selectedFlower.value;
   if (!flower) return;
-  updateFlowerState(flower.sceneId, { locked: !flower.locked });
+  const ids = pickUnit(selectedFlowers.value, flower.sceneId);
+  selectedFlowers.value = selectedFlowers.value.map((item) => (ids.includes(item.sceneId) ? { ...item, locked: !flower.locked } : item));
 }
 
 function toggleFlowerLock(sceneId) {
@@ -2398,10 +2475,12 @@ function nudgeSelectedPosition(direction, event = null) {
   const flower = selectedFlower.value;
   const object = flower ? placedObjects.get(flower.sceneId) : null;
   if (!flower || !object || flower.locked) return;
-  // Items sit inside the arrangement, which may be turned
-  object.position.add(delta.applyQuaternion(arrangement.quaternion.clone().invert()));
-  if (isFiller(flower)) keepInsideBouquet(object, { exact: true });
-  commitObjectState(flower.sceneId);
+  withGroup(() => {
+    // Items sit inside the arrangement, which may be turned
+    object.position.add(delta.applyQuaternion(arrangement.quaternion.clone().invert()));
+    if (isFiller(flower)) keepInsideBouquet(object, { exact: true });
+    commitObjectState(flower.sceneId);
+  });
 }
 
 function setBouquetTurn(degrees) {
@@ -2473,15 +2552,21 @@ function onKeydown(event) {
       bouquetSelected: bouquetSelected.value,
       hasSelectedFlower: !!selectedFlower.value,
       placing: !!pendingFlower.value,
+      grouping: !!groupPick.value,
+      grouped: selectedGroup.value.length > 1,
     },
   );
   if (!action) return;
   event.preventDefault();
 
-  if (action === "cancel-placing") pendingFlower.value = null;
+  if (action === "undo" || action === "redo") stepHistory(action);
+  else if (action === "group") groupPick.value ? confirmGroup() : startGrouping();
+  else if (action === "ungroup") ungroupSelection();
+  else if (action === "cancel-grouping") cancelGrouping();
+  else if (action === "cancel-placing") pendingFlower.value = null;
   else if (action === "deselect") clearSelection();
   else if (action === "focus") focusSelection();
-  else if (action === "remove") removeFlower(selectedFlower.value.sceneId);
+  else if (action === "remove") removeSelection();
   else if (action.startsWith("mode:")) transformMode.value = action.slice(5);
   else if (action.startsWith("nudge:")) nudgeSelectedPosition(action.slice(6), event);
 }
@@ -2491,6 +2576,292 @@ function updateFlowerState(sceneId, patch) {
     flower.sceneId === sceneId ? { ...flower, ...patch } : flower,
   );
 }
+
+// ── Undo / redo ────────────────────────────────────────────────────────
+// Every change to the placed items (placing, removing, moving, turning,
+// sizing, locking, grouping, the card) and to the wrappers and ribbon is a
+// step: Ctrl+Z (⌘Z) goes back one, Ctrl+Y or Ctrl+Shift+Z forward again.
+const designHistory = createHistory();
+let historyOn = false; // from when the bouquet has loaded
+let applyingHistory = false;
+let historyTimer = 0;
+let historyQueue = Promise.resolve();
+const hintNote = ref(null); // { text, ok } shown briefly in the hint bar
+let hintNoteTimer = 0;
+const modKey = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || "") ? "⌘" : "Ctrl";
+
+function designSnapshot() {
+  return JSON.stringify({
+    items: selectedFlowers.value,
+    wrap: { outer: wrap.outer.id ?? null, inner: wrap.inner.id ?? null },
+    ribbon: selectedRibbonId.value ?? null,
+  });
+}
+
+/** Starts the history over from the bouquet as it is now (nothing to undo) */
+function resetHistory() {
+  clearTimeout(historyTimer);
+  historyTimer = 0;
+  designHistory.reset(designSnapshot());
+  historyOn = true;
+}
+
+// A burst of changes (a slider, a filler re-laying the others) is one step
+function queueHistory() {
+  if (!historyOn || applyingHistory) return;
+  clearTimeout(historyTimer);
+  historyTimer = setTimeout(recordHistory, 250);
+}
+
+function recordHistory() {
+  historyTimer = 0;
+  if (!historyOn || applyingHistory) return;
+  // A drag in progress is one step, saved when it ends
+  if (isTransformDragging.value) {
+    historyTimer = setTimeout(recordHistory, 250);
+    return;
+  }
+  designHistory.record(designSnapshot());
+}
+watch([selectedFlowers, () => wrap.outer.id, () => wrap.inner.id, selectedRibbonId], queueHistory, { deep: true });
+
+function showHintNote(text, ok = true) {
+  hintNote.value = { text, ok };
+  clearTimeout(hintNoteTimer);
+  hintNoteTimer = setTimeout(() => (hintNote.value = null), 1600);
+}
+
+function stepHistory(direction) {
+  historyQueue = historyQueue
+    .then(async () => {
+      if (!historyOn || isTransformDragging.value) return;
+      // A change still waiting to be saved is the newest step
+      if (historyTimer) {
+        clearTimeout(historyTimer);
+        recordHistory();
+      }
+      const target = direction === "undo" ? designHistory.undo() : designHistory.redo();
+      if (!target) return showHintNote(direction === "undo" ? "Nothing to undo" : "Nothing to redo", false);
+      await applySnapshot(target);
+      showHintNote(direction === "undo" ? "Undone" : "Redone");
+    })
+    .catch((error) => console.error("Undo/redo failed:", error));
+}
+
+/** Puts the bouquet back the way a snapshot has it, rebuilding only what changed */
+async function applySnapshot(json) {
+  const target = JSON.parse(json);
+  applyingHistory = true;
+  try {
+    groupPick.value = null;
+    pendingFlower.value = null;
+    gizmo?.detach();
+    const current = new Map(selectedFlowers.value.map((item) => [item.sceneId, item]));
+    const wanted = new Set(target.items.map((item) => item.sceneId));
+    for (const sceneId of current.keys()) if (!wanted.has(sceneId)) dropObject(sceneId);
+
+    const placed = [];
+    for (const item of target.items) {
+      const before = current.get(item.sceneId);
+      let object = placedObjects.get(item.sceneId);
+      // A card with a different message, size or fold is drawn again
+      if (object && before && isCard(item) && (before.message !== item.message || before.size !== item.size || before.open !== item.open)) {
+        dropObject(item.sceneId);
+        object = null;
+      }
+      if (!object) {
+        object = await buildItemObject(item);
+      } else if (object.userData.sprigs && item.sprigs && JSON.stringify(before?.sprigs ?? null) !== JSON.stringify(item.sprigs)) {
+        showSprigs(object, item, copySprigs(item.sprigs));
+      }
+      if (!object) continue;
+      poseObject(object, item);
+      placed.push(item);
+    }
+    selectedFlowers.value = placed;
+
+    if ((wrap.outer.id ?? null) !== target.wrap.outer) selectWrapper("outer", findWrapper(target.wrap.outer));
+    if ((wrap.inner.id ?? null) !== target.wrap.inner) selectWrapper("inner", findWrapper(target.wrap.inner));
+    const ribbon = ribbonOptions.value.find((option) => option.id === target.ribbon);
+    if (ribbon && selectedRibbonId.value !== ribbon.id) selectRibbon(ribbon);
+
+    if (selectedSceneId.value && !placedObjects.has(selectedSceneId.value)) selectedSceneId.value = null;
+    await nextTick();
+    updateGizmo();
+    refreshGroupBoxes();
+  } finally {
+    await nextTick();
+    applyingHistory = false;
+    // Whatever couldn't come back (an item the shop removed) is left out of this step too
+    designHistory.replace(designSnapshot());
+  }
+}
+
+/** Builds an item's 3D object from its saved record and puts it on the bouquet */
+async function buildItemObject(item) {
+  let object;
+  if (isCard(item)) {
+    object = createCard({ size: item.size, message: item.message || "", open: Boolean(item.open) });
+  } else {
+    if (!item.model_3d_url) return null;
+    try {
+      const template = await loadFlowerTemplate(item.model_3d_url);
+      const sprigs = isFiller(item) && item.sprigs?.length ? copySprigs(item.sprigs) : null;
+      object = new THREE.Group();
+      object.add(itemModel(template, isFiller(item), item.sceneId, sprigs));
+      object.userData.sprigs = Boolean(sprigs);
+    } catch (error) {
+      console.error("Failed to bring back an item:", error);
+      return null;
+    }
+  }
+  object.userData.sceneId = item.sceneId;
+  flowerLayer.add(object);
+  placedObjects.set(item.sceneId, object);
+  return object;
+}
+
+function poseObject(object, item) {
+  const position = item.position || {};
+  const rotation = item.rotation || {};
+  const rad = (deg) => THREE.MathUtils.degToRad(Number(deg || 0));
+  object.position.set(Number(position.x || 0), Number(position.y || 0), Number(position.z || 0));
+  object.rotation.set(rad(rotation.xDeg), rad(rotation.yDeg), rad(rotation.zDeg));
+  object.scale.setScalar(Number(item.scale ?? 1));
+}
+
+// ── Groups ─────────────────────────────────────────────────────────────
+// Items in a group move, turn and resize together, like a filler's pieces.
+// Group: select an item, press Group (or Ctrl/Shift + click another item),
+// click the items to add, then Group. Ungroup splits them again.
+const pickedCount = computed(() => groupPick.value?.ids.length ?? 0);
+const selectedGroup = computed(() => {
+  const group = selectedFlower.value?.group;
+  const members = group ? selectedFlowers.value.filter((item) => item.group === group) : [];
+  return members.length > 1 ? members : [];
+});
+
+function startGrouping(extraId = null) {
+  const lead = selectedFlower.value;
+  if (!lead) return;
+  pendingFlower.value = null;
+  const ids = pickUnit(selectedFlowers.value, lead.sceneId);
+  groupPick.value = { ids: extraId ? togglePick(selectedFlowers.value, ids, extraId) : ids };
+}
+
+function pickForGroup(sceneId) {
+  groupPick.value = { ids: togglePick(selectedFlowers.value, groupPick.value.ids, sceneId) };
+}
+
+function cancelGrouping() {
+  groupPick.value = null;
+}
+
+function confirmGroup() {
+  const ids = groupPick.value?.ids ?? [];
+  if (ids.length < 2) return showHintNote("Pick at least two items to group", false);
+  const group = `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  // One lock for the whole group: locked if any of them was
+  const locked = selectedFlowers.value.some((item) => ids.includes(item.sceneId) && item.locked);
+  selectedFlowers.value = tidyGroups(selectedFlowers.value.map((item) => (ids.includes(item.sceneId) ? { ...item, group, locked } : item)));
+  groupPick.value = null;
+  bouquetSelected.value = false;
+  if (!ids.includes(selectedSceneId.value)) selectedSceneId.value = ids[0];
+  showHintNote(`Grouped ${ids.length} items. They move together now.`);
+}
+
+function ungroupSelection() {
+  const group = selectedFlower.value?.group;
+  if (!group) return;
+  const count = selectedFlowers.value.filter((item) => item.group === group).length;
+  selectedFlowers.value = selectedFlowers.value.map((item) => (item.group === group ? { ...item, group: null } : item));
+  showHintNote(`Ungrouped ${count} items`);
+}
+
+// Moving a grouped item carries the rest of its group along: whatever the
+// dragged (lead) item did since the start is done to the others too.
+let groupMove = null;
+
+function beginGroupMove(leadId = selectedSceneId.value) {
+  groupMove = null;
+  const lead = selectedFlowers.value.find((item) => item.sceneId === leadId);
+  if (!lead?.group || !placedObjects.has(leadId)) return;
+  const starts = new Map();
+  for (const item of selectedFlowers.value) {
+    if (item.group !== lead.group || (item.locked && item.sceneId !== leadId)) continue;
+    const object = placedObjects.get(item.sceneId);
+    if (!object) continue;
+    object.updateMatrix();
+    starts.set(item.sceneId, object.matrix.clone());
+  }
+  if (starts.size > 1) groupMove = { leadId, starts };
+}
+
+function followLead() {
+  if (!groupMove) return;
+  const lead = placedObjects.get(groupMove.leadId);
+  if (!lead) return;
+  lead.updateMatrix();
+  const change = lead.matrix.clone().multiply(groupMove.starts.get(groupMove.leadId).clone().invert());
+  for (const [sceneId, start] of groupMove.starts) {
+    if (sceneId === groupMove.leadId) continue;
+    const object = placedObjects.get(sceneId);
+    if (object) change.clone().multiply(start).decompose(object.position, object.quaternion, object.scale);
+  }
+}
+
+function endGroupMove() {
+  if (!groupMove) return;
+  const { leadId, starts } = groupMove;
+  groupMove = null;
+  for (const sceneId of starts.keys()) {
+    if (sceneId === leadId) continue;
+    const object = placedObjects.get(sceneId);
+    const item = selectedFlowers.value.find((entry) => entry.sceneId === sceneId);
+    if (!object || !item) continue;
+    if (isFiller(item)) keepInsideBouquet(object, { exact: true });
+    commitObjectState(sceneId);
+  }
+}
+
+/** Runs a change to the selected item so its group follows (safe to nest) */
+function withGroup(change) {
+  if (groupMove) return change();
+  beginGroupMove();
+  try {
+    return change();
+  } finally {
+    followLead();
+    endGroupMove();
+  }
+}
+
+// Outlines: green around a selected group, rose around items being picked
+let groupBoxes = [];
+
+function refreshGroupBoxes() {
+  groupBoxes.forEach((box) => {
+    scene?.remove(box);
+    box.geometry.dispose();
+    box.material.dispose();
+  });
+  groupBoxes = [];
+  if (!scene) return;
+  const picking = Boolean(groupPick.value);
+  const ids = picking ? groupPick.value.ids : selectedGroup.value.map((item) => item.sceneId);
+  for (const sceneId of ids) {
+    const object = placedObjects.get(sceneId);
+    if (!object) continue;
+    const box = new THREE.BoxHelper(object, picking ? 0xb86558 : 0x4db173);
+    box.material.depthTest = false;
+    box.material.transparent = true;
+    box.material.opacity = 0.9;
+    box.renderOrder = 10;
+    scene.add(box);
+    groupBoxes.push(box);
+  }
+}
+watch([groupPick, () => selectedGroup.value.map((item) => item.sceneId).join()], refreshGroupBoxes, { flush: "post" });
 
 function enforceFlowerLimit(flower) {
   if (isCard(flower)) {
@@ -2609,6 +2980,7 @@ function buildBouquetCustomization() {
           rotation: { ...placedCard.value.rotation },
           scale: Number(placedCard.value.scale ?? 1),
           locked: placedCard.value.locked,
+          group: placedCard.value.group || null,
         }
       : null,
     fillers: placedFillers.value.map((filler, index) => ({
@@ -2622,6 +2994,7 @@ function buildBouquetCustomization() {
       rotation: { ...filler.rotation },
       scale: Number(filler.scale ?? 1),
       locked: filler.locked,
+      group: filler.group || null,
       // Its pieces on the original bouquet's spots
       ...(filler.sprigs ? { sprigs: copySprigs(filler.sprigs) } : {}),
     })),
@@ -2640,6 +3013,7 @@ function buildBouquetCustomization() {
         rotation: { ...flower.rotation },
         scale: Number(flower.scale ?? object?.scale.x ?? 1),
         locked: flower.locked,
+        group: flower.group || null,
       };
     }),
   };
@@ -2743,6 +3117,7 @@ async function restoreBouquet(customization) {
         rotation: { xDeg: Number(rotation.xDeg || 0), yDeg: Number(rotation.yDeg || 0), zDeg: Number(rotation.zDeg || 0) },
         scale,
         locked: Boolean(savedFlower.locked),
+        group: typeof savedFlower.group === "string" ? savedFlower.group : null,
         ...(sprigs ? { sprigs } : {}),
       });
     } catch (error) {
@@ -2764,6 +3139,7 @@ async function restoreBouquet(customization) {
     showToast("The card on this bouquet is no longer offered by the shop.", "error");
   }
 
+  selectedFlowers.value = tidyGroups(selectedFlowers.value);
   selectedSceneId.value = selectedFlowers.value[0]?.sceneId || null;
 }
 
@@ -2856,6 +3232,7 @@ function animateScene() {
   animationFrameId = window.requestAnimationFrame(animateScene);
   if (hasTransformTarget.value) placeSelectionCard();
   else anchoredTo = null;
+  groupBoxes.forEach((box) => box.update());
   stepCameraTween();
   controls?.update();
   renderer?.render(scene, camera);
@@ -3141,6 +3518,35 @@ function showToast(message, type = "success") {
 
 .fc-hint.live .fc-hint-copy span {
   color: rgba(242, 245, 242, 0.7);
+}
+
+.fc-hint-action {
+  min-height: 32px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--leaf);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.fc-hint-action:hover:not(:disabled) {
+  background: var(--leaf-deep);
+}
+
+.fc-hint-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.fc-hint-action:focus-visible,
+.fc-hint-cancel:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
 }
 
 .fc-hint-cancel {

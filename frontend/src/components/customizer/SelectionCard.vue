@@ -94,12 +94,21 @@
       </button>
     </div>
 
+    <!-- Group items so they move together, or split a group again -->
+    <button v-if="mode === 'flower'" type="button" class="sc-row sc-more" @click="$emit(grouped ? 'ungroup' : 'group')">
+      <span class="sc-group">
+        <CustomizerIcon :name="grouped ? 'ungroup' : 'group'" />
+        {{ grouped ? `Ungroup ${groupCount} items` : "Group with other items" }}
+      </span>
+      <CustomizerIcon name="chevronRight" class="sc-group-go" />
+    </button>
+
     <footer class="sc-actions">
       <button v-if="mode === 'flower'" type="button" class="sc-link" :aria-pressed="locked" @click="$emit('lock')">
         <CustomizerIcon :name="locked ? 'lock' : 'unlock'" /> {{ locked ? "Unlock" : "Lock" }}
       </button>
       <button v-if="mode === 'flower'" type="button" class="sc-link danger" @click="$emit('remove')">
-        <CustomizerIcon name="trash" /> Remove
+        <CustomizerIcon name="trash" /> {{ grouped ? "Remove all" : "Remove" }}
       </button>
       <span v-if="mode === 'bouquet'" class="sc-note">Your flowers stay where you placed them.</span>
       <button type="button" class="sc-close" aria-label="Deselect (Esc)" title="Deselect (Esc)" @click="$emit('close')"><CustomizerIcon name="x" /></button>
@@ -124,8 +133,10 @@ defineProps({
   position: { type: Object, default: null },
   side: { type: String, default: "right" },
   docked: { type: Boolean, default: false },
+  grouped: { type: Boolean, default: false },
+  groupCount: { type: Number, default: 0 },
 });
-const emit = defineEmits(["nudge-turn", "scale", "rotate", "nudge-rotate", "nudge", "lock", "remove", "reset", "close"]);
+const emit = defineEmits(["nudge-turn", "scale", "rotate", "nudge-rotate", "nudge", "lock", "remove", "reset", "close", "group", "ungroup"]);
 
 const open = ref(false);
 
@@ -387,6 +398,19 @@ function fill(value, min, max) {
 }
 
 .sc-more-link .fc-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.sc-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+}
+
+.sc-group .fc-icon,
+.sc-group-go {
   width: 14px;
   height: 14px;
 }

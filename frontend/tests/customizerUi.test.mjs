@@ -100,7 +100,8 @@ test("Esc cancels placing first, then deselects", () => {
 
 test("ignores keys typed into fields", () => {
   assert.equal(keyAction(key("g", { inField: true }), ready), null);
-  assert.equal(keyAction(key("g", { ctrlKey: true }), ready), null);
+  assert.equal(keyAction(key("k", { ctrlKey: true }), ready), null);
+  assert.equal(keyAction(key("z", { ctrlKey: true, inField: true }), ready), null);
   assert.equal(keyAction(key("g"), { ...ready, modalOpen: true }), null);
   assert.equal(keyAction(key("g"), { ...ready, ready: false }), null);
 });
@@ -122,4 +123,21 @@ test("anchorCard keeps the card inside the stage", () => {
   assert.equal(nearBottom.side, "right");
   assert.equal(nearBottom.left, 324);
   assert.ok(nearBottom.top + 180 <= 684);
+});
+
+test("Ctrl+Z undoes, Ctrl+Y and Ctrl+Shift+Z redo, also with nothing selected", () => {
+  const none = { ...ready, hasTarget: false, hasSelectedFlower: false };
+  assert.equal(keyAction(key("z", { ctrlKey: true }), none), "undo");
+  assert.equal(keyAction(key("y", { ctrlKey: true }), none), "redo");
+  assert.equal(keyAction(key("Z", { ctrlKey: true, shiftKey: true }), none), "redo");
+  assert.equal(keyAction(key("z", { metaKey: true }), none), "undo");
+  assert.equal(keyAction(key("z", { ctrlKey: true }), { ...none, modalOpen: true }), null);
+});
+
+test("Ctrl+G groups, Ctrl+Shift+G ungroups, Esc stops picking", () => {
+  assert.equal(keyAction(key("g", { ctrlKey: true }), ready), "group");
+  assert.equal(keyAction(key("g", { ctrlKey: true }), { ...ready, hasSelectedFlower: false }), null);
+  assert.equal(keyAction(key("g", { ctrlKey: true, shiftKey: true }), ready), null);
+  assert.equal(keyAction(key("g", { ctrlKey: true, shiftKey: true }), { ...ready, grouped: true }), "ungroup");
+  assert.equal(keyAction(key("Escape"), { ...ready, grouping: true, placing: true }), "cancel-grouping");
 });
