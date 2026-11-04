@@ -2,18 +2,10 @@
   <section class="fp" id="featured" aria-labelledby="fp-title">
     <div class="bc-container fp-layout">
       <div class="fp-intro">
-        <h2 id="fp-title">In bloom this <em>{{ seasonMonth }}</em></h2>
-        <p class="fp-lede">Flowers at their best right now, picked by the BloomCraft team from shops near you.</p>
-        <ul class="fp-notes">
-          <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z" /></svg>
-            Picked for the season
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16l-1.2-4.8A1.6 1.6 0 0 0 17.2 4H6.8a1.6 1.6 0 0 0-1.6 1.2zM5 10v9h14v-9M9 19v-5h6v5" /></svg>
-            From local flower shops
-          </li>
-        </ul>
+        <div class="fp-heading">
+          <h2 id="fp-title">In bloom this <em>{{ seasonMonth }}</em></h2>
+          <p class="fp-lede">Flowers at their best right now, picked by the BloomCraft team.</p>
+        </div>
         <div class="fp-intro-foot">
           <button type="button" class="fp-browse" @click="$emit('browse')">
             Browse all flowers
@@ -165,21 +157,28 @@ watch(
 
 <style scoped>
 .fp {
-  padding: clamp(32px, 4.5vw, 64px) 0 clamp(16px, 2vw, 28px);
+  padding: clamp(24px, 3vw, 40px) 0 clamp(8px, 1.5vw, 16px);
 }
 
+/* A heading row, then a row of small cards */
 .fp-layout {
-  display: grid;
-  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
-  align-items: center;
-  gap: clamp(24px, 4vw, 64px);
+  display: block;
+}
+
+.fp-intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: 14px;
 }
 
 /* ── Intro ─────────────────────────────── */
 .fp-intro h2 {
-  margin: 6px 0 0;
+  margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(32px, 3.6vw, 46px);
+  font-size: clamp(26px, 2.6vw, 32px);
   font-weight: 500;
   line-height: 1.05;
   color: var(--ink);
@@ -190,50 +189,19 @@ watch(
 }
 
 .fp-lede {
-  margin: 14px 0 0;
-  font-size: 15px;
+  margin: 4px 0 0;
+  font-size: 14px;
   line-height: 1.65;
   color: var(--ink-soft);
 }
 
-.fp-notes {
-  display: grid;
-  gap: 8px;
-  margin: 18px 0 0;
-  padding: 0;
-  list-style: none;
-}
 
-.fp-notes li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13.5px;
-  color: var(--ink);
-}
 
-.fp-notes svg {
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  padding: 5px;
-  box-sizing: content-box;
-  border-radius: 50%;
-  background: rgba(77, 177, 115, 0.12);
-  fill: none;
-  stroke: var(--leaf-deep);
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
 
 .fp-intro-foot {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 26px;
+  gap: 10px;
 }
 
 .fp-browse {
@@ -299,9 +267,9 @@ watch(
 /* ── Cards ─────────────────────────────── */
 .fp-track {
   display: flex;
-  gap: 20px;
+  gap: 14px;
   margin: 0;
-  padding: 6px 4px 14px;
+  padding: 4px 2px 10px;
   overflow-x: auto;
   list-style: none;
   scroll-snap-type: x mandatory;
@@ -313,7 +281,7 @@ watch(
 }
 
 .fp-item {
-  flex: 0 0 clamp(240px, 22vw, 290px);
+  flex: 0 0 196px;
   scroll-snap-align: start;
 }
 
@@ -323,7 +291,7 @@ watch(
   height: 100%;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 16px;
   background: #fff;
   transition: transform 0.25s var(--ease-out, ease-out), box-shadow 0.25s ease;
 }
@@ -336,12 +304,12 @@ watch(
 .fp-photo {
   position: relative;
   display: block;
-  aspect-ratio: 4 / 5;
-  margin: 8px 8px 0;
+  aspect-ratio: 1 / 1;
+  margin: 6px 6px 0;
   padding: 0;
   overflow: hidden;
   border: 0;
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--ivory);
   cursor: pointer;
 }
@@ -387,8 +355,8 @@ watch(
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px 16px;
+  gap: 2px;
+  padding: 10px 12px 12px;
 }
 
 .fp-shop {
@@ -411,7 +379,7 @@ watch(
 .fp-name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 19px;
   font-weight: 500;
   line-height: 1.15;
 }
@@ -450,9 +418,9 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   margin-top: auto;
-  padding-top: 12px;
+  padding-top: 8px;
 }
 
 .fp-price {
@@ -464,7 +432,7 @@ watch(
 }
 
 .fp-now {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -526,22 +494,15 @@ watch(
   outline-offset: 3px;
 }
 
-@media (max-width: 860px) {
-  .fp-layout {
-    grid-template-columns: 1fr;
-    gap: 22px;
-  }
-
-  .fp-notes {
-    display: none;
-  }
-
-  .fp-intro-foot {
-    margin-top: 16px;
-  }
-
+@media (max-width: 640px) {
   .fp-item {
-    flex-basis: min(76vw, 280px);
+    flex-basis: min(44vw, 180px);
+  }
+
+  .fp-browse {
+    min-height: 40px;
+    padding: 0 14px;
+    font-size: 13px;
   }
 }
 
