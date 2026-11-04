@@ -123,9 +123,9 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
   left: 10px;
   padding: 4px 10px;
   border-radius: 999px;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #fff;
 }

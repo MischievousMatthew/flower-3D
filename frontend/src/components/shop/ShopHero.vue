@@ -72,7 +72,6 @@ const { followLink } = useSiteContent();
 
 const FALLBACK = {
   id: "default",
-  eyebrow: "Fresh flowers for every moment",
   title: "Bespoke florals, built by you",
   subtitle: "Create your perfect bouquet with fresh flowers, customizable designs, and trusted local shops.",
   image_url: "https://images.unsplash.com/photo-1563241527-3004b7be0ffd?w=1800&h=900&fit=crop&q=80",

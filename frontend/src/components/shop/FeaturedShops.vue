@@ -20,7 +20,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z" /><circle cx="12" cy="10" r="2.2" /></svg>
             Near you · {{ distance(nearby[shop.id]) }}
           </span>
-          <span v-if="shop.verification_level === 'verified'" class="fs-verified">Verified</span>
+          <span v-if="shop.verification_level === 'verified'" class="fs-verified">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
+            Verified
+          </span>
           <div class="fs-copy">
             <h3>{{ shop.store_name }}</h3>
             <p v-if="shop.store_address" class="fs-place">
@@ -163,7 +166,7 @@ const distance = (km) => {
   padding: 4px 10px 4px 8px;
   border-radius: 999px;
   background: var(--leaf-deep);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--paper);
   box-shadow: 0 6px 14px -8px rgba(54, 63, 78, 0.6);
@@ -181,12 +184,26 @@ const distance = (km) => {
   position: absolute;
   top: 10px;
   right: 10px;
-  padding: 3px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 8px;
   border-radius: 999px;
-  background: rgba(250, 251, 250, 0.92);
-  font-size: 10.5px;
-  font-weight: 500;
-  color: var(--leaf-deep);
+  background: var(--leaf-deep);
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 6px 14px -8px rgba(54, 63, 78, 0.6);
+}
+
+.fs-verified svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .fs-copy {
@@ -215,7 +232,7 @@ const distance = (km) => {
   gap: 4px;
   overflow: hidden;
   margin: 0 0 8px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: rgba(250, 251, 250, 0.85);
@@ -238,7 +255,7 @@ const distance = (km) => {
 }
 
 .fs-meta {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: rgba(250, 251, 250, 0.85);
 }
 
@@ -250,7 +267,7 @@ const distance = (km) => {
   border-radius: 999px;
   background: var(--paper);
   color: var(--ink);
-  font: 500 11.5px var(--font-sans);
+  font: 500 12.5px var(--font-sans);
   cursor: pointer;
 }
 

@@ -176,6 +176,7 @@ const capitalize = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1)
 }
 
 .bf-head p {
+  text-wrap: pretty;
   margin: 0;
   font-size: 12.5px;
   line-height: 1.55;

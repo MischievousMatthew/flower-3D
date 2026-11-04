@@ -134,7 +134,7 @@ const items = computed(() =>
 }
 
 .ts-copy small {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--ink-soft);
 }
 

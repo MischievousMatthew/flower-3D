@@ -29,7 +29,7 @@
   --ivory-deep: #e4eae5;
   --paper: #fafbfa;
   --ink: #363f4e;
-  --ink-soft: #6a7282;
+  --ink-soft: #5f6776; /* 5.2:1 on --ivory, 4.7:1 on --ivory-deep */
   --line: rgba(54, 63, 78, 0.12);
   --line-soft: rgba(54, 63, 78, 0.07);
   /* Logo green for fills; the deeper green is for text and links (readable on white) */

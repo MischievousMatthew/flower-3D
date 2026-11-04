@@ -360,9 +360,9 @@ watch(
   padding: 4px 10px;
   border-radius: 999px;
   color: #fff;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
