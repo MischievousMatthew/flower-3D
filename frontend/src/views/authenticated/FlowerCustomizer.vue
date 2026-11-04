@@ -167,32 +167,7 @@
                 </button>
               </div>
 
-              <!-- Print on the outer paper: plain, newspaper, or a word written over and over -->
-              <div v-if="activeWrapLayer === 'outer' && canPattern" class="fc-pattern">
-                <span class="fc-pattern-label">Paper print</span>
-                <div class="fc-segment fc-segment--3" role="radiogroup" aria-label="Paper print">
-                  <button
-                    v-for="option in WRAPPER_PATTERNS"
-                    :key="option.key"
-                    type="button"
-                    role="radio"
-                    class="fc-segment-btn"
-                    :class="{ active: wrapPattern.type === option.key }"
-                    :aria-checked="wrapPattern.type === option.key"
-                    @click="wrapPattern.type = option.key"
-                  >
-                    <span class="fc-segment-label">{{ option.label }}</span>
-                  </button>
-                </div>
-                <label v-if="wrapPattern.type === 'words'" class="fc-pattern-word">
-                  <span>Your word</span>
-                  <input v-model="wrapPattern.text" type="text" :maxlength="MAX_PATTERN_WORD" placeholder="love" autocomplete="off" spellcheck="false" />
-                  <small>{{ wrapPattern.text.trim() ? "Written all over the paper, on the colour you pick below." : "Type a word, like love or congrats." }}</small>
-                </label>
-                <p v-else-if="wrapPattern.type === 'newspaper'" class="fc-pattern-note">Newspaper print keeps its black-and-white look, so there's no colour to pick for the outer paper.</p>
-              </div>
-
-              <div v-if="wrapperOptions.length && !(activeWrapLayer === 'outer' && canPattern && wrapPattern.type === 'newspaper')" class="fc-options" role="radiogroup" :aria-label="`${activeWrapLayer === 'outer' ? 'Outer' : 'Inner'} wrapper`">
+              <div v-if="wrapperOptions.length" class="fc-options" role="radiogroup" :aria-label="`${activeWrapLayer === 'outer' ? 'Outer' : 'Inner'} wrapper`">
                 <button
                   v-for="option in wrapperOptions"
                   :key="option.id"
@@ -206,6 +181,7 @@
                   <span class="fc-option-swatch" :style="{ background: option.color_hex }"></span>
                   <span class="fc-option-copy">
                     <strong>{{ option.name }}</strong>
+                    <small v-if="printLabel(option)">{{ printLabel(option) }}</small>
                     <small v-if="option.description">{{ option.description }}</small>
                   </span>
                   <BcIcon v-if="activeWrap.id === option.id" name="check" class="fc-option-check" />
@@ -556,7 +532,7 @@ import { TransformControls } from "three/examples/jsm/controls/TransformControls
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import api from "../../plugins/axios.js";
 import { LEGACY_DESIGN, createBouquetBase, designForOccasion } from "../../utils/bouquetDesigns/index.js";
-import { MAX_PATTERN_WORD, PATTERN_DESIGNS, WRAPPER_PATTERNS, applyWrapPattern, normalizePattern } from "../../utils/wrapperPatterns.js";
+import { PATTERN_DESIGNS, applyWrapPattern, normalizePattern } from "../../utils/wrapperPatterns.js";
 import {
   DEFAULT_PRESETS,
   LEGACY_PRESET,
@@ -665,10 +641,14 @@ const maxFlowers = computed(() => preset.value?.size ?? LEGACY_PRESET.size);
 const maxFillers = computed(() => fillerLimitFor(maxFlowers.value));
 const hasWrapper = computed(() => occasion.value?.wrapper ?? true);
 const hasRibbon = computed(() => occasion.value?.ribbon ?? true);
-// Paper prints (newspaper, words) go on paper wraps only, not a basket or a hand-tied bouquet
-const wrapPattern = reactive({ type: "plain", text: "love" });
+// The outer wrapper's print (newspaper, words) comes with the shop's wrapper.
+// Prints go on paper wraps only, not a basket or a hand-tied bouquet.
 const canPattern = computed(() => hasWrapper.value && PATTERN_DESIGNS.includes(baseDesign.value));
-const savedPattern = computed(() => (canPattern.value ? normalizePattern({ type: wrapPattern.type, text: wrapPattern.text }) : null));
+const savedPattern = computed(() =>
+  canPattern.value && selectedOuterWrapper.value ? normalizePattern({ type: selectedOuterWrapper.value.pattern, text: selectedOuterWrapper.value.pattern_text }) : null,
+);
+const printLabel = (option) =>
+  option.pattern === "newspaper" ? "Newspaper print" : option.pattern === "words" && option.pattern_text ? `“${option.pattern_text}” print` : "";
 // A ribbon only shows when the occasion has one and the shop stocks ribbons
 const showsRibbon = computed(() => hasRibbon.value && ribbonOptions.value.length > 0);
 // The bouquet's design follows its occasion (classic for older bouquets)
@@ -2716,9 +2696,6 @@ async function restoreBouquet(customization) {
       // Fillers saved with an old price are now part of the base price
       .map((filler) => ({ ...filler, price: 0, kind: "filler", product_id: filler.id, product_name: filler.name })),
   ];
-  const savedPrint = normalizePattern(customization.wrapper_pattern);
-  wrapPattern.type = savedPrint?.type ?? "plain";
-  if (savedPrint?.text) wrapPattern.text = savedPrint.text;
   applyWrapColor("outer", selectedOuterWrapper.value?.color_hex || customization.paper_color || null);
   applyWrapColor("inner", selectedInnerWrapper.value?.color_hex || customization.inner_paper_color || null);
   applyRibbonColor(selectedRibbon.value?.color_hex || customization.ribbon_color || ribbonColor.value);
@@ -3490,51 +3467,6 @@ function showToast(message, type = "success") {
 .fc-options {
   display: grid;
   gap: 6px;
-}
-
-.fc-pattern {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-.fc-pattern-label,
-.fc-pattern-word span {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-.fc-pattern .fc-segment {
-  margin-bottom: 0;
-}
-.fc-segment--3 {
-  grid-template-columns: repeat(3, 1fr);
-}
-.fc-pattern-word {
-  display: grid;
-  gap: 6px;
-}
-.fc-pattern-word input {
-  min-height: 44px;
-  padding: 0 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--paper);
-  color: var(--ink);
-  font: inherit;
-  font-size: 16px;
-}
-.fc-pattern-word input:focus {
-  outline: 2px solid var(--leaf);
-  outline-offset: 1px;
-}
-.fc-pattern-word small,
-.fc-pattern-note {
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: var(--ink-soft);
 }
 
 .fc-option {

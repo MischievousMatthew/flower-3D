@@ -293,6 +293,43 @@
             <span v-if="errors.model_file" class="cz-error">{{ errors.model_file }}</span>
           </div>
 
+          <!-- Wrapper print: plain paper, newspaper, or a word written all over the colour -->
+          <div v-if="activeTab === 'wrapper'" class="cz-field">
+            <span class="cz-label">Print <small>(optional)</small></span>
+            <div class="cz-print" role="radiogroup" aria-label="Print">
+              <button
+                v-for="option in PRINTS"
+                :key="option.key"
+                type="button"
+                role="radio"
+                class="cz-print-btn"
+                :class="{ on: form.pattern === option.key }"
+                :aria-checked="form.pattern === option.key"
+                @click="setPrint(option.key)"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+            <div v-if="form.pattern === 'words'" class="cz-print-word">
+              <input
+                v-model="form.patternText"
+                class="cz-input"
+                :class="{ invalid: errors.pattern_text }"
+                type="text"
+                :maxlength="MAX_PATTERN_WORD"
+                placeholder="e.g. love"
+                aria-label="Word printed on the wrapper"
+                @input="refreshPrintPreview"
+              />
+              <span v-if="errors.pattern_text" class="cz-error">{{ errors.pattern_text }}</span>
+            </div>
+            <div v-if="form.pattern !== 'none'" class="cz-print-preview">
+              <img v-if="printPreview" :src="printPreview" alt="" />
+              <span v-else class="bc-skeleton"></span>
+              <small class="cz-hint">{{ form.pattern === "newspaper" ? "Black-and-white newsprint. Its own look, so the colour above isn't used for it." : "Written over and over on the colour above, in a handwriting style." }} Prints show on paper wraps (classic cone and Korean wrap).</small>
+            </div>
+          </div>
+
           <label class="cz-field">
             <span class="cz-label">Description</span>
             <textarea
@@ -360,6 +397,9 @@
                   <span v-if="item.type === 'card'" class="cz-price">{{ itemPriceLabel(item) }}</span>
                 </div>
                 <p v-if="item.color_hex" class="cz-hexline">{{ item.color_hex.toUpperCase() }}</p>
+                <div v-if="item.type === 'wrapper' && item.pattern" class="cz-meta">
+                  <span class="cz-chip">{{ item.pattern === "newspaper" ? "Newspaper print" : `Print: “${item.pattern_text}”` }}</span>
+                </div>
                 <div v-if="item.type === 'card'" class="cz-meta">
                   <span class="cz-chip">Up to {{ item.card_limit }} {{ item.card_limit_type }}</span>
                   <span v-for="size in item.card_sizes || []" :key="size.label" class="cz-chip">
@@ -408,13 +448,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import api from "../../plugins/axios";
 import vendorHeader from "../../layouts/vendorHeader.vue";
 import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import ShopLayout from "../../components/vendor/shop/ShopLayout.vue";
 import BouquetPresetsPanel from "../../components/vendor/shop/BouquetPresetsPanel.vue";
 import { toast } from "@/utils/snackbar";
+import { MAX_PATTERN_WORD, patternPreview } from "../../utils/wrapperPatterns.js";
 import "../../styles/bloomcraft.css";
 
 const TABS = [
@@ -492,6 +533,8 @@ const deletingId = ref(null);
 const errors = reactive({});
 
 const form = reactive({
+  pattern: "none",
+  patternText: "",
   name: "",
   description: "",
   price: "",
@@ -646,8 +689,42 @@ function sliderTrack(key) {
 }
 
 // ---- Form ----
+// ---- Wrapper print ----
+const PRINTS = [
+  { key: "none", label: "None" },
+  { key: "newspaper", label: "Newspaper" },
+  { key: "words", label: "Words" },
+];
+const printPreview = ref("");
+let previewTimer = null;
+
+function refreshPrintPreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(async () => {
+    const pattern = form.pattern === "words" ? { type: "words", text: form.patternText || "love" } : { type: form.pattern };
+    printPreview.value = form.pattern === "none" ? "" : await patternPreview(pattern, form.color);
+  }, 150);
+}
+
+watch(
+  () => form.color,
+  () => {
+    if (form.pattern === "words") refreshPrintPreview();
+  },
+);
+
+function setPrint(key) {
+  form.pattern = key;
+  delete errors.pattern_text;
+  printPreview.value = "";
+  refreshPrintPreview();
+}
+
 function resetForm() {
   editingId.value = null;
+  form.pattern = "none";
+  form.patternText = "";
+  printPreview.value = "";
   form.name = "";
   form.description = "";
   form.price = "";
@@ -672,6 +749,11 @@ function startEdit(item) {
   form.price = Number(item.price) ? String(item.price) : "";
   form.modelUrl = item.model_url || null;
   if (item.color_hex) setColorFromHex(item.color_hex);
+  if (item.type === "wrapper") {
+    form.pattern = item.pattern || "none";
+    form.patternText = item.pattern_text || "";
+    refreshPrintPreview();
+  }
   if (item.type === "card") {
     form.imagePreview = item.image_url || null;
     form.limitType = item.card_limit_type || "words";
@@ -754,6 +836,7 @@ function validate() {
     });
   }
   if (current.value.hasColor && !/^#[0-9a-f]{6}$/i.test(form.color)) errors.color_hex = "Enter a 6-digit hex code.";
+  if (activeTab.value === "wrapper" && form.pattern === "words" && !form.patternText.trim()) errors.pattern_text = "Type the word to print, like love.";
   if (current.value.hasModel && !form.modelFile && !form.modelUrl) errors.model_file = "Upload a 3D model for this filler.";
   return !Object.keys(errors).length;
 }
@@ -776,6 +859,10 @@ async function submitForm() {
     });
   }
   if (current.value.hasColor) payload.append("color_hex", form.color);
+  if (type === "wrapper") {
+    payload.append("pattern", form.pattern);
+    if (form.pattern === "words") payload.append("pattern_text", form.patternText.trim());
+  }
   if (form.modelFile) payload.append("model_file", form.modelFile);
 
   saving.value = true;
@@ -1657,6 +1744,54 @@ const formatSize = (bytes) =>
   display: grid;
   place-items: center;
   font-size: 28px;
+}
+
+.cz-print {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--v-subtle-2);
+}
+.cz-print-btn {
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--v-text-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.cz-print-btn.on {
+  background: var(--v-raised);
+  color: var(--v-text);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+.cz-print-btn:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 1px;
+}
+.cz-print-word {
+  display: grid;
+  gap: 4px;
+}
+.cz-print-preview {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+.cz-print-preview img,
+.cz-print-preview .bc-skeleton {
+  width: 88px;
+  height: 88px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--v-border);
 }
 
 .cz-meta {

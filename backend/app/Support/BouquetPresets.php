@@ -316,11 +316,8 @@ class BouquetPresets
         if (! $occasion['ribbon']) {
             unset($customizations['ribbon'], $customizations['ribbon_color']);
         }
-        $pattern = self::cleanPattern($customizations['wrapper_pattern'] ?? null);
+        // The print comes from the shop's chosen wrapper (resolveSelections), never the browser
         unset($customizations['wrapper_pattern']);
-        if ($pattern && $occasion['wrapper'] && in_array($occasion['design'], self::PATTERN_DESIGNS, true)) {
-            $customizations['wrapper_pattern'] = $pattern;
-        }
 
         return ['ok' => true, 'customizations' => $customizations, 'filler_limit' => $fillerLimit, 'base_price' => $base];
     }

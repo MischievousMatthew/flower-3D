@@ -204,3 +204,9 @@ export function patternLabel(pattern) {
   if (!p) return "";
   return p.type === "newspaper" ? "Newspaper print" : `Words: “${p.text}”`;
 }
+
+/** A small picture of the print (data URL), for forms and option lists; "" for plain paper */
+export async function patternPreview(pattern, hex) {
+  const texture = await patternTexture(pattern, hex);
+  return texture?.image?.toDataURL?.("image/jpeg", 0.8) ?? "";
+}

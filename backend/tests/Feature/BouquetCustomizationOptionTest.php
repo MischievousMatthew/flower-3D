@@ -40,6 +40,7 @@ class BouquetCustomizationOptionTest extends TestCase
         });
 
         (include database_path('migrations/2026_10_10_000001_create_bouquet_customization_options_table.php'))->up();
+        (include database_path('migrations/2026_11_04_130000_add_pattern_to_bouquet_customization_options.php'))->up();
 
         $this->withoutMiddleware(EnsureSubscriptionModuleAccess::class);
     }
@@ -182,5 +183,47 @@ class BouquetCustomizationOptionTest extends TestCase
         $none = BouquetCustomizationOption::resolveSelections($vendor->id, ['type' => 'custom_flower_bouquet']);
         $this->assertTrue($none['ok']);
         $this->assertSame(0.0, $none['total']);
+    }
+
+    public function test_a_wrapper_can_carry_a_print_that_reaches_the_bouquet(): void
+    {
+        $vendor = $this->vendor();
+
+        $love = $this->as($vendor)->postJson('/api/vendor/customization-options', [
+            'type' => 'wrapper', 'name' => 'Love print', 'color_hex' => '#D6336C', 'pattern' => 'words', 'pattern_text' => '  love ',
+        ])->assertCreated()->json('data');
+        $this->assertSame('words', $love['pattern']);
+        $this->assertSame('love', $love['pattern_text']);
+
+        $this->as($vendor)->postJson('/api/vendor/customization-options', [
+            'type' => 'wrapper', 'name' => 'No word', 'color_hex' => '#ffffff', 'pattern' => 'words',
+        ])->assertStatus(422)->assertJsonValidationErrors('pattern_text', 'errors');
+
+        $news = $this->as($vendor)->postJson('/api/vendor/customization-options', [
+            'type' => 'wrapper', 'name' => 'Newspaper', 'color_hex' => '#efece4', 'pattern' => 'newspaper', 'pattern_text' => 'ignored',
+        ])->assertCreated()->json('data');
+        $this->assertNull($news['pattern_text']);
+
+        // Back to plain
+        $this->as($vendor)->postJson("/api/vendor/customization-options/{$love['id']}", ['pattern' => 'none'])
+            ->assertOk()->assertJsonPath('data.pattern', null);
+        $this->as($vendor)->postJson("/api/vendor/customization-options/{$love['id']}", ['pattern' => 'words', 'pattern_text' => 'love'])->assertOk();
+
+        // The bouquet gets the print from the wrapper, whatever the browser sent
+        $result = BouquetCustomizationOption::resolveSelections($vendor->id, [
+            'type' => 'custom_flower_bouquet',
+            'wrapper' => ['id' => $love['id']],
+            'wrapper_pattern' => ['type' => 'newspaper'],
+        ]);
+        $this->assertSame(['type' => 'words', 'text' => 'love'], $result['customizations']['wrapper_pattern']);
+
+        $plain = BouquetCustomizationOption::create(['owner_id' => $vendor->id, 'type' => 'wrapper', 'name' => 'Kraft', 'color_hex' => '#c8a27a']);
+        $result = BouquetCustomizationOption::resolveSelections($vendor->id, [
+            'type' => 'custom_flower_bouquet', 'wrapper' => ['id' => $plain->id], 'wrapper_pattern' => ['type' => 'newspaper'],
+        ]);
+        $this->assertArrayNotHasKey('wrapper_pattern', $result['customizations']);
+
+        // The storefront sends the print with the wrapper
+        $this->getJson("/api/stores/{$vendor->id}/customization-options")->assertOk();
     }
 }

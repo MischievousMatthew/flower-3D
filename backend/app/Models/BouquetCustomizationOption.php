@@ -32,6 +32,8 @@ class BouquetCustomizationOption extends Model
         'name',
         'description',
         'color_hex',
+        'pattern',
+        'pattern_text',
         'price',
         'is_active',
         'model_url',
@@ -152,9 +154,18 @@ class BouquetCustomizationOption extends Model
                 'id' => $option->id,
                 'name' => $option->name,
                 'color_hex' => $option->color_hex,
+                'pattern' => $option->patternData(),
                 'price' => 0.0, // part of the occasion's base price
             ];
             $customizations[$colorKey] = $option->color_hex;
+        }
+
+        // The outer wrapper's print (newspaper, words), from the shop's wrapper, never the browser
+        unset($customizations['wrapper_pattern']);
+        $outer = $wrapperId ? $options->get($wrapperId) : null;
+        $design = $customizations['design'] ?? 'classic';
+        if ($outer && $outer->patternData() && in_array($design, BouquetPresets::PATTERN_DESIGNS, true)) {
+            $customizations['wrapper_pattern'] = $outer->patternData();
         }
 
         $resolvedFillers = [];
@@ -227,6 +238,14 @@ class BouquetCustomizationOption extends Model
         $customizations['extras_total'] = round($total, 2);
 
         return ['ok' => true, 'total' => round($total, 2), 'customizations' => $customizations];
+    }
+
+    /** The wrapper's print as the customizer and viewer read it, or null for plain paper */
+    public function patternData(): ?array
+    {
+        return $this->type === self::TYPE_WRAPPER
+            ? BouquetPresets::cleanPattern(['type' => $this->pattern, 'text' => $this->pattern_text])
+            : null;
     }
 
     private static function failure(string $message, array $customizations): array

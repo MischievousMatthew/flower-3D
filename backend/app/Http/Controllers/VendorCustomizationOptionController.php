@@ -178,6 +178,9 @@ class VendorCustomizationOptionController extends Controller
 
         if ($type === Option::TYPE_WRAPPER) {
             $rules['is_active'] = 'nullable|boolean';
+            // A print on the paper: none, newspaper, or a word written all over it
+            $rules['pattern'] = 'nullable|in:none,newspaper,words';
+            $rules['pattern_text'] = 'nullable|required_if:pattern,words|string|max:' . \App\Support\BouquetPresets::MAX_PATTERN_WORD;
         }
 
         if ($type === Option::TYPE_FILLER) {
@@ -231,6 +234,11 @@ class VendorCustomizationOptionController extends Controller
         }
         if ($request->has('is_active') && $type === Option::TYPE_WRAPPER) {
             $data['is_active'] = $request->boolean('is_active');
+        }
+        if ($request->has('pattern') && $type === Option::TYPE_WRAPPER) {
+            $clean = \App\Support\BouquetPresets::cleanPattern(['type' => $request->input('pattern'), 'text' => $request->input('pattern_text')]);
+            $data['pattern'] = $clean['type'] ?? null;
+            $data['pattern_text'] = $clean['text'] ?? null;
         }
 
         if ($type === Option::TYPE_CARD) {
