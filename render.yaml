@@ -15,6 +15,10 @@ services:
     envVars:
       - key: APP_ENV
         value: production
+      # Secret: must be the same base64 key as backend/.env (both use one database;
+      # it signs badge/leave QR codes and encrypts leave sessions). Set it in the dashboard.
+      - key: APP_KEY
+        sync: false
       - key: FRONTEND_URL
         value: https://bloomcraft-app.vercel.app
       - key: APP_URL
