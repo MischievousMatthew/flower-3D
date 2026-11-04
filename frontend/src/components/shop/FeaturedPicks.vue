@@ -1,90 +1,111 @@
 <template>
   <section class="fp" id="featured" aria-labelledby="fp-title">
-    <div class="bc-container">
-      <div class="fp-head">
+    <div class="bc-container fp-layout">
+      <div class="fp-intro">
         <p class="bc-label">Featured picks</p>
         <h2 id="fp-title">Chosen by <em>BloomCraft</em></h2>
-        <p class="fp-lede">Flowers our team loves right now, from shops near you.</p>
+        <p class="fp-lede">Flowers our team loves right now, picked from shops on BloomCraft.</p>
+        <ul class="fp-notes">
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z" /></svg>
+            Hand-picked by our team
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16l-1.2-4.8A1.6 1.6 0 0 0 17.2 4H6.8a1.6 1.6 0 0 0-1.6 1.2zM5 10v9h14v-9M9 19v-5h6v5" /></svg>
+            From local flower shops
+          </li>
+        </ul>
+        <div class="fp-intro-foot">
+          <button type="button" class="fp-browse" @click="$emit('browse')">
+            Browse all flowers
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </button>
+          <div v-if="scrollable" class="fp-arrows">
+            <button type="button" class="fp-arrow" aria-label="Previous picks" :disabled="atStart" @click="slide(-1)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+            </button>
+            <button type="button" class="fp-arrow" aria-label="More picks" :disabled="atEnd" @click="slide(1)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div class="fp-grid" :class="{ single: products.length === 1 }">
-        <article
-          v-for="product in products"
-          :key="product.id"
-          :ref="(el) => (cardEls[product.id] = el)"
-          class="fp-card"
-        >
-          <button type="button" class="fp-photo" :aria-label="`View ${product.product_name}`" @click="$emit('open', product)">
-            <img
-              :ref="(el) => (imageEls[product.id] = el)"
-              :src="imageOf(product)"
-              :alt="product.product_name"
-              loading="lazy"
-              @error="onImageError"
-            />
-            <span class="fp-badge" :class="badge(product).tone">{{ badge(product).label }}</span>
-          </button>
-
-          <div class="fp-body">
-            <p v-if="product.category" class="fp-category">{{ product.category }}</p>
-            <h3 class="fp-name">
-              <button type="button" @click="$emit('open', product)">{{ product.product_name }}</button>
-            </h3>
-            <button v-if="product.vendor_name" type="button" class="fp-shop" @click="$emit('vendor', product.vendor_id)">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16l-1.2-4.8A1.6 1.6 0 0 0 17.2 4H6.8a1.6 1.6 0 0 0-1.6 1.2zM5 10v9h14v-9M9 19v-5h6v5" /></svg>
-              {{ product.vendor_name }}
+      <ul ref="trackEl" class="fp-track" @scroll.passive="measure">
+        <li v-for="product in products" :key="product.id" class="fp-item">
+          <article :ref="(el) => (cardEls[product.id] = el)" class="fp-card">
+            <button type="button" class="fp-photo" :aria-label="`View ${product.product_name}`" @click="$emit('open', product)">
+              <img
+                :ref="(el) => (imageEls[product.id] = el)"
+                :src="imageOf(product)"
+                :alt="product.product_name"
+                loading="lazy"
+                @error="onImageError"
+              />
+              <span class="fp-badge" :class="badge(product).tone">{{ badge(product).label }}</span>
+              <span v-if="!inStock(product)" class="fp-sold-out">Sold out</span>
             </button>
 
-            <p class="fp-stats">
-              <span class="fp-star" aria-hidden="true">★</span>
-              <strong>{{ product.average_rating ? Number(product.average_rating).toFixed(1) : "New" }}</strong>
-              <template v-if="product.total_reviews"> · {{ product.total_reviews }} {{ product.total_reviews === 1 ? "review" : "reviews" }}</template>
-              <template v-if="product.sold_count"> · {{ sold(product.sold_count) }} sold</template>
-            </p>
-
-            <p v-if="product.description" class="fp-desc">{{ product.description }}</p>
-
-            <div class="fp-buy">
-              <p class="fp-price">
-                <span class="fp-now">₱{{ money(product.discount_price || product.selling_price) }}</span>
-                <span v-if="product.discount_price" class="fp-was">₱{{ money(product.selling_price) }}</span>
-              </p>
-              <span class="fp-stock" :class="stock(product).tone">{{ stock(product).label }}</span>
-            </div>
-
-            <div class="fp-actions">
-              <button
-                type="button"
-                class="fp-btn fp-btn--primary"
-                :disabled="!inStock(product) || addingId === product.id"
-                @click="$emit('add', product, { imageEl: imageEls[product.id], cardEl: cardEls[product.id] })"
-              >
-                {{ addingId === product.id ? "Adding" : "Add to cart" }}
+            <div class="fp-body">
+              <button v-if="product.vendor_name" type="button" class="fp-shop" @click="$emit('vendor', product.vendor_id)">
+                {{ product.vendor_name }}
               </button>
-              <button type="button" class="fp-btn fp-btn--ghost" :disabled="!inStock(product)" @click="$emit('buy', product)">Buy now</button>
+              <h3 class="fp-name">
+                <button type="button" @click="$emit('open', product)">{{ product.product_name }}</button>
+              </h3>
+              <p class="fp-stats">
+                <span class="fp-star" aria-hidden="true">★</span>
+                <strong>{{ product.average_rating ? Number(product.average_rating).toFixed(1) : "New" }}</strong>
+                <template v-if="product.sold_count"> · {{ sold(product.sold_count) }} sold</template>
+              </p>
+
+              <div class="fp-buy">
+                <p class="fp-price">
+                  <span class="fp-now">₱{{ money(product.discount_price || product.selling_price) }}</span>
+                  <span v-if="product.discount_price" class="fp-was">₱{{ money(product.selling_price) }}</span>
+                </p>
+                <button
+                  type="button"
+                  class="fp-cart"
+                  :aria-label="`Add ${product.product_name} to cart`"
+                  :title="inStock(product) ? 'Add to cart' : 'Sold out'"
+                  :disabled="!inStock(product) || addingId === product.id"
+                  @click="$emit('add', product, { imageEl: imageEls[product.id], cardEl: cardEls[product.id] })"
+                >
+                  <span v-if="addingId === product.id" class="fp-cart-dots" aria-hidden="true">···</span>
+                  <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l-1 12H7zM9 8V6a3 3 0 0 1 6 0v2M12 12v5M9.5 14.5h5" /></svg>
+                </button>
+              </div>
             </div>
-          </div>
-        </article>
-      </div>
+          </article>
+        </li>
+      </ul>
     </div>
   </section>
 </template>
 
 <script setup>
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+
 /**
- * "Chosen by BloomCraft" (Admin → Website): wide cards with the photo beside
- * the details, so one pick or a few both fill the row.
+ * "Chosen by BloomCraft" (Admin → Website): the heading on the left and
+ * compact product cards on the right, in a row that scrolls when there are
+ * more than fit. One pick stays a normal-sized card.
  */
-defineProps({
+const props = defineProps({
   products: { type: Array, default: () => [] },
   addingId: { type: [Number, String], default: null },
 });
-defineEmits(["open", "add", "buy", "vendor"]);
+defineEmits(["open", "add", "buy", "vendor", "browse"]);
 
 const imageEls = {};
 const cardEls = {};
+const trackEl = ref(null);
+const scrollable = ref(false);
+const atStart = ref(true);
+const atEnd = ref(false);
 
-const FALLBACK = "https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=800&h=800&fit=crop";
+const FALLBACK = "https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=800&h=1000&fit=crop";
 function imageOf(product) {
   if (product?.primary_image?.image_url) return product.primary_image.image_url;
   const images = product?.images || [];
@@ -104,100 +125,242 @@ function badge(product) {
   return { label: "New", tone: "new" };
 }
 
-function stock(product) {
-  const q = Number(product.quantity_in_stock ?? 0);
-  if (q <= 0) return { label: "Out of stock", tone: "out" };
-  if (q <= 10) return { label: `Only ${q} left`, tone: "low" };
-  return { label: "In stock", tone: "in" };
+// Arrows show only when the cards don't all fit
+function measure() {
+  const el = trackEl.value;
+  if (!el) return;
+  scrollable.value = el.scrollWidth > el.clientWidth + 4;
+  atStart.value = el.scrollLeft <= 4;
+  atEnd.value = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
 }
+
+function slide(direction) {
+  const el = trackEl.value;
+  if (!el) return;
+  const card = el.querySelector(".fp-item");
+  const step = card ? card.getBoundingClientRect().width + 20 : el.clientWidth * 0.8;
+  el.scrollBy({ left: direction * step, behavior: "smooth" });
+}
+
+let resize = null;
+onMounted(() => {
+  measure();
+  resize = new ResizeObserver(measure);
+  if (trackEl.value) resize.observe(trackEl.value);
+});
+onBeforeUnmount(() => resize?.disconnect());
+watch(
+  () => props.products.length,
+  async () => {
+    await nextTick();
+    measure();
+  },
+);
 </script>
 
 <style scoped>
 .fp {
-  padding: clamp(28px, 4vw, 56px) 0 clamp(12px, 2vw, 24px);
+  padding: clamp(32px, 4.5vw, 64px) 0 clamp(16px, 2vw, 28px);
 }
 
-.fp-head {
-  margin-bottom: 22px;
+.fp-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(24px, 4vw, 64px);
 }
 
-.fp-head h2 {
-  margin: 4px 0 0;
+/* ── Intro ─────────────────────────────── */
+.fp-intro h2 {
+  margin: 6px 0 0;
   font-family: var(--font-display);
-  font-size: clamp(30px, 3.6vw, 44px);
+  font-size: clamp(32px, 3.6vw, 46px);
   font-weight: 500;
-  line-height: 1.1;
+  line-height: 1.05;
   color: var(--ink);
 }
 
-.fp-head h2 em {
+.fp-intro h2 em {
   color: var(--leaf-deep);
 }
 
 .fp-lede {
-  margin: 8px 0 0;
-  font-size: 14.5px;
+  margin: 14px 0 0;
+  font-size: 15px;
+  line-height: 1.65;
   color: var(--ink-soft);
 }
 
-.fp-grid {
+.fp-notes {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fp-notes li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.fp-notes svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  padding: 5px;
+  box-sizing: content-box;
+  border-radius: 50%;
+  background: rgba(77, 177, 115, 0.12);
+  fill: none;
+  stroke: var(--leaf-deep);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.fp-intro-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.fp-browse {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.fp-browse:hover {
+  background: var(--ink);
+  color: #fff;
+}
+
+.fp-browse svg,
+.fp-arrow svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.fp-arrows {
+  display: flex;
+  gap: 8px;
+}
+
+.fp-arrow {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.18s ease;
+}
+
+.fp-arrow:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.fp-arrow:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+/* ── Cards ─────────────────────────────── */
+.fp-track {
+  display: flex;
   gap: 20px;
+  margin: 0;
+  padding: 6px 4px 14px;
+  overflow-x: auto;
+  list-style: none;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.fp-track::-webkit-scrollbar {
+  display: none;
+}
+
+.fp-item {
+  flex: 0 0 clamp(240px, 22vw, 290px);
+  scroll-snap-align: start;
 }
 
 .fp-card {
-  display: grid;
-  grid-template-columns: minmax(180px, 42%) 1fr;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 20px;
   background: #fff;
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.fp-grid.single .fp-card {
-  grid-template-columns: minmax(220px, 38%) 1fr;
+  transition: transform 0.25s var(--ease-out, ease-out), box-shadow 0.25s ease;
 }
 
 .fp-card:hover {
-  border-color: rgba(46, 122, 79, 0.35);
-  box-shadow: 0 22px 44px -30px rgba(54, 63, 78, 0.45);
+  transform: translateY(-4px);
+  box-shadow: 0 24px 40px -28px rgba(54, 63, 78, 0.5);
 }
 
 .fp-photo {
   position: relative;
   display: block;
-  min-height: 280px;
+  aspect-ratio: 4 / 5;
+  margin: 8px 8px 0;
   padding: 0;
   overflow: hidden;
   border: 0;
+  border-radius: 14px;
   background: var(--ivory);
   cursor: pointer;
 }
 
 .fp-photo img {
-  position: absolute;
-  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.5s var(--ease-out, ease-out);
+  transition: transform 0.6s var(--ease-out, ease-out);
 }
 
 .fp-card:hover .fp-photo img {
-  transform: scale(1.04);
+  transform: scale(1.05);
 }
 
 .fp-badge {
   position: absolute;
-  top: 14px;
-  left: 14px;
-  padding: 5px 12px;
+  top: 10px;
+  left: 10px;
+  padding: 4px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.92);
   color: var(--ink);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -213,29 +376,49 @@ function stock(product) {
   color: #fff;
 }
 
-.fp-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-  padding: clamp(18px, 2.4vw, 30px);
+.fp-sold-out {
+  position: absolute;
+  inset: auto 10px 10px;
+  padding: 6px 0;
+  border-radius: 10px;
+  background: rgba(54, 63, 78, 0.85);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
 }
 
-.fp-category {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
+.fp-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px 16px;
+}
+
+.fp-shop {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--leaf-deep);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.fp-shop:hover {
+  text-decoration: underline;
 }
 
 .fp-name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(26px, 2.6vw, 34px);
+  font-size: 24px;
   font-weight: 500;
-  line-height: 1.1;
+  line-height: 1.15;
 }
 
 .fp-name button {
@@ -252,39 +435,9 @@ function stock(product) {
   color: var(--leaf-deep);
 }
 
-.fp-shop {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  gap: 6px;
-  min-height: 32px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--leaf-deep);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.fp-shop:hover {
-  text-decoration: underline;
-}
-
-.fp-shop svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 .fp-stats {
   margin: 0;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--ink-soft);
 }
 
@@ -294,142 +447,118 @@ function stock(product) {
 }
 
 .fp-star {
-  margin-right: 4px;
+  margin-right: 3px;
   color: var(--gold);
-}
-
-.fp-desc {
-  display: -webkit-box;
-  margin: 2px 0 0;
-  overflow: hidden;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--ink-soft);
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
 }
 
 .fp-buy {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 12px;
+  gap: 10px;
   margin-top: auto;
-  padding-top: 14px;
-  border-top: 1px solid var(--line-soft);
+  padding-top: 12px;
 }
 
 .fp-price {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
   margin: 0;
 }
 
 .fp-now {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
 .fp-was {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--ink-soft);
   text-decoration: line-through;
 }
 
-.fp-stock {
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.fp-stock.in {
-  background: rgba(77, 177, 115, 0.12);
-  color: var(--leaf-deep);
-}
-
-.fp-stock.low {
-  background: rgba(212, 178, 122, 0.2);
-  color: #8a6420;
-}
-
-.fp-stock.out {
-  background: rgba(54, 63, 78, 0.08);
-  color: var(--ink-soft);
-}
-
-.fp-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 6px;
-}
-
-.fp-btn {
-  flex: 1 1 140px;
-  min-height: 46px;
-  padding: 0 20px;
-  border-radius: 999px;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
-}
-
-.fp-btn--primary {
+.fp-cart {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 44px;
+  height: 44px;
   border: 0;
+  border-radius: 50%;
   background: var(--leaf-deep);
   color: #fff;
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.18s ease;
 }
 
-.fp-btn--primary:hover:not(:disabled) {
+.fp-cart:hover:not(:disabled) {
   background: var(--ink);
+  transform: scale(1.05);
 }
 
-.fp-btn--ghost {
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink);
-}
-
-.fp-btn--ghost:hover:not(:disabled) {
-  border-color: var(--ink);
-}
-
-.fp-btn:disabled {
+.fp-cart:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
+.fp-cart svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.fp-cart-dots {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.fp-browse:focus-visible,
+.fp-arrow:focus-visible,
 .fp-photo:focus-visible,
-.fp-name button:focus-visible,
 .fp-shop:focus-visible,
-.fp-btn:focus-visible {
+.fp-name button:focus-visible,
+.fp-cart:focus-visible {
   outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 
-@media (max-width: 640px) {
-  .fp-card,
-  .fp-grid.single .fp-card {
+@media (max-width: 860px) {
+  .fp-layout {
     grid-template-columns: 1fr;
+    gap: 22px;
   }
 
-  .fp-photo {
-    min-height: 0;
-    aspect-ratio: 4 / 3;
+  .fp-notes {
+    display: none;
+  }
+
+  .fp-intro-foot {
+    margin-top: 16px;
+  }
+
+  .fp-item {
+    flex-basis: min(76vw, 280px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .fp-card,
   .fp-photo img,
-  .fp-card {
+  .fp-cart {
     transition: none;
+  }
+
+  .fp-card:hover {
+    transform: none;
   }
 }
 </style>

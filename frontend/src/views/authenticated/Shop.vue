@@ -80,6 +80,7 @@
       @add="addToCartDirect"
       @buy="buyNowDirect"
       @vendor="selectVendorById"
+      @browse="scrollToSection('products')"
     />
     <ShopMap v-model:page-filter="nearMeOnly" @visit="goToStorefront" @range="onShopRange" />
 
