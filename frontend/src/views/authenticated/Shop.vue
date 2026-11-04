@@ -71,17 +71,6 @@
       @browse="scrollToSection('products')"
     />
 
-    <!-- In bloom this month: the admin's seasonal picks (Admin → Website → Featured) -->
-    <FeaturedPicks
-      v-if="featuredProducts.length"
-      :products="featuredProducts"
-      :adding-id="addingToCartProductId"
-      @open="openProductModal"
-      @add="addToCartDirect"
-      @buy="buyNowDirect"
-      @vendor="selectVendorById"
-      @browse="scrollToSection('products')"
-    />
     <!-- Top sellers (when there are enough) and every flower, with the bouquet finder beside them -->
     <section class="shop-picks" aria-label="Flowers">
       <div class="bc-container shop-picks-grid">
@@ -228,7 +217,6 @@ import ShopProductTile from "../../components/shop/ShopProductTile.vue";
 import BouquetFinder from "../../components/shop/BouquetFinder.vue";
 import FeaturedShops from "../../components/shop/FeaturedShops.vue";
 import DesignerShopPicker from "../../components/shop/DesignerShopPicker.vue";
-import FeaturedPicks from "../../components/shop/FeaturedPicks.vue";
 import { rememberProduct } from "../../utils/productPreview.js";
 import ShopMap from "../../components/shop/ShopMap.vue";
 import JournalTeaser from "../../components/site/JournalTeaser.vue";
@@ -241,15 +229,6 @@ const route = useRoute();
 const { site } = useSiteContent();
 
 // ── Website content (Admin → Website) ─────────────────────────────────────
-const featuredProducts = ref([]);
-const fetchFeatured = async () => {
-  try {
-    const { data } = await api.get("customer/products/featured");
-    if (data.success) featuredProducts.value = data.data || [];
-  } catch {
-    featuredProducts.value = [];
-  }
-};
 // Most popular products: the Top Selling row, and a photo for each occasion circle
 const popularProducts = ref([]);
 const loadingPopular = ref(true);
@@ -272,10 +251,8 @@ const fetchPopular = async () => {
     loadingPopular.value = false;
   }
 };
-// Top Selling leaves out what "In bloom this month" already shows, and only
-// appears once there are enough flowers for it to add something
-const featuredIds = computed(() => new Set(featuredProducts.value.map((product) => product.id)));
-const topSelling = computed(() => popularProducts.value.filter((product) => !featuredIds.value.has(product.id)).slice(0, 5));
+// Top Selling only appears once there are enough flowers for it to add something
+const topSelling = computed(() => popularProducts.value.slice(0, 5));
 const showTopSelling = computed(() => topSelling.value.length >= 3 && popularProducts.value.length >= 8);
 const nearbyById = computed(() => Object.fromEntries(nearbyStores.value.map((store) => [store.id, store.distance_km])));
 const productImage = (p) => p.primary_image?.image_url || p.images?.[0]?.image_url || null;
@@ -970,7 +947,7 @@ const buyNowDirect = async (product) => {
 
 onMounted(async () => {
   const fromContentLink = applyContentLink(route.query);
-  await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors(), fetchFeatured(), fetchPopular()]);
+  await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors(), fetchPopular()]);
   if (fromContentLink) setTimeout(() => scrollToSection("products"), 50);
   if (isAuthenticated.value) {
     await Promise.all([loadCart(), fetchNearbyStores()]);
