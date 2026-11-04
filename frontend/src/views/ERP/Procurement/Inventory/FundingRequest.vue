@@ -1,328 +1,269 @@
 <template>
-  <div class="funding-requests">
-    
+  <HrPage title="Funding requests" subtitle="Ask Finance for money to restock. Draft a request, send it for approval, then turn approved ones into purchase orders.">
+    <template #actions>
+      <button
+        type="button"
+        class="sp-btn sp-btn-primary"
+        :disabled="!canCreateFunding"
+        :title="canCreateFunding ? '' : permissionMessages.create"
+        @click="goToCreate"
+      >
+        <span v-html="ICONS.plus"></span>New request
+      </button>
+    </template>
 
-    <div class="requests-content">
-      <!-- Header -->
-      <div class="page-header">
-        <div class="page-title-section">
-          <h1 class="page-title">Purchase Funding Requests</h1>
-          <p class="page-subtitle">
-            Prepare and submit funding requests to Finance
-          </p>
-        </div>
-
-        <div class="header-actions">
-          <div class="search-box">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <circle cx="11" cy="11" r="8"></circle>
-              <path d="m21 21-4.35-4.35"></path>
-            </svg>
-            <input
-              type="text"
-              placeholder="Search requests"
-              v-model="searchQuery"
-            />
-          </div>
-          <button
-            class="create-btn"
-            @click="goToCreate"
-            :disabled="!canCreateFunding"
-            :title="canCreateFunding ? '' : permissionMessages.create"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            New Request
-          </button>
-        </div>
-      </div>
-
-      <!-- Status Tabs -->
-      <div class="status-tabs">
+    <!-- Stages: also the filter -->
+    <section class="fr-stages" aria-label="Request stages">
+      <template v-if="loading && !requests.length">
+        <div v-for="n in 5" :key="n" class="sp-card fr-stage"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton fr-sk-num"></div></div>
+      </template>
+      <template v-else>
         <button
-          v-for="tab in statusTabs"
-          :key="tab.value"
-          :class="{ active: activeStatusTab === tab.value }"
-          @click="activeStatusTab = tab.value"
+          v-for="s in STAGES"
+          :key="s.value"
+          type="button"
+          class="sp-card fr-stage"
+          :class="[`t-${s.tone}`, { on: activeStatusTab === s.value }]"
+          :aria-pressed="activeStatusTab === s.value"
+          @click="activeStatusTab = s.value"
         >
-          <span class="tab-label">{{ tab.label }}</span>
-          <span class="tab-count">{{ getStatusCount(tab.value) }}</span>
+          <span class="fr-stage-label"><span v-if="s.value !== 'all'" class="fr-dot"></span>{{ s.label }}</span>
+          <strong>{{ getStatusCount(s.value) }}</strong>
+          <small v-if="s.value === 'Approved' && approvedTotal > 0">{{ money(approvedTotal) }} approved</small>
+          <small v-else-if="s.value === 'Pending' && pendingTotal > 0">{{ money(pendingTotal) }} waiting</small>
         </button>
-      </div>
+      </template>
+    </section>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="loading-container">
-        <div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div>
-        <p>Loading requests...</p>
-      </div>
-
-      <!-- Error State -->
-      <div v-else-if="error" class="error-container">
-        <p>{{ error }}</p>
-        <button @click="fetchRequests" class="retry-btn">Retry</button>
-      </div>
-
-      <!-- Requests Table -->
-      <div v-else class="table-container">
-        <table class="requests-table">
-          <thead>
-            <tr>
-              <th>Request Info</th>
-              <th>Product Details</th>
-              <th>Finance Approver</th>
-              <th>Financial Summary</th>
-              <th>Urgency</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="request in filteredRequests"
-              :key="request.id"
-              @click="viewRequest(request.id)"
-              :class="{ selected: selectedRequestId === request.id }"
-            >
-              <td class="info-cell">
-                <div class="request-info">
-                  <span class="request-id">{{
-                    request.finance_request_id
-                  }}</span>
-                  <span class="request-date">{{
-                    formatDate(request.request_date)
-                  }}</span>
-                  <span class="requested-by"
-                    >By: {{ request.submitted_by_name }}</span
-                  >
-                </div>
-              </td>
-              <td class="product-cell">
-                <div class="product-info">
-                  <span class="product-name">{{ request.product_name }}</span>
-                  <span class="product-details"
-                    >{{ request.flower_category }} • {{ request.variant }}</span
-                  >
-                  <span class="quantity"
-                    >{{ request.requested_qty }} {{ request.uom }}</span
-                  >
-                </div>
-              </td>
-              <td>
-                <div class="manager-info">
-                  <span class="manager-name">{{
-                    request.approver_name || request.accounting_manager_name || "Not assigned"
-                  }}</span>
-                </div>
-              </td>
-              <td class="financial-cell">
-                <div class="financial-summary">
-                  <div class="amount-row">
-                    <span class="label">Est. Cost:</span>
-                    <span class="value"
-                      >₱{{ formatNumber(request.estimated_total_cost) }}</span
-                    >
-                  </div>
-                  <div class="amount-row">
-                    <span class="label">Margin:</span>
-                    <span
-                      class="value"
-                      :class="getMarginClass(request.estimated_gross_margin)"
-                    >
-                      {{ request.estimated_gross_margin }}%
-                    </span>
-                  </div>
-                  <div
-                    class="recommendation-badge"
-                    :class="
-                      request.finance_recommendation
-                        ?.toLowerCase()
-                        .replace(' ', '-')
-                    "
-                  >
-                    {{ request.finance_recommendation }}
-                  </div>
-                </div>
-              </td>
-              <td>
-                <span
-                  class="urgency-badge"
-                  :class="request.urgency_level?.toLowerCase()"
-                >
-                  <svg
-                    v-if="request.urgency_level === 'Critical'"
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <path
-                      d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"
-                    />
-                  </svg>
-                  {{ request.urgency_level }}
-                </span>
-              </td>
-              <td>
-                <span
-                  class="status-badge"
-                  :class="getStatusClass(request.request_status)"
-                >
-                  {{ request.request_status }}
-                </span>
-              </td>
-              <td class="action-cell" @click.stop>
-                <button class="action-btn" @click="toggleMenu(request.id)">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <circle cx="12" cy="5" r="2"></circle>
-                    <circle cx="12" cy="12" r="2"></circle>
-                    <circle cx="12" cy="19" r="2"></circle>
-                  </svg>
-                </button>
-                <div v-if="openMenuId === request.id" class="dropdown-menu">
-                  <button @click="viewRequest(request.id)">View Details</button>
-                  <button
-                    v-if="request.request_status === 'Draft'"
-                    @click="editRequest(request.id)"
-                    :disabled="!canEditFunding"
-                    :title="canEditFunding ? '' : permissionMessages.edit"
-                  >
-                    Edit Request
-                  </button>
-                  <button
-                    v-if="request.request_status === 'Draft'"
-                    @click="submitRequest(request.id)"
-                    :disabled="!canEditFunding"
-                    :title="canEditFunding ? '' : permissionMessages.edit"
-                  >
-                    Submit to Finance
-                  </button>
-                  <button
-                    class="delete-btn"
-                    @click="deleteRequest(request.id)"
-                    :disabled="!canDeleteFunding"
-                    :title="canDeleteFunding ? '' : permissionMessages.delete"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </td>
-            </tr>
-            <tr v-if="filteredRequests.length === 0">
-              <td colspan="7" class="empty-state">
-                <p>No funding requests found</p>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <div class="sp-card fr-bar">
+      <label class="sp-search fr-search">
+        <span v-html="ICONS.search"></span>
+        <input v-model="searchQuery" class="sp-input" type="search" placeholder="Request number, item or who asked" aria-label="Search funding requests" />
+      </label>
+      <select v-model="urgency" class="sp-select fr-select" aria-label="Urgency">
+        <option value="">Any urgency</option>
+        <option v-for="u in URGENCIES" :key="u" :value="u">{{ u }}</option>
+      </select>
+      <button v-if="filtered" type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="clearFilters">Clear</button>
     </div>
-  </div>
+
+    <div v-if="error" class="sp-banner error">
+      <span v-html="ICONS.alert"></span>{{ error }}
+      <button type="button" @click="fetchRequests">Try again</button>
+    </div>
+
+    <section class="sp-card fr-card" aria-label="Funding requests">
+      <div v-if="loading && !requests.length" class="fr-rows">
+        <div v-for="n in 5" :key="n" class="fr-row sk"><div class="bc-skeleton sp-sk-line w30"></div><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div>
+      </div>
+
+      <div v-else-if="!filteredRequests.length" class="sp-empty">
+        <span class="sp-empty-icon" v-html="ICONS.wallet"></span>
+        <h3>{{ filtered ? "No requests match" : "No funding requests yet" }}</h3>
+        <p>{{ filtered ? "Try another stage, urgency or search." : "When stock runs low, ask Finance for the money to restock. Requests can wait as drafts until you're ready to send them." }}</p>
+        <button v-if="filtered" type="button" class="sp-btn sp-btn-ghost" @click="clearFilters">Clear filters</button>
+        <button v-else-if="canCreateFunding" type="button" class="sp-btn sp-btn-primary" @click="goToCreate"><span v-html="ICONS.plus"></span>New request</button>
+      </div>
+
+      <template v-else>
+        <div class="fr-head" aria-hidden="true">
+          <span>Request</span><span>Item</span><span class="num">Estimated cost</span><span>Finance</span><span>Status</span><span></span>
+        </div>
+        <ul class="fr-rows" :class="{ dim: loading }">
+          <li v-for="r in filteredRequests" :key="r.id" class="fr-row" :class="{ selected: selectedRequestId === r.id }" @click="viewRequest(r.id)">
+            <span class="fr-id">
+              <router-link :to="{ name: 'FundingRequestDetails', params: { id: r.id } }" class="fr-link" @click.stop="selectedRequestId = r.id">
+                {{ r.finance_request_id }}
+              </router-link>
+              <small>{{ formatDate(r.request_date) }}<template v-if="r.submitted_by_name"> · by {{ r.submitted_by_name }}</template></small>
+              <span v-if="r.urgency_level && r.urgency_level !== 'Normal'" class="sp-chip fr-urgency" :class="r.urgency_level === 'Critical' ? 'red' : 'amber'">
+                <span v-if="r.urgency_level === 'Critical'" v-html="ICONS.alert"></span>{{ r.urgency_level }}
+              </span>
+            </span>
+
+            <span class="fr-item">
+              <b>{{ r.product_name }}</b>
+              <small>{{ [r.flower_category, r.variant].filter(Boolean).join(" · ") }}</small>
+              <small class="fr-qty">{{ Number(r.requested_qty || 0).toLocaleString("en-PH") }} {{ (r.uom || "units").toLowerCase() }}</small>
+            </span>
+
+            <span class="fr-amount num">
+              <b v-if="Number(r.estimated_total_cost) > 0">{{ money(r.estimated_total_cost) }}</b>
+              <b v-else class="fr-none">No cost yet</b>
+              <small v-if="r.estimated_gross_margin !== null && r.estimated_gross_margin !== undefined" :class="marginTone(r.estimated_gross_margin)">
+                {{ Number(r.estimated_gross_margin).toFixed(1) }}% margin
+              </small>
+            </span>
+
+            <span class="fr-finance">
+              <b>{{ r.approver_name || r.accounting_manager_name || "Not assigned" }}</b>
+              <small v-if="r.finance_recommendation" class="fr-rec" :class="recommendationOf(r.finance_recommendation).tone">
+                {{ recommendationOf(r.finance_recommendation).label }}
+              </small>
+            </span>
+
+            <span class="fr-status">
+              <span class="sp-chip" :class="statusOf(r.request_status).tone">{{ statusOf(r.request_status).label }}</span>
+              <small v-if="r.request_status === 'Approved' && r.payment_status">{{ r.payment_status === "paid" ? "Paid" : "Not paid yet" }}</small>
+            </span>
+
+            <span class="fr-actions" @click.stop>
+              <button
+                type="button"
+                class="sp-icon-btn"
+                :aria-label="`Actions for ${r.finance_request_id}`"
+                :aria-expanded="openMenuId === r.id"
+                aria-haspopup="menu"
+                @click="toggleMenu(r.id)"
+              >
+                <span v-html="ICONS.more"></span>
+              </button>
+              <div v-if="openMenuId === r.id" class="fr-menu" role="menu">
+                <button type="button" role="menuitem" @click="viewRequest(r.id)"><span v-html="ICONS.eye"></span>View details</button>
+                <template v-if="r.request_status === 'Draft'">
+                  <button type="button" role="menuitem" :disabled="!canEditFunding" :title="canEditFunding ? '' : permissionMessages.edit" @click="editRequest(r.id)">
+                    <span v-html="ICONS.edit"></span>Edit request
+                  </button>
+                  <button type="button" role="menuitem" :disabled="!canEditFunding" :title="canEditFunding ? '' : permissionMessages.edit" @click="askSubmit(r)">
+                    <span v-html="ICONS.send"></span>Send to Finance
+                  </button>
+                </template>
+                <button type="button" role="menuitem" class="danger" :disabled="!canDeleteFunding" :title="canDeleteFunding ? '' : permissionMessages.delete" @click="askDelete(r)">
+                  <span v-html="ICONS.trash"></span>Delete
+                </button>
+              </div>
+            </span>
+          </li>
+        </ul>
+      </template>
+    </section>
+
+    <!-- Confirm: send to Finance / delete -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="confirming" class="sp-backdrop" @click="confirming = null"></div></Transition>
+      <Transition name="sp-pop">
+        <div v-if="confirming" class="sp-modal-wrap" @keydown.esc="confirming = null">
+          <div class="sp-modal" role="alertdialog" aria-modal="true" aria-labelledby="fr-confirm-title" aria-describedby="fr-confirm-text">
+            <div class="sp-modal-head">
+              <div>
+                <h3 id="fr-confirm-title">{{ confirming.kind === "delete" ? "Delete this request?" : "Send to Finance?" }}</h3>
+                <p id="fr-confirm-text">
+                  <template v-if="confirming.kind === 'delete'">{{ confirming.request.finance_request_id }} for {{ confirming.request.product_name }} will be removed. This can't be undone.</template>
+                  <template v-else>{{ confirming.request.finance_request_id }} for {{ confirming.request.product_name }} goes to {{ confirming.request.approver_name || confirming.request.accounting_manager_name || "the Finance approver" }} for review. You can't edit it while it's waiting.</template>
+                </p>
+              </div>
+              <button type="button" class="sp-icon-btn" aria-label="Close" @click="confirming = null"><span v-html="ICONS.close"></span></button>
+            </div>
+            <div class="sp-modal-foot">
+              <button ref="cancelBtn" type="button" class="sp-btn sp-btn-ghost" @click="confirming = null">Cancel</button>
+              <button
+                type="button"
+                class="sp-btn"
+                :class="confirming.kind === 'delete' ? 'sp-btn-danger' : 'sp-btn-primary'"
+                :disabled="confirming.busy"
+                @click="confirmAction"
+              >
+                {{ confirming.busy ? (confirming.kind === "delete" ? "Deleting…" : "Sending…") : confirming.kind === "delete" ? "Delete request" : "Send to Finance" }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+  </HrPage>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../../plugins/axios";
+import HrPage from "../../../../components/hr/HrPage.vue";
+import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcons";
+import { money } from "../../../../components/vendor/finance/financeUi";
 import { toast } from "@/utils/snackbar";
 import { PERMISSION_TOOLTIPS, useAssignment } from "../../../../composables/useAssignment";
-
+import "../../../../components/vendor/finance/finance.css";
 
 const router = useRouter();
 const { can } = useAssignment();
 
 const searchQuery = ref("");
 const activeStatusTab = ref("all");
+const urgency = ref("");
 const selectedRequestId = ref(null);
 const openMenuId = ref(null);
 const loading = ref(false);
 const error = ref(null);
 const requests = ref([]);
+const confirming = ref(null); // { kind: "submit" | "delete", request, busy }
+const cancelBtn = ref(null);
 const canCreateFunding = computed(() => can("inventory_funding", "create"));
 const canEditFunding = computed(() => can("inventory_funding", "edit"));
 const canDeleteFunding = computed(() => can("inventory_funding", "delete"));
 const permissionMessages = PERMISSION_TOOLTIPS;
 
-const statusTabs = [
-  { label: "All Requests", value: "all" },
-  { label: "Draft", value: "Draft" },
-  { label: "Pending", value: "Pending" },
-  { label: "Approved", value: "Approved" },
-  { label: "Rejected", value: "Rejected" },
+// The request's stages (the values stay the ones the server uses)
+const STAGES = [
+  { label: "All requests", value: "all", tone: "slate" },
+  { label: "Draft", value: "Draft", tone: "slate" },
+  { label: "Waiting for Finance", value: "Pending", tone: "amber" },
+  { label: "Approved", value: "Approved", tone: "green" },
+  { label: "Rejected", value: "Rejected", tone: "red" },
 ];
+const URGENCIES = ["Normal", "Urgent", "Critical"];
+const STATUS = {
+  Draft: { label: "Draft", tone: "slate" },
+  Pending: { label: "Waiting for Finance", tone: "amber" },
+  Approved: { label: "Approved", tone: "green" },
+  Rejected: { label: "Rejected", tone: "red" },
+};
+const statusOf = (status) => STATUS[status] || { label: status || "Unknown", tone: "slate" };
+// Finance's recommendation, in words
+const RECOMMENDATION = {
+  Approve: { label: "Recommends approving", tone: "green" },
+  "Approve Partial": { label: "Recommends part of it", tone: "amber" },
+  Reject: { label: "Recommends rejecting", tone: "red" },
+};
+const recommendationOf = (value) => RECOMMENDATION[value] || { label: value, tone: "" };
+
+const filtered = computed(() => activeStatusTab.value !== "all" || !!urgency.value || !!searchQuery.value.trim());
 
 const filteredRequests = computed(() => {
-  let filtered = requests.value;
-  if (activeStatusTab.value !== "all") {
-    filtered = filtered.filter(
-      (r) => r.request_status === activeStatusTab.value,
+  let list = requests.value;
+  if (activeStatusTab.value !== "all") list = list.filter((r) => r.request_status === activeStatusTab.value);
+  if (urgency.value) list = list.filter((r) => (r.urgency_level || "Normal") === urgency.value);
+  const query = searchQuery.value.trim().toLowerCase();
+  if (query) {
+    list = list.filter((r) =>
+      [r.finance_request_id, r.product_name, r.submitted_by_name].some((value) => String(value || "").toLowerCase().includes(query)),
     );
   }
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase();
-    filtered = filtered.filter(
-      (r) =>
-        r.finance_request_id.toLowerCase().includes(query) ||
-        r.product_name.toLowerCase().includes(query) ||
-        r.submitted_by_name.toLowerCase().includes(query),
-    );
-  }
-  return filtered;
+  return list;
 });
 
-const getStatusCount = (status) => {
-  if (status === "all") return requests.value.length;
-  return requests.value.filter((r) => r.request_status === status).length;
-};
+const getStatusCount = (status) => (status === "all" ? requests.value.length : requests.value.filter((r) => r.request_status === status).length);
+const totalOf = (status) =>
+  requests.value.filter((r) => r.request_status === status).reduce((sum, r) => sum + Number(r.estimated_total_cost || 0), 0);
+const approvedTotal = computed(() => totalOf("Approved"));
+const pendingTotal = computed(() => totalOf("Pending"));
 
-const getMarginClass = (margin) => {
-  if (margin >= 30) return "text-success";
-  if (margin >= 20) return "text-warning";
-  return "text-error";
+const marginTone = (margin) => {
+  const value = Number(margin);
+  if (value >= 30) return "good";
+  if (value >= 20) return "ok";
+  return "low";
 };
-
-const getStatusClass = (status) => status.toLowerCase().replace(" ", "-");
 
 const formatDate = (date) => {
-  if (!date) return "N/A";
-  return new Date(date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  if (!date) return "No date";
+  return new Date(date).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
 };
 
-const formatNumber = (num) => {
-  if (!num) return "0";
-  return parseFloat(num).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-};
+function clearFilters() {
+  activeStatusTab.value = "all";
+  urgency.value = "";
+  searchQuery.value = "";
+}
 
 const fetchRequests = async () => {
   loading.value = true;
@@ -331,10 +272,7 @@ const fetchRequests = async () => {
     const { data } = await api.get("/procurement/inventory/funding-requests");
     if (data.success) requests.value = data.data;
   } catch (err) {
-    console.error("Error fetching requests:", err);
-    error.value =
-      err.response?.data?.message || "Failed to load funding requests";
-    toast.error(error.value);
+    error.value = err.response?.data?.message || "We couldn't load the funding requests.";
   } finally {
     loading.value = false;
   }
@@ -345,543 +283,387 @@ const goToCreate = () =>
     ? router.push("/erp/procurement/inventory/funding-request/create")
     : toast.error("You do not have permission to create funding requests");
 
-// ID is hidden in history state — never appears in the URL
+// The id travels in the route params (opaque URL), never visibly
 const viewRequest = (id) => {
   selectedRequestId.value = id;
-  router.push({
-    name: "FundingRequestDetails",
-    params: { id },
-  });
+  openMenuId.value = null;
+  router.push({ name: "FundingRequestDetails", params: { id } });
 };
 
 const editRequest = (id) => {
+  openMenuId.value = null;
   if (!canEditFunding.value) {
     toast.error("You do not have permission to edit funding requests");
     return;
   }
-  openMenuId.value = null;
-  router.push({
-    name: "EditFundingRequest",
-    params: { id },
-  });
+  router.push({ name: "EditFundingRequest", params: { id } });
 };
 
-const submitRequest = async (id) => {
+function askSubmit(request) {
+  openMenuId.value = null;
   if (!canEditFunding.value) {
     toast.error("You do not have permission to submit funding requests");
     return;
   }
-  openMenuId.value = null;
-  if (!confirm("Submit this request to Finance?")) return;
-  try {
-    const { data } = await api.post(
-      `/procurement/inventory/funding-requests/${id}/submit`,
-    );
-    if (data.success) {
-      toast.success(data.message);
-      await fetchRequests();
-    }
-  } catch (err) {
-    toast.error(err.response?.data?.message || "Failed to submit request");
-  }
-};
+  confirming.value = { kind: "submit", request, busy: false };
+}
 
-const deleteRequest = async (id) => {
+function askDelete(request) {
+  openMenuId.value = null;
   if (!canDeleteFunding.value) {
     toast.error("You do not have permission to delete funding requests");
     return;
   }
-  openMenuId.value = null;
-  if (!confirm("Are you sure you want to delete this funding request?")) return;
+  confirming.value = { kind: "delete", request, busy: false };
+}
+
+// Focus Cancel when the dialog opens, so Enter never deletes by accident
+watch(confirming, async (open, before) => {
+  if (open && !before) {
+    await nextTick();
+    cancelBtn.value?.focus();
+  }
+});
+
+async function confirmAction() {
+  const current = confirming.value;
+  if (!current || current.busy) return;
+  current.busy = true;
+  const id = current.request.id;
   try {
-    const { data } = await api.delete(
-      `/procurement/inventory/funding-requests/${id}`,
-    );
+    const { data } =
+      current.kind === "delete"
+        ? await api.delete(`/procurement/inventory/funding-requests/${id}`)
+        : await api.post(`/procurement/inventory/funding-requests/${id}/submit`);
     if (data.success) {
-      toast.success(data.message);
+      toast.success(data.message || (current.kind === "delete" ? "Request deleted." : "Sent to Finance."));
+      confirming.value = null;
       await fetchRequests();
+    } else {
+      current.busy = false;
     }
   } catch (err) {
-    toast.error(err.response?.data?.message || "Failed to delete request");
+    current.busy = false;
+    toast.error(err.response?.data?.message || (current.kind === "delete" ? "We couldn't delete the request." : "We couldn't send the request."));
   }
-};
+}
 
 const toggleMenu = (id) => {
   openMenuId.value = openMenuId.value === id ? null : id;
 };
 
-onMounted(() => fetchRequests());
+// Clicking anywhere else, or Esc, closes the row menu
+function closeMenu(event) {
+  if (event.type === "keydown" && event.key !== "Escape") return;
+  if (event.type === "click" && event.target.closest?.(".fr-actions")) return;
+  openMenuId.value = null;
+}
+
+onMounted(() => {
+  fetchRequests();
+  document.addEventListener("click", closeMenu);
+  document.addEventListener("keydown", closeMenu);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener("click", closeMenu);
+  document.removeEventListener("keydown", closeMenu);
+});
 </script>
 
 <style scoped>
-.sk-line {
-  height: 12px;
-  margin: 6px auto;
-  border-radius: 6px;
-  width: 60%;
+/* Stages */
+.fr-stages {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
 }
-.sk-short {
-  width: 35%;
-}
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
-
-* {
-  font-family: "Poppins", sans-serif;
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-.funding-requests {
-  display: flex;
-  min-height: 100vh;
-  background: transparent;
-}
-.requests-content {
-  flex: 1;
-  padding: 32px 40px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 28px;
-}
-.page-title-section {
+.fr-stage {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--v-border);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.page-title {
-  font-size: 32px;
-  font-weight: 700;
+.fr-stage:hover {
+  border-color: var(--v-border-strong);
+}
+.fr-stage.on {
+  border-color: var(--bc-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc-accent) 18%, transparent);
+}
+.fr-stage:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.fr-stage-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--v-text-2);
+}
+.fr-stage strong {
+  font-size: 22px;
+  font-weight: 600;
   color: var(--v-text);
-  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
 }
-.page-subtitle {
-  font-size: 14px;
+.fr-stage small {
+  font-size: 12px;
+  color: var(--v-muted);
+  font-variant-numeric: tabular-nums;
+}
+.fr-sk-num {
+  width: 40px;
+  height: 22px;
+  border-radius: 6px;
+}
+.fr-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--v-faint);
+}
+.t-amber .fr-dot { background: #f59e0b; }
+.t-green .fr-dot { background: #10b981; }
+.t-red .fr-dot { background: #ef4444; }
+
+/* Filters */
+.fr-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+.fr-search {
+  flex: 1;
+  min-width: 220px;
+}
+.fr-select {
+  width: auto;
+  min-width: 160px;
+}
+
+/* Rows */
+.fr-card {
+  padding: 8px;
+}
+.fr-head,
+.fr-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.9fr) minmax(0, 1.4fr) minmax(120px, 0.7fr) minmax(140px, 0.9fr) minmax(140px, 0.8fr) 44px;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+}
+.fr-head {
+  padding-top: 10px;
+  padding-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--v-muted);
+}
+.num {
+  text-align: right;
+}
+.fr-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transition: opacity 0.2s;
+}
+.fr-rows.dim {
+  opacity: 0.55;
+}
+.fr-rows > li + li {
+  border-top: 1px solid var(--v-border);
+}
+.fr-row {
+  position: relative;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.fr-row:hover,
+.fr-row.selected {
+  background: var(--v-subtle);
+}
+.fr-row.sk {
+  grid-template-columns: 1fr 2fr 1fr;
+  cursor: default;
+}
+.fr-row > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.fr-row b,
+.fr-link {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--v-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fr-link {
+  align-self: flex-start;
+  text-decoration: none;
+}
+.fr-link:hover {
+  color: var(--bc-accent);
+}
+.fr-link:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.fr-row small {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--v-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fr-urgency {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+.fr-urgency :deep(svg) {
+  width: 13px;
+  height: 13px;
+}
+.fr-row small.fr-qty {
+  color: var(--v-text-2);
+  font-weight: 500;
+}
+.fr-amount {
+  align-items: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+.fr-row b.fr-none {
   color: var(--v-muted);
   font-weight: 500;
 }
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+.fr-row small.good { color: var(--v-green-text); font-weight: 600; }
+.fr-row small.ok { color: var(--v-amber-text); font-weight: 600; }
+.fr-row small.low { color: var(--v-red-text); font-weight: 600; }
+.fr-row small.fr-rec.green { color: var(--v-green-text); }
+.fr-row small.fr-rec.amber { color: var(--v-amber-text); }
+.fr-row small.fr-rec.red { color: var(--v-red-text); }
+.fr-status {
+  align-items: flex-start;
 }
 
-.search-box {
+/* Row menu */
+.fr-actions {
+  position: relative;
+  align-items: flex-end;
+}
+.fr-actions .sp-icon-btn {
+  width: 40px;
+  height: 40px;
+}
+.fr-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 200px;
+  padding: 6px;
+  border: 1px solid var(--v-border);
+  border-radius: 12px;
+  background: var(--v-raised);
+  box-shadow: 0 18px 40px -16px var(--v-shadow), 0 4px 12px -6px var(--v-shadow);
+}
+.fr-menu button {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
-  background: var(--v-surface);
-  border: 1px solid var(--v-border);
-  border-radius: 10px;
-  min-width: 300px;
-  transition: all 0.2s;
-}
-.search-box:focus-within {
-  border-color: #4299e1;
-  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
-}
-.search-box svg {
-  color: var(--v-faint);
-  flex-shrink: 0;
-}
-.search-box input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 14px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
   color: var(--v-text);
-}
-.search-box input::placeholder {
-  color: var(--v-faint);
-}
-
-.create-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: #4299e1;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
   cursor: pointer;
-  transition: all 0.2s;
 }
-.create-btn:hover {
-  background: #2b6cb0;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(66, 153, 225, 0.35);
-}
-.create-btn:disabled,
-.dropdown-menu button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.status-tabs {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
-  padding: 20px 24px;
-  background: var(--v-surface);
-  border: 1px solid var(--v-border);
-  border-radius: 12px;
-}
-.status-tabs button {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 14px 20px;
+.fr-menu button:hover:not(:disabled) {
   background: var(--v-subtle);
-  border: 1px solid var(--v-border);
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--v-text-2);
-  cursor: pointer;
-  transition: all 0.2s;
 }
-.status-tabs button.active {
-  background: #4299e1;
-  border-color: #4299e1;
-  color: white;
-  box-shadow: 0 4px 12px rgba(66, 153, 225, 0.25);
+.fr-menu button:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: -2px;
 }
-.tab-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 8px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 700;
+.fr-menu button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
-.status-tabs button.active .tab-count {
-  background: rgba(255, 255, 255, 0.25);
+.fr-menu button.danger {
+  color: var(--v-red-text);
+}
+.fr-menu button :deep(svg) {
+  width: 16px;
+  height: 16px;
 }
 
-.loading-container,
-.error-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  background: var(--v-surface);
-  border: 1px solid var(--v-border);
-  border-radius: 12px;
-}
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid var(--v-border);
-  border-top-color: #4299e1;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+/* Tablets and phones: each request becomes a small card */
+@media (max-width: 1100px) {
+  .fr-stages {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
-.loading-container p,
-.error-container p {
-  margin-top: 16px;
-  font-size: 14px;
-  color: var(--v-muted);
+@media (max-width: 900px) {
+  .fr-head {
+    display: none;
+  }
+  .fr-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "id actions"
+      "item item"
+      "amount status"
+      "finance finance";
+    row-gap: 10px;
+  }
+  .fr-id { grid-area: id; }
+  .fr-item { grid-area: item; }
+  .fr-amount { grid-area: amount; align-items: flex-start; text-align: left; }
+  .fr-finance { grid-area: finance; }
+  .fr-status { grid-area: status; align-items: flex-end; }
+  .fr-actions { grid-area: actions; }
 }
-.retry-btn {
-  margin-top: 12px;
-  padding: 8px 20px;
-  background: #4299e1;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+@media (max-width: 560px) {
+  .fr-stages {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fr-select {
+    flex: 1;
+  }
 }
-.retry-btn:hover {
-  background: #2b6cb0;
-}
-
-.table-container {
-  background: var(--v-surface);
-  border: 1px solid var(--v-border);
-  border-radius: 12px;
-  overflow: hidden;
-}
-.requests-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.requests-table thead {
-  background: var(--v-subtle);
-  border-bottom: 2px solid var(--v-border);
-}
-.requests-table th {
-  padding: 14px 16px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--v-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.requests-table tbody tr {
-  border-bottom: 1px solid var(--v-border);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.requests-table tbody tr:hover {
-  background: var(--v-blue-soft);
-}
-.requests-table tbody tr.selected {
-  background: var(--v-blue-soft);
-}
-.requests-table td {
-  padding: 16px;
-  font-size: 14px;
-  color: var(--v-text);
-  vertical-align: top;
-}
-.empty-state {
-  text-align: center;
-  padding: 60px 20px !important;
-  color: var(--v-faint);
-}
-
-.info-cell {
-  min-width: 180px;
-}
-.request-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.request-id {
-  font-weight: 700;
-  color: var(--v-text);
-  font-family: "Poppins", monospace;
-  font-size: 14px;
-}
-.request-date,
-.requested-by {
-  font-size: 12px;
-  color: var(--v-muted);
-}
-
-.product-cell {
-  min-width: 200px;
-}
-.product-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.product-name {
-  font-weight: 700;
-  color: var(--v-text);
-  font-size: 14px;
-}
-.product-details {
-  font-size: 12px;
-  color: var(--v-muted);
-}
-.quantity {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--v-blue-text);
-}
-
-.manager-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.manager-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--v-text);
-}
-
-.financial-cell {
-  min-width: 180px;
-}
-.financial-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.amount-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-}
-.amount-row .label {
-  color: var(--v-muted);
-  font-weight: 500;
-}
-.amount-row .value {
-  font-weight: 700;
-  color: var(--v-text);
-  font-family: "Poppins", monospace;
-}
-
-.text-success {
-  color: var(--v-blue-text) !important;
-}
-.text-warning {
-  color: var(--v-amber-text) !important;
-}
-.text-error {
-  color: var(--v-red-text) !important;
-}
-
-.recommendation-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  margin-top: 4px;
-  text-align: center;
-}
-.recommendation-badge.approve {
-  background: #bee3f8;
-  color: var(--v-blue-text);
-}
-.recommendation-badge.approve-partial {
-  background: var(--v-amber-soft);
-  color: var(--v-amber-text);
-}
-.recommendation-badge.reject {
-  background: #fed7e2;
-  color: var(--v-red-text);
-}
-
-.urgency-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-}
-.urgency-badge.normal {
-  background: #bee3f8;
-  color: var(--v-blue-text);
-}
-.urgency-badge.urgent {
-  background: var(--v-amber-soft);
-  color: var(--v-amber-text);
-}
-.urgency-badge.critical {
-  background: #fed7e2;
-  color: var(--v-red-text);
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 6px 14px;
-  border-radius: 16px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-}
-.status-badge.draft {
-  background: var(--v-blue-soft);
-  color: var(--v-text-2);
-}
-.status-badge.pending {
-  background: var(--v-amber-soft);
-  color: var(--v-amber-text);
-}
-.status-badge.approved {
-  background: #bee3f8;
-  color: var(--v-blue-text);
-}
-.status-badge.rejected {
-  background: #fed7e2;
-  color: var(--v-red-text);
-}
-
-.action-cell {
-  position: relative;
-}
-.action-btn {
-  background: transparent;
-  border: none;
-  color: var(--v-faint);
-  cursor: pointer;
-  padding: 6px;
-  display: flex;
-  align-items: center;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-.action-btn:hover {
-  background: var(--v-subtle);
-  color: var(--v-text-2);
-}
-
-.dropdown-menu {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  margin-top: 4px;
-  background: var(--v-surface);
-  border: 1px solid var(--v-border);
-  border-radius: 10px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-  z-index: 100;
-  min-width: 200px;
-  overflow: hidden;
-}
-.dropdown-menu button {
-  display: block;
-  width: 100%;
-  padding: 12px 16px;
-  text-align: left;
-  background: transparent;
-  border: none;
-  font-size: 14px;
-  color: var(--v-text);
-  cursor: pointer;
-  transition: all 0.2s;
-  font-weight: 500;
-}
-.dropdown-menu button:hover {
-  background: var(--v-blue-soft);
-}
-.dropdown-menu button:disabled:hover {
-  background: transparent;
-}
-.dropdown-menu button.delete-btn {
-  color: var(--v-red-text);
-}
-.dropdown-menu button.delete-btn:hover {
-  background: var(--v-red-soft);
+@media (prefers-reduced-motion: reduce) {
+  .fr-stage,
+  .fr-row,
+  .fr-rows {
+    transition: none;
+  }
 }
 </style>
