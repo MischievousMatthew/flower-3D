@@ -71,7 +71,7 @@
       @browse="scrollToSection('products')"
     />
 
-    <!-- Featured picks (Admin → Website), then every pinned shop on a map -->
+    <!-- Featured picks (Admin → Website) -->
     <FeaturedPicks
       v-if="featuredProducts.length"
       :products="featuredProducts"
@@ -82,12 +82,11 @@
       @vendor="selectVendorById"
       @browse="scrollToSection('products')"
     />
-    <ShopMap v-model:page-filter="nearMeOnly" @visit="goToStorefront" @range="onShopRange" />
-
-    <!-- Top sellers and featured shops, with the bouquet finder beside them -->
-    <section class="shop-picks" aria-label="Popular right now">
+    <!-- Top sellers (when there are enough) and every flower, with the bouquet finder beside them -->
+    <section class="shop-picks" aria-label="Flowers">
       <div class="bc-container shop-picks-grid">
         <div class="shop-picks-main">
+          <template v-if="loadingPopular || showTopSelling">
           <div class="shop-row-head">
             <h2>Top Selling Flowers</h2>
             <button type="button" class="shop-row-all" @click="viewAllPopular">View all <span aria-hidden="true">→</span></button>
@@ -95,7 +94,7 @@
           <div v-if="loadingPopular" class="top-grid" aria-label="Loading top sellers">
             <span v-for="n in 5" :key="n" class="bc-skeleton top-skel"></span>
           </div>
-          <div v-else-if="topSelling.length" class="top-grid">
+          <div v-else class="top-grid">
             <ShopProductTile
               v-for="(product, i) in topSelling"
               :key="`top-${product.id}`"
@@ -106,13 +105,37 @@
               @add="addToCartDirect"
             />
           </div>
-          <p v-else class="shop-empty-line">Top sellers show up here once shops start selling.</p>
+          </template>
 
-          <!-- Everything, newest first; filters from occasions, the finder and admin links land here -->
-          <section id="products" class="fresh" aria-labelledby="fresh-title">
+          <!-- Everything; filters from occasions, the finder, search and admin links land here -->
+          <section id="products" class="fresh" :class="{ first: !loadingPopular && !showTopSelling }" aria-labelledby="fresh-title">
             <div class="shop-row-head">
               <h2 id="fresh-title">Fresh Flowers</h2>
-              <span class="fresh-count" v-if="!isLoading">{{ pagination.total }} {{ pagination.total === 1 ? "design" : "designs" }}</span>
+              <span class="fresh-count" v-if="!isLoading">{{ pagination.total }} {{ pagination.total === 1 ? "flower" : "flowers" }}</span>
+            </div>
+            <div class="fresh-tools">
+              <label class="fresh-search">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
+                <input
+                  v-model="searchInput"
+                  type="search"
+                  inputmode="search"
+                  enterkeyhint="search"
+                  maxlength="100"
+                  placeholder="Search roses, tulips, red…"
+                  aria-label="Search flowers"
+                  @keydown.enter.prevent="applySearch"
+                />
+                <button v-if="searchInput" type="button" class="fresh-search-clear" aria-label="Clear search" @click="clearSearch">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
+                </button>
+              </label>
+              <label class="fresh-sort">
+                <span>Sort</span>
+                <select v-model="sortBy" aria-label="Sort flowers" @change="onSortChange">
+                  <option v-for="option in SORT_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
+                </select>
+              </label>
             </div>
             <ul v-if="activeFilterChips.length" class="fresh-chips" aria-label="Filters">
               <li v-for="chip in activeFilterChips" :key="chip.key">
@@ -137,22 +160,18 @@
               />
             </div>
             <p v-else class="shop-empty-line">
-              {{ activeFilterChips.length ? "Nothing matches these filters yet. Try removing one." : "Flowers show up here as shops add them." }}
+              {{
+                activeSearch
+                  ? `No flowers match "${activeSearch}". Try another word or clear the search.`
+                  : activeFilterChips.length
+                    ? "Nothing matches these filters yet. Try removing one."
+                    : "Flowers show up here as shops add them."
+              }}
             </p>
 
             <!-- Flowers come a grid's worth at a time; the end says so -->
             <ShowMore v-if="products.length" tone="customer" :has-more="pagination.current_page < pagination.last_page" :loading="isLoading" :shown="products.length" :total="pagination.total || 0" done-text="You've seen every flower here" @more="loadMoreProducts" />
           </section>
-
-          <FeaturedShops
-            id="flower-shops"
-            class="shop-picks-shops"
-            :shops="vendors"
-            :loading="loadingVendors"
-            :nearby="nearbyById"
-            :by-road="nearbyByRoad"
-            @visit="goToStorefront"
-          />
         </div>
 
         <BouquetFinder
@@ -167,10 +186,23 @@
       </div>
     </section>
 
+    <!-- Every pinned shop on a map, then the shops themselves -->
+    <ShopMap v-model:page-filter="nearMeOnly" @visit="goToStorefront" @range="onShopRange" />
+    <section class="shop-stores" aria-label="Flower shops list">
+      <div class="bc-container">
+        <FeaturedShops
+          id="flower-shops"
+          :shops="vendors"
+          :loading="loadingVendors"
+          :nearby="nearbyById"
+          :by-road="nearbyByRoad"
+          @visit="goToStorefront"
+        />
+      </div>
+    </section>
+
     <!-- Journal (Admin → Website → Journal) -->
     <JournalTeaser :articles="site.articles" />
-
-    <ShopTrustStrip variant="bottom" />
 
     <SiteFooter />
 
@@ -239,7 +271,11 @@ const fetchPopular = async () => {
     loadingPopular.value = false;
   }
 };
-const topSelling = computed(() => popularProducts.value.slice(0, 5));
+// Top Selling leaves out what Chosen by BloomCraft already shows, and only
+// appears once there are enough flowers for it to add something
+const featuredIds = computed(() => new Set(featuredProducts.value.map((product) => product.id)));
+const topSelling = computed(() => popularProducts.value.filter((product) => !featuredIds.value.has(product.id)).slice(0, 5));
+const showTopSelling = computed(() => topSelling.value.length >= 3 && popularProducts.value.length >= 8);
 const nearbyById = computed(() => Object.fromEntries(nearbyStores.value.map((store) => [store.id, store.distance_km])));
 const productImage = (p) => p.primary_image?.image_url || p.images?.[0]?.image_url || null;
 const occasionImages = computed(() => {
@@ -269,6 +305,17 @@ const quantity = ref(1);
 const showAuthModal = ref(false);
 const pendingAction = ref(null);
 const sortBy = ref("created_at_desc");
+const SORT_OPTIONS = [
+  { value: "created_at_desc", label: "Newest" },
+  { value: "popular_desc", label: "Most popular" },
+  { value: "price_low", label: "Price: low to high" },
+  { value: "price_high", label: "Price: high to low" },
+  { value: "name_asc", label: "Name: A to Z" },
+];
+// What's typed in the search box, and the search the list is showing
+const searchInput = ref("");
+const activeSearch = ref("");
+let searchTimer = 0;
 const isLoading = ref(false);
 const products = ref([]);
 
@@ -464,6 +511,7 @@ const buildQueryParams = () => {
   p.in_stock_only = selectedFilters.value.inStockOnly ? 1 : 0;
   p.sort_by = sortBy.value;
   if (nearMe.value) p.owner_ids = idsParam(nearMe.value.ownerIds);
+  if (activeSearch.value) p.search = activeSearch.value;
   return p;
 };
 
@@ -491,6 +539,7 @@ const activeFilterChips = computed(() => {
     ...f.color.map((v) => ({ key: `color-${v}`, type: "color", value: v, label: label(v) })),
   ];
   if (nearMe.value) chips.unshift({ key: "near-me", type: "near-me", label: `Within ${nearMe.value.km} km of you` });
+  if (activeSearch.value) chips.unshift({ key: "search", type: "search", label: `"${activeSearch.value}"` });
   if (f.priceMin !== null || (f.priceMax !== null && f.priceMax !== Math.round(filterOptions.value.price_range?.max ?? -1))) {
     const min = f.priceMin !== null ? `₱${f.priceMin}` : "";
     const max = f.priceMax !== null ? `₱${f.priceMax}` : "";
@@ -502,6 +551,10 @@ const removeFilterChip = (chip) => {
   const f = selectedFilters.value;
   if (chip.type === "near-me") {
     nearMeOnly.value = false; // the watcher reloads the page's lists
+    return;
+  }
+  if (chip.type === "search") {
+    clearSearch();
     return;
   }
   if (chip.type === "price") {
@@ -597,12 +650,37 @@ const clearAllFilters = () => {
     inStockOnly: true,
   };
   pagination.value.current_page = 1;
+  clearTimeout(searchTimer);
+  searchInput.value = "";
+  activeSearch.value = "";
   if (nearMe.value) {
     nearMeOnly.value = false; // the watcher reloads everything
     return;
   }
   fetchProducts();
 };
+
+// Search runs a moment after typing stops, or straight away on Enter
+function applySearch() {
+  clearTimeout(searchTimer);
+  const next = searchInput.value.trim().slice(0, 100);
+  if (next === activeSearch.value) return;
+  activeSearch.value = next;
+  pagination.value.current_page = 1;
+  fetchProducts();
+}
+function clearSearch() {
+  searchInput.value = "";
+  applySearch();
+}
+watch(searchInput, () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(applySearch, 350);
+});
+function onSortChange() {
+  pagination.value.current_page = 1;
+  fetchProducts();
+}
 
 // The circle changed (distance, pin, or switched on/off): reload what the page lists
 watch(nearMeKey, (now, before) => {
@@ -1196,8 +1274,117 @@ onUnmounted(() => {
   border-radius: 12px;
 }
 
-.shop-picks-shops {
-  margin-top: 32px;
+.shop-stores {
+  padding: 8px 0 clamp(28px, 4vw, 48px);
+}
+
+.fresh-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: -4px 0 16px;
+}
+
+.fresh-search {
+  position: relative;
+  display: flex;
+  flex: 1 1 260px;
+  align-items: center;
+  max-width: 420px;
+}
+
+.fresh-search > svg {
+  position: absolute;
+  left: 14px;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.fresh-search input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 42px 0 42px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  appearance: none;
+}
+
+.fresh-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.fresh-search input::placeholder {
+  color: var(--ink-soft);
+}
+
+.fresh-search input:focus-visible,
+.fresh-sort select:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+.fresh-search-clear {
+  position: absolute;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.fresh-search-clear:hover {
+  background: var(--ivory);
+  color: var(--ink);
+}
+
+.fresh-search-clear svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.fresh-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.fresh-sort select {
+  min-height: 44px;
+  padding: 0 36px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23363f4e' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+    no-repeat right 12px center / 16px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  appearance: none;
+  cursor: pointer;
 }
 
 /* The full store list and everything after it sit lower on the page */
@@ -1236,6 +1423,16 @@ onUnmounted(() => {
 .fresh {
   margin-top: 36px;
   scroll-margin-top: 110px;
+}
+
+.fresh.first {
+  margin-top: 0;
+}
+
+@media (max-width: 640px) {
+  .fresh-sort {
+    margin-left: 0;
+  }
 }
 
 .fresh-count {

@@ -116,27 +116,30 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
   color: var(--leaf);
 }
 
+/* Same badge as the featured cards (FeaturedPicks) */
 .pt-badge {
   position: absolute;
   top: 10px;
   left: 10px;
-  padding: 3px 9px;
+  padding: 4px 10px;
   border-radius: 999px;
   font-size: 10.5px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: #fff;
 }
 
 .pt-badge.best {
-  background: #c9874a;
-}
-
-.pt-badge.sale {
   background: var(--leaf-deep);
 }
 
+.pt-badge.sale {
+  background: #b3413b;
+}
+
 .pt-badge.muted {
-  background: rgba(54, 63, 78, 0.6);
+  background: rgba(54, 63, 78, 0.78);
 }
 
 .pt-body {

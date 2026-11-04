@@ -2,7 +2,6 @@
   <section class="fp" id="featured" aria-labelledby="fp-title">
     <div class="bc-container fp-layout">
       <div class="fp-intro">
-        <p class="bc-label">Featured picks</p>
         <h2 id="fp-title">Chosen by <em>BloomCraft</em></h2>
         <p class="fp-lede">Flowers our team loves right now, picked from shops on BloomCraft.</p>
         <ul class="fp-notes">
@@ -42,8 +41,7 @@
                 loading="lazy"
                 @error="onImageError"
               />
-              <span class="fp-badge" :class="badge(product).tone">{{ badge(product).label }}</span>
-              <span v-if="!inStock(product)" class="fp-sold-out">Sold out</span>
+              <span v-if="badge(product)" class="fp-badge" :class="badge(product).tone">{{ badge(product).label }}</span>
             </button>
 
             <div class="fp-body">
@@ -73,7 +71,7 @@
                   @click="$emit('add', product, { imageEl: imageEls[product.id], cardEl: cardEls[product.id] })"
                 >
                   <span v-if="addingId === product.id" class="fp-cart-dots" aria-hidden="true">···</span>
-                  <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l-1 12H7zM9 8V6a3 3 0 0 1 6 0v2M12 12v5M9.5 14.5h5" /></svg>
+                  <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2" /><circle cx="9.5" cy="20" r="1.2" /><circle cx="17.5" cy="20" r="1.2" /></svg>
                 </button>
               </div>
             </div>
@@ -119,10 +117,12 @@ const money = (value) => Number(value || 0).toLocaleString("en-PH", { minimumFra
 const sold = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n % 1000 ? 1 : 0)}k` : String(n));
 const inStock = (product) => Number(product.quantity_in_stock ?? 1) > 0;
 
+// The same badges as the product tiles (ShopProductTile)
 function badge(product) {
-  if (product.discount_price) return { label: "Sale", tone: "sale" };
+  if (!inStock(product)) return { label: "Sold out", tone: "muted" };
+  if (Number(product.discount_price) > 0 && Number(product.discount_price) < Number(product.selling_price)) return { label: "On sale", tone: "sale" };
   if ((product.sold_count ?? 0) >= 10) return { label: "Best seller", tone: "best" };
-  return { label: "New", tone: "new" };
+  return null;
 }
 
 // Arrows show only when the cards don't all fit
@@ -352,40 +352,30 @@ watch(
   transform: scale(1.05);
 }
 
+/* Same badge as the product tiles */
 .fp-badge {
   position: absolute;
   top: 10px;
   left: 10px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--ink);
+  color: #fff;
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-.fp-badge.sale {
-  background: #b3413b;
-  color: #fff;
 }
 
 .fp-badge.best {
   background: var(--leaf-deep);
-  color: #fff;
 }
 
-.fp-sold-out {
-  position: absolute;
-  inset: auto 10px 10px;
-  padding: 6px 0;
-  border-radius: 10px;
-  background: rgba(54, 63, 78, 0.85);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 500;
-  text-align: center;
+.fp-badge.sale {
+  background: #b3413b;
+}
+
+.fp-badge.muted {
+  background: rgba(54, 63, 78, 0.78);
 }
 
 .fp-body {

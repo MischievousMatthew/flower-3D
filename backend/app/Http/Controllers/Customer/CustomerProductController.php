@@ -26,6 +26,8 @@ class CustomerProductController extends Controller
         'in_stock_only' => 'nullable',
         // Only these shops (owner user ids, comma separated), e.g. the ones near the customer
         'owner_ids'     => 'nullable|string|max:2000',
+        // Words typed into the Shop page search (name, category, colour, flower type)
+        'search'        => 'nullable|string|max:100',
         'sort_by'       => 'nullable|string|in:created_at_desc,price_low,price_high,name_asc,name_desc,popular_desc',
         'page'          => 'nullable|integer|min:1',
         'per_page'      => 'nullable|integer|min:1|max:100',
@@ -86,6 +88,19 @@ class CustomerProductController extends Controller
             }
             if ($request->filled('max_price') && is_numeric($request->max_price)) {
                 $query->whereRaw('selling_price <= ?', [(float) $request->max_price]);
+            }
+            if ($request->filled('search')) {
+                $words = array_slice(preg_split('/\s+/u', trim((string) $request->search), -1, PREG_SPLIT_NO_EMPTY) ?: [], 0, 6);
+                foreach ($words as $word) {
+                    // % and _ typed by the customer are matched literally
+                    $like = '%' . addcslashes($word, '%_\\') . '%';
+                    $query->where(function ($q) use ($like) {
+                        $q->where('product_name', 'like', $like)
+                            ->orWhere('category', 'like', $like)
+                            ->orWhere('color', 'like', $like)
+                            ->orWhere('flower_type', 'like', $like);
+                    });
+                }
             }
             if ($request->has('owner_ids')) {
                 $ownerIds = array_slice(array_values(array_filter(array_map('intval', explode(',', (string) $request->owner_ids)))), 0, 200);

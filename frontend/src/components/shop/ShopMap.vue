@@ -3,7 +3,6 @@
     <div class="bc-container">
       <div class="smap-head">
         <div>
-          <p class="bc-label">Shop map</p>
           <h2 id="smap-title">Flower shops <em>around you</em></h2>
           <p class="smap-lede">
             Every shop on BloomCraft, pinned where it is.
@@ -525,7 +524,7 @@ onBeforeUnmount(() => {
 
 .smap-map {
   width: 100%;
-  height: clamp(360px, 58vh, 580px);
+  height: clamp(320px, 46vh, 460px);
   z-index: 0;
 }
 

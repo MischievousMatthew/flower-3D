@@ -14,7 +14,15 @@
             <span class="bc-skeleton so-skel"></span>
           </li>
         </ul>
-        <ul v-else-if="occasions.length" class="so-list">
+        <div v-if="!loading && occasions.length && scrollable" class="so-arrows">
+          <button type="button" class="so-arrow" aria-label="Previous occasions" :disabled="atStart" @click="slide(-1)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+          </button>
+          <button type="button" class="so-arrow" aria-label="More occasions" :disabled="atEnd" @click="slide(1)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+          </button>
+        </div>
+        <ul v-if="!loading && occasions.length" ref="listEl" class="so-list" :class="{ 'at-end': atEnd }" @scroll.passive="measure">
           <li v-for="occasion in occasions" :key="occasion">
             <button
               type="button"
@@ -24,17 +32,14 @@
               @click="$emit('pick', occasion)"
             >
               <span class="so-photo">
-                <img v-if="images[occasion]" :src="images[occasion]" :alt="''" loading="lazy" />
-                <svg v-else viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 7.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 1 1 0 5zM16.5 12a2.5 2.5 0 1 1 5 0 2.5 2.5 0 1 1-5 0zM12 16.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 1 1 0-5zM7.5 12a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0z" />
-                  <circle cx="12" cy="12" r="2" />
-                </svg>
+                <img v-if="usePhotos && images[occasion]" :src="images[occasion]" :alt="''" loading="lazy" />
+                <span v-else class="so-icon" v-html="occasionIconFor(occasion)"></span>
               </span>
               <span class="so-name">{{ occasion }}</span>
             </button>
           </li>
         </ul>
-        <p v-else class="so-empty">Occasions appear here as shops tag their flowers.</p>
+        <p v-if="!loading && !occasions.length" class="so-empty">Occasions appear here as shops tag their flowers.</p>
       </div>
 
       <!-- Promotions (Admin → Website), one at a time -->
@@ -63,7 +68,8 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { occasionIconFor } from "../../constants/occasionIcons.js";
 import { useRouter } from "vue-router";
 import { useSiteContent } from "../../composables/useSiteContent";
 
@@ -81,6 +87,43 @@ const props = defineProps({
 defineEmits(["pick", "browse"]);
 const router = useRouter();
 const { followLink } = useSiteContent();
+
+// Product photos only when they tell the occasions apart (several different
+// photos); otherwise every occasion gets its own drawn icon
+const usePhotos = computed(() => {
+  const photos = props.occasions.map((name) => props.images[name]).filter(Boolean);
+  return photos.length >= 4 && new Set(photos).size === photos.length;
+});
+
+// Arrows show when the row doesn't fit
+const listEl = ref(null);
+const scrollable = ref(false);
+const atStart = ref(true);
+const atEnd = ref(false);
+function measure() {
+  const el = listEl.value;
+  if (!el) return;
+  scrollable.value = el.scrollWidth > el.clientWidth + 4;
+  atStart.value = el.scrollLeft <= 4;
+  atEnd.value = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
+}
+function slide(direction) {
+  const el = listEl.value;
+  if (el) el.scrollBy({ left: direction * Math.max(el.clientWidth * 0.7, 200), behavior: "smooth" });
+}
+let resize = null;
+onMounted(() => {
+  resize = new ResizeObserver(measure);
+  watch(listEl, (el) => el && resize.observe(el), { immediate: true });
+});
+onBeforeUnmount(() => resize?.disconnect());
+watch(
+  () => [props.occasions.length, props.loading],
+  async () => {
+    await nextTick();
+    measure();
+  },
+);
 
 const index = ref(0);
 const promo = computed(() => props.promotions[index.value] || props.promotions[0] || {});
@@ -174,10 +217,87 @@ const endsLabel = (value) => new Date(value).toLocaleDateString("en-PH", { month
   padding: 0 0 4px;
   overflow-x: auto;
   list-style: none;
-  scrollbar-width: thin;
-  /* Fade the last circle so it reads as "more to scroll" */
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  /* Fade the last circle so it reads as "more to scroll" (not once at the end) */
   -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
   mask-image: linear-gradient(90deg, #000 88%, transparent);
+}
+
+.so-list::-webkit-scrollbar {
+  display: none;
+}
+
+.so-list.at-end {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.so-card {
+  position: relative;
+}
+
+.so-arrows {
+  position: absolute;
+  top: 26px;
+  right: 30px;
+  display: flex;
+  gap: 8px;
+}
+
+.so-arrow {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.18s ease;
+}
+
+.so-arrow:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.so-arrow:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.so-arrow:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+.so-arrow svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.so-icon {
+  display: grid;
+  place-items: center;
+  color: var(--leaf-deep);
+}
+
+.so-icon :deep(svg) {
+  width: 30px;
+  height: 30px;
+  stroke-width: 1.5;
+}
+
+@media (max-width: 640px) {
+  .so-arrows {
+    display: none;
+  }
 }
 
 .so-item {
