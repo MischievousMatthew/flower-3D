@@ -232,7 +232,7 @@
             </template>
 
             <div v-else class="pf-qr">
-              <EmployeeQRCode :employee_id="selected.id" :owner_id="selected.owner_id" :employee_name="selected.full_name" />
+              <EmployeeQRCode :employee_id="selected.id" :owner_id="selected.owner_id" :employee_name="selected.full_name" :employee_code="selected.employee_id || ''" :position="selected.position || ''" />
             </div>
           </div>
         </aside>

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\EmployeeInfo;
+use App\Models\User;
+use App\Services\Leave\LeaveAccess;
 use App\Services\EmployeeQRCodeService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -22,7 +24,7 @@ class EmployeeQRController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => ['qr_data' => $this->qrCodeService->payload($employee), 'version' => (int) ($employee->qr_version ?? 1)],
+            'data' => ['qr_data' => $this->qrCodeService->payload($employee), 'version' => (int) ($employee->qr_version ?? 1), 'shop' => $this->shop()],
         ]);
     }
 
@@ -35,8 +37,16 @@ class EmployeeQRController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'New QR code made. Older copies no longer work.',
-            'data' => ['qr_data' => $this->qrCodeService->payload($employee), 'version' => (int) $employee->qr_version],
+            'data' => ['qr_data' => $this->qrCodeService->payload($employee), 'version' => (int) $employee->qr_version, 'shop' => $this->shop()],
         ]);
+    }
+
+    /** The shop's name and logo, drawn in the middle of the badge like the leave poster */
+    private function shop(): array
+    {
+        $shop = User::find($this->getOwnerId());
+
+        return $shop ? app(LeaveAccess::class)->shopInfo($shop) : ['name' => '', 'logo' => null];
     }
 
     public function __construct(EmployeeQRCodeService $qrCodeService)

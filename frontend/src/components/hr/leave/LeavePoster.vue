@@ -38,9 +38,9 @@
 
 <script setup>
 import { onMounted, ref } from "vue";
-import QRCode from "qrcode";
 import { SHOP_ICONS as ICONS } from "../../vendor/shop/shopIcons";
 import { initialsOf } from "../hrUi";
+import { drawQrWithLogo } from "../qrWithLogo";
 
 const props = defineProps({
   // () => { code, name, logo }
@@ -57,74 +57,9 @@ const logoOk = ref(true);
 const logoUsed = ref(false);
 const copied = ref(false);
 
-function loadImage(src) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous"; // so the canvas can still be downloaded
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
-
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-}
-
-/** A QR code with high error correction, and the logo on a white tile in the middle (about 22% wide). */
 async function draw() {
-  const c = canvas.value;
-  await QRCode.toCanvas(c, url.value, { errorCorrectionLevel: "H", width: SIZE, margin: 2, color: { dark: "#111827", light: "#ffffff" } });
-  const ctx = c.getContext("2d");
-  const tile = SIZE * 0.24;
-  const x = (SIZE - tile) / 2;
-  ctx.fillStyle = "#ffffff";
-  roundRect(ctx, x, x, tile, tile, tile * 0.22);
-  ctx.fill();
-
-  const inner = tile * 0.8;
-  const ix = (SIZE - inner) / 2;
-  logoUsed.value = false;
-  if (info.value.logo) {
-    try {
-      const img = await loadImage(info.value.logo);
-      ctx.save();
-      roundRect(ctx, ix, ix, inner, inner, inner * 0.2);
-      ctx.clip();
-      // Cover the square, whatever the logo's shape
-      const scale = Math.max(inner / img.width, inner / img.height);
-      ctx.drawImage(img, SIZE / 2 - (img.width * scale) / 2, SIZE / 2 - (img.height * scale) / 2, img.width * scale, img.height * scale);
-      ctx.restore();
-      c.toDataURL(); // throws if the logo made the canvas unreadable
-      logoUsed.value = true;
-    } catch (_) {
-      logoOk.value = false;
-      await QRCode.toCanvas(c, url.value, { errorCorrectionLevel: "H", width: SIZE, margin: 2, color: { dark: "#111827", light: "#ffffff" } });
-      ctx.fillStyle = "#ffffff";
-      roundRect(ctx, x, x, tile, tile, tile * 0.22);
-      ctx.fill();
-    }
-  }
-  if (!logoUsed.value) {
-    const accent = getComputedStyle(document.documentElement).getPropertyValue("--bc-accent").trim() || "#48bb78";
-    ctx.fillStyle = accent;
-    roundRect(ctx, ix, ix, inner, inner, inner * 0.2);
-    ctx.fill();
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `700 ${inner * 0.42}px Poppins, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(initialsOf(info.value.name) || "BC", SIZE / 2, SIZE / 2 + inner * 0.03);
-  }
-  // The QR library pins a pixel size on the element; let CSS size it (square) instead
-  c.style.width = "";
-  c.style.height = "";
+  logoUsed.value = await drawQrWithLogo(canvas.value, url.value, { logo: info.value.logo, name: info.value.name, size: SIZE });
+  if (info.value.logo && !logoUsed.value) logoOk.value = false;
   ready.value = true;
 }
 

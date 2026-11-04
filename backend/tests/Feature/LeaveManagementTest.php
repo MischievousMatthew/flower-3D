@@ -99,6 +99,19 @@ class LeaveManagementTest extends TestCase
         $this->postJson('/api/public/leave/verify-qr', ['token' => base64_encode(json_encode(['employee_id' => $p->id, 'owner_id' => $vendor->id]))])->assertStatus(410);
     }
 
+    public function test_the_badge_code_comes_with_the_shop_name_for_its_middle(): void
+    {
+        $vendor = $this->shopOwner();
+        $p = $this->profile($vendor);
+
+        $this->signIn($vendor)->getJson("/api/employees/{$p->id}/qr-code/payload")
+            ->assertOk()
+            ->assertJsonPath('data.qr_data', app(EmployeeQRCodeService::class)->payload($p))
+            ->assertJsonStructure(['data' => ['shop' => ['name', 'logo']]]);
+        $this->signIn($vendor)->postJson("/api/employees/{$p->id}/qr-code/reissue")
+            ->assertOk()->assertJsonStructure(['data' => ['qr_data', 'shop' => ['name', 'logo']]]);
+    }
+
     public function test_leave_counts_scheduled_days_and_stays_within_the_balance(): void
     {
         $vendor = $this->shopOwner();
