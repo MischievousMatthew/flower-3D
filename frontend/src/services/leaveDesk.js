@@ -25,7 +25,8 @@ export const leaveDesk = {
   stats: () => data(api.get("/leaves/statistics")),
   decide: (id, status, admin_notes) => data(api.put(`/leaves/${id}/status`, { status, admin_notes })),
   cancel: (id, note) => data(api.post(`/leaves/${id}/cancel`, { note })),
-  document: async (id) => (await api.get(`/leaves/${id}/document`)).data.data.url,
+  // { url, preview, kind: image|pdf|file, name }; links last 5 minutes
+  document: async (id) => (await api.get(`/leaves/${id}/document`)).data.data,
   file(form) {
     const body = new FormData();
     for (const k of ["employee_id", "leave_type", "start_date", "end_date", "reason"]) body.append(k, form[k]);

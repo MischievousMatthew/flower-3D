@@ -54,7 +54,12 @@ class EmployeeLeaveController extends Controller
             ->orderByDesc('start_date')
             ->limit(300)->get();
 
-        return response()->json(['success' => true, 'data' => $leaves->map(fn ($l) => $this->leave->formatLeave($l, true))->values()]);
+        $me = $request->user();
+
+        return response()->json(['success' => true, 'data' => $leaves->map(fn ($l) => $this->leave->formatLeave($l, true) + [
+            // Their own request: the page hides Approve/Decline (the server refuses them anyway)
+            'is_mine' => $this->leave->isOwn($me, $l->employee),
+        ])->values()]);
     }
 
     /** GET /leaves/statistics */
@@ -122,12 +127,17 @@ class EmployeeLeaveController extends Controller
         return response()->json(['success' => true, 'message' => 'Leave cancelled.']);
     }
 
-    /** GET /leaves/{id}/document — a link valid for 5 minutes */
+    /** GET /leaves/{id}/document — links valid for 5 minutes: the file, and a picture of it (photos, a PDF's first page) */
     public function document(int $id): JsonResponse
     {
         $leave = $this->leave->leaves($this->getOwnerId())->findOrFail($id);
 
-        return response()->json(['success' => true, 'data' => ['url' => $this->leave->documentLink($leave)]]);
+        return response()->json(['success' => true, 'data' => [
+            'url' => $this->leave->documentLink($leave),
+            'preview' => $this->leave->documentPreview($leave),
+            'kind' => $this->leave->documentKind($leave),
+            'name' => $leave->document_name,
+        ]]);
     }
 
     /** DELETE /leaves/{id} */
@@ -225,7 +235,11 @@ class EmployeeLeaveController extends Controller
             ->when($status, fn ($q, $s) => $q->where('status', $s))
             ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")->orderByDesc('date')->limit(300)->get();
 
-        return response()->json(['success' => true, 'data' => $rows->map(fn ($r) => $this->leave->formatOvertimeRequest($r, true))->values()]);
+        $me = $request->user();
+
+        return response()->json(['success' => true, 'data' => $rows->map(fn ($r) => $this->leave->formatOvertimeRequest($r, true) + [
+            'is_mine' => $this->leave->isOwn($me, $r->employee),
+        ])->values()]);
     }
 
     /** POST /overtime-requests {employee_id, date, minutes, reason} */

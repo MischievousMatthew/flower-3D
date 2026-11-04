@@ -237,6 +237,31 @@ class LeaveService
         return CloudinaryHelper::privateDownloadUrl($leave->document_public_id, $leave->document_format, $leave->document_resource_type ?? 'image', 300);
     }
 
+    /** "image", "pdf" or "file" (Word documents) */
+    public function documentKind(EmployeeLeave $leave): ?string
+    {
+        if (! $leave->document_public_id) {
+            return null;
+        }
+        $format = strtolower((string) $leave->document_format);
+
+        return match (true) {
+            $format === 'pdf' => 'pdf',
+            ($leave->document_resource_type ?? 'image') === 'image' => 'image',
+            default => 'file',
+        };
+    }
+
+    /** A picture to show on the page: the photo itself, or a PDF's first page. Null for Word files. */
+    public function documentPreview(EmployeeLeave $leave): ?string
+    {
+        return match ($this->documentKind($leave)) {
+            'image' => $this->documentLink($leave),
+            'pdf' => CloudinaryHelper::privateDownloadUrl($leave->document_public_id, 'jpg', 'image', 300),
+            default => null,
+        };
+    }
+
     public function formatLeave(EmployeeLeave $l, bool $withHistory = false): array
     {
         $out = [
@@ -435,13 +460,20 @@ class LeaveService
     /** People can't approve their own requests. HR accounts and profiles are linked by email. */
     private function guardOwn($reviewer, ?EmployeeInfo $profile, string $what): void
     {
-        if (! $reviewer instanceof Employee || ! $profile) {
-            return;
-        }
-        $emails = array_filter([strtolower((string) $profile->work_email), strtolower((string) $profile->personal_email)]);
-        if (in_array(strtolower((string) $reviewer->email), $emails, true)) {
+        if ($this->isOwn($reviewer, $profile)) {
             throw ValidationException::withMessages(['status' => "You can't decide your own {$what} request. Ask someone else."]);
         }
+    }
+
+    /** Whether this HR account belongs to the person on the profile (linked by email) */
+    public function isOwn($reviewer, ?EmployeeInfo $profile): bool
+    {
+        if (! $reviewer instanceof Employee || ! $profile) {
+            return false;
+        }
+        $emails = array_filter([strtolower((string) $profile->work_email), strtolower((string) $profile->personal_email)]);
+
+        return in_array(strtolower((string) $reviewer->email), $emails, true);
     }
 
     private static function days(float $n): string

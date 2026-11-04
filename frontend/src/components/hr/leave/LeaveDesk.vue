@@ -105,8 +105,9 @@
         <div v-if="o.status === 'pending'" class="ld-decide">
           <input v-model="notes[`o${o.id}`]" class="sp-input" maxlength="1000" placeholder="Note (needed to decline)" :aria-label="`Note for ${o.employee}`" />
           <button v-if="perms.edit" type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="busy" @click="cancelOvertime(o)">Cancel</button>
-          <button v-if="perms.reject" type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="busy" @click="decideOvertime(o, 'rejected')">Decline</button>
-          <button v-if="perms.approve" type="button" class="sp-btn sp-btn-primary sp-btn-sm" :disabled="busy" @click="decideOvertime(o, 'approved')">Approve</button>
+          <small v-if="o.is_mine" class="ld-mine-note">Your own request. Someone else decides it.</small>
+          <button v-if="perms.reject && !o.is_mine" type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="busy" @click="decideOvertime(o, 'rejected')">Decline</button>
+          <button v-if="perms.approve && !o.is_mine" type="button" class="sp-btn sp-btn-primary sp-btn-sm" :disabled="busy" @click="decideOvertime(o, 'approved')">Approve</button>
         </div>
       </article>
     </section>
@@ -193,7 +194,18 @@
 
             <h4 class="st-section-title">Reason</h4>
             <p class="ld-reason">“{{ detail.reason }}”</p>
-            <button v-if="detail.document" type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="busy" @click="openDocument(detail)"><span v-html="ICONS.clip"></span>Open {{ detail.document }}</button>
+            <button v-if="detail.document" type="button" class="ld-file" :aria-label="`View ${detail.document}`" @click="openDocument">
+              <span class="ld-file-thumb">
+                <span v-if="docLoading" class="bc-skeleton"></span>
+                <img v-else-if="doc?.preview && !doc.broken" :src="doc.preview" alt="" @error="doc.broken = true" />
+                <span v-else class="ld-file-icon" v-html="ICONS.note"></span>
+              </span>
+              <span class="ld-file-text">
+                <b>{{ detail.document }}</b>
+                <small>{{ docKindLabel }} · Click to view</small>
+              </span>
+              <span class="ld-file-go" v-html="ICONS.eye"></span>
+            </button>
 
             <template v-if="detailBalance">
               <h4 class="st-section-title">{{ detail.label }} this year</h4>
@@ -206,7 +218,8 @@
             <h4 class="st-section-title">History</h4>
             <RequestHistory :history="detail.history" />
 
-            <template v-if="detail.status === 'pending' && (perms.approve || perms.reject)">
+            <p v-if="detail.status === 'pending' && detail.is_mine" class="sp-banner info ld-mine"><span v-html="ICONS.lock"></span>This is your own request. Someone else who can approve leave needs to decide it.</p>
+            <template v-else-if="detail.status === 'pending' && (perms.approve || perms.reject)">
               <h4 class="st-section-title">Your decision</h4>
               <textarea v-model="decisionNote" class="sp-textarea" maxlength="1000" placeholder="Note to them (needed to decline)"></textarea>
             </template>
@@ -214,7 +227,7 @@
           </div>
           <div class="sp-drawer-foot">
             <button v-if="perms.edit && (detail.status === 'pending' || (detail.status === 'approved' && detail.start_date > today))" type="button" class="sp-btn sp-btn-ghost ld-left" :disabled="busy" @click="cancelLeave(detail)">Cancel leave</button>
-            <template v-if="detail.status === 'pending'">
+            <template v-if="detail.status === 'pending' && !detail.is_mine">
               <button v-if="perms.reject" type="button" class="sp-btn sp-btn-ghost" :disabled="busy" @click="decide('rejected')">Decline</button>
               <button v-if="perms.approve" type="button" class="sp-btn sp-btn-primary" :disabled="busy" @click="decide('approved')">{{ busy ? "Saving…" : "Approve" }}</button>
             </template>
@@ -311,11 +324,42 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- A leave document, shown over the request -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="docOpen" class="sp-backdrop ld-doc-backdrop" @click="docOpen = false"></div></Transition>
+      <Transition name="sp-pop">
+        <div v-if="docOpen && doc" class="sp-modal-wrap ld-doc-wrap">
+          <div class="sp-modal wide ld-doc-modal" role="dialog" aria-modal="true" aria-labelledby="ld-doc-title">
+            <div class="sp-modal-head ld-doc-head">
+              <div>
+                <h3 id="ld-doc-title">{{ doc.name }}</h3>
+                <p>{{ detail?.employee }} · {{ docKindLabel }}</p>
+              </div>
+              <button ref="docClose" type="button" class="sp-icon-btn" aria-label="Close" @click="docOpen = false"><span v-html="ICONS.close"></span></button>
+            </div>
+            <div class="ld-doc-view">
+              <img v-if="doc.preview && !doc.broken" :src="doc.preview" :alt="doc.name" @error="doc.broken = true" />
+              <div v-else class="sp-empty">
+                <span class="sp-empty-icon" v-html="ICONS.note"></span>
+                <h3>{{ doc.kind === "file" ? "Word files can't be shown here" : "Couldn't show this file" }}</h3>
+                <p>Download it to read it.</p>
+              </div>
+            </div>
+            <p v-if="doc.kind === 'pdf' && doc.preview && !doc.broken" class="sp-hint ld-doc-hint">Showing the first page. Download it to read the whole document.</p>
+            <div class="sp-modal-foot">
+              <button type="button" class="sp-btn sp-btn-ghost" @click="docOpen = false">Close</button>
+              <a class="sp-btn sp-btn-primary" :href="doc.url" target="_blank" rel="noopener noreferrer"><span v-html="ICONS.download"></span>Download</a>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { toast } from "@/utils/snackbar";
 import { SHOP_ICONS as ICONS } from "../../vendor/shop/shopIcons";
 import { personColor } from "../../vendor/staff/staffUi";
@@ -461,6 +505,9 @@ function openLeave(l) {
   detail.value = l;
   decisionNote.value = "";
   drawerError.value = "";
+  doc.value = null;
+  docOpen.value = false;
+  if (l.document) loadDocument(l).catch(() => {});
   if (!balances.value || balances.value.year !== Number(l.start_date.slice(0, 4))) {
     balanceYear.value = Number(l.start_date.slice(0, 4));
     loadBalances();
@@ -500,19 +547,49 @@ function cancelLeave(l) {
   });
 }
 
-async function openDocument(l) {
-  const win = window.open("", "_blank");
+// ── Leave documents: a thumbnail in the request, the full view in a modal ──
+
+const DOC_LINK_MS = 4 * 60 * 1000; // links last 5 minutes; fetch new ones a bit before
+const DOC_KINDS = { image: "Photo", pdf: "PDF", file: "Word file" };
+const doc = ref(null);
+const docLoading = ref(false);
+const docOpen = ref(false);
+const docClose = ref(null);
+const docKindLabel = computed(() => DOC_KINDS[doc.value?.kind] ?? "Document");
+
+async function loadDocument(l) {
+  docLoading.value = true;
   try {
-    const url = await props.api.document(l.id);
-    if (win) {
-      win.opener = null;
-      win.location.href = url;
-    }
+    const d = await props.api.document(l.id);
+    if (detail.value?.id === l.id) doc.value = { ...d, leaveId: l.id, at: Date.now(), broken: false };
   } catch (e) {
-    win?.close();
+    if (detail.value?.id === l.id) doc.value = null;
+    throw e;
+  } finally {
+    docLoading.value = false;
+  }
+}
+
+async function openDocument() {
+  const l = detail.value;
+  try {
+    if (!doc.value || doc.value.leaveId !== l.id || Date.now() - doc.value.at > DOC_LINK_MS) await loadDocument(l);
+    docOpen.value = true;
+    await nextTick();
+    docClose.value?.focus();
+  } catch (e) {
     toast.error(message(e, "Couldn't open the document."));
   }
 }
+
+function onKey(e) {
+  if (e.key === "Escape" && docOpen.value) {
+    e.stopPropagation();
+    docOpen.value = false;
+  }
+}
+window.addEventListener("keydown", onKey, true);
+onBeforeUnmount(() => window.removeEventListener("keydown", onKey, true));
 
 // ── Overtime decisions ──
 
@@ -735,6 +812,125 @@ onMounted(() => {
   font-size: 13px;
   font-style: italic;
   color: var(--v-text-2);
+}
+/* Attached document: thumbnail + name, opens the preview */
+.ld-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid var(--v-border);
+  border-radius: 12px;
+  background: var(--v-subtle);
+  color: var(--v-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.ld-file:hover {
+  border-color: var(--bc-accent);
+}
+.ld-file:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.ld-file-thumb {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--v-raised);
+  border: 1px solid var(--v-border);
+}
+.ld-file-thumb img,
+.ld-file-thumb .bc-skeleton {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ld-file-icon,
+.ld-file-go {
+  display: grid;
+  color: var(--v-muted);
+}
+.ld-file-icon :deep(svg) {
+  width: 24px;
+  height: 24px;
+}
+.ld-file-go :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+.ld-file-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.ld-file-text b {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ld-file-text small {
+  font-size: 12px;
+  color: var(--v-muted);
+}
+.ld-mine {
+  margin-top: 18px;
+}
+.ld-mine-note {
+  font-size: 12px;
+  color: var(--v-muted);
+}
+
+/* Document preview, above the request drawer */
+.ld-doc-backdrop {
+  z-index: 1300;
+}
+.ld-doc-wrap {
+  z-index: 1301;
+}
+.ld-doc-modal {
+  width: min(860px, 100%);
+}
+.ld-doc-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ld-doc-head > div {
+  min-width: 0;
+}
+.ld-doc-head h3 {
+  overflow-wrap: anywhere;
+}
+.ld-doc-view {
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+  max-height: 68vh;
+  overflow: auto;
+  border-radius: 12px;
+  background: var(--v-subtle);
+}
+.ld-doc-view img {
+  display: block;
+  max-width: 100%;
+  max-height: 68vh;
+  object-fit: contain;
+}
+.ld-doc-hint {
+  margin: 8px 0 0;
 }
 .ld-review {
   margin: 0;

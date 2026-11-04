@@ -149,6 +149,11 @@ class LeaveManagementTest extends TestCase
         $id = $this->fileLeave($this->leaveSession($vendor, $p))->json('data.request.id');
         $mine = $this->fileLeave($this->leaveSession($vendor, $self))->json('data.request.id');
 
+        // The page knows which one is theirs, so it can hide Approve/Decline
+        $flags = collect($this->signIn($hr)->getJson('/api/leaves?status=pending')->assertOk()->json('data'))->pluck('is_mine', 'id');
+        $this->assertTrue($flags[$mine]);
+        $this->assertFalse($flags[$id]);
+
         $this->signIn($hr)->putJson("/api/leaves/{$mine}/status", ['status' => 'approved'])->assertStatus(422);
         $this->signIn($hr)->putJson("/api/leaves/{$id}/status", ['status' => 'rejected'])->assertStatus(422)->assertJsonValidationErrors('admin_notes');
         $this->signIn($hr)->putJson("/api/leaves/{$id}/status", ['status' => 'approved', 'admin_notes' => 'Enjoy'])
