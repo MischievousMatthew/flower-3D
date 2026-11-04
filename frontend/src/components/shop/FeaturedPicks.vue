@@ -36,7 +36,8 @@
             <button type="button" class="fp-photo" :aria-label="`View ${product.product_name}`" @click="$emit('open', product)">
               <img
                 :ref="(el) => (imageEls[product.id] = el)"
-                :src="imageOf(product)"
+                :src="sizedImage(imageOf(product), 300)"
+                :srcset="sizedSrcset(imageOf(product), 300)"
                 :alt="product.product_name"
                 loading="lazy"
                 @error="onImageError"
@@ -84,6 +85,7 @@
 
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { sizedImage, sizedSrcset } from "../../utils/cloudinaryImage.js";
 
 /**
  * "Chosen by BloomCraft" (Admin → Website): the heading on the left and

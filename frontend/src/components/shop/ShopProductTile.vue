@@ -1,7 +1,7 @@
 <template>
   <article class="pt" :class="{ compact }">
     <button type="button" class="pt-media" :aria-label="`View ${product.product_name}`" @click="$emit('open', product)">
-      <img v-if="image" ref="imageEl" :src="image" :alt="product.product_name" loading="lazy" />
+      <img v-if="image" ref="imageEl" :src="sizedImage(image, 320)" :srcset="sizedSrcset(image, 320)" :alt="product.product_name" loading="lazy" decoding="async" />
       <span v-else class="pt-noimg" aria-hidden="true">✿</span>
       <span v-if="badge" class="pt-badge" :class="badge.tone">{{ badge.text }}</span>
     </button>
@@ -35,6 +35,7 @@
 
 <script setup>
 import { computed, ref } from "vue";
+import { sizedImage, sizedSrcset } from "../../utils/cloudinaryImage.js";
 
 /** Small product card for the shop's Top Selling row and the bouquet finder */
 const props = defineProps({
@@ -204,12 +205,12 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
 
 .pt-cart {
   position: absolute;
-  right: 12px;
-  bottom: 14px;
+  right: 10px;
+  bottom: 10px;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 9px;

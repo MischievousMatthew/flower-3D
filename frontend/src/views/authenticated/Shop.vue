@@ -229,6 +229,7 @@ import BouquetFinder from "../../components/shop/BouquetFinder.vue";
 import FeaturedShops from "../../components/shop/FeaturedShops.vue";
 import DesignerShopPicker from "../../components/shop/DesignerShopPicker.vue";
 import FeaturedPicks from "../../components/shop/FeaturedPicks.vue";
+import { rememberProduct } from "../../utils/productPreview.js";
 import ShopMap from "../../components/shop/ShopMap.vue";
 import JournalTeaser from "../../components/site/JournalTeaser.vue";
 import SiteFooter from "../../components/site/SiteFooter.vue";
@@ -893,6 +894,7 @@ const shopByOccasion = (occasion) => {
 
 // ── Modal ─────────────────────────────────────────────────────────────────
 const openProductModal = (product) => {
+  rememberProduct(product);
   router.push({ name: "ProductDetails", params: { id: String(product.id) } });
 };
 const closeModal = () => {

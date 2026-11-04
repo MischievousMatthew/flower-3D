@@ -12,7 +12,7 @@
       </div>
 
       <div v-if="hasContact" class="footer-col">
-        <h4>Contact us</h4>
+        <h2>Contact us</h2>
         <ul>
           <li v-if="settings.contact_email"><a :href="`mailto:${settings.contact_email}`">{{ settings.contact_email }}</a></li>
           <li v-if="settings.contact_phone"><a :href="`tel:${settings.contact_phone.replace(/\s+/g, '')}`">{{ settings.contact_phone }}</a></li>
@@ -22,7 +22,7 @@
       </div>
 
       <div class="footer-col">
-        <h4>Explore</h4>
+        <h2>Explore</h2>
         <ul>
           <li><router-link to="/shop">Shop</router-link></li>
           <li><router-link to="/journal">Journal</router-link></li>
@@ -73,6 +73,7 @@ const year = new Date().getFullYear();
   margin-bottom: 12px;
 }
 .footer-brand p {
+  text-wrap: pretty;
   max-width: 380px;
   margin: 0 0 18px;
   font-size: 14px;
@@ -86,7 +87,7 @@ const year = new Date().getFullYear();
   padding: 0;
   list-style: none;
 }
-.footer-col h4 {
+.footer-col h2 {
   margin: 0 0 14px;
   color: var(--paper);
   font-size: 12px;
@@ -100,8 +101,15 @@ const year = new Date().getFullYear();
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 2px;
   font-size: 14px;
+}
+
+/* At least 24px tall to tap (WCAG 2.5.8) */
+.footer-col li > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
 }
 .site-footer a {
   color: rgba(250, 251, 250, 0.85);

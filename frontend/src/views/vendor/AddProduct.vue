@@ -34,6 +34,7 @@
               @drop.stop.prevent="moveImage(i)"
             >
               <img :src="img.url" :alt="`Photo ${i + 1}`" />
+              <span v-if="img.small" class="ap-lowres" :title="`${img.size}: under 800px, it may look blurry`">Low resolution</span>
               <span v-if="i === 0" class="ap-cover">Cover</span>
               <button v-else type="button" class="ap-make-cover" @click="makeCover(i)">Make cover</button>
               <button type="button" class="ap-x" aria-label="Remove photo" @click="removeImage(i)"><span v-html="ICONS.close"></span></button>
@@ -46,6 +47,9 @@
             </label>
           </div>
           <p v-if="errors.images" class="sp-error">{{ errors.images }}</p>
+          <p v-else-if="images.some((img) => img.small)" class="ap-lowres-note">
+            Photos marked “Low resolution” are under 800px and may look blurry on the product page. A bigger photo (at least 800px) looks sharper.
+          </p>
         </section>
 
         <!-- 2. Basics -->
@@ -504,9 +508,23 @@ function addFiles(files) {
       toast.error(`${file.name} is over 10 MB.`);
       continue;
     }
-    images.value.push({ file, url: URL.createObjectURL(file) });
+    const entry = reactive({ file, url: URL.createObjectURL(file), small: false, size: "" });
+    images.value.push(entry);
+    checkPhotoSize(entry);
   }
 }
+
+// Photos under 800px on the short side look blurry on the product page
+const MIN_PHOTO_SIDE = 800;
+function checkPhotoSize(entry) {
+  const img = new Image();
+  img.onload = () => {
+    entry.small = Math.min(img.naturalWidth, img.naturalHeight) < MIN_PHOTO_SIDE;
+    entry.size = `${img.naturalWidth}×${img.naturalHeight}`;
+  };
+  img.src = entry.url;
+}
+
 function onPick(e) {
   addFiles([...(e.target.files ?? [])]);
   e.target.value = "";
@@ -1258,5 +1276,22 @@ onBeforeUnmount(() => {
   .ap-toggles {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.ap-lowres {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #8a5a12;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+.ap-lowres-note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--v-text-2, #5f6776);
 }
 </style>

@@ -39,6 +39,7 @@
                 <figure v-for="(img, i) in newImages" :key="img.url" class="pe-photo">
                   <img :src="img.url" alt="New photo" />
                   <span class="pe-cover new">New</span>
+                  <span v-if="img.small" class="pe-lowres" :title="`${img.size}: under 800px, it may look blurry`">Low res</span>
                   <button type="button" class="pe-photo-x" aria-label="Remove photo" @click="dropNewImage(i)">
                     <span v-html="ICONS.close"></span>
                   </button>
@@ -50,6 +51,9 @@
                 </label>
               </div>
               <p v-if="errors.images" class="sp-error">{{ errors.images }}</p>
+              <p v-else-if="newImages.some((img) => img.small)" class="pe-lowres-note">
+                Photos marked “Low res” are under 800px and may look blurry. A bigger photo looks sharper.
+              </p>
             </section>
 
             <!-- Basics -->
@@ -340,9 +344,23 @@ function addImages(event) {
       errors.images = `${file.name} is over 10 MB.`;
       continue;
     }
-    newImages.value.push({ file, url: URL.createObjectURL(file) });
+    const entry = reactive({ file, url: URL.createObjectURL(file), small: false, size: "" });
+    newImages.value.push(entry);
+    checkPhotoSize(entry);
   }
 }
+
+// Photos under 800px on the short side look blurry on the product page
+const MIN_PHOTO_SIDE = 800;
+function checkPhotoSize(entry) {
+  const img = new Image();
+  img.onload = () => {
+    entry.small = Math.min(img.naturalWidth, img.naturalHeight) < MIN_PHOTO_SIDE;
+    entry.size = `${img.naturalWidth}×${img.naturalHeight}`;
+  };
+  img.src = entry.url;
+}
+
 function dropNewImage(i) {
   URL.revokeObjectURL(newImages.value[i].url);
   newImages.value.splice(i, 1);
@@ -600,5 +618,22 @@ function close() {
   .pe-status {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.pe-lowres {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #8a5a12;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+.pe-lowres-note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--v-text-2, #5f6776);
 }
 </style>

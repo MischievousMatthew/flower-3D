@@ -51,7 +51,7 @@
                 :aria-label="`Photo ${i + 1}`"
                 @click="showImage(i)"
               >
-                <img :src="image.image_url" alt="" loading="lazy" />
+                <img :src="sizedImage(image.image_url, 96)" :srcset="sizedSrcset(image.image_url, 96)" alt="" loading="lazy" />
               </button>
               <button
                 v-if="hasModel"
@@ -75,7 +75,16 @@
                 :modelType="product.models[0].model_type"
                 class="pd-model"
               />
-              <img v-else-if="images.length" ref="imageEl" :src="images[active].image_url" :alt="product.product_name" class="pd-photo" />
+              <img
+                v-else-if="images.length"
+                ref="imageEl"
+                :src="sizedImage(images[active].image_url, 640)"
+                :srcset="sizedSrcset(images[active].image_url, 640)"
+                :alt="product.product_name"
+                class="pd-photo"
+                fetchpriority="high"
+                decoding="async"
+              />
               <div v-else class="pd-noimg" aria-hidden="true">✿</div>
 
               <template v-if="!show3D && images.length > 1">
@@ -100,7 +109,6 @@
 
           <!-- Details and buying -->
           <div class="pd-info">
-            <p class="pd-label">{{ categoryLabel || "Flowers" }}</p>
             <h1 class="pd-name">{{ product.product_name }}</h1>
             <p v-if="product.description" class="pd-lede">{{ shortDescription }}</p>
 
@@ -249,7 +257,7 @@
               </ul>
             </div>
             <figure class="pd-quote">
-              <img v-if="images.length" :src="images[images.length > 1 ? 1 : 0].image_url" alt="" loading="lazy" />
+              <img v-if="images.length" :src="sizedImage(images[images.length > 1 ? 1 : 0].image_url, 600)" :srcset="sizedSrcset(images[images.length > 1 ? 1 : 0].image_url, 600)" alt="" loading="lazy" />
               <blockquote>Because every moment deserves flowers.</blockquote>
             </figure>
           </div>
@@ -302,11 +310,18 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from "vue";
+import { computed, defineAsyncComponent, h, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import api from "../../plugins/axios.js";
 import NavHeader from "../../layouts/NavHeader.vue";
-import ModelViewer3D from "../../layouts/3D/3DModelViewer.vue";
+import { sizedImage, sizedSrcset } from "../../utils/cloudinaryImage.js";
+import { productPreview, rememberProduct } from "../../utils/productPreview.js";
+// three.js is big: it loads only when the customer opens 3D View
+const ModelViewer3D = defineAsyncComponent({
+  loader: () => import("../../layouts/3D/3DModelViewer.vue"),
+  loadingComponent: { render: () => h("span", { class: "bc-skeleton pd-model-skel", "aria-label": "Loading 3D view" }) },
+  delay: 0,
+});
 import ProductReviews from "../../layouts/components/ProductReviews.vue";
 import ProductQuestions from "../../layouts/components/ProductQuestions.vue";
 import SiteFooter from "../../components/site/SiteFooter.vue";
@@ -451,8 +466,9 @@ async function toggleFavorite() {
 }
 
 async function load(id) {
-  loading.value = true;
-  product.value = null;
+  const preview = productPreview(id);
+  loading.value = !preview;
+  product.value = preview;
   related.value = [];
   active.value = 0;
   show3D.value = false;
@@ -463,7 +479,8 @@ async function load(id) {
     const { data } = await api.get(`/customer/products/${id}`);
     product.value = data?.success ? data.data : null;
   } catch {
-    product.value = null;
+    // Couldn't reach the server: keep what the tile already showed
+    product.value = preview;
   } finally {
     loading.value = false;
   }
@@ -589,6 +606,7 @@ function goToStore() {
 }
 
 function openProduct(item) {
+  rememberProduct(item);
   router.push({ name: "ProductDetails", params: { id: String(item.id) } });
 }
 
@@ -826,15 +844,6 @@ watch(
   gap: 14px;
 }
 
-.pd-label {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-
 .pd-name {
   margin: 0;
   font-family: var(--font-display);
@@ -983,15 +992,15 @@ watch(
 .pd-qty {
   display: inline-flex;
   align-items: center;
-  height: 42px;
+  height: 46px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--paper);
 }
 
 .pd-qty button {
-  width: 42px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   background: none;
@@ -1007,7 +1016,7 @@ watch(
 
 .pd-qty input {
   width: 52px;
-  height: 32px;
+  height: 44px;
   padding: 0;
   border: 0;
   border-radius: 6px;
@@ -1182,7 +1191,7 @@ watch(
 
 .pd-promises small,
 .pd-strip small {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--ink-soft);
 }
 
@@ -1413,7 +1422,10 @@ watch(
 }
 
 .pd-viewall {
-  font-size: 12.5px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--leaf-deep);
   text-decoration: none;
@@ -1553,5 +1565,13 @@ watch(
   .pd-buy .pd-btn--solid {
     grid-column: 1 / -1;
   }
+}
+
+.pd-model-skel {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  border-radius: inherit;
 }
 </style>
