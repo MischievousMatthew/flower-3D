@@ -71,7 +71,7 @@
       @browse="scrollToSection('products')"
     />
 
-    <!-- Featured picks (Admin → Website) -->
+    <!-- In bloom this month: the admin's seasonal picks (Admin → Website → Featured) -->
     <FeaturedPicks
       v-if="featuredProducts.length"
       :products="featuredProducts"
@@ -272,7 +272,7 @@ const fetchPopular = async () => {
     loadingPopular.value = false;
   }
 };
-// Top Selling leaves out what Chosen by BloomCraft already shows, and only
+// Top Selling leaves out what "In bloom this month" already shows, and only
 // appears once there are enough flowers for it to add something
 const featuredIds = computed(() => new Set(featuredProducts.value.map((product) => product.id)));
 const topSelling = computed(() => popularProducts.value.filter((product) => !featuredIds.value.has(product.id)).slice(0, 5));

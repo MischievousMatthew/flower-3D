@@ -70,8 +70,8 @@
           <div class="panel">
             <div class="panel-head">
               <div>
-                <h2 class="panel-title">Featured picks</h2>
-                <p class="panel-sub">Shown near the top of the shop, in this order. Up to 12.</p>
+                <h2 class="panel-title">In bloom this month</h2>
+                <p class="panel-sub">The flowers in season right now. Shown near the top of the shop as “In bloom this {{ new Date().toLocaleDateString("en-PH", { month: "long" }) }}”, in this order. Up to 12.</p>
               </div>
               <span class="count-pill">{{ featured.length }} / 12</span>
             </div>

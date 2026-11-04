@@ -2,12 +2,12 @@
   <section class="fp" id="featured" aria-labelledby="fp-title">
     <div class="bc-container fp-layout">
       <div class="fp-intro">
-        <h2 id="fp-title">Chosen by <em>BloomCraft</em></h2>
-        <p class="fp-lede">Flowers our team loves right now, picked from shops on BloomCraft.</p>
+        <h2 id="fp-title">In bloom this <em>{{ seasonMonth }}</em></h2>
+        <p class="fp-lede">Flowers at their best right now, picked by the BloomCraft team from shops near you.</p>
         <ul class="fp-notes">
           <li>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z" /></svg>
-            Hand-picked by our team
+            Picked for the season
           </li>
           <li>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16l-1.2-4.8A1.6 1.6 0 0 0 17.2 4H6.8a1.6 1.6 0 0 0-1.6 1.2zM5 10v9h14v-9M9 19v-5h6v5" /></svg>
@@ -88,7 +88,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { sizedImage, sizedSrcset } from "../../utils/cloudinaryImage.js";
 
 /**
- * "Chosen by BloomCraft" (Admin → Website): the heading on the left and
+ * "In bloom this <month>" (Admin → Website → Featured): the heading on the left and
  * compact product cards on the right, in a row that scrolls when there are
  * more than fit. One pick stays a normal-sized card.
  */
@@ -97,6 +97,9 @@ const props = defineProps({
   addingId: { type: [Number, String], default: null },
 });
 defineEmits(["open", "add", "buy", "vendor", "browse"]);
+
+// The month in the heading follows the calendar: "In bloom this November"
+const seasonMonth = new Date().toLocaleDateString("en-PH", { month: "long" });
 
 const imageEls = {};
 const cardEls = {};
