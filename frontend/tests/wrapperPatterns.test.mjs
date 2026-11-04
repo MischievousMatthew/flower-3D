@@ -24,3 +24,14 @@ test("order screens name the print", () => {
   assert.equal(wrapperPatternLabel({ type: "words", text: "love" }), "Words: “love”");
   assert.equal(wrapperPatternLabel(null), "");
 });
+
+test("a word print keeps its size, kept between 50% and 200%", async () => {
+  const { cleanPatternSize } = await import("../src/utils/wrapperPatterns.js");
+  assert.deepEqual(normalizePattern({ type: "words", text: "love", size: 150 }), { type: "words", text: "love", size: 150 });
+  assert.deepEqual(normalizePattern({ type: "words", text: "love", size: 100 }), { type: "words", text: "love" });
+  assert.equal(cleanPatternSize(10), 50);
+  assert.equal(cleanPatternSize(999), 200);
+  assert.equal(cleanPatternSize(123), 125);
+  assert.equal(cleanPatternSize(null), 100);
+  assert.equal(cleanPatternSize("abc"), 100);
+});

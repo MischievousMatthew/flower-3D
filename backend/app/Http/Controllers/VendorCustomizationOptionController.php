@@ -181,6 +181,8 @@ class VendorCustomizationOptionController extends Controller
             // A print on the paper: none, newspaper, or a word written all over it
             $rules['pattern'] = 'nullable|in:none,newspaper,words';
             $rules['pattern_text'] = 'nullable|required_if:pattern,words|string|max:' . \App\Support\BouquetPresets::MAX_PATTERN_WORD;
+            // The word's size, as a percent of the normal size
+            $rules['pattern_size'] = 'nullable|integer|min:' . \App\Support\BouquetPresets::MIN_PATTERN_SIZE . '|max:' . \App\Support\BouquetPresets::MAX_PATTERN_SIZE;
         }
 
         if ($type === Option::TYPE_FILLER) {
@@ -236,9 +238,14 @@ class VendorCustomizationOptionController extends Controller
             $data['is_active'] = $request->boolean('is_active');
         }
         if ($request->has('pattern') && $type === Option::TYPE_WRAPPER) {
-            $clean = \App\Support\BouquetPresets::cleanPattern(['type' => $request->input('pattern'), 'text' => $request->input('pattern_text')]);
+            $clean = \App\Support\BouquetPresets::cleanPattern([
+                'type' => $request->input('pattern'),
+                'text' => $request->input('pattern_text'),
+                'size' => $request->input('pattern_size'),
+            ]);
             $data['pattern'] = $clean['type'] ?? null;
             $data['pattern_text'] = $clean['text'] ?? null;
+            $data['pattern_size'] = isset($clean['text']) ? ($clean['size'] ?? 100) : null;
         }
 
         if ($type === Option::TYPE_CARD) {

@@ -322,6 +322,27 @@
                 @input="refreshPrintPreview"
               />
               <span v-if="errors.pattern_text" class="cz-error">{{ errors.pattern_text }}</span>
+              <div class="cz-print-size">
+                <label class="cz-print-size-head" for="cz-print-size">
+                  <span>Word size</span>
+                  <output for="cz-print-size">{{ form.patternSize }}%</output>
+                </label>
+                <div class="cz-print-size-row">
+                  <span class="cz-print-size-end" aria-hidden="true">A</span>
+                  <input
+                    id="cz-print-size"
+                    v-model.number="form.patternSize"
+                    type="range"
+                    :min="MIN_PATTERN_SIZE"
+                    :max="MAX_PATTERN_SIZE"
+                    step="5"
+                    :aria-valuetext="`${form.patternSize} percent`"
+                    @input="refreshPrintPreview"
+                  />
+                  <span class="cz-print-size-end big" aria-hidden="true">A</span>
+                </div>
+                <button v-if="form.patternSize !== 100" type="button" class="cz-print-size-reset" @click="resetPrintSize">Back to normal size</button>
+              </div>
             </div>
             <div v-if="form.pattern !== 'none'" class="cz-print-preview">
               <img v-if="printPreview" :src="printPreview" alt="" />
@@ -455,7 +476,7 @@ import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import ShopLayout from "../../components/vendor/shop/ShopLayout.vue";
 import BouquetPresetsPanel from "../../components/vendor/shop/BouquetPresetsPanel.vue";
 import { toast } from "@/utils/snackbar";
-import { MAX_PATTERN_WORD, patternPreview } from "../../utils/wrapperPatterns.js";
+import { MAX_PATTERN_SIZE, MAX_PATTERN_WORD, MIN_PATTERN_SIZE, cleanPatternSize, patternPreview } from "../../utils/wrapperPatterns.js";
 import "../../styles/bloomcraft.css";
 
 const TABS = [
@@ -535,6 +556,7 @@ const errors = reactive({});
 const form = reactive({
   pattern: "none",
   patternText: "",
+  patternSize: 100,
   name: "",
   description: "",
   price: "",
@@ -701,9 +723,14 @@ let previewTimer = null;
 function refreshPrintPreview() {
   clearTimeout(previewTimer);
   previewTimer = setTimeout(async () => {
-    const pattern = form.pattern === "words" ? { type: "words", text: form.patternText || "love" } : { type: form.pattern };
+    const pattern = form.pattern === "words" ? { type: "words", text: form.patternText || "love", size: form.patternSize } : { type: form.pattern };
     printPreview.value = form.pattern === "none" ? "" : await patternPreview(pattern, form.color);
-  }, 150);
+  }, 60);
+}
+
+function resetPrintSize() {
+  form.patternSize = 100;
+  refreshPrintPreview();
 }
 
 watch(
@@ -724,6 +751,7 @@ function resetForm() {
   editingId.value = null;
   form.pattern = "none";
   form.patternText = "";
+  form.patternSize = 100;
   printPreview.value = "";
   form.name = "";
   form.description = "";
@@ -752,6 +780,7 @@ function startEdit(item) {
   if (item.type === "wrapper") {
     form.pattern = item.pattern || "none";
     form.patternText = item.pattern_text || "";
+    form.patternSize = cleanPatternSize(item.pattern_size);
     refreshPrintPreview();
   }
   if (item.type === "card") {
@@ -861,7 +890,10 @@ async function submitForm() {
   if (current.value.hasColor) payload.append("color_hex", form.color);
   if (type === "wrapper") {
     payload.append("pattern", form.pattern);
-    if (form.pattern === "words") payload.append("pattern_text", form.patternText.trim());
+    if (form.pattern === "words") {
+      payload.append("pattern_text", form.patternText.trim());
+      payload.append("pattern_size", String(form.patternSize));
+    }
   }
   if (form.modelFile) payload.append("model_file", form.modelFile);
 
@@ -1779,16 +1811,81 @@ const formatSize = (bytes) =>
   display: grid;
   gap: 4px;
 }
+.cz-print-size {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+.cz-print-size-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--v-text-2);
+}
+.cz-print-size-head output {
+  font-variant-numeric: tabular-nums;
+  color: var(--v-text);
+}
+.cz-print-size-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+.cz-print-size-row input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+  accent-color: var(--bc-accent);
+  cursor: pointer;
+}
+.cz-print-size-row input:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.cz-print-size-end {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--v-text-2);
+}
+.cz-print-size-end.big {
+  font-size: 20px;
+}
+.cz-print-size-reset {
+  justify-self: start;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--bc-accent);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.cz-print-size-reset:hover {
+  text-decoration: underline;
+}
+.cz-print-size-reset:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 .cz-print-preview {
   display: grid;
-  grid-template-columns: 88px 1fr;
+  grid-template-columns: 128px 1fr;
   gap: 12px;
   align-items: center;
 }
 .cz-print-preview img,
 .cz-print-preview .bc-skeleton {
-  width: 88px;
-  height: 88px;
+  width: 128px;
+  height: 128px;
   border-radius: 10px;
   object-fit: cover;
   border: 1px solid var(--v-border);

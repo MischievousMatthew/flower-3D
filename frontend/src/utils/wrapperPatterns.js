@@ -11,6 +11,9 @@ export const WRAPPER_PATTERNS = [
   { key: "words", label: "Words" },
 ];
 export const MAX_PATTERN_WORD = 16;
+// The word's size, as a percent of the normal size (mirrors BouquetPresets)
+export const MIN_PATTERN_SIZE = 50;
+export const MAX_PATTERN_SIZE = 200;
 // Prints go on paper wraps only (mirrors BouquetPresets::PATTERN_DESIGNS)
 export const PATTERN_DESIGNS = ["classic", "korean"];
 const SCRIPT_FONT = `"Dancing Script", "Segoe Script", "Brush Script MT", cursive`;
@@ -25,13 +28,22 @@ export function cleanPatternWord(text) {
     .slice(0, MAX_PATTERN_WORD);
 }
 
+/** A word size between 50% and 200%, in steps of 5; 100 when missing */
+export function cleanPatternSize(size) {
+  const n = Number(size);
+  if (size === null || size === undefined || size === "" || !Number.isFinite(n)) return 100;
+  return Math.round(Math.min(MAX_PATTERN_SIZE, Math.max(MIN_PATTERN_SIZE, n)) / 5) * 5;
+}
+
 /** A saved pattern, or null for plain paper */
 export function normalizePattern(pattern) {
   const type = pattern?.type;
   if (type === "newspaper") return { type };
   if (type === "words") {
     const text = cleanPatternWord(pattern.text);
-    return text ? { type, text } : null;
+    if (!text) return null;
+    const size = cleanPatternSize(pattern.size);
+    return size === 100 ? { type, text } : { type, text, size };
   }
   return null;
 }
@@ -94,23 +106,26 @@ function mix(hex, toward, amount) {
   return `#${a.lerp(new THREE.Color(toward), amount).getHexString()}`;
 }
 
-function drawWords(ctx, hex, text) {
+function drawWords(ctx, hex, text, size = 100) {
+  const scale = size / 100;
   const background = hex || "#d9467a";
   ctx.fillStyle = background;
   ctx.fillRect(0, 0, SIZE, SIZE);
   // Pale letters on a dark paper, darker letters on a light one
   const light = new THREE.Color(background).getHSL({}).l > 0.68;
   ctx.fillStyle = light ? mix(background, "#000000", 0.38) : mix(background, "#ffffff", 0.72);
-  ctx.font = `700 170px ${SCRIPT_FONT}`;
+  ctx.font = `700 ${Math.round(170 * scale)}px ${SCRIPT_FONT}`;
   ctx.textBaseline = "middle";
 
-  const step = Math.max(ctx.measureText(text).width + 90, 260);
+  const step = Math.max(ctx.measureText(text).width + 90 * scale, 260 * scale);
+  const rowHeight = 250 * scale;
+  const rows = Math.ceil((SIZE * 0.75) / rowHeight) + 1; // enough rows to cover the turned square
   ctx.save();
   ctx.translate(SIZE / 2, SIZE / 2);
   ctx.rotate(-0.22);
   // Cover the rotated square, offsetting every other row
-  for (let row = -6, i = 0; row <= 6; row++, i++) {
-    const y = row * 250;
+  for (let row = -rows, i = 0; row <= rows; row++, i++) {
+    const y = row * rowHeight;
     for (let x = -SIZE * 1.2 + (i % 2 ? step / 2 : 0); x < SIZE * 1.2; x += step) ctx.fillText(text, x, y);
   }
   ctx.restore();
@@ -122,7 +137,7 @@ const cache = new Map();
 export async function patternTexture(pattern, hex) {
   const p = normalizePattern(pattern);
   if (!p || typeof document === "undefined") return null;
-  const key = p.type === "words" ? `w|${hex}|${p.text}` : "n";
+  const key = p.type === "words" ? `w|${hex}|${p.text}|${p.size ?? 100}` : "n";
   if (cache.has(key)) return cache.get(key);
 
   if (p.type === "words") {
@@ -135,7 +150,7 @@ export async function patternTexture(pattern, hex) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = SIZE;
   const ctx = canvas.getContext("2d");
-  if (p.type === "words") drawWords(ctx, hex, p.text);
+  if (p.type === "words") drawWords(ctx, hex, p.text, p.size);
   else drawNewspaper(ctx);
 
   const texture = new THREE.CanvasTexture(canvas);

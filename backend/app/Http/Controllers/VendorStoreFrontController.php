@@ -420,7 +420,7 @@ class VendorStorefrontController extends Controller
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get([
-                    'id', 'type', 'name', 'description', 'color_hex', 'pattern', 'pattern_text', 'price', 'model_url',
+                    'id', 'type', 'name', 'description', 'color_hex', 'pattern', 'pattern_text', 'pattern_size', 'price', 'model_url',
                     'image_url', 'card_limit_type', 'card_limit', 'card_sizes',
                 ]);
 

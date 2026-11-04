@@ -43,6 +43,9 @@ class BouquetPresets
     /** Designs whose outer paper can carry a print (newspaper, words) */
     public const PATTERN_DESIGNS = ['classic', 'korean'];
     public const MAX_PATTERN_WORD = 16;
+    // The printed word's size, as a percent of the normal size
+    public const MIN_PATTERN_SIZE = 50;
+    public const MAX_PATTERN_SIZE = 200;
 
     /** Icons a vendor can give their own occasions (frontend constants/occasionIcons.js) */
     public const ICONS = ['rings', 'heart', 'gift', 'cap', 'dove', 'flower'];
@@ -322,7 +325,7 @@ class BouquetPresets
         return ['ok' => true, 'customizations' => $customizations, 'filler_limit' => $fillerLimit, 'base_price' => $base];
     }
 
-    /** A print on the outer paper: newspaper, or a short word written over and over; null for plain */
+    /** A print on the paper: newspaper, or a short word written over and over (size in %); null for plain */
     public static function cleanPattern($pattern): ?array
     {
         if (! is_array($pattern)) {
@@ -335,10 +338,25 @@ class BouquetPresets
             $text = preg_replace('/[^\p{L}\p{N} \'&!♥.-]/u', '', (string) ($pattern['text'] ?? ''));
             $text = mb_substr(trim(preg_replace('/\s+/u', ' ', (string) $text)), 0, self::MAX_PATTERN_WORD);
 
-            return $text !== '' ? ['type' => 'words', 'text' => $text] : null;
+            if ($text === '') {
+                return null;
+            }
+            $size = self::cleanPatternSize($pattern['size'] ?? null);
+
+            return $size === 100 ? ['type' => 'words', 'text' => $text] : ['type' => 'words', 'text' => $text, 'size' => $size];
         }
 
         return null;
+    }
+
+    /** A word size between 50% and 200%, in steps of 5; 100 when missing */
+    public static function cleanPatternSize($size): int
+    {
+        if (! is_numeric($size)) {
+            return 100;
+        }
+
+        return (int) (round(max(self::MIN_PATTERN_SIZE, min(self::MAX_PATTERN_SIZE, (float) $size)) / 5) * 5);
     }
 
     private static function cleanSizes($sizes): array
