@@ -24,6 +24,8 @@ class CustomerProductController extends Controller
         'min_price'     => 'nullable|numeric|min:0',
         'max_price'     => 'nullable|numeric|min:0',
         'in_stock_only' => 'nullable',
+        // Only these shops (owner user ids, comma separated), e.g. the ones near the customer
+        'owner_ids'     => 'nullable|string|max:2000',
         'sort_by'       => 'nullable|string|in:created_at_desc,price_low,price_high,name_asc,name_desc,popular_desc',
         'page'          => 'nullable|integer|min:1',
         'per_page'      => 'nullable|integer|min:1|max:100',
@@ -84,6 +86,10 @@ class CustomerProductController extends Controller
             }
             if ($request->filled('max_price') && is_numeric($request->max_price)) {
                 $query->whereRaw('selling_price <= ?', [(float) $request->max_price]);
+            }
+            if ($request->has('owner_ids')) {
+                $ownerIds = array_slice(array_values(array_filter(array_map('intval', explode(',', (string) $request->owner_ids)))), 0, 200);
+                $query->whereIn('owner_id', $ownerIds ?: [0]);
             }
             if (filter_var($request->get('in_stock_only', false), FILTER_VALIDATE_BOOLEAN)) {
                 $query->where('quantity_in_stock', '>', 0);

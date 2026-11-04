@@ -29,12 +29,53 @@
         </div>
       </div>
 
-      <p class="smap-foot" aria-live="polite">
+      <!-- Shops inside the circle, nearest first -->
+      <div v-if="!loading && !error && hasPin" class="smap-range" aria-live="polite">
+        <div class="smap-range-head">
+          <p class="smap-range-title">
+            <strong>{{ inRange.length }}</strong> {{ inRange.length === 1 ? "shop" : "shops" }} within {{ radiusKm }} km of your address
+            <span class="smap-sep" aria-hidden="true">·</span> {{ shops.length }} on the map
+          </p>
+          <label class="smap-only">
+            <input type="checkbox" :checked="pageFilter" @change="$emit('update:pageFilter', $event.target.checked)" />
+            <span class="smap-only-track" aria-hidden="true"></span>
+            <span>Show only these shops' flowers on this page</span>
+          </label>
+        </div>
+
+        <ul v-if="inRange.length" class="smap-cards">
+          <li v-for="item in inRange" :key="item.shop.id">
+            <article class="smap-card" :class="{ active: focusedId === item.shop.id }">
+              <button type="button" class="smap-card-main" :aria-label="`Show ${item.shop.store_name} on the map`" @click="focusShop(item.shop)">
+                <span class="smap-card-logo">
+                  <img v-if="item.shop.store_logo_path" :src="item.shop.store_logo_path" alt="" loading="lazy" />
+                  <span v-else aria-hidden="true">{{ item.shop.store_name?.charAt(0) || "B" }}</span>
+                </span>
+                <span class="smap-card-text">
+                  <strong>{{ item.shop.store_name }}</strong>
+                  <small>{{ item.km.toFixed(1) }} km away<template v-if="item.shop.taking_orders === false"> · not taking orders now</template></small>
+                </span>
+              </button>
+              <button type="button" class="smap-card-visit" @click="$emit('visit', item.shop.id)">Visit</button>
+            </article>
+          </li>
+        </ul>
+
+        <div v-else class="smap-none">
+          <template v-if="nearest">
+            <p>
+              No shops within {{ radiusKm }} km. The nearest is <strong>{{ nearest.shop.store_name }}</strong>, {{ nearest.km.toFixed(1) }} km away.
+            </p>
+            <button v-if="reachKm" type="button" class="smap-btn" @click="radiusKm = reachKm">Show shops within {{ reachKm }} km</button>
+            <button v-else type="button" class="smap-btn smap-btn--ghost" @click="focusShop(nearest.shop)">See it on the map</button>
+          </template>
+          <p v-else>No shops have pinned their location yet.</p>
+        </div>
+      </div>
+
+      <p v-if="loading || error || !hasPin" class="smap-foot" aria-live="polite">
         <template v-if="loading">Finding shops</template>
-        <template v-else-if="hasPin">
-          <strong>{{ withinCount }}</strong> {{ withinCount === 1 ? "shop" : "shops" }} within {{ radiusKm }} km of your address
-          <span class="smap-sep" aria-hidden="true">·</span> {{ shops.length }} on the map
-        </template>
+        <template v-else-if="error"></template>
         <template v-else-if="isAuthenticated">
           {{ shops.length }} {{ shops.length === 1 ? "shop" : "shops" }} on the map.
           <router-link :to="{ name: 'Profile' }" class="smap-link">Pin your address in your profile</router-link> to see the shops around you.
@@ -58,7 +99,11 @@ import { useAuth } from "../../composables/useAuth";
  * Every shop pinned on a map with its logo, and a circle around the
  * customer's pinned address (1 to 5 km) showing how far they'd like to look.
  */
-const emit = defineEmits(["visit"]);
+const props = defineProps({
+  // Whether the rest of the Shop page shows only the shops inside the circle
+  pageFilter: { type: Boolean, default: true },
+});
+const emit = defineEmits(["visit", "range", "update:pageFilter"]);
 const RADII = [1, 2, 3, 4, 5];
 
 const { isAuthenticated, user } = useAuth();
@@ -100,20 +145,32 @@ function distanceKm([lat1, lng1], [lat2, lng2]) {
   const a = Math.sin(rad(lat2 - lat1) / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lng2 - lng1) / 2) ** 2;
   return 6371 * 2 * Math.asin(Math.sqrt(a));
 }
-const withinCount = computed(() =>
-  home.value ? shops.value.filter((s) => distanceKm(home.value, [s.latitude, s.longitude]) <= radiusKm.value).length : 0,
+// Every shop with its distance from the customer, nearest first
+const byDistance = computed(() =>
+  home.value
+    ? shops.value.map((shop) => ({ shop, km: distanceKm(home.value, [shop.latitude, shop.longitude]) })).sort((a, b) => a.km - b.km)
+    : [],
 );
+const inRange = computed(() => byDistance.value.filter((item) => item.km <= radiusKm.value));
+const inRangeIds = computed(() => new Set(inRange.value.map((item) => item.shop.id)));
+const nearest = computed(() => byDistance.value[0] || null);
+// The smallest choice (up to 5 km) that reaches the nearest shop, or null when it's farther
+const reachKm = computed(() => (nearest.value ? RADII.find((km) => km >= nearest.value.km) ?? null : null));
+const focusedId = ref(null);
 
 const escapeHtml = (text) =>
   String(text ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 // A round pin with the shop's logo (or its first letter) and a point underneath
+// Inside the circle: bright with a green glow. Outside: faded and smaller.
+const rangeClass = (group) => (!home.value ? "" : group.some((shop) => inRangeIds.value.has(shop.id)) ? " is-in" : " is-out");
+
 function shopIcon(shop) {
   const face = shop.store_logo_path
     ? `<img src="${escapeHtml(shop.store_logo_path)}" alt="" loading="lazy" />`
     : `<span>${escapeHtml(shop.store_name?.charAt(0) || "B")}</span>`;
   return L.divIcon({
-    className: "smap-pin-wrap",
+    className: "smap-pin-wrap" + rangeClass([shop]),
     html: `<span class="smap-pin">${face}</span>`,
     iconSize: [48, 58],
     iconAnchor: [24, 58],
@@ -176,15 +233,25 @@ function groupShops() {
   return groups;
 }
 
+const markerFor = new Map(); // shop id → its own pin (when it isn't stacked)
+
 function drawShops() {
   if (!map || !shopLayer) return;
   shopLayer.clearLayers();
+  markerFor.clear();
   for (const { shops: group } of groupShops()) {
     if (group.length === 1) {
       const shop = group[0];
-      L.marker([shop.latitude, shop.longitude], { icon: shopIcon(shop), title: shop.store_name, alt: shop.store_name, riseOnHover: true })
+      const marker = L.marker([shop.latitude, shop.longitude], {
+        icon: shopIcon(shop),
+        title: shop.store_name,
+        alt: shop.store_name,
+        riseOnHover: true,
+        zIndexOffset: inRangeIds.value.has(shop.id) ? 500 : 0,
+      })
         .addTo(shopLayer)
         .bindPopup(popupFor(shop), { closeButton: true });
+      markerFor.set(shop.id, marker);
       continue;
     }
     const center = L.latLngBounds(group.map((s) => [s.latitude, s.longitude])).getCenter();
@@ -222,7 +289,7 @@ function stackIcon(group) {
     .join("");
   const width = 48 + Math.min(group.length - 1, 2) * 18;
   return L.divIcon({
-    className: "smap-pin-wrap",
+    className: "smap-pin-wrap" + rangeClass(group),
     html: `<span class="smap-stack" style="width:${width}px">${faces}<b>${group.length}</b></span>`,
     iconSize: [width, 58],
     iconAnchor: [width / 2, 58],
@@ -334,7 +401,38 @@ async function load() {
   if (!error.value) render();
 }
 
-watch(radiusKm, () => drawCircle(true));
+/** From a card: fly to the shop and open its pin (zooming in far enough to unstack it) */
+function focusShop(shop) {
+  if (!map) return;
+  focusedId.value = shop.id;
+  mapEl.value?.scrollIntoView({ behavior: "smooth", block: "center" });
+  map.once("moveend", () => markerFor.get(shop.id)?.openPopup());
+  map.flyTo([shop.latitude, shop.longitude], Math.max(map.getZoom(), 17), { duration: 0.8 });
+}
+
+// Tell the page which shops are inside the circle (null when the customer has no pin)
+function emitRange() {
+  emit(
+    "range",
+    home.value
+      ? {
+          km: radiusKm.value,
+          shopIds: inRange.value.map((item) => item.shop.id),
+          ownerIds: inRange.value.map((item) => item.shop.owner_id).filter(Boolean),
+        }
+      : null,
+  );
+}
+
+watch(radiusKm, () => {
+  drawCircle(true);
+  drawShops();
+});
+watch(
+  () => [home.value?.join(), radiusKm.value, inRange.value.map((item) => item.shop.id).join()],
+  emitRange,
+  { immediate: true },
+);
 // Logging in or out redraws the map around the customer's pin
 watch(isAuthenticated, async () => {
   await loadMe();
@@ -470,6 +568,214 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
+.smap-range {
+  margin-top: 16px;
+}
+
+.smap-range-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 20px;
+  margin-bottom: 14px;
+}
+
+.smap-range-title {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.smap-range-title strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.smap-only {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 13.5px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.smap-only input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.smap-only-track {
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(54, 63, 78, 0.2);
+  transition: background-color 0.2s ease;
+}
+
+.smap-only-track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(54, 63, 78, 0.3);
+  transition: transform 0.2s ease;
+}
+
+.smap-only input:checked + .smap-only-track {
+  background: var(--leaf-deep);
+}
+
+.smap-only input:checked + .smap-only-track::after {
+  transform: translateX(16px);
+}
+
+.smap-only input:focus-visible + .smap-only-track {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+.smap-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.smap-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.smap-card:hover,
+.smap-card.active {
+  border-color: var(--leaf);
+  box-shadow: 0 10px 24px -18px rgba(46, 122, 79, 0.6);
+}
+
+.smap-card-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.smap-card-logo {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--ivory);
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--leaf-deep);
+}
+
+.smap-card-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.smap-card-text {
+  display: grid;
+  min-width: 0;
+}
+
+.smap-card-text strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.smap-card-text small {
+  font-size: 12.5px;
+  color: var(--leaf-deep);
+}
+
+.smap-card-visit {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.smap-card-visit:hover {
+  border-color: var(--ink);
+}
+
+.smap-card-main:focus-visible,
+.smap-card-visit:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+.smap-none {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 18px 20px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  background: #fff;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.smap-none p {
+  margin: 0;
+}
+
+.smap-none strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.smap-btn--ghost {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+}
+
 .smap-foot {
   margin: 12px 2px 0;
   font-size: 13.5px;
@@ -547,6 +853,28 @@ onBeforeUnmount(() => {
   font-size: 22px;
   font-weight: 600;
   color: #2e7a4f;
+}
+
+/* In range: a soft green glow. Out of range: faded and a little smaller. */
+.smap-pin-wrap.is-in .smap-pin,
+.smap-pin-wrap.is-in .smap-stack-face {
+  box-shadow: 0 0 0 4px rgba(77, 177, 115, 0.45), 0 8px 18px -4px rgba(46, 122, 79, 0.55);
+}
+
+.smap-pin-wrap.is-out {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+}
+
+.smap-pin-wrap.is-out .smap-pin,
+.smap-pin-wrap.is-out .smap-stack {
+  transform: scale(0.82);
+  transform-origin: 50% 100%;
+}
+
+.smap-pin-wrap.is-out:hover {
+  opacity: 0.85;
+  filter: none;
 }
 
 .leaflet-marker-icon:hover .smap-pin {

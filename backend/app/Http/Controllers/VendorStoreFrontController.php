@@ -189,6 +189,12 @@ class VendorStorefrontController extends Controller
                 });
             }
 
+            // Only these shops, e.g. the ones near the customer on the shop map
+            if ($request->has('ids')) {
+                $ids = array_slice(array_values(array_filter(array_map('intval', explode(',', (string) $request->ids)))), 0, 200);
+                $query->whereIn('id', $ids ?: [0]);
+            }
+
             if ($request->filled('product_type')) {
                 $query->whereJsonContains('product_types', $request->product_type);
             }
@@ -418,6 +424,7 @@ class VendorStorefrontController extends Controller
                     && ((float) $v->store_latitude !== 0.0 || (float) $v->store_longitude !== 0.0))
                 ->map(fn ($v) => [
                     'id' => $v->id,
+                    'owner_id' => $this->resolveVendorOwnerId($v),
                     'store_name' => $v->store_name ?? '',
                     'store_logo_path' => $this->storageUrl($v->store_logo_path),
                     'store_address' => $v->full_store_address,

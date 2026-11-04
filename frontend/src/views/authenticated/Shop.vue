@@ -81,7 +81,7 @@
       @buy="buyNowDirect"
       @vendor="selectVendorById"
     />
-    <ShopMap @visit="goToStorefront" />
+    <ShopMap v-model:page-filter="nearMeOnly" @visit="goToStorefront" @range="onShopRange" />
 
     <!-- Top sellers and featured shops, with the bouquet finder beside them -->
     <section class="shop-picks" aria-label="Popular right now">
@@ -222,7 +222,13 @@ const loadingPopular = ref(true);
 const fetchPopular = async () => {
   try {
     const { data } = await api.get("customer/products", {
-      params: { page: 1, per_page: 40, sort_by: "popular_desc", in_stock_only: 1 },
+      params: {
+        page: 1,
+        per_page: 40,
+        sort_by: "popular_desc",
+        in_stock_only: 1,
+        ...(nearMe.value ? { owner_ids: idsParam(nearMe.value.ownerIds) } : {}),
+      },
     });
     const list = Array.isArray(data?.data?.data) ? data.data.data : [];
     popularProducts.value = list.filter(isShopVisibleProduct);
@@ -267,6 +273,19 @@ const products = ref([]);
 
 // Live stats for the open product modal
 const vendors = ref([]);
+
+// ── Near me (the shop map's circle) ────────────────────────────────────────
+// With a pinned address, the page shows only the shops inside the circle,
+// until the customer switches it off (or removes the chip).
+const shopRange = ref(null); // { km, shopIds, ownerIds } from the map, null without a pin
+const nearMeOnly = ref(true);
+const nearMe = computed(() => (nearMeOnly.value && shopRange.value ? shopRange.value : null));
+const nearMeKey = computed(() => (nearMe.value ? `${nearMe.value.km}|${nearMe.value.ownerIds.join()}|${nearMe.value.shopIds.join()}` : ""));
+const onShopRange = (range) => {
+  shopRange.value = range;
+};
+// "0" means none: the server then lists nothing instead of everything
+const idsParam = (ids) => (ids.length ? ids.join(",") : "0");
 const selectedVendor = ref(null);
 const vendorSearch = ref("");
 const loadingVendors = ref(false);
@@ -342,6 +361,7 @@ const fetchVendors = async () => {
       per_page: vendorPagination.value.per_page,
     };
     if (vendorSearch.value) params.search = vendorSearch.value;
+    if (nearMe.value) params.ids = idsParam(nearMe.value.shopIds);
     const r = await api.get("vendors", { params });
     if (r.data.success) {
       const vendorData = Array.isArray(r.data.data?.data)
@@ -442,6 +462,7 @@ const buildQueryParams = () => {
     p.max_price = selectedFilters.value.priceMax;
   p.in_stock_only = selectedFilters.value.inStockOnly ? 1 : 0;
   p.sort_by = sortBy.value;
+  if (nearMe.value) p.owner_ids = idsParam(nearMe.value.ownerIds);
   return p;
 };
 
@@ -468,6 +489,7 @@ const activeFilterChips = computed(() => {
     ...f.category.map((v) => ({ key: `category-${v}`, type: "category", value: v, label: site.categories.find((c) => c.value === v)?.label || label(v) })),
     ...f.color.map((v) => ({ key: `color-${v}`, type: "color", value: v, label: label(v) })),
   ];
+  if (nearMe.value) chips.unshift({ key: "near-me", type: "near-me", label: `Within ${nearMe.value.km} km of you` });
   if (f.priceMin !== null || (f.priceMax !== null && f.priceMax !== Math.round(filterOptions.value.price_range?.max ?? -1))) {
     const min = f.priceMin !== null ? `₱${f.priceMin}` : "";
     const max = f.priceMax !== null ? `₱${f.priceMax}` : "";
@@ -477,6 +499,10 @@ const activeFilterChips = computed(() => {
 });
 const removeFilterChip = (chip) => {
   const f = selectedFilters.value;
+  if (chip.type === "near-me") {
+    nearMeOnly.value = false; // the watcher reloads the page's lists
+    return;
+  }
   if (chip.type === "price") {
     f.priceMin = null;
     f.priceMax = null;
@@ -570,8 +596,22 @@ const clearAllFilters = () => {
     inStockOnly: true,
   };
   pagination.value.current_page = 1;
+  if (nearMe.value) {
+    nearMeOnly.value = false; // the watcher reloads everything
+    return;
+  }
   fetchProducts();
 };
+
+// The circle changed (distance, pin, or switched on/off): reload what the page lists
+watch(nearMeKey, (now, before) => {
+  if (now === before) return;
+  pagination.value.current_page = 1;
+  vendorPagination.value.current_page = 1;
+  fetchProducts();
+  fetchPopular();
+  fetchVendors();
+});
 
 // ── Product helpers ───────────────────────────────────────────────────────
 const getProductImage = (product) => {
