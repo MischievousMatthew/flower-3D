@@ -35,8 +35,8 @@
       </section>
 
       <!-- New request -->
-      <section v-if="mode === 'new'" class="card">
-        <h2>New request</h2>
+      <section v-if="mode === 'new'" ref="newCard" class="card new-card" :class="{ flash: flashNew }" aria-labelledby="new-request-title">
+        <h2 id="new-request-title">New request</h2>
         <form class="form" novalidate @submit.prevent="submit">
           <!-- 1. The kind of problem -->
           <fieldset class="step">
@@ -185,13 +185,14 @@
       <section v-else class="card hint-card">
         <h2>Pick a request</h2>
         <p class="muted">Choose one on the left to see the conversation, or start a new request.</p>
+        <button type="button" class="btn primary hint-new" @click="startNew">+ New request</button>
       </section>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
@@ -370,15 +371,36 @@ const open = async (id) => {
 
 const clearFieldErrors = () => Object.keys(fieldErrors).forEach((k) => delete fieldErrors[k]);
 
-const startNew = () => {
+// The new request form; the button always brings it into view
+const newCard = ref(null);
+const flashNew = ref(false);
+
+const startNew = async ({ reveal = true } = {}) => {
   Object.assign(draft, blankDraft());
+  draftPhotos.value = [];
   subjectEdited.value = false;
   allOrders.value = false;
   error.value = "";
   clearFieldErrors();
   mode.value = "new";
+  // An open request in the link would reopen on refresh
+  if (route.query.ticket) {
+    const { ticket, ...rest } = route.query;
+    router.replace({ query: rest });
+  }
   if (!orders.value.length) loadOrders();
   else ordersLoaded.value = true;
+  if (!reveal) return;
+  // Show the form (it can be below the list or off screen) and put the cursor on the first choice
+  await nextTick();
+  const card = newCard.value;
+  if (!card) return;
+  card.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  card.querySelector("input:not([type=hidden]), textarea, button")?.focus({ preventScroll: true });
+  flashNew.value = false;
+  await nextTick();
+  flashNew.value = true;
+  setTimeout(() => (flashNew.value = false), 1200);
 };
 
 const firstError = (e) => {
@@ -470,7 +492,7 @@ onMounted(async () => {
   await loadList();
   const fromLink = linkedId("ticket");
   if (fromLink) open(fromLink);
-  else if (!tickets.value.length) startNew();
+  else if (!tickets.value.length) startNew({ reveal: false });
 });
 </script>
 
@@ -540,6 +562,21 @@ onMounted(async () => {
   margin: 0;
   color: var(--muted);
   font-size: 13.5px;
+}
+/* Lands below the fixed top bar when scrolled to */
+.new-card {
+  scroll-margin-top: 120px;
+}
+/* A short glow so it's clear where the form opened */
+.new-card.flash {
+  animation: newFlash 1.2s ease-out;
+}
+@keyframes newFlash {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); }
+  100% { box-shadow: 0 0 0 14px transparent; }
+}
+.hint-new {
+  margin-top: 14px;
 }
 .support-grid {
   display: grid;
@@ -1074,7 +1111,8 @@ onMounted(async () => {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sk {
+  .sk,
+  .new-card.flash {
     animation: none;
   }
 }
