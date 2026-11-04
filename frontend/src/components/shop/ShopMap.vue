@@ -173,11 +173,21 @@ async function render() {
   }
   if (home.value) {
     L.marker(home.value, { icon: homeIcon(), title: "Your address", zIndexOffset: 1000, keyboard: false }).addTo(map).bindTooltip("Your address");
-    drawCircle(true);
-  } else if (points.length) {
-    map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 14 });
+    drawCircle(false);
   }
-  setTimeout(() => map?.invalidateSize(), 0);
+  fitView();
+  // Once the map knows its real size, fit again (a fit made before that zooms too far out)
+  setTimeout(() => {
+    map?.invalidateSize();
+    fitView();
+  }, 120);
+}
+
+/** Zoom to the circle around the customer, or to all the shops */
+function fitView() {
+  if (!map) return;
+  if (circle) map.fitBounds(circle.getBounds(), { padding: [24, 24] });
+  else if (shops.value.length) map.fitBounds(L.latLngBounds(shops.value.map((s) => [s.latitude, s.longitude])), { padding: [48, 48], maxZoom: 14 });
 }
 
 async function load() {
@@ -364,6 +374,7 @@ onBeforeUnmount(() => {
 
 .smap-pin {
   position: relative;
+  box-sizing: border-box;
   display: grid;
   place-items: center;
   width: 48px;
@@ -388,9 +399,13 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
 }
 
-.smap-pin img {
-  width: 100%;
-  height: 100%;
+/* Leaflet sets width: auto on every marker image; the logo must fit the pin */
+.leaflet-container .leaflet-marker-pane .smap-pin img {
+  display: block;
+  width: 42px !important;
+  height: 42px !important;
+  max-width: 42px !important;
+  max-height: 42px !important;
   border-radius: 50%;
   object-fit: cover;
 }
