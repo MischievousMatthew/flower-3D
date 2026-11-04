@@ -112,6 +112,10 @@ const loading = ref(true);
 const error = ref(false);
 const radiusKm = ref(3);
 
+// Cavite, with a little room at the edges (Ternate and Maragondon in the west,
+// Carmona and GMA in the east, Tagaytay in the south, Bacoor and Kawit on the bay)
+const CAVITE = L.latLngBounds([14.02, 120.56], [14.54, 121.09]);
+
 let map = null;
 let circle = null;
 let shopLayer = null; // the shop pins, regrouped whenever the zoom changes
@@ -356,7 +360,13 @@ async function render() {
   await nextTick();
   if (!mapEl.value) return;
   map?.remove();
-  map = L.map(mapEl.value, { scrollWheelZoom: false, zoomControl: true }).setView(home.value || [14.5995, 120.9842], 12);
+  map = L.map(mapEl.value, {
+    scrollWheelZoom: false,
+    zoomControl: true,
+    // The map stays on Cavite: it can't be dragged or zoomed out past the province
+    maxBounds: CAVITE,
+    maxBoundsViscosity: 1,
+  }).setView(home.value || CAVITE.getCenter(), 12);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: "© OpenStreetMap contributors",
@@ -375,11 +385,20 @@ async function render() {
   // Once the map knows its real size, fit again (a fit made before that zooms too far out)
   setTimeout(() => {
     map?.invalidateSize();
+    lockZoomToCavite();
     fitView();
   }, 120);
 }
 
 /** Zoom to the circle around the customer, or to all the shops */
+/** No zooming out further than the whole of Cavite filling the map */
+function lockZoomToCavite() {
+  if (!map) return;
+  const zoom = map.getBoundsZoom(CAVITE, false);
+  map.setMinZoom(zoom);
+  if (map.getZoom() < zoom) map.setZoom(zoom);
+}
+
 function fitView() {
   if (!map) return;
   if (circle) map.fitBounds(circle.getBounds(), { padding: [24, 24] });
