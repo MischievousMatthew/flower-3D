@@ -85,7 +85,10 @@
                 <h2 class="nt-title">Notifications</h2>
                 <p class="nt-sub">{{ freshCount ? `${freshCount} new` : "You're all caught up" }}</p>
               </div>
-              <button v-if="noticeUnread" type="button" class="nt-action" @click="readAllNotices">Mark all read</button>
+              <button type="button" class="nt-action" :disabled="!freshCount" @click="readAll">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2.5 12.5 4 4L13 10M10.5 16.5 17 10M14.5 16.5 21 10" /></svg>
+                {{ freshCount ? "Mark all as read" : "All read" }}
+              </button>
             </header>
 
             <div class="nt-scroll">
@@ -527,6 +530,12 @@ const openNotice = async (notice) => {
   openedNotice.value = notice;
 };
 const openedNotice = ref(null);
+// Everything new in the panel: BloomCraft notices on the server, order updates on this device
+const readAll = async () => {
+  markOrderNotificationsAsSeen(orderNotifications.value);
+  freshIds.value = new Set();
+  if (noticeUnread.value || notices.value.some((n) => !n.read)) await readAllNotices();
+};
 const readAllNotices = async () => {
   notices.value.forEach((n) => (n.read = true));
   noticeUnread.value = 0;
@@ -939,8 +948,11 @@ onUnmounted(() => {
 }
 
 .nt-action {
-  min-height: 32px;
-  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
   border-radius: 999px;
   background: #e9f5ed;
   color: var(--leaf-deep);
@@ -949,8 +961,24 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-.nt-action:hover {
+.nt-action:hover:not(:disabled) {
   background: #dcefe2;
+}
+
+.nt-action:disabled {
+  background: var(--ivory);
+  color: var(--ink-soft);
+  cursor: default;
+}
+
+.nt-action svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .nt-scroll {
