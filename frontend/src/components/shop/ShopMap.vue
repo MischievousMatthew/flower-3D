@@ -70,6 +70,7 @@ const radiusKm = ref(3);
 
 let map = null;
 let circle = null;
+let shopLayer = null; // the shop pins, regrouped whenever the zoom changes
 
 // The signed-in customer's own pin and photo (the session user doesn't carry them)
 const me = ref(null);
@@ -160,6 +161,116 @@ function popupFor(shop) {
   return box;
 }
 
+// Pins closer than this on screen would cover each other, so they share one stacked pin
+const OVERLAP_PX = 40;
+
+/** Groups the shops whose pins would overlap at the current zoom */
+function groupShops() {
+  const groups = [];
+  for (const shop of shops.value) {
+    const at = map.latLngToLayerPoint([shop.latitude, shop.longitude]);
+    const near = groups.find((g) => g.at.distanceTo(at) < OVERLAP_PX);
+    if (near) near.shops.push(shop);
+    else groups.push({ at, shops: [shop] });
+  }
+  return groups;
+}
+
+function drawShops() {
+  if (!map || !shopLayer) return;
+  shopLayer.clearLayers();
+  for (const { shops: group } of groupShops()) {
+    if (group.length === 1) {
+      const shop = group[0];
+      L.marker([shop.latitude, shop.longitude], { icon: shopIcon(shop), title: shop.store_name, alt: shop.store_name, riseOnHover: true })
+        .addTo(shopLayer)
+        .bindPopup(popupFor(shop), { closeButton: true });
+      continue;
+    }
+    const center = L.latLngBounds(group.map((s) => [s.latitude, s.longitude])).getCenter();
+    const names = group.map((s) => s.store_name).join(", ");
+    const marker = L.marker(center, { icon: stackIcon(group), title: names, alt: `${group.length} shops: ${names}`, riseOnHover: true }).addTo(shopLayer);
+    marker.on("click", () => openStack(marker, group));
+  }
+}
+
+/** Zoom in until the shops separate; if they never would, list them instead */
+function openStack(marker, group) {
+  const bounds = L.latLngBounds(group.map((s) => [s.latitude, s.longitude]));
+  const target = Math.min(map.getBoundsZoom(bounds, false, L.point(OVERLAP_PX * 3, OVERLAP_PX * 3)), map.getMaxZoom());
+  const apart = (zoom) => {
+    const points = group.map((s) => map.project([s.latitude, s.longitude], zoom));
+    return points.every((a, i) => points.every((b, j) => i === j || a.distanceTo(b) >= OVERLAP_PX));
+  };
+  if (target > map.getZoom() && apart(target)) {
+    map.flyToBounds(bounds, { padding: [80, 80], maxZoom: target });
+    return;
+  }
+  marker.bindPopup(stackPopup(group), { closeButton: true, maxWidth: 300 }).openPopup();
+}
+
+// Up to three logos fanned out, with how many shops share the spot
+function stackIcon(group) {
+  const faces = group
+    .slice(0, 3)
+    .map((shop, i) => {
+      const face = shop.store_logo_path
+        ? `<img src="${escapeHtml(shop.store_logo_path)}" alt="" loading="lazy" />`
+        : `<span>${escapeHtml(shop.store_name?.charAt(0) || "B")}</span>`;
+      return `<span class="smap-stack-face" style="--i:${i}">${face}</span>`;
+    })
+    .join("");
+  const width = 48 + Math.min(group.length - 1, 2) * 18;
+  return L.divIcon({
+    className: "smap-pin-wrap",
+    html: `<span class="smap-stack" style="width:${width}px">${faces}<b>${group.length}</b></span>`,
+    iconSize: [width, 58],
+    iconAnchor: [width / 2, 58],
+    popupAnchor: [0, -54],
+  });
+}
+
+// A list of the shops at one spot, each with its own Visit button
+function stackPopup(group) {
+  const box = document.createElement("div");
+  box.className = "smap-popup smap-popup--list";
+  const title = document.createElement("strong");
+  title.textContent = `${group.length} shops here`;
+  box.appendChild(title);
+  for (const shop of group) {
+    const row = document.createElement("div");
+    row.className = "smap-popup-row";
+    const logo = document.createElement("span");
+    logo.className = "smap-popup-logo";
+    if (shop.store_logo_path) {
+      const img = document.createElement("img");
+      img.src = shop.store_logo_path;
+      img.alt = "";
+      logo.appendChild(img);
+    } else {
+      logo.textContent = shop.store_name?.charAt(0) || "B";
+    }
+    const text = document.createElement("span");
+    text.className = "smap-popup-text";
+    const name = document.createElement("b");
+    name.textContent = shop.store_name;
+    text.appendChild(name);
+    const detail = document.createElement("small");
+    detail.textContent = home.value
+      ? `${distanceKm(home.value, [shop.latitude, shop.longitude]).toFixed(1)} km from your address`
+      : shop.store_address || "";
+    if (detail.textContent) text.appendChild(detail);
+    const visit = document.createElement("button");
+    visit.type = "button";
+    visit.textContent = "Visit";
+    visit.setAttribute("aria-label", `Visit ${shop.store_name}`);
+    visit.addEventListener("click", () => emit("visit", shop.id));
+    row.append(logo, text, visit);
+    box.appendChild(row);
+  }
+  return box;
+}
+
 function drawCircle(fit = true) {
   if (!map) return;
   circle?.remove();
@@ -185,14 +296,9 @@ async function render() {
     attribution: "© OpenStreetMap contributors",
   }).addTo(map);
 
-  const points = [];
-  for (const shop of shops.value) {
-    const at = [shop.latitude, shop.longitude];
-    points.push(at);
-    L.marker(at, { icon: shopIcon(shop), title: shop.store_name, alt: shop.store_name, riseOnHover: true })
-      .addTo(map)
-      .bindPopup(popupFor(shop), { closeButton: true });
-  }
+  shopLayer = L.layerGroup().addTo(map);
+  drawShops();
+  map.on("zoomend", drawShops);
   if (home.value) {
     L.marker(home.value, { icon: homeIcon(), title: "Your address", alt: "Your address", zIndexOffset: 1000 })
       .addTo(map)
@@ -239,6 +345,7 @@ onMounted(load);
 onBeforeUnmount(() => {
   map?.remove();
   map = null;
+  shopLayer = null;
 });
 </script>
 
@@ -481,6 +588,133 @@ onBeforeUnmount(() => {
   letter-spacing: 0.04em;
   transform: translateX(-50%);
   white-space: nowrap;
+}
+
+.smap-stack {
+  position: relative;
+  display: block;
+  height: 48px;
+}
+
+.smap-stack-face {
+  position: absolute;
+  top: 0;
+  left: calc(var(--i) * 18px);
+  z-index: calc(3 - var(--i));
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #f2f5f2;
+  box-shadow: 0 6px 16px -4px rgba(54, 63, 78, 0.45);
+}
+
+.leaflet-container .leaflet-marker-pane .smap-stack-face img {
+  display: block;
+  width: 42px !important;
+  height: 42px !important;
+  max-width: 42px !important;
+  max-height: 42px !important;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.smap-stack-face span {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: #2e7a4f;
+}
+
+.smap-stack::after {
+  content: "";
+  position: absolute;
+  left: 24px;
+  bottom: -10px;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 10px solid #fff;
+  transform: translateX(-50%);
+}
+
+.smap-stack b {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #2e7a4f;
+  color: #fff;
+  font: 600 11px/1 "Poppins", -apple-system, "Segoe UI", sans-serif;
+}
+
+.leaflet-marker-icon:hover .smap-stack {
+  transform: translateY(-2px);
+}
+
+.smap-popup--list {
+  gap: 8px;
+  min-width: 240px;
+}
+
+.smap-popup-row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(54, 63, 78, 0.08);
+}
+
+.smap-popup-logo {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #f2f5f2;
+  color: #2e7a4f;
+  font-weight: 600;
+}
+
+.smap-popup-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.smap-popup-text {
+  display: grid;
+  min-width: 0;
+}
+
+.smap-popup-text b {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  color: #363f4e;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.smap-popup-text small {
+  font-size: 11.5px;
+  color: #6a7282;
+}
+
+.smap-popup .smap-popup-row button {
+  margin-top: 0;
 }
 
 .smap-home {
