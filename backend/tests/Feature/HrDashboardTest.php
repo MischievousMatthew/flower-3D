@@ -119,6 +119,56 @@ class HrDashboardTest extends TestCase
         $this->assertTrue(collect($res->json('data.activity'))->firstWhere('name', 'Ana Cruz')['flagged']);
     }
 
+    public function test_the_export_sums_up_a_period_per_person(): void
+    {
+        $vendor = $this->shopOwner();
+        [$rosa, $cy] = [$this->profile($vendor), $this->profile($vendor, ['first_name' => 'Cy'])];
+        $this->scan($vendor, $rosa, '2026-10-19', '17:00:00');
+        $this->scan($vendor, $rosa, '2026-10-20', '17:00:00');
+        $this->scan($vendor, $rosa, '2026-09-30', '17:00:00'); // before the period
+        $this->leave($vendor, $cy, '2026-09-29', '2026-10-02', 'approved'); // 2 of its days fall in October
+        $this->leave($vendor, $cy, '2026-10-25', '2026-10-25', 'pending');
+        Payroll::forceCreate(['owner_id' => $vendor->id, 'employee_id' => $rosa->id, 'period_start' => '2026-10-01', 'period_end' => '2026-10-15', 'gross_salary' => 9000, 'deduction_amount' => 1000, 'net_salary' => 8000, 'status' => 'paid']);
+
+        $res = $this->signIn($vendor)->getJson('/api/hr/dashboard/export?from=2026-10-01&to=2026-10-21')->assertOk();
+        $res->assertJsonPath('data.with_pay', true)
+            ->assertJsonPath('data.summary.headcount', 2)
+            ->assertJsonPath('data.summary.present', 2)
+            ->assertJsonPath('data.summary.leave_days', 2)
+            ->assertJsonPath('data.summary.waiting.leave', 1)
+            ->assertJsonPath('data.leave.0.days', 2);
+        $this->assertEquals(8000, $res->json('data.summary.net_pay'));
+        $rosaRow = collect($res->json('data.people'))->firstWhere('name', 'Rosa Cruz');
+        $this->assertSame(2, $rosaRow['present']);
+        $this->assertEquals(9000, $rosaRow['gross_pay']);
+        $this->assertSame(2, collect($res->json('data.people'))->firstWhere('name', 'Cy Cruz')['leave_days']);
+
+        // At most three months at a time
+        $this->getJson('/api/hr/dashboard/export?from=2026-01-01&to=2026-10-21')->assertStatus(422);
+    }
+
+    public function test_the_export_needs_its_permission_and_shows_pay_only_to_payroll_viewers(): void
+    {
+        $vendor = $this->shopOwner();
+        $rosa = $this->profile($vendor);
+        Payroll::forceCreate(['owner_id' => $vendor->id, 'employee_id' => $rosa->id, 'period_start' => '2026-10-01', 'period_end' => '2026-10-15', 'net_salary' => 8000, 'status' => 'paid']);
+        $grant = fn (Employee $e, string $module, string $permission) => DB::table('employee_module_permissions')->insert([
+            'owner_id' => $vendor->id, 'employee_id' => $e->id, 'module' => $module, 'permission' => $permission,
+            'access' => 'granular', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $viewer = Employee::forceCreate(['owner_id' => $vendor->id, 'name' => 'Vic', 'email' => 'vic@example.com', 'password' => 'x', 'status' => 'Active']);
+        $grant($viewer, 'hr_dashboard', 'view');
+        $hr = Employee::forceCreate(['owner_id' => $vendor->id, 'name' => 'Hana', 'email' => 'hana@example.com', 'password' => 'x', 'status' => 'Active']);
+        $grant($hr, 'hr_dashboard', 'view');
+        $grant($hr, 'hr_dashboard', 'export');
+
+        $url = '/api/hr/dashboard/export?from=2026-10-01&to=2026-10-21';
+        $this->signIn($viewer)->getJson($url)->assertForbidden();
+        $this->app['auth']->forgetGuards();
+        $res = $this->signIn($hr)->getJson($url)->assertOk()->assertJsonPath('data.with_pay', false)->assertJsonPath('data.summary.net_pay', null);
+        $this->assertArrayNotHasKey('net_pay', $res->json('data.people.0'));
+    }
+
     public function test_staff_need_only_the_hr_dashboard_permission(): void
     {
         $vendor = $this->shopOwner();

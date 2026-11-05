@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Employee;
 use App\Models\EmployeeAttendance;
 use App\Models\EmployeeInfo;
 use App\Models\EmployeeLeave;
 use App\Models\OvertimeRequest;
 use App\Models\Payroll;
 use App\Models\StaffShift;
+use App\Services\Attendance\AttendanceCalculator;
 use App\Traits\ScopesOwner;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -87,6 +91,117 @@ class HrDashboardController extends Controller
             'leave_today' => $leaveToday->take(6)->map(fn ($l) => $this->leaveRow($l, $byId))->values(),
             'upcoming_leave' => $upcoming->map(fn ($l) => $this->leaveRow($l, $byId))->values(),
             'payroll' => $this->lastPayroll($ownerId),
+        ]]);
+    }
+
+    /**
+     * GET /hr/dashboard/export?from&to — the HR report for a period, for the
+     * dashboard's Export: a summary, one row per person (attendance, leave,
+     * overtime, and pay when the person exporting may see payroll), the
+     * approved leave and what is still waiting for a decision.
+     */
+    public function export(Request $request, AttendanceCalculator $calculator): JsonResponse
+    {
+        $data = $request->validate([
+            'from' => 'required|date',
+            'to' => 'required|date|after_or_equal:from',
+        ]);
+        $from = Carbon::parse($data['from'])->startOfDay();
+        $to = Carbon::parse($data['to'])->endOfDay();
+        if ($from->diffInDays($to) > AttendanceCalculator::MAX_RANGE_DAYS) {
+            throw ValidationException::withMessages(['from' => 'Choose a range of three months or less.']);
+        }
+
+        $ownerId = $this->getOwnerId();
+        $user = $request->user();
+        // Pay is private: only for those who may see payroll
+        $withPay = ! $user instanceof Employee || $user->hasModulePermission('payroll', 'view');
+
+        $report = $calculator->report($ownerId, $from, $to);
+        $profiles = EmployeeInfo::forOwner($ownerId)->get(['id', 'employment_status', 'date_hired'])->keyBy('id');
+
+        // Approved leave inside the period, counted by the days that fall in it
+        $leaves = EmployeeLeave::forOwner($ownerId)->where('status', 'approved')
+            ->whereDate('start_date', '<=', $to->toDateString())->whereDate('end_date', '>=', $from->toDateString())
+            ->orderBy('start_date')->get(['id', 'employee_id', 'leave_type', 'start_date', 'end_date', 'is_paid']);
+        $daysIn = fn ($l) => (int) Carbon::parse(max($l->start_date->toDateString(), $from->toDateString()))
+            ->diffInDays(Carbon::parse(min($l->end_date->toDateString(), $to->toDateString()))) + 1;
+        $leaveByPerson = $leaves->groupBy('employee_id')->map(fn ($rows) => $rows->sum($daysIn));
+
+        $pay = collect();
+        if ($withPay) {
+            $pay = Payroll::forOwner($ownerId)->whereIn('status', ['approved', 'paid'])
+                ->whereDate('period_end', '>=', $from->toDateString())->whereDate('period_end', '<=', $to->toDateString())
+                ->get(['employee_id', 'gross_salary', 'deduction_amount', 'net_salary'])
+                ->groupBy('employee_id')
+                ->map(fn ($rows) => ['gross' => round((float) $rows->sum('gross_salary'), 2), 'deductions' => round((float) $rows->sum('deduction_amount'), 2), 'net' => round((float) $rows->sum('net_salary'), 2)]);
+        }
+
+        $names = collect($report['people'])->pluck('name', 'employee_id');
+        $people = collect($report['people'])->map(function ($p) use ($profiles, $leaveByPerson, $pay, $withPay) {
+            $profile = $profiles->get($p['employee_id']);
+            $row = [
+                'name' => $p['name'],
+                'position' => $p['position'],
+                'status' => $profile?->employment_status,
+                'date_hired' => $profile?->date_hired ? Carbon::parse($profile->date_hired)->toDateString() : null,
+                'scheduled' => $p['scheduled'],
+                'present' => $p['present'],
+                'absent' => $p['absent'],
+                'on_leave' => $p['on_leave'],
+                'attendance_rate' => $p['scheduled'] ? round(min($p['present'], $p['scheduled']) / $p['scheduled'] * 100) : null,
+                'late' => $p['late'],
+                'late_minutes' => $p['late_minutes'],
+                'undertime' => $p['undertime'],
+                'missing_out' => $p['missing_out'],
+                'hours' => $p['hours'],
+                'overtime_hours' => round(($p['overtime_approved_minutes'] ?? 0) / 60, 2),
+                'leave_days' => (int) ($leaveByPerson[$p['employee_id']] ?? 0),
+            ];
+            if ($withPay) {
+                $row += ['gross_pay' => $pay[$p['employee_id']]['gross'] ?? 0, 'deductions' => $pay[$p['employee_id']]['deductions'] ?? 0, 'net_pay' => $pay[$p['employee_id']]['net'] ?? 0];
+            }
+
+            return $row;
+        })->values();
+
+        $active = $profiles->filter(fn ($p) => ! in_array(strtolower((string) $p->employment_status), self::GONE, true));
+        $t = $report['totals'];
+
+        return response()->json(['success' => true, 'data' => [
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'with_pay' => $withPay,
+            'summary' => [
+                'headcount' => $active->count(),
+                'by_status' => $active->groupBy(fn ($p) => $p->employment_status ?: 'Not set')->map->count(),
+                'hired' => $profiles->filter(fn ($p) => $p->date_hired && Carbon::parse($p->date_hired)->between($from, $to))->count(),
+                'scheduled' => $t['scheduled'],
+                'present' => $t['present'],
+                'absent' => $t['absent'],
+                'attendance_rate' => $t['scheduled'] ? round(min($t['present'], $t['scheduled']) / $t['scheduled'] * 100) : null,
+                'late' => $t['late'],
+                'late_minutes' => $t['late_minutes'],
+                'hours' => $t['hours'],
+                'overtime_hours' => round($t['overtime_approved_minutes'] / 60, 2),
+                'leave_days' => (int) $leaveByPerson->sum(),
+                'net_pay' => $withPay ? round((float) $pay->sum('net'), 2) : null,
+                'waiting' => [
+                    'leave' => EmployeeLeave::forOwner($ownerId)->where('status', 'pending')->count(),
+                    'overtime' => OvertimeRequest::where('owner_id', $ownerId)->where('status', 'pending')->count(),
+                    'attendance' => EmployeeAttendance::forOwner($ownerId)->where('review_status', 'pending')->count(),
+                    'payroll' => Payroll::forOwner($ownerId)->where('status', 'pending')->count(),
+                ],
+            ],
+            'people' => $people,
+            'leave' => $leaves->map(fn ($l) => [
+                'name' => $names[$l->employee_id] ?? 'Former employee',
+                'type' => $l->leave_type,
+                'start_date' => $l->start_date->toDateString(),
+                'end_date' => $l->end_date->toDateString(),
+                'days' => $daysIn($l),
+                'paid' => (bool) $l->is_paid,
+            ])->values(),
         ]]);
     }
 
