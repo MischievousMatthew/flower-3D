@@ -87,7 +87,17 @@ return [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '5432'),
+            // Supabase's pooler in session mode (5432) allows only 15 clients at
+            // once; every request in flight holds one, so a busy ERP page ran out
+            // and sign-in failed ("max clients reached in session mode").
+            // Transaction mode (6543) shares connections between requests.
+            // DB_POOL_MODE=session goes back to the old port.
+            'port' => str_contains((string) env('DB_HOST', ''), 'pooler.supabase.com') && env('DB_POOL_MODE', 'transaction') === 'transaction'
+                ? 6543
+                : env('DB_PORT', '5432'),
+            // Transaction mode can't keep named prepared statements between
+            // requests; this sends each query with its typed values instead
+            'options' => defined('PDO::PGSQL_ATTR_DISABLE_PREPARES') ? [PDO::PGSQL_ATTR_DISABLE_PREPARES => true] : [],
             'database' => env('DB_DATABASE', 'laravel'),
             'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),
