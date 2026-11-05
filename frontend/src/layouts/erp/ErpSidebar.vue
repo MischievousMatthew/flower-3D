@@ -17,9 +17,10 @@
     <nav ref="navEl" class="es-nav">
       <section v-for="section in sections" :key="section.label" class="es-section">
         <h2 class="es-label">{{ section.label }}</h2>
+        <template v-for="(item, index) in section.items" :key="item.key">
+        <!-- A smaller group name inside the section (Procurement: Inventory, Supply Chain) -->
+        <h3 v-if="item.sub && item.sub !== section.items[index - 1]?.sub" class="es-sublabel">{{ item.sub }}</h3>
         <router-link
-          v-for="item in section.items"
-          :key="item.key"
           :to="item.path"
           class="es-item"
           active-class=""
@@ -36,6 +37,7 @@
           <span v-else-if="!allowed(item)" class="es-lock" aria-label="Your role can't open this" v-html="ICONS.lock"></span>
           <span v-else-if="badgeFor(item.key) > 0" class="es-badge" :aria-label="`${badgeFor(item.key)} unread`">{{ badgeFor(item.key) > 99 ? "99+" : badgeFor(item.key) }}</span>
         </router-link>
+        </template>
       </section>
 
     </nav>
@@ -244,6 +246,26 @@ watch(
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--v-faint);
+}
+/* A group inside a section: smaller than the items, a step under the section name */
+.es-sublabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px 4px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--v-muted);
+}
+.es-sublabel::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--v-border);
+}
+.es-label + .es-sublabel {
+  padding-top: 4px;
 }
 .es *,
 .es *::before,

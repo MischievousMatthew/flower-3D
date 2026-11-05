@@ -45,22 +45,41 @@ const EXTRA_PATHS = {
   funding_requests: ["/erp/finance/funding-request/"],
 };
 
+// Procurement holds two smaller groups in the sidebar: Inventory, then Supply
+// Chain (its dashboard first). Supply Chain modules keep their own permission group.
+const NAV_PLACE = {
+  inventory_products: { section: "Procurement", sub: "Inventory" },
+  inventory_funding: { section: "Procurement", sub: "Inventory" },
+};
+const SUB_ORDER = ["Inventory", "Supply Chain"];
+// Shorter names where the subheading already says it
+const NAV_LABEL = { sc_dashboard: "Dashboard" };
+
 export const ERP_NAV = (() => {
   const sections = new Map();
   for (const mod of ERP_MODULES) {
-    const group = mod.navGroup ?? mod.group;
+    const place = NAV_PLACE[mod.key] ?? (mod.group === "Supply Chain" ? { section: "Procurement", sub: "Supply Chain" } : null);
+    const group = place?.section ?? mod.navGroup ?? mod.group;
     const label = SECTION_LABELS[group] ?? group;
     if (!sections.has(label)) sections.set(label, { label, group, items: [] });
     sections.get(label).items.push({
       key: mod.key,
       // The permission that opens it (usually the module itself)
       access: mod.access ?? mod.key,
-      label: mod.label,
+      label: NAV_LABEL[mod.key] ?? mod.label,
+      // Its full name, for the page header
+      title: mod.label,
+      sub: place?.sub ?? null,
       icon: ICON_FOR[mod.icon] ?? "grid",
       // A module with sub-pages has no page of its own, so open its first one
       path: mod.children?.[0]?.path ?? mod.path,
       paths: [mod.path, ...(mod.children ?? []).map((c) => c.path), ...(EXTRA_PATHS[mod.key] ?? [])],
     });
+  }
+  // Within a section, its groups in order (items keep their own order inside each)
+  for (const section of sections.values()) {
+    const rank = (item) => (item.sub ? SUB_ORDER.indexOf(item.sub) : -1);
+    section.items = section.items.map((item, i) => ({ item, i })).sort((a, b) => rank(a.item) - rank(b.item) || a.i - b.i).map(({ item }) => item);
   }
   return [...sections.values()];
 })();

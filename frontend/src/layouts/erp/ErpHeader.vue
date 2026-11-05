@@ -3,8 +3,8 @@
     <button type="button" class="eh-icon-btn eh-menu" aria-label="Open menu" @click="toggleMobile" v-html="ICONS.menu"></button>
 
     <div class="eh-where">
-      <span v-if="place" class="eh-crumb">{{ place.section.label }}</span>
-      <h1 class="eh-title">{{ place?.item.label || "Workspace" }}</h1>
+      <span v-if="place" class="eh-crumb">{{ place.section.label }}<template v-if="place.item.sub"> · {{ place.item.sub }}</template></span>
+      <h1 class="eh-title">{{ place?.item.title || place?.item.label || "Workspace" }}</h1>
     </div>
 
     <div class="eh-actions">
