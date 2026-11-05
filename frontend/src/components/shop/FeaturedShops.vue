@@ -28,7 +28,7 @@
             <h3>{{ shop.store_name }}</h3>
             <p v-if="shop.store_address" class="fs-place">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z" /><circle cx="12" cy="10" r="2.2" /></svg>
-              {{ shop.store_address }}
+              {{ shop.store_address }}<template v-if="nearby[shop.id] == null && distances[shop.id] != null"> · {{ distance(distances[shop.id]) }}</template>
             </p>
             <div class="fs-foot">
               <span class="fs-meta">{{ shop.same_day_delivery ? "Same-day delivery" : `From ₱${Math.round(shop.price_min || 0).toLocaleString()}` }}</span>
@@ -53,10 +53,6 @@
       <span>We couldn't load the shops just now.</span>
       <button type="button" class="fs-link" @click="$emit('retry')">Try again</button>
     </div>
-    <div v-else-if="nearKm != null" class="fs-empty fs-empty--row">
-      <span>No shops within {{ nearKm }} km of your address yet.</span>
-      <button type="button" class="fs-link" @click="$emit('show-all')">Show all shops</button>
-    </div>
     <p v-else class="fs-empty">Shops will appear here once they open on BloomCraft.</p>
   </section>
 </template>
@@ -71,21 +67,17 @@ import { computed } from "vue";
 const props = defineProps({
   shops: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
-  nearby: { type: Object, default: () => ({}) }, // shop id → distance in km
+  nearby: { type: Object, default: () => ({}) }, // shops inside the map's circle: id → km (tagged "Near you")
+  distances: { type: Object, default: () => ({}) }, // every shop: id → km, as the map measures it
   byRoad: { type: Boolean, default: true },
   failed: { type: Boolean, default: false }, // the list couldn't be loaded
-  nearKm: { type: Number, default: null }, // only shops this close are asked for
   total: { type: Number, default: 0 }, // shops in all, shown 8 at a time
   loadingMore: { type: Boolean, default: false },
 });
-defineEmits(["visit", "retry", "show-all", "more"]);
+defineEmits(["visit", "retry", "more"]);
 
-// Near ones first. Shops added by "Explore more" stay after the ones already shown.
-const ordered = computed(() => {
-  const first = props.shops.slice(0, 8);
-  const byNear = (a, b) => (props.nearby[a.id] ?? Infinity) - (props.nearby[b.id] ?? Infinity);
-  return [...first.sort(byNear), ...props.shops.slice(8)];
-});
+// The page asks the server for the nearest shops first, so the order is kept as is
+const ordered = computed(() => props.shops);
 const remaining = computed(() => Math.max(0, props.total - props.shops.length));
 const distance = (km) => {
   const text = km < 1 ? `${Math.round(km * 1000)} m` : `${Number(km).toFixed(1)} km`;

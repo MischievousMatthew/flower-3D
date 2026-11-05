@@ -428,7 +428,9 @@ function focusShop(shop) {
   map.flyTo([shop.latitude, shop.longitude], Math.max(map.getZoom(), 17), { duration: 0.8 });
 }
 
-// Tell the page which shops are inside the circle (null when the customer has no pin)
+// Tell the page which shops are inside the circle, and every shop's distance
+// (straight line, as the circle and the list here measure it), so the page
+// shows the same numbers. Null when the customer has no pin.
 function emitRange() {
   emit(
     "range",
@@ -437,6 +439,7 @@ function emitRange() {
           km: radiusKm.value,
           shopIds: inRange.value.map((item) => item.shop.id),
           ownerIds: inRange.value.map((item) => item.shop.owner_id).filter(Boolean),
+          distances: Object.fromEntries(byDistance.value.map((item) => [item.shop.id, Math.round(item.km * 10) / 10])),
         }
       : null,
   );
@@ -447,7 +450,7 @@ watch(radiusKm, () => {
   drawShops();
 });
 watch(
-  () => [home.value?.join(), radiusKm.value, inRange.value.map((item) => item.shop.id).join()],
+  () => [home.value?.join(), radiusKm.value, byDistance.value.map((item) => `${item.shop.id}:${item.km.toFixed(1)}`).join()],
   emitRange,
   { immediate: true },
 );

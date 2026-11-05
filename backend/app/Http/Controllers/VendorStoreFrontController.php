@@ -215,6 +215,15 @@ class VendorStorefrontController extends Controller
                 $query->where('price_max', '<=', (float) $request->max_price);
             }
 
+            // In this order first (e.g. nearest to the customer), then the newest
+            if ($request->filled('order_ids')) {
+                $order = array_slice(array_values(array_unique(array_filter(array_map('intval', explode(',', (string) $request->order_ids))))), 0, 200);
+                if ($order) {
+                    $cases = collect($order)->map(fn ($id, $i) => "WHEN {$id} THEN {$i}")->implode(' ');
+                    $query->orderByRaw("CASE id {$cases} ELSE " . count($order) . ' END');
+                }
+            }
+
             $perPage = min((int) $request->get('per_page', 8), 50);
             $vendors = $query->orderBy('created_at', 'desc')->paginate($perPage);
             $formattedVendors = $vendors->getCollection()

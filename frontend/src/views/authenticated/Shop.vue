@@ -194,16 +194,15 @@
           id="flower-shops"
           :shops="vendors"
           :loading="loadingVendors"
-          :nearby="nearbyById"
-          :by-road="nearbyByRoad"
+          :nearby="nearInCircle"
+          :distances="shopDistances"
+          :by-road="false"
           :failed="vendorsFailed"
-          :near-km="nearMe ? nearMe.km : null"
           :total="vendorPagination.total"
           :loading-more="loadingMoreVendors"
           @visit="goToStorefront"
           @more="fetchVendors({ append: true })"
           @retry="fetchVendors()"
-          @show-all="nearMeOnly = false"
         />
       </div>
     </section>
@@ -284,7 +283,6 @@ const fetchPopular = async () => {
 const featuredIds = computed(() => new Set(featuredProducts.value.map((product) => product.id)));
 const topSelling = computed(() => popularProducts.value.filter((product) => !featuredIds.value.has(product.id)).slice(0, 5));
 const showTopSelling = computed(() => topSelling.value.length >= 3 && popularProducts.value.length >= 8);
-const nearbyById = computed(() => Object.fromEntries(nearbyStores.value.map((store) => [store.id, store.distance_km])));
 const productImage = (p) => p.primary_image?.image_url || p.images?.[0]?.image_url || null;
 const occasionImages = computed(() => {
   const images = {};
@@ -429,7 +427,9 @@ const fetchVendors = async ({ append = false } = {}) => {
     per_page: SHOPS_PER_PAGE,
   };
   if (vendorSearch.value) params.search = vendorSearch.value;
-  if (nearMe.value) params.ids = idsParam(nearMe.value.shopIds);
+  // Every shop is listed; with a pin, nearest first (across all pages)
+  const nearestFirst = Object.entries(shopDistances.value).sort((a, b) => a[1] - b[1]).map(([id]) => id);
+  if (nearestFirst.length) params.order_ids = nearestFirst.slice(0, 200).join(",");
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const r = await api.get("vendors", { params });
@@ -493,28 +493,16 @@ const clearVendorFilter = () => {
   pagination.value.current_page = 1;
   fetchProducts();
 };
-// ── Stores near the customer's pinned location ────────────────────────────
-const nearbyStores = ref([]);
-const nearbyHasPin = ref(false);
-const nearbyLoaded = ref(false);
-const nearbyRadiusKm = ref(5);
-const nearbyByRoad = ref(true); // false only if the routing service was unavailable
-const fetchNearbyStores = async () => {
-  if (!isAuthenticated.value) return;
-  try {
-    const { data } = await api.get("/stores/nearby");
-    if (data.success) {
-      nearbyStores.value = data.data || [];
-      nearbyHasPin.value = !!data.has_pin;
-      nearbyRadiusKm.value = data.radius_km || 5;
-      nearbyByRoad.value = data.distance_type !== "straight";
-    }
-  } catch (error) {
-    console.error("fetchNearbyStores:", error);
-  } finally {
-    nearbyLoaded.value = true;
-  }
-};
+// ── Shops near the customer ──────────────────────────────────────────────
+// The map measures every shop's distance from the customer's pin (in a
+// straight line, like its circle). The shop cards use those same numbers, so a
+// shop never shows two different distances. "Near you" is for the shops
+// inside the circle; every shop is listed, nearest first.
+const shopDistances = computed(() => shopRange.value?.distances ?? {});
+const nearInCircle = computed(() => {
+  const inside = new Set(shopRange.value?.shopIds ?? []);
+  return Object.fromEntries(Object.entries(shopDistances.value).filter(([id]) => inside.has(Number(id))));
+});
 
 const goToStorefront = (storeId) =>
   router.push({
@@ -722,10 +710,13 @@ function onSortChange() {
 watch(nearMeKey, (now, before) => {
   if (now === before) return;
   pagination.value.current_page = 1;
-  vendorPagination.value.current_page = 1;
   fetchProducts();
   fetchPopular();
-  fetchVendors();
+});
+// The shops list doesn't narrow to the circle; it only re-sorts once the distances are known
+const shopOrderKey = computed(() => Object.entries(shopDistances.value).sort((a, b) => a[1] - b[1]).map(([id]) => id).join());
+watch(shopOrderKey, (now, before) => {
+  if (now !== before) fetchVendors();
 });
 
 // ── Product helpers ───────────────────────────────────────────────────────
@@ -1008,7 +999,7 @@ onMounted(async () => {
   await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors(), fetchFeatured(), fetchPopular()]);
   if (fromContentLink) setTimeout(() => scrollToSection("products"), 50);
   if (isAuthenticated.value) {
-    await Promise.all([loadCart(), fetchNearbyStores()]);
+    await loadCart();
   } else {
     await loadPendingActionFromStorage();
   }
