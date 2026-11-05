@@ -198,8 +198,11 @@
           :by-road="nearbyByRoad"
           :failed="vendorsFailed"
           :near-km="nearMe ? nearMe.km : null"
+          :total="vendorPagination.total"
+          :loading-more="loadingMoreVendors"
           @visit="goToStorefront"
-          @retry="fetchVendors"
+          @more="fetchVendors({ append: true })"
+          @retry="fetchVendors()"
           @show-all="nearMeOnly = false"
         />
       </div>
@@ -413,13 +416,17 @@ watch(isAuthenticated, async (val) => {
 let vendorRequest = 0;
 const vendorsFailed = ref(false);
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const fetchVendors = async () => {
+// 8 shops at a time; "Explore more shops" adds the next 8 below (append)
+const SHOPS_PER_PAGE = 8;
+const loadingMoreVendors = ref(false);
+const fetchVendors = async ({ append = false } = {}) => {
   const mine = ++vendorRequest;
-  loadingVendors.value = !vendors.value.length;
+  if (append) loadingMoreVendors.value = true;
+  else loadingVendors.value = !vendors.value.length;
   vendorsFailed.value = false;
   const params = {
-    page: vendorPagination.value.current_page,
-    per_page: vendorPagination.value.per_page,
+    page: append ? vendorPagination.value.current_page + 1 : 1,
+    per_page: SHOPS_PER_PAGE,
   };
   if (vendorSearch.value) params.search = vendorSearch.value;
   if (nearMe.value) params.ids = idsParam(nearMe.value.shopIds);
@@ -429,21 +436,30 @@ const fetchVendors = async () => {
       if (mine !== vendorRequest) return;
       if (!r.data.success) throw new Error("vendors not loaded");
       const vendorData = Array.isArray(r.data.data?.data) ? r.data.data.data : [];
-      vendors.value = vendorData;
+      if (append) {
+        const seen = new Set(vendors.value.map((v) => v.id));
+        vendors.value = [...vendors.value, ...vendorData.filter((v) => !seen.has(v.id))];
+      } else {
+        vendors.value = vendorData;
+      }
       vendorPagination.value = {
-        current_page: r.data.data?.current_page ?? 1,
+        current_page: r.data.data?.current_page ?? params.page,
         last_page: r.data.data?.last_page ?? 1,
-        per_page: r.data.data?.per_page ?? vendorData.length,
-        total: r.data.data?.total ?? vendorData.length,
+        per_page: SHOPS_PER_PAGE,
+        total: r.data.data?.total ?? vendors.value.length,
       };
       loadingVendors.value = false;
+      loadingMoreVendors.value = false;
       return;
     } catch (e) {
       if (mine !== vendorRequest) return;
       if (attempt === 2) {
         console.error(e);
-        vendorsFailed.value = true;
+        // A failed "more" keeps the shops already shown
+        if (append) toast.error("Couldn't load more shops. Please try again.");
+        else vendorsFailed.value = true;
         loadingVendors.value = false;
+        loadingMoreVendors.value = false;
         return;
       }
       await wait(attempt ? 4000 : 1500);

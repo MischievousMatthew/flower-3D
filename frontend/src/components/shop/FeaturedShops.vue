@@ -37,7 +37,18 @@
           </div>
         </article>
       </li>
+      <!-- The next shops on their way -->
+      <template v-if="loadingMore">
+        <li v-for="n in Math.min(4, remaining)" :key="`more-${n}`" class="bc-skeleton fs-skel" aria-hidden="true"></li>
+      </template>
     </ul>
+    <div v-if="!loading && shops.length && remaining > 0" class="fs-more">
+      <button type="button" class="fs-more-btn" :disabled="loadingMore" @click="$emit('more')">
+        {{ loadingMore ? "Loading shops…" : "Explore more shops" }}
+        <span v-if="!loadingMore" class="fs-more-count">{{ remaining }} more</span>
+        <svg v-if="!loadingMore" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      </button>
+    </div>
     <div v-else-if="failed" class="fs-empty fs-empty--row" role="alert">
       <span>We couldn't load the shops just now.</span>
       <button type="button" class="fs-link" @click="$emit('retry')">Try again</button>
@@ -64,12 +75,18 @@ const props = defineProps({
   byRoad: { type: Boolean, default: true },
   failed: { type: Boolean, default: false }, // the list couldn't be loaded
   nearKm: { type: Number, default: null }, // only shops this close are asked for
+  total: { type: Number, default: 0 }, // shops in all, shown 8 at a time
+  loadingMore: { type: Boolean, default: false },
 });
-defineEmits(["visit", "retry", "show-all"]);
+defineEmits(["visit", "retry", "show-all", "more"]);
 
-const ordered = computed(() =>
-  [...props.shops].sort((a, b) => (props.nearby[a.id] ?? Infinity) - (props.nearby[b.id] ?? Infinity)).slice(0, 8),
-);
+// Near ones first. Shops added by "Explore more" stay after the ones already shown.
+const ordered = computed(() => {
+  const first = props.shops.slice(0, 8);
+  const byNear = (a, b) => (props.nearby[a.id] ?? Infinity) - (props.nearby[b.id] ?? Infinity);
+  return [...first.sort(byNear), ...props.shops.slice(8)];
+});
+const remaining = computed(() => Math.max(0, props.total - props.shops.length));
 const distance = (km) => {
   const text = km < 1 ? `${Math.round(km * 1000)} m` : `${Number(km).toFixed(1)} km`;
   return props.byRoad ? text : `${text} away`;
@@ -290,6 +307,62 @@ const distance = (km) => {
   margin: 0;
   font-size: 13px;
   color: var(--ink-soft);
+}
+
+.fs-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 26px;
+}
+
+.fs-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 22px 0 26px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.2s var(--ease-out), color 0.2s var(--ease-out);
+}
+
+.fs-more-btn:hover:not(:disabled) {
+  background: var(--ink);
+  color: #fff;
+}
+
+.fs-more-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.fs-more-count {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--leaf) 16%, transparent);
+  font-size: 12px;
+  color: var(--leaf-deep);
+}
+
+.fs-more-btn:hover:not(:disabled) .fs-more-count {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.fs-more-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .fs-empty--row {
