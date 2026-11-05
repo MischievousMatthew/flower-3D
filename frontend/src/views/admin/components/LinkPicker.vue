@@ -62,24 +62,24 @@ const setType = (type) => {
   gap: 6px;
   font-size: 12px;
   font-weight: 500;
-  color: #475569;
+  color: var(--a-text-2);
 }
 .input {
   padding: 9px 11px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--a-border);
   border-radius: 9px;
   font-size: 13px;
-  color: #1e2739;
-  background: #fff;
+  color: var(--a-text);
+  background: var(--a-surface);
   font-family: inherit;
 }
 .input:focus {
   outline: none;
-  border-color: #7c6ff7;
+  border-color: var(--a-accent);
   box-shadow: 0 0 0 3px rgba(124, 111, 247, 0.12);
 }
 .hint {
-  color: #94a3b8;
+  color: var(--a-faint);
   font-weight: 400;
 }
 @media (max-width: 560px) {

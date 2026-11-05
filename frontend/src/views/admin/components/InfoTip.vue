@@ -51,16 +51,16 @@ onBeforeUnmount(() => document.removeEventListener("click", closeOutside));
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: #94a3b8;
+  color: var(--a-faint);
   cursor: help;
 }
 .it-btn:hover,
 .it-btn[aria-expanded="true"] {
-  color: #5b4fc9;
-  background: #f1efff;
+  color: var(--a-accent-text);
+  background: var(--a-accent-soft);
 }
 .it-btn:focus-visible {
-  outline: 2px solid #7c6ff7;
+  outline: 2px solid var(--a-accent);
   outline-offset: 1px;
 }
 .it-btn svg {

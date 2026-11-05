@@ -38,12 +38,76 @@
       </template>
     </nav>
 
+    <!-- Appearance: light / dark and the theme color, saved in this browser -->
+    <Transition name="ap-pop">
+      <section v-if="appearanceOpen" id="admin-appearance" ref="appearanceEl" class="ap" role="dialog" aria-label="Appearance" @keydown.esc.stop="closeAppearance(true)">
+        <h3 class="ap-title">Appearance</h3>
+
+        <p class="ap-label" id="ap-mode-label">Mode</p>
+        <div class="ap-seg" role="radiogroup" aria-labelledby="ap-mode-label">
+          <button
+            v-for="m in MODES"
+            :key="m.value"
+            type="button"
+            role="radio"
+            :aria-checked="theme.mode.value === m.value"
+            :class="{ on: theme.mode.value === m.value }"
+            @click="theme.setMode(m.value)"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" v-html="m.icon"></svg>
+            {{ m.label }}
+          </button>
+        </div>
+
+        <p class="ap-label" id="ap-color-label">Theme color</p>
+        <div class="ap-swatches" role="radiogroup" aria-labelledby="ap-color-label">
+          <button
+            v-for="p in ADMIN_ACCENT_PRESETS"
+            :key="p.value"
+            type="button"
+            role="radio"
+            class="ap-swatch"
+            :style="{ '--sw': p.value }"
+            :aria-checked="theme.accent.value === p.value"
+            :aria-label="p.name"
+            :title="p.name"
+            @click="theme.setAccent(p.value)"
+          >
+            <svg v-if="theme.accent.value === p.value" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
+          </button>
+          <!-- Any color -->
+          <label class="ap-swatch ap-custom" :class="{ on: isCustomAccent }" :style="isCustomAccent ? { '--sw': theme.accent.value } : null" title="Pick any color">
+            <input type="color" :value="theme.accent.value" aria-label="Pick any theme color" @input="theme.setAccent($event.target.value)" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          </label>
+        </div>
+
+        <div class="ap-foot">
+          <span class="ap-preview" aria-hidden="true"><i></i>Buttons and highlights</span>
+          <button v-if="theme.accent.value !== DEFAULT_ADMIN_ACCENT" type="button" class="ap-reset" @click="theme.resetAccent()">Reset color</button>
+        </div>
+      </section>
+    </Transition>
+
     <div class="profile">
       <span class="profile-avatar">{{ initials }}</span>
       <div class="profile-text">
         <span class="profile-name">{{ adminAccess.access.name || "Administrator" }}</span>
         <span class="profile-role">{{ adminAccess.access.role || "Admin" }}</span>
       </div>
+      <button
+        ref="appearanceBtn"
+        type="button"
+        class="logout-btn ap-toggle"
+        :class="{ on: appearanceOpen }"
+        title="Appearance"
+        aria-label="Appearance: theme color and dark mode"
+        :aria-expanded="appearanceOpen"
+        aria-controls="admin-appearance"
+        @click="appearanceOpen ? closeAppearance() : (appearanceOpen = true)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" v-html="ICONS.palette"></svg>
+      </button>
       <button type="button" class="logout-btn" :disabled="signingOut" :title="signingOut ? 'Signing out…' : 'Sign out'" :aria-label="signingOut ? 'Signing out' : 'Sign out'" @click="handleLogout">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" v-html="ICONS.logout"></svg>
       </button>
@@ -58,6 +122,7 @@ import { useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import { useSidebarState } from "../../composables/useSidebarState";
 import { useAdminAccess } from "../../composables/useAdminAccess";
+import { ADMIN_ACCENT_PRESETS, DEFAULT_ADMIN_ACCENT, useAdminTheme } from "../../composables/useAdminTheme";
 import api from "../../plugins/axios";
 
 // Lucide-style outline icons (24×24, stroke)
@@ -80,7 +145,32 @@ const ICONS = {
   settings: '<line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/>',
   health: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
+  palette: '<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.56-2.5 5.56-5.55C21.97 6.01 17.46 2 12 2z"/>',
 };
+
+// ── Appearance ────────────────────────────────────────────────────────
+const MODES = [
+  { value: "light", label: "Light", icon: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>' },
+  { value: "dark", label: "Dark", icon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>' },
+  { value: "system", label: "Device", icon: '<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/>' },
+];
+const theme = useAdminTheme();
+const isCustomAccent = computed(() => !ADMIN_ACCENT_PRESETS.some((p) => p.value === theme.accent.value));
+const appearanceOpen = ref(false);
+const appearanceEl = ref(null);
+const appearanceBtn = ref(null);
+function closeAppearance(focusButton = false) {
+  appearanceOpen.value = false;
+  if (focusButton) appearanceBtn.value?.focus();
+}
+// A click anywhere else closes it
+function onDocPointer(event) {
+  if (!appearanceOpen.value) return;
+  if (appearanceEl.value?.contains(event.target) || appearanceBtn.value?.contains(event.target)) return;
+  closeAppearance();
+}
+onMounted(() => document.addEventListener("pointerdown", onDocPointer));
+onUnmounted(() => document.removeEventListener("pointerdown", onDocPointer));
 
 const GROUPS = [
   {
@@ -202,8 +292,8 @@ watch(
   z-index: 200;
   display: flex;
   flex-direction: column;
-  background: #ffffff;
-  border-right: 1px solid #eceef5;
+  background: var(--a-surface);
+  border-right: 1px solid var(--a-border);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -219,7 +309,7 @@ watch(
   height: 36px;
   border-radius: 10px;
   object-fit: contain;
-  background: #f5f3ff;
+  background: var(--a-accent-soft);
   padding: 3px;
 }
 .brand-text {
@@ -230,13 +320,13 @@ watch(
 .brand-name {
   font-size: 15.5px;
   font-weight: 700;
-  color: #1e2739;
+  color: var(--a-text);
   letter-spacing: -0.2px;
 }
 .brand-tag {
   font-size: 11px;
   font-weight: 500;
-  color: #8b80f9;
+  color: var(--a-accent-text);
 }
 
 /* Navigation */
@@ -245,7 +335,7 @@ watch(
   overflow-y: auto;
   padding: 6px 12px 12px;
   scrollbar-width: thin;
-  scrollbar-color: #e2e8f0 transparent;
+  scrollbar-color: var(--a-border) transparent;
 }
 .nav-group {
   display: flex;
@@ -263,7 +353,7 @@ watch(
   font-weight: 600;
   letter-spacing: 0.8px;
   text-transform: uppercase;
-  color: #a0a8b8;
+  color: var(--a-faint);
 }
 .nav-item {
   position: relative;
@@ -272,18 +362,18 @@ watch(
   gap: 10px;
   padding: 8px 10px;
   border-radius: 10px;
-  color: #5b6475;
+  color: var(--a-muted);
   font-size: 13px;
   font-weight: 500;
   text-decoration: none;
   transition: background 0.15s, color 0.15s;
 }
 .nav-item:hover {
-  background: #f6f5ff;
-  color: #1e2739;
+  background: var(--a-accent-soft);
+  color: var(--a-text);
 }
 .nav-item:focus-visible {
-  outline: 2px solid #7c6ff7;
+  outline: 2px solid var(--a-accent);
   outline-offset: 1px;
 }
 .nav-icon {
@@ -294,8 +384,8 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #f4f5f9;
-  color: #6b7385;
+  background: var(--a-subtle);
+  color: var(--a-muted);
   transition: background 0.15s, color 0.15s;
 }
 .nav-icon svg {
@@ -303,8 +393,8 @@ watch(
   height: 17px;
 }
 .nav-item:hover .nav-icon {
-  background: #ede9fe;
-  color: #6d5ff0;
+  background: var(--a-accent-soft-2);
+  color: var(--a-accent-text);
 }
 .nav-text {
   flex: 1;
@@ -312,8 +402,8 @@ watch(
   line-height: 1.25;
 }
 .nav-item.active {
-  background: linear-gradient(135deg, #f1efff, #ebe7ff);
-  color: #4c3fd0;
+  background: linear-gradient(135deg, var(--a-accent-soft), var(--a-accent-soft));
+  color: var(--a-accent-text);
   font-weight: 600;
 }
 .nav-item.active::before {
@@ -324,11 +414,11 @@ watch(
   bottom: 8px;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: #7c6ff7;
+  background: var(--a-accent);
 }
 .nav-item.active .nav-icon {
-  background: linear-gradient(135deg, #8f84ff, #6d5ff0);
-  color: #fff;
+  background: linear-gradient(135deg, var(--a-accent-light), var(--a-accent-hover));
+  color: var(--a-accent-ink);
   box-shadow: 0 4px 10px rgba(109, 95, 240, 0.28);
 }
 .nav-badge {
@@ -349,7 +439,7 @@ watch(
 .sk {
   display: block;
   border-radius: 8px;
-  background: linear-gradient(100deg, #eef1f6 30%, #f8fafc 50%, #eef1f6 70%);
+  background: linear-gradient(100deg, var(--a-subtle-2) 30%, var(--a-subtle) 50%, var(--a-subtle-2) 70%);
   background-size: 300% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
 }
@@ -374,9 +464,9 @@ watch(
   gap: 10px;
   margin: 8px 12px 14px;
   padding: 10px;
-  border: 1px solid #eceef5;
+  border: 1px solid var(--a-border);
   border-radius: 14px;
-  background: #fafaff;
+  background: var(--a-subtle);
 }
 .profile-avatar {
   width: 34px;
@@ -386,8 +476,8 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #8f84ff, #5b4fc9);
-  color: #fff;
+  background: linear-gradient(135deg, var(--a-accent-light), var(--a-accent-deep));
+  color: var(--a-accent-ink);
   font-size: 12.5px;
   font-weight: 600;
 }
@@ -407,11 +497,11 @@ watch(
 .profile-name {
   font-size: 12.5px;
   font-weight: 600;
-  color: #1e2739;
+  color: var(--a-text);
 }
 .profile-role {
   font-size: 11px;
-  color: #8a93a6;
+  color: var(--a-muted);
 }
 .logout-btn {
   width: 32px;
@@ -420,7 +510,7 @@ watch(
   border: 1px solid transparent;
   border-radius: 9px;
   background: transparent;
-  color: #94a3b8;
+  color: var(--a-faint);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -432,18 +522,202 @@ watch(
   height: 17px;
 }
 .logout-btn:hover:not(:disabled) {
-  color: #e11d48;
-  background: #fff1f2;
-  border-color: #fecdd3;
+  color: var(--a-red-text);
+  background: var(--a-red-soft);
+  border-color: var(--a-red-border);
 }
 .logout-btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
+.logout-btn:focus-visible {
+  outline: 2px solid var(--a-accent);
+  outline-offset: 2px;
+}
+.ap-toggle:hover:not(:disabled),
+.ap-toggle.on {
+  color: var(--a-accent-text);
+  background: var(--a-accent-soft);
+  border-color: var(--a-accent-muted);
+}
+
+/* Appearance panel, just above the profile */
+.ap {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 78px;
+  z-index: 5;
+  padding: 14px;
+  border: 1px solid var(--a-border);
+  border-radius: 14px;
+  background: var(--a-surface);
+  box-shadow: 0 18px 40px -16px rgba(15, 23, 42, 0.35);
+}
+.ap-title {
+  margin: 0 0 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--a-text);
+}
+.ap-label {
+  margin: 10px 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--a-faint);
+}
+.ap-seg {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--a-subtle-2);
+}
+.ap-seg button {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-height: 44px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--a-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.ap-seg button svg {
+  width: 16px;
+  height: 16px;
+}
+.ap-seg button:hover {
+  color: var(--a-text);
+}
+.ap-seg button.on {
+  background: var(--a-surface);
+  color: var(--a-accent-text);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+.ap-seg button:focus-visible,
+.ap-swatch:focus-visible,
+.ap-custom:has(input:focus-visible),
+.ap-reset:focus-visible {
+  outline: 2px solid var(--a-accent);
+  outline-offset: 2px;
+}
+.ap-swatches {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+.ap-swatch {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  min-height: 32px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--sw);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  transition: transform 0.15s;
+}
+.ap-swatch:hover {
+  transform: scale(1.08);
+}
+.ap-swatch[aria-checked="true"],
+.ap-custom.on {
+  border-color: var(--a-surface);
+  box-shadow: 0 0 0 2px var(--sw);
+}
+.ap-swatch svg {
+  width: 14px;
+  height: 14px;
+}
+.ap-custom {
+  background: conic-gradient(#f43f5e, #f59e0b, #22c55e, #0ea5e9, #8b5cf6, #f43f5e);
+  overflow: hidden;
+}
+.ap-custom.on {
+  background: var(--sw);
+}
+.ap-custom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.ap-custom svg {
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+.ap-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+}
+.ap-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--a-muted);
+}
+.ap-preview i {
+  width: 22px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--a-accent);
+}
+.ap-reset {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--a-accent-text);
+  cursor: pointer;
+}
+.ap-reset:hover {
+  background: var(--a-accent-soft);
+}
+.ap-pop-enter-active,
+.ap-pop-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+.ap-pop-enter-from,
+.ap-pop-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ap-pop-enter-active,
+  .ap-pop-leave-active,
+  .ap-swatch {
+    transition: none;
+  }
+}
 .signing-out {
   margin: -8px 14px 12px;
   font-size: 11.5px;
-  color: #8a93a6;
+  color: var(--a-muted);
   text-align: center;
 }
 

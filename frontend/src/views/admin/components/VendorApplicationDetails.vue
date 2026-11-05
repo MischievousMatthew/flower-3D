@@ -239,15 +239,15 @@ const formatDateTime = (v) =>
   gap: 12px;
 }
 .card {
-  background: #fff;
-  border: 1px solid #e9edf3;
+  background: var(--a-surface);
+  border: 1px solid var(--a-border);
   border-radius: 12px;
   padding: 14px 16px;
   min-width: 0;
 }
 .card.warn {
-  border-color: #fecaca;
-  background: #fff7f7;
+  border-color: var(--a-red-border);
+  background: var(--a-red-soft);
 }
 .card-head {
   display: flex;
@@ -262,7 +262,7 @@ const formatDateTime = (v) =>
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: #94a3b8;
+  color: var(--a-faint);
   margin-bottom: 8px;
 }
 .card-head .card-label {
@@ -270,11 +270,11 @@ const formatDateTime = (v) =>
 }
 .sub {
   font-size: 11.5px;
-  color: #94a3b8;
+  color: var(--a-faint);
 }
 .strong {
   font-weight: 600;
-  color: #1e2739;
+  color: var(--a-text);
   font-size: 13px;
 }
 .facts {
@@ -285,11 +285,11 @@ const formatDateTime = (v) =>
   font-size: 13px;
 }
 .facts dt {
-  color: #94a3b8;
+  color: var(--a-faint);
 }
 .facts dd {
   margin: 0;
-  color: #1e2739;
+  color: var(--a-text);
   overflow-wrap: anywhere;
 }
 .doc-grid {
@@ -303,16 +303,16 @@ const formatDateTime = (v) =>
   align-items: flex-start;
   gap: 2px;
   padding: 8px;
-  border: 1px solid #e9edf3;
+  border: 1px solid var(--a-border);
   border-radius: 10px;
-  background: #fbfcfe;
+  background: var(--a-subtle);
   cursor: pointer;
   text-align: left;
   transition: border-color 0.15s, box-shadow 0.15s;
   min-width: 0;
 }
 .doc:hover:not(:disabled) {
-  border-color: #c7c2fb;
+  border-color: var(--a-accent-muted);
   box-shadow: 0 4px 14px rgba(124, 111, 247, 0.12);
 }
 .doc.missing {
@@ -323,8 +323,8 @@ const formatDateTime = (v) =>
   width: 100%;
   aspect-ratio: 4 / 3;
   border-radius: 7px;
-  background: #f1f5f9;
-  color: #94a3b8;
+  background: var(--a-subtle-2);
+  color: var(--a-faint);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -339,39 +339,39 @@ const formatDateTime = (v) =>
 .doc-label {
   font-size: 12px;
   font-weight: 500;
-  color: #1e2739;
+  color: var(--a-text);
 }
 .doc-meta {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--a-faint);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
 }
 .doc.missing .doc-meta {
-  color: #dc2626;
+  color: var(--a-red-text);
 }
 .progress {
   height: 6px;
   border-radius: 6px;
-  background: #f1f5f9;
+  background: var(--a-subtle-2);
   overflow: hidden;
 }
 .progress span {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #a79ffb, #6d5ff0);
+  background: linear-gradient(90deg, var(--a-accent-light-2), var(--a-accent-hover));
 }
 .checks {
   display: flex;
   gap: 14px;
   margin-top: 10px;
   font-size: 12.5px;
-  color: #94a3b8;
+  color: var(--a-faint);
 }
 .checks .done {
-  color: #15803d;
+  color: var(--a-green-text);
 }
 .masked {
   display: inline-flex;
@@ -381,9 +381,9 @@ const formatDateTime = (v) =>
   font-size: 12px;
   padding: 2px 7px;
   border-radius: 6px;
-  background: #f8fafc;
-  border: 1px solid #eef1f6;
-  color: #475569;
+  background: var(--a-subtle);
+  border: 1px solid var(--a-border);
+  color: var(--a-text-2);
 }
 .portfolio {
   display: grid;
@@ -407,12 +407,12 @@ const formatDateTime = (v) =>
 .quote {
   margin: 0;
   font-size: 13px;
-  color: #334155;
+  color: var(--a-text-2);
   white-space: pre-wrap;
 }
 .resub {
   padding: 10px 0;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--a-border);
 }
 .resub:first-of-type {
   border-top: none;
@@ -435,7 +435,7 @@ const formatDateTime = (v) =>
   flex-direction: column;
   gap: 2px;
   font-size: 12.5px;
-  color: #475569;
+  color: var(--a-text-2);
   margin-top: 4px;
 }
 .pill {
@@ -444,31 +444,31 @@ const formatDateTime = (v) =>
   border-radius: 20px;
   font-size: 10.5px;
   font-weight: 600;
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--a-subtle-2);
+  color: var(--a-muted);
 }
-.rs-resubmitted { background: #dbeafe; color: #1d4ed8; }
+.rs-resubmitted { background: var(--a-blue-soft); color: var(--a-blue-text); }
 .rs-needs_resubmission,
-.rs-pending_resubmission { background: #fef3c7; color: #b45309; }
+.rs-pending_resubmission { background: var(--a-amber-soft); color: var(--a-amber-text); }
 .rs-completed,
-.rs-approved { background: #dcfce7; color: #15803d; }
+.rs-approved { background: var(--a-green-soft); color: var(--a-green-text); }
 .link-btn {
   border: none;
   background: none;
-  color: #6d5ff0;
+  color: var(--a-accent-text);
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
   padding: 0;
 }
 .mini-btn {
-  border: 1px solid #e2e8f0;
-  background: #fff;
+  border: 1px solid var(--a-border);
+  background: var(--a-surface);
   border-radius: 7px;
   padding: 5px 10px;
   font-size: 12px;
   font-weight: 500;
-  color: #475569;
+  color: var(--a-text-2);
   cursor: pointer;
 }
 .mini-btn.ok {
@@ -489,7 +489,7 @@ const formatDateTime = (v) =>
   }
 }
 .expired {
-  color: #b4413a;
+  color: var(--a-red-text);
   font-weight: 600;
 }
 </style>

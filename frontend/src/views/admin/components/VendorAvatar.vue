@@ -22,8 +22,8 @@ watch(() => props.vendor.logo_url, () => (broken.value = false));
 <style scoped>
 .v-avatar {
   border-radius: 50%;
-  background: linear-gradient(135deg, #7c6ff7, #5b4fc9);
-  color: #fff;
+  background: linear-gradient(135deg, var(--a-accent), var(--a-accent-deep));
+  color: var(--a-accent-ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;

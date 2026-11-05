@@ -1,0 +1,110 @@
+/*
+ * Admin panel colors. Every admin page reads these --a-* tokens instead of
+ * fixed colors, so the panel can switch to dark mode (html[data-admin-theme="dark"],
+ * set by composables/useAdminTheme.js on admin pages only). The accent
+ * (--a-accent*) comes from the theme color the admin picks and is set from JS.
+ * Light values are the exact colors the pages were designed with.
+ */
+:root {
+  --a-bg: #f8fafc;
+  --a-surface: #ffffff;
+  --a-subtle: #f8fafc;
+  --a-subtle-2: #f1f5f9;
+  --a-track: #e2e8f0;
+  --a-border: #e9edf3;
+  --a-border-strong: #cbd5e1;
+  --a-text: #1e2739;
+  --a-text-2: #475569;
+  --a-muted: #64748b;
+  --a-faint: #94a3b8;
+
+  --a-green-soft: #dcfce7;
+  --a-green-text: #15803d;
+  --a-green-border: #bbf7d0;
+  --a-red-soft: #fee2e2;
+  --a-red-text: #b91c1c;
+  --a-red-border: #fecaca;
+  --a-amber-soft: #fef3c7;
+  --a-amber-text: #b45309;
+  --a-amber-border: #fde68a;
+  --a-blue-soft: #e0f2fe;
+  --a-blue-text: #0369a1;
+  --a-blue-border: #bfdbfe;
+  --a-purple-text: #6d28d9;
+  --a-pink-soft: #fce7f3;
+  --a-pink-text: #be185d;
+
+  /* Until the theme script runs: the original violet */
+  --a-accent: #7c6ff7;
+  --a-accent-hover: #6d5ff0;
+  --a-accent-deep: #5b4fc9;
+  --a-accent-strong: #4c3fd0;
+  --a-accent-light: #8f84ff;
+  --a-accent-light-2: #a79ffb;
+  --a-accent-soft: #f5f3ff;
+  --a-accent-soft-2: #ede9fe;
+  --a-accent-muted: #c7c2fb;
+  --a-accent-text: #5b4fc9;
+  --a-accent-ink: #ffffff;
+}
+
+html[data-admin-theme="dark"] {
+  color-scheme: dark;
+  --a-bg: #0f141b;
+  --a-surface: #161c25;
+  --a-subtle: #1b222c;
+  --a-subtle-2: #222a36;
+  --a-track: #2a3340;
+  --a-border: #2a3340;
+  --a-border-strong: #3a4555;
+  --a-text: #e6eaf0;
+  --a-text-2: #c3cad5;
+  --a-muted: #95a0b0;
+  --a-faint: #6f7a8b;
+
+  --a-green-soft: #163323;
+  --a-green-text: #86efac;
+  --a-green-border: #1f5134;
+  --a-red-soft: #3a1d22;
+  --a-red-text: #fca5a5;
+  --a-red-border: #5c2a31;
+  --a-amber-soft: #3a2a12;
+  --a-amber-text: #fcd34d;
+  --a-amber-border: #5a431c;
+  --a-blue-soft: #172a45;
+  --a-blue-text: #93c5fd;
+  --a-blue-border: #24406a;
+  --a-purple-text: #c4b5fd;
+  --a-pink-soft: #3a1a2c;
+  --a-pink-text: #f9a8d4;
+}
+
+html[data-admin-theme="dark"] body {
+  background: var(--a-bg);
+}
+
+/* Shared panels the admin pages borrow from the shop portal (return cases,
+   support) read the portal's --v-* tokens: give them the same dark values */
+html[data-admin-theme="dark"] {
+  --v-bg: var(--a-bg);
+  --v-surface: var(--a-surface);
+  --v-raised: #1d2430;
+  --v-subtle: var(--a-subtle);
+  --v-subtle-2: var(--a-subtle-2);
+  --v-input: #121821;
+  --v-border: var(--a-border);
+  --v-border-strong: var(--a-border-strong);
+  --v-text: var(--a-text);
+  --v-text-2: var(--a-text-2);
+  --v-muted: var(--a-muted);
+  --v-faint: var(--a-faint);
+  --v-red-soft: var(--a-red-soft);
+  --v-red-text: var(--a-red-text);
+  --v-amber-soft: var(--a-amber-soft);
+  --v-amber-text: var(--a-amber-text);
+  --v-blue-soft: var(--a-blue-soft);
+  --v-blue-text: var(--a-blue-text);
+  --v-green-soft: var(--a-green-soft);
+  --v-green-text: var(--a-green-text);
+  --v-purple-text: var(--a-purple-text);
+}

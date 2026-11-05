@@ -64,10 +64,10 @@ const status = computed(() => {
   margin: 2px 0 0;
 }
 .pr-admin {
-  --pr-text: #64748b;
-  --pr-met: #15803d;
-  --pr-track: #eef0f4;
-  --pr-done: #16a34a;
+  --pr-text: var(--a-muted, #64748b);
+  --pr-met: var(--a-green-text, #15803d);
+  --pr-track: var(--a-subtle-2, #eef0f4);
+  --pr-done: var(--a-green-text, #16a34a);
 }
 .pr-vendor {
   --pr-text: var(--v-muted, #64748b);

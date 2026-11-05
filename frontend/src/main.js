@@ -5,6 +5,8 @@ import router from "./router/index.js";
 import { configurePhilippineDateTimeDefaults } from "./utils/philippineDateTime";
 import { applyVendorTheme } from "./composables/useVendorTheme";
 import "./styles/vendor-theme.css";
+import "./styles/admin-theme.css";
+import { applyAdminTheme } from "./composables/useAdminTheme";
 import "./styles/float-fields.css";
 import { installModalCloseGuard } from "./utils/modalCloseGuard";
 import { vPhone } from "./utils/phone";
@@ -35,5 +37,6 @@ app.use(router);
 app.directive("phone", vPhone);
 // Theme color and dark mode for the vendor pages
 applyVendorTheme(router);
+applyAdminTheme(router);
 
 app.mount("#app");

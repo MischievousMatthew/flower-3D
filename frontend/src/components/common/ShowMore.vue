@@ -87,9 +87,9 @@ onBeforeUnmount(() => observer?.disconnect());
   padding: 18px 0 6px;
 }
 .sm-admin {
-  --sm-text: #64748b;
-  --sm-track: #e2e8f0;
-  --sm-accent: #5b4fc9;
+  --sm-text: var(--a-muted, #64748b);
+  --sm-track: var(--a-track, #e2e8f0);
+  --sm-accent: var(--a-accent-text, #5b4fc9);
 }
 .sm-customer {
   --sm-text: var(--ink-soft, #5c6573);
