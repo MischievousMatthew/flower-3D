@@ -33,6 +33,13 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot()
     {
+        // New tables get Row Level Security as soon as their migration runs,
+        // so Supabase's public Data API never exposes them (see RowLevelSecurity)
+        \Illuminate\Support\Facades\Event::listen(
+            \Illuminate\Database\Events\MigrationsEnded::class,
+            fn () => \App\Support\RowLevelSecurity::enableEverywhere(),
+        );
+
         // Error messages use plain field names ("employee", not "employee id")
         Validator::resolver(fn ($translator, $data, $rules, $messages, $attributes) => new FriendlyValidator($translator, $data, $rules, $messages, $attributes));
 
