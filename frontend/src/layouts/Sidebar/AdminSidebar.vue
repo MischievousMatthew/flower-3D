@@ -3,7 +3,8 @@
 
   <aside class="sidebar" :class="{ 'mobile-open': isMobileOpen }" aria-label="Admin navigation">
     <div class="brand">
-      <img src="/bloomcraft-blankBg.png" alt="" width="36" height="36" class="brand-logo" />
+      <!-- The light "B" on dark mode, so the logo doesn't sink into the dark sidebar -->
+      <img :src="theme.isDark.value ? '/bloomcraft-darkmode-removebg.png' : '/bloomcraft-blankBg.png'" alt="" width="36" height="36" class="brand-logo" :class="{ 'on-dark': theme.isDark.value }" />
       <div class="brand-text">
         <span class="brand-name">BloomCraft</span>
         <span class="brand-tag">Admin console</span>
@@ -302,15 +303,23 @@ watch(
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 18px 18px 14px;
+  margin: 0 12px;
+  padding: 18px 6px 14px;
+  /* The menu scrolls under here; the line keeps the two apart */
+  border-bottom: 1px solid var(--a-border);
 }
 .brand-logo {
+  flex: none;
   width: 36px;
   height: 36px;
   border-radius: 10px;
   object-fit: contain;
   background: var(--a-accent-soft);
   padding: 3px;
+}
+.brand-logo.on-dark {
+  background: var(--a-subtle-2);
+  box-shadow: inset 0 0 0 1px var(--a-border-strong);
 }
 .brand-text {
   display: flex;
