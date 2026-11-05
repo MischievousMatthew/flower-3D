@@ -118,7 +118,7 @@
 
             <section v-else-if="activeStep === 'fillers'" class="fc-step-panel">
               <h2>Add fillers</h2>
-              <p class="fc-step-lede">Greenery and small blooms between the stems. {{ placedFillers.length }} of {{ maxFillers }} used.</p>
+              <p class="fc-step-lede">Greenery and small blooms between the stems. {{ fillerTypesUsed }} of {{ maxFillers }} kinds used. Adding the same filler again doesn't count.</p>
               <div class="fc-suggest">
                 <button type="button" class="fc-suggest-btn" :disabled="!placedFillers.length" @click="suggestArrangement('filler')">
                   <BcIcon name="sparkle" />
@@ -744,6 +744,9 @@ const filteredFillers = computed(() => {
 const isStem = (item) => (item?.kind || "flower") === "flower";
 const placedFlowers = computed(() => selectedFlowers.value.filter(isStem));
 const placedFillers = computed(() => selectedFlowers.value.filter((item) => item.kind === "filler"));
+// The filler limit counts different fillers: the same filler again counts once
+const fillerTypesUsed = computed(() => new Set(placedFillers.value.map((item) => Number(item.id))).size);
+const fillerAllowed = (filler) => fillerTypesUsed.value < maxFillers.value || placedFillers.value.some((item) => Number(item.id) === Number(filler?.id));
 const placedCard = computed(() => selectedFlowers.value.find((item) => item.kind === "card") || null);
 const cardDraftUsed = computed(() => countCardMessage(cardEditor.draft, cardEditor.limitType));
 const cardUsage = (card) => countCardMessage(card.message, card.limit_type);
@@ -892,7 +895,7 @@ const countOfFlower = (flowerId, kind = "flower") =>
 const canUseFlower = (flower) => {
   if (isCard(flower)) return !placedCard.value; // one card per bouquet
   if (!flower?.model) return false;
-  if (isFiller(flower)) return placedFillers.value.length < maxFillers.value;
+  if (isFiller(flower)) return fillerAllowed(flower);
   return placedFlowers.value.length < maxFlowers.value && flower.quantity_in_stock > countOfFlower(flower.id);
 };
 
@@ -1496,8 +1499,8 @@ function endTransformDrag(pointerId = null) {
 async function placeFlowerOnBouquet(flower, placement) {
   if (isCard(flower)) return placeCardOnBouquet(flower, placement);
   const filler = isFiller(flower);
-  if (filler && placedFillers.value.length >= maxFillers.value) {
-    return showToast(`Maximum of ${maxFillers.value} fillers only.`, "error");
+  if (filler && !fillerAllowed(flower)) {
+    return showToast(`Up to ${maxFillers.value} different fillers. Add more of one you already used instead.`, "error");
   }
   if (!filler && placedFlowers.value.length >= maxFlowers.value) {
     showToast(`This ${maxFlowers.value}-flower bouquet is full. Choose a bigger size to add more.`, "error");
@@ -1864,7 +1867,7 @@ function setWrapperScale(next) {
 /** Why a size can't be picked right now (it's smaller than what's placed), or "" */
 function sizeBlocked(size) {
   if (size < placedFlowers.value.length) return `You've placed ${placedFlowers.value.length} flowers. Remove some to choose ${size}.`;
-  if (fillerLimitFor(size) < placedFillers.value.length) return `You've placed ${placedFillers.value.length} fillers; this size allows ${fillerLimitFor(size)}.`;
+  if (fillerLimitFor(size) < fillerTypesUsed.value) return `You've used ${fillerTypesUsed.value} different fillers; this size allows ${fillerLimitFor(size)}.`;
   return "";
 }
 
@@ -3035,7 +3038,7 @@ function enforceFlowerLimit(flower) {
     return showToast("A bouquet can have one card. Remove the current card to choose another.", "error");
   }
   if (isFiller(flower)) {
-    return showToast(`Maximum of ${maxFillers.value} fillers only.`, "error");
+    return showToast(`Up to ${maxFillers.value} different fillers. Add more of one you already used instead.`, "error");
   }
   if (placedFlowers.value.length >= maxFlowers.value) {
     return showToast(`This ${maxFlowers.value}-flower bouquet is full. Choose a bigger size to add more.`, "error");

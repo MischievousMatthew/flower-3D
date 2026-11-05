@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Middleware\EnsureSubscriptionModuleAccess;
 use App\Models\BouquetCustomizationOption;
 use App\Models\User;
+use App\Support\BouquetPresets;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -246,6 +247,25 @@ class BouquetCustomizationOptionTest extends TestCase
 
         // The storefront sends the print with the wrapper
         $this->getJson("/api/stores/{$vendor->id}/customization-options")->assertOk();
+    }
+
+    public function test_the_filler_limit_counts_different_fillers_not_copies(): void
+    {
+        $vendor = $this->vendor();
+        $make = fn ($name) => BouquetCustomizationOption::create(['owner_id' => $vendor->id, 'type' => 'filler', 'name' => $name, 'model_url' => 'https://example.com/f.glb']);
+        $red = $make('Red');
+        $others = collect(range(1, 5))->map(fn ($n) => $make("Filler {$n}"));
+        $limit = BouquetPresets::MIN_FILLERS; // a legacy bouquet's limit
+
+        // The same filler many times counts once
+        $copies = array_fill(0, 8, ['id' => $red->id]);
+        $this->assertTrue(BouquetCustomizationOption::resolveSelections($vendor->id, ['type' => 'custom_flower_bouquet', 'fillers' => $copies])['ok']);
+
+        // One different filler past the limit is refused
+        $different = $others->take($limit)->map(fn ($o) => ['id' => $o->id])->push(['id' => $red->id])->all();
+        $result = BouquetCustomizationOption::resolveSelections($vendor->id, ['type' => 'custom_flower_bouquet', 'fillers' => $different]);
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('different fillers', $result['message']);
     }
 
     public function test_filler_pieces_moved_on_their_own_keep_their_pose(): void

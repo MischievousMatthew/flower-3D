@@ -24,6 +24,8 @@ class BouquetCustomizationOption extends Model
     public const MODEL_TYPES = [self::TYPE_FILLER, self::TYPE_WRAP_MODEL];
 
     public const MAX_FILLERS = 5;
+    // Copies of the same filler don't count toward the limit; this only stops a runaway save
+    public const MAX_FILLER_COPIES = 60;
 
     // A card's message is capped by words or by letters (spaces don't count)
     public const CARD_LIMIT_WORDS = 'words';
@@ -119,8 +121,13 @@ class BouquetCustomizationOption extends Model
         $fillers = data_get($customizations, 'fillers', []);
         $fillers = is_array($fillers) ? array_values($fillers) : [];
 
-        if (count($fillers) > $maxFillers) {
-            return self::failure('This bouquet can have up to ' . $maxFillers . ' fillers.', $customizations);
+        // The limit is on different fillers: the same filler again counts once
+        $kinds = collect($fillers)->map(fn ($filler) => (int) data_get($filler, 'id', 0))->unique()->count();
+        if ($kinds > $maxFillers) {
+            return self::failure('This bouquet can have up to ' . $maxFillers . ' different fillers.', $customizations);
+        }
+        if (count($fillers) > self::MAX_FILLER_COPIES) {
+            return self::failure('This bouquet has too many fillers. Remove some and try again.', $customizations);
         }
 
         $ids = array_filter(array_merge(
