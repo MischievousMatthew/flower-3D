@@ -754,18 +754,9 @@ const routes = [
                     component: () =>
                       import("../views/ERP/Procurement/SupplyChain/Scanner/ToProcess.vue"),
                   },
-                  {
-                    path: "ship",
-                    name: "ScanToShip",
-                    component: () =>
-                      import("../views/ERP/Procurement/SupplyChain/Scanner/ToShip.vue"),
-                  },
-                  {
-                    path: "receive",
-                    name: "ScanToReceive",
-                    component: () =>
-                      import("../views/ERP/Procurement/SupplyChain/Scanner/ToReceive.vue"),
-                  },
+                  // One scanner for every step now: the old step pages open it
+                  { path: "ship", name: "ScanToShip", redirect: { name: "ScanToProcess" } },
+                  { path: "receive", name: "ScanToReceive", redirect: { name: "ScanToProcess" } },
                   {
                     path: "completed",
                     name: "ScanCompleted",

@@ -74,9 +74,12 @@ class DeliveryService
                 throw new RuntimeException("No delivery found for barcode: {$barcodeValue}");
             }
 
-            // ── 2. Resolve which status this scanner page advances to ──────────
-            $targetStatus = Delivery::SCANNER_PAGE_TARGET[$scannerPage]
-                ?? throw new RuntimeException("Unknown scanner page: {$scannerPage}");
+            // ── 2. Resolve which status this scan advances to ──────────────────
+            // "auto" (the one scanner): the next step from wherever it is now
+            $targetStatus = $scannerPage === 'auto'
+                ? $this->autoTarget($delivery)
+                : (Delivery::SCANNER_PAGE_TARGET[$scannerPage]
+                    ?? throw new RuntimeException("Unknown scanner page: {$scannerPage}"));
 
             // ── 3. Validate the sequential prerequisite ────────────────────────
             //   e.g. you cannot scan "To Ship" if the order is still "Pending"
@@ -105,6 +108,22 @@ class DeliveryService
             $delivery->load(['order.items', 'logs.scanner', 'scanner']);
 
             return $delivery;
+        });
+    }
+
+    /** The next step for a delivery scanned on the one scanner, or why there is none */
+    private function autoTarget(Delivery $delivery): string
+    {
+        if ($next = Delivery::AUTO_NEXT[$delivery->status] ?? null) {
+            return $next;
+        }
+
+        throw new RuntimeException(match ($delivery->status) {
+            'to_received' => 'This order was already dropped off. It is waiting for the customer to confirm they got it.',
+            'completed'   => 'This order is already completed.',
+            'returned'    => 'This order was returned. Nothing to scan.',
+            'refunded'    => 'This order was refunded. Nothing to scan.',
+            default       => 'This order cannot be moved by scanning.',
         });
     }
 
@@ -259,7 +278,8 @@ class DeliveryService
             ->whereHas('order', fn ($q) => $q->where('vendor_id', $vendorId))
             ->when(
                 ! empty($filters['status']) && $filters['status'] !== 'all',
-                fn ($q) => $q->where('status', $filters['status'])
+                // One status, or several separated by commas (the one scanner's queue)
+                fn ($q) => $q->whereIn('status', array_slice(array_filter(explode(',', $filters['status'])), 0, 10))
             )
             ->when(
                 ! empty($filters['search']),
@@ -330,7 +350,8 @@ class DeliveryService
             )
             ->when(
                 ! empty($filters['status']) && $filters['status'] !== 'all',
-                fn ($q) => $q->where('status', $filters['status'])
+                // One status, or several separated by commas (the one scanner's queue)
+                fn ($q) => $q->whereIn('status', array_slice(array_filter(explode(',', $filters['status'])), 0, 10))
             )
             ->when(
                 ! empty($filters['search']),

@@ -42,6 +42,13 @@ class Delivery extends Model
         'refunded'     => [],
     ];
 
+    // The one scanner ("auto"): each scan moves a delivery one step forward
+    const AUTO_NEXT = [
+        'pending'      => 'to_processed',
+        'to_processed' => 'to_ship',
+        'to_ship'      => 'to_received',
+    ];
+
     const SCANNER_PAGE_TARGET = [
         'to_process' => 'to_processed',
         'to_ship'    => 'to_ship',

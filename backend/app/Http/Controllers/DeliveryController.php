@@ -21,7 +21,7 @@ class DeliveryController extends Controller
     {
         $data = $request->validate([
             'barcode'      => ['required', 'string', 'max:100'],
-            'scanner_page' => ['required', 'string', 'in:to_process,to_ship,to_receive'],
+            'scanner_page' => ['required', 'string', 'in:to_process,to_ship,to_receive,auto'],
         ]);
 
         try {

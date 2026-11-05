@@ -322,9 +322,8 @@ export const ERP_MODULES = [
     group: "Supply Chain",
     path: "/erp/procurement/supply-chain/scan",
     children: [
-      { label: "To process", path: "/erp/procurement/supply-chain/scan/process" },
-      { label: "To ship", path: "/erp/procurement/supply-chain/scan/ship" },
-      { label: "To receive", path: "/erp/procurement/supply-chain/scan/receive" },
+      { label: "Scanner", path: "/erp/procurement/supply-chain/scan/process" },
+      { label: "Completed", path: "/erp/procurement/supply-chain/scan/completed" },
     ],
     description:
       "Allows you to scan order items, monitor available stock, and process shipments.",

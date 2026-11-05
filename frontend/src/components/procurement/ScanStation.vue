@@ -1,28 +1,33 @@
 <template>
-  <HrPage :title="title" :subtitle="subtitle" :tabs="SCAN_TABS">
+  <HrPage title="Order scanner" subtitle="Scan any order's barcode. It moves to its next step on its own: packed, handed to the rider, then dropped off." :tabs="SCAN_TABS">
     <template #actions>
-      <span class="ss-live" :class="`t-${tone}`"><span class="ss-live-dot"></span>{{ queue === null ? "Loading…" : `${queue.length} waiting` }}</span>
+      <span class="ss-live"><span class="ss-live-dot"></span>{{ queue === null ? "Loading…" : `${queue.length} in progress` }}</span>
     </template>
 
     <div class="ss-grid">
       <div class="ss-col">
         <!-- Scanner -->
-        <section class="sp-card ss-scan" :class="`t-${tone}`" aria-labelledby="ss-scan-title">
+        <section class="sp-card ss-scan" aria-labelledby="ss-scan-title">
           <div class="sp-card-head">
-            <div><h2 id="ss-scan-title">Scan a delivery</h2><p>Use a barcode scanner, the camera, or type the code and press Enter</p></div>
+            <div><h2 id="ss-scan-title">Scan an order</h2><p>Use a barcode scanner, the camera, or type the code and press Enter</p></div>
           </div>
-          <ScannerInput ref="scannerRef" :placeholder="placeholder" :auto-focus="true" @scan="handleScan" />
+          <ScannerInput ref="scannerRef" placeholder="Scan an order barcode…" :auto-focus="true" @scan="handleScan" />
         </section>
 
-        <!-- Last scan -->
+        <!-- Last scan: where it was and where it is now -->
         <Transition name="sp-fade">
-          <section v-if="lastResult" class="sp-card ss-last" :class="`t-${tone}`" aria-live="polite">
+          <section v-if="lastResult" class="sp-card ss-last" aria-live="polite">
             <span class="ss-last-ic" v-html="ICONS.check"></span>
             <div class="grow">
-              <b>{{ lastResult.order?.order_number ?? lastResult.delivery_id }}</b>
-              <span>{{ lastResult.order?.delivery_contact_name ?? "Customer" }} · now <strong>{{ nextLabel }}</strong></span>
+              <b>{{ lastResult.ref }}</b>
+              <span>{{ lastResult.customer }}</span>
+              <span class="ss-move">
+                <span class="sp-chip" :class="SCAN_STEPS[lastResult.from]?.tone ?? 'slate'">{{ stepLabel(lastResult.from) }}</span>
+                <span class="ss-arrow" aria-label="moved to" v-html="ICONS.chevronRight"></span>
+                <span class="sp-chip" :class="SCAN_STEPS[lastResult.to]?.tone ?? 'slate'">{{ stepLabel(lastResult.to) }}</span>
+              </span>
             </div>
-            <small>{{ lastTime }}</small>
+            <small>{{ lastResult.time }}</small>
           </section>
         </Transition>
 
@@ -41,51 +46,66 @@
             </li>
           </ul>
         </section>
-      </div>
-
-      <div class="ss-col">
-        <!-- Progress -->
-        <section class="sp-card ss-progress" aria-label="Progress today">
-          <dl>
-            <div><dt>Done today</dt><dd>{{ doneCount }}</dd></div>
-            <div><dt>Still waiting</dt><dd>{{ queue?.length ?? 0 }}</dd></div>
-            <div><dt>Progress</dt><dd :class="`c-${tone}`">{{ pct }}%</dd></div>
-          </dl>
-          <div class="ss-bar" role="img" :aria-label="`${pct}% done`"><span :class="`b-${tone}`" :style="{ width: `${pct}%` }"></span></div>
-        </section>
 
         <!-- How to -->
         <section class="sp-card" aria-labelledby="ss-how">
-          <div class="sp-card-head"><div><h2 id="ss-how">How it works</h2></div></div>
+          <div class="sp-card-head"><div><h2 id="ss-how">How it works</h2><p>The same barcode, scanned once at each step</p></div></div>
           <ol class="ss-steps">
-            <li v-for="(s, i) in steps" :key="i"><span class="ss-step-n" :class="`b-${tone}`">{{ i + 1 }}</span><span v-html="s"></span></li>
+            <li><span class="ss-step-n b-amber">1</span><span><strong>Packed:</strong> scan the order's <strong>BLM-</strong> label. It moves from To process to <strong>To ship</strong>.</span></li>
+            <li><span class="ss-step-n b-blue">2</span><span><strong>Handed to the rider:</strong> scan it again. It's now <strong>On the way</strong>.</span></li>
+            <li><span class="ss-step-n b-violet">3</span><span><strong>At the customer's door:</strong> scan it once more. It moves to <strong>To receive</strong> and the customer is asked to confirm.</span></li>
           </ol>
+        </section>
+      </div>
+
+      <div class="ss-col">
+        <!-- Where every order is: tap a step to see only those -->
+        <section class="sp-card" aria-labelledby="ss-where">
+          <div class="sp-card-head">
+            <div><h2 id="ss-where">Where orders are</h2><p>{{ doneCount }} scanned today on this device</p></div>
+          </div>
+          <div class="ss-stages" role="group" aria-label="Filter the list by step">
+            <button
+              v-for="s in STAGES"
+              :key="s.status"
+              type="button"
+              class="ss-stage"
+              :class="[`t-${SCAN_STEPS[s.status].tone}`, { on: stageFilter === s.status }]"
+              :aria-pressed="stageFilter === s.status"
+              @click="stageFilter = stageFilter === s.status ? null : s.status"
+            >
+              <span class="ss-stage-ic" v-html="ICONS[SCAN_STEPS[s.status].icon]"></span>
+              <strong>{{ queue === null ? "–" : counts[s.status] }}</strong>
+              <span>{{ stepLabel(s.status) }}</span>
+              <small>Next scan: {{ s.next }}</small>
+            </button>
+          </div>
         </section>
 
         <!-- Queue -->
         <section class="sp-card" aria-labelledby="ss-queue">
           <div class="sp-card-head">
-            <div><h2 id="ss-queue">{{ queueTitle }}</h2><p>Refreshes every 10 seconds</p></div>
-            <span class="sp-chip" :class="tone">{{ queue?.length ?? 0 }}</span>
+            <div><h2 id="ss-queue">{{ stageFilter ? stepLabel(stageFilter) : "All orders in progress" }}</h2><p>Refreshes every 10 seconds</p></div>
+            <button v-if="stageFilter" type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="stageFilter = null">Show all</button>
           </div>
           <label v-if="(queue?.length ?? 0) > 5" class="sp-search ss-find">
             <span v-html="ICONS.search"></span>
-            <input v-model="find" class="sp-input" type="search" placeholder="Order number or customer" aria-label="Find in the queue" />
+            <input v-model="find" class="sp-input" type="search" placeholder="Order number or customer" aria-label="Find an order" />
           </label>
           <ul v-if="queue === null" class="ss-queue"><li v-for="n in 4" :key="n"><div class="bc-skeleton sp-sk-line w70"></div></li></ul>
-          <div v-else-if="!queue.length" class="ss-empty">
+          <div v-else-if="!shownQueue.length" class="ss-empty">
             <span v-html="ICONS.check"></span>
             <b>All clear</b>
-            <small>{{ emptyText }}</small>
+            <small>{{ stageFilter ? `Nothing is at ${stepLabel(stageFilter)} right now.` : "No orders are waiting for a scan." }}</small>
           </div>
           <ul v-else class="ss-queue">
-            <li v-for="d in shownQueue" :key="d.id" :class="{ done: doneIds.has(d.id) }">
-              <span class="ss-q-ic" :class="`t-${tone}`" v-html="doneIds.has(d.id) ? ICONS.check : ICONS.box"></span>
+            <li v-for="d in shownQueue" :key="d.id">
+              <span class="ss-q-ic" :class="`t-${SCAN_STEPS[d.status]?.tone}`" v-html="ICONS[SCAN_STEPS[d.status]?.icon ?? 'box']"></span>
               <span class="grow">
                 <b>{{ d.order?.order_number ?? d.delivery_id }}</b>
                 <small>{{ d.order?.delivery_contact_name ?? "—" }}<template v-if="d.order?.reservation_date"> · for {{ shortDate(d.order.reservation_date) }}</template></small>
               </span>
-              <span class="ss-q-amt">{{ money(d.order?.total_amount) }}</span>
+              <span class="sp-chip" :class="SCAN_STEPS[d.status]?.tone ?? 'slate'">{{ stepLabel(d.status) }}</span>
             </li>
           </ul>
         </section>
@@ -95,50 +115,37 @@
 </template>
 
 <script setup>
-// One scanning station: scan a delivery's barcode to move it to the next
-// step. The same flow as before (deliveryService.scan with the page's stage).
+// The one order scanner: every scan moves a delivery one step forward from
+// wherever it is (To process → To ship → On the way → To receive), so staff
+// don't switch pages per step. The server checks and applies the step ("auto").
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import HrPage from "../hr/HrPage.vue";
 import ScannerInput from "../../layouts/components/ScannerInput.vue";
 import { SHOP_ICONS as ICONS } from "../vendor/shop/shopIcons";
 import { apiMessage } from "../vendor/shop/useVendorCatalog";
-import { money } from "../vendor/finance/financeUi";
 import { deliveryService } from "../../services/deliveryService";
+import { SCAN_STEPS, SCAN_TABS, stepLabel } from "./scanTabs";
 import { toast } from "@/utils/snackbar";
 
-const props = defineProps({
-  title: { type: String, required: true },
-  subtitle: { type: String, default: "" },
-  stage: { type: String, required: true }, // to_process | to_ship | to_receive
-  queueStatus: { type: String, required: true }, // deliveries waiting at this station
-  queueTitle: { type: String, default: "Waiting" },
-  nextLabel: { type: String, required: true },
-  placeholder: { type: String, default: "Scan a delivery barcode…" },
-  steps: { type: Array, default: () => [] },
-  emptyText: { type: String, default: "Nothing waiting here right now." },
-  tone: { type: String, default: "blue" },
-  storageKey: { type: String, required: true },
-});
-
-const SCAN_TABS = [
-  { name: "ScanToProcess", label: "To process", icon: "box" },
-  { name: "ScanToShip", label: "To ship", icon: "truck" },
-  { name: "ScanToReceive", label: "To receive", icon: "pin" },
-  { name: "ScanCompleted", label: "Completed", icon: "check" },
+// The steps a scan can still move an order out of
+const STAGES = [
+  { status: "pending", next: "To ship" },
+  { status: "to_processed", next: "On the way" },
+  { status: "to_ship", next: "To receive" },
 ];
 
 // What was scanned today on this device, so a reload keeps the tally
-const TODAY_KEY = `${props.storageKey}_${new Date().toISOString().slice(0, 10)}`;
+const TODAY_KEY = `orderScans_${new Date().toISOString().slice(0, 10)}`;
 const readDone = () => {
   try {
-    return new Set(JSON.parse(localStorage.getItem(TODAY_KEY) || "[]"));
+    return Number(localStorage.getItem(TODAY_KEY) || 0) || 0;
   } catch {
-    return new Set();
+    return 0;
   }
 };
-const saveDone = (ids) => {
+const saveDone = (n) => {
   try {
-    localStorage.setItem(TODAY_KEY, JSON.stringify([...ids]));
+    localStorage.setItem(TODAY_KEY, String(n));
   } catch {
     /* only a convenience */
   }
@@ -147,27 +154,26 @@ const saveDone = (ids) => {
 const scannerRef = ref(null);
 const queue = ref(null);
 const lastResult = ref(null);
-const lastTime = ref("");
 const scanLog = ref([]);
-const doneIds = ref(readDone());
+const doneCount = ref(readDone());
 const find = ref("");
+const stageFilter = ref(null);
 let logId = 0;
 let pollTimer = null;
 
-const doneCount = computed(() => doneIds.value.size);
-const pct = computed(() => {
-  const total = doneCount.value + (queue.value?.length ?? 0);
-  return total ? Math.round((doneCount.value / total) * 100) : 0;
-});
+const counts = computed(() => Object.fromEntries(STAGES.map((s) => [s.status, (queue.value ?? []).filter((d) => d.status === s.status).length])));
 const shownQueue = computed(() => {
   const q = find.value.trim().toLowerCase();
-  return (queue.value ?? []).filter((d) => !q || `${d.order?.order_number ?? ""} ${d.delivery_id ?? ""} ${d.order?.delivery_contact_name ?? ""}`.toLowerCase().includes(q));
+  return (queue.value ?? [])
+    .filter((d) => !stageFilter.value || d.status === stageFilter.value)
+    .filter((d) => !q || `${d.order?.order_number ?? ""} ${d.delivery_id ?? ""} ${d.order?.delivery_contact_name ?? ""}`.toLowerCase().includes(q));
 });
 const shortDate = (d) => new Date(`${String(d).slice(0, 10)}T00:00:00`).toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+const clock = (withSeconds = false) => new Date().toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", ...(withSeconds ? { second: "2-digit" } : {}) });
 
 async function loadQueue() {
   try {
-    const res = await deliveryService.scOrders({ status: props.queueStatus, per_page: 100 });
+    const res = await deliveryService.scOrders({ status: STAGES.map((s) => s.status).join(","), per_page: 100 });
     const raw = res?.data?.data ?? res?.data ?? [];
     queue.value = Array.isArray(raw) ? raw : [];
   } catch {
@@ -178,17 +184,20 @@ async function loadQueue() {
 async function handleScan(barcode) {
   scannerRef.value?.setScanning(true);
   const code = barcode.trim().toUpperCase();
+  // Where it was before this scan, if it's in the list
+  const before = (queue.value ?? []).find((d) => [d.barcode, d.delivery_id].some((v) => String(v ?? "").toUpperCase() === code));
   try {
-    const res = await deliveryService.scan(code, props.stage);
+    const res = await deliveryService.scan(code, "auto");
     const delivery = res?.data?.delivery ?? res?.data ?? res;
-    lastResult.value = delivery;
-    lastTime.value = new Date().toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" });
-    doneIds.value = new Set([...doneIds.value, delivery.id]);
-    saveDone(doneIds.value);
+    const to = delivery.status;
+    const from = before?.status ?? Object.keys(SCAN_STEPS).find((k) => SCAN_STEPS[k].next === to) ?? null;
     const ref_ = delivery.order?.order_number ?? delivery.delivery_id ?? code;
-    addLog(code, "ok", `${ref_} → ${props.nextLabel}`);
-    scannerRef.value?.showResult("ok", `${ref_} moved to ${props.nextLabel}`);
-    toast.success(`${ref_} is now ${props.nextLabel}.`, { toastId: "scan-ok" });
+    lastResult.value = { ref: ref_, customer: delivery.order?.delivery_contact_name ?? "Customer", from, to, time: clock() };
+    doneCount.value += 1;
+    saveDone(doneCount.value);
+    addLog(code, "ok", `${ref_}: ${stepLabel(from)} → ${stepLabel(to)}`);
+    scannerRef.value?.showResult("ok", `${ref_} moved to ${stepLabel(to)}`);
+    toast.success(`${ref_} is now ${stepLabel(to)}.`, { toastId: "scan-ok" });
     await loadQueue();
   } catch (e) {
     const msg = apiMessage(e, "That scan didn't work. Check the barcode and try again.");
@@ -200,7 +209,7 @@ async function handleScan(barcode) {
 }
 
 function addLog(barcode, type, message) {
-  scanLog.value.unshift({ id: ++logId, barcode, type, message, time: new Date().toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", second: "2-digit" }) });
+  scanLog.value.unshift({ id: ++logId, barcode, type, message, time: clock(true) });
   if (scanLog.value.length > 30) scanLog.value.pop();
 }
 
@@ -236,12 +245,9 @@ onUnmounted(() => clearInterval(pollTimer));
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: currentColor;
+  background: #10b981;
   animation: ss-pulse 1.8s ease-in-out infinite;
 }
-.t-amber .ss-live-dot, .ss-live.t-amber .ss-live-dot { color: #f59e0b; }
-.ss-live.t-blue .ss-live-dot { color: #3b82f6; }
-.ss-live.t-violet .ss-live-dot { color: #8b5cf6; }
 @keyframes ss-pulse {
   50% { opacity: 0.35; }
 }
@@ -258,11 +264,8 @@ onUnmounted(() => clearInterval(pollTimer));
   min-width: 0;
 }
 .ss-scan {
-  border-top: 3px solid var(--v-border-strong);
+  border-top: 3px solid var(--bc-accent);
 }
-.ss-scan.t-amber { border-top-color: #f59e0b; }
-.ss-scan.t-blue { border-top-color: #3b82f6; }
-.ss-scan.t-violet { border-top-color: #8b5cf6; }
 .ss-last {
   display: flex;
   align-items: center;
@@ -290,7 +293,23 @@ onUnmounted(() => clearInterval(pollTimer));
   font-size: 13px;
   color: var(--v-text-2);
 }
+.ss-move {
+  display: inline-flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.ss-arrow {
+  display: inline-flex;
+  color: var(--v-faint);
+}
+.ss-arrow :deep(svg) {
+  width: 14px;
+  height: 14px;
+}
 .ss-last small {
+  align-self: flex-start;
   font-size: 12px;
   color: var(--v-faint);
 }
@@ -322,6 +341,7 @@ onUnmounted(() => clearInterval(pollTimer));
   color: var(--v-faint);
 }
 .ss-log-dot {
+  flex: none;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -333,44 +353,73 @@ onUnmounted(() => clearInterval(pollTimer));
 .ss-log li.err .grow {
   color: var(--v-red-text);
 }
-.ss-progress dl {
+
+/* Where orders are */
+.ss-stages {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  margin: 0 0 12px;
 }
-.ss-progress dt {
-  font-size: 12px;
-  color: var(--v-muted);
+.ss-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 44px;
+  padding: 12px;
+  border: 1px solid var(--v-border);
+  border-radius: 14px;
+  background: var(--v-surface);
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
 }
-.ss-progress dd {
-  margin: 2px 0 0;
+.ss-stage:hover {
+  border-color: var(--v-border-strong);
+}
+.ss-stage:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.ss-stage strong {
+  margin-top: 6px;
   font-size: 22px;
   font-weight: 600;
   color: var(--v-text);
 }
-.c-amber { color: var(--v-amber-text) !important; }
-.c-blue { color: var(--v-blue-text) !important; }
-.c-violet { color: var(--v-purple-text) !important; }
-.ss-bar {
-  height: 8px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--v-subtle-2);
+.ss-stage > span:not(.ss-stage-ic) {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--v-text-2);
 }
-.ss-bar span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  transition: width 0.4s ease;
+.ss-stage small {
+  font-size: 11.5px;
+  color: var(--v-muted);
 }
-.b-amber { background: #f59e0b; }
-.b-blue { background: #3b82f6; }
-.b-violet { background: #8b5cf6; }
+.ss-stage-ic {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+.ss-stage-ic :deep(svg) {
+  width: 15px;
+  height: 15px;
+}
+.ss-stage.t-amber .ss-stage-ic { background: var(--v-amber-soft); color: var(--v-amber-text); }
+.ss-stage.t-blue .ss-stage-ic { background: var(--v-blue-soft); color: var(--v-blue-text); }
+.ss-stage.t-violet .ss-stage-ic { background: var(--v-purple-soft); color: var(--v-purple-text); }
+.ss-stage.on.t-amber { border-color: var(--v-amber-text); background: var(--v-amber-soft); }
+.ss-stage.on.t-blue { border-color: var(--v-blue-text); background: var(--v-blue-soft); }
+.ss-stage.on.t-violet { border-color: var(--v-purple-text); background: var(--v-purple-soft); }
+
 .ss-steps {
   list-style: none;
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin: 0;
   padding: 0;
 }
@@ -379,8 +428,11 @@ onUnmounted(() => clearInterval(pollTimer));
   align-items: flex-start;
   gap: 10px;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--v-text-2);
+}
+.ss-steps strong {
+  color: var(--v-text);
 }
 .ss-step-n {
   flex: none;
@@ -393,6 +445,9 @@ onUnmounted(() => clearInterval(pollTimer));
   font-size: 12px;
   font-weight: 700;
 }
+.b-amber { background: #d97706; }
+.b-blue { background: #2563eb; }
+.b-violet { background: #7c3aed; }
 .ss-find {
   margin-bottom: 10px;
 }
@@ -400,7 +455,7 @@ onUnmounted(() => clearInterval(pollTimer));
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 420px;
+  max-height: 460px;
   overflow-y: auto;
 }
 .ss-queue li {
@@ -412,9 +467,6 @@ onUnmounted(() => clearInterval(pollTimer));
 .ss-queue li + li {
   border-top: 1px solid var(--v-border);
 }
-.ss-queue li.done {
-  opacity: 0.55;
-}
 .ss-queue b {
   font-size: 13px;
   color: var(--v-text);
@@ -422,6 +474,9 @@ onUnmounted(() => clearInterval(pollTimer));
 .ss-queue small {
   font-size: 12px;
   color: var(--v-muted);
+}
+.ss-queue .sp-chip {
+  flex: none;
 }
 .ss-q-ic {
   flex: none;
@@ -439,11 +494,6 @@ onUnmounted(() => clearInterval(pollTimer));
 .ss-q-ic :deep(svg) {
   width: 15px;
   height: 15px;
-}
-.ss-q-amt {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--v-text);
 }
 .ss-empty {
   display: flex;
@@ -471,12 +521,14 @@ onUnmounted(() => clearInterval(pollTimer));
     grid-template-columns: minmax(0, 1fr);
   }
 }
+@media (max-width: 480px) {
+  .ss-stages {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .ss-live-dot {
     animation: none;
-  }
-  .ss-bar span {
-    transition: none;
   }
 }
 </style>

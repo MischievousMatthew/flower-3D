@@ -55,6 +55,7 @@
 </template>
 
 <script setup>
+import { SCAN_TABS } from "../../../../../components/procurement/scanTabs";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import HrPage from "../../../../../components/hr/HrPage.vue";
 import ShowMore from "../../../../../components/common/ShowMore.vue";
@@ -65,12 +66,6 @@ import { useShowMorePaged } from "../../../../../composables/useShowMore";
 import { deliveryService } from "../../../../../services/deliveryService";
 import "../../../../../components/vendor/finance/finance.css";
 
-const SCAN_TABS = [
-  { name: "ScanToProcess", label: "To process", icon: "box" },
-  { name: "ScanToShip", label: "To ship", icon: "truck" },
-  { name: "ScanToReceive", label: "To receive", icon: "pin" },
-  { name: "ScanCompleted", label: "Completed", icon: "check" },
-];
 const STATUS = {
   completed: { label: "Completed", plural: "completed deliveries", tone: "green", icon: "check" },
   returned: { label: "Returned", plural: "returns", tone: "amber", icon: "restore" },
