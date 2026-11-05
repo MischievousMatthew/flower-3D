@@ -442,9 +442,21 @@
 
             <!-- Registration -->
             <template v-else-if="drawer.tab === 'registration'">
-              <template v-if="registration.loading">
-                <div v-for="n in 3" :key="n" class="card"><div class="sk sk-line" style="width: 40%"></div><div class="sk sk-line"></div></div>
+              <!-- Still loading (the vendor or their registration): skeleton, never "nothing on file" -->
+              <template v-if="registrationPending">
+                <div class="reg-loading" role="status" aria-live="polite">
+                  <span class="sr-only">Loading the registration</span>
+                  <div v-for="n in 3" :key="n" class="card" aria-hidden="true">
+                    <div class="sk sk-line" style="width: 40%"></div>
+                    <div class="sk sk-line"></div>
+                    <div class="sk sk-line" style="width: 70%"></div>
+                  </div>
+                </div>
               </template>
+              <div v-else-if="registration.failed" class="reg-failed" role="alert">
+                <p>The registration details couldn't be loaded.</p>
+                <button type="button" class="ghost-btn" @click="retryRegistration">Try again</button>
+              </div>
               <p v-else-if="!registration.app" class="empty-msg">No registration on file for this vendor.</p>
               <VendorApplicationDetails v-else :app="registration.app" :resubmissions="registration.resubmissions" @view-document="openDocument" />
             </template>
@@ -779,7 +791,7 @@ const exportApplications = async () => {
 const drawer = reactive({ open: false, mode: null, application: null, resubmissions: [], vendorId: null, tab: "performance", error: "" });
 const drawerEl = ref(null);
 const profile = ref(null);
-const registration = reactive({ loading: false, app: null, resubmissions: [], loadedFor: null });
+const registration = reactive({ loading: false, failed: false, app: null, resubmissions: [], loadedFor: null });
 let lastFocus = null;
 
 const perf = computed(() => profile.value?.performance ?? {});
@@ -835,7 +847,9 @@ const loadVendor = async (id) => {
 const openVendor = (id, vendorTab = "performance") => {
   if (drawer.vendorId !== id) {
     profile.value = null;
-    Object.assign(registration, { app: null, resubmissions: [], loadedFor: null });
+    // Forget the last vendor's registration, and any request still on its way for it
+    registrationRequest++;
+    Object.assign(registration, { app: null, resubmissions: [], loadedFor: null, loading: false, failed: false });
   }
   Object.assign(drawer, { mode: "vendor", vendorId: id, application: null, tab: vendorTab });
   router.replace({ query: { ...route.query, vendor: id } });
@@ -843,22 +857,45 @@ const openVendor = (id, vendorTab = "performance") => {
   loadVendor(id);
 };
 
-const setVendorTab = async (key) => {
+const setVendorTab = (key) => {
   drawer.tab = key;
-  if (key !== "registration" || !profile.value?.application_id || registration.loadedFor === profile.value.application_id) return;
-  const appId = profile.value.application_id;
-  registration.loading = true;
+};
+
+// The Registration tab loads itself whenever it's open and the vendor is known:
+// opening it before the vendor has loaded, switching vendors, or a deep link
+// all end up here. Only the newest request may fill it in.
+let registrationRequest = 0;
+async function loadRegistration() {
+  const appId = profile.value?.application_id;
+  if (!appId || registration.loadedFor === appId || registration.loading) return;
+  const requestId = ++registrationRequest;
+  Object.assign(registration, { loading: true, failed: false });
   try {
     const [{ data: app }, resub] = await Promise.all([
       api.get(`/admin/vendor-applications/${appId}`),
       api.get(`/admin/vendor-applications/${appId}/resubmissions`).catch(() => ({ data: { items: [] } })),
     ]);
+    if (requestId !== registrationRequest) return;
     Object.assign(registration, { app, resubmissions: resub.data.items || [], loadedFor: appId });
   } catch {
-    toast.error("The registration details couldn't be loaded.");
+    if (requestId === registrationRequest) registration.failed = true;
   } finally {
-    registration.loading = false;
+    if (requestId === registrationRequest) registration.loading = false;
   }
+}
+watch(
+  () => [drawer.open, drawer.mode, drawer.tab, profile.value?.application_id],
+  ([open, mode, tab]) => {
+    if (open && mode === "vendor" && tab === "registration") loadRegistration();
+  },
+);
+// Waiting for the vendor, or for a registration they do have
+const registrationPending = computed(
+  () => !profile.value || registration.loading || (!registration.failed && !!profile.value.application_id && registration.loadedFor !== profile.value.application_id),
+);
+const retryRegistration = () => {
+  registration.failed = false;
+  loadRegistration();
 };
 
 const closeDrawer = () => {
@@ -1737,6 +1774,30 @@ textarea:focus {
   text-align: center;
   padding: 28px 0;
   margin: 0;
+}
+.reg-loading {
+  display: contents;
+}
+.reg-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 12px;
+  text-align: center;
+}
+.reg-failed p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--a-text-2);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 /* Drawer content */
