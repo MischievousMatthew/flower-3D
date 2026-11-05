@@ -28,12 +28,11 @@
         <svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9" /></svg>
       </span>
       <h2>Application sent</h2>
-      <p class="vr-done-lead">Thank you{{ formData.ownerName ? `, ${formData.ownerName.split(" ")[0]}` : "" }}. We've emailed a copy to {{ formData.email || "you" }}.</p>
-      <div class="vr-id">
-        <span>Application ID</span>
-        <b>{{ applicationId }}</b>
-        <button type="button" class="af-plain" @click="copyApplicationId">{{ copied ? "Copied" : "Copy" }}</button>
-      </div>
+      <p class="vr-done-lead">
+        Thank you{{ formData.ownerName ? `, ${formData.ownerName.split(" ")[0]}` : "" }}.
+        <template v-if="applicationEmailed">We've emailed a copy to <b>{{ formData.email }}</b>.</template>
+        <template v-else>We'll write to <b>{{ formData.email || "your email" }}</b> with the decision.</template>
+      </p>
       <ol class="vr-next" aria-label="What happens next">
         <li><b>We check your documents</b><span>Usually within two working days.</span></li>
         <li><b>You get an email with the decision</b><span>If something needs fixing, the email says exactly what to send again.</span></li>
@@ -638,16 +637,8 @@ const goToStep = (step) => {
   saveProgress();
 };
 
-const copied = ref(false);
-const copyApplicationId = async () => {
-  try {
-    await navigator.clipboard.writeText(String(applicationId.value));
-    copied.value = true;
-    setTimeout(() => (copied.value = false), 2000);
-  } catch (_) {
-    // clipboard blocked: the ID is on screen to copy by hand
-  }
-};
+// Whether the copy of the application really went out by email
+const applicationEmailed = ref(false);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NEW: Cavite location data (cities and municipalities)
@@ -1989,6 +1980,7 @@ const handleSubmit = async () => {
     if (data.success) {
       clearProgress();
       applicationId.value = data.data.application_id || data.data.id;
+      applicationEmailed.value = data.emailed !== false;
       // NEW: success toast before showing modal
       toast.success("Application submitted successfully! 🎉", {
         autoClose: 4000,
@@ -2823,26 +2815,8 @@ select.vr-input {
   font-size: 15.5px;
   color: var(--ink-soft);
 }
-.vr-id {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 14px;
-  margin-bottom: 26px;
-  padding: 16px 18px;
-  border-radius: 16px;
-  background: #fff;
-  border: 1px solid var(--line-soft);
-}
-.vr-id span {
-  font-size: 13px;
-  color: var(--ink-soft);
-}
-.vr-id b {
-  flex: 1;
-  font-size: 18px;
+.vr-done-lead b {
   font-weight: 600;
-  letter-spacing: 0.02em;
   color: var(--ink);
 }
 .vr-next {

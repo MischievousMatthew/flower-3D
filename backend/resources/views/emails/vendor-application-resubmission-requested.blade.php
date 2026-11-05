@@ -1,1 +1,29 @@
-<!doctype html><html><body style="margin:0;padding:32px;background:#f7f2eb;font-family:Arial,sans-serif;color:#2f241b"><div style="max-width:640px;margin:auto;background:#fff;border-radius:20px;padding:32px"><h1 style="margin-top:0">Vendor Application Requires Resubmission</h1><p>Hello {{ $application->owner_name ?: 'Vendor' }},</p><p>Your vendor application has been reviewed. Some submitted requirements need to be updated before it can be approved.</p><p style="margin:28px 0"><a href="{{ $url }}" style="background:#9e7250;color:#fff;padding:13px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Resubmit Requirements</a></p><p>Thank you.</p></div></body></html>
+@extends('emails.layouts.bloomcraft')
+
+@section('title', 'A few things to update')
+@section('preheader', 'Your BloomCraft application is almost there. Please update a few details.')
+@section('eyebrow', 'Action needed')
+@section('eyebrow_color', '#8a6417')
+@section('heading', 'A few things to update')
+
+@section('content')
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.7;">
+        Hi {{ \Illuminate\Support\Str::of($application->owner_name ?: 'there')->before(' ') }},
+    </p>
+    <p style="margin:0 0 6px;font-size:15px;line-height:1.7;">
+        We reviewed your application for <strong style="color:#363F4E;">{{ $application->store_name ?: 'your shop' }}</strong>.
+        It's almost there: some details or documents need updating before we can approve it.
+    </p>
+
+    @include('emails.partials.panel', [
+        'tone' => 'amber',
+        'label' => 'What to do',
+        'body' => "Open the link below to see exactly what to change, then send it back. You only update what we ask for.",
+    ])
+
+    @include('emails.partials.button', ['url' => $url, 'label' => 'Update my application', 'margin' => '6px 0 8px'])
+
+    <p style="margin:18px 0 0;font-size:13.5px;line-height:1.7;color:#6b7380;">
+        This link is just for you, so please don't share it.
+    </p>
+@endsection

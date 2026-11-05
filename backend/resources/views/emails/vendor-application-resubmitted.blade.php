@@ -1,1 +1,23 @@
-<!doctype html><html><body style="margin:0;padding:32px;background:#f7f2eb;font-family:Arial,sans-serif;color:#2f241b"><div style="max-width:640px;margin:auto;background:#fff;border-radius:20px;padding:32px"><h1 style="margin-top:0">Updated vendor requirements submitted</h1><p>{{ $application->store_name ?: $application->owner_name }} has submitted updated requirements for review.</p><p>Open Vendor Requests to review the resubmitted fields.</p></div></body></html>
+@extends('emails.layouts.bloomcraft')
+
+@section('title', 'Updated application to review')
+@section('preheader', ($application->store_name ?: $application->owner_name) . ' sent the updates you asked for.')
+@section('eyebrow', 'For the admin team')
+@section('heading', 'Updates are in')
+
+@section('content')
+    <p style="margin:0 0 6px;font-size:15px;line-height:1.7;">
+        <strong style="color:#363F4E;">{{ $application->store_name ?: $application->owner_name }}</strong>
+        sent the updated details you asked for. Their application is ready for another look.
+    </p>
+
+    @include('emails.partials.panel', [
+        'tone' => 'plain',
+        'label' => 'Applicant',
+        'html' => e($application->owner_name ?: '-') . '<br><span style="color:#6b7380;">' . e($application->email) . '</span>',
+    ])
+
+    <p style="margin:0;font-size:14.5px;line-height:1.7;">
+        Open <strong style="color:#363F4E;">Vendor requests</strong> in the admin panel to review what changed.
+    </p>
+@endsection

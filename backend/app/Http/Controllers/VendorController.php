@@ -296,9 +296,18 @@ class VendorController extends Controller
 
             DB::commit();
 
+            // A copy to the applicant; the application stands even if the email fails
+            $emailed = false;
+            try {
+                $emailed = (new \App\Mail\VendorApplicationReceived($app))->send();
+            } catch (\Throwable $mailError) {
+                \Log::warning('Vendor application email failed.', ['application_id' => $applicationId, 'error' => $mailError->getMessage()]);
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Vendor application submitted successfully!',
+                'emailed' => $emailed,
                 'data'    => [
                     'application_id'   => $app->application_id,
                     'email'            => $app->email,

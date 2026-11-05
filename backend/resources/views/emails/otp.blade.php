@@ -1,53 +1,27 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your verification code</title>
-</head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+@extends('emails.layouts.bloomcraft')
 
-          <tr>
-            <td style="background:#2d3748;padding:32px 40px;text-align:center;">
-              <span style="color:#ffffff;font-size:22px;font-weight:500;">🌸 Bloomcraft</span>
+@section('title', 'Your verification code')
+@section('preheader', "Your BloomCraft code is {$otp}. It expires in {$expiryMinutes} minutes.")
+@section('eyebrow', 'Verification code')
+@section('heading', 'Here is your code')
+
+@section('content')
+    <p style="margin:0 0 6px;font-size:15px;line-height:1.7;">
+        Enter this code on BloomCraft to continue.
+    </p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0;">
+        <tr>
+            <td align="center" style="background:#f1f8f3;border:1px dashed #9fd4b2;border-radius:16px;padding:24px 12px;">
+                <span style="font-family:'Poppins','Segoe UI',Helvetica,Arial,sans-serif;font-size:38px;font-weight:600;letter-spacing:12px;color:#363F4E;">{{ $otp }}</span>
             </td>
-          </tr>
+        </tr>
+    </table>
 
-          <tr>
-            <td style="padding:40px;">
-              <p style="margin:0 0 8px;color:#718096;font-size:14px;">Your verification code</p>
-
-              <div style="text-align:center;margin:28px 0;">
-                <span style="font-size:40px;font-weight:600;letter-spacing:12px;">
-                  {{ $otp }}
-                </span>
-              </div>
-
-              <p style="color:#4a5568;">
-                This code expires in <strong>{{ $expiryMinutes }} minutes</strong>.
-              </p>
-
-              <p style="color:#a0aec0;font-size:13px;">
-                If you didn't request this, ignore this email.
-              </p>
-            </td>
-          </tr>
-
-          <tr>
-            <td style="text-align:center;padding:20px;">
-              <p style="color:#cbd5e0;font-size:12px;">
-                © {{ date('Y') }} Bloomcraft
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
+    <p style="margin:0 0 10px;font-size:14.5px;line-height:1.7;">
+        It expires in <strong style="color:#363F4E;">{{ $expiryMinutes }} minutes</strong>. Never share it with anyone, including BloomCraft staff.
+    </p>
+    <p style="margin:0;font-size:13.5px;line-height:1.7;color:#6b7380;">
+        Didn't ask for a code? You can ignore this email. Your account stays safe.
+    </p>
+@endsection
