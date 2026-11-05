@@ -38,6 +38,14 @@
         </article>
       </li>
     </ul>
+    <div v-else-if="failed" class="fs-empty fs-empty--row" role="alert">
+      <span>We couldn't load the shops just now.</span>
+      <button type="button" class="fs-link" @click="$emit('retry')">Try again</button>
+    </div>
+    <div v-else-if="nearKm != null" class="fs-empty fs-empty--row">
+      <span>No shops within {{ nearKm }} km of your address yet.</span>
+      <button type="button" class="fs-link" @click="$emit('show-all')">Show all shops</button>
+    </div>
     <p v-else class="fs-empty">Shops will appear here once they open on BloomCraft.</p>
   </section>
 </template>
@@ -54,8 +62,10 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   nearby: { type: Object, default: () => ({}) }, // shop id → distance in km
   byRoad: { type: Boolean, default: true },
+  failed: { type: Boolean, default: false }, // the list couldn't be loaded
+  nearKm: { type: Number, default: null }, // only shops this close are asked for
 });
-defineEmits(["visit"]);
+defineEmits(["visit", "retry", "show-all"]);
 
 const ordered = computed(() =>
   [...props.shops].sort((a, b) => (props.nearby[a.id] ?? Infinity) - (props.nearby[b.id] ?? Infinity)).slice(0, 8),
@@ -280,6 +290,30 @@ const distance = (km) => {
   margin: 0;
   font-size: 13px;
   color: var(--ink-soft);
+}
+
+.fs-empty--row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.fs-link {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 500;
+  color: var(--leaf-deep);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.fs-link:hover {
+  color: var(--ink);
 }
 
 .fs :focus-visible {

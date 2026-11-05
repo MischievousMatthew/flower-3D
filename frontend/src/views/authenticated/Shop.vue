@@ -196,7 +196,11 @@
           :loading="loadingVendors"
           :nearby="nearbyById"
           :by-road="nearbyByRoad"
+          :failed="vendorsFailed"
+          :near-km="nearMe ? nearMe.km : null"
           @visit="goToStorefront"
+          @retry="fetchVendors"
+          @show-all="nearMeOnly = false"
         />
       </div>
     </section>
@@ -402,20 +406,29 @@ watch(isAuthenticated, async (val) => {
 });
 
 // ── Vendors ───────────────────────────────────────────────────────────────
+// Only the newest request may change the list: an older, slower reply (the
+// list before the map's circle was known) must not overwrite it. A failed load
+// tries again twice (the server may be waking up), then says so with a retry,
+// instead of looking like there are no shops at all.
+let vendorRequest = 0;
+const vendorsFailed = ref(false);
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const fetchVendors = async () => {
-  try {
-    loadingVendors.value = true;
-    const params = {
-      page: vendorPagination.value.current_page,
-      per_page: vendorPagination.value.per_page,
-    };
-    if (vendorSearch.value) params.search = vendorSearch.value;
-    if (nearMe.value) params.ids = idsParam(nearMe.value.shopIds);
-    const r = await api.get("vendors", { params });
-    if (r.data.success) {
-      const vendorData = Array.isArray(r.data.data?.data)
-        ? r.data.data.data
-        : [];
+  const mine = ++vendorRequest;
+  loadingVendors.value = !vendors.value.length;
+  vendorsFailed.value = false;
+  const params = {
+    page: vendorPagination.value.current_page,
+    per_page: vendorPagination.value.per_page,
+  };
+  if (vendorSearch.value) params.search = vendorSearch.value;
+  if (nearMe.value) params.ids = idsParam(nearMe.value.shopIds);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await api.get("vendors", { params });
+      if (mine !== vendorRequest) return;
+      if (!r.data.success) throw new Error("vendors not loaded");
+      const vendorData = Array.isArray(r.data.data?.data) ? r.data.data.data : [];
       vendors.value = vendorData;
       vendorPagination.value = {
         current_page: r.data.data?.current_page ?? 1,
@@ -423,15 +436,21 @@ const fetchVendors = async () => {
         per_page: r.data.data?.per_page ?? vendorData.length,
         total: r.data.data?.total ?? vendorData.length,
       };
+      loadingVendors.value = false;
+      return;
+    } catch (e) {
+      if (mine !== vendorRequest) return;
+      if (attempt === 2) {
+        console.error(e);
+        vendorsFailed.value = true;
+        loadingVendors.value = false;
+        return;
+      }
+      await wait(attempt ? 4000 : 1500);
+      if (mine !== vendorRequest) return;
     }
-  } catch (e) {
-    console.error(e);
-    vendors.value = [];
-  } finally {
-    loadingVendors.value = false;
   }
 };
-
 const selectVendor = (vendor) => {
   if (selectedVendor.value?.id === vendor.id) {
     clearVendorFilter();
