@@ -172,18 +172,6 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></svg>
                 Buy Now
               </button>
-              <button
-                type="button"
-                class="pd-heart"
-                :class="{ on: isFavorite }"
-                :aria-pressed="isFavorite"
-                :aria-label="isFavorite ? 'Remove from favorites' : 'Add to favorites'"
-                :title="isFavorite ? 'In your favorites' : 'Add to favorites'"
-                :disabled="favoriteBusy"
-                @click="toggleFavorite"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 7.9 3.6 4.5 7 4.5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.4 0 5.6 3.4 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z" /></svg>
-              </button>
             </div>
 
             <ul class="pd-promises">
@@ -286,12 +274,21 @@
         </section>
 
         <!-- You may also like -->
-        <section v-if="related.length" class="pd-related" aria-labelledby="pd-related-title">
+        <section v-if="loadingRelated || related.length" class="pd-related" aria-labelledby="pd-related-title" :aria-busy="loadingRelated && !related.length">
           <div class="pd-related-head">
             <h2 id="pd-related-title">You May Also Like</h2>
             <router-link :to="{ name: 'Shop', query: { section: 'products' } }" class="pd-viewall">View all <span aria-hidden="true">→</span></router-link>
           </div>
-          <div class="pd-related-grid">
+          <!-- Skeleton tiles in the shape of the product tiles -->
+          <div v-if="!related.length" class="pd-related-grid" aria-label="Loading suggestions">
+            <div v-for="n in 5" :key="n" class="pd-rel-skel" aria-hidden="true">
+              <span class="bc-skeleton pd-rel-skel-img"></span>
+              <span class="bc-skeleton pd-rel-skel-line w80"></span>
+              <span class="bc-skeleton pd-rel-skel-line w50"></span>
+              <span class="bc-skeleton pd-rel-skel-line w35"></span>
+            </div>
+          </div>
+          <div v-else class="pd-related-grid">
             <ShopProductTile
               v-for="item in related"
               :key="item.id"
@@ -342,7 +339,7 @@ const TABS = [
 
 const route = useRoute();
 const router = useRouter();
-const { isAuthenticated, user } = useAuth();
+const { isAuthenticated } = useAuth();
 const cartStore = useCart();
 const { flyToCart } = useFlyToCart();
 const { site } = useSiteContent();
@@ -352,6 +349,7 @@ const imageEl = ref(null);
 const product = ref(null);
 const loading = ref(true);
 const related = ref([]);
+const loadingRelated = ref(false); // "You may also like" shows skeleton tiles until it arrives
 const active = ref(0);
 const show3D = ref(false);
 const qty = ref(1);
@@ -360,9 +358,6 @@ const qtyDraft = ref(null);
 const busy = ref(null); // "cart" | "buy"
 const addingRelatedId = ref(null);
 const activeTab = ref("description");
-// Favorites (customer accounts): the heart beside Buy Now
-const isFavorite = ref(false);
-const favoriteBusy = ref(false);
 // Reviews load the first time their tab is opened
 const tabsSeen = reactive({ reviews: false });
 watch(activeTab, (tab) => {
@@ -430,46 +425,12 @@ function openTab(key) {
   document.getElementById("pd-tabs")?.scrollIntoView({ behavior: "smooth" });
 }
 
-async function loadFavorite(id) {
-  isFavorite.value = false;
-  if (user.value?.role !== "customer") return;
-  try {
-    const { data } = await api.get("/customer/favorites");
-    if (String(route.params.id) === String(id)) isFavorite.value = (data?.data ?? []).some((f) => String(f.product_id) === String(id));
-  } catch {
-    // The heart just starts empty
-  }
-}
-
-async function toggleFavorite() {
-  if (!isAuthenticated.value) {
-    toast.info("Sign in to save favorites.");
-    return;
-  }
-  if (user.value?.role !== "customer") {
-    toast.info("Favorites are for customer accounts.");
-    return;
-  }
-  const id = product.value?.id;
-  if (!id) return;
-  favoriteBusy.value = true;
-  const adding = !isFavorite.value;
-  try {
-    await (adding ? api.post(`/customer/favorites/${id}`) : api.delete(`/customer/favorites/${id}`));
-    isFavorite.value = adding;
-    toast.success(adding ? "Added to your favorites." : "Removed from your favorites.");
-  } catch (e) {
-    toast.error(e?.response?.data?.message || "Couldn't update your favorites.");
-  } finally {
-    favoriteBusy.value = false;
-  }
-}
-
 async function load(id) {
   const preview = productPreview(id);
   loading.value = !preview;
   product.value = preview;
   related.value = [];
+  loadingRelated.value = true;
   active.value = 0;
   show3D.value = false;
   qty.value = 1;
@@ -484,16 +445,27 @@ async function load(id) {
   } finally {
     loading.value = false;
   }
-  loadFavorite(id);
   if (product.value) {
     document.title = `${product.value.product_name} · BloomCraft`;
     loadRelated();
+  } else {
+    loadingRelated.value = false;
   }
 }
 
 // Same category first, topped up with the newest products
 async function loadRelated() {
   const id = product.value.id;
+  loadingRelated.value = true;
+  try {
+    await fillRelated(id);
+  } finally {
+    // A newer product's list may have started meanwhile; only the current one ends the skeleton
+    if (product.value?.id === id) loadingRelated.value = false;
+  }
+}
+
+async function fillRelated(id) {
   const pick = (list) => (Array.isArray(list) ? list : []).filter((p) => p.id !== id);
   const fetchList = async (params) => {
     try {
@@ -508,7 +480,7 @@ async function loadRelated() {
     const more = await fetchList({ sort_by: "created_at_desc" });
     list = [...list, ...more.filter((p) => !list.some((q) => q.id === p.id))];
   }
-  related.value = list.slice(0, 5);
+  if (product.value?.id === id) related.value = list.slice(0, 5);
 }
 
 async function refreshStats() {
@@ -1050,49 +1022,8 @@ watch(
 
 .pd-buy {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
-}
-
-.pd-heart {
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--paper);
-  color: var(--ink-soft);
-  cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
-}
-
-.pd-heart svg {
-  width: 22px;
-  height: 22px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linejoin: round;
-}
-
-.pd-heart:hover:not(:disabled) {
-  border-color: #e0475a;
-  color: #e0475a;
-}
-
-.pd-heart.on {
-  border-color: #f4c2c9;
-  background: #fdecee;
-  color: #e0475a;
-}
-
-.pd-heart.on svg {
-  fill: currentColor;
-}
-
-.pd-heart:active:not(:disabled) {
-  transform: scale(0.92);
 }
 
 .pd-btn {
@@ -1437,6 +1368,48 @@ watch(
   gap: 18px;
 }
 
+/* Loading tiles: same frame as a product tile */
+.pd-rel-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-bottom: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.pd-rel-skel-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 3.4;
+  border-radius: 0;
+}
+
+.pd-rel-skel-line {
+  display: block;
+  height: 12px;
+  margin: 0 14px;
+  border-radius: 6px;
+}
+
+.pd-rel-skel-line.w80 {
+  width: 80%;
+  height: 14px;
+  margin-top: 4px;
+}
+
+.pd-rel-skel-line.w50 {
+  width: 50%;
+}
+
+.pd-rel-skel-line.w35 {
+  width: 35%;
+  height: 16px;
+}
+
 /* Missing / loading */
 .pd-missing {
   display: grid;
@@ -1559,11 +1532,7 @@ watch(
   }
 
   .pd-buy {
-    grid-template-columns: 1fr auto;
-  }
-
-  .pd-buy .pd-btn--solid {
-    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
   }
 }
 
