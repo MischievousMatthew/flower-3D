@@ -196,6 +196,8 @@ class BouquetCustomizationOption extends Model
                 'locked' => (bool) data_get($filler, 'locked', false),
                 'group' => self::cleanGroup(data_get($filler, 'group')),
                 'sprigs' => self::cleanSprigs(data_get($filler, 'sprigs')),
+                // Its pieces were arranged by hand, so adding fillers doesn't re-lay them
+                'arranged' => (bool) data_get($filler, 'arranged', false),
             ];
         }
 
@@ -290,13 +292,19 @@ class BouquetCustomizationOption extends Model
             $number = fn ($key, $default, $min, $max) => is_numeric(data_get($sprig, $key))
                 ? max($min, min($max, round((float) data_get($sprig, $key), 4)))
                 : $default;
-            $clean[] = [
+            $piece = [
                 'i' => (int) $spot,
                 'a' => $number('a', 0.0, -10.0, 10.0),
                 'r' => $number('r', 0.0, -10.0, 10.0),
                 'k' => $number('k', 1.0, 0.2, 2.0),
                 'p' => $number('p', 1.0, 0.0, 1.5),
             ];
+            // Moved on its own: [x, y, z, qx, qy, qz, qw, size] in the filler's frame
+            $pose = is_array(data_get($sprig, 't')) ? array_values(data_get($sprig, 't')) : [];
+            if (count($pose) === 8 && collect($pose)->every(fn ($v) => is_numeric($v) && abs((float) $v) <= 50) && (float) $pose[7] > 0) {
+                $piece['t'] = array_map(fn ($v) => round((float) $v, 5), $pose);
+            }
+            $clean[] = $piece;
         }
 
         return $clean ?: null;

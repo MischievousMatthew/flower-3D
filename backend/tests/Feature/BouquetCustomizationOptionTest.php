@@ -248,6 +248,31 @@ class BouquetCustomizationOptionTest extends TestCase
         $this->getJson("/api/stores/{$vendor->id}/customization-options")->assertOk();
     }
 
+    public function test_filler_pieces_moved_on_their_own_keep_their_pose(): void
+    {
+        $vendor = $this->vendor();
+        $filler = BouquetCustomizationOption::create(['owner_id' => $vendor->id, 'type' => 'filler', 'name' => 'Eucalyptus', 'model_url' => 'https://example.com/e.glb']);
+
+        $result = BouquetCustomizationOption::resolveSelections($vendor->id, [
+            'type' => 'custom_flower_bouquet',
+            'fillers' => [[
+                'id' => $filler->id,
+                'arranged' => true,
+                'sprigs' => [
+                    ['i' => 1, 'a' => 0.2, 't' => [0.1, 0.2, 0.3, 0, 0, 0, 1, 0.5]],
+                    ['i' => 2, 't' => [1, 2, 3]], // not a pose: dropped
+                    ['i' => 3, 't' => [0, 0, 0, 0, 0, 0, 1, 0]], // no size: dropped
+                ],
+            ]],
+        ]);
+
+        $saved = $result['customizations']['fillers'][0];
+        $this->assertTrue($saved['arranged']);
+        $this->assertSame([0.1, 0.2, 0.3, 0.0, 0.0, 0.0, 1.0, 0.5], $saved['sprigs'][0]['t']);
+        $this->assertArrayNotHasKey('t', $saved['sprigs'][1]);
+        $this->assertArrayNotHasKey('t', $saved['sprigs'][2]);
+    }
+
     public function test_group_ids_on_bouquet_items_are_kept_only_when_safe(): void
     {
         $this->assertSame('gm3k2abcd', BouquetCustomizationOption::cleanGroup('gm3k2abcd'));

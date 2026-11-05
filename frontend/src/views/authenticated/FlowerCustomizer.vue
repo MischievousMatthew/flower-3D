@@ -389,15 +389,16 @@
           <SelectionCard
             v-if="sceneReady && hasTransformTarget && !groupPick"
             ref="selectionCardEl"
-            :title="bouquetSelected ? 'Whole bouquet' : selectedGroup.length ? `Group of ${selectedGroup.length}` : selectedFlower.product_name"
+            :title="bouquetSelected ? 'Whole bouquet' : selectedGroup.length ? `Group of ${selectedGroup.length}` : activePiece ? `${selectedFlower.product_name} piece` : selectedFlower.product_name"
             :subtitle="selectedGroup.length ? '' : selectionSubtitle"
             :grouped="selectedGroup.length > 1"
             :group-count="selectedGroup.length"
+            :piece="!!activePiece"
             :mode="bouquetSelected ? 'bouquet' : 'flower'"
             :locked="!bouquetSelected && !!selectedFlower?.locked"
-            :scale="Number(selectedFlower?.scale ?? 1)"
-            :rotation="selectedFlower?.rotation || {}"
-            :turn="bouquetSelected ? bouquetTurn : selectedFlower?.rotation?.yDeg || 0"
+            :scale="activePiece ? pieceView.scale : Number(selectedFlower?.scale ?? 1)"
+            :rotation="activePiece ? pieceView.rotation : selectedFlower?.rotation || {}"
+            :turn="bouquetSelected ? bouquetTurn : (activePiece ? pieceView.rotation : selectedFlower?.rotation)?.yDeg || 0"
             :axes="ROTATION_AXES"
             :move-locked="moveLocked"
             :position="selectionCardPosition"
@@ -412,6 +413,7 @@
             @remove="removeSelection"
             @group="startGrouping()"
             @ungroup="ungroupSelection"
+            @whole="selectWholeFiller"
             @reset="bouquetSelected ? resetBouquetPlacement() : resetSelectedTransform()"
             @close="clearSelection"
           />
@@ -544,7 +546,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, toRaw, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -579,7 +581,7 @@ import { anchorCard, buildSteps, keyAction, receiptLines } from "../../utils/cus
 import { createHistory, pickUnit, tidyGroups, togglePick } from "../../utils/customizerHistory.js";
 import { suggestFillers, suggestFlowers } from "../../utils/arrangementSuggest.js";
 import { buildFillerBunch } from "../../utils/fillerBunch.js";
-import { FILLER_STYLES, ORIGINAL_FRONT, SPAN_PER_BED_RADIUS, buildFillerSprigs, fillerKind, placeSprig, planFillers, spillAt } from "../../utils/fillerLayout.js";
+import { FILLER_STYLES, ORIGINAL_FRONT, SPAN_PER_BED_RADIUS, buildFillerSprigs, fillerKind, keepSprigPose, placeSprig, planFillers, spillAt, sprigMoved } from "../../utils/fillerLayout.js";
 import NavHeader from "../../layouts/NavHeader.vue";
 import BcIcon from "../../components/customizer/CustomizerIcon.js";
 import CustomizerSteps from "../../components/customizer/CustomizerSteps.vue";
@@ -642,6 +644,11 @@ const groupPick = ref(null); // { ids } while picking items to group (see Groups
 const draggedFlower = ref(null);
 const selectedFlowers = ref([]);
 const selectedSceneId = ref(null);
+// One piece of a filler picked on its own: { sceneId, i } (i = its spot), see Filler pieces
+const selectedPiece = ref(null);
+const wholeFillerId = ref(null); // a filler the customer chose to move as a whole
+
+const pieceView = ref({ rotation: {}, scale: 1 });
 const isDragOver = ref(false);
 const isTransformDragging = ref(false);
 // The whole bouquet (wrap + everything on it) can be selected instead of one item
@@ -758,6 +765,11 @@ const basePrice = computed(() => Number(occasion.value?.base_price || 0));
 const extrasPrice = computed(() => basePrice.value);
 const totalPrice = computed(() => selectedFlowers.value.reduce((sum, flower) => sum + flower.price, 0) + extrasPrice.value);
 const selectedFlower = computed(() => selectedFlowers.value.find((flower) => flower.sceneId === selectedSceneId.value) || null);
+// The piece picked, while its filler is the selection
+const activePiece = computed(() => {
+  const piece = selectedPiece.value;
+  return piece && !bouquetSelected.value && piece.sceneId === selectedSceneId.value && selectedFlower.value ? piece : null;
+});
 const flowersSubtotal = computed(() => placedFlowers.value.reduce((sum, flower) => sum + flower.price, 0));
 const fillersSubtotal = computed(() => placedFillers.value.reduce((sum, filler) => sum + filler.price, 0));
 const flowerImage = (flowerId) => flowers.value.find((flower) => flower.id === flowerId)?.image || null;
@@ -835,6 +847,12 @@ const stemMeta = (item) => (item.quantity_in_stock != null ? `${formatPeso(item.
 const selectionSubtitle = computed(() => {
   const flower = selectedFlower.value;
   if (bouquetSelected.value || !flower) return "";
+  if (activePiece.value) {
+    const count = flower.sprigs?.length || 0;
+    const at = (flower.sprigs || []).findIndex((sprig) => sprig.i === activePiece.value.i);
+    return count > 1 && at >= 0 ? `Piece ${at + 1} of ${count}` : "";
+  }
+  if (flower.sprigs?.length > 1 && !flower.group) return "Click a piece to move it on its own";
   const same = selectedFlowers.value.filter((item) => item.id === flower.id && item.kind === flower.kind);
   return same.length > 1 ? `${same.findIndex((item) => item.sceneId === flower.sceneId) + 1} of ${same.length}` : "";
 });
@@ -1216,7 +1234,7 @@ function setupGizmo() {
     isTransformDragging.value = event.value;
     if (event.value) {
       gizmoStartScale = gizmo.object?.scale.x ?? 1;
-      if (gizmo.object !== arrangement) beginGroupMove();
+      if (gizmo.object !== arrangement && !gizmo.object?.userData.sprig) beginGroupMove();
       return;
     }
     commitGizmoChange();
@@ -1228,7 +1246,9 @@ function setupGizmo() {
       // Items only scale evenly: follow whichever handle moved the most
       const { x, y, z } = object.scale;
       const pick = [x, y, z].reduce((best, value) => (Math.abs(value - gizmoStartScale) > Math.abs(best - gizmoStartScale) ? value : best), x);
-      object.scale.setScalar(THREE.MathUtils.clamp(pick, 0.25, 2));
+      // A filler piece's size is a share of its size on its spot
+      const base = object.userData.sprig ? object.userData.baseScale || 1 : 1;
+      object.scale.setScalar(THREE.MathUtils.clamp(pick, 0.25 * base, 2 * base));
     }
     followLead();
   });
@@ -1243,8 +1263,15 @@ function updateGizmo() {
     : bouquetSelected.value
       ? arrangement
       : item && !item.locked
-        ? placedObjects.get(item.sceneId)
+        ? activePiece.value
+          ? pieceObject()
+          : placedObjects.get(item.sceneId)
         : null;
+  // The piece is gone (the fillers were laid out again): its filler stays selected
+  if (activePiece.value && item && !item.locked && !target) {
+    selectedPiece.value = null;
+    return;
+  }
   if (!target) {
     gizmo.detach();
     return;
@@ -1261,7 +1288,7 @@ function updateGizmo() {
   gizmo.showY = true;
   if (gizmo.object !== target) gizmo.attach(target);
 }
-watch([selectedSceneId, bouquetSelected, transformMode, () => selectedFlower.value?.locked, pendingFlower, draggedFlower, sceneReady, groupPick], updateGizmo, { flush: "post" });
+watch([selectedSceneId, bouquetSelected, transformMode, () => selectedFlower.value?.locked, pendingFlower, draggedFlower, sceneReady, groupPick, activePiece], updateGizmo, { flush: "post" });
 
 function commitGizmoChange() {
   const object = gizmo?.object;
@@ -1270,6 +1297,7 @@ function commitGizmoChange() {
     bouquetTurn.value = Math.round(THREE.MathUtils.radToDeg(arrangement.rotation.y));
     return;
   }
+  if (object.userData.sprig) return commitPiece(object);
   const item = selectedFlowers.value.find((entry) => entry.sceneId === object.userData.sceneId);
   if (isFiller(item)) keepInsideBouquet(object, { exact: true });
   commitObjectState(object.userData.sceneId);
@@ -1330,10 +1358,18 @@ function setupCanvasInteractions() {
       startGrouping(placedHit.sceneId);
       return;
     }
+    const hitItem = selectedFlowers.value.find((entry) => entry.sceneId === placedHit.sceneId);
+    // A filler's pieces are picked one by one, unless the filler is in a group
+    // or was just switched to "whole filler" (pressing it again drags it all)
+    const wholeFiller = wholeFillerId.value === placedHit.sceneId && selectedSceneId.value === placedHit.sceneId && !bouquetSelected.value;
+    const piece = placedHit.piece && !hitItem?.group && !wholeFiller ? placedHit.piece : null;
+    if (!wholeFiller) wholeFillerId.value = null;
     selectPlacedFlower(placedHit.sceneId);
-    if (selectedFlowers.value.find((entry) => entry.sceneId === placedHit.sceneId)?.locked) return;
-    beginGroupMove(placedHit.sceneId);
-    transformDrag = { sceneId: placedHit.sceneId, pointerId: event.pointerId };
+    selectedPiece.value = piece ? { sceneId: placedHit.sceneId, i: piece.userData.sprig.i } : null;
+    if (piece) syncPieceView();
+    if (hitItem?.locked) return;
+    if (!piece) beginGroupMove(placedHit.sceneId);
+    transformDrag = { sceneId: placedHit.sceneId, piece, pointerId: event.pointerId };
     isTransformDragging.value = true;
     canvas.setPointerCapture?.(event.pointerId);
     controls.enabled = false;
@@ -1414,8 +1450,12 @@ function getPlacedFlowerHit(clientX, clientY) {
   const intersections = raycaster.intersectObjects(Array.from(placedObjects.values()), true);
   if (!intersections.length) return null;
   let current = intersections[0].object;
-  while (current && !current.userData?.sceneId) current = current.parent;
-  return current?.userData?.sceneId ? { sceneId: current.userData.sceneId, object: current } : null;
+  let piece = null; // a filler's piece of greenery, when that's what was hit
+  while (current && !current.userData?.sceneId) {
+    if (current.userData?.sprig) piece = current;
+    current = current.parent;
+  }
+  return current?.userData?.sceneId ? { sceneId: current.userData.sceneId, object: current, piece } : null;
 }
 
 function updateHoverMarker(clientX, clientY) {
@@ -1440,9 +1480,12 @@ function endTransformDrag(pointerId = null) {
     flushPointer();
   }
   const sceneId = transformDrag?.sceneId;
+  const piece = transformDrag?.piece;
+  const moved = Boolean(transformDrag?.from);
   transformDrag = null;
   isTransformDragging.value = false;
   if (controls) controls.enabled = true;
+  if (piece) return moved ? commitPiece(piece) : undefined;
   if (!sceneId) return endGroupMove();
   const object = placedObjects.get(sceneId);
   if (object && isFiller(selectedFlowers.value.find((entry) => entry.sceneId === sceneId))) keepInsideBouquet(object, { exact: true });
@@ -1708,8 +1751,66 @@ function dropObject(sceneId) {
 function removeSelection() {
   const flower = selectedFlower.value;
   if (!flower) return;
+  if (activePiece.value) return removePiece();
   pickUnit(selectedFlowers.value, flower.sceneId).forEach(removeFlower);
 }
+
+// ── Filler pieces ──────────────────────────────────────────────────────
+// A filler is one item made of several pieces of greenery. Clicking a piece
+// picks just that piece, to move, turn, size or remove on its own. A filler
+// whose pieces were arranged by hand keeps them when other fillers are added
+// or removed; a suggestion lays them all out afresh.
+
+/** The selected piece's 3D object, or null */
+function pieceObject() {
+  const piece = activePiece.value;
+  const group = piece ? placedObjects.get(piece.sceneId)?.children[0] : null;
+  return group?.children.find((child) => child.userData.sprig?.i === piece.i) || null;
+}
+
+/** The selection card's numbers for the selected piece */
+function syncPieceView() {
+  const piece = pieceObject();
+  if (!piece) return;
+  const deg = (radians) => Math.round(THREE.MathUtils.radToDeg(radians) * 10) / 10;
+  pieceView.value = {
+    rotation: { xDeg: deg(piece.rotation.x), yDeg: deg(piece.rotation.y), zDeg: deg(piece.rotation.z) },
+    scale: Math.round((piece.scale.x / (piece.userData.baseScale || 1)) * 100) / 100,
+  };
+}
+
+/** Saves where a piece is now; its filler is now arranged by hand */
+function commitPiece(piece) {
+  let filler = piece.parent;
+  while (filler && !filler.userData.sceneId) filler = filler.parent;
+  if (!filler) return;
+  keepSprigPose(piece);
+  updateFlowerState(filler.userData.sceneId, { arranged: true });
+  if (activePiece.value?.i === piece.userData.sprig.i) syncPieceView();
+}
+
+/** Takes the selected piece off; the filler goes too when it was its last */
+function removePiece() {
+  const flower = selectedFlower.value;
+  const piece = pieceObject();
+  if (!flower || !piece) return;
+  const sprigs = (flower.sprigs || []).filter((sprig) => toRaw(sprig) !== piece.userData.sprig);
+  selectedPiece.value = null;
+  if (!sprigs.length) return removeFlower(flower.sceneId);
+  if (gizmo?.object === piece) gizmo.detach();
+  piece.parent.remove(piece);
+  updateFlowerState(flower.sceneId, { sprigs, arranged: true });
+  updateGizmo();
+}
+
+/** Selects the whole filler the piece belongs to, to move all its pieces together */
+function selectWholeFiller() {
+  wholeFillerId.value = activePiece.value?.sceneId ?? null;
+  selectedPiece.value = null;
+}
+
+/** Fillers the layout leaves alone: locked, or arranged by hand */
+const keepsPieces = (item) => item.locked || item.arranged || (item.sprigs || []).some(sprigMoved);
 
 // ── Occasion presets ───────────────────────────────────────────────────
 
@@ -2131,12 +2232,12 @@ function leanPose(dx, dz, lean, turn) {
   return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(dz / r, 0, -dx / r), rad(lean)).multiply(pose);
 }
 
-const copySprigs = (sprigs) => (sprigs ? sprigs.map(({ i, a, r, k, p }) => ({ i, a, r, k, p })) : null);
+const copySprigs = (sprigs) => (sprigs ? sprigs.map(({ i, a, r, k, p, t }) => ({ i, a, r, k, p, ...(sprigMoved({ t }) ? { t: [...t] } : {}) })) : null);
 
 const poseOf = (sceneId) => {
   const object = placedObjects.get(sceneId);
   const item = selectedFlowers.value.find((entry) => entry.sceneId === sceneId);
-  return { sceneId, position: object.position.clone(), quaternion: object.quaternion.clone(), scale: object.scale.x, sprigs: copySprigs(item?.sprigs) };
+  return { sceneId, position: object.position.clone(), quaternion: object.quaternion.clone(), scale: object.scale.x, sprigs: copySprigs(item?.sprigs), arranged: Boolean(item?.arranged) };
 };
 
 /** Lays out the unlocked flowers or fillers in a new suggested arrangement; each call gives a different one */
@@ -2184,6 +2285,7 @@ function undoSuggestion(kind) {
     const item = selectedFlowers.value.find((entry) => entry.sceneId === pose.sceneId);
     if (!object || !item) continue;
     if (pose.sprigs) showSprigs(object, item, copySprigs(pose.sprigs));
+    if (isFiller(item)) item.arranged = pose.arranged;
     object.position.copy(pose.position);
     object.quaternion.copy(pose.quaternion);
     object.scale.setScalar(pose.scale);
@@ -2237,6 +2339,8 @@ function showSprigs(object, item, sprigs) {
   object.add(buildFillerSprigs(template, sprigs, () => SkeletonUtils.clone(template)));
   object.userData.sprigs = true;
   item.sprigs = sprigs;
+  // A selected piece now has a new object (or is gone)
+  if (activePiece.value?.sceneId === item.sceneId) nextTick(() => (updateGizmo(), syncPieceView()));
 }
 
 /** Sets a filler's pieces and puts it over the bed, sized to this wrap, every piece inside the paper */
@@ -2263,6 +2367,7 @@ function fitSprigs(object, wall) {
   const group = object.children[0];
   for (const piece of [...(group?.children || [])]) {
     const sprig = piece.userData.sprig;
+    if (sprigMoved(sprig)) continue; // the customer put it there
     for (let step = 0; step < 22 && !allowed(piece); step++) {
       if (sprig.p > 0.35 && step < 10) sprig.p = Math.round((sprig.p - 0.07) * 100) / 100;
       else if (sprig.k > 0.45) sprig.k = Math.round(sprig.k * 0.9 * 100) / 100;
@@ -2271,7 +2376,7 @@ function fitSprigs(object, wall) {
     }
     if (!allowed(piece)) {
       group.remove(piece);
-      item.sprigs = item.sprigs.filter((other) => other !== sprig);
+      item.sprigs = item.sprigs.filter((other) => toRaw(other) !== sprig);
     }
   }
 }
@@ -2281,19 +2386,26 @@ function fitSprigs(object, wall) {
  * Runs as fillers are added or removed, so the greenery always looks like the
  * original's, as full as the fillers placed allow. Returns the look's { style, label }.
  */
-function layOutFillers(style = "original") {
+function layOutFillers(style = "original", { all = false } = {}) {
   const ground = fillerGround();
   const look = FILLER_STYLES.find((entry) => entry.key === style) || FILLER_STYLES[0];
   if (!ground) return { style: look.key, label: look.label };
-  const ready = placedFillers.value.filter((item) => !item.locked && placedObjects.has(item.sceneId) && modelCache.has(item.model_3d_url));
-  // Locked fillers keep their spots
-  const keep = placedFillers.value.filter((item) => item.locked).flatMap((item) => (item.sprigs || []).map((sprig) => sprig.i));
+  // A suggestion (all) re-lays hand-arranged fillers too; adding or removing one doesn't
+  const stays = (item) => (all ? item.locked : keepsPieces(item));
+  const ready = placedFillers.value.filter((item) => !stays(item) && placedObjects.has(item.sceneId) && modelCache.has(item.model_3d_url));
+  // Locked and hand-arranged fillers keep their spots
+  const keep = placedFillers.value.filter(stays).flatMap((item) => (item.sprigs || []).map((sprig) => sprig.i));
+  ready.forEach((item) => (item.arranged = false));
   const plans = planFillers(
     ready.map((item) => ({ kind: fillerKind(modelCache.get(item.model_3d_url)) })),
     { align: ground.align, style: look.key, keep },
   );
   ready.forEach((item, index) => {
-    layFiller(placedObjects.get(item.sceneId), item, plans[index], ground);
+    // Every spot of its kind is held by a kept filler: it gets a full set of its own
+    const sprigs = plans[index].length
+      ? plans[index]
+      : planFillers([{ kind: fillerKind(modelCache.get(item.model_3d_url)) }], { align: ground.align, style: look.key })[0];
+    layFiller(placedObjects.get(item.sceneId), item, sprigs, ground);
     commitObjectState(item.sceneId);
   });
   return { style: look.key, label: look.label };
@@ -2303,7 +2415,7 @@ function layOutFillers(style = "original") {
 function suggestFillerLayout(items, avoid) {
   // Every suggestion is a new arrangement, never the original again
   const choices = FILLER_STYLES.filter((style) => !style.first && style.key !== avoid);
-  return layOutFillers(choices[Math.floor(Math.random() * choices.length)].key);
+  return layOutFillers(choices[Math.floor(Math.random() * choices.length)].key, { all: true });
 }
 
 // Adding or removing items starts suggestions afresh
@@ -2330,6 +2442,7 @@ function resetDesign() {
 function selectPlacedFlower(sceneId) {
   bouquetSelected.value = false;
   selectedSceneId.value = sceneId;
+  selectedPiece.value = null; // a click on a piece picks it right after
 }
 
 function selectBouquet() {
@@ -2341,6 +2454,8 @@ function clearSelection() {
   selectedSceneId.value = null;
   bouquetSelected.value = false;
   groupPick.value = null;
+  selectedPiece.value = null;
+  wholeFillerId.value = null;
 }
 
 // Deselecting in any way (Esc, ×, empty space, Remove, Start over) undoes Focus
@@ -2359,6 +2474,15 @@ function moveSelectedFlower(clientX, clientY, sceneId = selectedSceneId.value) {
   const object = sceneId ? placedObjects.get(sceneId) : null;
   const flower = selectedFlowers.value.find((entry) => entry.sceneId === sceneId);
   if (!placement || !object || flower?.locked) return;
+  const piece = transformDrag?.piece;
+  if (piece) {
+    // One piece slides at its own height by how far the pointer moved
+    const at = flowerLayer.worldToLocal(piece.getWorldPosition(new THREE.Vector3()));
+    if (!transformDrag.from) transformDrag.from = { pointer: placement.local.clone(), piece: at };
+    const target = transformDrag.from.piece.clone().add(placement.local.clone().sub(transformDrag.from.pointer).setY(0));
+    piece.position.copy(piece.parent.worldToLocal(flowerLayer.localToWorld(target)));
+    return;
+  }
   const frame = isFiller(flower) ? bedFrame() : null;
   if (!frame) return object.position.copy(placement.local);
   if (object.userData.sprigs) {
@@ -2387,6 +2511,11 @@ function rotateSelected(axis, degrees) {
   if (flower.locked) return;
   // Keep the angle between -180 and 180
   const wrapped = ((((degrees + 180) % 360) + 360) % 360) - 180;
+  const piece = activePiece.value && pieceObject();
+  if (piece) {
+    piece.rotation[axis] = THREE.MathUtils.degToRad(wrapped);
+    return commitPiece(piece);
+  }
   const nextRotation = { ...flower.rotation, [`${axis}Deg`]: wrapped };
   object.rotation[axis] = THREE.MathUtils.degToRad(wrapped);
   updateFlowerState(sceneId, { rotation: nextRotation });
@@ -2402,6 +2531,11 @@ function scaleSelected(scale) {
   if (!flower || !object || flower.locked) return;
 
   const nextScale = THREE.MathUtils.clamp(scale, 0.25, 2);
+  const piece = activePiece.value && pieceObject();
+  if (piece) {
+    piece.scale.setScalar(nextScale * (piece.userData.baseScale || 1));
+    return commitPiece(piece);
+  }
   object.scale.setScalar(nextScale);
   updateFlowerState(flower.sceneId, { scale: nextScale });
 }
@@ -2409,7 +2543,8 @@ function scaleSelected(scale) {
 function nudgeSelectedRotation(axis, delta) {
   const flower = selectedFlower.value;
   if (!flower) return;
-  updateSelectedRotation(axis, (flower.rotation[`${axis}Deg`] || 0) + delta);
+  const rotation = activePiece.value ? pieceView.value.rotation : flower.rotation;
+  updateSelectedRotation(axis, (rotation[`${axis}Deg`] || 0) + delta);
 }
 
 function resetSelectedTransform() {
@@ -2420,6 +2555,14 @@ function resetSelectedNow() {
   const flower = selectedFlower.value;
   const object = flower ? placedObjects.get(flower.sceneId) : null;
   if (!flower || !object) return;
+  const piece = activePiece.value && pieceObject();
+  if (piece) {
+    // Back on its spot, as the layout had it
+    delete piece.userData.sprig.t;
+    placeSprig(piece, modelCache.get(flower.model_3d_url));
+    syncPieceView();
+    return updateFlowerState(flower.sceneId, { arranged: true });
+  }
   if (object.userData.sprigs) {
     // Back over the middle of the bed, sized to the wrap
     const ground = fillerGround();
@@ -2489,6 +2632,12 @@ function nudgeSelectedPosition(direction, event = null) {
   const flower = selectedFlower.value;
   const object = flower ? placedObjects.get(flower.sceneId) : null;
   if (!flower || !object || flower.locked) return;
+  const piece = activePiece.value && pieceObject();
+  if (piece) {
+    const at = piece.getWorldPosition(new THREE.Vector3()).add(delta);
+    piece.position.copy(piece.parent.worldToLocal(at));
+    return commitPiece(piece);
+  }
   withGroup(() => {
     // Items sit inside the arrangement, which may be turned
     object.position.add(delta.applyQuaternion(arrangement.quaternion.clone().invert()));
@@ -2511,7 +2660,11 @@ function resetBouquetPlacement() {
 
 // Points the camera at the selection, keeping the current angle and distance
 function focusSelection() {
-  const target = bouquetSelected.value ? arrangement : selectedFlower.value ? placedObjects.get(selectedFlower.value.sceneId) : null;
+  const target = bouquetSelected.value
+    ? arrangement
+    : selectedFlower.value
+      ? (activePiece.value && pieceObject()) || placedObjects.get(selectedFlower.value.sceneId)
+      : null;
   if (!target || !controls) return;
   const box = new THREE.Box3().setFromObject(target);
   if (box.isEmpty()) return;
@@ -3009,8 +3162,9 @@ function buildBouquetCustomization() {
       scale: Number(filler.scale ?? 1),
       locked: filler.locked,
       group: filler.group || null,
-      // Its pieces on the original bouquet's spots
+      // Its pieces on the original bouquet's spots (or where the customer moved them)
       ...(filler.sprigs ? { sprigs: copySprigs(filler.sprigs) } : {}),
+      arranged: Boolean(filler.arranged),
     })),
     flowers: placedFlowers.value.map((flower, index) => {
       const object = placedObjects.get(flower.sceneId);
@@ -3132,7 +3286,7 @@ async function restoreBouquet(customization) {
         scale,
         locked: Boolean(savedFlower.locked),
         group: typeof savedFlower.group === "string" ? savedFlower.group : null,
-        ...(sprigs ? { sprigs } : {}),
+        ...(sprigs ? { sprigs, arranged: Boolean(savedFlower.arranged) } : {}),
       });
     } catch (error) {
       console.error("Failed to restore saved flower:", error);
@@ -3207,7 +3361,7 @@ function placeSelectionCard() {
   const card = selectionCardEl.value?.$el;
   const target = gizmo?.object;
   if (!stage || !card || !target || !camera) return;
-  const key = bouquetSelected.value ? "bouquet" : selectedSceneId.value;
+  const key = bouquetSelected.value ? "bouquet" : `${selectedSceneId.value}:${activePiece.value?.i ?? ""}`;
   if (anchoredTo === key) {
     keepCardInStage(stage, card);
     return;

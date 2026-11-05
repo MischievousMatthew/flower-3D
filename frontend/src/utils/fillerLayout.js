@@ -14,6 +14,8 @@
 //   k  size (1 = as in the original)
 //   p  how far out from the middle it stays (1 = as in the original; lower
 //      when it had to come in to stay inside the paper)
+//   t  only once the customer moved the piece on its own: its pose in the
+//      filler's frame, [x, y, z, qx, qy, qz, qw, size]; it then stays there
 // The filler object sits at the bed centre, scaled by the wrap's filler span.
 import * as THREE from "three";
 import SLOT_DATA from "../constants/fillerSlots.json";
@@ -109,18 +111,43 @@ export function buildFillerSprigs(template, sprigs, makeCopy) {
   for (const sprig of sprigs) {
     if (!SLOTS[sprig.i]) continue;
     const copy = makeCopy();
-    sprigMatrix(sprig, mesh).decompose(copy.position, copy.quaternion, copy.scale);
     copy.userData.sprig = sprig;
+    poseSprig(copy, mesh);
     group.add(copy);
   }
   return group;
 }
 
-/** Puts a piece's object back on its (changed) spot */
+/** A piece's hand-set pose, when it has a valid one */
+const handPose = (t) => (Array.isArray(t) && t.length === 8 && t.every(Number.isFinite) && t[7] > 0 ? t : null);
+
+// A piece on its spot, or where the customer put it. `baseScale` is its size
+// on the spot, so a hand-set size reads as a share of that.
+function poseSprig(copy, mesh) {
+  const sprig = copy.userData.sprig;
+  sprigMatrix(sprig, mesh).decompose(copy.position, copy.quaternion, copy.scale);
+  copy.userData.baseScale = copy.scale.x;
+  const t = handPose(sprig.t);
+  if (!t) return;
+  copy.position.set(t[0], t[1], t[2]);
+  copy.quaternion.set(t[3], t[4], t[5], t[6]).normalize();
+  copy.scale.setScalar(t[7]);
+}
+
+/** Puts a piece's object back on its (changed) spot, or its hand-set pose */
 export function placeSprig(copy, template) {
   const mesh = mainMesh(template);
-  if (mesh) sprigMatrix(copy.userData.sprig, mesh).decompose(copy.position, copy.quaternion, copy.scale);
+  if (mesh) poseSprig(copy, mesh);
 }
+
+/** Keeps where a piece is now as its hand-set pose */
+export function keepSprigPose(copy) {
+  const { position: p, quaternion: q } = copy;
+  copy.userData.sprig.t = [p.x, p.y, p.z, q.x, q.y, q.z, q.w, copy.scale.x].map((v) => Number(v.toFixed(5)));
+}
+
+/** Whether a piece was moved on its own */
+export const sprigMoved = (sprig) => Boolean(handPose(sprig?.t));
 
 // `spin` and `size` are the most a piece turns about its own stem (share of a
 // full turn) and grows or shrinks. Every look but the first moves each piece
