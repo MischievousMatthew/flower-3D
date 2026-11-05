@@ -329,16 +329,21 @@
               <div class="card">
                 <div class="card-head">
                   <span class="card-label">Last 6 months</span>
-                  <span class="sub">Bars: sales · dots: orders</span>
+                  <span class="sub">Bars: sales · line: orders</span>
                 </div>
                 <div class="month-chart">
+                  <!-- Orders: one line across the months, its dots centred over each bar -->
+                  <svg class="month-line" :viewBox="`0 0 ${(perf.months?.length || 1) * 100} 120`" preserveAspectRatio="none" aria-hidden="true">
+                    <polyline :points="orderLinePoints" />
+                  </svg>
                   <div v-for="m in perf.months" :key="m.label" class="month">
                     <div class="month-bar-wrap">
-                      <span class="month-orders" :style="{ bottom: barPct(m.orders, maxMonthOrders) + '%' }" :title="`${m.orders} orders`"></span>
                       <span class="month-bar" :style="{ height: barPct(m.sales, maxMonthSales) + '%' }" :title="money(m.sales)"></span>
+                      <span class="month-orders" :style="{ bottom: `calc(${DOT_PAD}px + ${orderShare(m.orders)} * (100% - ${DOT_PAD * 2}px))` }" :title="`${m.orders} ${m.orders === 1 ? 'order' : 'orders'}`"></span>
                     </div>
                     <span class="month-label">{{ m.label }}</span>
                     <span class="month-value">{{ moneyShort(m.sales) }}</span>
+                    <span class="month-count">{{ m.orders }} {{ m.orders === 1 ? "order" : "orders" }}</span>
                   </div>
                 </div>
               </div>
@@ -780,6 +785,16 @@ let lastFocus = null;
 const perf = computed(() => profile.value?.performance ?? {});
 const lastSuspension = computed(() => profile.value?.history.find((e) => e.action === "suspended"));
 const maxMonthSales = computed(() => Math.max(0, ...(perf.value.months ?? []).map((m) => m.sales)));
+// The orders line: a dot's height is its share of the busiest month, kept
+// DOT_PAD px inside the chart so a zero sits on the baseline, not below it
+const DOT_PAD = 6;
+const PLOT_HEIGHT = 120;
+const orderShare = (orders) => (maxMonthOrders.value > 0 ? orders / maxMonthOrders.value : 0);
+const orderLinePoints = computed(() =>
+  (perf.value.months ?? [])
+    .map((m, i) => `${i * 100 + 50},${(PLOT_HEIGHT - DOT_PAD - orderShare(m.orders) * (PLOT_HEIGHT - DOT_PAD * 2)).toFixed(1)}`)
+    .join(" "),
+);
 const maxMonthOrders = computed(() => Math.max(0, ...(perf.value.months ?? []).map((m) => m.orders)));
 const outcomeRates = computed(() => [
   { label: "Completed", value: perf.value.completion_rate, color: "#22c55e" },
@@ -1808,16 +1823,40 @@ textarea:focus {
 .callout.rose { background: var(--a-red-soft); color: var(--a-red-text); }
 .callout.red { background: var(--a-red-soft); color: var(--a-red-text); }
 .month-chart {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  /* No gap: each column's centre is exactly where the orders line has its point */
+  gap: 0;
   align-items: end;
+}
+/* Sits over the bars (the first 120px of every column) */
+.month-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 120px;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+.month-line polyline {
+  fill: none;
+  stroke: #f59e0b;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.85;
 }
 .month {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  padding: 0 5px;
 }
 .month-bar-wrap {
   position: relative;
@@ -1839,14 +1878,20 @@ textarea:focus {
 .month-orders {
   position: absolute;
   left: 50%;
-  width: 9px;
-  height: 9px;
-  margin-left: -4.5px;
-  margin-bottom: -4.5px;
+  width: 10px;
+  height: 10px;
+  /* Centred on its point: half its size left and down */
+  transform: translate(-50%, 50%);
   border-radius: 50%;
   background: var(--a-surface);
   border: 2px solid #f59e0b;
-  z-index: 1;
+  box-sizing: border-box;
+  z-index: 2;
+}
+.month-count {
+  margin-top: -2px;
+  font-size: 11px;
+  color: var(--a-amber-text);
 }
 .month-label {
   font-size: 11.5px;
