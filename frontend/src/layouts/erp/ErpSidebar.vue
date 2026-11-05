@@ -35,7 +35,7 @@
           <span class="es-text">{{ item.label }}</span>
           <span v-if="isLocked(item.access)" class="es-lock" aria-label="Not in your plan" v-html="ICONS.lock"></span>
           <span v-else-if="!allowed(item)" class="es-lock" aria-label="Your role can't open this" v-html="ICONS.lock"></span>
-          <span v-else-if="badgeFor(item.key) > 0" class="es-badge" :aria-label="`${badgeFor(item.key)} unread`">{{ badgeFor(item.key) > 99 ? "99+" : badgeFor(item.key) }}</span>
+          <span v-else-if="badgeFor(item.key) > 0" class="es-badge" :aria-label="badgeLabel(item.key)" :title="badgeLabel(item.key)">{{ badgeFor(item.key) > 99 ? "99+" : badgeFor(item.key) }}</span>
         </router-link>
         </template>
       </section>
@@ -69,7 +69,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import { useAssignment } from "../../composables/useAssignment";
 import { useChatNotifications } from "../../composables/useChatNotifications";
-import { useSupplyChainNotifications } from "../../composables/useSupplyChainNotifications";
+import { useErpBadges } from "../../composables/useErpBadges";
 import { useSidebarState } from "../../composables/useSidebarState";
 import { useSubscriptionAccess } from "../../composables/useSubscriptionAccess";
 import { useVendorProfile } from "../../composables/useVendorProfile";
@@ -81,7 +81,7 @@ const router = useRouter();
 const { user, logout } = useAuth();
 const { canView } = useAssignment();
 const { unreadChatCount } = useChatNotifications();
-const { scOrdersBadgeCount } = useSupplyChainNotifications();
+const { badgeCounts, refreshBadges, startBadges, stopBadges } = useErpBadges();
 const { isMobileOpen, closeMobile } = useSidebarState();
 const { ACCESS_REUSE_MS, subscriptionAccess, loadSubscriptionAccess, subscriptionAllowsModule, subscriptionUpgradeMessage } = useSubscriptionAccess();
 const { vendorProfile, fetchProfile } = useVendorProfile({ autoFetch: false, showToast: false });
@@ -119,7 +119,23 @@ const logoUrl = computed(() => {
 });
 
 const isLocked = (key) => subscriptionAccess.value !== null && !subscriptionAllowsModule(subscriptionAccess.value, key);
-const badgeFor = (key) => (key === "crm" ? unreadChatCount.value : key === "sc_orders" ? scOrdersBadgeCount.value : 0);
+// Only pages with something waiting have a number (see ErpBadgesController); chat keeps its live unread count
+const badgeFor = (key) => (key === "crm" ? unreadChatCount.value : badgeCounts.value[key] ?? 0);
+const BADGE_WORDS = {
+  crm: "unread",
+  attendance: "to review",
+  leave_management: "to approve",
+  payroll_requests: "to approve",
+  funding_requests: "to approve",
+  refunds: "to send",
+  crm_cases: "new",
+  crm_inquiries: "to answer",
+  inventory_products: "low on stock",
+  sc_orders: "need attention",
+  deliveries: "returns to decide",
+  order_scan: "to scan",
+};
+const badgeLabel = (key) => `${badgeFor(key)} ${BADGE_WORDS[key] ?? "waiting"}`;
 
 const lockText = (item) => {
   if (isLocked(item.access)) return subscriptionUpgradeMessage(subscriptionAccess.value, item.access);
@@ -151,8 +167,12 @@ onMounted(() => {
   if (isOwner.value) fetchProfile().catch(() => {});
   loadSubscriptionAccess({ maxAge: ACCESS_REUSE_MS }).catch(() => {});
   accessTimer = window.setInterval(() => loadSubscriptionAccess().catch(() => {}), 60000);
+  startBadges();
 });
-onUnmounted(() => window.clearInterval(accessTimer));
+onUnmounted(() => {
+  window.clearInterval(accessTimer);
+  stopBadges();
+});
 
 watch(
   () => route.path,
@@ -160,6 +180,8 @@ watch(
     lockedModule.value = null;
     showActive();
     if (isMobileOpen.value) closeMobile();
+    // Work done on the last page (an approval, an answer, a scan) lowers its number
+    refreshBadges();
   },
 );
 </script>

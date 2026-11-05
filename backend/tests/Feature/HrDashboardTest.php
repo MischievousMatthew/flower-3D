@@ -169,6 +169,29 @@ class HrDashboardTest extends TestCase
         $this->assertArrayNotHasKey('net_pay', $res->json('data.people.0'));
     }
 
+    public function test_sidebar_badges_count_waiting_work_only_on_pages_the_person_can_open(): void
+    {
+        $vendor = $this->shopOwner();
+        $rosa = $this->profile($vendor);
+        $this->leave($vendor, $rosa, '2026-10-25', '2026-10-25', 'pending');
+        $this->leave($vendor, $rosa, '2026-10-27', '2026-10-27', 'pending');
+        $this->leave($vendor, $rosa, '2026-10-29', '2026-10-29', 'approved');
+        $this->scan($vendor, $rosa, '2026-10-20', '17:00:00', 'pending');
+
+        $res = $this->signIn($vendor)->getJson('/api/erp/badges')->assertOk();
+        $res->assertJsonPath('data.leave_management', 2)->assertJsonPath('data.attendance', 1);
+        // Pages with nothing waiting have no number at all
+        $this->assertArrayNotHasKey('payroll_requests', $res->json('data'));
+
+        $this->app['auth']->forgetGuards();
+        $staff = Employee::forceCreate(['owner_id' => $vendor->id, 'name' => 'Lea', 'email' => 'lea@example.com', 'password' => 'x', 'status' => 'Active']);
+        DB::table('employee_module_permissions')->insert([
+            'owner_id' => $vendor->id, 'employee_id' => $staff->id, 'module' => 'leave_management', 'permission' => 'view',
+            'access' => 'granular', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->signIn($staff)->getJson('/api/erp/badges')->assertOk()->assertExactJson(['success' => true, 'data' => ['leave_management' => 2]]);
+    }
+
     public function test_staff_need_only_the_hr_dashboard_permission(): void
     {
         $vendor = $this->shopOwner();

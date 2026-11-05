@@ -817,6 +817,8 @@ Route::middleware('token.auth')->group(function () {
 
     Route::get('/hr/dashboard', [HrDashboardController::class, 'show'])->middleware('employee.module:hr_dashboard,view');
     Route::get('/hr/dashboard/export', [HrDashboardController::class, 'export'])->middleware('employee.module:hr_dashboard,export');
+    // The ERP sidebar's numbers (each page checked against the person's own permissions)
+    Route::get('/erp/badges', [\App\Http\Controllers\ErpBadgesController::class, 'index']);
 
     Route::prefix('leaves')->group(function () {
         Route::middleware('employee.module:leave_management,view')->group(function () {
