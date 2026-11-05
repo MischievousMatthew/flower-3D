@@ -4,8 +4,8 @@ import { ERP_MODULES } from "../../constants/erpModules";
 
 // Sidebar headings for each module group
 const SECTION_LABELS = {
-  HR: "People",
-  Finance: "Money",
+  HR: "Human Resources",
+  Finance: "Finance",
   CRM: "Customers",
   Procurement: "Procurement",
   "Supply Chain": "Supply chain",

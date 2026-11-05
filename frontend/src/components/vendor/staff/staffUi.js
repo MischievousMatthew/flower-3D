@@ -3,7 +3,7 @@
 import { ERP_MODULES } from "../../../constants/erpModules";
 
 const GROUP_ORDER = ["HR", "Finance", "Procurement", "Supply Chain", "CRM"];
-const GROUP_LABEL = { HR: "People & HR", Finance: "Money", Procurement: "Stock & buying", "Supply Chain": "Suppliers & deliveries", CRM: "Customers" };
+const GROUP_LABEL = { HR: "Human Resources", Finance: "Finance", Procurement: "Stock & buying", "Supply Chain": "Suppliers & deliveries", CRM: "Customers" };
 
 /** What each action means, per area. Anything not listed falls back to a generic sentence. */
 const ACTION_TEXT = {
