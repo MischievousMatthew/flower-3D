@@ -42,9 +42,9 @@
       </div>
 
       <button type="submit" class="af-btn" :class="{ busy: loading }" :disabled="loading || locked">
-        {{ loading ? (slow ? "Waking up BloomCraft…" : "Signing in…") : locked ? "Sign-in paused" : "Sign in" }}
+        {{ loading ? (slow || serverWaking ? "Waking up BloomCraft…" : "Signing in…") : locked ? "Sign-in paused" : "Sign in" }}
       </button>
-      <p v-if="loading && slow" class="af-note lg-slow" role="status">
+      <p v-if="loading && (slow || serverWaking)" class="af-note lg-slow" role="status">
         Our server naps when nobody's around, so the first sign-in of the day can take up to a minute. Keep this page open.
       </p>
     </form>
@@ -114,7 +114,7 @@ import { hasStoredAuthSession, getPreferredAuthToken, getPreferredUserType } fro
 
 const route = useRoute();
 const router = useRouter();
-const { combinedLogin, completeTwoFactorLogin: finishTwoFactorLogin, loading } = useAuth();
+const { combinedLogin, completeTwoFactorLogin: finishTwoFactorLogin, loading, serverWaking } = useAuth();
 const { site } = useSiteContent();
 const supportEmail = computed(() => site.settings?.contact_email || "");
 

@@ -25,6 +25,33 @@ const loading = ref(false);
 const error = ref(null);
 const initialized = ref(false);
 const isLoggingOut = ref(false);
+// True while sign-in waits for a server that is waking up or restarting
+const serverWaking = ref(false);
+
+// Render answers with no CORS headers (seen as no response at all) or a
+// 502/503/504 while the server wakes up or swaps in a new deploy. Sign-in waits
+// and tries again a few times instead of failing. Anything the server did
+// answer, such as a wrong password, is returned straight away.
+const WAKE_DELAYS = [3000, 6000, 10000];
+const isWaking = (err) => !err?.response || [502, 503, 504].includes(err.response.status);
+async function postWhileWaking(url, body, config) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await api.post(url, body, config);
+    } catch (err) {
+      if (!isWaking(err) || attempt >= WAKE_DELAYS.length) throw err;
+      serverWaking.value = true;
+      await new Promise((resolve) => setTimeout(resolve, WAKE_DELAYS[attempt]));
+    }
+  }
+}
+async function signInRequest(url, body, config) {
+  try {
+    return await postWhileWaking(url, body, config);
+  } finally {
+    serverWaking.value = false;
+  }
+}
 watch(user, (u) => setOwnerAccess(u?.role === "vendor"), { immediate: true });
 
 export function useAuth() {
@@ -102,7 +129,7 @@ export function useAuth() {
       const loginContext =
         credentials?.loginContext ?? (await buildLoginContext());
 
-      const { data } = await api.post("/auth/employee-login", {
+      const { data } = await signInRequest("/auth/employee-login", {
         username: credentials.username,
         password: credentials.password,
         login_context: loginContext,
@@ -171,7 +198,7 @@ export function useAuth() {
       const loginContext =
         credentials?.loginContext ?? (await buildLoginContext());
 
-      const { data } = await api.post("/auth/login", {
+      const { data } = await signInRequest("/auth/login", {
         username: credentials.username,
         password: credentials.password,
         login_context: loginContext,
@@ -496,6 +523,7 @@ export function useAuth() {
     user,
     loading,
     error,
+    serverWaking,
     isAuthenticated,
     isLoggingOut,
     register,
