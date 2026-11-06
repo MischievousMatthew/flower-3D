@@ -1237,6 +1237,8 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/link-options', [AdminContentController::class, 'linkOptions']);
 
             Route::get('/banners', [AdminContentController::class, 'banners']);
+            Route::get('/banners/settings', [AdminContentController::class, 'slideshowSettings']);
+            Route::put('/banners/settings', [AdminContentController::class, 'saveSlideshowSettings']);
             Route::post('/banners', [AdminContentController::class, 'saveBanner']);
             Route::post('/banners/{id}', [AdminContentController::class, 'saveBanner'])->whereNumber('id');
             Route::delete('/banners/{id}', [AdminContentController::class, 'deleteBanner'])->whereNumber('id');

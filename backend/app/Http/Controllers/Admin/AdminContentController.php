@@ -78,6 +78,41 @@ class AdminContentController extends Controller
         return response()->json(['success' => true, 'data' => SiteBanner::query()->orderBy('sort_order')->orderByDesc('id')->get()->map(fn ($b) => $this->withSchedule($b))]);
     }
 
+    /**
+     * GET /api/admin/content/banners/settings
+     */
+    public function slideshowSettings(): JsonResponse
+    {
+        return response()->json(['success' => true, 'data' => SiteSetting::slideshow()]);
+    }
+
+    /**
+     * PUT /api/admin/content/banners/settings
+     */
+    public function saveSlideshowSettings(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'seconds' => 'required|integer|min:3|max:30',
+            'autoplay' => 'required|boolean',
+            'pause_on_hover' => 'required|boolean',
+            'show_arrows' => 'required|boolean',
+            'show_dots' => 'required|boolean',
+        ], [
+            'seconds.min' => 'Each slide needs at least 3 seconds so people can read it.',
+            'seconds.max' => 'Keep each slide to 30 seconds or less.',
+        ]);
+
+        SiteSetting::updateOrCreate(['key' => 'slideshow'], ['value' => [
+            'seconds' => (int) $data['seconds'],
+            'autoplay' => (bool) $data['autoplay'],
+            'pause_on_hover' => (bool) $data['pause_on_hover'],
+            'show_arrows' => (bool) $data['show_arrows'],
+            'show_dots' => (bool) $data['show_dots'],
+        ]]);
+
+        return response()->json(['success' => true, 'message' => 'Slideshow settings saved.', 'data' => SiteSetting::slideshow()]);
+    }
+
     public function saveBanner(Request $request, ?int $id = null): JsonResponse
     {
         $banner = $id ? SiteBanner::find($id) : new SiteBanner(['sort_order' => (int) SiteBanner::max('sort_order') + 1]);

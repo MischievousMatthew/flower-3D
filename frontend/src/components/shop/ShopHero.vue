@@ -1,5 +1,5 @@
 <template>
-  <section class="sh" aria-roledescription="carousel" aria-label="Featured" @mouseenter="paused = true" @mouseleave="paused = false">
+  <section class="sh" aria-roledescription="carousel" aria-label="Featured" @mouseenter="hovering = true" @mouseleave="hovering = false">
     <div class="sh-track" :style="{ transform: `translateX(-${active * 100}%)` }">
       <article
         v-for="(slide, i) in slides"
@@ -38,13 +38,15 @@
     </div>
 
     <template v-if="slides.length > 1">
-      <button type="button" class="sh-arrow prev" aria-label="Previous slide" @click="go(active - 1)">
+      <template v-if="play.show_arrows">
+      <button type="button" class="sh-arrow prev" aria-label="Previous slide" @click="goManual(active - 1)">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
       </button>
-      <button type="button" class="sh-arrow next" aria-label="Next slide" @click="go(active + 1)">
+      <button type="button" class="sh-arrow next" aria-label="Next slide" @click="goManual(active + 1)">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
       </button>
-      <div class="sh-dots">
+      </template>
+      <div v-if="play.show_dots" class="sh-dots">
         <button
           v-for="(s, i) in slides"
           :key="s.id"
@@ -52,7 +54,7 @@
           :class="{ on: i === active }"
           :aria-label="`Show slide ${i + 1}`"
           :aria-current="i === active"
-          @click="go(i)"
+          @click="goManual(i)"
         ></button>
       </div>
     </template>
@@ -60,12 +62,22 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useSiteContent } from "../../composables/useSiteContent";
 
 /** The shop's hero slideshow: Admin → Website banners, or a built-in slide when there are none */
-const props = defineProps({ banners: { type: Array, default: () => [] } });
+const props = defineProps({
+  banners: { type: Array, default: () => [] },
+  // Admin → Promotion Management → Banners → Slideshow settings
+  settings: { type: Object, default: () => ({}) },
+});
+const DEFAULTS = { seconds: 6, autoplay: true, pause_on_hover: true, show_arrows: true, show_dots: true };
+const play = computed(() => {
+  const s = { ...DEFAULTS, ...(props.settings || {}) };
+  const seconds = Number(s.seconds);
+  return { ...s, seconds: Number.isFinite(seconds) ? Math.min(30, Math.max(3, seconds)) : DEFAULTS.seconds };
+});
 const emit = defineEmits(["shop", "design"]);
 const router = useRouter();
 const { followLink } = useSiteContent();
@@ -88,16 +100,31 @@ const titleParts = (title = "") => {
 const primary = (slide) => (slide.link_type ? followLink(router, slide) : emit("shop"));
 
 const active = ref(0);
-const paused = ref(false);
+const hovering = ref(false);
+const paused = computed(() => play.value.pause_on_hover && hovering.value);
 const go = (i) => {
   const n = slides.value.length;
   active.value = ((i % n) + n) % n;
 };
 
 let timer = null;
+let reduced = false;
+const restart = () => {
+  clearInterval(timer);
+  timer = null;
+  if (reduced || !play.value.autoplay) return;
+  timer = setInterval(() => !paused.value && slides.value.length > 1 && go(active.value + 1), play.value.seconds * 1000);
+};
+// a click on an arrow or dot gives the new slide its full time
+const goManual = (i) => {
+  go(i);
+  restart();
+};
+watch(() => [play.value.autoplay, play.value.seconds], restart);
+watch(() => slides.value.length, () => active.value >= slides.value.length && (active.value = 0));
 onMounted(() => {
-  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  if (!reduced) timer = setInterval(() => !paused.value && slides.value.length > 1 && go(active.value + 1), 6500);
+  reduced = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  restart();
 });
 onBeforeUnmount(() => clearInterval(timer));
 </script>

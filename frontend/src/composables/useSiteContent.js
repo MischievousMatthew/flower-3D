@@ -16,6 +16,7 @@ const site = reactive({
   categories: [],
   occasions: [],
   settings: {},
+  slideshow: {},
 });
 
 let request = null;

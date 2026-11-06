@@ -54,7 +54,7 @@
       <div v-if="site.announcements.length" class="bc-container shop-announce">
         <AnnouncementBar />
       </div>
-      <ShopHero :banners="site.banners" @shop="scrollToSection('products')" @design="openDesigner" />
+      <ShopHero :banners="site.banners" :settings="site.slideshow" @shop="scrollToSection('products')" @design="openDesigner" />
       <DesignerShopPicker :open="designerPickerOpen" @close="designerPickerOpen = false" @choose="designWithShop" @browse="browseFlowerShops" />
     </div>
 

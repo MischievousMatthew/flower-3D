@@ -39,6 +39,58 @@
             </div>
             <button type="button" class="primary-btn" @click="editBanner()">+ New banner</button>
           </div>
+
+          <!-- Slideshow settings -->
+          <div class="show-settings" aria-labelledby="show-settings-title">
+            <div class="show-head">
+              <div>
+                <h3 id="show-settings-title" class="show-title">Slideshow settings</h3>
+                <p class="panel-sub">How the banners play on the shop. Applies to every banner.</p>
+              </div>
+              <div class="show-save">
+                <span v-if="slideshowDirty" class="hint">Unsaved changes</span>
+                <button type="button" class="ghost-btn" :disabled="!slideshowDirty || slideshowSaving" @click="resetSlideshow">Undo</button>
+                <button type="button" class="primary-btn" :disabled="!slideshowDirty || slideshowSaving" @click="saveSlideshow">{{ slideshowSaving ? "Saving…" : "Save settings" }}</button>
+              </div>
+            </div>
+            <div v-if="!slideshowLoaded" class="sk sk-row"></div>
+            <div v-else class="show-grid">
+              <div class="show-time" :class="{ muted: !slideshow.autoplay }">
+                <label for="slide-seconds" class="field-label">Time on each slide</label>
+                <div class="time-row">
+                  <input
+                    id="slide-seconds"
+                    v-model.number="slideshow.seconds"
+                    type="range"
+                    min="3"
+                    max="30"
+                    step="1"
+                    class="range"
+                    :disabled="!slideshow.autoplay"
+                    :aria-valuetext="`${slideshow.seconds} seconds`"
+                  />
+                  <div class="stepper">
+                    <button type="button" aria-label="One second less" :disabled="!slideshow.autoplay || slideshow.seconds <= 3" @click="slideshow.seconds--">−</button>
+                    <output for="slide-seconds">{{ slideshow.seconds }}s</output>
+                    <button type="button" aria-label="One second more" :disabled="!slideshow.autoplay || slideshow.seconds >= 30" @click="slideshow.seconds++">+</button>
+                  </div>
+                </div>
+                <span class="hint">{{ slideshow.autoplay ? `Moves to the next banner every ${slideshow.seconds} seconds (3–30).` : "Autoplay is off, so customers move between banners themselves." }}</span>
+              </div>
+              <div class="show-toggles">
+                <label v-for="opt in SLIDESHOW_TOGGLES" :key="opt.key" class="toggle" :class="{ muted: opt.needsAutoplay && !slideshow.autoplay }">
+                  <input v-model="slideshow[opt.key]" type="checkbox" role="switch" :disabled="opt.needsAutoplay && !slideshow.autoplay" />
+                  <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+                  <span class="toggle-text">
+                    <span class="strong">{{ opt.label }}</span>
+                    <span class="hint">{{ opt.hint }}</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+            <p v-if="!slideshow.autoplay && !slideshow.show_arrows && !slideshow.show_dots" class="form-error">With autoplay, arrows and dots all off, customers will only ever see the first banner.</p>
+          </div>
+
           <SkeletonRows v-if="loading.banners" />
           <p v-else-if="!banners.length" class="empty">No banners yet. Add one to feature a collection, season or store.</p>
           <ul v-else class="media-list">
@@ -426,7 +478,55 @@ const fetchLinkOptions = async () => {
     // the picker just has fewer choices
   }
 };
-const fetchBanners = () => get("banners", "/admin/content/banners", banners);
+const fetchBanners = () => {
+  if (!slideshowLoaded.value) fetchSlideshow();
+  return get("banners", "/admin/content/banners", banners);
+};
+
+// ── Slideshow settings ───────────────────────────────────────────
+const SLIDESHOW_TOGGLES = [
+  { key: "autoplay", label: "Play automatically", hint: "Move to the next banner on its own." },
+  { key: "pause_on_hover", label: "Pause on hover", hint: "Hold the banner while the pointer is over it.", needsAutoplay: true },
+  { key: "show_arrows", label: "Show arrows", hint: "Previous and next buttons on the sides." },
+  { key: "show_dots", label: "Show dots", hint: "One dot per banner along the bottom." },
+];
+const SLIDESHOW_DEFAULTS = { seconds: 6, autoplay: true, pause_on_hover: true, show_arrows: true, show_dots: true };
+const slideshow = reactive({ ...SLIDESHOW_DEFAULTS });
+const slideshowSaved = ref({ ...SLIDESHOW_DEFAULTS });
+const slideshowLoaded = ref(false);
+const slideshowSaving = ref(false);
+const slideshowDirty = computed(() => Object.keys(SLIDESHOW_DEFAULTS).some((k) => slideshow[k] !== slideshowSaved.value[k]));
+const applySlideshow = (data) => {
+  slideshowSaved.value = { ...SLIDESHOW_DEFAULTS, ...data };
+  Object.assign(slideshow, slideshowSaved.value);
+};
+const resetSlideshow = () => Object.assign(slideshow, slideshowSaved.value);
+const fetchSlideshow = async () => {
+  try {
+    applySlideshow((await api.get("/admin/content/banners/settings")).data.data);
+  } catch {
+    toast.error("Slideshow settings couldn't be loaded. Try refreshing.");
+  } finally {
+    slideshowLoaded.value = true;
+  }
+};
+const saveSlideshow = async () => {
+  const seconds = Math.round(Number(slideshow.seconds));
+  if (!Number.isFinite(seconds) || seconds < 3 || seconds > 30) {
+    toast.error("Pick between 3 and 30 seconds per banner.");
+    return;
+  }
+  slideshowSaving.value = true;
+  try {
+    const { data } = await api.put("/admin/content/banners/settings", { ...slideshow, seconds });
+    applySlideshow(data.data);
+    toast.success("Slideshow settings saved. The shop uses them straight away.");
+  } catch (e) {
+    toast.error(firstError(e));
+  } finally {
+    slideshowSaving.value = false;
+  }
+};
 const fetchFeatured = () => get("featured", "/admin/content/featured", featured);
 const fetchArticles = async () => {
   const data = await get("articles", "/admin/content/articles", articles, { status: articleFilter.value || undefined });
@@ -1297,6 +1397,175 @@ textarea.input {
 }
 .check input {
   accent-color: var(--a-accent);
+}
+
+/* Slideshow settings */
+.show-settings {
+  border: 1px solid var(--a-border);
+  background: var(--a-subtle);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.show-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.show-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--a-text);
+  margin: 0;
+}
+.show-save {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.show-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 18px;
+  align-items: start;
+}
+.show-time {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.time-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.range {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--a-accent);
+  height: 24px;
+  cursor: pointer;
+}
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--a-border);
+  border-radius: 9px;
+  background: var(--a-surface);
+  overflow: hidden;
+}
+.stepper button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--a-text-2);
+  font-size: 16px;
+  cursor: pointer;
+}
+.stepper button:hover:not(:disabled) {
+  background: var(--a-accent-soft);
+  color: var(--a-accent-text);
+}
+.stepper button:focus-visible,
+.range:focus-visible {
+  outline: 2px solid var(--a-accent);
+  outline-offset: 2px;
+}
+.stepper button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.stepper output {
+  min-width: 44px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--a-text);
+  font-variant-numeric: tabular-nums;
+}
+.show-toggles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+.toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  min-height: 44px;
+}
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.toggle-track {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 20px;
+  background: var(--a-subtle-2);
+  border: 1px solid var(--a-border);
+  position: relative;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--a-surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s ease;
+}
+.toggle input:checked + .toggle-track {
+  background: var(--a-accent);
+  border-color: var(--a-accent);
+}
+.toggle input:checked + .toggle-track .toggle-thumb {
+  transform: translateX(14px);
+}
+.toggle input:focus-visible + .toggle-track {
+  outline: 2px solid var(--a-accent);
+  outline-offset: 2px;
+}
+.toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--a-text);
+}
+.toggle-text .strong {
+  font-weight: 500;
+}
+.toggle.muted,
+.show-time.muted {
+  opacity: 0.55;
+}
+.toggle.muted {
+  cursor: not-allowed;
+}
+@media (max-width: 900px) {
+  .show-grid,
+  .show-toggles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toggle-track,
+  .toggle-thumb {
+    transition: none;
+  }
 }
 .tones {
   display: flex;
