@@ -116,4 +116,42 @@ class VendorApplicationRequirementsTest extends TestCase
         $this->assertContains('contact_number', $this->failing(['contact_number' => '(046) 123 4567']));
         $this->assertContains('contact_number', $this->failing(['contact_number' => '12345']));
     }
+
+    public function test_when_saving_fails_admins_see_the_real_cause_under_the_applicants_code(): void
+    {
+        Schema::dropIfExists('api_error_logs');
+        Schema::create('api_error_logs', function (Blueprint $t) {
+            $t->id();
+            $t->string('method', 10);
+            $t->string('path', 255);
+            $t->string('action', 190)->nullable();
+            $t->unsignedSmallInteger('status_code');
+            $t->string('exception', 190)->nullable();
+            $t->string('message', 500)->nullable();
+            $t->unsignedBigInteger('user_id')->nullable();
+            $t->string('ip_address', 45)->nullable();
+            $t->unsignedInteger('duration_ms')->nullable();
+            $t->timestamp('created_at')->useCurrent();
+        });
+        (require base_path('database/migrations/2026_10_25_100000_add_reference_to_api_error_logs.php'))->up();
+        (require base_path('database/migrations/2026_10_25_400000_add_resolution_to_api_error_logs.php'))->up();
+
+        // Like production: debug off, so the response itself carries no cause
+        config(['app.debug' => false]);
+        // The first database step after validation fails, before any upload starts
+        \Illuminate\Support\Facades\DB::beforeExecuting(function (string $sql) {
+            if (str_contains($sql, 'count(*)') && ! str_contains($sql, 'email')) {
+                throw new \RuntimeException('new row violates check constraint "vendor_applications_business_type_check"');
+            }
+        });
+
+        $res = $this->post('/api/vendor/register', $this->application([
+            'operating_schedules' => json_encode([['days' => ['Monday'], 'opening_time' => '08:00', 'closing_time' => '17:00']]),
+        ]), ['Accept' => 'application/json'])->assertStatus(500);
+
+        $this->assertStringNotContainsString('check constraint', $res->getContent());
+        $log = \App\Models\ApiErrorLog::firstOrFail();
+        $this->assertStringContainsString('vendor_applications_business_type_check', $log->message);
+        $this->assertStringContainsString($log->reference, $res->json('message'));
+    }
 }

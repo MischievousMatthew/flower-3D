@@ -334,6 +334,8 @@ class VendorController extends Controller
                 'file'      => $e->getFile(),
                 'line'      => $e->getLine(),
             ]);
+            // Admin → System health shows the real cause under the code the applicant sees
+            \App\Support\FriendlyErrors::remember($request, 'Vendor registration failed: ' . $e->getMessage(), $e);
 
             return response()->json([
                 'success' => false,
