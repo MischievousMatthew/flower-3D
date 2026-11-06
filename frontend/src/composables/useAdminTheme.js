@@ -72,7 +72,8 @@ export function applyAdminTheme(router) {
   // so a refresh doesn't flash white.
   const onAdminPage = ref(signedInAsAdmin());
   router.afterEach((to) => {
-    onAdminPage.value = to.matched.some((r) => r.meta?.requiresAdmin === true);
+    // adminTheme: the hidden admin sign-in page, which wears the panel's colors too
+    onAdminPage.value = to.matched.some((r) => r.meta?.requiresAdmin === true || r.meta?.adminTheme === true);
   });
 
   watchEffect(() => {

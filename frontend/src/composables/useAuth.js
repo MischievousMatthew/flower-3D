@@ -190,6 +190,32 @@ export function useAuth() {
     }
   };
 
+  // ================= ADMIN LOGIN (hidden page) =================
+  // Only from /console/<key>: the server checks the key and that it's an admin account
+  const adminLogin = async (key, credentials) => {
+    try {
+      loading.value = true;
+      error.value = null;
+      const { data } = await signInRequest(`/admin-gate/${encodeURIComponent(key)}/login`, {
+        username: credentials.username,
+        password: credentials.password,
+        login_context: await buildLoginContext(),
+        device_id: getDeviceId(),
+        continue_here: credentials.continueHere ? true : undefined,
+      }, { quietStatuses: [409] });
+
+      if (!data?.token || data?.user?.role !== "admin") throw new Error("No admin session received");
+
+      setAuthData(data.token, { ...data.user, type: "admin" }, "user");
+      await router.push(data.redirect_url || "/admin/dashboard");
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err?.response?.data?.message, ...loginProblem(err) };
+    } finally {
+      loading.value = false;
+    }
+  };
+
   // ================= REGULAR LOGIN =================
   const login = async (credentials) => {
     try {
@@ -528,6 +554,7 @@ export function useAuth() {
     isLoggingOut,
     register,
     login,
+    adminLogin,
     employeeLogin,
     combinedLogin,
     completeTwoFactorLogin,

@@ -692,7 +692,7 @@ const SOCIALS = [
   { key: "tiktok", label: "TikTok", placeholder: "https://tiktok.com/@…" },
   { key: "x", label: "X", placeholder: "https://x.com/…" },
 ];
-const REASON = { unknown_account: "Unknown account", wrong_password: "Wrong password", locked: "Blocked while locked", suspended: "Suspended account", unverified: "Unverified account" };
+const REASON = { unknown_account: "Unknown account", wrong_password: "Wrong password", locked: "Blocked while locked", suspended: "Suspended account", unverified: "Unverified account", wrong_page: "Admin on the public sign-in page", admin_page: "Non-admin on the admin sign-in page" };
 const AREAS = {
   AdminVendorController: "Vendors",
   VendorApplication: "Vendor applications",

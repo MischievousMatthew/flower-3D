@@ -1044,6 +1044,15 @@ const routes = [
     ],
   },
 
+  // Hidden admin sign-in: nothing links here. The :key is checked by the server
+  // (ADMIN_LOGIN_KEY); a wrong key shows the normal "page not found".
+  // Unnamed with a kept path, so it gets no opaque token.
+  {
+    path: "/console/:key",
+    component: () => import("../views/admin/AdminLogin.vue"),
+    meta: { public: true, preservePublicPath: true, adminTheme: true },
+  },
+
   // 404 Catch All
   {
     path: "/:pathMatch(.*)*",

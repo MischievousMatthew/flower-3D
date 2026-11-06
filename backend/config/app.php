@@ -124,6 +124,9 @@ return [
     ],
 
     'frontend_url' => env('FRONTEND_URL', 'https://bloomcraft-app.vercel.app'),
+
+    // The secret in the admin sign-in page's URL (/console/<key>); see App\Support\AdminLoginGate
+    'admin_login_key' => env('ADMIN_LOGIN_KEY'),
     'frontend_vendor_profile_path' => env(
         'FRONTEND_VENDOR_PROFILE_PATH',
         '/MySju890iPNSbkf2RtOrclCnGLtzdKvUT0bk0tXnZoD'

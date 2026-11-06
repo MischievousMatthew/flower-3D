@@ -31,5 +31,10 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Tests never reach the real Cloudinary account: uploads fail as "not configured" -->
+        <env name="CLOUDINARY_URL" value="" force="true"/>
+        <env name="CLOUDINARY_CLOUD_NAME" value="" force="true"/>
+        <env name="CLOUDINARY_API_KEY" value="" force="true"/>
+        <env name="CLOUDINARY_API_SECRET" value="" force="true"/>
     </php>
 </phpunit>

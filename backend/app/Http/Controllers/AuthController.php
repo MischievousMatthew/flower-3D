@@ -10,6 +10,7 @@ use App\Services\LoginAuditService;
 use App\Services\AccountSuspensionService;
 use App\Services\LoginGuard;
 use App\Support\AccountLookup;
+use App\Support\AdminLoginGate;
 use App\Support\PlatformSettings;
 use App\Support\SingleSession;
 use App\Services\EmailOtpService;
@@ -244,6 +245,27 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
+        return $this->signIn($request, false);
+    }
+
+    /** The hidden admin sign-in page checks its key before showing the form */
+    public function adminGate(string $key)
+    {
+        abort_unless(AdminLoginGate::opens($key), 404);
+
+        return response()->noContent();
+    }
+
+    /** Sign-in from the hidden admin page: the right key, and admin accounts only */
+    public function adminLogin(Request $request, string $key)
+    {
+        abort_unless(AdminLoginGate::opens($key), 404);
+
+        return $this->signIn($request, true);
+    }
+
+    private function signIn(Request $request, bool $adminPage)
+    {
         // Nothing typed here is logged: people sometimes put their password in the
         // username box. Failed sign-ins are kept in login_attempts instead.
         try {
@@ -270,6 +292,15 @@ class AuthController extends Controller
 
             if (!$passwordOk) {
                 $guard->recordFailure($request, $identifier, 'wrong_password', $user->id);
+                $this->refuseCredentials($guard, $identifier);
+            }
+
+            // Admins sign in only on the hidden admin page (once its key is set), and
+            // only admins sign in there. The wrong page answers exactly like a wrong
+            // password, so neither page reveals which accounts are admins.
+            $isAdmin = $user->role === User::ROLE_ADMIN;
+            if ($adminPage ? !$isAdmin : ($isAdmin && AdminLoginGate::enabled())) {
+                $guard->recordFailure($request, $identifier, $adminPage ? 'admin_page' : 'wrong_page', $user->id);
                 $this->refuseCredentials($guard, $identifier);
             }
 

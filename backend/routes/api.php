@@ -121,6 +121,10 @@ Route::prefix('auth')->group(function () {
 
 Route::post('/auth/employee-login', [EmployeeAuthController::class, 'login'])->middleware('throttle:auth-login');
 
+// The hidden admin sign-in page (/console/<key>): a wrong key is a plain 404
+Route::get('/admin-gate/{key}', [AuthController::class, 'adminGate'])->middleware('throttle:auth-availability');
+Route::post('/admin-gate/{key}/login', [AuthController::class, 'adminLogin'])->middleware('throttle:auth-login');
+
 // ============================================================
 // 2. PUBLIC — VENDOR REGISTRATION
 // ============================================================
