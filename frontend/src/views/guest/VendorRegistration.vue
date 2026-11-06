@@ -29,9 +29,9 @@
       </span>
       <h2>Application sent</h2>
       <p class="vr-done-lead">
-        Thank you{{ formData.ownerName ? `, ${formData.ownerName.split(" ")[0]}` : "" }}.
-        <template v-if="applicationEmailed">We've emailed a copy to <b>{{ formData.email }}</b>.</template>
-        <template v-else>We'll write to <b>{{ formData.email || "your email" }}</b> with the decision.</template>
+        Thank you{{ sentTo.name ? `, ${sentTo.name}` : "" }}.
+        <template v-if="applicationEmailed">We've emailed a copy to <b>{{ sentTo.email }}</b>.</template>
+        <template v-else>We'll write to <b>{{ sentTo.email || "your email" }}</b> with the decision.</template>
       </p>
       <ol class="vr-next" aria-label="What happens next">
         <li><b>We check your documents</b><span>Usually within two working days.</span></li>
@@ -639,6 +639,8 @@ const goToStep = (step) => {
 
 // Whether the copy of the application really went out by email
 const applicationEmailed = ref(false);
+// Who it went to, kept for the "sent" page: the form is cleared once it's sent
+const sentTo = reactive({ email: "", name: "" });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NEW: Cavite location data (cities and municipalities)
@@ -1978,6 +1980,8 @@ const handleSubmit = async () => {
     const data = response.data;
 
     if (data.success) {
+      sentTo.email = data.data.email || formData.email;
+      sentTo.name = (formData.ownerName || "").trim().split(/\s+/)[0] || "";
       clearProgress();
       applicationId.value = data.data.application_id || data.data.id;
       applicationEmailed.value = data.emailed !== false;
@@ -1987,7 +1991,7 @@ const handleSubmit = async () => {
       });
       showApplicationModal.value = true;
       localStorage.setItem("lastVendorApplicationId", applicationId.value);
-      localStorage.setItem("lastVendorApplicationEmail", formData.email);
+      localStorage.setItem("lastVendorApplicationEmail", sentTo.email);
     } else {
       if (data.errors) {
         const firstMessage = applyBackendErrors(data.errors);
