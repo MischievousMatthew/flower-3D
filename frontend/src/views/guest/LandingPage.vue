@@ -111,7 +111,8 @@
             </h1>
             <p class="hero-desc hero-reveal">
               Where vendors meet creativity. Design custom flower arrangements
-              in 3D or let our AI suggest the perfect bloom for every occasion.
+              in 3D, get a suggested arrangement in one tap, and order from
+              flower shops near you.
             </p>
             <div class="hero-actions hero-reveal">
               <router-link to="/guest/register" class="bc-btn bc-btn--dark">
@@ -246,8 +247,8 @@
                 <h3>Finish with <em>fillers</em></h3>
                 <p>
                   Eucalyptus, baby's breath and greenery bring it together. Not
-                  sure where to start? Our AI concierge suggests the perfect
-                  combination for the occasion, season and recipient.
+                  sure where they go? One tap suggests where to place them,
+                  and you can try another look or undo it any time.
                 </p>
               </article>
 
@@ -713,10 +714,10 @@ const features = ref([
   },
   {
     id: 2,
-    icon: "🤖",
-    title: "AI Suggestions",
+    icon: "✨",
+    title: "Arrangement Suggestions",
     description:
-      "Not sure what to choose? Our AI recommends arrangements based on occasion, season, and your preferences.",
+      "Not sure how to place your flowers? One tap lays them out in a new arrangement. Try another until it feels right, or undo any time.",
   },
   {
     id: 3,
@@ -735,7 +736,7 @@ const processSteps = [
   },
   {
     title: "Design it in 3D",
-    text: "Pick blooms, wrapping and fillers in the 3D studio, or let our AI concierge suggest a combination for the occasion.",
+    text: "Pick blooms, wrapping and fillers in the 3D studio, then tap Suggest an arrangement for a ready-made layout.",
   },
   {
     title: "Hand-tied and delivered",
