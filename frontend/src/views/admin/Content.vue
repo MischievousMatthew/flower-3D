@@ -209,6 +209,75 @@
               </div>
               <button type="button" class="primary-btn" @click="editAnnouncement(null, group.kind)">+ New</button>
             </div>
+
+            <!-- Announcement bar settings -->
+            <div v-if="group.kind === 'announcement'" class="show-settings narrow" aria-labelledby="bar-settings-title">
+              <div class="show-head">
+                <div>
+                  <h3 id="bar-settings-title" class="show-title">Bar settings</h3>
+                  <p class="panel-sub">How the announcement bar plays on the shop.</p>
+                </div>
+                <div class="show-save">
+                  <span v-if="bar.dirty" class="hint">Unsaved changes</span>
+                  <button type="button" class="ghost-btn" :disabled="!bar.dirty || bar.saving" @click="bar.reset">Undo</button>
+                  <button type="button" class="primary-btn" :disabled="!bar.dirty || bar.saving" @click="bar.save">{{ bar.saving ? "Saving…" : "Save settings" }}</button>
+                </div>
+              </div>
+              <div v-if="!bar.loaded" class="sk sk-row"></div>
+              <div v-else class="show-grid">
+                <div class="show-time" :class="{ muted: !bar.values.autoplay }">
+                  <label for="bar-seconds" class="field-label">Time on each announcement</label>
+                  <div class="time-row">
+                    <input
+                      id="bar-seconds"
+                      v-model.number="bar.values.seconds"
+                      type="range"
+                      min="3"
+                      max="30"
+                      step="1"
+                      class="range"
+                      :disabled="!bar.values.autoplay"
+                      :aria-valuetext="`${bar.values.seconds} seconds`"
+                    />
+                    <div class="stepper">
+                      <button type="button" aria-label="One second less" :disabled="!bar.values.autoplay || bar.values.seconds <= 3" @click="bar.values.seconds--">−</button>
+                      <output for="bar-seconds">{{ bar.values.seconds }}s</output>
+                      <button type="button" aria-label="One second more" :disabled="!bar.values.autoplay || bar.values.seconds >= 30" @click="bar.values.seconds++">+</button>
+                    </div>
+                  </div>
+                  <span class="hint">{{ bar.values.autoplay ? `Moves to the next announcement every ${bar.values.seconds} seconds (3–30).` : "Autoplay is off, so customers step through announcements themselves." }}</span>
+                </div>
+                <div class="show-toggles">
+                  <label v-for="opt in BAR_TOGGLES" :key="opt.key" class="toggle" :class="{ muted: opt.needsAutoplay && !bar.values.autoplay }">
+                    <input v-model="bar.values[opt.key]" type="checkbox" role="switch" :disabled="opt.needsAutoplay && !bar.values.autoplay" />
+                    <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-text">
+                      <span class="strong">{{ opt.label }}</span>
+                      <span class="hint">{{ opt.hint }}</span>
+                    </span>
+                  </label>
+                </div>
+                <div class="show-time" :class="{ muted: !bar.values.dismissible }">
+                  <span id="bar-dismiss-label" class="field-label">A closed announcement stays hidden</span>
+                  <div class="seg small" role="radiogroup" aria-labelledby="bar-dismiss-label">
+                    <button
+                      v-for="opt in DISMISS_FOR"
+                      :key="opt.value"
+                      type="button"
+                      role="radio"
+                      class="seg-btn"
+                      :class="{ active: bar.values.dismiss_for === opt.value }"
+                      :aria-checked="bar.values.dismiss_for === opt.value"
+                      :disabled="!bar.values.dismissible"
+                      @click="bar.values.dismiss_for = opt.value"
+                    >{{ opt.label }}</button>
+                  </div>
+                  <span class="hint">{{ !bar.values.dismissible ? "Customers can't close announcements, so this doesn't apply." : bar.values.dismiss_for === "forever" ? "Once closed, a customer won't see that announcement again." : `It comes back after ${bar.values.dismiss_for === "1" ? "a day" : "7 days"}.` }}</span>
+                </div>
+              </div>
+              <p v-if="!bar.values.autoplay && !bar.values.show_arrows" class="form-error">With autoplay and arrows both off, customers will only see the first announcement.</p>
+            </div>
+
             <SkeletonRows v-if="loading.announcements" :rows="3" />
             <p v-else-if="!announcementsOf(group.kind).length" class="empty small">None yet.</p>
             <ul v-else class="media-list compact">
@@ -217,7 +286,7 @@
                   <button type="button" :disabled="i === 0" aria-label="Move up" @click="moveAnnouncement(group.kind, i, -1)">▲</button>
                   <button type="button" :disabled="i === announcementsOf(group.kind).length - 1" aria-label="Move down" @click="moveAnnouncement(group.kind, i, 1)">▼</button>
                 </div>
-                <img v-if="a.image_url" :src="a.image_url" alt="" class="thumb" />
+                <img v-if="a.image_url && a.kind === 'promotion'" :src="a.image_url" alt="" class="thumb" />
                 <span v-else class="tone-dot" :class="`tone-${a.tone}`"></span>
                 <div class="media-main">
                   <span class="strong">{{ a.title }}</span>
@@ -251,7 +320,7 @@
 
         <form id="editor-form" class="drawer-body" @submit.prevent="saveEditor">
           <!-- Image -->
-          <div class="image-field" :class="{ required: editor.type === 'banner' }">
+          <div v-if="!(editor.type === 'announcement' && form.kind === 'announcement')" class="image-field" :class="{ required: editor.type === 'banner' }">
             <span class="field-label">{{ editor.type === "article" ? "Cover photo" : editor.type === "banner" ? "Banner image *" : "Image (optional)" }}</span>
             <label class="image-drop" :class="{ filled: imagePreview }">
               <img v-if="imagePreview" :src="imagePreview" alt="" />
@@ -490,49 +559,84 @@ const SLIDESHOW_TOGGLES = [
   { key: "show_arrows", label: "Show arrows", hint: "Previous and next buttons on the sides." },
   { key: "show_dots", label: "Show dots", hint: "One dot per banner along the bottom." },
 ];
-const SLIDESHOW_DEFAULTS = { seconds: 6, autoplay: true, pause_on_hover: true, show_arrows: true, show_dots: true };
-const slideshow = reactive({ ...SLIDESHOW_DEFAULTS });
-const slideshowSaved = ref({ ...SLIDESHOW_DEFAULTS });
-const slideshowLoaded = ref(false);
-const slideshowSaving = ref(false);
-const slideshowDirty = computed(() => Object.keys(SLIDESHOW_DEFAULTS).some((k) => slideshow[k] !== slideshowSaved.value[k]));
-const applySlideshow = (data) => {
-  slideshowSaved.value = { ...SLIDESHOW_DEFAULTS, ...data };
-  Object.assign(slideshow, slideshowSaved.value);
+/** A small settings form: load, edit, undo, save. Used by the slideshow and the announcement bar. */
+const settingsForm = ({ url, defaults, noun, savedMessage }) => {
+  const values = reactive({ ...defaults });
+  const saved = ref({ ...defaults });
+  const loaded = ref(false);
+  const saving = ref(false);
+  const dirty = computed(() => Object.keys(defaults).some((k) => values[k] !== saved.value[k]));
+  const apply = (data) => {
+    saved.value = { ...defaults, ...data };
+    Object.assign(values, saved.value);
+  };
+  const reset = () => Object.assign(values, saved.value);
+  const load = async () => {
+    try {
+      apply((await api.get(url)).data.data);
+    } catch {
+      toast.error(`${noun} settings couldn't be loaded. Try refreshing.`);
+    } finally {
+      loaded.value = true;
+    }
+  };
+  const save = async () => {
+    const seconds = Math.round(Number(values.seconds));
+    if (!Number.isFinite(seconds) || seconds < 3 || seconds > 30) {
+      toast.error("Pick between 3 and 30 seconds.");
+      return;
+    }
+    saving.value = true;
+    try {
+      const { data } = await api.put(url, { ...values, seconds });
+      apply(data.data);
+      toast.success(savedMessage);
+    } catch (e) {
+      toast.error(firstError(e));
+    } finally {
+      saving.value = false;
+    }
+  };
+  return { values, loaded, saving, dirty, reset, load, save };
 };
-const resetSlideshow = () => Object.assign(slideshow, slideshowSaved.value);
-const fetchSlideshow = async () => {
-  try {
-    applySlideshow((await api.get("/admin/content/banners/settings")).data.data);
-  } catch {
-    toast.error("Slideshow settings couldn't be loaded. Try refreshing.");
-  } finally {
-    slideshowLoaded.value = true;
-  }
-};
-const saveSlideshow = async () => {
-  const seconds = Math.round(Number(slideshow.seconds));
-  if (!Number.isFinite(seconds) || seconds < 3 || seconds > 30) {
-    toast.error("Pick between 3 and 30 seconds per banner.");
-    return;
-  }
-  slideshowSaving.value = true;
-  try {
-    const { data } = await api.put("/admin/content/banners/settings", { ...slideshow, seconds });
-    applySlideshow(data.data);
-    toast.success("Slideshow settings saved. The shop uses them straight away.");
-  } catch (e) {
-    toast.error(firstError(e));
-  } finally {
-    slideshowSaving.value = false;
-  }
-};
+
+const {
+  values: slideshow, loaded: slideshowLoaded, saving: slideshowSaving, dirty: slideshowDirty,
+  reset: resetSlideshow, load: fetchSlideshow, save: saveSlideshow,
+} = settingsForm({
+  url: "/admin/content/banners/settings",
+  defaults: { seconds: 6, autoplay: true, pause_on_hover: true, show_arrows: true, show_dots: true },
+  noun: "Slideshow",
+  savedMessage: "Slideshow settings saved. The shop uses them straight away.",
+});
+
+// ── Announcement bar settings ────────────────────────────────────
+const BAR_TOGGLES = [
+  { key: "autoplay", label: "Play automatically", hint: "Move to the next announcement on its own." },
+  { key: "pause_on_hover", label: "Pause on hover", hint: "Hold the announcement while the pointer is over it.", needsAutoplay: true },
+  { key: "show_arrows", label: "Show arrows", hint: "‹ › buttons to step through announcements." },
+  { key: "dismissible", label: "Customers can close it", hint: "Turn off for notices everyone must see." },
+];
+const DISMISS_FOR = [
+  { value: "forever", label: "For good" },
+  { value: "1", label: "1 day" },
+  { value: "7", label: "7 days" },
+];
+const bar = reactive(settingsForm({
+  url: "/admin/content/announcements/settings",
+  defaults: { seconds: 7, autoplay: true, pause_on_hover: true, show_arrows: true, dismissible: true, dismiss_for: "forever" },
+  noun: "Announcement bar",
+  savedMessage: "Announcement bar settings saved. The shop uses them straight away.",
+}));
 const fetchFeatured = () => get("featured", "/admin/content/featured", featured);
 const fetchArticles = async () => {
   const data = await get("articles", "/admin/content/articles", articles, { status: articleFilter.value || undefined });
   if (data?.categories) articleCategories.value = data.categories;
 };
-const fetchAnnouncements = () => get("announcements", "/admin/content/announcements", announcements);
+const fetchAnnouncements = () => {
+  if (!bar.loaded) bar.load();
+  return get("announcements", "/admin/content/announcements", announcements);
+};
 let searchTimer = null;
 const searchProducts = async () => {
   loading.search = true;
@@ -1547,6 +1651,17 @@ textarea.input {
 }
 .toggle-text .strong {
   font-weight: 500;
+}
+/* inside a half-width panel: one column, toggles still two-up */
+.show-settings.narrow .show-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.seg-btn:disabled {
+  cursor: not-allowed;
+}
+.seg-btn:focus-visible {
+  outline: 2px solid var(--a-accent);
+  outline-offset: 1px;
 }
 .toggle.muted,
 .show-time.muted {

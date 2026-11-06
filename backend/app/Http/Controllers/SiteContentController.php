@@ -40,6 +40,7 @@ class SiteContentController extends Controller
                 'occasions' => $this->taxonomyWithCounts(ProductTaxonomy::OCCASION),
                 'settings' => SiteSetting::snapshot(),
                 'slideshow' => SiteSetting::slideshow(),
+                'announcement_bar' => SiteSetting::announcementBar(),
             ],
         ]);
     }

@@ -33,14 +33,38 @@ class SiteSetting extends Model
         'show_dots' => true,      // slide dots
     ];
 
+    /** How the announcement bar at the top of the shop behaves. Also kept out of KEYS. */
+    public const ANNOUNCEMENT_BAR_DEFAULTS = [
+        'seconds' => 7,              // time each announcement stays up
+        'autoplay' => true,          // move on by itself
+        'pause_on_hover' => true,    // hold while the pointer is over it
+        'show_arrows' => true,       // ‹ › buttons
+        'dismissible' => true,       // customers may close announcements
+        'dismiss_for' => 'forever',  // forever | 1 | 7 (days a closed announcement stays hidden)
+    ];
+
+    public const DISMISS_FOR = ['forever', '1', '7'];
+
     /** @return array<string, mixed> */
     public static function slideshow(): array
     {
-        $stored = static::query()->where('key', 'slideshow')->value('value');
+        return static::group('slideshow', self::SLIDESHOW_DEFAULTS);
+    }
+
+    /** @return array<string, mixed> */
+    public static function announcementBar(): array
+    {
+        return static::group('announcement_bar', self::ANNOUNCEMENT_BAR_DEFAULTS);
+    }
+
+    /** A stored settings row merged over its defaults; unknown keys are dropped. */
+    private static function group(string $key, array $defaults): array
+    {
+        $stored = static::query()->where('key', $key)->value('value');
         if (is_string($stored)) {
             $stored = json_decode($stored, true);
         }
 
-        return array_merge(self::SLIDESHOW_DEFAULTS, array_intersect_key(is_array($stored) ? $stored : [], self::SLIDESHOW_DEFAULTS));
+        return array_merge($defaults, array_intersect_key(is_array($stored) ? $stored : [], $defaults));
     }
 }

@@ -1,6 +1,13 @@
 <template>
-  <div v-if="current" class="announce" :class="`tone-${current.tone || 'brand'}`" role="status">
-    <button v-if="visible.length > 1" type="button" class="announce-nav" aria-label="Previous announcement" @click="step(-1)">‹</button>
+  <div
+    v-if="current"
+    class="announce"
+    :class="`tone-${current.tone || 'brand'}`"
+    role="status"
+    @mouseenter="hovering = true"
+    @mouseleave="hovering = false"
+  >
+    <button v-if="showArrows" type="button" class="announce-nav" aria-label="Previous announcement" @click="stepManual(-1)">‹</button>
     <p class="announce-text">
       <strong>{{ current.title }}</strong>
       <span v-if="current.message"> {{ current.message }}</span>
@@ -8,13 +15,13 @@
         {{ current.link_label || "Learn more" }} →
       </button>
     </p>
-    <button v-if="visible.length > 1" type="button" class="announce-nav" aria-label="Next announcement" @click="step(1)">›</button>
-    <button type="button" class="announce-close" aria-label="Dismiss" @click="dismiss(current.id)">✕</button>
+    <button v-if="showArrows" type="button" class="announce-nav" aria-label="Next announcement" @click="stepManual(1)">›</button>
+    <button v-if="play.dismissible" type="button" class="announce-close" aria-label="Dismiss" @click="dismiss(current.id)">✕</button>
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useSiteContent } from "../../composables/useSiteContent";
 
@@ -23,25 +30,46 @@ const router = useRouter();
 const { site, followLink } = useSiteContent();
 const STORAGE_KEY = "bc_dismissed_announcements";
 
+const DAY = 86_400_000;
+
+// Admin → Promotion Management → Announcements & promos → Bar settings
+const DEFAULTS = { seconds: 7, autoplay: true, pause_on_hover: true, show_arrows: true, dismissible: true, dismiss_for: "forever" };
+const play = computed(() => {
+  const s = { ...DEFAULTS, ...(site.announcement_bar || {}) };
+  const seconds = Number(s.seconds);
+  return { ...s, seconds: Number.isFinite(seconds) ? Math.min(30, Math.max(3, seconds)) : DEFAULTS.seconds };
+});
+
+/** [{ id, at }]: when each announcement was closed. Older visits saved bare ids; those count as closed now. */
 const readDismissed = () => {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    return Array.isArray(list) ? list.map((d) => (typeof d === "object" && d ? d : { id: d, at: Date.now() })) : [];
   } catch {
     return [];
   }
 };
 const dismissed = ref(readDismissed());
 const index = ref(0);
+const hovering = ref(false);
 
-const visible = computed(() => site.announcements.filter((a) => !dismissed.value.includes(a.id)));
+const isHidden = (id) => {
+  if (!play.value.dismissible) return false;
+  const entry = dismissed.value.find((d) => d.id === id);
+  if (!entry) return false;
+  if (play.value.dismiss_for === "forever") return true;
+  return Date.now() - entry.at < Number(play.value.dismiss_for) * DAY;
+};
+const visible = computed(() => site.announcements.filter((a) => !isHidden(a.id)));
 const current = computed(() => visible.value[index.value % Math.max(visible.value.length, 1)] ?? null);
+const showArrows = computed(() => play.value.show_arrows && visible.value.length > 1);
 
 const step = (delta) => {
   const n = visible.value.length;
-  index.value = (index.value + delta + n) % n;
+  if (n) index.value = (index.value + delta + n) % n;
 };
 const dismiss = (id) => {
-  dismissed.value = [...dismissed.value, id];
+  dismissed.value = [...dismissed.value.filter((d) => d.id !== id), { id, at: Date.now() }];
   index.value = 0;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dismissed.value.slice(-50)));
@@ -51,9 +79,25 @@ const dismiss = (id) => {
 };
 
 let timer = null;
+let reduced = false;
+const restart = () => {
+  clearInterval(timer);
+  timer = null;
+  if (reduced || !play.value.autoplay) return;
+  timer = setInterval(() => {
+    if (play.value.pause_on_hover && hovering.value) return;
+    if (visible.value.length > 1) step(1);
+  }, play.value.seconds * 1000);
+};
+// a click on an arrow gives the new announcement its full time
+const stepManual = (delta) => {
+  step(delta);
+  restart();
+};
+watch(() => [play.value.autoplay, play.value.seconds], restart);
 onMounted(() => {
-  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  if (!reduced) timer = setInterval(() => visible.value.length > 1 && step(1), 7000);
+  reduced = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  restart();
 });
 onBeforeUnmount(() => clearInterval(timer));
 </script>

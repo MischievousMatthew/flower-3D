@@ -331,7 +331,48 @@ class AdminContentController extends Controller
         $item->tone = $data['tone'] ?? 'brand';
         $item->is_active = $request->boolean('is_active', $item->is_active ?? true);
 
-        return $this->saveWithImage($item, $request->file('image'), 'image', 'site_promotions', 'Saved.');
+        // Announcements are a slim text bar, so only promotions take a picture
+        $image = $item->kind === Announcement::PROMOTION ? $request->file('image') : null;
+
+        return $this->saveWithImage($item, $image, 'image', 'site_promotions', 'Saved.');
+    }
+
+    /**
+     * GET /api/admin/content/announcements/settings
+     */
+    public function announcementBarSettings(): JsonResponse
+    {
+        return response()->json(['success' => true, 'data' => SiteSetting::announcementBar()]);
+    }
+
+    /**
+     * PUT /api/admin/content/announcements/settings
+     */
+    public function saveAnnouncementBarSettings(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'seconds' => 'required|integer|min:3|max:30',
+            'autoplay' => 'required|boolean',
+            'pause_on_hover' => 'required|boolean',
+            'show_arrows' => 'required|boolean',
+            'dismissible' => 'required|boolean',
+            'dismiss_for' => ['required', Rule::in(SiteSetting::DISMISS_FOR)],
+        ], [
+            'seconds.min' => 'Each announcement needs at least 3 seconds so people can read it.',
+            'seconds.max' => 'Keep each announcement to 30 seconds or less.',
+            'dismiss_for.in' => 'Choose how long a closed announcement stays hidden.',
+        ]);
+
+        SiteSetting::updateOrCreate(['key' => 'announcement_bar'], ['value' => [
+            'seconds' => (int) $data['seconds'],
+            'autoplay' => (bool) $data['autoplay'],
+            'pause_on_hover' => (bool) $data['pause_on_hover'],
+            'show_arrows' => (bool) $data['show_arrows'],
+            'dismissible' => (bool) $data['dismissible'],
+            'dismiss_for' => (string) $data['dismiss_for'],
+        ]]);
+
+        return response()->json(['success' => true, 'message' => 'Announcement bar settings saved.', 'data' => SiteSetting::announcementBar()]);
     }
 
     public function deleteAnnouncement(int $id): JsonResponse

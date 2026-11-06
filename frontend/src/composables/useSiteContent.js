@@ -17,6 +17,7 @@ const site = reactive({
   occasions: [],
   settings: {},
   slideshow: {},
+  announcement_bar: {},
 });
 
 let request = null;

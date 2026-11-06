@@ -1257,6 +1257,8 @@ Route::middleware('token.auth')->group(function () {
             Route::delete('/articles/{id}', [AdminContentController::class, 'deleteArticle'])->whereNumber('id');
 
             Route::get('/announcements', [AdminContentController::class, 'announcements']);
+            Route::get('/announcements/settings', [AdminContentController::class, 'announcementBarSettings']);
+            Route::put('/announcements/settings', [AdminContentController::class, 'saveAnnouncementBarSettings']);
             Route::post('/announcements', [AdminContentController::class, 'saveAnnouncement']);
             Route::post('/announcements/{id}', [AdminContentController::class, 'saveAnnouncement'])->whereNumber('id');
             Route::delete('/announcements/{id}', [AdminContentController::class, 'deleteAnnouncement'])->whereNumber('id');
