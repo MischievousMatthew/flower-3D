@@ -19,7 +19,7 @@
       <p :key="current.id" class="announce-text" aria-live="polite">
         <strong class="announce-title">{{ current.title }}</strong>
         <span v-if="current.message" class="announce-msg">{{ current.message }}</span>
-        <button v-if="current.link_type" type="button" class="announce-link" @click="followLink(router, current)">
+        <button v-if="current.link_type" type="button" class="announce-link" @click="openLink(current)">
           {{ current.link_label || "Learn more" }}
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
         </button>
@@ -58,6 +58,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useSiteContent } from "../../composables/useSiteContent";
+import { ANNOUNCEMENT_ICONS as ICONS } from "../../constants/announcementTones";
 
 /** Announcements from Admin → Promotion Management, one at a time; dismissals are remembered */
 const router = useRouter();
@@ -65,17 +66,24 @@ const { site, followLink } = useSiteContent();
 const STORAGE_KEY = "bc_dismissed_announcements";
 const DAY = 86_400_000;
 
-const ICONS = {
-  brand: '<path d="M3 11l15-6v14L3 13v-2z"/><path d="M18 9a3 3 0 0 1 0 6"/><path d="M7 13.5V18a2 2 0 0 0 4 0v-3"/>',
-  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.5h.01"/>',
-  success: '<path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.4 7.2 17.9l.9-5.4L4.2 8.7l5.4-.8L12 3z"/>',
-  warning: '<path d="M12 4l9 16H3l9-16z"/><path d="M12 10v4"/><path d="M12 17h.01"/>',
+/**
+ * Preview mode (Admin → Promotion Management, before posting): shows the
+ * given `items` with the given bar `settings`; links don't navigate and
+ * closing one isn't remembered.
+ */
+const props = defineProps({
+  preview: { type: Boolean, default: false },
+  items: { type: Array, default: null },
+  settings: { type: Object, default: null },
+});
+const openLink = (item) => {
+  if (!props.preview) followLink(router, item);
 };
 
 // Admin → Promotion Management → Announcements & promos → Bar settings
 const DEFAULTS = { seconds: 7, autoplay: true, pause_on_hover: true, show_arrows: true, dismissible: true, dismiss_for: "forever" };
 const play = computed(() => {
-  const s = { ...DEFAULTS, ...(site.announcement_bar || {}) };
+  const s = { ...DEFAULTS, ...((props.settings ?? site.announcement_bar) || {}) };
   const seconds = Number(s.seconds);
   return { ...s, seconds: Number.isFinite(seconds) ? Math.min(30, Math.max(3, seconds)) : DEFAULTS.seconds };
 });
@@ -89,7 +97,7 @@ const readDismissed = () => {
     return [];
   }
 };
-const dismissed = ref(readDismissed());
+const dismissed = ref(props.preview ? [] : readDismissed());
 const index = ref(0);
 const cycle = ref(0); // bumps to restart the progress line
 const hovering = ref(false);
@@ -103,7 +111,7 @@ const isHidden = (id) => {
   if (play.value.dismiss_for === "forever") return true;
   return Date.now() - entry.at < Number(play.value.dismiss_for) * DAY;
 };
-const visible = computed(() => site.announcements.filter((a) => !isHidden(a.id)));
+const visible = computed(() => (props.items ?? site.announcements).filter((a) => !isHidden(a.id)));
 const position = computed(() => index.value % Math.max(visible.value.length, 1));
 const current = computed(() => visible.value[position.value] ?? null);
 const tone = computed(() => (ICONS[current.value?.tone] ? current.value.tone : "brand"));
@@ -124,6 +132,7 @@ const dismiss = (id) => {
   dismissed.value = [...dismissed.value.filter((d) => d.id !== id), { id, at: Date.now() }];
   index.value = 0;
   cycle.value++;
+  if (props.preview) return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dismissed.value.slice(-50)));
   } catch {

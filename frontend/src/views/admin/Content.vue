@@ -287,7 +287,12 @@
                   <button type="button" :disabled="i === announcementsOf(group.kind).length - 1" aria-label="Move down" @click="moveAnnouncement(group.kind, i, 1)">▼</button>
                 </div>
                 <img v-if="a.image_url && a.kind === 'promotion'" :src="a.image_url" alt="" class="thumb" />
-                <span v-else class="tone-dot" :class="`tone-${a.tone}`"></span>
+                <span v-else-if="a.kind === 'announcement'" class="tone-dot" :style="toneStyle(a.tone)" :title="toneOf(a.tone).label">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" v-html="toneOf(a.tone).icon"></svg>
+                </span>
+                <span v-else class="tone-dot promo-dot" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" v-html="PROMO_ICON"></svg>
+                </span>
                 <div class="media-main">
                   <span class="strong">{{ a.title }}</span>
                   <span class="sub">{{ a.message || "—" }}</span>
@@ -320,7 +325,7 @@
 
         <form id="editor-form" class="drawer-body" @submit.prevent="saveEditor">
           <!-- Image -->
-          <div v-if="!(editor.type === 'announcement' && form.kind === 'announcement')" class="image-field" :class="{ required: editor.type === 'banner' }">
+          <div v-if="!(editor.type === 'announcement' && (form.kind === 'announcement' || editor.reviewing))" class="image-field" :class="{ required: editor.type === 'banner' }">
             <span class="field-label">{{ editor.type === "article" ? "Cover photo" : editor.type === "banner" ? "Banner image *" : "Image (optional)" }}</span>
             <label class="image-drop" :class="{ filled: imagePreview }">
               <img v-if="imagePreview" :src="imagePreview" alt="" />
@@ -339,6 +344,39 @@
             <LinkPicker v-model:type="form.link_type" v-model:value="form.link_value" :options="linkOptions" />
           </template>
 
+          <!-- Announcement / promotion: review before posting -->
+          <template v-else-if="editor.type === 'announcement' && editor.reviewing">
+            <div class="review-intro">
+              <h3>Check how it looks</h3>
+              <p>This is how customers will see it on the shop. Go back to change anything.</p>
+            </div>
+            <figure class="review-stage bc-theme">
+              <figcaption class="review-where">{{ form.kind === "promotion" ? "Shop page, beside “Shop by occasion”" : "Top of the shop" }}</figcaption>
+              <AnnouncementBar v-if="form.kind === 'announcement'" preview :items="[previewItem]" :settings="bar.values" />
+              <PromoCard v-else preview :promotions="[previewItem]" />
+            </figure>
+            <dl class="review-facts">
+              <div>
+                <dt>When</dt>
+                <dd>{{ reviewWhen }}</dd>
+              </div>
+              <div>
+                <dt>Button</dt>
+                <dd>{{ form.link_type ? `“${previewButton}” goes to ${describeLink(form)}` : "No button" }}</dd>
+              </div>
+              <div v-if="form.kind === 'promotion'">
+                <dt>Promo code</dt>
+                <dd>{{ form.promo_code.trim() ? `${form.promo_code.trim()} (customers tap it to copy)` : "None" }}</dd>
+              </div>
+              <div v-else>
+                <dt>Colour</dt>
+                <dd>{{ toneOf(form.tone).label }}</dd>
+              </div>
+            </dl>
+            <p v-if="form.link_label.trim() && !form.link_type" class="review-note">You typed button text but didn't choose where it goes, so no button shows.</p>
+            <p v-if="!form.is_active" class="review-note">It's switched off, so customers won't see it until you switch it on.</p>
+          </template>
+
           <!-- Announcement / promotion -->
           <template v-else-if="editor.type === 'announcement'">
             <div class="seg wide">
@@ -353,10 +391,25 @@
               <small class="hint">Shown for customers to copy. Letters, numbers, - and _ only. Vendors honour it at checkout or in chat.</small>
             </label>
             <div v-else class="field">
-              <span>Colour</span>
-              <div class="tones">
-                <button v-for="t in TONES" :key="t.value" type="button" class="tone-btn" :class="[`tone-${t.value}`, { active: form.tone === t.value }]" @click="form.tone = t.value">{{ t.label }}</button>
+              <span id="tone-label">Colour and icon</span>
+              <div class="tones" role="radiogroup" aria-labelledby="tone-label">
+                <button
+                  v-for="t in TONES"
+                  :key="t.value"
+                  type="button"
+                  role="radio"
+                  class="tone-btn"
+                  :class="{ active: form.tone === t.value }"
+                  :style="{ '--swatch': t.swatch, '--swatch-ink': t.ink }"
+                  :aria-checked="form.tone === t.value"
+                  :aria-label="t.label"
+                  :title="t.label"
+                  @click="form.tone = t.value"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" v-html="t.icon"></svg>
+                </button>
               </div>
+              <small class="hint">The bar shows this icon in this colour. You'll see the full bar before posting.</small>
             </div>
             <label class="field"><span>Button text</span><input v-model="form.link_label" class="input" placeholder="Learn more" maxlength="40" /></label>
             <LinkPicker v-model:type="form.link_type" v-model:value="form.link_value" :options="linkOptions" optional />
@@ -411,7 +464,7 @@
           </template>
 
           <!-- Schedule (banners + announcements) -->
-          <div v-if="editor.type !== 'article'" class="schedule">
+          <div v-if="editor.type !== 'article' && !editor.reviewing" class="schedule">
             <span class="field-label">Schedule (optional)</span>
             <div class="two">
               <label class="field"><span>Starts</span><input v-model="form.starts_at" type="datetime-local" class="input" /></label>
@@ -431,6 +484,12 @@
             <button type="submit" form="editor-form" class="ghost-btn" :disabled="saving">{{ saving ? "Saving…" : editor.item?.state === "draft" || !editor.item ? "Save draft" : "Save changes" }}</button>
             <button v-if="!editor.item || editor.item.state === 'draft'" type="button" class="primary-btn" :disabled="saving" @click="saveAndPublish">
               {{ form.publish_at ? "Schedule" : "Publish" }}
+            </button>
+          </template>
+          <template v-else-if="editor.type === 'announcement'">
+            <button v-if="editor.reviewing" type="button" class="ghost-btn" :disabled="saving" @click="editor.reviewing = false">Back to edit</button>
+            <button type="submit" form="editor-form" class="primary-btn" :disabled="saving">
+              {{ saving ? "Posting…" : !editor.reviewing ? "Review before posting" : editor.item ? "Save changes" : "Post it" }}
             </button>
           </template>
           <button v-else type="submit" form="editor-form" class="primary-btn" :disabled="saving">{{ saving ? "Saving…" : "Save" }}</button>
@@ -461,6 +520,10 @@ import { toast } from "@/utils/snackbar";
 import { useSidebarState } from "../../composables/useSidebarState";
 import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import LinkPicker from "./components/LinkPicker.vue";
+import AnnouncementBar from "../../components/site/AnnouncementBar.vue";
+import PromoCard from "../../components/shop/PromoCard.vue";
+import { ANNOUNCEMENT_TONES } from "../../constants/announcementTones";
+import "../../styles/bloomcraft.css"; // shop look for the review preview
 import { articleBlocks } from "../../utils/articleBlocks";
 import api from "../../plugins/axios";
 
@@ -492,12 +555,11 @@ const ANNOUNCEMENT_GROUPS = [
   { kind: "announcement", title: "Announcements", hint: "A slim bar at the top of the shop. Customers can dismiss each one." },
   { kind: "promotion", title: "Promotions", hint: "Cards under the shop banner, with an optional promo code to copy." },
 ];
-const TONES = [
-  { value: "brand", label: "Dark" },
-  { value: "info", label: "Blue" },
-  { value: "success", label: "Green" },
-  { value: "warning", label: "Amber" },
-];
+// Colour picker shows each colour's icon (the same one the shop's bar shows)
+const TONES = ANNOUNCEMENT_TONES;
+const toneOf = (value) => TONES.find((t) => t.value === value) ?? TONES[0];
+const toneStyle = (value) => ({ "--swatch": toneOf(value).swatch, "--swatch-ink": toneOf(value).ink });
+const PROMO_ICON = '<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><path d="M7.5 7.5h.01"/>';
 const tab = ref(TABS.some((t) => t.key === route.query.tab) ? route.query.tab : "banners");
 const loading = reactive({ banners: false, featured: false, search: false, articles: false, announcements: false });
 const saving = ref(false);
@@ -714,7 +776,30 @@ const removeFeatured = async (p) => {
 };
 
 // ── Editor ───────────────────────────────────────────────────────
-const editor = reactive({ type: null, item: null, error: "" });
+const editor = reactive({ type: null, item: null, error: "", reviewing: false });
+
+// Review step (announcements + promotions): the real shop components, fed the form
+const previewButton = computed(() => form.link_label?.trim() || (form.kind === "promotion" ? "Shop the offer" : "Learn more"));
+const previewItem = computed(() => ({
+  id: "preview",
+  kind: form.kind,
+  title: form.title?.trim() || "Your title",
+  message: form.message?.trim() || "",
+  tone: form.tone,
+  promo_code: form.kind === "promotion" ? form.promo_code?.trim() || "" : "",
+  link_type: form.link_type || "",
+  link_label: previewButton.value,
+  image_url: form.kind === "promotion" ? imagePreview.value : null,
+  ends_at: form.ends_at || null,
+}));
+const reviewWhen = computed(() => {
+  const start = form.starts_at ? formatDateTime(form.starts_at) : null;
+  const end = form.ends_at ? formatDateTime(form.ends_at) : null;
+  if (start && end) return `From ${start} until ${end}`;
+  if (start) return `From ${start}, no end date`;
+  if (end) return `Straight away, until ${end}`;
+  return "Straight away, no end date";
+});
 const form = reactive({});
 const imageFile = ref(null);
 const imagePreview = ref(null);
@@ -731,7 +816,7 @@ const toLocalInput = (iso) => {
 const openEditor = (type, item, values, image) => {
   Object.keys(form).forEach((k) => delete form[k]);
   Object.assign(form, values);
-  Object.assign(editor, { type, item, error: "" });
+  Object.assign(editor, { type, item, error: "", reviewing: false });
   imageFile.value = null;
   imagePreview.value = image ?? null;
   removeImage.value = false;
@@ -772,6 +857,7 @@ const editorTitle = computed(() => {
   const isNew = !editor.item;
   if (editor.type === "banner") return isNew ? "New banner" : "Edit banner";
   if (editor.type === "article") return isNew ? "New article" : "Edit article";
+  if (editor.reviewing) return `Review ${form.kind === "promotion" ? "promotion" : "announcement"}`;
   return `${isNew ? "New" : "Edit"} ${form.kind === "promotion" ? "promotion" : "announcement"}`;
 });
 
@@ -815,6 +901,19 @@ const saveEditor = async () => {
   editor.error = "";
   if (editor.type === "banner" && !imagePreview.value) {
     editor.error = "Choose a banner image.";
+    return;
+  }
+  // Announcements and promotions are checked on a preview before they go up
+  if (editor.type === "announcement" && !editor.reviewing) {
+    if (!form.title.trim()) {
+      editor.error = "Add a title first.";
+      return;
+    }
+    if (form.starts_at && form.ends_at && new Date(form.ends_at) <= new Date(form.starts_at)) {
+      editor.error = "The end must be after the start.";
+      return;
+    }
+    editor.reviewing = true;
     return;
   }
   saving.value = true;
@@ -1346,16 +1445,32 @@ onMounted(() => {
 .state-ended,
 .state-off,
 .article-draft { background: var(--a-subtle-2); color: var(--a-muted); }
+/* Announcement rows: the bar's own icon in its own colour */
 .tone-dot {
-  width: 14px;
-  height: 14px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   flex-shrink: 0;
+  background: var(--swatch);
+  color: var(--swatch-ink);
+  box-shadow: inset 0 0 0 1px var(--a-border);
 }
-.tone-brand { background: #1b1612; color: #fff; }
-.tone-info { background: var(--a-blue-soft); color: var(--a-blue-text); }
-.tone-success { background: var(--a-green-soft); color: var(--a-green-text); }
-.tone-warning { background: var(--a-amber-soft); color: var(--a-amber-text); }
+.tone-dot svg,
+.tone-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.promo-dot {
+  --swatch: var(--a-green-soft);
+  --swatch-ink: var(--a-green-text);
+}
 
 .seg {
   display: inline-flex;
@@ -1684,19 +1799,104 @@ textarea.input {
 }
 .tones {
   display: flex;
-  gap: 6px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 .tone-btn {
-  border: 2px solid transparent;
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--a-border);
+  border-radius: 50%;
+  background: var(--swatch);
+  color: var(--swatch-ink);
   cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.tone-btn svg {
+  width: 20px;
+  height: 20px;
+}
+.tone-btn:hover {
+  transform: translateY(-1px);
 }
 .tone-btn.active {
-  border-color: var(--a-accent);
+  box-shadow: 0 0 0 2px var(--a-surface), 0 0 0 4px var(--a-accent);
+}
+.tone-btn:focus-visible {
+  outline: 2px solid var(--a-accent);
+  outline-offset: 3px;
+}
+
+/* Review before posting */
+.review-intro h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--a-text);
+}
+.review-intro p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--a-muted);
+}
+/* Always the shop's light look, whatever the admin theme */
+.review-stage {
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--a-border);
+  border-radius: 12px;
+  background: var(--ivory);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.review-where {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.review-facts {
+  margin: 0;
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--a-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--a-border);
+}
+.review-facts div {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--a-surface);
+  font-size: 13px;
+}
+.review-facts dt {
+  color: var(--a-muted);
+}
+.review-facts dd {
+  margin: 0;
+  color: var(--a-text);
+  overflow-wrap: anywhere;
+}
+.review-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--a-amber-soft);
+  color: var(--a-amber-text);
+  font-size: 13px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tone-btn {
+    transition: none;
+  }
 }
 
 /* Footer preview */
