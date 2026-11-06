@@ -8,6 +8,9 @@
 --}}
 @php
     $site = rtrim(config('app.frontend_url', 'https://bloomcraft-app.vercel.app'), '/');
+    // The logo comes from Cloudinary, sized for email (80 px for sharp screens):
+    // Gmail's image proxy showed the copy on the Vercel site as a broken image
+    $logo = 'https://res.cloudinary.com/dqs1e1inx/image/upload/w_80,h_80,c_fit/v1793959592/email/bloomcraft-logo.png';
     $serif = "'Cormorant Garamond', Georgia, 'Times New Roman', serif";
     $sans = "'Poppins', 'Segoe UI', Helvetica, Arial, sans-serif";
 @endphp
@@ -49,7 +52,7 @@
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                                 <tr>
                                     <td style="vertical-align:middle;padding-right:10px;">
-                                        <img src="{{ $site }}/bloomcraft-darkmode-removebg.png" width="40" height="40" alt="" style="display:block;border:0;width:40px;height:40px;">
+                                        <img src="{{ $logo }}" width="40" height="40" alt="" style="display:block;border:0;width:40px;height:40px;">
                                     </td>
                                     <td style="vertical-align:middle;font-family:{!! $serif !!};font-size:26px;font-weight:600;color:#ffffff;letter-spacing:.01em;">
                                         BloomCraft
