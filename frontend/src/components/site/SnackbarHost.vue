@@ -29,7 +29,7 @@
 
 <script setup>
 // Shows the snackbars from utils/snackbar.js (mounted once in App.vue).
-// Dark when the page is in dark mode (vendor and ERP pages), light otherwise.
+// Dark when the page is in dark mode (vendor, ERP and admin pages), light otherwise.
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { dismiss, hold, release, snackbars } from "../../utils/snackbar";
@@ -48,14 +48,16 @@ function runAction(s) {
   else s.action.onClick?.();
 }
 
-// Follows the page: vendor and ERP pages put data-vendor-theme="dark" on <html>
+// Follows the page: vendor and ERP pages put data-vendor-theme="dark" on <html>,
+// admin pages put data-admin-theme="dark"
+const THEME_ATTRS = ["data-vendor-theme", "data-admin-theme"];
 const dark = ref(false);
 let observer = null;
-const read = () => (dark.value = document.documentElement.getAttribute("data-vendor-theme") === "dark");
+const read = () => (dark.value = THEME_ATTRS.some((a) => document.documentElement.getAttribute(a) === "dark"));
 onMounted(() => {
   read();
   observer = new MutationObserver(read);
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-vendor-theme"] });
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: THEME_ATTRS });
 });
 onBeforeUnmount(() => observer?.disconnect());
 </script>
