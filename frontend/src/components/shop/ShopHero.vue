@@ -71,6 +71,8 @@ const props = defineProps({
   banners: { type: Array, default: () => [] },
   // Admin → Promotion Management → Banners → Slideshow settings
   settings: { type: Object, default: () => ({}) },
+  // Admin full-screen preview: the buttons don't go anywhere
+  preview: { type: Boolean, default: false },
 });
 const DEFAULTS = { seconds: 6, autoplay: true, pause_on_hover: true, show_arrows: true, show_dots: true };
 const play = computed(() => {
@@ -97,7 +99,10 @@ const titleParts = (title = "") => {
   return at > 0 && at < title.length - 1 ? [title.slice(0, at + 1) + " ", title.slice(at + 1).trim()] : [title];
 };
 
-const primary = (slide) => (slide.link_type ? followLink(router, slide) : emit("shop"));
+const primary = (slide) => {
+  if (props.preview) return;
+  return slide.link_type ? followLink(router, slide) : emit("shop");
+};
 
 const active = ref(0);
 const hovering = ref(false);

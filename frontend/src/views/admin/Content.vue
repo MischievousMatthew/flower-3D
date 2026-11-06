@@ -342,6 +342,13 @@
             <label class="field"><span>Subtitle</span><textarea v-model="form.subtitle" class="input" rows="2" maxlength="300"></textarea></label>
             <label class="field"><span>Button text</span><input v-model="form.button_label" class="input" placeholder="Shop now" maxlength="40" /></label>
             <LinkPicker v-model:type="form.link_type" v-model:value="form.link_value" :options="linkOptions" />
+            <div class="fs-cta">
+              <button type="button" class="ghost-btn" :disabled="!imagePreview" @click="fullPreview = true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" /></svg>
+                See it full screen
+              </button>
+              <small class="hint">{{ imagePreview ? "Shows the banner at the size customers see it." : "Choose an image first." }}</small>
+            </div>
           </template>
 
           <!-- Announcement / promotion: review before posting -->
@@ -351,7 +358,13 @@
               <p>This is how customers will see it on the shop. Go back to change anything.</p>
             </div>
             <figure class="review-stage bc-theme">
-              <figcaption class="review-where">{{ form.kind === "promotion" ? "Shop page, beside “Shop by occasion”" : "Top of the shop" }}</figcaption>
+              <figcaption class="review-where">
+                <span>{{ form.kind === "promotion" ? "Shop page, beside “Shop by occasion”" : "Top of the shop" }}</span>
+                <button type="button" class="fs-open" @click="fullPreview = true">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" /></svg>
+                  Full screen
+                </button>
+              </figcaption>
               <AnnouncementBar v-if="form.kind === 'announcement'" preview :items="[previewItem]" :settings="bar.values" />
               <PromoCard v-else preview :promotions="[previewItem]" />
             </figure>
@@ -497,6 +510,39 @@
       </aside>
     </Transition>
 
+    <!-- Full-screen preview: the shop's own components at real size -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="fullPreview" ref="fsEl" class="fs-preview bc-theme" role="dialog" aria-modal="true" aria-label="Full-screen preview" tabindex="-1">
+          <header class="fs-bar">
+            <span class="fs-label">
+              <strong>Preview</strong>
+              <span>How customers will see this {{ editor.type === "banner" ? "banner" : form.kind }}. It isn't posted yet.</span>
+            </span>
+            <button type="button" class="fs-close" @click="fullPreview = false">
+              Close <kbd>Esc</kbd>
+            </button>
+          </header>
+          <div class="fs-page">
+            <ShopHero v-if="editor.type === 'banner'" preview :banners="[bannerPreview]" :settings="{ autoplay: false }" />
+            <template v-else-if="form.kind === 'announcement'">
+              <div class="bc-container fs-announce">
+                <AnnouncementBar preview :items="[previewItem]" :settings="bar.values" />
+              </div>
+              <ShopHero preview :banners="liveBanners" :settings="{ autoplay: false }" />
+            </template>
+            <div v-else class="bc-container fs-split">
+              <div class="fs-ghost" aria-hidden="true">
+                <span class="fs-ghost-title">Shop by occasion</span>
+                <span class="fs-ghost-row"><i v-for="n in 5" :key="n"></i></span>
+              </div>
+              <PromoCard preview :promotions="[previewItem]" />
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- Delete confirm -->
     <Transition name="fade">
       <div v-if="deleting.item" class="dialog-backdrop" @click.self="deleting.item = null">
@@ -514,7 +560,7 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, reactive, ref, watch } from "vue";
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { toast } from "@/utils/snackbar";
 import { useSidebarState } from "../../composables/useSidebarState";
@@ -522,6 +568,7 @@ import AdminSidebar from "../../layouts/Sidebar/AdminSidebar.vue";
 import LinkPicker from "./components/LinkPicker.vue";
 import AnnouncementBar from "../../components/site/AnnouncementBar.vue";
 import PromoCard from "../../components/shop/PromoCard.vue";
+import ShopHero from "../../components/shop/ShopHero.vue";
 import { ANNOUNCEMENT_TONES } from "../../constants/announcementTones";
 import "../../styles/bloomcraft.css"; // shop look for the review preview
 import { articleBlocks } from "../../utils/articleBlocks";
@@ -792,6 +839,37 @@ const previewItem = computed(() => ({
   image_url: form.kind === "promotion" ? imagePreview.value : null,
   ends_at: form.ends_at || null,
 }));
+// Full-screen preview (banners, and the review step)
+const fullPreview = ref(false);
+const fsEl = ref(null);
+const bannerPreview = computed(() => ({
+  id: "preview",
+  eyebrow: form.eyebrow?.trim() || "",
+  title: form.title?.trim() || "Your headline",
+  subtitle: form.subtitle?.trim() || "",
+  button_label: form.button_label?.trim() || "",
+  link_type: form.link_type || "",
+  image_url: imagePreview.value,
+}));
+// behind an announcement: the banners that are showing now
+const liveBanners = computed(() => banners.value.filter((b) => b.state === "showing"));
+const onFsKey = (e) => {
+  if (e.key === "Escape") {
+    e.stopPropagation();
+    fullPreview.value = false;
+  }
+};
+watch(fullPreview, async (open) => {
+  if (open) {
+    window.addEventListener("keydown", onFsKey, true);
+    await nextTick();
+    fsEl.value?.focus();
+  } else {
+    window.removeEventListener("keydown", onFsKey, true);
+  }
+});
+watch(() => editor.type, (type) => !type && (fullPreview.value = false));
+onBeforeUnmount(() => window.removeEventListener("keydown", onFsKey, true));
 const reviewWhen = computed(() => {
   const start = form.starts_at ? formatDateTime(form.starts_at) : null;
   const end = form.ends_at ? formatDateTime(form.ends_at) : null;
@@ -1854,6 +1932,10 @@ textarea.input {
   gap: 10px;
 }
 .review-where {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -1893,6 +1975,148 @@ textarea.input {
   color: var(--a-amber-text);
   font-size: 13px;
 }
+.fs-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 600 12px var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+.fs-open:hover {
+  border-color: var(--leaf-deep);
+  color: var(--leaf-deep);
+}
+.fs-cta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.fs-cta .ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Full-screen preview: a slice of the shop at real size, always light */
+.fs-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  background: var(--ivory);
+  outline: none;
+}
+.fs-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--espresso);
+  color: var(--paper);
+  font-family: var(--font-sans);
+}
+.fs-label {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  min-width: 0;
+  font-size: 13px;
+}
+.fs-label span {
+  color: rgba(250, 251, 250, 0.74);
+}
+.fs-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(250, 251, 250, 0.24);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--paper);
+  font: 600 13px var(--font-sans);
+  cursor: pointer;
+}
+.fs-close:hover {
+  background: rgba(250, 251, 250, 0.12);
+}
+.fs-close:focus-visible,
+.fs-open:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+.fs-close kbd {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(250, 251, 250, 0.14);
+  font: 500 11px var(--font-sans);
+}
+.fs-page {
+  flex: 1;
+  overflow-y: auto;
+}
+.fs-announce {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.fs-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 22px;
+  padding-top: 40px;
+  padding-bottom: 40px;
+}
+.fs-ghost {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 26px 30px;
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  opacity: 0.6;
+}
+.fs-ghost-title {
+  font: 500 28px var(--font-display);
+  color: var(--ink);
+}
+.fs-ghost-row {
+  display: flex;
+  gap: 18px;
+}
+.fs-ghost-row i {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--ivory-deep);
+}
+@media (max-width: 960px) {
+  .fs-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fs-ghost {
+    display: none;
+  }
+}
+@media (max-width: 560px) {
+  .fs-label span {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tone-btn {
     transition: none;
