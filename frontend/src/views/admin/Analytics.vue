@@ -741,7 +741,7 @@ onBeforeUnmount(() => {
 .sk {
   display: block;
   border-radius: 8px;
-  background: linear-gradient(100deg, var(--a-subtle-2) 30%, var(--a-subtle) 50%, var(--a-subtle-2) 70%);
+  background: linear-gradient(100deg, var(--a-skel) 30%, var(--a-skel-shine) 50%, var(--a-skel) 70%);
   background-size: 300% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
 }

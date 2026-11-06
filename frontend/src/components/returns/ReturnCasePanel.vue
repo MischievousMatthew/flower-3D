@@ -434,7 +434,7 @@ const fmtDateTime = (v) =>
 .rc-sk {
   display: block;
   border-radius: 8px;
-  background: linear-gradient(100deg, var(--v-subtle-2) 30%, var(--v-subtle) 50%, var(--v-subtle-2) 70%);
+  background: linear-gradient(100deg, var(--v-skel, var(--v-subtle-2)) 30%, var(--v-skel-shine, var(--v-subtle)) 50%, var(--v-skel, var(--v-subtle-2)) 70%);
   background-size: 300% 100%;
   animation: rc-shimmer 1.6s ease-in-out infinite;
 }

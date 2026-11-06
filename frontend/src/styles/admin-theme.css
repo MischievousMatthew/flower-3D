@@ -11,6 +11,9 @@
   --a-subtle: #f8fafc;
   --a-subtle-2: #f1f5f9;
   --a-track: #e2e8f0;
+  /* loading placeholders: visible on both surface and subtle panels */
+  --a-skel: #e2e8f0;
+  --a-skel-shine: #f4f7fa;
   --a-border: #e9edf3;
   --a-border-strong: #cbd5e1;
   --a-text: #1e2739;
@@ -55,6 +58,8 @@ html[data-admin-theme="dark"] {
   --a-subtle: #1b222c;
   --a-subtle-2: #222a36;
   --a-track: #2a3340;
+  --a-skel: #2a3446;
+  --a-skel-shine: #38455c;
   --a-border: #2a3340;
   --a-border-strong: #3a4555;
   --a-text: #e6eaf0;
@@ -91,6 +96,8 @@ html[data-admin-theme="dark"] {
   --v-raised: #1d2430;
   --v-subtle: var(--a-subtle);
   --v-subtle-2: var(--a-subtle-2);
+  --v-skel: var(--a-skel);
+  --v-skel-shine: var(--a-skel-shine);
   --v-input: #121821;
   --v-border: var(--a-border);
   --v-border-strong: var(--a-border-strong);

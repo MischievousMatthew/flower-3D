@@ -17,15 +17,27 @@
       </header>
 
       <div class="page-body">
-        <nav v-if="visibleTabs.length > 1" class="tabs" role="tablist">
+        <nav v-if="accessReady && visibleTabs.length > 1" class="tabs" role="tablist">
           <button v-for="t in visibleTabs" :key="t.key" type="button" role="tab" class="tab" :class="{ active: tab === t.key }" :aria-selected="tab === t.key" @click="setTab(t.key)">
             {{ t.label }}
             <span v-if="t.key === 'health' && health && health.overall !== 'ok'" class="dot" :class="health.overall"></span>
           </button>
         </nav>
 
+        <!-- Waiting for this admin's permissions to know which tabs to show -->
+        <template v-if="!accessReady">
+          <div class="sk-tabs" aria-hidden="true"><span v-for="n in 3" :key="n" class="sk sk-tab"></span></div>
+          <section class="panel" aria-busy="true" aria-label="Loading">
+            <span class="sk sk-title"></span>
+            <div class="sk-list"><span v-for="n in 5" :key="n" class="sk sk-row"></span></div>
+          </section>
+        </template>
+        <section v-else-if="!tab" class="panel">
+          <p class="empty">Your role doesn't include anything on this page. Ask a super admin if you need access.</p>
+        </section>
+
         <!-- ═══ Administrators ═══ -->
-        <section v-if="tab === 'admins'" class="panel">
+        <section v-else-if="tab === 'admins'" class="panel">
           <div class="panel-head">
             <div>
               <h2 class="panel-title">Administrators</h2>
@@ -441,6 +453,7 @@
               <template v-if="apiErrors || lookup">
                 <h4 class="mini-title er-list-title" aria-live="polite">{{ lookup ? (lookup.length ? `Found ${lookup.length === 1 ? "1 error" : lookup.length + " errors"} for ${lookedUp}` : `No error with code ${lookedUp}`) : "Problems to fix, newest first" }}</h4>
                 <p v-if="lookup && !lookup.length" class="er-none">Check the code for typos. Errors older than 90 days are cleared.</p>
+                <div v-else-if="!lookup && !problems.loaded.value" class="sk-list"><span v-for="n in 3" :key="n" class="sk sk-row tall"></span></div>
                 <p v-else-if="!lookup && problems.loaded.value && !problems.items.value.length" class="calm er-clear">✓ No errors found. Everything that went wrong has been fixed.</p>
                 <ul class="er-list">
                   <li v-for="e in errorRows" :key="e.signature || e.id" class="er-row">
@@ -1346,8 +1359,10 @@ const timeAgo = (v) => {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 };
 
+const accessReady = ref(false);
 onMounted(async () => {
   await adminAccess.load().catch(() => {});
+  accessReady.value = true;
   openSection();
 });
 </script>
@@ -1508,7 +1523,7 @@ onMounted(async () => {
 .sk {
   display: block;
   border-radius: 10px;
-  background: linear-gradient(100deg, var(--a-subtle-2) 30%, var(--a-subtle) 50%, var(--a-subtle-2) 70%);
+  background: linear-gradient(100deg, var(--a-skel) 30%, var(--a-skel-shine) 50%, var(--a-skel) 70%);
   background-size: 300% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
 }
@@ -1522,6 +1537,19 @@ onMounted(async () => {
 }
 .sk-row.tall {
   height: 120px;
+}
+.sk-tabs {
+  display: flex;
+  gap: 6px;
+}
+.sk-tab {
+  width: 120px;
+  height: 38px;
+}
+.sk-title {
+  width: 200px;
+  height: 18px;
+  margin-bottom: 14px;
 }
 @keyframes shimmer {
   from { background-position: 100% 0; }
