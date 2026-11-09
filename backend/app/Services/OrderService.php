@@ -595,14 +595,32 @@ class OrderService
                 ->where('status', 'active')
                 ->firstOrFail();
 
-            $quantity = $funding->recommended_qty ?? $funding->requested_qty;
-            $price    = $funding->estimated_unit_cost;
+            // One order line per product on the request. Older requests had a
+            // single product stored on the request itself.
+            $unitOf = ['Stems' => 'stem', 'Bunches' => 'bunch', 'Boxes' => 'box'];
+            $lines = $funding->items()->get()->map(fn ($i) => [
+                'product_id'   => $i->product_id,
+                'product_name' => $i->product_name,
+                'quantity'     => (int) $i->quantity,
+                'price'        => (float) $i->unit_cost,
+                'unit'         => $unitOf[$i->uom] ?? 'stem',
+            ])->all();
 
-            // FIXED: look up the product so we can store product_id on the item.
-            // Scope to owner so multi-tenant lookups don't cross-contaminate.
-            $product = Product::where('product_name', $funding->product_name)
-                ->where('owner_id', $funding->owner_id)
-                ->first();
+            if (!$lines) {
+                // Look up the product so we can store product_id on the item,
+                // scoped to the owner so lookups never cross shops
+                $product = Product::where('product_name', $funding->product_name)
+                    ->where('owner_id', $funding->owner_id)
+                    ->first();
+                $lines = [[
+                    'product_id'   => $product?->id,
+                    'product_name' => $funding->product_name,
+                    'quantity'     => (int) ($funding->recommended_qty ?? $funding->requested_qty),
+                    'price'        => (float) $funding->estimated_unit_cost,
+                    'unit'         => $unitOf[$funding->uom] ?? 'stem',
+                ]];
+            }
+            $orderTotal = array_sum(array_map(fn ($l) => $l['quantity'] * $l['price'], $lines));
 
             // Finance already approved the funding request, so the order goes straight to the supplier
             $order = PurchaseOrder::create([
@@ -610,7 +628,7 @@ class OrderService
                 'supplier_id'     => $supplier->id,
                 'order_number'    => $this->generateOrderNumber(),
                 'status'          => 'pending',
-                'total_amount'    => $quantity * $price,
+                'total_amount'    => $orderTotal,
                 'order_date'      => now()->toDateString(),
                 'created_by_name' => PurchaseOrderEvent::nameOf(auth()->user()),
                 'submitted_at'    => now(),
@@ -620,12 +638,9 @@ class OrderService
             ]);
             PurchaseOrderEvent::record($order, 'created', null, 'pending', 'From an approved funding request');
 
-            $order->items()->create([
-                'product_id'   => $product?->id,   // ← now stored
-                'product_name' => $funding->product_name,
-                'quantity'     => $quantity,
-                'price'        => $price,
-            ]);
+            foreach ($lines as $line) {
+                $order->items()->create($line);
+            }
 
             $funding->update(['linked_order_id' => $order->id]);
 

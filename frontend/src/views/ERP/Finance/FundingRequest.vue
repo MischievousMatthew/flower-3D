@@ -48,8 +48,8 @@
         <li v-for="r in filteredRequests" :key="r.id" class="fr-row" tabindex="0" @click="viewRequest(r.id)" @keydown.enter="viewRequest(r.id)">
           <span class="fx-icon" :class="`tone-${STATUS[displayRequestStatus(r)]?.tone ?? 'slate'}`" v-html="ICONS.box"></span>
           <div class="grow">
-            <strong>{{ r.product_name }} <span class="muted">· {{ r.requested_qty }} {{ r.uom }}</span></strong>
-            <span class="fr-sub">{{ [r.flower_category, r.variant].filter(Boolean).join(" · ") }}</span>
+            <strong>{{ r.product_name }} <span class="muted">· {{ r.requested_qty }} {{ r.uom || "units" }}</span></strong>
+            <span class="fr-sub">{{ [r.flower_category, r.variant, r.urgency_level && r.urgency_level !== "Normal" ? r.urgency_level : null, payLabel(r)].filter(Boolean).join(" · ") }}</span>
             <span class="fr-meta">
               <span class="mono">{{ r.finance_request_id }}</span> · {{ formatDate(r.request_date) }} · from {{ r.submitted_by_name }}
               · approver <b :class="{ you: isAssignedApprover(r) }">{{ isAssignedApprover(r) ? "you" : r.approver_name || "not assigned" }}</b>
@@ -61,7 +61,7 @@
           </div>
           <div class="fr-amt">
             <strong>{{ peso(r.estimated_total_cost) }}</strong>
-            <small :class="marginTone(r.estimated_gross_margin)">{{ r.estimated_gross_margin }}% margin</small>
+            <small v-if="hasMargin(r)" :class="marginTone(r.estimated_gross_margin)">{{ r.estimated_gross_margin }}% margin</small>
           </div>
           <div class="fr-actions" @click.stop>
             <button
@@ -93,16 +93,21 @@
             </div>
 
             <dl class="fr-sum">
-              <div><dt>Quantity</dt><dd>{{ reviewForm.requested_qty }} {{ reviewForm.uom }}</dd></div>
+              <div><dt>Quantity</dt><dd>{{ reviewForm.requested_qty }} {{ reviewForm.uom || "units" }}</dd></div>
               <div><dt>Total cost</dt><dd>{{ peso(reviewForm.estimated_total_cost) }}</dd></div>
-              <div><dt>Margin</dt><dd :class="marginTone(reviewForm.estimated_gross_margin)">{{ reviewForm.estimated_gross_margin }}%</dd></div>
+              <div v-if="hasMargin(reviewForm)"><dt>Margin</dt><dd :class="marginTone(reviewForm.estimated_gross_margin)">{{ reviewForm.estimated_gross_margin }}%</dd></div>
+              <div v-else-if="payLabel(reviewForm)"><dt>Pay through</dt><dd>{{ payLabel(reviewForm) }}</dd></div>
               <div><dt>Approver</dt><dd>{{ reviewForm.approver_name || "Not assigned" }}</dd></div>
             </dl>
 
+            <ul v-if="reviewForm.items?.length > 1" class="fr-items">
+              <li v-for="i in reviewForm.items" :key="i.id"><span>{{ i.product_name }} <small>· {{ i.quantity }} {{ (i.uom || "").toLowerCase() }}</small></span><b>{{ peso(i.line_total) }}</b></li>
+            </ul>
+
             <div class="fr-brief">
-              <div><span class="fr-brief-label">What and why</span><p>{{ reviewForm.business_justification || "—" }}</p></div>
-              <div class="good"><span class="fr-brief-label">If approved</span><p>{{ reviewForm.approval_impact || "—" }}</p></div>
-              <div class="warn"><span class="fr-brief-label">If rejected or delayed</span><p>{{ reviewForm.rejection_risk || "—" }}</p></div>
+              <div><span class="fr-brief-label">Why it's needed</span><p>{{ reviewForm.business_justification || "—" }}</p></div>
+              <div v-if="reviewForm.approval_impact" class="good"><span class="fr-brief-label">If approved</span><p>{{ reviewForm.approval_impact }}</p></div>
+              <div v-if="reviewForm.rejection_risk" class="warn"><span class="fr-brief-label">If rejected or delayed</span><p>{{ reviewForm.rejection_risk }}</p></div>
               <div v-if="reviewForm.additional_notes"><span class="fr-brief-label">Other notes</span><p>{{ reviewForm.additional_notes }}</p></div>
             </div>
 
@@ -121,7 +126,7 @@
 
             <div v-if="reviewForm.decision === 'approve'" class="sp-grid-2">
               <label class="sp-field">
-                <span class="sp-label">Approved quantity ({{ reviewForm.uom }})</span>
+                <span class="sp-label">Approved quantity ({{ reviewForm.uom || "units" }})</span>
                 <input v-model.number="reviewForm.approved_quantity" class="sp-input" type="number" min="0" :max="reviewForm.requested_qty" />
               </label>
               <label class="sp-field">
@@ -267,6 +272,9 @@ async function fetchRequests() {
   }
 }
 
+const hasMargin = (r) => r?.estimated_gross_margin !== null && r?.estimated_gross_margin !== undefined && r?.estimated_gross_margin !== "";
+const payLabel = (r) => (r?.payment_channel ? `${r.payment_method === "ewallet" ? "E-wallet" : "Bank"}: ${r.payment_channel}` : r?.payment_terms || "");
+
 const viewRequest = (id) => router.push({ name: "FinanceFundingRequestDetails", params: { id } });
 
 function openReviewModal(r) {
@@ -276,6 +284,10 @@ function openReviewModal(r) {
   }
   reviewForm.value = { ...emptyReview(), ...r, id: r.id, approved_quantity: r.requested_qty, approved_amount: r.estimated_total_cost };
   showReviewModal.value = true;
+  // The list doesn't carry each product; fetch them for the breakdown
+  api.get(`finance/funding-requests/${r.id}`).then(({ data }) => {
+    if (showReviewModal.value && reviewForm.value.id === r.id) reviewForm.value.items = data.data?.items ?? [];
+  }).catch(() => {});
 }
 function closeReviewModal() {
   showReviewModal.value = false;
@@ -506,6 +518,28 @@ onMounted(fetchRequests);
   font-size: 13px;
   line-height: 1.5;
   color: var(--v-text-2);
+}
+.fr-items {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--v-border);
+  border-radius: 12px;
+  list-style: none;
+}
+.fr-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--v-text);
+}
+.fr-items small {
+  color: var(--v-muted);
+}
+.fr-items b {
+  font-variant-numeric: tabular-nums;
 }
 .fr-rec {
   display: flex;

@@ -47,14 +47,43 @@
         </dl>
       </section>
 
-      <!-- The case for it -->
+      <!-- What's being bought -->
       <section class="sp-card">
-        <div class="sp-card-head"><div><h2>Decision brief</h2><p>Why Procurement is asking, in their words</p></div></div>
+        <div class="sp-card-head"><div><h2>Products</h2><p>{{ lines.length }} {{ lines.length === 1 ? "product" : "products" }} · needed by {{ formatDate(request.required_delivery_date) }}</p></div></div>
+        <div class="fd-table-wrap">
+          <table class="fd-table">
+            <thead>
+              <tr><th scope="col">Product</th><th scope="col" class="num">Quantity</th><th scope="col" class="num">Unit cost</th><th scope="col" class="num">Amount</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="l in lines" :key="l.key">
+                <td><b>{{ l.name }}</b><small v-if="l.sub">{{ l.sub }}</small></td>
+                <td class="num">{{ l.qty }} {{ (l.uom || "").toLowerCase() }}</td>
+                <td class="num">{{ peso(l.cost) }}</td>
+                <td class="num">{{ peso(l.total) }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr v-if="Number(request.logistics_cost) > 0"><td colspan="3">Delivery fee</td><td class="num">{{ peso(request.logistics_cost) }}</td></tr>
+              <tr v-if="Number(request.tax_vat_estimate) > 0"><td colspan="3">Tax or VAT</td><td class="num">{{ peso(request.tax_vat_estimate) }}</td></tr>
+              <tr class="total"><td colspan="3">Total requested</td><td class="num">{{ peso(request.estimated_total_cost) }}</td></tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
+
+      <!-- Why -->
+      <section class="sp-card">
+        <div class="sp-card-head"><div><h2>Why it's needed</h2><p>In Procurement's words</p></div></div>
+        <div class="fd-why">
+          <span v-if="request.urgency_level" class="sp-chip" :class="URGENCY_TONE[request.urgency_level]">{{ request.urgency_level }}</span>
+          <span v-if="request.reason_for_shortage" class="sp-chip slate">{{ REASON_LABEL[request.reason_for_shortage] || request.reason_for_shortage }}</span>
+        </div>
         <div class="fd-brief">
-          <div><span class="fd-brief-label">What and why</span><p>{{ request.business_justification || "—" }}</p></div>
-          <div class="good"><span class="fd-brief-label">If approved</span><p>{{ request.approval_impact || "—" }}</p></div>
-          <div class="warn"><span class="fd-brief-label">If rejected or delayed</span><p>{{ request.rejection_risk || "—" }}</p></div>
-          <div v-if="request.additional_notes"><span class="fd-brief-label">Other notes</span><p>{{ request.additional_notes }}</p></div>
+          <div><span class="fd-brief-label">Reason</span><p>{{ request.business_justification || "—" }}</p></div>
+          <div v-if="request.approval_impact" class="good"><span class="fd-brief-label">If approved</span><p>{{ request.approval_impact }}</p></div>
+          <div v-if="request.rejection_risk" class="warn"><span class="fd-brief-label">If rejected or delayed</span><p>{{ request.rejection_risk }}</p></div>
+          <div v-if="request.additional_notes"><span class="fd-brief-label">Notes</span><p>{{ request.additional_notes }}</p></div>
         </div>
       </section>
 
@@ -123,80 +152,79 @@ const statusText = computed(() => {
   return canEditFunding.value && isInventoryContext.value ? "A draft. Edit it, then send it to Finance." : "A draft that hasn't been sent to Finance yet.";
 });
 
-const qty = (n) => `${n ?? 0} ${request.value?.uom ?? ""}`.trim();
-const marginTone = (m) => (m >= 30 ? "pos" : m >= 20 ? "mid" : "neg");
+const URGENCY_TONE = { Normal: "slate", Urgent: "amber", Critical: "red" };
+const REASON_LABEL = {
+  "New Order": "Customer orders to fill",
+  "Seasonal Demand": "Season or holiday demand",
+  Spoilage: "Stock spoiled or damaged",
+  "Forecast Error": "Sold faster than expected",
+  "Supplier Delay": "Supplier delivery was late",
+};
+const METHOD_LABEL = { bank: "Bank transfer", ewallet: "E-wallet" };
+
+// One row per product; requests made before several products were allowed have one
+const lines = computed(() => {
+  const r = request.value;
+  if (r.items?.length) {
+    return r.items.map((i) => ({
+      key: i.id,
+      name: i.product_name,
+      sub: [i.sku, i.current_stock !== null && i.current_stock !== undefined ? `${i.current_stock} in stock when requested` : null].filter(Boolean).join(" · "),
+      qty: i.quantity,
+      uom: i.uom,
+      cost: i.unit_cost,
+      total: i.line_total,
+    }));
+  }
+  if (!r.product_name) return [];
+  const qty = Number(r.requested_qty) || 0;
+  return [{ key: "one", name: r.product_name, sub: [r.flower_category, r.variant].filter(Boolean).join(" · "), qty, uom: r.uom, cost: r.estimated_unit_cost, total: qty * Number(r.estimated_unit_cost || 0) }];
+});
+
 const sections = computed(() => {
   const r = request.value;
-  const drop = (rows) => rows.filter((x) => x[1] !== null && x[1] !== undefined && x[1] !== "");
+  const has = (v) => v !== null && v !== undefined && v !== "" && !(typeof v === "number" && v === 0);
+  const rows = (list) => list.filter((x) => has(x[1]));
+  const qty = (n) => (has(n) ? `${n} ${r.uom ?? ""}`.trim() : null);
   return [
     {
-      title: "Product and supplier",
-      rows: drop([
-        ["Category", r.flower_category],
-        ["Variant or grade", r.variant],
-        ["Requested", qty(r.requested_qty)],
-        ["Minimum order", r.moq ? qty(r.moq) : "—"],
-        ["Needed by", formatDate(r.required_delivery_date)],
-        ["Preferred supplier", r.preferred_supplier || "—"],
-        ["Other suppliers", r.alternative_suppliers || "—", "", "wide"],
-      ]),
-    },
-    {
-      title: "Stock",
-      sub: "Why the shop is running short",
-      rows: drop([
-        ["In stock", qty(r.current_stock)],
-        ["Reserved", qty(r.reserved_stock)],
-        ["Free to use", qty(r.net_available_stock)],
-        ["Needed", qty(r.required_quantity)],
-        ["Short by", qty(r.stock_shortage_qty), "neg"],
-        ["Already ordered", qty(r.incoming_stock)],
-        ["Reason", r.reason_for_shortage, "", "wide"],
-      ]),
-    },
-    {
-      title: "Money",
-      rows: drop([
-        ["Unit cost", peso(r.estimated_unit_cost)],
-        ["Total cost", peso(r.estimated_total_cost)],
-        ["Selling price", peso(r.expected_selling_price)],
-        ["Expected revenue", peso(r.expected_revenue)],
-        ["Gross margin", `${r.estimated_gross_margin ?? 0}%`, marginTone(r.estimated_gross_margin)],
+      title: "Payment",
+      rows: rows([
+        ["Paid by", METHOD_LABEL[r.payment_method]],
+        [r.payment_method === "ewallet" ? "E-wallet" : "Bank", r.payment_channel],
         ["Payment terms", r.payment_terms],
-        r.tax_vat_estimate ? ["Tax or VAT", peso(r.tax_vat_estimate)] : null,
-        r.logistics_cost ? ["Delivery cost", peso(r.logistics_cost)] : null,
-      ].filter(Boolean)),
-    },
-    {
-      title: "Urgency and risk",
-      rows: drop([
-        ["Urgency", r.urgency_level],
-        ["Shelf life", r.shelf_life ? `${r.shelf_life} days` : null],
-        ["Expected spoilage", r.expected_spoilage !== null && r.expected_spoilage !== undefined ? `${r.expected_spoilage}%` : null],
-        ["Demand confidence", r.demand_confidence],
-        r.missed_sales_impact ? ["Sales at risk", peso(r.missed_sales_impact), "neg"] : null,
-        ["Season", r.seasonal_tag],
-      ].filter(Boolean)),
-    },
-    {
-      title: "Recommendation",
-      sub: "What the requester suggests Finance approves",
-      chip: r.finance_recommendation,
-      rows: drop([
-        ["Quantity", qty(r.recommended_qty)],
-        ["Budget", peso(r.recommended_budget)],
-        r.price_ceiling ? ["Price ceiling", peso(r.price_ceiling)] : null,
-        ["Suggested supplier", r.suggested_supplier],
-      ].filter(Boolean)),
+        ["Total requested", peso(r.estimated_total_cost)],
+      ]),
     },
     {
       title: "Request details",
-      rows: drop([
+      rows: rows([
         ["Request ID", r.finance_request_id],
-        ["Sales order", r.related_sales_order_id || "—"],
         ["Requested by", r.submitted_by_name],
         ["Approver", r.approver_name || r.accounting_manager_name || "Not assigned"],
+        ["Needed by", formatDate(r.required_delivery_date)],
         ["Sent to Finance", r.submitted_to_accounting_at ? formatDateTime(r.submitted_to_accounting_at) : "Not yet"],
+        ["Sales order", r.related_sales_order_id],
+      ]),
+    },
+    {
+      // Only older requests filled these in
+      title: "More details",
+      sub: "From the older request form",
+      chip: r.finance_recommendation,
+      rows: rows([
+        ["Preferred supplier", r.preferred_supplier && !r.items?.length ? r.preferred_supplier : null],
+        ["Other suppliers", r.alternative_suppliers],
+        ["Already ordered", Number(r.incoming_stock) ? qty(r.incoming_stock) : null],
+        ["Short by", Number(r.stock_shortage_qty) ? qty(r.stock_shortage_qty) : null, "neg"],
+        ["Selling price", Number(r.expected_selling_price) ? peso(r.expected_selling_price) : null],
+        ["Gross margin", Number(r.estimated_gross_margin) ? `${r.estimated_gross_margin}%` : null],
+        ["Expected spoilage", Number(r.expected_spoilage) ? `${r.expected_spoilage}%` : null],
+        ["Demand confidence", r.demand_confidence],
+        ["Sales at risk", Number(r.missed_sales_impact) ? peso(r.missed_sales_impact) : null, "neg"],
+        ["Season", r.seasonal_tag],
+        ["Price ceiling", Number(r.price_ceiling) ? peso(r.price_ceiling) : null],
+        ["Suggested supplier", r.suggested_supplier],
       ]),
     },
   ].filter((s) => s.rows.length);
@@ -378,6 +406,61 @@ onMounted(fetchRequest);
   font-size: 13px;
   line-height: 1.55;
   color: var(--v-text-2);
+}
+.fd-why {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.fd-why:empty {
+  display: none;
+}
+.fd-table-wrap {
+  overflow-x: auto;
+}
+.fd-table {
+  width: 100%;
+  min-width: 460px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.fd-table th {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--v-border);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--v-muted);
+  text-align: left;
+}
+.fd-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--v-border);
+  color: var(--v-text);
+  vertical-align: top;
+}
+.fd-table td b {
+  display: block;
+  font-weight: 600;
+}
+.fd-table td small {
+  font-size: 12px;
+  color: var(--v-muted);
+}
+.fd-table .num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.fd-table tfoot td {
+  border-bottom: 0;
+  color: var(--v-text-2);
+}
+.fd-table tfoot .total td {
+  border-top: 1px solid var(--v-border-strong);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v-text);
 }
 @media (max-width: 900px) {
   .fd-cols {

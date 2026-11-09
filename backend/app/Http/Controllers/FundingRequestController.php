@@ -197,7 +197,6 @@ class FundingRequestController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve products',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -237,6 +236,181 @@ class FundingRequestController extends Controller
         }
     }
 
+    /** Banks and e-wallets Finance can pay through */
+    public const PAYMENT_CHANNELS = [
+        'bank' => ['BDO', 'BPI', 'Metrobank', 'Landbank', 'PNB', 'Security Bank', 'UnionBank', 'RCBC', 'China Bank', 'EastWest Bank', 'Other bank'],
+        'ewallet' => ['GCash', 'Maya', 'GrabPay', 'ShopeePay', 'Coins.ph', 'Other e-wallet'],
+    ];
+
+    private const REASONS = ['New Order', 'Spoilage', 'Forecast Error', 'Seasonal Demand', 'Supplier Delay'];
+    private const URGENCY = ['Normal', 'Urgent', 'Critical'];
+
+    private static function uomFor(?string $sellingType): string
+    {
+        return ['per_piece' => 'Stems', 'per_bunch' => 'Bunches', 'per_box' => 'Boxes'][$sellingType] ?? 'Stems';
+    }
+
+    /**
+     * Checks the form and works out what gets saved: the request's own columns
+     * and its product lines. Returns [errorResponse|null, columns, lines].
+     */
+    private function buildRequest(Request $request, int $ownerId, bool $isDraft): array
+    {
+        $req = $isDraft ? 'nullable' : 'required';
+        $method = $request->input('payment_method');
+        $channels = self::PAYMENT_CHANNELS[$method] ?? array_merge(...array_values(self::PAYMENT_CHANNELS));
+
+        $validator = Validator::make($request->all(), [
+            'approver_id' => "$req|integer|exists:employees,id",
+            'items' => $isDraft ? 'nullable|array|max:50' : 'required|array|min:1|max:50',
+            'items.*.product_id' => 'required|integer|distinct',
+            'items.*.quantity' => 'required|integer|min:1|max:1000000',
+            'items.*.unit_cost' => 'required|numeric|min:0|max:10000000',
+            'required_delivery_date' => "$req|date",
+            'urgency_level' => "$req|in:" . implode(',', self::URGENCY),
+            'reason_for_shortage' => "$req|in:" . implode(',', self::REASONS),
+            'payment_method' => "$req|in:bank,ewallet",
+            'payment_channel' => [$req, 'string', 'max:60', \Illuminate\Validation\Rule::in($channels)],
+            'logistics_cost' => 'nullable|numeric|min:0|max:10000000',
+            'business_justification' => "$req|string|max:150",
+            'additional_notes' => 'nullable|string|max:300',
+        ], [
+            'items.required' => 'Pick at least one product.',
+            'items.min' => 'Pick at least one product.',
+            'items.*.product_id.distinct' => 'Each product can only be added once.',
+            'items.*.quantity.min' => 'Ask for at least 1.',
+            'payment_channel.in' => 'Pick a bank or e-wallet from the list.',
+        ], [
+            'approver_id' => 'Finance approver',
+            'required_delivery_date' => 'needed-by date',
+            'reason_for_shortage' => 'reason',
+            'payment_channel' => 'bank or e-wallet',
+            'business_justification' => 'reason in your words',
+        ]);
+
+        if ($validator->fails()) {
+            return [response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first(),
+                'errors' => $validator->errors(),
+            ], 422), [], []];
+        }
+
+        $input = collect($request->input('items', []));
+        $products = DB::table('products')
+            ->where('owner_id', $ownerId)
+            ->whereNull('deleted_at')
+            ->whereIn('id', $input->pluck('product_id')->all())
+            ->get(['id', 'product_name', 'sku', 'selling_type', 'quantity_in_stock', 'supplier_name'])
+            ->keyBy('id');
+
+        $lines = [];
+        foreach ($input as $i => $row) {
+            $product = $products->get((int) $row['product_id']);
+            if (!$product) {
+                return [response()->json([
+                    'success' => false,
+                    'message' => 'One of the products is no longer in your inventory. Remove it and try again.',
+                    'errors' => ["items.$i.product_id" => ['This product is no longer in your inventory.']],
+                ], 422), [], []];
+            }
+            $qty = (int) $row['quantity'];
+            $cost = round((float) $row['unit_cost'], 2);
+            $lines[] = [
+                'product_id' => $product->id,
+                'product_name' => $product->product_name,
+                'sku' => $product->sku,
+                'uom' => self::uomFor($product->selling_type),
+                'current_stock' => (int) $product->quantity_in_stock,
+                'quantity' => $qty,
+                'unit_cost' => $cost,
+                'line_total' => round($qty * $cost, 2),
+                'supplier_name' => $product->supplier_name,
+            ];
+        }
+
+        $count = count($lines);
+        $totalQty = array_sum(array_column($lines, 'quantity'));
+        $subtotal = array_sum(array_column($lines, 'line_total'));
+        $delivery = round((float) $request->input('logistics_cost', 0), 2);
+        $total = round($subtotal + $delivery, 2);
+        $uoms = array_unique(array_column($lines, 'uom'));
+        $single = $count === 1 ? $lines[0] : null;
+
+        $name = $count ? $lines[0]['product_name'] . ($count > 1 ? sprintf(' + %d more', $count - 1) : '') : null;
+
+        // The request's own columns still describe it as a whole, so the
+        // request list, Finance's review and purchase orders keep working
+        $columns = [
+            'approver_id' => $request->filled('approver_id') ? (int) $request->input('approver_id') : null,
+            'accounting_manager_id' => $request->filled('approver_id') ? (int) $request->input('approver_id') : null,
+            'product_name' => $name ? mb_substr($name, 0, 255) : null,
+            'requested_qty' => $totalQty ?: null,
+            'required_quantity' => $totalQty ?: null,
+            'recommended_qty' => $totalQty ?: null,
+            'uom' => count($uoms) === 1 ? reset($uoms) : null,
+            'current_stock' => $single['current_stock'] ?? null,
+            'preferred_supplier' => $single['supplier_name'] ?? null,
+            'required_delivery_date' => $request->input('required_delivery_date') ?: null,
+            'urgency_level' => $request->input('urgency_level') ?: null,
+            'reason_for_shortage' => $request->input('reason_for_shortage') ?: null,
+            // An average, so quantity × unit cost still equals the products' total
+            'estimated_unit_cost' => $totalQty ? round($subtotal / $totalQty, 2) : null,
+            'estimated_total_cost' => $total,
+            'recommended_budget' => $total,
+            'currency' => 'PHP',
+            'payment_method' => $request->input('payment_method') ?: null,
+            'payment_channel' => $request->input('payment_channel') ?: null,
+            'logistics_cost' => $delivery,
+            'business_justification' => $request->input('business_justification') ?: null,
+            'additional_notes' => $request->input('additional_notes') ?: null,
+            // No longer asked for
+            'payment_terms' => null,
+            'tax_vat_estimate' => null,
+            'related_sales_order_id' => null,
+            'flower_category' => null,
+            'variant' => null,
+            'moq' => null,
+            'alternative_suppliers' => null,
+            'reserved_stock' => null,
+            'net_available_stock' => null,
+            'stock_shortage_qty' => null,
+            'incoming_stock' => 0,
+            'expected_selling_price' => null,
+            'expected_revenue' => null,
+            'estimated_gross_margin' => null,
+            'expected_spoilage' => null,
+            'missed_sales_impact' => null,
+            'seasonal_tag' => null,
+            'demand_confidence' => null,
+            'finance_recommendation' => null,
+            'price_ceiling' => null,
+            'suggested_supplier' => null,
+            'approval_impact' => null,
+            'rejection_risk' => null,
+        ];
+
+        $lines = array_map(function ($l) {
+            unset($l['supplier_name']);
+            return $l;
+        }, $lines);
+
+        return [null, $columns, $lines];
+    }
+
+    private function saveLines(int $fundingRequestId, array $lines): void
+    {
+        DB::table('funding_request_items')->where('funding_request_id', $fundingRequestId)->delete();
+        if (!$lines) return;
+
+        $now = now();
+        DB::table('funding_request_items')->insert(array_map(fn ($l) => $l + [
+            'funding_request_id' => $fundingRequestId,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], $lines));
+    }
+
     public function store(Request $request)
     {
         try {
@@ -245,151 +419,45 @@ class FundingRequestController extends Controller
             }
 
             $isDraft = $request->boolean('is_draft', false);
-
-            $rules = [
-                'approver_id' => $isDraft ? 'nullable|exists:employees,id' : 'required|exists:employees,id',
-                'related_sales_order_id' => 'nullable|string|max:255',
-                'product_name' => $isDraft ? 'nullable|string|max:255' : 'required|string|max:255',
-                'flower_category' => $isDraft ? 'nullable|in:Fresh,Dried,Artificial' : 'required|in:Fresh,Dried,Artificial',
-                'variant' => $isDraft ? 'nullable|in:Premium,Grade A,Grade B,Standard' : 'required|in:Premium,Grade A,Grade B,Standard',
-                'requested_qty' => $isDraft ? 'nullable|numeric|min:0' : 'required|numeric|min:1',
-                'uom' => $isDraft ? 'nullable|in:Stems,Bunches,Boxes' : 'required|in:Stems,Bunches,Boxes',
-                'moq' => 'nullable|numeric|min:0',
-                'preferred_supplier' => 'nullable|string|max:255',
-                'alternative_suppliers' => 'nullable|string',
-                'required_delivery_date' => $isDraft ? 'nullable|date' : 'required|date',
-                'current_stock' => 'nullable|numeric|min:0',
-                'reserved_stock' => 'nullable|numeric|min:0',
-                'required_quantity' => 'nullable|numeric|min:0',
-                'incoming_stock' => 'nullable|numeric|min:0',
-                'reason_for_shortage' => $isDraft ? 'nullable|in:New Order,Spoilage,Forecast Error,Seasonal Demand,Supplier Delay' : 'required|in:New Order,Spoilage,Forecast Error,Seasonal Demand,Supplier Delay',
-                'estimated_unit_cost' => 'nullable|numeric|min:0',
-                'payment_terms' => $isDraft ? 'nullable|in:Cash,7 Days,15 Days,30 Days' : 'required|in:Cash,7 Days,15 Days,30 Days',
-                'expected_selling_price' => 'nullable|numeric|min:0',
-                'tax_vat_estimate' => 'nullable|numeric|min:0',
-                'logistics_cost' => 'nullable|numeric|min:0',
-                'urgency_level' => $isDraft ? 'nullable|in:Normal,Urgent,Critical' : 'required|in:Normal,Urgent,Critical',
-                'shelf_life' => 'nullable|numeric|min:0',
-                'expected_spoilage' => $isDraft ? 'nullable|numeric|min:0|max:100' : 'required|numeric|min:0|max:100',
-                'missed_sales_impact' => 'nullable|numeric|min:0',
-                'seasonal_tag' => 'nullable|string|max:255',
-                'demand_confidence' => $isDraft ? 'nullable|in:High,Medium,Low' : 'required|in:High,Medium,Low',
-                'finance_recommendation' => $isDraft ? 'nullable|in:Approve,Approve Partial,Reject' : 'required|in:Approve,Approve Partial,Reject',
-                'recommended_qty' => 'nullable|numeric|min:0',
-                'price_ceiling' => 'nullable|numeric|min:0',
-                'suggested_supplier' => 'nullable|string|max:255',
-                'business_justification' => $isDraft ? 'nullable|string|max:150' : 'required|string|max:150',
-                'approval_impact' => $isDraft ? 'nullable|string|max:150' : 'required|string|max:150',
-                'rejection_risk' => $isDraft ? 'nullable|string|max:150' : 'required|string|max:150',
-                'additional_notes' => 'nullable|string|max:300',
-            ];
-
-            $validator = Validator::make($request->all(), $rules);
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors(),
-                ], 422);
-            }
-
             $ownerId = $this->getOwnerId($request);
             $employeeId = $this->getEmployeeId($request);
 
             if (!$ownerId) return response()->json(['message' => 'Unable to resolve owner'], 404);
             if (!$employeeId) return response()->json(['message' => 'Unable to resolve requesting employee'], 403);
 
-            $approverId = $request->input('approver_id');
-            if ($response = $this->validateApprover($ownerId, $approverId)) {
+            [$error, $columns, $lines] = $this->buildRequest($request, $ownerId, $isDraft);
+            if ($error) return $error;
+
+            if ($response = $this->validateApprover($ownerId, $columns['approver_id'])) {
                 return $response;
             }
 
-            $year = (int) date('Y');
-            $financeRequestId = $this->generateFinanceRequestId($year);
-
-            $currentStock = (float) $request->input('current_stock', 0);
-            $reservedStock = (float) $request->input('reserved_stock', 0);
-            $requiredQty = (float) $request->input('required_quantity', 0);
-            $requestedQty = (float) $request->input('requested_qty', 0);
-            $recommendedQty = (float) $request->input('recommended_qty', $requestedQty);
-            $estimatedUnitCost = (float) $request->input('estimated_unit_cost', 0);
-            $expectedSellingPrice = (float) $request->input('expected_selling_price', 0);
-
-            $netAvailableStock = $currentStock - $reservedStock;
-            $stockShortageQty = max(0, $requiredQty - $netAvailableStock);
-            $estimatedTotalCost = $estimatedUnitCost * $requestedQty;
-            $expectedRevenue = $expectedSellingPrice * $requestedQty;
-            $estimatedGrossMargin = $expectedSellingPrice != 0
-                ? (($expectedSellingPrice - $estimatedUnitCost) / $expectedSellingPrice) * 100
-                : 0;
-            $recommendedBudget = $estimatedUnitCost * $recommendedQty;
-
-            $fundingRequestId = DB::table('funding_requests')->insertGetId([
-                'owner_id' => $ownerId,
-                'finance_request_id' => $financeRequestId,
-                'submitted_by_employee_id' => $employeeId,
-                'requester_id' => $employeeId,
-                'accounting_manager_id' => $approverId,
-                'approver_id' => $approverId,
-                'related_sales_order_id' => $request->input('related_sales_order_id'),
-                'request_date' => now()->toDateString(),
-                'request_status' => $isDraft ? 'Draft' : 'Pending',
-                'product_name' => $request->input('product_name'),
-                'flower_category' => $request->input('flower_category'),
-                'variant' => $request->input('variant'),
-                'requested_qty' => $requestedQty,
-                'uom' => $request->input('uom'),
-                'moq' => $request->input('moq'),
-                'preferred_supplier' => $request->input('preferred_supplier'),
-                'alternative_suppliers' => $request->input('alternative_suppliers'),
-                'required_delivery_date' => $request->input('required_delivery_date'),
-                'current_stock' => $currentStock,
-                'reserved_stock' => $reservedStock,
-                'net_available_stock' => $netAvailableStock,
-                'required_quantity' => $requiredQty,
-                'stock_shortage_qty' => $stockShortageQty,
-                'incoming_stock' => (float) $request->input('incoming_stock', 0),
-                'reason_for_shortage' => $request->input('reason_for_shortage'),
-                'estimated_unit_cost' => $estimatedUnitCost,
-                'estimated_total_cost' => $estimatedTotalCost,
-                'currency' => 'PHP',
-                'payment_terms' => $request->input('payment_terms'),
-                'expected_selling_price' => $expectedSellingPrice,
-                'expected_revenue' => $expectedRevenue,
-                'estimated_gross_margin' => round($estimatedGrossMargin, 1),
-                'tax_vat_estimate' => (float) $request->input('tax_vat_estimate', 0),
-                'logistics_cost' => (float) $request->input('logistics_cost', 0),
-                'urgency_level' => $request->input('urgency_level'),
-                'shelf_life' => $request->filled('shelf_life') ? (float) $request->input('shelf_life') : null,
-                'expected_spoilage' => $request->filled('expected_spoilage') ? (float) $request->input('expected_spoilage') : null,
-                'missed_sales_impact' => (float) $request->input('missed_sales_impact', 0),
-                'seasonal_tag' => $request->input('seasonal_tag'),
-                'demand_confidence' => $request->input('demand_confidence'),
-                'finance_recommendation' => $request->input('finance_recommendation'),
-                'recommended_qty' => $recommendedQty,
-                'recommended_budget' => $recommendedBudget,
-                'price_ceiling' => $request->filled('price_ceiling') ? (float) $request->input('price_ceiling') : null,
-                'suggested_supplier' => $request->input('suggested_supplier'),
-                'business_justification' => $request->input('business_justification'),
-                'approval_impact' => $request->input('approval_impact'),
-                'rejection_risk' => $request->input('rejection_risk'),
-                'additional_notes' => $request->input('additional_notes'),
-                'submitted_to_accounting_at' => $isDraft ? null : now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $fundingRequestId = DB::transaction(function () use ($ownerId, $employeeId, $isDraft, $columns, $lines) {
+                $id = DB::table('funding_requests')->insertGetId($columns + [
+                    'owner_id' => $ownerId,
+                    'finance_request_id' => $this->generateFinanceRequestId((int) date('Y')),
+                    'submitted_by_employee_id' => $employeeId,
+                    'requester_id' => $employeeId,
+                    'request_date' => now()->toDateString(),
+                    'request_status' => $isDraft ? 'Draft' : 'Pending',
+                    'submitted_to_accounting_at' => $isDraft ? null : now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $this->saveLines($id, $lines);
+                return $id;
+            });
 
             return response()->json([
                 'success' => true,
-                'message' => $isDraft ? 'Draft saved successfully' : 'Funding request submitted successfully',
+                'message' => $isDraft ? 'Draft saved' : 'Funding request sent to Finance',
                 'id' => $fundingRequestId,
             ], 201);
         } catch (Exception $e) {
             Log::error('Funding request store error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create funding request',
-                'error' => $e->getMessage(),
+                'message' => 'Couldn\'t save the funding request. Please try again.',
             ], 500);
         }
     }
@@ -423,6 +491,11 @@ class FundingRequestController extends Controller
 
             if (!$fundingRequest) return response()->json(['message' => 'Funding request not found'], 404);
 
+            $fundingRequest->items = DB::table('funding_request_items')
+                ->where('funding_request_id', $fundingRequest->id)
+                ->orderBy('id')
+                ->get(['id', 'product_id', 'product_name', 'sku', 'uom', 'current_stock', 'quantity', 'unit_cost', 'line_total']);
+
             return response()->json(['success' => true, 'data' => $fundingRequest], 200);
         } catch (Exception $e) {
             Log::error('Funding request show error: ' . $e->getMessage());
@@ -448,78 +521,30 @@ class FundingRequestController extends Controller
             if (!$fundingRequest) return response()->json(['message' => 'Funding request not found'], 404);
             if ($fundingRequest->request_status !== 'Draft') return response()->json(['message' => 'Only draft requests can be edited'], 400);
 
-            $approverId = $request->input('approver_id', $fundingRequest->approver_id ?? $fundingRequest->accounting_manager_id);
-            if ($response = $this->validateApprover($ownerId, $approverId)) {
+            // Saving keeps it a draft unless it's being sent to Finance now
+            $send = $request->boolean('submit', false);
+
+            [$error, $columns, $lines] = $this->buildRequest($request, $ownerId, !$send);
+            if ($error) return $error;
+
+            if ($response = $this->validateApprover($ownerId, $columns['approver_id'])) {
                 return $response;
             }
 
-            $currentStock = (float) $request->input('current_stock', 0);
-            $reservedStock = (float) $request->input('reserved_stock', 0);
-            $requiredQty = (float) $request->input('required_quantity', 0);
-            $requestedQty = (float) $request->input('requested_qty', 0);
-            $recommendedQty = (float) $request->input('recommended_qty', $requestedQty);
-            $estimatedUnitCost = (float) $request->input('estimated_unit_cost', 0);
-            $expectedSellingPrice = (float) $request->input('expected_selling_price', 0);
+            DB::transaction(function () use ($id, $columns, $lines, $send) {
+                DB::table('funding_requests')->where('id', $id)->update($columns + [
+                    'updated_at' => now(),
+                ] + ($send ? ['request_status' => 'Pending', 'submitted_to_accounting_at' => now()] : []));
+                $this->saveLines((int) $id, $lines);
+            });
 
-            $netAvailableStock = $currentStock - $reservedStock;
-            $stockShortageQty = max(0, $requiredQty - $netAvailableStock);
-            $estimatedTotalCost = $estimatedUnitCost * $requestedQty;
-            $expectedRevenue = $expectedSellingPrice * $requestedQty;
-            $estimatedGrossMargin = $expectedSellingPrice != 0
-                ? (($expectedSellingPrice - $estimatedUnitCost) / $expectedSellingPrice) * 100
-                : 0;
-            $recommendedBudget = $estimatedUnitCost * $recommendedQty;
-
-            DB::table('funding_requests')->where('id', $id)->update([
-                'accounting_manager_id' => $approverId,
-                'approver_id' => $approverId,
-                'related_sales_order_id' => $request->input('related_sales_order_id'),
-                'product_name' => $request->input('product_name'),
-                'flower_category' => $request->input('flower_category'),
-                'variant' => $request->input('variant'),
-                'requested_qty' => $requestedQty,
-                'uom' => $request->input('uom'),
-                'moq' => $request->input('moq'),
-                'preferred_supplier' => $request->input('preferred_supplier'),
-                'alternative_suppliers' => $request->input('alternative_suppliers'),
-                'required_delivery_date' => $request->input('required_delivery_date'),
-                'current_stock' => $currentStock,
-                'reserved_stock' => $reservedStock,
-                'net_available_stock' => $netAvailableStock,
-                'required_quantity' => $requiredQty,
-                'stock_shortage_qty' => $stockShortageQty,
-                'incoming_stock' => (float) $request->input('incoming_stock', 0),
-                'reason_for_shortage' => $request->input('reason_for_shortage'),
-                'estimated_unit_cost' => $estimatedUnitCost,
-                'estimated_total_cost' => $estimatedTotalCost,
-                'payment_terms' => $request->input('payment_terms'),
-                'expected_selling_price' => $expectedSellingPrice,
-                'expected_revenue' => $expectedRevenue,
-                'estimated_gross_margin' => round($estimatedGrossMargin, 1),
-                'tax_vat_estimate' => (float) $request->input('tax_vat_estimate', 0),
-                'logistics_cost' => (float) $request->input('logistics_cost', 0),
-                'urgency_level' => $request->input('urgency_level'),
-                'shelf_life' => $request->filled('shelf_life') ? (float) $request->input('shelf_life') : null,
-                'expected_spoilage' => $request->filled('expected_spoilage') ? (float) $request->input('expected_spoilage') : null,
-                'missed_sales_impact' => (float) $request->input('missed_sales_impact', 0),
-                'seasonal_tag' => $request->input('seasonal_tag'),
-                'demand_confidence' => $request->input('demand_confidence'),
-                'finance_recommendation' => $request->input('finance_recommendation'),
-                'recommended_qty' => $recommendedQty,
-                'recommended_budget' => $recommendedBudget,
-                'price_ceiling' => $request->filled('price_ceiling') ? (float) $request->input('price_ceiling') : null,
-                'suggested_supplier' => $request->input('suggested_supplier'),
-                'business_justification' => $request->input('business_justification'),
-                'approval_impact' => $request->input('approval_impact'),
-                'rejection_risk' => $request->input('rejection_risk'),
-                'additional_notes' => $request->input('additional_notes'),
-                'updated_at' => now(),
-            ]);
-
-            return response()->json(['success' => true, 'message' => 'Funding request updated successfully'], 200);
+            return response()->json([
+                'success' => true,
+                'message' => $send ? 'Funding request sent to Finance' : 'Draft saved',
+            ], 200);
         } catch (Exception $e) {
             Log::error('Funding request update error: ' . $e->getMessage());
-            return response()->json(['message' => 'Failed to update funding request'], 500);
+            return response()->json(['message' => 'Couldn\'t save the funding request. Please try again.'], 500);
         }
     }
 
@@ -566,6 +591,21 @@ class FundingRequestController extends Controller
             if ($fundingRequest->request_status !== 'Draft') return response()->json(['message' => 'Only draft requests can be submitted'], 400);
             if (!$fundingRequest->approver_id && !$fundingRequest->accounting_manager_id) {
                 return response()->json(['message' => 'An approver is required before submitting this request'], 422);
+            }
+
+            // A draft may have been saved half-filled: everything Finance needs must be there
+            $hasLines = DB::table('funding_request_items')->where('funding_request_id', $id)->exists();
+            $missing = array_filter([
+                'products' => !$hasLines && !$fundingRequest->product_name,
+                'a needed-by date' => !$fundingRequest->required_delivery_date,
+                'how it will be paid' => !$fundingRequest->payment_method && !$fundingRequest->payment_terms,
+                'the reason' => !$fundingRequest->reason_for_shortage,
+                'why it\'s needed' => !$fundingRequest->business_justification,
+            ]);
+            if ($missing) {
+                return response()->json([
+                    'message' => 'Edit the draft and add ' . implode(', ', array_keys($missing)) . ' before sending it.',
+                ], 422);
             }
 
             DB::table('funding_requests')->where('id', $id)->update([

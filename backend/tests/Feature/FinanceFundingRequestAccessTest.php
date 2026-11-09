@@ -18,9 +18,11 @@ class FinanceFundingRequestAccessTest extends TestCase
     {
         parent::setUp();
         $this->createAttendanceTables();
+        DB::statement('DROP TABLE IF EXISTS funding_request_items');
         DB::statement('DROP TABLE IF EXISTS funding_requests');
         foreach (['2026_02_07_085208_create_funding_requests_table', '2026_03_10_065051_add_linked_order_id_to_funding_requests_table',
-            '2026_04_02_120100_add_requester_and_approver_to_funding_requests_table', '2026_04_05_110000_add_payment_status_to_funding_requests_table'] as $m) {
+            '2026_04_02_120100_add_requester_and_approver_to_funding_requests_table', '2026_04_05_110000_add_payment_status_to_funding_requests_table',
+            '2026_11_09_120000_add_items_and_payment_method_to_funding_requests'] as $m) {
             (require base_path("database/migrations/{$m}.php"))->up();
         }
     }

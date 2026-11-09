@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\BelongsToOwner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FundingRequest extends Model
 {
@@ -49,6 +50,8 @@ class FundingRequest extends Model
         'estimated_total_cost',
         'currency',
         'payment_terms',
+        'payment_method',
+        'payment_channel',
         'expected_selling_price',
         'expected_revenue',
         'estimated_gross_margin',
@@ -157,6 +160,11 @@ class FundingRequest extends Model
     public function reviewedBy(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'reviewed_by_employee_id');
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(FundingRequestItem::class)->orderBy('id');
     }
 
     public function linkedOrder(): BelongsTo

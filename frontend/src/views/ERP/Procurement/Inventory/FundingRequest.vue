@@ -83,7 +83,7 @@
 
             <span class="fr-item">
               <b>{{ r.product_name }}</b>
-              <small>{{ [r.flower_category, r.variant].filter(Boolean).join(" · ") }}</small>
+              <small>{{ [r.flower_category, r.variant, r.payment_channel].filter(Boolean).join(" · ") }}</small>
               <small class="fr-qty">{{ Number(r.requested_qty || 0).toLocaleString("en-PH") }} {{ (r.uom || "units").toLowerCase() }}</small>
             </span>
 
