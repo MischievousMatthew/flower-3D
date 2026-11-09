@@ -177,4 +177,27 @@ class OrderScannerTest extends TestCase
         // The customer is told when it will complete
         $this->assertSame(now()->subDay()->addDays(3)->toDateString(), $service->completesAt(Delivery::withoutGlobalScopes()->find($fresh))->toDateString());
     }
+
+    public function test_deliveries_due_today_and_overdue_are_counted_and_filtered(): void
+    {
+        if (! Schema::hasColumn('orders', 'reservation_date')) {
+            Schema::table('orders', fn (Blueprint $t) => $t->date('reservation_date')->nullable());
+        }
+        $vendor = $this->shopOwner();
+        $today = now('Asia/Manila')->toDateString();
+        $set = function (int $id, string $date) {
+            DB::table('orders')->where('id', DB::table('deliveries')->where('id', $id)->value('order_id'))->update(['reservation_date' => $date]);
+        };
+        $set($this->delivery($vendor, 'to_processed', 'BLM-TODAY'), $today);
+        $set($this->delivery($vendor, 'to_ship', 'BLM-LATE'), now('Asia/Manila')->subDays(2)->toDateString());
+        $set($this->delivery($vendor, 'completed', 'BLM-DONE'), now('Asia/Manila')->subDays(3)->toDateString());
+        $set($this->delivery($vendor, 'pending', 'BLM-LATER'), now('Asia/Manila')->addDays(2)->toDateString());
+        $this->signIn($vendor);
+
+        $res = $this->getJson('/api/sc/orders?due=overdue')->assertOk()
+            ->assertJsonPath('status_counts.due_today', 1)
+            ->assertJsonPath('status_counts.overdue', 1);
+        $this->assertSame(['BLM-LATE'], array_column($res->json('data'), 'barcode'));
+        $this->assertSame(['BLM-TODAY'], array_column($this->getJson('/api/sc/orders?due=today')->json('data'), 'barcode'));
+    }
 }

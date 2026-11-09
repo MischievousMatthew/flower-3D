@@ -104,6 +104,23 @@
 
     <!-- ── Order stages, the same as the vendor's Orders page ────────── -->
     <template v-if="currentView !== 'requests'">
+      <section class="dl-due" aria-label="Due today and overdue">
+        <button
+          v-for="t in DUE_TILES"
+          :key="t.key"
+          type="button"
+          class="dl-due-tile"
+          :class="[`tone-${t.tone}`, { on: activeTab === t.key, hot: t.key === 'overdue' && counts.overdue, zero: !counts[t.key] }]"
+          @click="setStatusTab(t.key)"
+        >
+          <span class="dl-due-icon" v-html="ICONS[t.icon]"></span>
+          <span class="dl-due-text">
+            <span class="dl-due-label">{{ t.label }}</span>
+            <span class="dl-due-hint">{{ counts[t.key] ? t.hint : t.empty }}</span>
+          </span>
+          <strong>{{ counts[t.key] ?? 0 }}</strong>
+        </button>
+      </section>
       <section class="dl-pipe" aria-label="Orders by stage">
         <button
           v-for="(st, i) in PIPELINE"
@@ -227,6 +244,8 @@
               <span class="dl-items">{{ itemNames(d) || "—" }}</span>
               <span class="dl-meta">
                 <span v-if="d.order?.reservation_date" class="dl-date"><span v-html="ICONS.truck"></span>{{ dayText(d.order.reservation_date) }}</span>
+                <span v-if="lateDays(d) > 0" class="sp-chip red">{{ lateDays(d) }} {{ lateDays(d) === 1 ? "day" : "days" }} late</span>
+                <span v-else-if="lateDays(d) === 0" class="sp-chip green">Due today</span>
                 <span v-if="d.order?.store_name">{{ d.order.store_name }}</span>
                 <span v-if="d.photo_url" class="sp-chip teal"><span v-html="ICONS.image"></span>Photo taken</span>
                 <span v-else-if="d.status === 'to_ship'" class="sp-chip amber">Needs a photo</span>
@@ -947,10 +966,18 @@ const TRANSITIONS = {
     { value: "refunded", label: "Refunded" },
   ],
 };
-const TAB_EMPTY = { pending: "pending", to_processed: "being prepared", to_ship: "ready", to_received: "out for delivery", completed: "completed yet", returned: "returned" };
+const TAB_EMPTY = { pending: "pending", to_processed: "being prepared", to_ship: "ready", to_received: "out for delivery", completed: "completed yet", returned: "returned", due_today: "due today", overdue: "late" };
+
+const DUE_TILES = [
+  { key: "due_today", label: "Due today", hint: "Going out today", empty: "Nothing due today", icon: "calendar", tone: "green" },
+  { key: "overdue", label: "Overdue", hint: "Past their delivery date", empty: "Nothing late", icon: "alert", tone: "red" },
+];
+const DUE_FILTER = { due_today: "today", overdue: "overdue" };
 
 const statusTabs = [
   { value: "all", label: "All" },
+  { value: "due_today", label: "Due today" },
+  { value: "overdue", label: "Overdue" },
   { value: "pending", label: "Pending" },
   { value: "to_processed", label: "Preparing" },
   { value: "to_ship", label: "Ready" },
@@ -1163,7 +1190,8 @@ function debouncedFetchRequests() {
 async function fetchOrderPage(page) {
   {
     const params = { page, per_page: 20 };
-    if (activeTab.value !== "all") params.status = activeTab.value;
+    if (DUE_FILTER[activeTab.value]) params.due = DUE_FILTER[activeTab.value];
+    else if (activeTab.value !== "all") params.status = activeTab.value;
     if (search.value) params.search = search.value;
     const res = await deliveryService.scOrders(params);
     let raw = [];
@@ -1182,6 +1210,8 @@ async function fetchOrderPage(page) {
       completed: sc.completed ?? 0,
       returned: sc.returned ?? 0,
       refunded: sc.refunded ?? 0,
+      due_today: sc.due_today ?? 0,
+      overdue: sc.overdue ?? 0,
     };
     lastRefreshed.value = new Date().toLocaleTimeString();
     return { items: raw.filter(Boolean), lastPage: meta.value.last_page ?? 1, total: meta.value.total };
@@ -1428,6 +1458,14 @@ function setStatusTab(key) {
   activeTab.value = key;
   fetchOrders();
 }
+// Days past the delivery date for an order still on its way (0 = due today, -1 = not due yet)
+function lateDays(d) {
+  if (["completed", "returned", "refunded"].includes(d.status)) return -1;
+  const date = safeDate(d.order?.reservation_date);
+  if (!date) return -1;
+  const days = Math.round((new Date(new Date().toDateString()) - new Date(`${date}T00:00:00`)) / 86400000);
+  return days >= 0 ? days : -1;
+}
 const itemNames = (d) => (d.order?.items ?? []).map((i) => i.product_name).filter(Boolean).join(", ");
 const firstImage = (d) => (d.order?.items ?? []).find((i) => i.product_image)?.product_image ?? "";
 function dayText(ymd) {
@@ -1606,6 +1644,86 @@ onUnmounted(() => clearInterval(pollTimer));
 }
 
 /* ── Stages, like the vendor's Orders page ─────────────────────── */
+/* Due today and Overdue */
+.dl-due {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.dl-due-tile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--v-border);
+  border-radius: 16px;
+  background: var(--v-surface);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.dl-due-tile:hover,
+.dl-due-tile.on {
+  border-color: var(--tone);
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.06);
+}
+.dl-due-tile.on,
+.dl-due-tile.hot {
+  background: var(--tone-soft);
+}
+.dl-due-tile.hot {
+  border-color: var(--tone);
+}
+.dl-due-tile:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.dl-due-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--tone-soft);
+  color: var(--tone-ink);
+}
+.dl-due-tile.hot .dl-due-icon,
+.dl-due-tile.on .dl-due-icon {
+  background: var(--v-surface);
+}
+.dl-due-icon :deep(svg) {
+  width: 20px;
+  height: 20px;
+}
+.dl-due-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dl-due-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tone-ink);
+}
+.dl-due-hint {
+  font-size: 12px;
+  color: var(--v-muted);
+}
+.dl-due-tile strong {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--v-text);
+  font-variant-numeric: tabular-nums;
+}
+.dl-due-tile.zero strong {
+  color: var(--v-faint);
+}
+.tone-red { --tone: #fc8181; --tone-soft: var(--v-red-soft); --tone-ink: var(--v-red-text); }
 .dl-pipe {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -2030,6 +2148,11 @@ onUnmounted(() => clearInterval(pollTimer));
   }
   .dl-pipe-arrow {
     display: none;
+  }
+}
+@media (max-width: 560px) {
+  .dl-due {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 760px) {

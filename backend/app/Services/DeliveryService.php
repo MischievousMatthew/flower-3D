@@ -324,6 +324,10 @@ class DeliveryService
                 fn ($q) => $q->whereIn('status', array_slice(array_filter(explode(',', $filters['status'])), 0, 10))
             )
             ->when(
+                ! empty($filters['due']),
+                fn ($q) => $this->scopeDue($q, $filters['due'])
+            )
+            ->when(
                 ! empty($filters['search']),
                 fn ($q) => $q->where(function ($q) use ($filters) {
                     $q->where('delivery_id', 'like', "%{$filters['search']}%")
@@ -396,6 +400,10 @@ class DeliveryService
                 fn ($q) => $q->whereIn('status', array_slice(array_filter(explode(',', $filters['status'])), 0, 10))
             )
             ->when(
+                ! empty($filters['due']),
+                fn ($q) => $this->scopeDue($q, $filters['due'])
+            )
+            ->when(
                 ! empty($filters['search']),
                 fn ($q) => $q->where(function ($q) use ($filters) {
                     $q->where('delivery_id', 'like', "%{$filters['search']}%")
@@ -458,7 +466,32 @@ class DeliveryService
         // 'all' = sum of every status
         $counts['all'] = array_sum($counts);
 
+        // The same "due today" and "overdue" as the vendor's delivery schedule
+        foreach (['due_today' => 'today', 'overdue' => 'overdue'] as $key => $due) {
+            $counts[$key] = $this->scopeDue(
+                Delivery::query()->when($ownerId, fn ($q) => $q->whereHas('order', fn ($oq) => $oq->where('vendor_id', $ownerId))),
+                $due
+            )->count();
+        }
+
         return $counts;
+    }
+
+    /**
+     * Deliveries still on their way (not with the customer, returned or
+     * refunded) whose order is due today, or was due before today. Dates are
+     * the shop's (Manila), like the vendor's delivery schedule.
+     */
+    private function scopeDue($query, string $due)
+    {
+        $today = \Illuminate\Support\Carbon::today(\App\Models\VendorApplication::RESERVATION_TIMEZONE)->toDateString();
+
+        return $query
+            ->whereNotIn('status', ['completed', 'returned', 'refunded'])
+            ->whereHas('order', fn ($oq) => $oq
+                ->whereNotIn('status', ['cancelled', 'completed', 'returned', 'refunded'])
+                ->whereNotNull('reservation_date')
+                ->whereDate('reservation_date', $due === 'today' ? '=' : '<', $today));
     }
 
     private function scanAuditAttributes($timestamp): array

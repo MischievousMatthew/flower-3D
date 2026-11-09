@@ -45,6 +45,8 @@ class DeliveryController extends Controller
 
         $filters = $request->validate([
             'status'   => ['nullable', 'string'],
+            // Due today, or past the delivery date and not with the customer yet
+            'due'      => ['nullable', 'in:today,overdue'],
             'search'   => ['nullable', 'string', 'max:100'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
@@ -70,6 +72,8 @@ class DeliveryController extends Controller
         $filters = $request->validate([
             'status'   => ['nullable', 'string'],
             'search'   => ['nullable', 'string', 'max:100'],
+            // Due today, or past the delivery date and not with the customer yet
+            'due'      => ['nullable', 'in:today,overdue'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'page'     => ['nullable', 'integer', 'min:1'],
         ]);
