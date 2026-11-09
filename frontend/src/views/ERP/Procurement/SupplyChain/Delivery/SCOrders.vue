@@ -1,5 +1,6 @@
 <template>
   <div class="sc-orders-page">
+    <BarcodeModal ref="barcodeModalRef" />
 
     <!-- ── Header ─────────────────────────────────────────────────────── -->
     <div class="page-header">
@@ -264,6 +265,7 @@
               <span class="dl-top">
                 <strong>{{ d.order?.delivery_contact_name || "Customer" }}</strong>
                 <span class="dl-num">{{ d.order?.order_number ?? d.delivery_id }}</span>
+                <span v-if="d.barcode" class="dl-code">{{ d.barcode }}</span>
               </span>
               <span class="dl-items">{{ itemNames(d) || "—" }}</span>
               <span class="dl-meta">
@@ -284,6 +286,7 @@
             <div class="dl-actions">
               <button v-if="NEXT[d.status]" type="button" class="sp-btn sp-btn-primary sp-btn-sm" @click="openAdvance(d, NEXT[d.status].value)">{{ NEXT[d.status].label }}</button>
               <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="openDetail(d)">Details</button>
+              <button type="button" class="sp-icon-btn" title="Barcode" :aria-label="`Barcode for ${d.order?.order_number ?? d.delivery_id}`" @click="barcodeModalRef.open(d.order?.id, d.delivery_id)"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" width="16" height="16" aria-hidden="true"><path d="M3 4v12M6 4v12M8.5 4v12M11 4v12M14 4v12M17 4v12" /></svg></button>
               <button type="button" class="sp-icon-btn" title="History" :aria-label="`History of ${d.order?.order_number ?? d.delivery_id}`" @click="openLogs(d)"><span v-html="ICONS.history"></span></button>
             </div>
           </div>
@@ -647,6 +650,12 @@
                 ><span class="dm-meta-val mono">{{
                   detailModal.delivery.delivery_id
                 }}</span>
+              </div>
+              <div class="dm-meta-item">
+                <span class="dm-meta-label">Barcode</span>
+                <button type="button" class="dm-barcode-btn" @click="barcodeModalRef.open(detailModal.delivery.order?.id, detailModal.delivery.delivery_id)">
+                  <span class="mono">{{ detailModal.delivery.barcode || detailModal.delivery.delivery_id }}</span> · Show barcode
+                </button>
               </div>
               <div class="dm-meta-item">
                 <span class="dm-meta-label">Payment</span
@@ -1053,6 +1062,7 @@ import { toast } from "@/utils/snackbar";
 import { deliveryService } from "../../../../../services/deliveryService";
 import ReturnCasePanel from "../../../../../components/returns/ReturnCasePanel.vue";
 import DeliveryPhotoPicker from "../../../../../components/vendor/orders/DeliveryPhotoPicker.vue";
+import BarcodeModal from "../../../../../layouts/components/BarcodeModal.vue";
 import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopIcons";
 import Order3DModal from "../../../../../components/vendor/orders/Order3DModal.vue";
 import { bouquetFromItems, bouquetRecipe, isBouquetItem } from "../../../../../components/vendor/orders/orderUi";
@@ -1211,6 +1221,7 @@ const advanceModal = ref({ open: false, delivery: null, target: "", photo: null,
 const detailModal = ref({ open: false, delivery: null });
 const model3d = ref({ open: false, url: null, name: "" });
 const advancing = ref(false);
+const barcodeModalRef = ref(null);
 
 // ─── Calendar computed ────────────────────────────────────────────────────────
 const calYear = computed(() => calendarDate.value.getFullYear());
@@ -1944,6 +1955,28 @@ onUnmounted(() => clearInterval(pollTimer));
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
   color: var(--v-muted);
+}
+.dl-code {
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--v-subtle);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--v-muted);
+}
+.dm-barcode-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--bc-accent-deep);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.dm-barcode-btn:hover {
+  text-decoration: underline;
 }
 .dl-items {
   overflow: hidden;
