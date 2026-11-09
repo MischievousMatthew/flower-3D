@@ -644,9 +644,11 @@ class OrderService
 
     public function getApprovedFundingRequests(int $ownerId): \Illuminate\Support\Collection
     {
+        // With each product, so the list shows what Finance approved, not what was asked
         return FundingRequest::where('owner_id', $ownerId)
             ->where('request_status', 'Approved')
             ->whereNull('linked_order_id')
+            ->with('items')
             ->latest()
             ->get();
     }
@@ -694,7 +696,8 @@ class OrderService
                 $lines = [[
                     'product_id'   => $product?->id,
                     'product_name' => $funding->product_name,
-                    'quantity'     => (int) ($funding->recommended_qty ?? $funding->requested_qty),
+                    // What Finance approved, when they set it
+                    'quantity'     => (int) ($funding->approved_quantity ?: ($funding->recommended_qty ?? $funding->requested_qty)),
                     'price'        => (float) $funding->estimated_unit_cost,
                     'unit'         => $unitOf[$funding->uom] ?? 'stem',
                 ]];

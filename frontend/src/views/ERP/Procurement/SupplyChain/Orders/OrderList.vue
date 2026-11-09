@@ -109,8 +109,17 @@
                 <label v-for="fr in funding.requests" :key="fr.id" class="ol-fund" :class="{ on: funding.selected?.id === fr.id }">
                   <input v-model="funding.selected" type="radio" name="ol-fund" :value="fr" />
                   <span class="ol-fund-top"><b>{{ fr.product_name }}</b><span class="sp-chip green">Approved</span></span>
-                  <small>{{ fr.finance_request_id }} · {{ (fr.recommended_qty ?? fr.requested_qty)?.toLocaleString("en-PH") }} {{ fr.uom || "units" }} × {{ money(fr.estimated_unit_cost) }}</small>
-                  <strong>{{ money((fr.recommended_qty ?? fr.requested_qty) * fr.estimated_unit_cost) }}</strong>
+                  <small>{{ fr.finance_request_id }}<template v-if="fr.required_delivery_date"> · needed by {{ poDate(fr.required_delivery_date) }}</template></small>
+                  <ul class="ol-fund-lines">
+                    <li v-for="(l, li) in approvedLines(fr)" :key="li" :class="{ cut: l.qty < l.asked, none: !l.qty }">
+                      <span>{{ l.name }}</span>
+                      <span>{{ l.qty ? `${l.qty.toLocaleString("en-PH")}${l.qty < l.asked ? ` of ${l.asked.toLocaleString("en-PH")}` : ""} ${(l.uom || "units").toLowerCase()} × ${money(l.cost)}` : "Not approved" }}</span>
+                    </li>
+                  </ul>
+                  <span class="ol-fund-total">
+                    <strong>{{ money(fr.approved_amount ?? fr.estimated_total_cost) }}</strong>
+                    <small>approved by Finance<template v-if="Number(fr.approved_amount) !== Number(fr.estimated_total_cost)"> · asked {{ money(fr.estimated_total_cost) }}</template></small>
+                  </span>
                 </label>
               </div>
               <label v-if="funding.selected" class="sp-field">
@@ -246,6 +255,15 @@ function clearFilters() {
 }
 
 // ─── From approved funding (the existing flow) ───
+// What Finance approved for each product (older requests hold one product on the request)
+function approvedLines(fr) {
+  if (fr.items?.length) {
+    return fr.items.map((i) => ({ name: i.product_name, asked: Number(i.quantity), qty: Number(i.approved_quantity ?? i.quantity), uom: i.uom, cost: Number(i.unit_cost) }));
+  }
+  const asked = Number(fr.requested_qty) || 0;
+  return [{ name: fr.product_name, asked, qty: Number(fr.approved_quantity) || Number(fr.recommended_qty ?? asked), uom: fr.uom, cost: Number(fr.estimated_unit_cost) }];
+}
+
 async function openFunding() {
   funding.value = { loading: true, requests: [], selected: null, supplierId: "", busy: false, error: "" };
   try {
@@ -501,6 +519,41 @@ a.ol-row:focus-visible {
   max-height: 300px;
   margin: 6px 0 16px;
   overflow-y: auto;
+}
+.ol-fund-lines {
+  display: grid;
+  gap: 3px;
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+}
+.ol-fund-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--v-text-2);
+}
+.ol-fund-lines li span:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ol-fund-lines li.cut span:last-child {
+  color: var(--v-amber-text);
+}
+.ol-fund-lines li.none {
+  color: var(--v-muted);
+  text-decoration: line-through;
+}
+.ol-fund-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.ol-fund-total small {
+  font-size: 12px;
+  color: var(--v-muted);
 }
 .ol-fund {
   position: relative;
