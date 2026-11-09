@@ -61,7 +61,8 @@ class DeliveryController extends Controller
                 'total'        => $paginated->total(),
                 'per_page'     => $paginated->perPage(),
             ],
-            'status_counts' => $this->service->statusCounts(),
+            // This shop's own counts (they were every shop's)
+            'status_counts' => $this->service->statusCounts($vendorId),
         ]);
     }
 
