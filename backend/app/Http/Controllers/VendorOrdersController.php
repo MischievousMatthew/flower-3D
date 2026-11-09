@@ -616,6 +616,38 @@ class VendorOrdersController extends Controller
     /**
      * Update order status
      */
+    /** POST /vendor/orders/{orderId}/delivery-photo: the photo of the order before it goes out */
+    public function deliveryPhoto(Request $request, $orderId)
+    {
+        $request->validate([
+            // Cloudinary's free plan takes images up to 10 MB
+            'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+        ], [
+            'photo.required' => 'Take or choose a photo of the order.',
+            'photo.image' => 'That file isn\'t a photo.',
+            'photo.mimes' => 'Use a JPG, PNG or WebP photo.',
+            'photo.max' => 'The photo must be 10 MB or smaller.',
+        ]);
+
+        $order = Order::where('id', $orderId)->where('vendor_id', $request->user()->id)->with('delivery')->first();
+        if (! $order) {
+            return response()->json(['success' => false, 'message' => 'Order not found'], 404);
+        }
+
+        try {
+            $delivery = $order->delivery ?? $this->deliveryService->createForOrder($order->id);
+            $delivery = $this->deliveryService->attachPhoto($delivery, $request->file('photo'), $request->user()->name);
+        } catch (RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Photo saved.',
+            'data' => ['photo_url' => $delivery->photo_url, 'photo_taken_at' => $delivery->photo_taken_at?->toIso8601String()],
+        ]);
+    }
+
     public function updateOrderStatus(Request $request, $orderId)
     {
         try {

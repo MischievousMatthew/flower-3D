@@ -16,11 +16,13 @@
             <span class="sp-chip" :class="STATUS_TONE[action.to]">{{ targetLabel }}</span>
           </div>
           <p class="oa-text">{{ explanation }}</p>
+          <!-- A photo of the order before it goes out; the customer sees it -->
+          <DeliveryPhotoPicker v-if="needsPhoto" v-model:file="photo" :existing-url="order.photo_url || ''" :disabled="busy" class="oa-photo" />
           <p v-if="error" class="sp-error">{{ error }}</p>
           <div class="sp-modal-foot">
             <button type="button" class="sp-btn sp-btn-ghost" :disabled="busy" @click="close">Not now</button>
             <button type="button" class="sp-btn" :class="cancelling ? 'sp-btn-danger' : 'sp-btn-primary'" :disabled="busy" @click="confirm">
-              {{ busy ? "Saving…" : cancelling ? "Cancel order" : action.label }}
+              {{ busy ? (photo ? "Uploading photo…" : "Saving…") : cancelling ? "Cancel order" : action.label }}
             </button>
           </div>
         </div>
@@ -36,6 +38,7 @@ import api from "../../../plugins/axios";
 import { SHOP_ICONS as ICONS } from "../shop/shopIcons";
 import { apiMessage } from "../shop/useVendorCatalog";
 import { STATUS_TONE } from "./orderUi";
+import DeliveryPhotoPicker from "./DeliveryPhotoPicker.vue";
 
 // action: { to, label } from the order's `next` list, or { to: "cancelled" }
 const props = defineProps({ order: { type: Object, default: null }, action: { type: Object, default: null } });
@@ -45,7 +48,7 @@ const LABEL = { to_processed: "Preparing", to_ship: "Ready", to_received: "Out f
 const TEXT = {
   to_processed: "The customer sees that you've confirmed their order and started preparing it.",
   to_ship: "The arrangement is done and packed, waiting for the rider.",
-  to_received: "The order has left your shop. The customer can track it as out for delivery.",
+  to_received: "The order leaves your shop. Take a photo of it first: the customer sees it with their order and can track it as out for delivery.",
   completed: "The customer has received their order.",
   cancelled: "The customer is told the order was cancelled and any reserved stock goes back to your inventory. This can't be undone.",
 };
@@ -55,14 +58,31 @@ const error = ref("");
 const cancelling = computed(() => props.action?.to === "cancelled");
 const targetLabel = computed(() => LABEL[props.action?.to] ?? props.action?.to);
 const explanation = computed(() => TEXT[props.action?.to] ?? "");
+const needsPhoto = computed(() => props.action?.to === "to_received");
+const photo = ref(null);
 
-watch(() => props.action, () => (error.value = ""));
+watch(() => props.action, () => {
+  error.value = "";
+  photo.value = null;
+});
 
 async function confirm() {
   if (busy.value) return;
   busy.value = true;
   error.value = "";
   try {
+    if (needsPhoto.value) {
+      if (!photo.value && !props.order.photo_url) {
+        error.value = "Take or choose a photo of the order first. The customer sees it on their order.";
+        return;
+      }
+      if (photo.value) {
+        const fd = new FormData();
+        fd.append("photo", photo.value);
+        await api.post(`vendor/orders/${props.order.id}/delivery-photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+        photo.value = null;
+      }
+    }
     const { data } = await api.put(`vendor/orders/${props.order.id}/status`, { status: props.action.to });
     toast.success(cancelling.value ? `${props.order.order_number} cancelled.` : `${props.order.order_number}: ${targetLabel.value}.`);
     emit("done", data.data);
@@ -93,6 +113,9 @@ function close() {
 .oa-arrow :deep(svg) {
   width: 16px;
   height: 16px;
+}
+.oa-photo {
+  margin-top: 14px;
 }
 .oa-text {
   margin: 0;

@@ -409,6 +409,8 @@ class VendorFulfillmentController extends Controller
             }),
             'return_case' => $caseSummary,
             'case_open' => $caseOpen,
+            // The photo of the order, needed before it goes out for delivery
+            'photo_url' => $order->delivery?->photo_url,
             'next' => $next,
             'can_cancel' => $canCancel,
             'blocked_reason' => $caseOpen ? 'A return or refund is open on this order. Settle it first.'

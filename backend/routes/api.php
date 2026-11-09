@@ -532,6 +532,7 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/orders/statistics',       [VendorOrdersController::class, 'getOrderStatistics']);
             Route::get('/orders/{orderId}',        [VendorOrdersController::class, 'getOrderDetails']);
             Route::put('/orders/{orderId}/status', [VendorOrdersController::class, 'updateOrderStatus']);
+            Route::post('/orders/{orderId}/delivery-photo', [VendorOrdersController::class, 'deliveryPhoto']);
         });
 
         // Orders & Fulfillment pages
@@ -683,6 +684,7 @@ Route::middleware('token.auth')->group(function () {
 
     Route::prefix('deliveries')->group(function () {
         Route::patch('/{id}/status', [DeliveryController::class, 'updateStatus'])->middleware('employee.module:deliveries,edit');
+        Route::post('/{id}/photo',   [DeliveryController::class, 'photo'])->whereNumber('id')->middleware('employee.module:deliveries,edit');
         Route::get('/{id}/logs',     [DeliveryController::class, 'logs'])->middleware('employee.module:deliveries,view');
     });
 

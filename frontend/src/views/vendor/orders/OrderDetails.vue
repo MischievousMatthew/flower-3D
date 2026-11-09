@@ -106,6 +106,10 @@
         <aside class="od-col">
           <section class="sp-card" aria-label="Delivery">
             <div class="sp-card-head"><div><h2>Delivery</h2><p>{{ order.fulfillment.handled_by }}</p></div></div>
+            <figure v-if="order.photo_url" class="od-photo">
+              <img :src="order.photo_url" alt="Photo of the order before delivery" loading="lazy" />
+              <figcaption>Photo before delivery. The customer sees it on their order.</figcaption>
+            </figure>
             <div class="when" :class="{ late: isLate(order) }">
               <span class="when-icon" v-html="ICONS.calendar"></span>
               <div>
@@ -256,6 +260,23 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.od-photo {
+  margin: 0 0 14px;
+  overflow: hidden;
+  border: 1px solid var(--v-border);
+  border-radius: 14px;
+}
+.od-photo img {
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+}
+.od-photo figcaption {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--v-muted);
+}
 .od-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;

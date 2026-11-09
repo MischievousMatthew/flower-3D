@@ -25,6 +25,13 @@ export const deliveryService = {
 
   getLogs: (id) => api.get(`/deliveries/${id}/logs`),
 
+  // The photo of the order, taken or attached before it goes out for delivery
+  uploadPhoto: (id, file) => {
+    const fd = new FormData();
+    fd.append("photo", file);
+    return api.post(`/deliveries/${id}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+  },
+
   // ── Barcode for a delivery order ──────────────────────────────────────────
   getBarcode: (orderId) => api.get(`/sc/orders/${orderId}/barcode`),
 

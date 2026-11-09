@@ -202,6 +202,30 @@ class DeliveryController extends Controller
         }
     }
 
+    // ─── POST /api/v1/deliveries/{id}/photo ───────────────────────────────────
+    // The photo of the order, taken or attached before it goes out for delivery.
+    public function photo(Request $request, int $id): JsonResponse
+    {
+        $delivery = Delivery::findOrFail($id);
+        $request->validate([
+            // Cloudinary's free plan takes images up to 10 MB
+            'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+        ], [
+            'photo.required' => 'Take or choose a photo of the order.',
+            'photo.image' => 'That file isn\'t a photo.',
+            'photo.mimes' => 'Use a JPG, PNG or WebP photo.',
+            'photo.max' => 'The photo must be 10 MB or smaller.',
+        ]);
+
+        try {
+            $updated = $this->service->attachPhoto($delivery, $request->file('photo'), \App\Models\PurchaseOrderEvent::nameOf($request->user()));
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Photo saved.', 'delivery' => $this->formatDelivery($updated)]);
+    }
+
     // ─── GET /api/v1/deliveries/{id}/logs ─────────────────────────────────────
     // Full audit log for a delivery.
     public function logs(int $id): JsonResponse
@@ -246,6 +270,10 @@ class DeliveryController extends Controller
             'last_scanned_at' => $d->last_scanned_at?->toIso8601String(),
             'last_scanned_by' => $d->scanner?->name,
             'updated_at'      => $d->updated_at?->toIso8601String(),
+            // The photo of the order taken before it went out (the customer sees it)
+            'photo_url'       => $d->photo_url,
+            'photo_taken_at'  => $d->photo_taken_at?->toIso8601String(),
+            'photo_taken_by'  => $d->photo_taken_by,
             'order'           => $order ? [
                 'id'                     => $order->id,
                 'order_number'           => $order->order_number,

@@ -447,6 +447,15 @@
                   <ProductQuestions :order-id="order.id" />
                 </div>
 
+                <!-- The shop's photo of the order before it went out -->
+                <div class="ot-sec" v-if="order.delivery?.photo_url">
+                  <h4 class="ot-sec__title">Your order before delivery</h4>
+                  <a class="ot-photo" :href="order.delivery.photo_url" target="_blank" rel="noopener" aria-label="Open the photo of your order in full size">
+                    <img :src="order.delivery.photo_url" :alt="`Photo of order ${order.order_number} before delivery`" loading="lazy" />
+                  </a>
+                  <p class="ot-photo__note">{{ order.store_name || "The shop" }} took this photo before sending it out<template v-if="order.delivery.photo_taken_at"> · {{ fmtDT(order.delivery.photo_taken_at) }}</template>. Tap it to see it full size.</p>
+                </div>
+
                 <!-- Timeline -->
                 <div class="ot-sec" v-if="order.delivery?.timeline?.length">
                   <h4 class="ot-sec__title">Delivery Updates</h4>
@@ -2172,6 +2181,30 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.ot-photo {
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--line, #e2ddd5);
+  border-radius: 14px;
+  background: #f4f2ee;
+}
+.ot-photo img {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+}
+.ot-photo:focus-visible {
+  outline: 2px solid #4db173;
+  outline-offset: 2px;
+}
+.ot-photo__note {
+  margin: -6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft, #6b6560);
 }
 
 .ot-sec__title {

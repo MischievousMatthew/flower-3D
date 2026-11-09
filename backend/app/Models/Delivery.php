@@ -19,10 +19,15 @@ class Delivery extends Model
         'last_scanned_by',
         'last_scanned_at',
         'barcode',
+        'photo_url',
+        'photo_public_id',
+        'photo_taken_at',
+        'photo_taken_by',
     ];
 
     protected $casts = [
         'last_scanned_at' => 'datetime',
+        'photo_taken_at'  => 'datetime',
     ];
 
     // ─── Status FSM ──────────────────────────────────────────────────────────
@@ -65,11 +70,13 @@ class Delivery extends Model
         'refunded'     => 'refunded',
     ];
 
+    // The same words the vendor's Orders page uses
     const STATUS_LABELS = [
         'pending'      => 'Pending',
-        'to_processed' => 'To Process',
-        'to_ship'      => 'To Ship',
-        'to_receive'   => 'To Receive',
+        'to_processed' => 'Preparing',
+        'to_ship'      => 'Ready',
+        'to_received'  => 'Out for delivery',
+        'to_receive'   => 'Out for delivery',
         'completed'    => 'Completed',
         'returned'     => 'Returned',
         'refunded'     => 'Refunded',

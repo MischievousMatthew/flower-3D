@@ -1,13 +1,11 @@
 <template>
   <div class="sc-orders-page">
-    <LoadingOverlay :visible="isLoading" :message="isLoadingMessage" />
-    <BarcodeModal ref="barcodeModalRef" />
 
     <!-- ── Header ─────────────────────────────────────────────────────── -->
     <div class="page-header">
       <div>
-        <h1 class="page-title">Delivery Orders</h1>
-        <p class="page-sub">Real-time delivery tracking across all vendors</p>
+        <h1 class="page-title">Deliveries</h1>
+        <p class="page-sub">Prepare each order, photograph it, send it out and track it until the customer has it.</p>
       </div>
       <div class="header-right">
         <!-- View toggle — table / calendar / requests -->
@@ -16,7 +14,7 @@
             class="view-btn"
             :class="{ active: currentView === 'table' }"
             @click="currentView = 'table'"
-            title="Table view"
+            title="Orders"
           >
             <svg
               viewBox="0 0 20 20"
@@ -29,7 +27,7 @@
               <rect x="2" y="8" width="16" height="4" rx="1" />
               <rect x="2" y="14" width="16" height="4" rx="1" />
             </svg>
-            Table
+            Orders
           </button>
           <!-- <button
             class="view-btn"
@@ -54,7 +52,7 @@
             class="view-btn"
             :class="{ active: currentView === 'requests' }"
             @click="switchToRequests"
-            title="Return & Refund Requests"
+            title="Returns and refunds"
           >
             <svg
               viewBox="0 0 20 20"
@@ -70,7 +68,7 @@
                 stroke-linejoin="round"
               />
             </svg>
-            Requests
+            Returns & refunds
             <span v-if="reqCounts.needs_shop > 0" class="view-btn-badge">{{
               reqCounts.needs_shop
             }}</span>
@@ -103,60 +101,31 @@
       </div>
     </div>
 
-    <!-- ── KPI strip (table/calendar views only) ─────────────────────── -->
-    <div class="kpi-strip" v-if="currentView !== 'requests'">
-      <div
-        v-for="tab in statusTabs"
-        :key="tab.value"
-        class="kpi-card"
-        :class="[tab.color, { active: activeTab === tab.value }]"
-        @click="
-          activeTab = tab.value;
-          fetchOrders();
-        "
-      >
-        <div class="kpi-icon-box" :class="tab.color">
-          <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
-            <path
-              v-if="tab.value === 'all'"
-              d="M3 4h14v2H3zm0 5h14v2H3zm0 5h14v2H3z"
-            />
-            <path
-              v-else-if="tab.value === 'pending'"
-              d="M10 2a8 8 0 100 16A8 8 0 0010 2zm1 9H9V5h2v6zm0 2H9v2h2v-2z"
-            />
-            <path
-              v-else-if="tab.value === 'to_processed'"
-              d="M4 3h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1zm6 3l-4 4h3v4h2v-4h3l-4-4z"
-            />
-            <path
-              v-else-if="tab.value === 'to_ship'"
-              d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm7 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM1 2h2l2.4 9h8.4l1.8-6H6.3L5.7 3H1V2zm5 7h7l-1.1 4H7L6 9z"
-            />
-            <path
-              v-else-if="tab.value === 'to_received'"
-              d="M10.707 2.293a1 1 0 00-1.414 0l-7 7A1 1 0 003 11h1v6a1 1 0 001 1h4v-4h2v4h4a1 1 0 001-1v-6h1a1 1 0 00.707-1.707l-7-7z"
-            />
-            <path
-              v-else-if="tab.value === 'completed'"
-              d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z"
-            />
-            <path
-              v-else-if="['returned', 'refunded'].includes(tab.value)"
-              fill-rule="evenodd"
-              d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 110 14 1 1 0 110-2 5 5 0 100-10H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-              clip-rule="evenodd"
-            />
-          </svg>
-        </div>
-        <div class="kpi-text">
-          <span class="kpi-label">{{ tab.label }}</span>
-          <span class="kpi-num">{{
-            String(counts[tab.value] ?? 0).padStart(1, "0")
-          }}</span>
+    <!-- ── Order stages, the same as the vendor's Orders page ────────── -->
+    <template v-if="currentView !== 'requests'">
+      <section class="dl-pipe" aria-label="Orders by stage">
+        <button
+          v-for="(st, i) in PIPELINE"
+          :key="st.key"
+          type="button"
+          class="dl-pipe-step"
+          :class="[`tone-${st.tone}`, { on: activeTab === st.key }]"
+          @click="setStatusTab(st.key)"
+        >
+          <span class="dl-pipe-label"><span class="dl-pipe-dot"></span>{{ st.label }}</span>
+          <strong>{{ counts[st.key] ?? 0 }}</strong>
+          <span class="dl-pipe-hint">{{ st.hint }}</span>
+          <span v-if="i < PIPELINE.length - 1" class="dl-pipe-arrow" aria-hidden="true" v-html="ICONS.chevronRight"></span>
+        </button>
+      </section>
+      <div class="dl-tabs">
+        <div class="sp-seg" role="tablist" aria-label="Filter deliveries">
+          <button v-for="t in statusTabs" :key="t.value" type="button" role="tab" :aria-selected="activeTab === t.value" :class="{ on: activeTab === t.value }" @click="setStatusTab(t.value)">
+            {{ t.label }}<span class="count">{{ counts[t.value] ?? 0 }}</span>
+          </button>
         </div>
       </div>
-    </div>
+    </template>
 
     <!-- ── Requests KPI strip ─────────────────────────────────────────── -->
     <div class="kpi-strip" v-if="currentView === 'requests'">
@@ -268,147 +237,60 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════════
-         TABLE VIEW
+         LIST VIEW
     ══════════════════════════════════════════════════════════════════ -->
-    <div v-if="currentView === 'table'" class="card">
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Delivery ID</th>
-              <th>Order</th>
-              <th>Items</th>
-              <th>Status</th>
-              <th>Last Scan</th>
-              <th>Scanned By</th>
-              <th>Updated</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="loading">
-              <td colspan="8" class="loading-row">
-                <div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div>
-              </td>
-            </tr>
-            <tr v-else-if="!orders.length">
-              <td colspan="8" class="empty-row">No deliveries found</td>
-            </tr>
-            <tr v-for="d in orders" :key="d.id" class="data-row">
-              <td>
-                <div class="delivery-cell">
-                  <span class="delivery-id-text">{{ d.delivery_id }}</span>
-                  <span class="barcode-text">{{ d.barcode }}</span>
-                </div>
-              </td>
-              <td>
-                <div class="order-cell">
-                  <span class="order-ref">
-                    <template v-if="d.order?.order_number">{{
-                      d.order.order_number
-                    }}</template>
-                    <template v-else-if="d.order?.id"
-                      >#{{ d.order.id }}</template
-                    >
-                    <template v-else>—</template>
-                  </span>
-                  <span class="order-amount"
-                    >₱{{ Number(d.order?.total_amount ?? 0).toFixed(2) }}</span
-                  >
-                </div>
-              </td>
-              <td>
-                <span class="items-count"
-                  >{{
-                    d.order?.items_count ?? d.order?.items?.length ?? "—"
-                  }}
-                  items</span
-                >
-              </td>
-              <td>
-                <span class="status-badge" :class="d.status">{{
-                  d.status_label
-                }}</span>
-              </td>
-              <td class="muted-cell">{{ formatTime(d.last_scanned_at) }}</td>
-              <td class="muted-cell">{{ d.last_scanned_by ?? "—" }}</td>
-              <td class="muted-cell">{{ formatTime(d.updated_at) }}</td>
-              <td>
-                <div class="action-cell">
-                  <button
-                    class="action-btn detail-btn"
-                    title="View order details"
-                    @click="openDetail(d)"
-                  >
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      width="14"
-                    >
-                      <circle cx="10" cy="10" r="8" />
-                      <path d="M10 7v3l2 2" />
-                    </svg>
-                  </button>
-                  <button
-                    class="action-btn barcode-btn"
-                    title="Show barcode"
-                    @click="barcodeModalRef.open(d.order?.id, d.delivery_id)"
-                  >
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      width="14"
-                    >
-                      <path
-                        d="M3 3h2v14H3zM7 3h1v14H7zM10 3h2v14h-2zM14 3h1v14h-1zM16 3h1v14h-1z"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    class="action-btn logs-btn"
-                    title="View logs"
-                    @click="openLogs(d)"
-                  >
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      width="14"
-                    >
-                      <path d="M4 6h12M4 10h12M4 14h8" />
-                    </svg>
-                  </button>
-                  <button
-                    v-if="
-                      !['completed', 'returned', 'refunded'].includes(d.status)
-                    "
-                    class="action-btn advance-btn"
-                    title="Advance status"
-                    @click="openAdvance(d)"
-                  >
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      width="14"
-                    >
-                      <path d="M5 10h10M11 5l5 5-5 5" />
-                    </svg>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    <section v-if="currentView === 'table'" class="sp-card dl-list-card" aria-label="Deliveries">
+      <ul v-if="loading && !orders.length" class="dl-list">
+        <li v-for="n in 5" :key="n" class="dl-row">
+          <div class="bc-skeleton dl-thumb"></div>
+          <div class="dl-grow"><div class="bc-skeleton sp-sk-line w30"></div><div class="bc-skeleton sp-sk-line w70"></div></div>
+          <div class="bc-skeleton dl-sk-btn"></div>
+        </li>
+      </ul>
+      <div v-else-if="!orders.length" class="sp-empty">
+        <span class="sp-empty-icon" v-html="ICONS.truck"></span>
+        <h3>{{ search ? "No deliveries match" : activeTab === "all" ? "No deliveries yet" : `Nothing ${TAB_EMPTY[activeTab] ?? "here"}` }}</h3>
+        <p>{{ search ? "Try another order number or customer." : "Orders show up here once customers check out." }}</p>
       </div>
+      <ul v-else class="dl-list" :class="{ dim: loading }">
+        <li v-for="d in orders" :key="d.id" class="dl-row">
+          <button type="button" class="dl-main" @click="openDetail(d)">
+            <span class="dl-thumb-wrap">
+              <img v-if="d.photo_url || firstImage(d)" :src="d.photo_url || firstImage(d)" :alt="d.photo_url ? 'Photo of the order' : itemNames(d)" class="dl-thumb" loading="lazy" />
+              <span v-else class="dl-thumb blank" v-html="ICONS.flower"></span>
+              <span v-if="(d.order?.items_count ?? 0) > 1" class="dl-thumb-count">×{{ d.order.items_count }}</span>
+            </span>
+            <span class="dl-text">
+              <span class="dl-top">
+                <strong>{{ d.order?.delivery_contact_name || "Customer" }}</strong>
+                <span class="dl-num">{{ d.order?.order_number ?? d.delivery_id }}</span>
+              </span>
+              <span class="dl-items">{{ itemNames(d) || "—" }}</span>
+              <span class="dl-meta">
+                <span v-if="d.order?.reservation_date" class="dl-date"><span v-html="ICONS.truck"></span>{{ dayText(d.order.reservation_date) }}</span>
+                <span v-if="d.order?.store_name">{{ d.order.store_name }}</span>
+                <span v-if="d.photo_url" class="sp-chip teal"><span v-html="ICONS.image"></span>Photo taken</span>
+                <span v-else-if="d.status === 'to_ship'" class="sp-chip amber">Needs a photo</span>
+                <span class="dl-updated">Updated {{ formatTime(d.updated_at) }}</span>
+              </span>
+            </span>
+          </button>
+          <div class="dl-side">
+            <div class="dl-money">
+              <strong>₱{{ Number(d.order?.total_amount ?? 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong>
+              <span>{{ paymentLabel(d.order?.payment_method) }}<template v-if="d.order?.payment_status === 'paid'"> · paid</template></span>
+            </div>
+            <span class="sp-chip" :class="STATUS_TONE[d.status] ?? 'slate'">{{ STATUS_LABEL[d.status] ?? d.status_label }}</span>
+            <div class="dl-actions">
+              <button v-if="NEXT[d.status]" type="button" class="sp-btn sp-btn-primary sp-btn-sm" @click="openAdvance(d, NEXT[d.status].value)">{{ NEXT[d.status].label }}</button>
+              <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="openDetail(d)">Details</button>
+              <button type="button" class="sp-icon-btn" title="History" :aria-label="`History of ${d.order?.order_number ?? d.delivery_id}`" @click="openLogs(d)"><span v-html="ICONS.history"></span></button>
+            </div>
+          </div>
+        </li>
+      </ul>
       <ShowMore v-if="orders.length" tone="vendor" :has-more="orderPager.hasMore.value" :loading="orderPager.loadingMore.value" :shown="orders.length" :total="orderPager.total.value" @more="orderPager.showMore()" />
-    </div>
+    </section>
 
     <!-- ══════════════════════════════════════════════════════════════════
          CALENDAR VIEW
@@ -755,17 +637,15 @@
             </button>
           </div>
           <div class="dm-body" v-if="detailModal.delivery">
+            <figure v-if="detailModal.delivery.photo_url" class="dm-photo">
+              <img :src="detailModal.delivery.photo_url" alt="Photo of the order before delivery" />
+              <figcaption>Photo before delivery<template v-if="detailModal.delivery.photo_taken_by"> · {{ detailModal.delivery.photo_taken_by }}</template><template v-if="detailModal.delivery.photo_taken_at"> · {{ formatTime(detailModal.delivery.photo_taken_at) }}</template>. The customer sees this on their order.</figcaption>
+            </figure>
             <div class="dm-meta-grid">
               <div class="dm-meta-item">
                 <span class="dm-meta-label">Delivery ID</span
                 ><span class="dm-meta-val mono">{{
                   detailModal.delivery.delivery_id
-                }}</span>
-              </div>
-              <div class="dm-meta-item">
-                <span class="dm-meta-label">Barcode</span
-                ><span class="dm-meta-val mono">{{
-                  detailModal.delivery.barcode
                 }}</span>
               </div>
               <div class="dm-meta-item">
@@ -1061,48 +941,41 @@
       </div>
     </teleport>
 
-    <!-- Advance Status Modal -->
-    <teleport to="body">
-      <div
-        v-if="advanceModal.open"
-        class="modal-backdrop"
-        @click.self="advanceModal.open = false"
-      >
-        <div class="advance-modal">
-          <div class="modal-header">
-            <h2>Advance Delivery Status</h2>
-            <button class="modal-close" @click="advanceModal.open = false">
-              ✕
-            </button>
-          </div>
-          <div class="advance-body">
-            <p class="advance-hint">
-              Delivery
-              <strong>{{ advanceModal.delivery?.delivery_id }}</strong> is
-              currently
-              <span
-                class="status-badge"
-                :class="advanceModal.delivery?.status"
-                >{{ advanceModal.delivery?.status_label }}</span
-              >
-            </p>
-            <p class="advance-hint">Move to:</p>
-            <div class="advance-options">
-              <button
-                v-for="opt in advanceOptions(advanceModal.delivery)"
-                :key="opt.value"
-                class="advance-opt-btn"
-                :class="opt.value"
-                @click="doAdvance(opt.value)"
-                :disabled="advancing"
-              >
-                {{ opt.label }}
+    <!-- Next step -->
+    <Teleport to="body">
+      <Transition name="sp-fade"><div v-if="advanceModal.open" class="sp-backdrop" @click="closeAdvance"></div></Transition>
+      <Transition name="sp-pop">
+        <div v-if="advanceModal.open" class="sp-modal-wrap">
+          <form class="sp-modal dl-adv" role="dialog" aria-modal="true" aria-labelledby="dl-adv-title" novalidate @submit.prevent="confirmAdvance">
+            <div class="sp-modal-head">
+              <div>
+                <h3 id="dl-adv-title">{{ advanceTitle }}</h3>
+                <p>{{ advanceModal.delivery?.order?.order_number ?? advanceModal.delivery?.delivery_id }} · {{ advanceModal.delivery?.order?.delivery_contact_name || "Customer" }} · now <b>{{ STATUS_LABEL[advanceModal.delivery?.status] }}</b></p>
+              </div>
+              <button type="button" class="sp-icon-btn" aria-label="Close" @click="closeAdvance"><span v-html="ICONS.close"></span></button>
+            </div>
+
+            <!-- More than one way to go (after completion): pick one -->
+            <div v-if="advanceOptions(advanceModal.delivery).length > 1" class="dl-adv-pick" role="radiogroup" aria-label="Move to">
+              <label v-for="opt in advanceOptions(advanceModal.delivery)" :key="opt.value" class="dl-adv-opt" :class="{ on: advanceModal.target === opt.value }">
+                <input v-model="advanceModal.target" type="radio" :value="opt.value" />{{ opt.label }}
+              </label>
+            </div>
+            <p v-else class="dl-adv-text">{{ ADVANCE_TEXT[advanceModal.target] }}</p>
+
+            <DeliveryPhotoPicker v-if="advanceModal.target === 'to_received'" v-model:file="advanceModal.photo" :existing-url="advanceModal.delivery?.photo_url || ''" :disabled="advancing" />
+
+            <p v-if="advanceModal.error" class="sp-error" role="alert">{{ advanceModal.error }}</p>
+            <div class="sp-modal-foot">
+              <button type="button" class="sp-btn sp-btn-ghost" :disabled="advancing" @click="closeAdvance">Cancel</button>
+              <button type="submit" class="sp-btn sp-btn-primary" :disabled="advancing || !advanceModal.target">
+                {{ advancing ? (advanceModal.photo ? "Uploading photo…" : "Saving…") : (NEXT_LABEL[advanceModal.target] ?? "Save") }}
               </button>
             </div>
-          </div>
+          </form>
         </div>
-      </div>
-    </teleport>
+      </Transition>
+    </Teleport>
 
     <!-- ── NEW: Media Proof Modal ───────────────────────────────────────── -->
     <teleport to="body">
@@ -1179,8 +1052,8 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { toast } from "@/utils/snackbar";
 import { deliveryService } from "../../../../../services/deliveryService";
 import ReturnCasePanel from "../../../../../components/returns/ReturnCasePanel.vue";
-import LoadingOverlay from "../../../../../layouts/components/LoadingOverlay.vue";
-import BarcodeModal from "../../../../../layouts/components/BarcodeModal.vue";
+import DeliveryPhotoPicker from "../../../../../components/vendor/orders/DeliveryPhotoPicker.vue";
+import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopIcons";
 import Order3DModal from "../../../../../components/vendor/orders/Order3DModal.vue";
 import { bouquetFromItems, bouquetRecipe, isBouquetItem } from "../../../../../components/vendor/orders/orderUi";
 import "../../../../../components/vendor/shop/shop.css";
@@ -1188,25 +1061,57 @@ import "../../../../../components/vendor/shop/shop.css";
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DAY_HEADERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+// The same stages and words as the vendor's Orders page
+const STATUS_LABEL = {
+  pending: "Pending",
+  to_processed: "Preparing",
+  to_ship: "Ready",
+  to_received: "Out for delivery",
+  completed: "Completed",
+  returned: "Returned",
+  refunded: "Refunded",
+};
+const STATUS_TONE = { pending: "amber", to_processed: "blue", to_ship: "violet", to_received: "teal", completed: "green", returned: "red", refunded: "red" };
+const PIPELINE = [
+  { key: "pending", label: "Pending", hint: "Confirm them", tone: "amber" },
+  { key: "to_processed", label: "Preparing", hint: "Being arranged", tone: "blue" },
+  { key: "to_ship", label: "Ready", hint: "Photo, then send out", tone: "violet" },
+  { key: "to_received", label: "Out for delivery", hint: "On the way", tone: "teal" },
+];
+// The one next step from each stage
+const NEXT = {
+  pending: { value: "to_processed", label: "Start preparing" },
+  to_processed: { value: "to_ship", label: "Mark ready" },
+  to_ship: { value: "to_received", label: "Send out for delivery" },
+  to_received: { value: "completed", label: "Mark delivered" },
+};
+const NEXT_LABEL = { to_processed: "Start preparing", to_ship: "Mark ready", to_received: "Send out for delivery", completed: "Mark delivered", returned: "Mark returned", refunded: "Mark refunded" };
+const ADVANCE_TEXT = {
+  to_processed: "The order is confirmed and the shop starts arranging it.",
+  to_ship: "The order is arranged and waiting for the rider.",
+  to_received: "The order leaves the shop. Take a photo of it first: the customer sees it on their order.",
+  completed: "The customer has the order.",
+};
 const TRANSITIONS = {
-  pending: [{ value: "to_processed", label: "Mark Processed" }],
-  to_processed: [{ value: "to_ship", label: "Mark To Ship" }],
-  to_ship: [{ value: "to_received", label: "Mark Received" }],
-  to_received: [{ value: "completed", label: "Complete" }],
+  pending: [{ value: "to_processed", label: "Preparing" }],
+  to_processed: [{ value: "to_ship", label: "Ready" }],
+  to_ship: [{ value: "to_received", label: "Out for delivery" }],
+  to_received: [{ value: "completed", label: "Completed" }],
   completed: [
     { value: "returned", label: "Returned" },
     { value: "refunded", label: "Refunded" },
   ],
 };
+const TAB_EMPTY = { pending: "pending", to_processed: "being prepared", to_ship: "ready", to_received: "out for delivery", completed: "completed yet", returned: "returned" };
 
 const statusTabs = [
-  { value: "all", label: "All", color: "kpi-gray" },
-  { value: "pending", label: "Pending", color: "kpi-amber" },
-  { value: "to_processed", label: "To Processed", color: "kpi-blue" },
-  { value: "to_ship", label: "To Ship", color: "kpi-indigo" },
-  { value: "to_received", label: "To Received", color: "kpi-purple" },
-  { value: "completed", label: "Completed", color: "kpi-green" },
-  { value: "returned", label: "Returned", color: "kpi-red" },
+  { value: "all", label: "All" },
+  { value: "pending", label: "Pending" },
+  { value: "to_processed", label: "Preparing" },
+  { value: "to_ship", label: "Ready" },
+  { value: "to_received", label: "Out for delivery" },
+  { value: "completed", label: "Completed" },
+  { value: "returned", label: "Returned" },
 ];
 
 // NEW: request filter tabs
@@ -1302,10 +1207,9 @@ const logsModal = ref({
   logs: [],
   loading: false,
 });
-const advanceModal = ref({ open: false, delivery: null });
+const advanceModal = ref({ open: false, delivery: null, target: "", photo: null, error: "" });
 const detailModal = ref({ open: false, delivery: null });
 const model3d = ref({ open: false, url: null, name: "" });
-const barcodeModalRef = ref(null);
 const advancing = ref(false);
 
 // ─── Calendar computed ────────────────────────────────────────────────────────
@@ -1626,8 +1530,55 @@ async function openLogs(delivery) {
     logsModal.value.loading = false;
   }
 }
-function openAdvance(delivery) {
-  advanceModal.value = { open: true, delivery };
+function openAdvance(delivery, target = "") {
+  const options = TRANSITIONS[delivery?.status] ?? [];
+  advanceModal.value = { open: true, delivery, target: target || (options.length === 1 ? options[0].value : ""), photo: null, error: "" };
+}
+function closeAdvance() {
+  if (!advancing.value) advanceModal.value.open = false;
+}
+const advanceTitle = computed(() => {
+  const t = advanceModal.value.target;
+  return t ? `${NEXT_LABEL[t] ?? "Move on"}?` : "Move the order on";
+});
+// "Out for delivery" needs a photo of the order: uploaded first, then the step
+async function confirmAdvance() {
+  const m = advanceModal.value;
+  m.error = "";
+  if (!m.target) return;
+  if (m.target === "to_received" && !m.photo && !m.delivery?.photo_url) {
+    m.error = "Take or choose a photo of the order first. The customer sees it on their order.";
+    return;
+  }
+  if (m.photo) {
+    advancing.value = true;
+    try {
+      const res = await deliveryService.uploadPhoto(m.delivery.id, m.photo);
+      m.delivery = res.data.delivery ?? m.delivery;
+      m.photo = null;
+    } catch (e) {
+      m.error = e?.response?.data?.errors?.photo?.[0] ?? e?.response?.data?.message ?? "The photo didn't upload. Try again.";
+      advancing.value = false;
+      return;
+    }
+    advancing.value = false;
+  }
+  await doAdvance(m.target);
+}
+function setStatusTab(key) {
+  activeTab.value = key;
+  fetchOrders();
+}
+const itemNames = (d) => (d.order?.items ?? []).map((i) => i.product_name).filter(Boolean).join(", ");
+const firstImage = (d) => (d.order?.items ?? []).find((i) => i.product_image)?.product_image ?? "";
+function dayText(ymd) {
+  const date = safeDate(ymd);
+  if (!date) return "";
+  const days = Math.round((new Date(`${date}T00:00:00`) - new Date(new Date().toDateString())) / 86400000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  if (days === -1) return "Yesterday";
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-PH", { month: "short", day: "numeric" });
 }
 function advanceOptions(delivery) {
   return TRANSITIONS[delivery?.status] ?? [];
@@ -1793,6 +1744,369 @@ onUnmounted(() => clearInterval(pollTimer));
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+/* ── Stages, like the vendor's Orders page ─────────────────────── */
+.dl-pipe {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.dl-pipe-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--v-border);
+  border-radius: 16px;
+  background: var(--v-surface);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.dl-pipe-step:hover,
+.dl-pipe-step.on {
+  border-color: var(--tone);
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.06);
+}
+.dl-pipe-step.on {
+  background: var(--tone-soft);
+}
+.dl-pipe-step:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.tone-amber { --tone: #f6ad55; --tone-soft: var(--v-amber-soft); --tone-ink: var(--v-amber-text); }
+.tone-blue { --tone: #63b3ed; --tone-soft: var(--v-blue-soft); --tone-ink: var(--v-blue-text); }
+.tone-violet { --tone: #b794f4; --tone-soft: var(--v-purple-soft); --tone-ink: var(--v-purple-text); }
+.tone-teal { --tone: #4fd1c5; --tone-soft: var(--v-teal-soft); --tone-ink: var(--v-teal-text); }
+.dl-pipe-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tone-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dl-pipe-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tone);
+}
+.dl-pipe-step strong {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--v-text);
+}
+.dl-pipe-hint {
+  font-size: 11.5px;
+  color: var(--v-faint);
+}
+.dl-pipe-arrow {
+  position: absolute;
+  right: -15px;
+  top: 50%;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: var(--v-subtle);
+  color: var(--v-faint);
+}
+.dl-pipe-arrow :deep(svg) {
+  width: 14px;
+  height: 14px;
+}
+.dl-tabs {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.dl-tabs .sp-seg {
+  flex-wrap: nowrap;
+}
+.dl-tabs .sp-seg button {
+  white-space: nowrap;
+}
+
+/* ── Delivery list ─────────────────────────────────────────────── */
+.dl-list-card {
+  padding: 6px;
+}
+.dl-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transition: opacity 0.2s;
+}
+.dl-list.dim {
+  opacity: 0.55;
+}
+.dl-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 14px;
+}
+.dl-row + .dl-row {
+  border-top: 1px solid var(--v-border);
+}
+.dl-row:hover {
+  background: var(--v-subtle);
+}
+.dl-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dl-main:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 4px;
+  border-radius: 10px;
+}
+.dl-thumb-wrap {
+  position: relative;
+  flex: none;
+}
+.dl-thumb {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--v-subtle);
+}
+.dl-thumb.blank {
+  color: var(--v-faint);
+}
+.dl-thumb.blank :deep(svg) {
+  width: 24px;
+  height: 24px;
+}
+.dl-thumb-count {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  padding: 1px 6px;
+  border: 2px solid var(--v-surface);
+  border-radius: 999px;
+  background: var(--v-text);
+  color: var(--v-surface);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.dl-grow {
+  flex: 1;
+  min-width: 0;
+}
+.dl-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.dl-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.dl-top strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--v-text);
+}
+.dl-num {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--v-muted);
+}
+.dl-items {
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--v-text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dl-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--v-muted);
+}
+.dl-meta .sp-chip :deep(svg),
+.dl-date :deep(svg) {
+  width: 13px;
+  height: 13px;
+}
+.dl-meta .sp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dl-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--v-text-2);
+  font-weight: 500;
+}
+.dl-updated {
+  color: var(--v-faint);
+}
+.dl-side {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.dl-money {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 110px;
+  text-align: right;
+}
+.dl-money strong {
+  font-size: 14px;
+  color: var(--v-text);
+  font-variant-numeric: tabular-nums;
+}
+.dl-money span {
+  font-size: 11.5px;
+  color: var(--v-muted);
+}
+.dl-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dl-sk-btn {
+  width: 110px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+/* ── Photo in the order details ────────────────────────────────── */
+.dm-photo {
+  margin: 0 0 16px;
+  overflow: hidden;
+  border: 1px solid var(--v-border);
+  border-radius: 14px;
+}
+.dm-photo img {
+  display: block;
+  width: 100%;
+  max-height: 300px;
+  object-fit: cover;
+}
+.dm-photo figcaption {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--v-muted);
+}
+
+/* ── Next step window ──────────────────────────────────────────── */
+.dl-adv {
+  max-width: 480px;
+}
+.dl-adv-text {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--v-text-2);
+}
+.dl-adv-pick {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.dl-adv-opt {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--v-border-strong);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--v-text);
+  cursor: pointer;
+}
+.dl-adv-opt input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.dl-adv-opt.on {
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
+  font-weight: 600;
+}
+.dl-adv-opt:has(input:focus-visible) {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.dl-adv :deep(.dpp) {
+  margin-bottom: 12px;
+}
+
+@media (max-width: 1100px) {
+  .dl-pipe {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dl-pipe-arrow {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .dl-row {
+    flex-wrap: wrap;
+  }
+  .dl-side {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding-left: 70px;
+  }
+  .dl-money {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dl-pipe-step,
+  .dl-list {
+    transition: none;
+  }
 }
 
 .page-header {

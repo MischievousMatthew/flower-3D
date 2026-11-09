@@ -84,6 +84,7 @@ class DeliveryService
             // ── 3. Validate the sequential prerequisite ────────────────────────
             //   e.g. you cannot scan "To Ship" if the order is still "Pending"
             $this->assertSequentialScan($delivery, $targetStatus);
+            $this->assertPhotoBeforeDelivery($delivery, $targetStatus);
 
             // ── 4. Apply the transition ────────────────────────────────────────
             $now = now();
@@ -167,6 +168,7 @@ class DeliveryService
                 "Invalid transition: {$delivery->status} → {$targetStatus}"
             );
         }
+        $this->assertPhotoBeforeDelivery($delivery, $targetStatus);
 
         return DB::transaction(function () use ($delivery, $targetStatus, $recordScanContext) {
             $now = now();
@@ -223,6 +225,43 @@ class DeliveryService
 
             return $delivery->fresh(['order', 'logs.scanner']);
         });
+    }
+
+    /**
+     * A photo of the order is taken (or attached) before it goes out for
+     * delivery; the customer sees it on their order.
+     */
+    public function assertPhotoBeforeDelivery(Delivery $delivery, string $targetStatus): void
+    {
+        if ($targetStatus === 'to_received' && blank($delivery->photo_url)) {
+            throw new RuntimeException('Take or attach a photo of the order before it goes out for delivery. The customer sees it on their order.');
+        }
+    }
+
+    /** Saves the photo of the order (replacing an earlier one) */
+    public function attachPhoto(Delivery $delivery, \Illuminate\Http\UploadedFile $photo, ?string $takenBy): Delivery
+    {
+        if (in_array($delivery->status, ['to_received', 'completed', 'returned', 'refunded'], true)) {
+            throw new RuntimeException('This order already went out for delivery, so its photo can no longer change.');
+        }
+        $store = app(ReceiptFileStore::class);
+        $saved = $store->store($photo, 'delivery-photos');
+        $old = $delivery->photo_public_id;
+        $delivery->update([
+            'photo_url' => $saved['url'],
+            'photo_public_id' => $saved['public_id'],
+            'photo_taken_at' => now(),
+            'photo_taken_by' => $takenBy,
+        ]);
+        if ($old && $old !== $saved['public_id']) {
+            try {
+                $store->remove($old);
+            } catch (\Throwable) {
+                // The new photo is saved; an old copy left behind is harmless
+            }
+        }
+
+        return $delivery->fresh(['order', 'logs.scanner']);
     }
 
     // ─── Private Helpers ───────────────────────────────────────────────────
