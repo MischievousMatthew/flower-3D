@@ -228,7 +228,7 @@ const URGENCY = [
   { value: "Critical", hint: "Orders are at risk now", tone: "red" },
 ];
 const METHODS = [
-  { value: "bank", label: "Online banking", hint: "BPI, UnionBank, BDO, Landbank, Metrobank", icon: "card" },
+  { value: "bank", label: "Online banking", hint: "QR Ph (any bank app), BPI, UnionBank, BDO…", icon: "card" },
   { value: "ewallet", label: "E-wallet", hint: "GCash, Maya, GrabPay, ShopeePay", icon: "wallet" },
 ];
 const BASE = "/procurement/inventory/funding-requests";

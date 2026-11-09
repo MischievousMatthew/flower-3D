@@ -60,13 +60,14 @@
             <fieldset class="fp-fieldset">
               <legend class="sp-label">Pay with</legend>
               <div v-for="(list, kind) in CHANNELS" :key="kind" class="fp-group">
-                <span class="fp-group-label">{{ kind === "bank" ? "Online banking" : "E-wallet" }}</span>
+                <span class="fp-group-label">{{ kind === "bank" ? "Bank" : "E-wallet" }}</span>
                 <div class="fp-chips">
                   <label v-for="c in list" :key="c" class="fp-chip" :class="{ on: form.payment_channel === c }">
                     <input v-model="form.payment_channel" type="radio" name="fp-channel" :value="c" />{{ c }}
                   </label>
                 </div>
               </div>
+              <small v-if="form.payment_channel === 'QR Ph'" class="sp-hint">PayMongo shows a QR code. Scan it with your bank or e-wallet app (BDO, BPI, Metrobank, GCash, Maya and others).</small>
               <small v-if="request.payment_channel && form.payment_channel !== request.payment_channel" class="sp-hint">Procurement asked for {{ request.payment_channel }}.</small>
             </fieldset>
             <label class="sp-field fp-amount">
@@ -177,7 +178,7 @@ watch(
       outcome: "refund",
       amount: isCredit.value ? p.value.supplier_owes : p.value.to_pay,
       paid_on: today,
-      payment_channel: CHANNELS.bank.includes(props.request.payment_channel) || CHANNELS.ewallet.includes(props.request.payment_channel) ? props.request.payment_channel : "GCash",
+      payment_channel: CHANNELS.bank.includes(props.request.payment_channel) || CHANNELS.ewallet.includes(props.request.payment_channel) ? props.request.payment_channel : "QR Ph",
       reference: "",
       note: "",
     });

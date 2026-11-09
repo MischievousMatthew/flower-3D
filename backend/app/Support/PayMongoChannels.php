@@ -8,7 +8,11 @@ namespace App\Support;
  */
 class PayMongoChannels
 {
+    // QR Ph: PayMongo shows a QR code the payer scans with almost any bank or e-wallet app
+    public const QR = 'QR Ph';
+
     public const BANK = [
+        'QR Ph' => 'qrph',
         'BPI' => 'dob',
         'UnionBank' => 'dob_ubp',
         'BDO' => 'brankas_bdo',
@@ -32,6 +36,12 @@ class PayMongoChannels
     public static function all(): array
     {
         return array_merge(array_keys(self::BANK), array_keys(self::EWALLET));
+    }
+
+    /** Accounts a supplier can be paid into: everything except QR Ph */
+    public static function payoutNames(): array
+    {
+        return array_values(array_diff(self::all(), [self::QR]));
     }
 
     public static function methodOf(string $channel): ?string

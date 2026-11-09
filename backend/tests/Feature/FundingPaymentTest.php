@@ -268,4 +268,17 @@ class FundingPaymentTest extends TestCase
         $this->assertSame('paid', $this->payment($id)['stage']);
         $this->assertSame('BC-R-' . str_pad((string) $row->id, 6, '0', STR_PAD_LEFT), $this->payment($id)['payments'][0]['receipt_number']);
     }
+
+    public function test_qr_ph_pays_from_any_bank_app_but_is_not_a_payout_account(): void
+    {
+        config(['services.paymongo.secret_key' => 'sk_test_x']);
+        $id = $this->request();
+        $this->approve($id)->assertOk();
+        $this->order($id, 'Pay before delivery', 'processing');
+        Http::fake(['*' => Http::response(['data' => ['id' => 'cs_2', 'attributes' => ['checkout_url' => 'https://checkout.paymongo.test/cs_2']]])]);
+
+        $this->postJson(self::BASE . "/{$id}/paymongo", ['amount' => 2100, 'payment_channel' => 'QR Ph'])->assertOk();
+        Http::assertSent(fn ($request) => $request['data']['attributes']['payment_method_types'] === ['qrph']);
+        $this->assertNotContains('QR Ph', \App\Support\PayMongoChannels::payoutNames());
+    }
 }

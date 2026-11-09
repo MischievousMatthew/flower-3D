@@ -238,7 +238,7 @@ class FundingRequestController extends Controller
 
     /** Banks and e-wallets Finance can pay through: only those PayMongo offers */
     public const PAYMENT_CHANNELS = [
-        'bank' => ['BPI', 'UnionBank', 'BDO', 'Landbank', 'Metrobank'],
+        'bank' => ['QR Ph', 'BPI', 'UnionBank', 'BDO', 'Landbank', 'Metrobank'],
         'ewallet' => ['GCash', 'Maya', 'GrabPay', 'ShopeePay'],
     ];
 

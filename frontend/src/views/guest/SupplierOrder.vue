@@ -245,7 +245,7 @@ import { useRoute } from "vue-router";
 import api from "../../plugins/axios";
 import AuthShell from "../../components/auth/AuthShell.vue";
 import AuthNotice from "../../components/auth/AuthNotice.vue";
-import { CHANNELS } from "../../components/procurement/paymongoChannels";
+import { PAYOUT_CHANNELS } from "../../components/procurement/paymongoChannels";
 
 /** A supplier answers a purchase order from the private link in its email (no account) */
 const STAGE = {
@@ -269,7 +269,7 @@ const deliveryDate = ref("");
 const note = ref("");
 const reason = ref("");
 const shipNote = ref("");
-const PROVIDERS = CHANNELS;
+const PROVIDERS = PAYOUT_CHANNELS;
 const acct = reactive({ useSaved: false, method: "bank", provider: "", name: "", number: "" });
 const editingAccount = ref(false);
 const declineOpen = ref(false);

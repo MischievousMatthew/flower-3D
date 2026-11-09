@@ -239,7 +239,7 @@ class SupplierOrderController extends Controller
         return [
             'use_saved' => ['nullable', 'boolean'],
             'payout_method' => ['nullable', 'in:bank,ewallet'],
-            'payout_provider' => [$useSaved ? 'nullable' : 'required_with:payout_account_number', 'nullable', 'string', \Illuminate\Validation\Rule::in(\App\Support\PayMongoChannels::all())],
+            'payout_provider' => [$useSaved ? 'nullable' : 'required_with:payout_account_number', 'nullable', 'string', \Illuminate\Validation\Rule::in(\App\Support\PayMongoChannels::payoutNames())],
             'payout_account_name' => [$useSaved ? 'nullable' : 'required_with:payout_account_number', 'nullable', 'string', 'max:120'],
             // Digits, with the spaces or dashes people type
             'payout_account_number' => [$useSaved ? 'nullable' : 'required_with:payout_provider', 'nullable', 'string', 'max:40', 'regex:/^[0-9 \-]{6,40}$/'],
