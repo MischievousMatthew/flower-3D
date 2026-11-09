@@ -14,12 +14,13 @@
     <!-- Summary -->
     <section class="dv-stats" aria-label="Delivery summary">
       <template v-if="!data">
-        <div v-for="n in 5" :key="n" class="sp-stat"><div class="bc-skeleton sp-stat-icon"></div><div class="grow"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-line w30"></div></div></div>
+        <div v-for="n in 5" :key="n" class="dv-tile"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton dv-sk-num"></div><div class="bc-skeleton sp-sk-line w70"></div></div>
       </template>
       <template v-else>
-        <div v-for="s in STATS" :key="s.key" class="sp-stat" :class="{ alert: s.key === 'overdue' && data.stats.overdue }">
-          <span class="sp-stat-icon" :class="s.tone" v-html="ICONS[s.icon]"></span>
-          <div><strong>{{ data.stats[s.key] }}</strong><span>{{ s.label }}</span></div>
+        <div v-for="s in STATS" :key="s.key" class="dv-tile" :class="[`tone-${s.tone}`, { alert: s.key === 'overdue' && data.stats.overdue, zero: !data.stats[s.key] }]">
+          <span class="dv-tile-label"><span class="dv-tile-icon" v-html="ICONS[s.icon]"></span>{{ s.label }}</span>
+          <strong>{{ data.stats[s.key] }}</strong>
+          <span class="dv-tile-hint">{{ s.hint }}</span>
         </div>
       </template>
     </section>
@@ -29,7 +30,8 @@
         <!-- Overdue -->
         <section v-if="data?.overdue.length" class="sp-card dv-day overdue" aria-label="Overdue">
           <header class="dv-day-head">
-            <div><h2>Overdue</h2><p>Past their delivery date and not delivered yet</p></div>
+            <span class="dv-date late" aria-hidden="true"><span v-html="ICONS.alert"></span></span>
+            <div class="dv-day-title"><h2>Overdue</h2><p>Past their delivery date and not with the customer yet</p></div>
             <span class="sp-chip red">{{ data.overdue.length }}</span>
           </header>
           <ul class="dv-list">
@@ -46,15 +48,20 @@
         <template v-else>
           <section v-for="d in visibleDays" :key="d.date" class="sp-card dv-day" :class="{ today: d.date === data.today }" :aria-label="dayLabel(d.date, { long: true })">
             <header class="dv-day-head">
-              <div>
-                <h2>{{ dayLabel(d.date, { long: true }) }}</h2>
+              <span class="dv-date" :class="{ today: d.date === data.today }" aria-hidden="true">
+                <small>{{ weekday(d.date) }}</small>
+                <b>{{ dayNum(d.date) }}</b>
+              </span>
+              <div class="dv-day-title">
+                <h2>{{ dayLabel(d.date, { long: true }) }}<span v-if="d.date === data.today" class="dv-today">Today</span></h2>
                 <p>{{ d.orders.length ? `${d.orders.length} ${d.orders.length === 1 ? "delivery" : "deliveries"}` : "Nothing going out" }}</p>
               </div>
               <div v-if="d.orders.length" class="cap" :title="`${d.orders.length} of ${data.fulfillment.max_orders_per_day} orders a day`">
+                <small>{{ d.orders.length >= data.fulfillment.max_orders_per_day ? "Fully booked" : `${data.fulfillment.max_orders_per_day - d.orders.length} spots left` }}</small>
                 <span class="cap-bar"><span :class="{ full: d.orders.length >= data.fulfillment.max_orders_per_day }" :style="{ width: `${Math.min(100, (d.orders.length / data.fulfillment.max_orders_per_day) * 100)}%` }"></span></span>
-                <small>{{ d.orders.length }}/{{ data.fulfillment.max_orders_per_day }}</small>
               </div>
             </header>
+            <p v-if="!d.orders.length" class="dv-none">Nothing to prepare or send this day.</p>
             <ul v-if="d.orders.length" class="dv-list">
               <DeliveryRow v-for="o in d.orders" :key="o.id" :order="o" @open="open" @act="act" />
             </ul>
@@ -80,11 +87,12 @@
         </section>
         <section class="sp-card legend" aria-label="What to do">
           <div class="sp-card-head"><div><h2>Order flow</h2></div></div>
-          <ol>
-            <li><span class="sp-chip amber">Pending</span>Confirm it</li>
-            <li><span class="sp-chip blue">Preparing</span>Arrange &amp; pack</li>
-            <li><span class="sp-chip violet">Ready</span>Hand to the rider</li>
-            <li><span class="sp-chip teal">Out for delivery</span>Mark delivered</li>
+          <ol class="flow">
+            <li><span class="flow-dot amber"></span><div><b>Pending</b><small>Confirm it and start preparing</small></div></li>
+            <li><span class="flow-dot blue"></span><div><b>Preparing</b><small>Arrange and pack it</small></div></li>
+            <li><span class="flow-dot violet"></span><div><b>Ready</b><small>Take a photo, then send it out</small></div></li>
+            <li><span class="flow-dot teal"></span><div><b>Out for delivery</b><small>The customer marks it received (or it completes after 3 days)</small></div></li>
+            <li><span class="flow-dot green"></span><div><b>Completed</b><small>The customer has it</small></div></li>
           </ol>
           <label class="done-toggle">
             <span class="sp-switch"><input v-model="includeDone" type="checkbox" @change="load" /><span></span></span>
@@ -112,12 +120,14 @@ import "../../../components/vendor/shop/shop.css";
 const router = useRouter();
 const RANGES = [7, 14, 30];
 const STATS = [
-  { key: "today", label: "Due today", icon: "calendar", tone: "tone-green" },
-  { key: "prepare_now", label: "Start preparing", icon: "clock", tone: "tone-amber" },
-  { key: "ready", label: "Ready to send", icon: "box", tone: "tone-violet" },
-  { key: "out", label: "Out for delivery", icon: "truck", tone: "tone-blue" },
-  { key: "overdue", label: "Overdue", icon: "alert", tone: "tone-red" },
+  { key: "today", label: "Due today", icon: "calendar", tone: "green", hint: "Going out today" },
+  { key: "prepare_now", label: "Start preparing", icon: "clock", tone: "amber", hint: "Needs work now" },
+  { key: "ready", label: "Ready to send", icon: "box", tone: "violet", hint: "Photo, then send out" },
+  { key: "out", label: "Out for delivery", icon: "truck", tone: "teal", hint: "Waiting for the customer" },
+  { key: "overdue", label: "Overdue", icon: "alert", tone: "red", hint: "Past their date" },
 ];
+const weekday = (ymd) => new Date(`${ymd}T00:00:00`).toLocaleDateString("en-PH", { weekday: "short" });
+const dayNum = (ymd) => new Date(`${ymd}T00:00:00`).getDate();
 
 const days = ref(7);
 const includeDone = ref(false);
@@ -170,6 +180,8 @@ const DeliveryRow = defineComponent({
               props.showDate ? h("span", { class: "dv-late" }, `${dayLabel(o.delivery_date)} · ${Math.abs(daysFromToday(o.delivery_date))} d late`) : null,
               o.address ? h("span", { class: "dv-addr" }, o.address) : null,
               prepNote ? h("span", { class: ["dv-prep", { now: shouldPrepare(o) }] }, prepNote) : null,
+              o.status === "to_ship" && !o.photo_url ? h("span", { class: "sp-chip amber" }, "Needs a photo") : null,
+              o.photo_url && ["to_processed", "to_ship"].includes(o.status) ? h("span", { class: "sp-chip teal" }, "Photo taken") : null,
             ]),
           ]),
         ]),
@@ -178,7 +190,9 @@ const DeliveryRow = defineComponent({
           h("span", { class: ["sp-chip", STATUS_TONE[o.status]] }, o.status_label),
           o.next.length
             ? h("button", { type: "button", class: "sp-btn sp-btn-primary sp-btn-sm", onClick: () => emit("act", o, o.next[0]) }, o.next[0].label)
-            : h("button", { type: "button", class: "sp-btn sp-btn-ghost sp-btn-sm", onClick: () => emit("open", o) }, "Details"),
+            : o.status === "to_received"
+              ? h("span", { class: "dv-wait", title: "The customer marks it received, or it completes by itself 3 days after it went out" }, "Waiting for the customer")
+              : h("button", { type: "button", class: "sp-btn sp-btn-ghost sp-btn-sm", onClick: () => emit("open", o) }, "Details"),
         ]),
       ]);
     };
@@ -197,6 +211,187 @@ onMounted(load);
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 18px;
+}
+/* Summary tiles, like the stage cards on Orders */
+.dv-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--v-border);
+  border-radius: 16px;
+  background: var(--v-surface);
+}
+.tone-green { --tone: #68d391; --tone-soft: var(--v-green-soft); --tone-ink: var(--v-green-text); }
+.tone-amber { --tone: #f6ad55; --tone-soft: var(--v-amber-soft); --tone-ink: var(--v-amber-text); }
+.tone-violet { --tone: #b794f4; --tone-soft: var(--v-purple-soft); --tone-ink: var(--v-purple-text); }
+.tone-teal { --tone: #4fd1c5; --tone-soft: var(--v-teal-soft); --tone-ink: var(--v-teal-text); }
+.tone-red { --tone: #fc8181; --tone-soft: var(--v-red-soft); --tone-ink: var(--v-red-text); }
+.dv-tile.alert {
+  border-color: var(--tone);
+  background: var(--tone-soft);
+}
+.dv-tile-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tone-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dv-tile-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: var(--tone-soft);
+}
+.dv-tile-icon :deep(svg) {
+  width: 14px;
+  height: 14px;
+}
+.dv-tile strong {
+  margin-top: 4px;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--v-text);
+}
+.dv-tile.zero strong {
+  color: var(--v-faint);
+}
+.dv-tile-hint {
+  font-size: 11.5px;
+  color: var(--v-faint);
+}
+.dv-sk-num {
+  width: 40%;
+  height: 26px;
+  margin: 6px 0;
+}
+
+/* Date badge on each day */
+.dv-date {
+  flex: none;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  width: 48px;
+  height: 52px;
+  border: 1px solid var(--v-border);
+  border-radius: 12px;
+  background: var(--v-subtle);
+  line-height: 1.1;
+}
+.dv-date small {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--v-muted);
+}
+.dv-date b {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--v-text);
+}
+.dv-date.today {
+  border-color: var(--bc-accent);
+  background: var(--bc-accent);
+}
+.dv-date.today small,
+.dv-date.today b {
+  color: var(--bc-accent-ink, #fff);
+}
+.dv-date.late {
+  border-color: var(--v-red-text);
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
+}
+.dv-date.late :deep(svg) {
+  width: 20px;
+  height: 20px;
+}
+.dv-day-title {
+  flex: 1;
+  min-width: 0;
+}
+.dv-today {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.dv-none {
+  margin: 0;
+  padding: 2px 0 2px 62px;
+  font-size: 12.5px;
+  color: var(--v-faint);
+}
+.dv-wait {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--v-subtle);
+  font-size: 12px;
+  color: var(--v-muted);
+  white-space: nowrap;
+}
+
+/* The order flow, as a short timeline */
+.legend .flow {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+.legend .flow li {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.legend .flow li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 16px;
+  bottom: -12px;
+  width: 2px;
+  background: var(--v-border);
+}
+.flow-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-top: 3px;
+  border-radius: 50%;
+}
+.flow-dot.amber { background: #f6ad55; }
+.flow-dot.blue { background: #63b3ed; }
+.flow-dot.violet { background: #b794f4; }
+.flow-dot.teal { background: #4fd1c5; }
+.flow-dot.green { background: #68d391; }
+.flow b {
+  display: block;
+  font-size: 13px;
+  color: var(--v-text);
+}
+.flow small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--v-muted);
 }
 .dv-stats .sp-stat {
   min-width: 0;
