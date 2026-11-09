@@ -49,6 +49,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Every contact number is saved as "0917 123 4567"
         $middleware->api(append: [\App\Http\Middleware\FormatPhoneNumbers::class]);
+        // No cron on the free server: orders out for delivery 3 days complete
+        // after a response goes out, at most every 10 minutes
+        $middleware->api(append: [\App\Http\Middleware\AutoCompleteDeliveredOrders::class]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // API errors in plain words, even with APP_DEBUG on. The full error

@@ -242,7 +242,7 @@
             <span class="sp-chip" :class="STATUS_TONE[d.status] ?? 'slate'">{{ STATUS_LABEL[d.status] ?? d.status_label }}</span>
             <div class="dl-actions">
               <button v-if="NEXT[d.status]" type="button" class="sp-btn sp-btn-primary sp-btn-sm" @click="openAdvance(d, NEXT[d.status].value)">{{ NEXT[d.status].label }}</button>
-              <span v-else-if="d.status === 'to_received'" class="dl-wait" title="Only the customer completes the order, by marking it received">Waiting for the customer</span>
+              <span v-else-if="d.status === 'to_received'" class="dl-wait" title="The customer marks it received, or it completes by itself 3 days after it went out">Waiting for the customer</span>
               <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="openDetail(d)">Details</button>
               <button type="button" class="sp-icon-btn" title="Barcode" :aria-label="`Barcode for ${d.order?.order_number ?? d.delivery_id}`" @click="barcodeModalRef.open(d.order?.id, d.delivery_id)"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" width="16" height="16" aria-hidden="true"><path d="M3 4v12M6 4v12M8.5 4v12M11 4v12M14 4v12M17 4v12" /></svg></button>
               <button type="button" class="sp-icon-btn" title="History" :aria-label="`History of ${d.order?.order_number ?? d.delivery_id}`" @click="openLogs(d)"><span v-html="ICONS.history"></span></button>
@@ -920,7 +920,7 @@ const PIPELINE = [
   { key: "pending", label: "Pending", hint: "Confirm them", tone: "amber" },
   { key: "to_processed", label: "Preparing", hint: "Being arranged", tone: "blue" },
   { key: "to_ship", label: "Ready", hint: "Photo, then send out", tone: "violet" },
-  { key: "to_received", label: "Out for delivery", hint: "Customer confirms it", tone: "teal" },
+  { key: "to_received", label: "Out for delivery", hint: "Customer confirms (or 3 days)", tone: "teal" },
   { key: "completed", label: "Completed", hint: "Customer has it", tone: "green" },
 ];
 // The one next step from each stage

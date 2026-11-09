@@ -307,6 +307,10 @@
               <div class="ot-receive__text">
                 <strong>Your order is on its way</strong>
                 <span>Once it's in your hands, mark it received. That's how the order is completed.</span>
+                <small v-if="order.delivery?.auto_complete_at" class="ot-receive__auto">
+                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5" /><path d="M10 6v4l2.5 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+                  If you don't, it completes by itself on {{ fmtDay(order.delivery.auto_complete_at) }}. Something wrong with it? Tell the shop or ask for a return or refund before then.
+                </small>
               </div>
               <button
                 type="button"
@@ -1095,6 +1099,9 @@ const canReview = (order) =>
 const hasReviewed = (order) => reviewedOrderIds.value.has(order.id);
 
 // ── Mark as received ──────────────────────────────────────────────────────────
+// "Friday, Nov 14" for the day an order completes by itself
+const fmtDay = (iso) => (iso ? new Date(iso).toLocaleDateString("en-PH", { weekday: "long", month: "short", day: "numeric" }) : "");
+
 function doComplete(order) {
   confirmModal.show = true;
   confirmModal.loading = false;
@@ -2235,6 +2242,21 @@ onMounted(async () => {
 }
 .ot-receive__btn {
   flex: none;
+}
+.ot-receive__auto {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b5a2e;
+}
+.ot-receive__auto svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
 }
 @media (max-width: 560px) {
   .ot-receive {

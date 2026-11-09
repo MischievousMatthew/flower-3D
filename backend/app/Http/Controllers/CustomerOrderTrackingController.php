@@ -307,6 +307,9 @@ class CustomerOrderTrackingController extends Controller
                 // What the shop sent out, photographed before delivery
                 'photo_url' => $delivery->photo_url,
                 'photo_taken_at' => $delivery->photo_taken_at?->toIso8601String(),
+                // Not marked received by then, it completes by itself
+                'auto_complete_at' => app(\App\Services\OrderAutoCompleteService::class)->completesAt($delivery)?->toIso8601String(),
+                'auto_complete_days' => \App\Services\OrderAutoCompleteService::DAYS,
                 'timeline' => $delivery->logs
                     ->sortBy('scanned_at')
                     ->map(fn ($log) => [

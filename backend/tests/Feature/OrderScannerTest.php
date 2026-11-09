@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Delivery;
+use App\Services\OrderAutoCompleteService;
 use App\Services\ReceiptFileStore;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
@@ -138,5 +140,41 @@ class OrderScannerTest extends TestCase
         // ...nor from Deliveries in the ERP
         $this->expectExceptionMessage('Only the customer can complete this order');
         app(\App\Services\DeliveryService::class)->advanceStatus(\App\Models\Delivery::findOrFail($id), 'completed');
+    }
+
+    public function test_an_order_out_for_delivery_three_days_completes_itself(): void
+    {
+        Schema::dropIfExists('order_requests');
+        Schema::create('order_requests', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('order_id');
+            $t->string('status');
+            $t->timestamps();
+        });
+        // Completing an order also records when stock was taken off
+        foreach (['stock_deducted_at', 'delivered_at'] as $c) {
+            if (! Schema::hasColumn('orders', $c)) {
+                Schema::table('orders', fn (Blueprint $t) => $t->timestamp($c)->nullable());
+            }
+        }
+        $vendor = $this->shopOwner();
+        $old = $this->delivery($vendor, 'to_received', 'BLM-OLD');
+        $fresh = $this->delivery($vendor, 'to_received', 'BLM-NEW');
+        $disputed = $this->delivery($vendor, 'to_received', 'BLM-CASE');
+        foreach ([$old => 4, $fresh => 1, $disputed => 5] as $id => $days) {
+            DB::table('delivery_logs')->insert(['delivery_id' => $id, 'status' => 'to_received', 'scanned_at' => now()->subDays($days)]);
+        }
+        DB::table('order_requests')->insert(['order_id' => DB::table('deliveries')->where('id', $disputed)->value('order_id'), 'status' => 'pending']);
+
+        $service = app(OrderAutoCompleteService::class);
+        $this->assertSame(1, $service->sweep());
+
+        $this->assertSame('completed', DB::table('deliveries')->where('id', $old)->value('status'));
+        $this->assertSame('completed', DB::table('orders')->where('id', DB::table('deliveries')->where('id', $old)->value('order_id'))->value('status'));
+        // Too soon, or a return being settled: left alone
+        $this->assertSame('to_received', DB::table('deliveries')->where('id', $fresh)->value('status'));
+        $this->assertSame('to_received', DB::table('deliveries')->where('id', $disputed)->value('status'));
+        // The customer is told when it will complete
+        $this->assertSame(now()->subDay()->addDays(3)->toDateString(), $service->completesAt(Delivery::withoutGlobalScopes()->find($fresh))->toDateString());
     }
 }
