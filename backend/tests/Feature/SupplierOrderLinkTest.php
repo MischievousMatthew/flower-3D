@@ -116,6 +116,19 @@ class SupplierOrderLinkTest extends TestCase
             ->assertJsonPath('data.payment.account', null);
     }
 
+    public function test_an_order_from_funding_shows_when_the_shop_needs_it(): void
+    {
+        $needed = now()->addDays(4)->toDateString();
+        DB::table('funding_requests')->insert(['owner_id' => 3, 'linked_order_id' => $this->orderId, 'request_status' => 'Approved', 'required_delivery_date' => $needed]);
+
+        // Older orders made from funding had no date of their own: the request's "needed by" is used
+        $this->getJson('/api/supplier-orders/' . $this->token())->assertOk()->assertJsonPath('data.expected_date', $needed);
+
+        // Emailing it saves the date on the order, so the email says "please deliver by"
+        app(OrderService::class)->fillWantedDate(PurchaseOrder::findOrFail($this->orderId));
+        $this->assertSame($needed, PurchaseOrder::findOrFail($this->orderId)->expected_date->toDateString());
+    }
+
     public function test_a_pay_first_supplier_must_give_an_account_when_confirming(): void
     {
         DB::table('suppliers')->update(['payment_terms' => 'Pay before delivery']);

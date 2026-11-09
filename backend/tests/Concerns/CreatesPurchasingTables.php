@@ -93,6 +93,8 @@ trait CreatesPurchasingTables
             $t->string('payment_timing', 20)->nullable();
             $t->string('supplier_terms', 60)->nullable();
             $t->unsignedSmallInteger('payment_due_days')->nullable();
+            $t->string('request_status')->nullable();
+            $t->date('required_delivery_date')->nullable();
             $t->timestamps();
         });
         Schema::create('funding_request_payments', function (Blueprint $t) {

@@ -319,7 +319,8 @@ class SupplierOrderController extends Controller
             'contact_person' => $order->supplier?->contact_person,
             'order_number' => $order->order_number,
             'order_date' => $order->order_date?->toDateString(),
-            'expected_date' => $order->expected_date?->toDateString(),
+            // The shop's date, or the funding request's "needed by" date for older orders made from one
+            'expected_date' => app(\App\Services\OrderService::class)->wantedDate($order),
             'notes' => $order->notes,
             'stage' => match (true) {
                 $order->supplier_declined_at && $order->status === 'draft' => 'declined',

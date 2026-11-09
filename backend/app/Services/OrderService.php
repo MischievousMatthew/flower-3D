@@ -220,6 +220,28 @@ class OrderService
         return ['order' => $order->fresh(['supplier', 'items', 'events']), 'emailed' => $emailed];
     }
 
+    /**
+     * When the shop wants it: the funding request's "needed by" date, for an
+     * order made from one that has no expected date of its own yet.
+     */
+    public function wantedDate(PurchaseOrder $order): ?string
+    {
+        if ($order->expected_date) {
+            return $order->expected_date->toDateString();
+        }
+        $needed = FundingRequest::where('linked_order_id', $order->id)->value('required_delivery_date');
+
+        return $needed ? \Illuminate\Support\Carbon::parse($needed)->toDateString() : null;
+    }
+
+    /** Saves that date on the order, so the email, the supplier's page and the list all show it */
+    public function fillWantedDate(PurchaseOrder $order): void
+    {
+        if (! $order->expected_date && ($date = $this->wantedDate($order))) {
+            $order->forceFill(['expected_date' => $date])->save();
+        }
+    }
+
     /** The approved funding request paying for this order, if there is one (Finance already approved it) */
     public function fundingFor(PurchaseOrder $order): ?FundingRequest
     {
@@ -249,6 +271,7 @@ class OrderService
             if ($order->supplier?->status !== 'active') {
                 throw new \RuntimeException("{$order->supplier?->company_name} isn't active any more. Pick another supplier first.");
             }
+            $this->fillWantedDate($order);
             $order->quietlyMoveTo(['status' => 'pending', 'submitted_at' => now(), 'supplier_declined_at' => null]);
 
             return $order;
@@ -345,6 +368,8 @@ class OrderService
         if (! $order->supplier?->email) {
             return null;
         }
+        // Orders made from funding before the date was copied over still say when it's wanted
+        $this->fillWantedDate($order);
         // Never send a supplier an order at ₱0
         if ($order->items->contains(fn ($i) => (float) $i->price <= 0)) {
             PurchaseOrderEvent::record($order, 'email_failed', null, null, 'Not sent: an item has no price');
@@ -685,6 +710,8 @@ class OrderService
                 'status'          => 'draft',
                 'total_amount'    => $orderTotal,
                 'order_date'      => now()->toDateString(),
+                // When the shop needs it, from the funding request
+                'expected_date'   => $funding->required_delivery_date ? \Illuminate\Support\Carbon::parse($funding->required_delivery_date)->toDateString() : null,
                 'created_by_name' => PurchaseOrderEvent::nameOf(auth()->user()),
                 'approved_at'     => now(),
                 'approved_by_name' => 'Finance · ' . ($funding->finance_request_id ?? "funding request #{$funding->id}"),
