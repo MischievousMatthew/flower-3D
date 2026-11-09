@@ -103,6 +103,8 @@
                 <span class="meta-date" :class="{ late: isLate(o), soon: isSoon(o) }">
                   <span v-html="ICONS.truck"></span>{{ dayLabel(o.delivery_date) }}
                 </span>
+                <span v-if="o.status === 'to_ship' && !o.photo_url" class="sp-chip amber">Needs a photo</span>
+                <span v-else-if="o.photo_url && ['to_processed', 'to_ship'].includes(o.status)" class="sp-chip teal">Photo taken</span>
                 <span v-if="isLate(o)" class="sp-chip red">Late</span>
                 <span v-else-if="shouldPrepare(o)" class="sp-chip amber">Prepare now</span>
                 <span v-if="o.return_case" class="sp-chip pink">{{ o.return_case.type === "return" ? "Return" : "Refund" }}: {{ CASE_STAGE[o.return_case.stage] ?? o.return_case.status }}</span>
