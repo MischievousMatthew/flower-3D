@@ -156,20 +156,26 @@ async function stamp(file) {
   const x = w - boxW - margin;
   const y = h - boxH - margin;
 
-  ctx.fillStyle = "rgba(15, 20, 28, 0.62)";
+  // A light dark backing: the photo still shows through it
+  ctx.fillStyle = "rgba(0, 0, 0, 0.32)";
   const radius = Math.round(size * 0.6);
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(x, y, boxW, boxH, radius);
   else ctx.rect(x, y, boxW, boxH);
   ctx.fill();
 
+  // White text with a soft shadow, so it reads on bright petals too
   ctx.textAlign = "right";
   ctx.textBaseline = "top";
+  ctx.fillStyle = "#ffffff";
+  ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
+  ctx.shadowBlur = Math.max(2, Math.round(size * 0.25));
+  ctx.shadowOffsetY = Math.max(1, Math.round(size * 0.06));
   lines.forEach((t, i) => {
     ctx.font = fonts[i];
-    ctx.fillStyle = i === 0 ? "#ffffff" : "rgba(255, 255, 255, 0.86)";
     ctx.fillText(t, x + boxW - pad, y + pad + i * lineH);
   });
+  ctx.shadowColor = "transparent";
 
   const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.88));
   if (!blob) throw new Error("stamp failed");
