@@ -106,16 +106,8 @@
         <aside class="od-col">
           <section class="sp-card" aria-label="Delivery">
             <div class="sp-card-head"><div><h2>Delivery</h2><p>{{ order.fulfillment.handled_by }}</p></div></div>
-            <!-- Photo of the order: attached while it's prepared or ready, needed before it goes out -->
-            <div v-if="canAttachPhoto" class="od-photo-box">
-              <DeliveryPhotoPicker v-model:file="photoFile" :existing-url="order.photo_url || ''" :order-number="order.order_number || ''" :disabled="photoBusy" />
-              <div v-if="photoFile" class="od-photo-actions">
-                <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="photoBusy" @click="photoFile = null">Cancel</button>
-                <button type="button" class="sp-btn sp-btn-primary sp-btn-sm" :disabled="photoBusy" @click="savePhoto">{{ photoBusy ? "Uploading…" : "Save photo" }}</button>
-              </div>
-              <p v-if="photoError" class="sp-error" role="alert">{{ photoError }}</p>
-            </div>
-            <figure v-else-if="order.photo_url" class="od-photo">
+            <!-- The photo is taken in the "Send out for delivery" step; here it's only shown -->
+            <figure v-if="order.photo_url" class="od-photo">
               <img :src="order.photo_url" alt="Photo of the order before delivery" loading="lazy" />
               <figcaption>Photo before delivery. The customer sees it on their order.</figcaption>
             </figure>
@@ -181,8 +173,6 @@ import { useRouter } from "vue-router";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import OrderActionModal from "../../../components/vendor/orders/OrderActionModal.vue";
-import DeliveryPhotoPicker from "../../../components/vendor/orders/DeliveryPhotoPicker.vue";
-import { toast } from "@/utils/snackbar";
 import Order3DModal from "../../../components/vendor/orders/Order3DModal.vue";
 import ReturnCasePanel from "../../../components/returns/ReturnCasePanel.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
@@ -208,29 +198,6 @@ const presetOf = (item) => {
 };
 
 const order = ref(null);
-
-// The photo of the order before delivery, attached any time before it goes out
-const photoFile = ref(null);
-const photoBusy = ref(false);
-const photoError = ref("");
-const canAttachPhoto = computed(() => ["pending", "to_processed", "to_ship"].includes(order.value?.status));
-async function savePhoto() {
-  if (!photoFile.value) return;
-  photoBusy.value = true;
-  photoError.value = "";
-  try {
-    const fd = new FormData();
-    fd.append("photo", photoFile.value);
-    const { data } = await api.post(`vendor/orders/${order.value.id}/delivery-photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
-    order.value = { ...order.value, photo_url: data.data?.photo_url ?? order.value.photo_url };
-    photoFile.value = null;
-    toast.success("Photo saved. The customer will see it once the order goes out.");
-  } catch (e) {
-    photoError.value = apiMessage(e, "The photo didn't upload. Try again.");
-  } finally {
-    photoBusy.value = false;
-  }
-}
 const error = ref("");
 const acting = ref(null);
 const viewer = ref(null);
@@ -294,19 +261,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.od-photo-box {
-  display: grid;
-  gap: 10px;
-  margin: 0 0 14px;
-  padding: 12px;
-  border: 1px solid var(--v-border);
-  border-radius: 14px;
-}
-.od-photo-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
 .od-photo {
   margin: 0 0 14px;
   overflow: hidden;
