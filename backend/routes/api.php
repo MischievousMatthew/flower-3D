@@ -905,6 +905,7 @@ Route::middleware('token.auth')->group(function () {
             Route::get('funding-requests/products',     [FundingRequestController::class, 'getProducts']);
             Route::get('funding-requests',              [FundingRequestController::class, 'index']);
             Route::get('funding-requests/{id}',         [FundingRequestController::class, 'show']);
+            Route::get('funding-requests/{id}/payments/{paymentId}/receipt', [FundingRequestController::class, 'receipt'])->whereNumber(['id', 'paymentId']);
         });
 
         Route::middleware('employee.module:inventory_funding,create')->group(function () {
@@ -1166,6 +1167,7 @@ Route::middleware('token.auth')->group(function () {
         Route::middleware('employee.module:funding_requests,view')->group(function () {
             Route::get('funding-requests',               [AccountingFundingRequestController::class, 'index']);
             Route::get('funding-requests/{id}',          [FundingRequestController::class, 'show'])->whereNumber('id');
+            Route::get('funding-requests/{id}/payments/{paymentId}/receipt', [FundingRequestController::class, 'receipt'])->whereNumber(['id', 'paymentId']);
         });
 
         Route::post('funding-requests/{id}/approve', [AccountingFundingRequestController::class, 'approve'])->middleware('employee.module:funding_requests,approve');

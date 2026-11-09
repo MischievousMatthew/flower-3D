@@ -33,7 +33,8 @@
 
           <div class="sp-modal-foot rc-noprint">
             <button type="button" class="sp-btn sp-btn-ghost" @click="$emit('close')">Close</button>
-            <button type="button" class="sp-btn sp-btn-primary" @click="print"><span v-html="ICONS.print"></span>Print or save as PDF</button>
+            <button type="button" class="sp-btn sp-btn-ghost" @click="print"><span v-html="ICONS.print"></span>Print</button>
+            <button type="button" class="sp-btn sp-btn-primary" :disabled="downloading" @click="download"><span v-html="ICONS.download"></span>{{ downloading ? "Preparing…" : "Download PDF" }}</button>
           </div>
         </div>
       </div>
@@ -42,7 +43,9 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
+import api from "../../plugins/axios";
+import { toast } from "@/utils/snackbar";
 import { SHOP_ICONS as ICONS } from "../vendor/shop/shopIcons";
 import { peso } from "./fundingPayment";
 
@@ -51,6 +54,8 @@ const props = defineProps({
   payment: { type: Object, default: () => ({}) },
   request: { type: Object, default: () => ({}) },
   pay: { type: Object, default: () => ({}) },
+  // finance or inventory: which side's address to fetch the PDF from
+  context: { type: String, default: "finance" },
 });
 defineEmits(["close"]);
 
@@ -65,6 +70,27 @@ const masked = computed(() => {
   return n.includes("•") ? n : digits ? `•••• ${digits.slice(-4)}` : "";
 });
 const print = () => window.print();
+
+const downloading = ref(false);
+async function download() {
+  downloading.value = true;
+  try {
+    const base = props.context === "finance" ? "finance/funding-requests" : "procurement/inventory/funding-requests";
+    const res = await api.get(`${base}/${props.request.id}/payments/${props.payment.id}/receipt`, { responseType: "blob" });
+    const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `BloomCraft-receipt-${props.payment.receipt_number}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch {
+    toast.error("Couldn't download the receipt. Try again, or use Print.");
+  } finally {
+    downloading.value = false;
+  }
+}
 </script>
 
 <style scoped>

@@ -126,6 +126,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import api from "../../plugins/axios";
 import { SHOP_ICONS as ICONS } from "../vendor/shop/shopIcons";
 import { apiMessage } from "../vendor/shop/useVendorCatalog";
@@ -141,6 +142,7 @@ const props = defineProps({
   mode: { type: String, default: "pay" },
 });
 const emit = defineEmits(["close", "done"]);
+const router = useRouter();
 
 const pad = (n) => String(n).padStart(2, "0");
 const now = new Date();
@@ -215,8 +217,8 @@ async function payWithPayMongo() {
     const { data } = await api.post(`finance/funding-requests/${props.request.id}/paymongo`, {
       amount,
       payment_channel: form.payment_channel,
-      // PayMongo brings Finance back to this page afterwards
-      return_to: window.location.pathname,
+      // PayMongo brings Finance back to this request's page, where the receipt opens
+      return_to: router.resolve({ name: "FinanceFundingRequestDetails", params: { id: props.request.id } }).path,
     });
     // Off to PayMongo; it sends Finance back to the list afterwards
     window.location.href = data.data.checkout_url;

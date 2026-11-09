@@ -227,6 +227,13 @@ class FundingPaymentTest extends TestCase
 
         $this->pay($id, 1000)->assertOk()->assertJsonPath('data.to_pay', 700);
         $this->pay($id, 700)->assertOk()->assertJsonPath('data.stage', 'paid');
+
+        // Each payment's receipt downloads as a PDF
+        $paymentId = (int) DB::table('funding_request_payments')->where('funding_request_id', $id)->max('id');
+        $pdf = $this->get(self::BASE . "/{$id}/payments/{$paymentId}/receipt")->assertOk();
+        $this->assertStringContainsString('application/pdf', $pdf->headers->get('content-type'));
+        $this->assertStringContainsString('BloomCraft-receipt-BC-R-', $pdf->headers->get('content-disposition'));
+        $this->get(self::BASE . "/{$id}/payments/999/receipt")->assertNotFound();
     }
 
     public function test_paying_through_paymongo_records_the_payment_once_it_is_paid(): void

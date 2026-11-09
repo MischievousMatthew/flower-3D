@@ -148,7 +148,7 @@
         </section>
       </div>
     </template>
-    <FundingReceiptModal :open="!!receipt" :payment="receipt ?? {}" :request="request ?? {}" :pay="pay ?? {}" @close="receipt = null" />
+    <FundingReceiptModal :open="!!receipt" :payment="receipt ?? {}" :request="request ?? {}" :pay="pay ?? {}" :context="context" @close="receipt = null" />
     <FundingPayModal :open="!!payMode" :request="request ?? {}" :mode="payMode || 'pay'" @close="payMode = ''" @done="afterPay" />
   </HrPage>
 </template>
@@ -371,8 +371,20 @@ onMounted(async () => {
     router.replace({ query: {} });
   }
   await fetchRequest();
-  if (back === "pending") setTimeout(fetchRequest, 4000);
+  if (back === "paid") openLatestReceipt();
+  if (back === "pending") {
+    setTimeout(async () => {
+      await fetchRequest();
+      openLatestReceipt();
+    }, 4000);
+  }
 });
+
+// The payment just made, so its receipt is ready to download
+function openLatestReceipt() {
+  const latest = [...(pay.value?.payments ?? [])].filter((m) => m.kind === "payment").sort((a, b) => b.id - a.id)[0];
+  if (latest) receipt.value = latest;
+}
 </script>
 
 <style scoped>

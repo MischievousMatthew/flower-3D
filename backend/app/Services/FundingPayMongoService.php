@@ -24,7 +24,7 @@ class FundingPayMongoService
 
     public function __construct(private readonly FundingPaymentService $payments) {}
 
-    public function create(int $ownerId, int $fundingId, float $amount, string $channel, ?string $payerName, ?string $returnTo = null): FundingPaymentCheckout
+    public function create(int $ownerId, int $fundingId, float $amount, string $channel, ?string $payerName, ?string $returnTo = null, ?string $backendUrl = null): FundingPaymentCheckout
     {
         $key = config('services.paymongo.secret_key');
         if (!$key) {
@@ -63,7 +63,9 @@ class FundingPayMongoService
             'metadata' => ['return_to' => $returnTo],
         ]);
 
-        $callback = rtrim((string) config('app.url'), '/') . '/api/funding-payments/callback?checkout_id=' . $checkout->id;
+        // The backend the app really called, so PayMongo comes back to a server that's running
+        // (APP_URL can point somewhere else); APP_URL only when there's no request
+        $callback = rtrim($backendUrl ?: (string) config('app.url'), '/') . '/api/funding-payments/callback?checkout_id=' . $checkout->id;
         $attributes = [
             'send_email_receipt' => false,
             'show_description' => true,

@@ -511,6 +511,32 @@ class FundingRequestController extends Controller
         }
     }
 
+    /** GET …/funding-requests/{id}/payments/{paymentId}/receipt: the payment receipt as a PDF */
+    public function receipt(Request $request, $id, $paymentId)
+    {
+        if ($response = $this->requireAnyModuleAccess($request, [self::INVENTORY_MODULE, self::FINANCE_APPROVER_MODULE], 'view')) {
+            return $response;
+        }
+        $ownerId = $this->getOwnerId($request);
+        $funding = \App\Models\FundingRequest::where('owner_id', $ownerId)->find($id);
+        $payment = $funding?->payments()->where('id', $paymentId)->where('kind', \App\Models\FundingRequestPayment::KIND_PAYMENT)->first();
+        if (!$payment) {
+            return response()->json(['message' => 'Receipt not found'], 404);
+        }
+
+        $order = \App\Models\PurchaseOrder::with('supplier', 'items')->find($payment->purchase_order_id ?: $funding->linked_order_id);
+        $owner = \App\Models\User::find($ownerId);
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('receipts.funding-payment', [
+            'payment' => $payment,
+            'funding' => $funding,
+            'order' => $order,
+            'shopName' => $owner?->vendor?->store_name ?: ($owner?->name ?: 'Our flower shop'),
+            'account' => \App\Support\SupplierPayout::masked($order) ?? \App\Support\SupplierPayout::masked($order?->supplier),
+            'lines' => ($order?->items ?? collect())->filter(fn ($i) => ((int) $i->quantity - (int) $i->cancelled_qty) > 0),
+        ])->setPaper('a5', 'portrait')->download("BloomCraft-receipt-{$payment->receipt_number}.pdf");
+    }
+
     public function update(Request $request, $id)
     {
         try {

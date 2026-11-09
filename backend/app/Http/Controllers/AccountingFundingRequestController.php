@@ -154,6 +154,15 @@ class AccountingFundingRequestController extends Controller
         return $this->moneyResponse(fn () => $payments->pay($this->getOwnerId($request), (int) $id, $data));
     }
 
+    /** This server's own address, as the app reached it (https behind Render's proxy) */
+    private function backendUrl(Request $request): string
+    {
+        $host = $request->getHttpHost();
+        $local = preg_match('/^(localhost|127\.0\.0\.1)(:\d+)?$/', $host);
+
+        return ($local ? $request->getScheme() : 'https') . '://' . $host;
+    }
+
     /** POST finance/funding-requests/{id}/paymongo: start paying the supplier through PayMongo Checkout */
     public function payWithPayMongo(Request $request, \App\Services\FundingPayMongoService $paymongo, $id)
     {
@@ -175,6 +184,7 @@ class AccountingFundingRequestController extends Controller
                 $data['payment_channel'],
                 \App\Models\PurchaseOrderEvent::nameOf($request->user()),
                 $data['return_to'] ?? null,
+                $this->backendUrl($request),
             )->checkout_url,
         ]);
     }
