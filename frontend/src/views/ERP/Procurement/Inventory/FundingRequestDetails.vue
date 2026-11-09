@@ -356,7 +356,23 @@ async function submitRequest() {
   }
 }
 
-onMounted(fetchRequest);
+// Back from PayMongo after paying the supplier from this page
+const PAYMONGO_RESULT = {
+  paid: ["success", "Paid through PayMongo. The supplier was emailed a receipt."],
+  pending: ["info", "PayMongo is still confirming the payment. It shows here as paid once it goes through."],
+  review: ["error", "PayMongo took the payment, but it couldn't be recorded here automatically. Check the request with your admin."],
+  cancelled: ["info", "Payment cancelled. Nothing was paid."],
+};
+onMounted(async () => {
+  const back = route.query.funding_payment;
+  const result = PAYMONGO_RESULT[back];
+  if (result) {
+    toast[result[0]](result[1]);
+    router.replace({ query: {} });
+  }
+  await fetchRequest();
+  if (back === "pending") setTimeout(fetchRequest, 4000);
+});
 </script>
 
 <style scoped>

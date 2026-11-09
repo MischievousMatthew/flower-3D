@@ -212,7 +212,12 @@ async function payWithPayMongo() {
   if (Object.keys(err).length || formError.value) return;
   busy.value = true;
   try {
-    const { data } = await api.post(`finance/funding-requests/${props.request.id}/paymongo`, { amount, payment_channel: form.payment_channel });
+    const { data } = await api.post(`finance/funding-requests/${props.request.id}/paymongo`, {
+      amount,
+      payment_channel: form.payment_channel,
+      // PayMongo brings Finance back to this page afterwards
+      return_to: window.location.pathname,
+    });
     // Off to PayMongo; it sends Finance back to the list afterwards
     window.location.href = data.data.checkout_url;
   } catch (e) {

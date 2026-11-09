@@ -24,7 +24,7 @@ class FundingPayMongoService
 
     public function __construct(private readonly FundingPaymentService $payments) {}
 
-    public function create(int $ownerId, int $fundingId, float $amount, string $channel, ?string $payerName): FundingPaymentCheckout
+    public function create(int $ownerId, int $fundingId, float $amount, string $channel, ?string $payerName, ?string $returnTo = null): FundingPaymentCheckout
     {
         $key = config('services.paymongo.secret_key');
         if (!$key) {
@@ -59,6 +59,8 @@ class FundingPayMongoService
             'payment_channel' => $channel,
             'reference_number' => 'BC-FP-' . $f->id . '-' . strtoupper(bin2hex(random_bytes(5))),
             'paid_by_name' => $payerName,
+            // Where Finance goes back to after PayMongo
+            'metadata' => ['return_to' => $returnTo],
         ]);
 
         $callback = rtrim((string) config('app.url'), '/') . '/api/funding-payments/callback?checkout_id=' . $checkout->id;
@@ -93,7 +95,7 @@ class FundingPayMongoService
             $url = data_get($data, 'data.attributes.checkout_url');
             if (!$response->successful() || !$url) {
                 $detail = (string) data_get($data, 'errors.0.detail', '');
-                $checkout->update(['status' => 'failed', 'metadata' => ['gateway_error' => $detail]]);
+                $checkout->update(['status' => 'failed', 'metadata' => array_merge($checkout->metadata ?? [], ['gateway_error' => $detail])]);
                 Log::warning('Funding PayMongo checkout refused', ['checkout_id' => $checkout->id, 'detail' => $detail]);
                 throw new HttpException(422, str_contains(strtolower($detail), 'payment_method')
                     ? "{$channel} isn't turned on in the PayMongo account yet. Choose another bank or e-wallet, or turn it on in PayMongo."
@@ -184,7 +186,7 @@ class FundingPayMongoService
                 return true;
             } catch (HttpException $e) {
                 // Paid at PayMongo but no longer payable here (e.g. paid twice): kept for a person to sort out
-                $locked->update(['status' => 'needs_review', 'paymongo_payment_id' => $paymentId, 'metadata' => ['problem' => $e->getMessage()]]);
+                $locked->update(['status' => 'needs_review', 'paymongo_payment_id' => $paymentId, 'metadata' => array_merge($locked->metadata ?? [], ['problem' => $e->getMessage()])]);
                 Log::warning('Funding checkout paid but not recorded', ['checkout_id' => $locked->id, 'reason' => $e->getMessage()]);
 
                 return false;

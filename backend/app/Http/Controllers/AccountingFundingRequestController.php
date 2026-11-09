@@ -163,6 +163,8 @@ class AccountingFundingRequestController extends Controller
         $data = $request->validate([
             'amount' => 'required|numeric|gt:0|max:100000000',
             'payment_channel' => ['required', \Illuminate\Validation\Rule::in(\App\Support\PayMongoChannels::all())],
+            // The page Finance paid from, so PayMongo brings them back to it: a path on our site only
+            'return_to' => ['nullable', 'string', 'max:300', 'regex:#^/[^/\\\\]#'],
         ], ['payment_channel.in' => 'Choose a bank or e-wallet PayMongo offers.']);
 
         return $this->moneyResponse(fn () => [
@@ -172,6 +174,7 @@ class AccountingFundingRequestController extends Controller
                 (float) $data['amount'],
                 $data['payment_channel'],
                 \App\Models\PurchaseOrderEvent::nameOf($request->user()),
+                $data['return_to'] ?? null,
             )->checkout_url,
         ]);
     }
@@ -184,19 +187,31 @@ class AccountingFundingRequestController extends Controller
     {
         $checkout = \App\Models\FundingPaymentCheckout::find($request->integer('checkout_id'));
         $state = 'cancelled';
-        if ($checkout && $request->boolean('success')) {
-            $state = $paymongo->confirm($checkout) ? 'paid' : ($checkout->fresh()->status === 'needs_review' ? 'review' : 'pending');
-        } elseif ($checkout) {
-            $paymongo->cancel($checkout);
+        // Finance always goes back to the app, even if something here fails:
+        // the signed webhook still records the payment
+        try {
+            if ($checkout && $request->boolean('success')) {
+                $state = $paymongo->confirm($checkout) ? 'paid' : ($checkout->fresh()->status === 'needs_review' ? 'review' : 'pending');
+            } elseif ($checkout) {
+                $paymongo->cancel($checkout);
+            }
+        } catch (Throwable $e) {
+            Log::error('Funding payment return failed', ['checkout_id' => $checkout?->id, 'error' => $e->getMessage()]);
+            $state = 'pending';
         }
 
-        $frontend = rtrim((string) config('app.frontend_url', ''), '/');
-        if ($frontend !== '' && !preg_match('#^https?://#i', $frontend)) {
+        $frontend = trim((string) config('app.frontend_url', ''));
+        if ($frontend === '') {
+            $frontend = 'https://bloomcraft-app.vercel.app';
+        }
+        if (!preg_match('#^https?://#i', $frontend)) {
             $frontend = 'https://' . ltrim($frontend, '/');
         }
-        $path = '/' . ltrim((string) config('app.frontend_finance_funding_path'), '/');
+        // Back to the page they paid from (the list or the request), or the funding list
+        $returnTo = (string) data_get($checkout?->metadata, 'return_to', '');
+        $path = preg_match('#^/[^/\\\\]#', $returnTo) ? strtok($returnTo, '?#') : '/' . ltrim((string) config('app.frontend_finance_funding_path'), '/');
 
-        return redirect($frontend . $path . '?funding_payment=' . $state . '&request=' . urlencode((string) $checkout?->funding_request_id));
+        return redirect(rtrim($frontend, '/') . $path . '?funding_payment=' . $state . '&request=' . urlencode((string) $checkout?->funding_request_id));
     }
 
     /** POST finance/funding-requests/{id}/supplier-credit: what a supplier owes is refunded or kept as credit */

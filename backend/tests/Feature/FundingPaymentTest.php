@@ -43,6 +43,11 @@ class FundingPaymentTest extends TestCase
             $t->id();
             $t->unsignedBigInteger('owner_id');
             $t->string('company_name');
+            $t->string('email')->nullable();
+            $t->string('contact_person')->nullable();
+            foreach (['payout_method', 'payout_provider', 'payout_account_name', 'payout_account_number'] as $c) {
+                $t->text($c)->nullable();
+            }
             $t->string('payment_terms')->nullable();
             $t->string('status')->default('active');
             $t->timestamps();
@@ -230,9 +235,14 @@ class FundingPaymentTest extends TestCase
         $id = $this->request();
         $this->approve($id)->assertOk();
         $this->order($id, 'Pay before delivery', 'processing');
+        // The supplier has an email, so the receipt goes out on the way back
+        DB::table('suppliers')->update(['email' => 'farm@example.com', 'contact_person' => 'Marie']);
 
         $paid = false;
         Http::fake(function ($request) use (&$paid) {
+            if (! str_contains($request->url(), 'paymongo')) {
+                return Http::response(['messageId' => 'm1'], 201);
+            }
             if ($request->method() === 'POST') {
                 $this->assertSame(['gcash'], $request['data']['attributes']['payment_method_types']);
                 $this->assertSame(210000, $request['data']['attributes']['line_items'][0]['amount']);
@@ -250,7 +260,7 @@ class FundingPaymentTest extends TestCase
         // Only PayMongo's banks and e-wallets
         $this->postJson(self::BASE . "/{$id}/paymongo", ['amount' => 2100, 'payment_channel' => 'PNB'])->assertStatus(422);
         $this->postJson(self::BASE . "/{$id}/paymongo", ['amount' => 10, 'payment_channel' => 'GCash'])->assertStatus(422);
-        $this->postJson(self::BASE . "/{$id}/paymongo", ['amount' => 2100, 'payment_channel' => 'GCash'])
+        $this->postJson(self::BASE . "/{$id}/paymongo", ['amount' => 2100, 'payment_channel' => 'GCash', 'return_to' => '/abc123/7'])
             ->assertOk()->assertJsonPath('data.checkout_url', 'https://checkout.paymongo.test/cs_1');
         $checkout = FundingPaymentCheckout::firstOrFail();
 
@@ -259,7 +269,7 @@ class FundingPaymentTest extends TestCase
         $this->assertSame(0, DB::table('funding_request_payments')->count());
 
         $paid = true;
-        $this->get("/api/funding-payments/callback?checkout_id={$checkout->id}&success=true")->assertRedirectContains('funding_payment=paid');
+        $this->get("/api/funding-payments/callback?checkout_id={$checkout->id}&success=true")->assertRedirectContains('/abc123/7?funding_payment=paid');
         $this->get("/api/funding-payments/callback?checkout_id={$checkout->id}&success=true")->assertRedirectContains('funding_payment=paid');
 
         $this->assertSame(1, DB::table('funding_request_payments')->count());
