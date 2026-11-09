@@ -74,6 +74,10 @@ export function eventText(e) {
       return "Told the supplier it's cancelled";
     case "paid":
       return "Finance paid the supplier";
+    case "paid_emailed":
+      return "Told the supplier it was paid";
+    case "supplier_payout":
+      return "Supplier changed their payment account";
     case "supplier_confirmed":
       return "Supplier confirmed the order";
     case "supplier_declined":
@@ -93,7 +97,7 @@ export function eventText(e) {
   }
 }
 
-export const EVENT_TONE = { inspected: "violet", approved: "green", emailed: "blue", sent_back: "amber", email_failed: "red", received: "violet", created: "slate", edited: "slate", status: "slate", supplier_confirmed: "green", supplier_declined: "red", supplier_shipped: "blue", cancelled: "red", cancel_emailed: "blue", paid: "green" };
+export const EVENT_TONE = { inspected: "violet", approved: "green", emailed: "blue", sent_back: "amber", email_failed: "red", received: "violet", created: "slate", edited: "slate", status: "slate", supplier_confirmed: "green", supplier_declined: "red", supplier_shipped: "blue", cancelled: "red", cancel_emailed: "blue", paid: "green", paid_emailed: "blue", supplier_payout: "slate" };
 
 export const poDate = (d) => (d ? new Date(String(d).length === 10 ? `${d}T00:00:00` : d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—");
 export const poDateTime = (d) => (d ? new Date(d).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "—");

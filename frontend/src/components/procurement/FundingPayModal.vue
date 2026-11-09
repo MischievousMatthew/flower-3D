@@ -26,6 +26,21 @@
               <dd>{{ peso(isCredit ? p.supplier_owes : p.to_pay) }}</dd>
             </div>
           </dl>
+          <div v-if="!isCredit" class="fp-dest" :class="{ none: !payout }">
+            <span class="fx-icon" v-html="ICONS[payout?.method === 'ewallet' ? 'wallet' : 'card']"></span>
+            <div v-if="payout" class="grow">
+              <span class="sp-label">Send to</span>
+              <b>{{ payout.provider }} · {{ payout.account_number }}</b>
+              <small>{{ payout.account_name || "No name given" }}{{ p.order?.payout_from_order ? "" : " · from their last order" }}</small>
+            </div>
+            <div v-else class="grow">
+              <span class="sp-label">Send to</span>
+              <b>No account from the supplier yet</b>
+              <small>They can add it from the order link in their email. Ask them for it before paying.</small>
+            </div>
+            <button v-if="payout" type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="copyNumber">{{ copied ? "Copied" : "Copy number" }}</button>
+          </div>
+
           <p v-if="!isCredit && p.released > 0" class="fp-note"><span v-html="ICONS.check"></span>{{ peso(p.released) }} of the budget isn't needed and won't be paid.</p>
           <p v-if="!isCredit && p.due_date" class="fp-note" :class="{ bad: p.overdue }"><span v-html="ICONS.calendar"></span>{{ p.overdue ? "Was due" : "Due by" }} {{ dateText(p.due_date) }}<template v-if="p.supplier_terms"> ({{ p.supplier_terms }})</template></p>
 
@@ -111,6 +126,18 @@ const now = new Date();
 const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
 const p = computed(() => props.request?.payment ?? {});
+// Where the supplier asked to be paid
+const payout = computed(() => p.value.order?.payout ?? null);
+const copied = ref(false);
+async function copyNumber() {
+  try {
+    await navigator.clipboard.writeText(String(payout.value.account_number).replace(/s+/g, ""));
+    copied.value = true;
+    setTimeout(() => (copied.value = false), 1500);
+  } catch {
+    toast.info("Copy it by hand: " + payout.value.account_number);
+  }
+}
 const isCredit = computed(() => props.mode === "credit");
 const busy = ref(false);
 const formError = ref("");
@@ -217,6 +244,36 @@ function close() {
 }
 .fp-calc .total dd {
   font-size: 17px;
+}
+.fp-dest {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--bc-accent);
+  border-radius: 12px;
+  background: var(--bc-accent-soft);
+}
+.fp-dest.none {
+  border-color: var(--v-amber-text);
+  background: var(--v-amber-soft);
+}
+.fp-dest .grow {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fp-dest b {
+  font-size: 14px;
+  color: var(--v-text);
+  overflow-wrap: anywhere;
+}
+.fp-dest small {
+  font-size: 12px;
+  color: var(--v-text-2);
 }
 .fp-note {
   display: flex;

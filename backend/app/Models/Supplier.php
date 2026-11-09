@@ -27,7 +27,14 @@ class Supplier extends Model
         'minimum_order',
         'payment_terms',
         'notes',
+        'payout_method',
+        'payout_provider',
+        'payout_account_name',
+        'payout_account_number',
     ];
+
+    // Only Finance sees the account number, through the funding payment screen
+    protected $hidden = ['payout_account_number'];
 
     /** What a supplier mainly provides */
     public const TYPES = ['flower_farm', 'wholesaler', 'packaging', 'supplies'];
@@ -39,6 +46,7 @@ class Supplier extends Model
         'delivery_days'  => 'array',
         'lead_time_days' => 'integer',
         'minimum_order'  => 'decimal:2',
+        'payout_account_number' => 'encrypted',
     ];
 
     public function getLogoUrlAttribute(): ?string

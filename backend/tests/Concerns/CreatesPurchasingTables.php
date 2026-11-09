@@ -130,5 +130,6 @@ trait CreatesPurchasingTables
         Schema::dropIfExists('purchase_order_supplier_links');
         (require database_path('migrations/2026_11_03_500000_create_purchase_order_supplier_links.php'))->up();
         (require database_path('migrations/2026_11_03_600000_add_cancelled_to_purchase_orders.php'))->up();
+        (require database_path('migrations/2026_11_09_150000_supplier_payout_accounts.php'))->up();
     }
 }

@@ -62,6 +62,19 @@
         </tfoot>
     </table>
 
+    @php
+        $payTerms = $order->supplier?->payment_terms;
+        $payBefore = \App\Support\SupplierPaymentTerms::timing($payTerms) === \App\Support\SupplierPaymentTerms::BEFORE;
+        $payDays = \App\Support\SupplierPaymentTerms::dueDays($payTerms);
+    @endphp
+    @include('emails.partials.panel', [
+        'tone' => 'plain',
+        'label' => 'Payment' . ($payTerms ? " · {$payTerms}" : ''),
+        'body' => $payBefore
+            ? "{$shopName} pays before delivery, once you confirm, for the items you confirm." . ($respondUrl ? ' Add the account to be paid into when you confirm.' : '')
+            : "{$shopName} pays after delivery, for what arrives" . ($payDays ? ", within {$payDays} days" : '') . '.' . ($respondUrl ? ' You can add the account to be paid into when you confirm.' : ''),
+    ])
+
     @if ($order->notes)
         @include('emails.partials.panel', ['tone' => 'green', 'label' => 'Notes', 'body' => $order->notes])
     @endif

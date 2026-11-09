@@ -91,6 +91,9 @@ class FundingPaymentService
                 'supplier_name' => $order->supplier?->company_name,
                 'supplier_confirmed_at' => $order->supplier_confirmed_at?->toIso8601String(),
                 'completed_at' => $order->completed_at?->toIso8601String(),
+                // Where the supplier asked to be paid (given when they confirmed)
+                'payout' => \App\Support\SupplierPayout::full($order) ?? \App\Support\SupplierPayout::full($order->supplier),
+                'payout_from_order' => \App\Support\SupplierPayout::has($order),
             ] : null,
         ];
 
@@ -147,7 +150,7 @@ class FundingPaymentService
     /** Record money sent to the supplier */
     public function pay(int $ownerId, int $id, array $data): array
     {
-        return DB::transaction(function () use ($ownerId, $id, $data) {
+        $result = DB::transaction(function () use ($ownerId, $id, $data) {
             $f = FundingRequest::where('owner_id', $ownerId)->lockForUpdate()->findOrFail($id);
             $state = $this->state($f);
             if (!$state || $state['legacy']) {
@@ -196,8 +199,21 @@ class FundingPaymentService
                     number_format($amount, 2), $data['payment_channel'] ?? $f->payment_channel ?? 'bank or e-wallet', $data['reference']));
             }
 
-            return $this->state($f->fresh());
+            return [$this->state($f->fresh()), $order, $amount, $data];
         });
+        [$state, $order, $amount, $data] = $result;
+
+        // Tell the supplier it's on its way; the payment stands even if the email doesn't go
+        if ($order?->supplier?->email) {
+            try {
+                $sent = (new \App\Mail\PurchaseOrderPaidMail($order, $amount, $data['paid_on'], $data['reference'], $data['payment_channel'] ?? null))->send();
+                PurchaseOrderEvent::record($order, $sent ? 'paid_emailed' : 'email_failed', null, null, $order->supplier->email);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Supplier payment email failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $state;
     }
 
     /** Close what a supplier owes: they refunded it, or it's kept as credit with them */

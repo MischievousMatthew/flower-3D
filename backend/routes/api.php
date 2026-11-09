@@ -141,6 +141,7 @@ Route::prefix('supplier-orders/{token}')->middleware('throttle:30,1')->group(fun
     Route::post('/confirm',  [\App\Http\Controllers\SupplierOrderController::class, 'confirm']);
     Route::post('/decline',  [\App\Http\Controllers\SupplierOrderController::class, 'decline']);
     Route::post('/shipped',  [\App\Http\Controllers\SupplierOrderController::class, 'shipped']);
+    Route::post('/payout',   [\App\Http\Controllers\SupplierOrderController::class, 'payout']);
 });
 
 // ============================================================

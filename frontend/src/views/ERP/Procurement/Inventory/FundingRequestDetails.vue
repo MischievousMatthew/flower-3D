@@ -62,6 +62,12 @@
           <div><b>{{ stage.label }}</b><p>{{ stage.text }}</p></div>
         </div>
 
+        <p v-if="pay.order && !pay.legacy" class="fd-payout">
+          <span v-html="ICONS[pay.order.payout?.method === 'ewallet' ? 'wallet' : 'card']"></span>
+          <template v-if="pay.order.payout">Supplier is paid into <b>{{ pay.order.payout.provider }} {{ pay.order.payout.account_number }}</b><template v-if="pay.order.payout.account_name"> · {{ pay.order.payout.account_name }}</template></template>
+          <template v-else>The supplier hasn't given an account to be paid into yet.</template>
+        </p>
+
         <ol v-if="!pay.legacy" class="fd-steps" aria-label="Payment steps">
           <li v-for="st in steps" :key="st.key" :class="st.state"><span class="fd-dot" aria-hidden="true"></span><b>{{ st.label }}</b><small>{{ st.sub }}</small></li>
         </ol>
@@ -488,6 +494,23 @@ onMounted(fetchRequest);
 }
 .fd-why:empty {
   display: none;
+}
+.fd-payout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: -6px 0 16px;
+  font-size: 13px;
+  color: var(--v-text-2);
+}
+.fd-payout :deep(svg) {
+  width: 16px;
+  height: 16px;
+  color: var(--v-muted);
+}
+.fd-payout b {
+  color: var(--v-text);
 }
 .fd-pay-actions {
   display: flex;

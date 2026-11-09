@@ -37,7 +37,14 @@ class PurchaseOrder extends Model
         'cancelled_at',
         'cancel_reason',
         'cancelled_by_name',
+        'payout_method',
+        'payout_provider',
+        'payout_account_name',
+        'payout_account_number',
     ];
+
+    // Only Finance sees the account number, through the funding payment screen
+    protected $hidden = ['payout_account_number'];
 
     protected $casts = [
         'total_amount'  => 'decimal:2',
@@ -51,6 +58,7 @@ class PurchaseOrder extends Model
         'supplier_shipped_at'   => 'datetime',
         'supplier_declined_at'  => 'datetime',
         'cancelled_at'          => 'datetime',
+        'payout_account_number' => 'encrypted',
     ];
 
     /** The five stages people see, and the stored statuses each one covers */

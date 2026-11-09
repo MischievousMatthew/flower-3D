@@ -104,6 +104,66 @@ class SupplierOrderLinkTest extends TestCase
         $this->assertDatabaseHas('user_notifications', ['user_id' => 3]);
     }
 
+    public function test_the_page_shows_when_and_how_the_supplier_is_paid(): void
+    {
+        DB::table('suppliers')->update(['payment_terms' => '15 days']);
+
+        $this->getJson('/api/supplier-orders/' . $this->token())
+            ->assertOk()
+            ->assertJsonPath('data.payment.terms', '15 days')
+            ->assertJsonPath('data.payment.timing', 'after_delivery')
+            ->assertJsonPath('data.payment.due_days', 15)
+            ->assertJsonPath('data.payment.account', null);
+    }
+
+    public function test_a_pay_first_supplier_must_give_an_account_when_confirming(): void
+    {
+        DB::table('suppliers')->update(['payment_terms' => 'Pay before delivery']);
+        $token = $this->token();
+        $items = [['id' => $this->itemId(), 'qty' => 1100]];
+
+        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items])
+            ->assertStatus(422)->assertJsonValidationErrors('payout_account_number');
+        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items, 'payout_provider' => 'GCash', 'payout_account_name' => 'Marie Cruz', 'payout_account_number' => 'abc'])
+            ->assertStatus(422)->assertJsonValidationErrors('payout_account_number');
+
+        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items, 'payout_provider' => 'GCash', 'payout_account_name' => 'Marie Cruz', 'payout_account_number' => '0917 123 4567'])
+            ->assertOk()
+            ->assertJsonPath('data.payment.account.provider', 'GCash')
+            ->assertJsonPath('data.payment.account.account_number', '•••• 4567');
+
+        // Saved on the order and the supplier, encrypted, and never in the shop's order data
+        $order = PurchaseOrder::with('supplier')->findOrFail($this->orderId);
+        $this->assertSame('0917 123 4567', $order->payout_account_number);
+        $this->assertSame('ewallet', $order->payout_method);
+        $this->assertSame('0917 123 4567', $order->supplier->payout_account_number);
+        $this->assertStringNotContainsString('4567', (string) DB::table('purchase_orders')->value('payout_account_number'));
+        $this->assertArrayNotHasKey('payout_account_number', $order->toArray());
+    }
+
+    public function test_the_saved_account_is_offered_next_time_and_can_be_changed_until_paid(): void
+    {
+        DB::table('suppliers')->update(['payment_terms' => 'Pay before delivery']);
+        \App\Models\Supplier::query()->first()->forceFill(['payout_method' => 'bank', 'payout_provider' => 'BDO', 'payout_account_name' => 'Blooms Inc', 'payout_account_number' => '0012 3456 7890'])->save();
+        $token = $this->token();
+
+        $this->getJson("/api/supplier-orders/{$token}")->assertJsonPath('data.payment.account.account_number', '•••• 7890');
+        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => [['id' => $this->itemId(), 'qty' => 1100]], 'use_saved' => true])->assertOk();
+        $this->assertSame('BDO', PurchaseOrder::findOrFail($this->orderId)->payout_provider);
+
+        $this->postJson("/api/supplier-orders/{$token}/payout", ['payout_provider' => 'BPI', 'payout_account_name' => 'Blooms Inc', 'payout_account_number' => '1111 2222 33'])
+            ->assertOk()->assertJsonPath('data.payment.account.provider', 'BPI');
+
+        // Once the shop has paid into it, it's fixed
+        $fundingId = DB::table('funding_requests')->insertGetId(['owner_id' => 3, 'linked_order_id' => $this->orderId]);
+        DB::table('funding_request_payments')->insert(['owner_id' => 3, 'funding_request_id' => $fundingId, 'purchase_order_id' => $this->orderId, 'kind' => 'payment', 'amount' => 13200, 'paid_on' => now()->toDateString()]);
+        $this->getJson("/api/supplier-orders/{$token}")
+            ->assertJsonPath('data.payment.paid', 13200)
+            ->assertJsonPath('data.payment.can_change_account', false)
+            ->assertJsonCount(1, 'data.payment.payments');
+        $this->postJson("/api/supplier-orders/{$token}/payout", ['payout_provider' => 'BDO', 'payout_account_name' => 'X', 'payout_account_number' => '999999'])->assertStatus(409);
+    }
+
     public function test_a_supplier_cannot_confirm_more_than_was_ordered(): void
     {
         $this->postJson('/api/supplier-orders/' . $this->token() . '/confirm', ['items' => [['id' => $this->itemId(), 'qty' => 2000]]])

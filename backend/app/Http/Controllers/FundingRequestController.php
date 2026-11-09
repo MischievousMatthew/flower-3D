@@ -499,6 +499,10 @@ class FundingRequestController extends Controller
             // Budget, what's due under the supplier's terms, and what was paid
             $model = \App\Models\FundingRequest::with(['payments', 'linkedOrder.items', 'linkedOrder.supplier'])->find($fundingRequest->id);
             $fundingRequest->payment = $model ? app(\App\Services\FundingPaymentService::class)->state($model) : null;
+            // The supplier's full account number is for Finance, who pays into it
+            if (!$request->is('api/finance/*') && isset($fundingRequest->payment['order']['payout']['account_number'])) {
+                $fundingRequest->payment['order']['payout']['account_number'] = \App\Support\SupplierPayout::mask($fundingRequest->payment['order']['payout']['account_number']);
+            }
 
             return response()->json(['success' => true, 'data' => $fundingRequest], 200);
         } catch (Exception $e) {

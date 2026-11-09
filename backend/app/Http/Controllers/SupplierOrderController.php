@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\FundingRequestPayment;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderEvent;
+use App\Support\SupplierPaymentTerms;
+use App\Support\SupplierPayout;
 use App\Models\PurchaseOrderSupplierLink;
 use App\Models\User;
 use App\Services\NotificationService;
@@ -46,14 +49,27 @@ class SupplierOrderController extends Controller
             'items.*.qty' => ['required', 'integer', 'min:0'],
             'delivery_date' => ['nullable', 'date', 'after_or_equal:today'],
             'note' => ['nullable', 'string', 'max:1000'],
-        ], [
+        ] + $this->payoutRules($request), [
             'delivery_date.after_or_equal' => 'Choose today or a later date.',
-        ]);
+        ] + $this->payoutMessages());
 
         return DB::transaction(function () use ($link, $data) {
             $order = PurchaseOrder::with('items', 'supplier')->lockForUpdate()->findOrFail($link->purchase_order_id);
             if ($order->status !== 'pending') {
                 return $this->alreadyAnswered($order);
+            }
+
+            // Where to pay them: needed up front when they're paid before delivery
+            $payout = $this->payoutFrom($data, $order);
+            if (! $payout && SupplierPaymentTerms::timing($order->supplier?->payment_terms) === SupplierPaymentTerms::BEFORE) {
+                return response()->json([
+                    'message' => "You're paid before delivery, so add the account the shop should pay into.",
+                    'errors' => ['payout_account_number' => ['Add the account to be paid into.']],
+                ], 422);
+            }
+            if ($payout) {
+                $order->forceFill($payout)->save();
+                $order->supplier?->forceFill($payout)->save();
             }
 
             // Check every line first; nothing is saved unless all of it is right
@@ -183,13 +199,121 @@ class SupplierOrderController extends Controller
         ], 409);
     }
 
+    /** POST /supplier-orders/{token}/payout: change the account to be paid into, until it's been paid */
+    public function payout(Request $request, string $token): JsonResponse
+    {
+        $link = $this->link($token);
+        if ($link instanceof JsonResponse) {
+            return $link;
+        }
+        $rules = $this->payoutRules($request);
+        unset($rules['use_saved']);
+        // Bank or e-wallet is worked out from the provider when not given
+        foreach (['payout_provider', 'payout_account_name', 'payout_account_number'] as $f) {
+            $rules[$f][0] = 'required';
+        }
+        $data = $request->validate($rules, $this->payoutMessages());
+
+        return DB::transaction(function () use ($link, $data) {
+            $order = PurchaseOrder::with('supplier')->lockForUpdate()->findOrFail($link->purchase_order_id);
+            if (! in_array($order->status, ['pending', 'processing', 'shipped', 'received', 'partially_received', 'completed'], true)) {
+                return response()->json(['message' => 'This order is closed, so the account can\'t be changed here.'], 409);
+            }
+            if ($this->paymentsFor($order)->where('kind', FundingRequestPayment::KIND_PAYMENT)->isNotEmpty()) {
+                return response()->json(['message' => 'The shop already paid into the account you gave. Contact them to change it.'], 409);
+            }
+            $payout = $this->payoutFrom($data, $order);
+            $order->forceFill($payout)->save();
+            $order->supplier?->forceFill($payout)->save();
+            PurchaseOrderEvent::recordForSupplier($order, 'supplier_payout', null, null, "Payment account: {$payout['payout_provider']} " . SupplierPayout::mask($payout['payout_account_number']));
+            $this->tellShop($order, "{$order->supplier?->company_name} changed their payment account", "For {$order->order_number}: {$payout['payout_provider']} " . SupplierPayout::mask($payout['payout_account_number']));
+
+            return response()->json(['message' => 'Payment account saved.', 'data' => $this->present($link->fresh())]);
+        });
+    }
+
+    private function payoutRules(Request $request): array
+    {
+        $useSaved = $request->boolean('use_saved');
+
+        return [
+            'use_saved' => ['nullable', 'boolean'],
+            'payout_method' => ['nullable', 'in:bank,ewallet'],
+            'payout_provider' => [$useSaved ? 'nullable' : 'required_with:payout_account_number', 'nullable', 'string', 'max:60'],
+            'payout_account_name' => [$useSaved ? 'nullable' : 'required_with:payout_account_number', 'nullable', 'string', 'max:120'],
+            // Digits, with the spaces or dashes people type
+            'payout_account_number' => [$useSaved ? 'nullable' : 'required_with:payout_provider', 'nullable', 'string', 'max:40', 'regex:/^[0-9 \-]{6,40}$/'],
+        ];
+    }
+
+    private function payoutMessages(): array
+    {
+        return [
+            'payout_provider.required' => 'Choose the bank or e-wallet.',
+            'payout_provider.required_with' => 'Choose the bank or e-wallet.',
+            'payout_account_name.required' => 'Enter the name on the account.',
+            'payout_account_name.required_with' => 'Enter the name on the account.',
+            'payout_account_number.required' => 'Enter the account or mobile number.',
+            'payout_account_number.required_with' => 'Enter the account or mobile number.',
+            'payout_account_number.regex' => 'Use numbers only (6 or more), spaces and dashes are fine.',
+        ];
+    }
+
+    /** The account from the form, or the one on file when they chose to keep it */
+    private function payoutFrom(array $data, PurchaseOrder $order): ?array
+    {
+        if (! empty($data['use_saved']) && SupplierPayout::has($order->supplier)) {
+            return collect(SupplierPayout::FIELDS)->mapWithKeys(fn ($f) => [$f => $order->supplier->{$f}])->all();
+        }
+        if (empty($data['payout_account_number']) || empty($data['payout_provider'])) {
+            return null;
+        }
+        $ewallets = ['GCash', 'Maya', 'GrabPay', 'ShopeePay', 'Coins.ph', 'Other e-wallet'];
+
+        return [
+            'payout_method' => $data['payout_method'] ?? (in_array($data['payout_provider'], $ewallets, true) ? 'ewallet' : 'bank'),
+            'payout_provider' => trim($data['payout_provider']),
+            'payout_account_name' => trim((string) ($data['payout_account_name'] ?? '')),
+            'payout_account_number' => trim(preg_replace('/\s+/', ' ', $data['payout_account_number'])),
+        ];
+    }
+
+    /** Money the shop sent (or got back) for this order, through a funding request */
+    private function paymentsFor(PurchaseOrder $order)
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('funding_request_payments')) {
+            return collect();
+        }
+
+        return FundingRequestPayment::where('purchase_order_id', $order->id)->orderBy('id')->get();
+    }
+
     /** What the supplier sees: the order, never anything else from the shop */
     private function present(PurchaseOrderSupplierLink $link): array
     {
         $order = $link->order()->with('items', 'supplier')->first();
         $owner = User::find($order->owner_id);
+        $terms = $order->supplier?->payment_terms;
+        $payments = $this->paymentsFor($order);
 
         return [
+            'payment' => [
+                'terms' => $terms,
+                'timing' => SupplierPaymentTerms::timing($terms),
+                'due_days' => SupplierPaymentTerms::dueDays($terms),
+                // The account they gave for this order, or the one they gave before
+                'account' => SupplierPayout::masked($order) ?? SupplierPayout::masked($order->supplier),
+                'account_for_order' => SupplierPayout::has($order),
+                'can_change_account' => $payments->where('kind', FundingRequestPayment::KIND_PAYMENT)->isEmpty(),
+                'paid' => round((float) $payments->where('kind', FundingRequestPayment::KIND_PAYMENT)->sum('amount'), 2),
+                'payments' => $payments->whereIn('kind', [FundingRequestPayment::KIND_PAYMENT, FundingRequestPayment::KIND_REFUND])->values()->map(fn ($p) => [
+                    'kind' => $p->kind,
+                    'amount' => (float) $p->amount,
+                    'paid_on' => $p->paid_on?->toDateString(),
+                    'channel' => $p->payment_channel,
+                    'reference' => $p->reference,
+                ]),
+            ],
             'shop_name' => $owner?->vendor?->store_name ?: ($owner?->name ?: 'The shop'),
             'supplier_name' => $order->supplier?->company_name,
             'contact_person' => $order->supplier?->contact_person,
