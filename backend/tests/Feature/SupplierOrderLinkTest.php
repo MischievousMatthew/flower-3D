@@ -139,8 +139,14 @@ class SupplierOrderLinkTest extends TestCase
             ->assertStatus(422)->assertJsonValidationErrors('payout_account_number');
         $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items, 'payout_provider' => 'GCash', 'payout_account_name' => 'Marie Cruz', 'payout_account_number' => 'abc'])
             ->assertStatus(422)->assertJsonValidationErrors('payout_account_number');
+        // The right number of digits for the bank or e-wallet
+        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items, 'payout_provider' => 'GCash', 'payout_account_name' => 'Marie Cruz', 'payout_account_number' => '917 123 4567'])
+            ->assertStatus(422)->assertJsonPath('errors.payout_account_number.0', 'Mobile numbers start with 09, e.g. 0917 123 4567.');
+        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items, 'payout_provider' => 'BPI', 'payout_account_name' => 'Marie Cruz', 'payout_account_number' => '12345678'])
+            ->assertStatus(422)->assertJsonPath('errors.payout_account_number.0', 'A BPI account number has 10 digits, e.g. 1234 567 890.');
 
-        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items, 'payout_provider' => 'GCash', 'payout_account_name' => 'Marie Cruz', 'payout_account_number' => '0917 123 4567'])
+        // Typed any way, saved the way the bank prints it
+        $this->postJson("/api/supplier-orders/{$token}/confirm", ['items' => $items, 'payout_provider' => 'GCash', 'payout_account_name' => 'Marie Cruz', 'payout_account_number' => '0917-1234567'])
             ->assertOk()
             ->assertJsonPath('data.payment.account.provider', 'GCash')
             ->assertJsonPath('data.payment.account.account_number', '•••• 4567');
@@ -174,7 +180,7 @@ class SupplierOrderLinkTest extends TestCase
             ->assertJsonPath('data.payment.paid', 13200)
             ->assertJsonPath('data.payment.can_change_account', false)
             ->assertJsonCount(1, 'data.payment.payments');
-        $this->postJson("/api/supplier-orders/{$token}/payout", ['payout_provider' => 'BDO', 'payout_account_name' => 'X', 'payout_account_number' => '999999'])->assertStatus(409);
+        $this->postJson("/api/supplier-orders/{$token}/payout", ['payout_provider' => 'BDO', 'payout_account_name' => 'X', 'payout_account_number' => '0012 3456 7890'])->assertStatus(409);
     }
 
     public function test_a_supplier_cannot_confirm_more_than_was_ordered(): void

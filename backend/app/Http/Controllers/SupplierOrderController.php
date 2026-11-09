@@ -241,8 +241,15 @@ class SupplierOrderController extends Controller
             'payout_method' => ['nullable', 'in:bank,ewallet'],
             'payout_provider' => [$useSaved ? 'nullable' : 'required_with:payout_account_number', 'nullable', 'string', \Illuminate\Validation\Rule::in(\App\Support\PayMongoChannels::payoutNames())],
             'payout_account_name' => [$useSaved ? 'nullable' : 'required_with:payout_account_number', 'nullable', 'string', 'max:120'],
-            // Digits, with the spaces or dashes people type
-            'payout_account_number' => [$useSaved ? 'nullable' : 'required_with:payout_provider', 'nullable', 'string', 'max:40', 'regex:/^[0-9 \-]{6,40}$/'],
+            // Digits (spaces or dashes are fine), as many as the bank or e-wallet uses
+            'payout_account_number' => [
+                $useSaved ? 'nullable' : 'required_with:payout_provider', 'nullable', 'string', 'max:40', 'regex:/^[0-9 \-]{6,40}$/',
+                function ($attribute, $value, $fail) use ($request) {
+                    if ($error = \App\Support\PayMongoChannels::accountError($request->input('payout_provider'), $value)) {
+                        $fail($error);
+                    }
+                },
+            ],
         ];
     }
 
@@ -273,7 +280,8 @@ class SupplierOrderController extends Controller
             'payout_method' => $data['payout_method'] ?? \App\Support\PayMongoChannels::kindOf($data['payout_provider']),
             'payout_provider' => trim($data['payout_provider']),
             'payout_account_name' => trim((string) ($data['payout_account_name'] ?? '')),
-            'payout_account_number' => trim(preg_replace('/\s+/', ' ', $data['payout_account_number'])),
+            // Saved the way the bank prints it, e.g. 0917 123 4567
+            'payout_account_number' => \App\Support\PayMongoChannels::formatAccount($data['payout_provider'], $data['payout_account_number']),
         ];
     }
 

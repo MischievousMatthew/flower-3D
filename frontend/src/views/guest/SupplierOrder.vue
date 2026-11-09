@@ -93,7 +93,8 @@
                   </div>
                   <div class="af-field">
                     <label class="af-label" for="so-edit-number">{{ acct.method === "ewallet" ? "Mobile number" : "Account number" }}</label>
-                    <input id="so-edit-number" v-model="acct.number" class="af-input" maxlength="40" inputmode="numeric" autocomplete="off" :placeholder="acct.method === 'ewallet' ? '0917 123 4567' : '0012 3456 7890'" :aria-invalid="!!errors.payout_account_number" @input="errors.payout_account_number = ''" />
+                    <input id="so-edit-number" v-model="acct.number" class="af-input so-number" inputmode="numeric" autocomplete="off" :placeholder="accountFormat(acct.provider)?.example || (acct.method === 'ewallet' ? '0917 123 4567' : 'Choose the bank first')" :aria-invalid="!!errors.payout_account_number" :aria-describedby="`so-edit-number-hint`" @input="errors.payout_account_number = ''" />
+                    <p v-if="!errors.payout_account_number && accountHint(acct.provider)" :id="`so-edit-number-hint`" class="af-note">{{ accountHint(acct.provider) }}</p>
                     <p v-if="errors.payout_account_number" class="af-note bad">{{ errors.payout_account_number }}</p>
                   </div>
                 </div>
@@ -186,7 +187,8 @@
                   </div>
                   <div class="af-field">
                     <label class="af-label" for="so-conf-number">{{ acct.method === "ewallet" ? "Mobile number" : "Account number" }}</label>
-                    <input id="so-conf-number" v-model="acct.number" class="af-input" maxlength="40" inputmode="numeric" autocomplete="off" :placeholder="acct.method === 'ewallet' ? '0917 123 4567' : '0012 3456 7890'" :aria-invalid="!!errors.payout_account_number" @input="errors.payout_account_number = ''" />
+                    <input id="so-conf-number" v-model="acct.number" class="af-input so-number" inputmode="numeric" autocomplete="off" :placeholder="accountFormat(acct.provider)?.example || (acct.method === 'ewallet' ? '0917 123 4567' : 'Choose the bank first')" :aria-invalid="!!errors.payout_account_number" :aria-describedby="`so-conf-number-hint`" @input="errors.payout_account_number = ''" />
+                    <p v-if="!errors.payout_account_number && accountHint(acct.provider)" :id="`so-conf-number-hint`" class="af-note">{{ accountHint(acct.provider) }}</p>
                     <p v-if="errors.payout_account_number" class="af-note bad">{{ errors.payout_account_number }}</p>
                   </div>
                 </div>
@@ -240,12 +242,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import api from "../../plugins/axios";
 import AuthShell from "../../components/auth/AuthShell.vue";
 import AuthNotice from "../../components/auth/AuthNotice.vue";
-import { PAYOUT_CHANNELS } from "../../components/procurement/paymongoChannels";
+import { PAYOUT_CHANNELS, formatAccount, accountFormat, accountHint, accountError } from "../../components/procurement/paymongoChannels";
 
 /** A supplier answers a purchase order from the private link in its email (no account) */
 const STAGE = {
@@ -272,6 +274,14 @@ const shipNote = ref("");
 const PROVIDERS = PAYOUT_CHANNELS;
 const acct = reactive({ useSaved: false, method: "bank", provider: "", name: "", number: "" });
 const editingAccount = ref(false);
+// Typed the way the bank prints it: digits only, spaced into groups
+watch(
+  () => [acct.number, acct.provider],
+  () => {
+    const formatted = formatAccount(acct.provider, acct.number);
+    if (formatted !== acct.number) acct.number = formatted;
+  },
+);
 const declineOpen = ref(false);
 const busy = ref("");
 const formError = ref("");
@@ -349,7 +359,8 @@ function checkAccount(required) {
   if (!required && !any) return true;
   if (!acct.provider) errors[PROVIDER_ERRORS.provider] = "Choose the bank or e-wallet.";
   if (!acct.name.trim()) errors[PROVIDER_ERRORS.name] = "Enter the name on the account.";
-  if (!/^[0-9 -]{6,40}$/.test(acct.number.trim())) errors[PROVIDER_ERRORS.number] = "Use numbers only (6 or more); spaces and dashes are fine.";
+  const numberError = accountError(acct.provider, acct.number);
+  if (numberError) errors[PROVIDER_ERRORS.number] = numberError;
   return !errors.payout_provider && !errors.payout_account_name && !errors.payout_account_number;
 }
 const accountBody = () => ({ payout_method: acct.method, payout_provider: acct.provider, payout_account_name: acct.name.trim(), payout_account_number: acct.number.trim() });
@@ -609,6 +620,10 @@ onMounted(load);
 }
 .so-acct-box legend {
   padding: 0 4px;
+}
+.so-number {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
 }
 .so-acct-fields {
   display: grid;
