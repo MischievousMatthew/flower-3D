@@ -52,7 +52,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
             <div>
               <b>{{ m.kind === "refund" ? "You refunded" : "Paid to you" }} {{ money(m.amount) }}</b>
-              <small>{{ fmtDate(m.paid_on) }}<template v-if="m.channel"> · {{ m.channel }}</template><template v-if="m.reference"> · ref. {{ m.reference }}</template></small>
+              <small>{{ fmtDate(m.paid_on) }}<template v-if="m.channel"> · {{ m.channel }}</template><template v-if="m.reference"> · ref. {{ m.reference }}</template><template v-if="m.receipt_number && m.kind === 'payment'"> · receipt {{ m.receipt_number }}</template></small>
             </div>
           </li>
         </ul>
@@ -245,6 +245,7 @@ import { useRoute } from "vue-router";
 import api from "../../plugins/axios";
 import AuthShell from "../../components/auth/AuthShell.vue";
 import AuthNotice from "../../components/auth/AuthNotice.vue";
+import { CHANNELS } from "../../components/procurement/paymongoChannels";
 
 /** A supplier answers a purchase order from the private link in its email (no account) */
 const STAGE = {
@@ -268,10 +269,7 @@ const deliveryDate = ref("");
 const note = ref("");
 const reason = ref("");
 const shipNote = ref("");
-const PROVIDERS = {
-  bank: ["BDO", "BPI", "Metrobank", "Landbank", "PNB", "Security Bank", "UnionBank", "RCBC", "China Bank", "EastWest Bank", "Other bank"],
-  ewallet: ["GCash", "Maya", "GrabPay", "ShopeePay", "Coins.ph", "Other e-wallet"],
-};
+const PROVIDERS = CHANNELS;
 const acct = reactive({ useSaved: false, method: "bank", provider: "", name: "", number: "" });
 const editingAccount = ref(false);
 const declineOpen = ref(false);

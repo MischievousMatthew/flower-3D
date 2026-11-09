@@ -55,7 +55,31 @@
             </label>
           </div>
 
-          <div class="sp-grid-2">
+          <!-- Pay through PayMongo -->
+          <div v-if="!isCredit && !manual" class="fp-pm">
+            <fieldset class="fp-fieldset">
+              <legend class="sp-label">Pay with</legend>
+              <div v-for="(list, kind) in CHANNELS" :key="kind" class="fp-group">
+                <span class="fp-group-label">{{ kind === "bank" ? "Online banking" : "E-wallet" }}</span>
+                <div class="fp-chips">
+                  <label v-for="c in list" :key="c" class="fp-chip" :class="{ on: form.payment_channel === c }">
+                    <input v-model="form.payment_channel" type="radio" name="fp-channel" :value="c" />{{ c }}
+                  </label>
+                </div>
+              </div>
+              <small v-if="request.payment_channel && form.payment_channel !== request.payment_channel" class="sp-hint">Procurement asked for {{ request.payment_channel }}.</small>
+            </fieldset>
+            <label class="sp-field fp-amount">
+              <span class="sp-label">Amount (₱)</span>
+              <input v-model.number="form.amount" class="sp-input" :class="{ invalid: err.amount }" type="number" :min="PAYMONGO_MINIMUM" step="0.01" inputmode="decimal" />
+              <small v-if="err.amount" class="sp-error">{{ err.amount }}</small>
+            </label>
+            <p class="fp-note"><span v-html="ICONS.lock"></span>You finish paying on PayMongo's page. Once it goes through, {{ p.order?.supplier_name || "the supplier" }} is emailed a receipt.</p>
+            <button type="button" class="fp-link" @click="manual = true">Paid another way? Record it instead</button>
+          </div>
+
+          <div v-if="isCredit || manual" class="sp-grid-2">
+            <p v-if="manual" class="sp-span-all fp-manual-head">Recording a payment made outside PayMongo. <button type="button" class="fp-link" @click="manual = false">Pay with PayMongo instead</button></p>
             <label v-if="!isCredit || form.outcome === 'refund'" class="sp-field">
               <span class="sp-label">{{ isCredit ? "Amount refunded" : "Amount paid" }} (₱)</span>
               <input v-model.number="form.amount" class="sp-input" :class="{ invalid: err.amount }" type="number" min="0.01" step="0.01" inputmode="decimal" />
@@ -90,7 +114,7 @@
           <div class="sp-modal-foot">
             <button type="button" class="sp-btn sp-btn-ghost" @click="close">Cancel</button>
             <button type="submit" class="sp-btn sp-btn-primary" :disabled="busy">
-              {{ busy ? "Saving…" : isCredit ? (form.outcome === "refund" ? "Record refund" : "Keep as credit") : `Mark ${peso(form.amount)} as paid` }}
+              {{ busy ? (isCredit || manual ? "Saving…" : "Opening PayMongo…") : isCredit ? (form.outcome === "refund" ? "Record refund" : "Keep as credit") : manual ? `Mark ${peso(form.amount)} as paid` : `Pay ${peso(form.amount)} with PayMongo` }}
             </button>
           </div>
         </form>
@@ -106,6 +130,7 @@ import { SHOP_ICONS as ICONS } from "../vendor/shop/shopIcons";
 import { apiMessage } from "../vendor/shop/useVendorCatalog";
 import { toast } from "@/utils/snackbar";
 import { peso, dateText } from "./fundingPayment";
+import { CHANNELS, kindOf, PAYMONGO_MINIMUM } from "./paymongoChannels";
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -116,11 +141,6 @@ const props = defineProps({
 });
 const emit = defineEmits(["close", "done"]);
 
-// Matches FundingRequestController::PAYMENT_CHANNELS
-const CHANNELS = {
-  bank: ["BDO", "BPI", "Metrobank", "Landbank", "PNB", "Security Bank", "UnionBank", "RCBC", "China Bank", "EastWest Bank", "Other bank"],
-  ewallet: ["GCash", "Maya", "GrabPay", "ShopeePay", "Coins.ph", "Other e-wallet"],
-};
 const pad = (n) => String(n).padStart(2, "0");
 const now = new Date();
 const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
@@ -131,7 +151,7 @@ const payout = computed(() => p.value.order?.payout ?? null);
 const copied = ref(false);
 async function copyNumber() {
   try {
-    await navigator.clipboard.writeText(String(payout.value.account_number).replace(/s+/g, ""));
+    await navigator.clipboard.writeText(String(payout.value.account_number).replace(/\s+/g, ""));
     copied.value = true;
     setTimeout(() => (copied.value = false), 1500);
   } catch {
@@ -140,6 +160,8 @@ async function copyNumber() {
 }
 const isCredit = computed(() => props.mode === "credit");
 const busy = ref(false);
+// Recording a payment made outside PayMongo
+const manual = ref(false);
 const formError = ref("");
 const err = reactive({});
 const form = reactive({ outcome: "refund", amount: 0, paid_on: today, payment_channel: "", reference: "", note: "" });
@@ -150,18 +172,19 @@ watch(
     if (!open) return;
     Object.keys(err).forEach((k) => delete err[k]);
     formError.value = "";
+    manual.value = false;
     Object.assign(form, {
       outcome: "refund",
       amount: isCredit.value ? p.value.supplier_owes : p.value.to_pay,
       paid_on: today,
-      payment_channel: props.request.payment_channel || "BDO",
+      payment_channel: CHANNELS.bank.includes(props.request.payment_channel) || CHANNELS.ewallet.includes(props.request.payment_channel) ? props.request.payment_channel : "GCash",
       reference: "",
       note: "",
     });
   },
 );
 
-const methodOf = (channel) => (CHANNELS.ewallet.includes(channel) ? "ewallet" : "bank");
+const methodOf = kindOf;
 
 function validate() {
   Object.keys(err).forEach((k) => delete err[k]);
@@ -179,8 +202,28 @@ function validate() {
   return !Object.keys(err).length;
 }
 
+async function payWithPayMongo() {
+  Object.keys(err).forEach((k) => delete err[k]);
+  const amount = Number(form.amount);
+  if (!(amount >= PAYMONGO_MINIMUM)) err.amount = `PayMongo payments start at ${peso(PAYMONGO_MINIMUM)}.`;
+  else if (amount > Number(p.value.to_pay) + 0.001) err.amount = `It can be up to ${peso(p.value.to_pay)}.`;
+  if (!form.payment_channel) formError.value = "Choose a bank or e-wallet.";
+  if (Object.keys(err).length || formError.value) return;
+  busy.value = true;
+  try {
+    const { data } = await api.post(`finance/funding-requests/${props.request.id}/paymongo`, { amount, payment_channel: form.payment_channel });
+    // Off to PayMongo; it sends Finance back to the list afterwards
+    window.location.href = data.data.checkout_url;
+  } catch (e) {
+    for (const [k, v] of Object.entries(e?.response?.data?.errors ?? {})) err[k] = Array.isArray(v) ? v[0] : v;
+    formError.value = apiMessage(e, "Couldn't open PayMongo.");
+    busy.value = false;
+  }
+}
+
 async function submit() {
   formError.value = "";
+  if (!isCredit.value && !manual.value) return payWithPayMongo();
   if (!validate()) return;
   busy.value = true;
   const money = !isCredit.value || form.outcome === "refund";
@@ -273,6 +316,84 @@ function close() {
 }
 .fp-dest small {
   font-size: 12px;
+  color: var(--v-text-2);
+}
+.fp-pm {
+  display: grid;
+  gap: 12px;
+}
+.fp-fieldset {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.fp-fieldset legend {
+  margin-bottom: 4px;
+  padding: 0;
+}
+.fp-group {
+  display: grid;
+  gap: 6px;
+}
+.fp-group-label {
+  font-size: 11.5px;
+  color: var(--v-muted);
+}
+.fp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fp-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--v-border-strong);
+  border-radius: 999px;
+  background: var(--v-surface);
+  color: var(--v-text-2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.fp-chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.fp-chip:has(input:focus-visible) {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.fp-chip.on {
+  border-color: var(--bc-accent);
+  background: var(--bc-accent-soft);
+  color: var(--bc-accent-deep);
+  font-weight: 600;
+}
+.fp-amount {
+  max-width: 240px;
+}
+.fp-link {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--bc-accent-deep);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.fp-manual-head {
+  margin: 0;
+  font-size: 12.5px;
   color: var(--v-text-2);
 }
 .fp-note {

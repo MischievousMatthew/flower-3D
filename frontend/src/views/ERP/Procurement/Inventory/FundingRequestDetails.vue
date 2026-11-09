@@ -90,6 +90,7 @@
               <small>{{ dateText(m.paid_on) }}<template v-if="m.reference"> · ref. {{ m.reference }}</template><template v-if="m.recorded_by_name"> · {{ m.recorded_by_name }}</template></small>
               <small v-if="m.note">{{ m.note }}</small>
             </div>
+            <button v-if="m.kind === 'payment'" type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="receipt = m"><span v-html="ICONS.receipt"></span>Receipt</button>
           </li>
         </ul>
       </section>
@@ -147,6 +148,7 @@
         </section>
       </div>
     </template>
+    <FundingReceiptModal :open="!!receipt" :payment="receipt ?? {}" :request="request ?? {}" :pay="pay ?? {}" @close="receipt = null" />
     <FundingPayModal :open="!!payMode" :request="request ?? {}" :mode="payMode || 'pay'" @close="payMode = ''" @done="afterPay" />
   </HrPage>
 </template>
@@ -161,6 +163,7 @@ import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcon
 import { apiMessage } from "../../../../components/vendor/shop/useVendorCatalog";
 import { PERMISSION_TOOLTIPS, useAssignment } from "../../../../composables/useAssignment";
 import FundingPayModal from "../../../../components/procurement/FundingPayModal.vue";
+import FundingReceiptModal from "../../../../components/procurement/FundingReceiptModal.vue";
 import { paymentStage, timingText, dateText, PAYMENT_KIND } from "../../../../components/procurement/fundingPayment";
 import "../../../../components/vendor/finance/finance.css";
 
@@ -197,6 +200,7 @@ const pay = computed(() => request.value?.payment ?? null);
 const stage = computed(() => paymentStage(pay.value));
 const canPay = computed(() => can("funding_requests", "approve"));
 const payMode = ref("");
+const receipt = ref(null);
 async function afterPay() {
   payMode.value = "";
   await fetchRequest();

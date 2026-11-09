@@ -239,7 +239,7 @@ class SupplierOrderController extends Controller
         return [
             'use_saved' => ['nullable', 'boolean'],
             'payout_method' => ['nullable', 'in:bank,ewallet'],
-            'payout_provider' => [$useSaved ? 'nullable' : 'required_with:payout_account_number', 'nullable', 'string', 'max:60'],
+            'payout_provider' => [$useSaved ? 'nullable' : 'required_with:payout_account_number', 'nullable', 'string', \Illuminate\Validation\Rule::in(\App\Support\PayMongoChannels::all())],
             'payout_account_name' => [$useSaved ? 'nullable' : 'required_with:payout_account_number', 'nullable', 'string', 'max:120'],
             // Digits, with the spaces or dashes people type
             'payout_account_number' => [$useSaved ? 'nullable' : 'required_with:payout_provider', 'nullable', 'string', 'max:40', 'regex:/^[0-9 \-]{6,40}$/'],
@@ -268,10 +268,9 @@ class SupplierOrderController extends Controller
         if (empty($data['payout_account_number']) || empty($data['payout_provider'])) {
             return null;
         }
-        $ewallets = ['GCash', 'Maya', 'GrabPay', 'ShopeePay', 'Coins.ph', 'Other e-wallet'];
 
         return [
-            'payout_method' => $data['payout_method'] ?? (in_array($data['payout_provider'], $ewallets, true) ? 'ewallet' : 'bank'),
+            'payout_method' => $data['payout_method'] ?? \App\Support\PayMongoChannels::kindOf($data['payout_provider']),
             'payout_provider' => trim($data['payout_provider']),
             'payout_account_name' => trim((string) ($data['payout_account_name'] ?? '')),
             'payout_account_number' => trim(preg_replace('/\s+/', ' ', $data['payout_account_number'])),
@@ -312,6 +311,7 @@ class SupplierOrderController extends Controller
                     'paid_on' => $p->paid_on?->toDateString(),
                     'channel' => $p->payment_channel,
                     'reference' => $p->reference,
+                    'receipt_number' => $p->receipt_number,
                 ]),
             ],
             'shop_name' => $owner?->vendor?->store_name ?: ($owner?->name ?: 'The shop'),

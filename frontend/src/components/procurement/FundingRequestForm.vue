@@ -134,7 +134,7 @@
 
         <!-- Payment -->
         <section class="sp-card" aria-labelledby="fr-pay">
-          <div class="sp-card-head"><div><h2 id="fr-pay">Payment</h2><p>How Finance should release the money</p></div></div>
+          <div class="sp-card-head"><div><h2 id="fr-pay">Payment</h2><p>Finance pays the supplier through PayMongo, with this bank or e-wallet</p></div></div>
           <div class="fr-methods" role="radiogroup" aria-label="Payment method">
             <label v-for="m in METHODS" :key="m.value" class="fr-method" :class="{ on: form.payment_method === m.value, invalid: err.payment_method }">
               <input v-model="form.payment_method" type="radio" name="fr-method" :value="m.value" @change="form.payment_channel = ''" />
@@ -205,6 +205,7 @@ import HrPage from "../hr/HrPage.vue";
 import { SHOP_ICONS as ICONS } from "../vendor/shop/shopIcons";
 import { apiMessage } from "../vendor/shop/useVendorCatalog";
 import { money } from "../vendor/finance/financeUi";
+import { CHANNELS } from "./paymongoChannels";
 import { useAssignment } from "../../composables/useAssignment";
 import { toast } from "@/utils/snackbar";
 import "../vendor/finance/finance.css";
@@ -227,14 +228,9 @@ const URGENCY = [
   { value: "Critical", hint: "Orders are at risk now", tone: "red" },
 ];
 const METHODS = [
-  { value: "bank", label: "Bank transfer", hint: "Paid from a bank account", icon: "card" },
-  { value: "ewallet", label: "E-wallet", hint: "GCash, Maya and others", icon: "wallet" },
+  { value: "bank", label: "Online banking", hint: "BPI, UnionBank, BDO, Landbank, Metrobank", icon: "card" },
+  { value: "ewallet", label: "E-wallet", hint: "GCash, Maya, GrabPay, ShopeePay", icon: "wallet" },
 ];
-// Matches FundingRequestController::PAYMENT_CHANNELS
-const CHANNELS = {
-  bank: ["BDO", "BPI", "Metrobank", "Landbank", "PNB", "Security Bank", "UnionBank", "RCBC", "China Bank", "EastWest Bank", "Other bank"],
-  ewallet: ["GCash", "Maya", "GrabPay", "ShopeePay", "Coins.ph", "Other e-wallet"],
-};
 const BASE = "/procurement/inventory/funding-requests";
 const LIST = "/erp/procurement/inventory/funding-request";
 

@@ -136,5 +136,10 @@ return [
         'FRONTEND_VENDOR_SUBSCRIPTION_PATH',
         '/pxHiyrGwDDpBO9v5VMswSWCpO333d4GMKwtrZwpHbpg'
     ),
+    // Finance's funding requests page, where PayMongo sends Finance back after paying a supplier
+    'frontend_finance_funding_path' => env(
+        'FRONTEND_FINANCE_FUNDING_PATH',
+        '/4v9F0fnGkGzX9G0rMznMHw7h0FUiJ9500M1kRrojhc1'
+    ),
 
 ];

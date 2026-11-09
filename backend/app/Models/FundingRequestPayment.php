@@ -33,6 +33,12 @@ class FundingRequestPayment extends Model
         'paid_on' => 'date:Y-m-d',
     ];
 
+    /** Shown on the receipt, e.g. BC-R-000042 */
+    public function getReceiptNumberAttribute(): string
+    {
+        return 'BC-R-' . str_pad((string) $this->id, 6, '0', STR_PAD_LEFT);
+    }
+
     public function fundingRequest(): BelongsTo
     {
         return $this->belongsTo(FundingRequest::class);

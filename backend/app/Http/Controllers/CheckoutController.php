@@ -1127,6 +1127,13 @@ class CheckoutController extends Controller
                 return response()->json(['success' => true, 'status' => 'subscription processed']);
             }
 
+            // Finance paying a supplier for a funding request
+            $fundingPayments = app(\App\Services\FundingPayMongoService::class);
+            if ($fundingPayments->handlesWebhook($payload)) {
+                $fundingPayments->handleWebhook($payload);
+                return response()->json(['success' => true, 'status' => 'funding payment processed']);
+            }
+
             if (app()->environment('local') && $request->has('test_mode')) {
                 Log::info('Local test webhook processing');
                 return $this->handleTestWebhook($request);

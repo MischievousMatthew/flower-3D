@@ -222,7 +222,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import HrPage from "../../../components/hr/HrPage.vue";
@@ -259,6 +259,7 @@ const REASONS = {
 const REJECT_REASONS = ["Not enough cash right now", "Over this month's budget", "We already have enough stock", "Supplier price is too high", "Needed-by date can't be met", "Duplicate request", "Details are missing or wrong", "Other"];
 
 const router = useRouter();
+const route = useRoute();
 const { can } = useAssignment();
 const { user } = useAuth();
 
@@ -476,7 +477,23 @@ async function submitDecision() {
   }
 }
 
-onMounted(fetchRequests);
+// Back from PayMongo after paying a supplier
+const PAYMONGO_RESULT = {
+  paid: ["success", "Paid through PayMongo. The supplier was emailed a receipt."],
+  pending: ["info", "PayMongo is still confirming the payment. It shows here as paid once it goes through."],
+  review: ["error", "PayMongo took the payment, but it couldn't be recorded here automatically. Check the request with your admin."],
+  cancelled: ["info", "Payment cancelled. Nothing was paid."],
+};
+onMounted(async () => {
+  const back = route.query.funding_payment;
+  const result = PAYMONGO_RESULT[back];
+  if (result) {
+    toast[result[0]](result[1]);
+    router.replace({ query: {} });
+  }
+  await fetchRequests();
+  if (back === "pending") setTimeout(fetchRequests, 4000);
+});
 </script>
 
 <style scoped>

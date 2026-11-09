@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\FundingPaymentCheckout;
 use App\Support\SupplierPaymentTerms;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -28,13 +30,13 @@ class FundingPaymentTest extends TestCase
     {
         parent::setUp();
         $this->createAttendanceTables();
-        foreach (['funding_request_payments', 'funding_request_items', 'funding_requests', 'purchase_order_items', 'purchase_orders', 'suppliers', 'vendor_balances'] as $t) {
+        foreach (['funding_payment_checkouts', 'funding_request_payments', 'funding_request_items', 'funding_requests', 'purchase_order_items', 'purchase_orders', 'suppliers', 'vendor_balances'] as $t) {
             Schema::dropIfExists($t);
         }
         foreach (['2026_02_07_085208_create_funding_requests_table', '2026_03_10_065051_add_linked_order_id_to_funding_requests_table',
             '2026_04_02_120100_add_requester_and_approver_to_funding_requests_table', '2026_04_05_110000_add_payment_status_to_funding_requests_table',
             '2026_11_09_120000_add_items_and_payment_method_to_funding_requests', '2026_11_09_130000_add_approved_quantity_to_funding_request_items',
-            '2026_11_09_140000_funding_request_payments'] as $m) {
+            '2026_11_09_140000_funding_request_payments', '2026_11_09_160000_create_funding_payment_checkouts'] as $m) {
             (require base_path("database/migrations/{$m}.php"))->up();
         }
         Schema::create('suppliers', function (Blueprint $t) {
@@ -216,5 +218,54 @@ class FundingPaymentTest extends TestCase
 
         $this->pay($id, 1000)->assertOk()->assertJsonPath('data.to_pay', 700);
         $this->pay($id, 700)->assertOk()->assertJsonPath('data.stage', 'paid');
+    }
+
+    public function test_paying_through_paymongo_records_the_payment_once_it_is_paid(): void
+    {
+        config(['services.paymongo.secret_key' => 'sk_test_x']);
+        $id = $this->request();
+        $this->approve($id)->assertOk();
+        $this->order($id, 'Pay before delivery', 'processing');
+
+        $paid = false;
+        Http::fake(function ($request) use (&$paid) {
+            if ($request->method() === 'POST') {
+                $this->assertSame(['gcash'], $request['data']['attributes']['payment_method_types']);
+                $this->assertSame(210000, $request['data']['attributes']['line_items'][0]['amount']);
+
+                return Http::response(['data' => ['id' => 'cs_1', 'attributes' => ['checkout_url' => 'https://checkout.paymongo.test/cs_1']]]);
+            }
+            $checkoutId = (string) FundingPaymentCheckout::value('id');
+
+            return Http::response(['data' => ['id' => 'cs_1', 'attributes' => [
+                'metadata' => ['funding_payment_checkout_id' => $checkoutId],
+                'payments' => $paid ? [['id' => 'pay_ABC', 'attributes' => ['status' => 'paid', 'amount' => 210000]]] : [],
+            ]]]);
+        });
+
+        // Only PayMongo's banks and e-wallets
+        $this->postJson(self::BASE . "/{$id}/paymongo", ['amount' => 2100, 'payment_channel' => 'PNB'])->assertStatus(422);
+        $this->postJson(self::BASE . "/{$id}/paymongo", ['amount' => 10, 'payment_channel' => 'GCash'])->assertStatus(422);
+        $this->postJson(self::BASE . "/{$id}/paymongo", ['amount' => 2100, 'payment_channel' => 'GCash'])
+            ->assertOk()->assertJsonPath('data.checkout_url', 'https://checkout.paymongo.test/cs_1');
+        $checkout = FundingPaymentCheckout::firstOrFail();
+
+        // Back before PayMongo has it as paid: nothing recorded
+        $this->get("/api/funding-payments/callback?checkout_id={$checkout->id}&success=true")->assertRedirectContains('funding_payment=pending');
+        $this->assertSame(0, DB::table('funding_request_payments')->count());
+
+        $paid = true;
+        $this->get("/api/funding-payments/callback?checkout_id={$checkout->id}&success=true")->assertRedirectContains('funding_payment=paid');
+        $this->get("/api/funding-payments/callback?checkout_id={$checkout->id}&success=true")->assertRedirectContains('funding_payment=paid');
+
+        $this->assertSame(1, DB::table('funding_request_payments')->count());
+        $row = DB::table('funding_request_payments')->first();
+        $this->assertSame('pay_ABC', $row->reference);
+        $this->assertSame('GCash', $row->payment_channel);
+        $this->assertSame('Fe', $row->recorded_by_name);
+        $this->assertSame('paid', $checkout->fresh()->status);
+        $this->signIn($this->finance);
+        $this->assertSame('paid', $this->payment($id)['stage']);
+        $this->assertSame('BC-R-' . str_pad((string) $row->id, 6, '0', STR_PAD_LEFT), $this->payment($id)['payments'][0]['receipt_number']);
     }
 }

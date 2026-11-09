@@ -119,7 +119,7 @@ class AccountingFundingRequestController extends Controller
     {
         return [
             'payment_method' => 'nullable|in:bank,ewallet',
-            'payment_channel' => 'nullable|string|max:60',
+            'payment_channel' => ['nullable', \Illuminate\Validation\Rule::in(\App\Support\PayMongoChannels::all())],
             'reference' => 'required|string|max:100',
             'paid_on' => 'required|date|before_or_equal:today',
             'note' => 'nullable|string|max:500',
@@ -152,6 +152,51 @@ class AccountingFundingRequestController extends Controller
         ]);
 
         return $this->moneyResponse(fn () => $payments->pay($this->getOwnerId($request), (int) $id, $data));
+    }
+
+    /** POST finance/funding-requests/{id}/paymongo: start paying the supplier through PayMongo Checkout */
+    public function payWithPayMongo(Request $request, \App\Services\FundingPayMongoService $paymongo, $id)
+    {
+        if ($response = $this->requirePayer($request)) {
+            return $response;
+        }
+        $data = $request->validate([
+            'amount' => 'required|numeric|gt:0|max:100000000',
+            'payment_channel' => ['required', \Illuminate\Validation\Rule::in(\App\Support\PayMongoChannels::all())],
+        ], ['payment_channel.in' => 'Choose a bank or e-wallet PayMongo offers.']);
+
+        return $this->moneyResponse(fn () => [
+            'checkout_url' => $paymongo->create(
+                $this->getOwnerId($request),
+                (int) $id,
+                (float) $data['amount'],
+                $data['payment_channel'],
+                \App\Models\PurchaseOrderEvent::nameOf($request->user()),
+            )->checkout_url,
+        ]);
+    }
+
+    /**
+     * GET /api/funding-payments/callback: PayMongo sends Finance back here.
+     * The link proves nothing by itself; the payment is looked up at PayMongo.
+     */
+    public function payMongoCallback(Request $request, \App\Services\FundingPayMongoService $paymongo)
+    {
+        $checkout = \App\Models\FundingPaymentCheckout::find($request->integer('checkout_id'));
+        $state = 'cancelled';
+        if ($checkout && $request->boolean('success')) {
+            $state = $paymongo->confirm($checkout) ? 'paid' : ($checkout->fresh()->status === 'needs_review' ? 'review' : 'pending');
+        } elseif ($checkout) {
+            $paymongo->cancel($checkout);
+        }
+
+        $frontend = rtrim((string) config('app.frontend_url', ''), '/');
+        if ($frontend !== '' && !preg_match('#^https?://#i', $frontend)) {
+            $frontend = 'https://' . ltrim($frontend, '/');
+        }
+        $path = '/' . ltrim((string) config('app.frontend_finance_funding_path'), '/');
+
+        return redirect($frontend . $path . '?funding_payment=' . $state . '&request=' . urlencode((string) $checkout?->funding_request_id));
     }
 
     /** POST finance/funding-requests/{id}/supplier-credit: what a supplier owes is refunded or kept as credit */

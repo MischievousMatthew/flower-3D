@@ -236,10 +236,10 @@ class FundingRequestController extends Controller
         }
     }
 
-    /** Banks and e-wallets Finance can pay through */
+    /** Banks and e-wallets Finance can pay through: only those PayMongo offers */
     public const PAYMENT_CHANNELS = [
-        'bank' => ['BDO', 'BPI', 'Metrobank', 'Landbank', 'PNB', 'Security Bank', 'UnionBank', 'RCBC', 'China Bank', 'EastWest Bank', 'Other bank'],
-        'ewallet' => ['GCash', 'Maya', 'GrabPay', 'ShopeePay', 'Coins.ph', 'Other e-wallet'],
+        'bank' => ['BPI', 'UnionBank', 'BDO', 'Landbank', 'Metrobank'],
+        'ewallet' => ['GCash', 'Maya', 'GrabPay', 'ShopeePay'],
     ];
 
     private const REASONS = ['New Order', 'Spoilage', 'Forecast Error', 'Seasonal Demand', 'Supplier Delay'];

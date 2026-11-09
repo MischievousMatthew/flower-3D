@@ -83,6 +83,8 @@ class FundingPaymentService
                 'paid_on' => $p->paid_on?->toDateString(),
                 'note' => $p->note,
                 'recorded_by_name' => $p->recorded_by_name,
+                'receipt_number' => $p->receipt_number,
+                'recorded_at' => $p->created_at?->toIso8601String(),
             ])->all(),
             'order' => $order ? [
                 'id' => $order->id,
@@ -177,7 +179,7 @@ class FundingPaymentService
                 'payment_due_days' => $state['due_days'],
             ]);
 
-            $f->payments()->create([
+            $payment = $f->payments()->create([
                 'owner_id' => $ownerId,
                 'purchase_order_id' => $f->linked_order_id,
                 'kind' => FundingRequestPayment::KIND_PAYMENT,
@@ -187,7 +189,8 @@ class FundingPaymentService
                 'reference' => $data['reference'],
                 'paid_on' => $data['paid_on'],
                 'note' => $data['note'] ?? null,
-                'recorded_by_name' => PurchaseOrderEvent::nameOf(auth()->user()),
+                // Paid through PayMongo: nobody is signed in on PayMongo's return, so the payer is passed in
+                'recorded_by_name' => $data['recorded_by_name'] ?? PurchaseOrderEvent::nameOf(auth()->user()),
             ]);
 
             $after = $this->state($f->fresh());
@@ -199,21 +202,21 @@ class FundingPaymentService
                     number_format($amount, 2), $data['payment_channel'] ?? $f->payment_channel ?? 'bank or e-wallet', $data['reference']));
             }
 
-            return [$this->state($f->fresh()), $order, $amount, $data];
+            return [$this->state($f->fresh()), $order, $payment, $f];
         });
-        [$state, $order, $amount, $data] = $result;
+        [$state, $order, $payment, $f] = $result;
 
-        // Tell the supplier it's on its way; the payment stands even if the email doesn't go
+        // Email the supplier a receipt; the payment stands even if the email doesn't go
         if ($order?->supplier?->email) {
             try {
-                $sent = (new \App\Mail\PurchaseOrderPaidMail($order, $amount, $data['paid_on'], $data['reference'], $data['payment_channel'] ?? null))->send();
+                $sent = (new \App\Mail\PurchaseOrderPaidMail($order, $payment, $f, $data['via'] ?? null))->send();
                 PurchaseOrderEvent::record($order, $sent ? 'paid_emailed' : 'email_failed', null, null, $order->supplier->email);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Supplier payment email failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
             }
         }
 
-        return $state;
+        return $state + ['payment_id' => $payment->id];
     }
 
     /** Close what a supplier owes: they refunded it, or it's kept as credit with them */

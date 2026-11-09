@@ -205,6 +205,8 @@ Route::post('/paymongo/webhook', [CheckoutController::class, 'handleWebhook'])
     ->middleware('paymongo.webhook');
 Route::get('/payment/callback',  [CheckoutController::class, 'paymentCallback']);
 Route::get('/subscription/payment/callback', [VendorSubscriptionController::class, 'paymentCallback']);
+// PayMongo sends Finance back here after paying a supplier; the payment is checked at PayMongo
+Route::get('/funding-payments/callback', [AccountingFundingRequestController::class, 'payMongoCallback'])->middleware('throttle:30,1');
 // Enterprise plan "Talk to us" from the landing and pricing pages
 Route::post('/enterprise-inquiries', [EnterpriseInquiryController::class, 'store'])->middleware('throttle:5,60');
 
@@ -1170,6 +1172,7 @@ Route::middleware('token.auth')->group(function () {
         // Paying the supplier, when their terms say; and what they owe back after a short delivery
         Route::post('funding-requests/{id}/pay', [AccountingFundingRequestController::class, 'pay'])->whereNumber('id')->middleware('employee.module:funding_requests,approve');
         Route::post('funding-requests/{id}/supplier-credit', [AccountingFundingRequestController::class, 'settleSupplierCredit'])->whereNumber('id')->middleware('employee.module:funding_requests,approve');
+        Route::post('funding-requests/{id}/paymongo', [AccountingFundingRequestController::class, 'payWithPayMongo'])->whereNumber('id')->middleware('employee.module:funding_requests,approve');
     });
 
     // ── Admin panel ───────────────────────────────────────────────────────
