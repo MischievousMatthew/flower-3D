@@ -14,7 +14,7 @@ trait CreatesPurchasingTables
 {
     protected function createPurchasingTables(): void
     {
-        foreach (['supplier_ratings', 'supplier_products', 'purchase_order_receipt_files', 'purchase_order_receipt_lines', 'purchase_order_receipts', 'warehouse_locations', 'shipments', 'purchase_order_events', 'warehouse_batches', 'purchase_order_items', 'purchase_orders', 'suppliers', 'funding_request_items', 'funding_requests'] as $t) {
+        foreach (['supplier_ratings', 'supplier_products', 'purchase_order_receipt_files', 'purchase_order_receipt_lines', 'purchase_order_receipts', 'warehouse_locations', 'shipments', 'purchase_order_events', 'warehouse_batches', 'purchase_order_items', 'purchase_orders', 'suppliers', 'funding_request_payments', 'funding_request_items', 'funding_requests'] as $t) {
             Schema::dropIfExists($t);
         }
         Schema::table('products', function (Blueprint $t) {
@@ -90,6 +90,19 @@ trait CreatesPurchasingTables
             $t->unsignedBigInteger('owner_id')->nullable();
             $t->unsignedBigInteger('linked_order_id')->nullable();
             $t->unsignedInteger('shelf_life')->nullable();
+            $t->string('payment_timing', 20)->nullable();
+            $t->string('supplier_terms', 60)->nullable();
+            $t->unsignedSmallInteger('payment_due_days')->nullable();
+            $t->timestamps();
+        });
+        Schema::create('funding_request_payments', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('owner_id');
+            $t->unsignedBigInteger('funding_request_id');
+            $t->unsignedBigInteger('purchase_order_id')->nullable();
+            $t->string('kind', 20);
+            $t->decimal('amount', 12, 2);
+            $t->date('paid_on');
             $t->timestamps();
         });
         Schema::create('funding_request_items', function (Blueprint $t) {
@@ -99,6 +112,7 @@ trait CreatesPurchasingTables
             $t->string('product_name');
             $t->string('uom', 20)->nullable();
             $t->integer('quantity');
+            $t->integer('approved_quantity')->nullable();
             $t->decimal('unit_cost', 12, 2)->default(0);
             $t->decimal('line_total', 12, 2)->default(0);
             $t->timestamps();

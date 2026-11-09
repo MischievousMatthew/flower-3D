@@ -1166,6 +1166,9 @@ Route::middleware('token.auth')->group(function () {
 
         Route::post('funding-requests/{id}/approve', [AccountingFundingRequestController::class, 'approve'])->middleware('employee.module:funding_requests,approve');
         Route::post('funding-requests/{id}/reject', [AccountingFundingRequestController::class, 'reject'])->middleware('employee.module:funding_requests,reject');
+        // Paying the supplier, when their terms say; and what they owe back after a short delivery
+        Route::post('funding-requests/{id}/pay', [AccountingFundingRequestController::class, 'pay'])->whereNumber('id')->middleware('employee.module:funding_requests,approve');
+        Route::post('funding-requests/{id}/supplier-credit', [AccountingFundingRequestController::class, 'settleSupplierCredit'])->whereNumber('id')->middleware('employee.module:funding_requests,approve');
     });
 
     // ── Admin panel ───────────────────────────────────────────────────────

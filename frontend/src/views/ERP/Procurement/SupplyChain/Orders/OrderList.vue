@@ -119,6 +119,7 @@
                   <option value="">Choose an active supplier</option>
                   <option v-for="s in activeSuppliers" :key="s.id" :value="s.id">{{ s.company_name }}</option>
                 </select>
+                <small v-if="fundingSupplier" class="sp-hint">{{ payWhen(fundingSupplier.payment_terms) }}</small>
               </label>
             </template>
             <p v-if="funding.error" class="sp-error">{{ funding.error }}</p>
@@ -165,6 +166,12 @@ const funding = ref(null);
 
 const filtered = computed(() => !!(stage.value || overdue.value || search.value.trim() || supplierId.value || from.value || to.value));
 const activeSuppliers = computed(() => suppliers.value.filter((s) => s.status === "active"));
+const fundingSupplier = computed(() => (funding.value?.supplierId ? suppliers.value.find((s) => s.id === funding.value.supplierId) : null));
+// Same reading as SupplierPaymentTerms on the server
+const payWhen = (terms) =>
+  /before|advance|upfront|up-front|up front|prepaid|pre-paid|prepay|full payment first|pay first|down ?payment/i.test(terms || "")
+    ? `Finance pays them once they confirm, before delivery${terms ? ` (${terms})` : ""}.`
+    : `Finance pays them after delivery, for what arrives${terms ? ` (${terms})` : " (no payment terms set)"}.`;
 
 const itemsText = (o) => {
   const items = o.items ?? [];

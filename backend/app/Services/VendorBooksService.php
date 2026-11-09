@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\FundingRequestPayment;
 use App\Models\PayMongoWebhookEvent;
 use App\Models\Payroll;
 use App\Support\PayMongoPayment;
@@ -104,7 +105,35 @@ class VendorBooksService
                 'expense_id' => $x->id,
             ]);
 
-        return $ledger->concat($payroll)->concat($expenses)
+        // Suppliers paid for approved funding requests (from the shop's own bank or
+        // e-wallet, not its BloomCraft balance), less what suppliers sent back
+        $supplierPayments = (! Schema::hasTable('funding_request_payments') ? collect() : FundingRequestPayment::query()
+            ->where('owner_id', $vendorId)
+            ->whereIn('kind', [FundingRequestPayment::KIND_PAYMENT, FundingRequestPayment::KIND_REFUND])
+            ->whereBetween('paid_on', [$from->toDateString(), $to->toDateString()])
+            ->with('fundingRequest:id,finance_request_id,product_name')
+            ->get())
+            ->map(function (FundingRequestPayment $p) {
+                $refund = $p->kind === FundingRequestPayment::KIND_REFUND;
+                $what = $p->fundingRequest?->product_name ?: 'stock';
+
+                return [
+                    'key' => 'frp-' . md5('frp' . $p->id),
+                    'kind' => $refund ? 'stock_refund' : 'stock',
+                    'direction' => $refund ? 'in' : 'out',
+                    'title' => $refund ? 'Supplier refund' : 'Stock purchase',
+                    'party' => 'For ' . $what . ($p->payment_channel ? " · {$p->payment_channel}" : ''),
+                    'category' => $refund ? 'stock_refund' : 'procurement',
+                    'category_label' => $refund ? 'Supplier refunds' : 'Stock purchases',
+                    'amount' => round((float) $p->amount, 2),
+                    'at' => Carbon::parse($p->paid_on->toDateString() . ' 12:00:00'),
+                    'order_number' => $p->fundingRequest?->finance_request_id,
+                    'source' => 'funding',
+                    'reference' => $p->reference,
+                ];
+            });
+
+        return $ledger->concat($payroll)->concat($expenses)->concat($supplierPayments)
             ->sortByDesc(fn ($e) => $e['at']->getTimestamp())
             ->values();
     }
@@ -118,7 +147,9 @@ class VendorBooksService
         $refunds = $sum('refund');
         $cogsSold = round((float) $entries->where('kind', 'sale')->sum('cost'), 2);
         // Flowers and stock bought in the period, for shops that count them when bought
-        $cogs = $basis === 'bought' ? $sum('stock') : $cogsSold;
+        // Stock bought, less what suppliers refunded after short deliveries
+        $stockSpend = round($sum('stock') - $sum('stock_refund'), 2);
+        $cogs = $basis === 'bought' ? $stockSpend : $cogsSold;
         $payroll = $sum('payroll');
         $saleEntries = $entries->where('kind', 'sale');
         $paymentFees = round((float) $saleEntries->sum(fn ($e) => $e['fee'] ?? 0), 2);
@@ -161,7 +192,7 @@ class VendorBooksService
             'net_profit' => $net,
             'gross_margin' => $netSales > 0 ? round($gross / $netSales * 100, 1) : null,
             'net_margin' => $netSales > 0 ? round($net / $netSales * 100, 1) : null,
-            'stock_purchases' => $sum('stock'),
+            'stock_purchases' => $stockSpend,
             'withdrawals' => $sum('withdrawal'),
             'adjustments_in' => round((float) $entries->where('kind', 'adjustment')->where('direction', 'in')->sum('amount'), 2),
             'adjustments_out' => round((float) $entries->where('kind', 'adjustment')->where('direction', 'out')->sum('amount'), 2),

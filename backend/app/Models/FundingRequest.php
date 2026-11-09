@@ -52,6 +52,10 @@ class FundingRequest extends Model
         'payment_terms',
         'payment_method',
         'payment_channel',
+        'payment_timing',
+        'supplier_terms',
+        'payment_due_days',
+        'supplier_credit_settled_at',
         'expected_selling_price',
         'expected_revenue',
         'estimated_gross_margin',
@@ -165,6 +169,11 @@ class FundingRequest extends Model
     public function items(): HasMany
     {
         return $this->hasMany(FundingRequestItem::class)->orderBy('id');
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(FundingRequestPayment::class)->orderBy('id');
     }
 
     public function linkedOrder(): BelongsTo

@@ -73,9 +73,10 @@
             </span>
           </div>
           <div class="fr-amt">
-            <span class="sp-chip" :class="STATUS[displayRequestStatus(r)]?.tone ?? 'slate'">{{ displayRequestStatus(r) }}</span>
+            <span v-if="paymentStage(r.payment)" class="sp-chip" :class="paymentStage(r.payment).tone" :title="paymentStage(r.payment).text">{{ paymentStage(r.payment).label }}</span>
+            <span v-else class="sp-chip" :class="STATUS[displayRequestStatus(r)]?.tone ?? 'slate'">{{ displayRequestStatus(r) }}</span>
             <strong>{{ peso(r.request_status === "Approved" ? r.approved_amount : r.estimated_total_cost) }}</strong>
-            <small v-if="r.request_status === 'Approved' && Number(r.approved_amount) !== Number(r.estimated_total_cost)">of {{ peso(r.estimated_total_cost) }} asked</small>
+            <small v-if="r.request_status === 'Approved'">{{ r.payment?.net_paid > 0 && !r.payment?.legacy ? `${peso(r.payment.net_paid)} paid` : "budget" }}<template v-if="r.payment?.overdue"> · overdue</template></small>
           </div>
           <div class="fr-actions" @click.stop>
             <button
@@ -86,6 +87,8 @@
               :title="canReviewRequest(r) ? 'Review this request' : 'Only the assigned approver can review this request'"
               @click="openReviewModal(r)"
             >Review</button>
+            <button v-if="r.payment?.stage === 'to_pay'" type="button" class="sp-btn sp-btn-primary sp-btn-sm" :disabled="!canPay" :title="canPay ? 'Record the payment to the supplier' : PERMISSION_TOOLTIPS.approve" @click="openPay(r, 'pay')">Pay</button>
+            <button v-if="r.payment?.stage === 'supplier_owes'" type="button" class="sp-btn sp-btn-primary sp-btn-sm" :disabled="!canPay" @click="openPay(r, 'credit')">Settle</button>
             <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="viewRequest(r.id)">Details</button>
           </div>
         </li>
@@ -166,16 +169,18 @@
             </div>
 
             <div v-if="decision === 'approve'" class="sp-grid-2 fr-decision">
-              <p class="sp-hint sp-span-all">Lower a product's quantity above to approve only part of it. The amount follows.</p>
+              <p class="fr-budget-note sp-span-all"><span v-html="ICONS.wallet"></span>Approving sets a budget. Nothing is paid now: you pay the supplier once they confirm or deliver, as their payment terms say, and only for what they can supply.</p>
+              <p class="sp-hint sp-span-all">Lower a product's quantity above to approve only part of it. The budget follows.</p>
               <label class="sp-field">
-                <span class="sp-label">Amount to release (₱)</span>
+                <span class="sp-label">Budget (₱)</span>
                 <input v-model.number="review.approved_amount" class="sp-input" type="number" min="0" step="0.01" inputmode="decimal" @input="amountTouched = true" />
                 <small v-if="amountTouched && Number(review.approved_amount) !== computedAmount" class="sp-hint">Products come to {{ peso(computedAmount) }}. <button type="button" class="fr-link" @click="resetAmount">Use that</button></small>
               </label>
               <div class="fr-paybox">
                 <span class="fx-icon" v-html="ICONS[review.payment_method === 'ewallet' ? 'wallet' : 'card']"></span>
-                <div><span class="sp-label">Paid through</span><b>{{ payLabel(review) || "Not given" }}</b></div>
+                <div><span class="sp-label">Will be paid through</span><b>{{ payLabel(review) || "Not given" }}</b></div>
               </div>
+              <small v-if="Number(review.approved_amount) > computedAmount" class="sp-error sp-span-all">The budget can't be more than {{ peso(computedAmount) }}: the approved products plus the delivery fee.</small>
               <label class="sp-field sp-span-all">
                 <span class="sp-label">Remarks <small>(optional)</small></span>
                 <textarea v-model="review.finance_remarks" class="sp-textarea" rows="2" maxlength="500" placeholder="Any conditions, like buying in two batches"></textarea>
@@ -204,12 +209,14 @@
                 :disabled="!decision || submitting || !canSubmitDecision"
                 :title="decisionPermissionTooltip"
                 @click="submitDecision"
-              >{{ submitting ? "Saving…" : decision === "reject" ? "Reject request" : `Approve ${peso(review.approved_amount)}` }}</button>
+              >{{ submitting ? "Saving…" : decision === "reject" ? "Reject request" : `Approve ${peso(review.approved_amount)} budget` }}</button>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
+
+    <FundingPayModal :open="!!paying" :request="paying?.request ?? {}" :mode="paying?.mode ?? 'pay'" @close="paying = null" @done="afterPay" />
   </HrPage>
 </template>
 
@@ -223,11 +230,14 @@ import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { PERMISSION_TOOLTIPS, useAssignment } from "../../../composables/useAssignment";
 import { useAuth } from "../../../composables/useAuth";
+import FundingPayModal from "../../../components/procurement/FundingPayModal.vue";
+import { paymentStage } from "../../../components/procurement/fundingPayment";
 import "../../../components/vendor/finance/finance.css";
 
 const STATUS_TABS = [
   { label: "All", value: "all" },
   { label: "Pending", value: "Pending" },
+  { label: "To pay", value: "to_pay" },
   { label: "Approved", value: "Approved" },
   { label: "Rejected", value: "Rejected" },
 ];
@@ -283,7 +293,19 @@ const decisionPermissionTooltip = computed(() => {
   return "";
 });
 
-const displayRequestStatus = (r) => (r?.request_status === "Approved" && r?.payment_status === "paid" ? "Paid" : r?.request_status || "Unknown");
+const displayRequestStatus = (r) => (r?.request_status === "Approved" && (r?.payment?.stage === "paid" || (!r?.payment && r?.payment_status === "paid")) ? "Paid" : r?.request_status || "Unknown");
+// Needs Finance to move money: pay the supplier, or settle what they owe
+const needsMoney = (r) => ["to_pay", "supplier_owes"].includes(r?.payment?.stage);
+const canPay = computed(() => can("funding_requests", "approve"));
+const paying = ref(null);
+function openPay(r, mode) {
+  if (!canPay.value) return toast.error(PERMISSION_TOOLTIPS.approve);
+  paying.value = { request: r, mode };
+}
+async function afterPay() {
+  paying.value = null;
+  await fetchRequests();
+}
 const payLabel = (r) => (r?.payment_channel ? `${r.payment_method === "ewallet" ? "E-wallet" : "Bank"} · ${r.payment_channel}` : r?.payment_terms ? `Terms: ${r.payment_terms}` : "");
 const productCount = (r) => {
   const n = Number(r?.items_count) || (r?.product_name ? 1 : 0);
@@ -315,7 +337,7 @@ const filteredRequests = computed(() => {
   const q = searchQuery.value.trim().toLowerCase();
   const rows = requests.value.filter(
     (r) =>
-      (activeStatusTab.value === "all" || r.request_status === activeStatusTab.value) &&
+      (activeStatusTab.value === "all" || (activeStatusTab.value === "to_pay" ? needsMoney(r) : r.request_status === activeStatusTab.value)) &&
       (!q || [r.finance_request_id, r.product_name, r.submitted_by_name, r.payment_channel, r.business_justification].some((v) => String(v ?? "").toLowerCase().includes(q))),
   );
   const by = {
@@ -326,19 +348,21 @@ const filteredRequests = computed(() => {
   }[sortBy.value];
   return [...rows].sort(by);
 });
-const getStatusCount = (status) => (status === "all" ? requests.value.length : requests.value.filter((r) => r.request_status === status).length);
+const getStatusCount = (status) => (status === "all" ? requests.value.length : requests.value.filter((r) => (status === "to_pay" ? needsMoney(r) : r.request_status === status)).length);
 
 const sum = (rows, key = "estimated_total_cost") => rows.reduce((s, r) => s + Number(r[key] || 0), 0);
 const kpis = computed(() => {
   const pending = requests.value.filter((r) => r.request_status === "Pending");
   const approved = requests.value.filter((r) => r.request_status === "Approved");
   const mine = pending.filter(isAssignedApprover);
-  const pressing = pending.filter((r) => r.urgency_level === "Critical" || (r.required_delivery_date && daysUntil(r.required_delivery_date) <= 2));
+  const toPay = approved.filter((r) => r.payment?.stage === "to_pay");
+  const owed = approved.filter((r) => r.payment?.stage === "supplier_owes");
+  const overdue = toPay.filter((r) => r.payment?.overdue).length;
   return [
     { key: "pending", label: "Waiting for review", icon: "clock", tone: "amber", value: pending.length, sub: `${peso(sum(pending))} asked for` },
     { key: "mine", label: "Assigned to you", icon: "user", tone: "violet", value: mine.length, hero: mine.length > 0, sub: mine.length ? "need your decision" : "nothing for you to review" },
-    { key: "pressing", label: "Due soon or critical", icon: "alert", tone: "red", value: pressing.length, sub: pressing.length ? "needed within 2 days or critical" : "nothing pressing" },
-    { key: "approved", label: "Released", icon: "wallet", tone: "green", value: peso(sum(approved, "approved_amount")), sub: `${approved.length} approved ${approved.length === 1 ? "request" : "requests"}` },
+    { key: "topay", label: "To pay suppliers", icon: "wallet", tone: overdue ? "red" : "green", value: peso(toPay.reduce((s, r) => s + Number(r.payment.to_pay || 0), 0)), sub: toPay.length ? `${toPay.length} ready to pay${overdue ? `, ${overdue} overdue` : ""}` : "nothing to pay right now" },
+    { key: "owed", label: "Suppliers owe you", icon: "alert", tone: owed.length ? "red" : "teal", value: peso(owed.reduce((s, r) => s + Number(r.payment.supplier_owes || 0), 0)), sub: owed.length ? `after ${owed.length} short ${owed.length === 1 ? "delivery" : "deliveries"}` : "no short deliveries" },
   ];
 });
 
@@ -423,7 +447,8 @@ async function submitDecision() {
     const bad = lines.value.find((l) => !Number.isInteger(Number(l.approve)) || Number(l.approve) < 0 || Number(l.approve) > l.quantity);
     if (bad) return toast.error(`Approve between 0 and ${bad.quantity} of ${bad.product_name}`);
     if (!lines.value.some((l) => Number(l.approve) > 0)) return toast.error("Approve at least one product, or reject the request");
-    if (!(Number(f.approved_amount) > 0)) return toast.error("Enter the amount to release");
+    if (!(Number(f.approved_amount) > 0)) return toast.error("Enter a budget above ₱0, or reject the request");
+    if (Number(f.approved_amount) > computedAmount.value + 0.001) return toast.error(`The budget can be up to ${peso(computedAmount.value)}`);
   }
   if (decision.value === "reject" && (!f.rejection_reason || !f.rejection_notes?.trim())) {
     toast.error("Choose a reason and add a note");
@@ -788,6 +813,25 @@ onMounted(fetchRequests);
 .fr-paybox b {
   font-size: 13.5px;
   color: var(--v-text);
+}
+.fr-budget-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bc-accent-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--v-text-2);
+}
+.fr-budget-note :deep(svg) {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: var(--bc-accent-deep);
 }
 .fr-link {
   padding: 0;

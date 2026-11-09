@@ -4,8 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\FundingRequest;
-use App\Models\VendorBalance;
-use App\Models\VendorTransaction;
+use App\Services\FundingPaymentService;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -81,6 +80,20 @@ class AccountingFundingRequestController extends Controller
                 ->orderBy('fr.created_at', 'desc')
                 ->get();
 
+            // Where each approved request's money stands
+            $approvedIds = $requests->where('request_status', FundingRequest::STATUS_APPROVED)->pluck('id');
+            if ($approvedIds->isNotEmpty()) {
+                $payments = app(FundingPaymentService::class);
+                $models = FundingRequest::with(['payments', 'linkedOrder.items', 'linkedOrder.supplier'])->whereIn('id', $approvedIds)->get()->keyBy('id');
+                $requests->each(function ($r) use ($models, $payments) {
+                    if ($m = $models->get($r->id)) {
+                        $state = $payments->state($m);
+                        unset($state['payments']);
+                        $r->payment = $state;
+                    }
+                });
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => $requests,
@@ -89,6 +102,76 @@ class AccountingFundingRequestController extends Controller
             Log::error('Finance funding requests error: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to retrieve requests'], 500);
         }
+    }
+
+    /** Finance staff who can approve funding, or the shop owner, record payments */
+    private function requirePayer(Request $request)
+    {
+        $user = $request->user();
+        if ($this->isShopOwner($user)) {
+            return null;
+        }
+
+        return $this->requireFinanceAccess($request, 'approve');
+    }
+
+    private function moneyRules(): array
+    {
+        return [
+            'payment_method' => 'nullable|in:bank,ewallet',
+            'payment_channel' => 'nullable|string|max:60',
+            'reference' => 'required|string|max:100',
+            'paid_on' => 'required|date|before_or_equal:today',
+            'note' => 'nullable|string|max:500',
+        ];
+    }
+
+    private function moneyResponse(callable $action)
+    {
+        try {
+            return response()->json(['success' => true, 'data' => $action()]);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], $e->getStatusCode());
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'Funding request not found'], 404);
+        } catch (Throwable $e) {
+            Log::error('Funding payment error: ' . $e->getMessage());
+            return response()->json(['message' => 'Couldn\'t save the payment. Please try again.'], 500);
+        }
+    }
+
+    /** POST finance/funding-requests/{id}/pay: money sent to the supplier */
+    public function pay(Request $request, FundingPaymentService $payments, $id)
+    {
+        if ($response = $this->requirePayer($request)) {
+            return $response;
+        }
+        $data = $request->validate(['amount' => 'required|numeric|gt:0|max:100000000'] + $this->moneyRules(), [
+            'reference.required' => 'Enter the reference number from the bank or e-wallet.',
+            'paid_on.before_or_equal' => 'The payment date can\'t be in the future.',
+        ]);
+
+        return $this->moneyResponse(fn () => $payments->pay($this->getOwnerId($request), (int) $id, $data));
+    }
+
+    /** POST finance/funding-requests/{id}/supplier-credit: what a supplier owes is refunded or kept as credit */
+    public function settleSupplierCredit(Request $request, FundingPaymentService $payments, $id)
+    {
+        if ($response = $this->requirePayer($request)) {
+            return $response;
+        }
+        $refund = $request->input('outcome') === 'refund';
+        $rules = ['outcome' => 'required|in:refund,credit'] + $this->moneyRules();
+        $rules['amount'] = $refund ? 'required|numeric|gt:0' : 'nullable';
+        $rules['reference'] = $refund ? 'required|string|max:100' : 'nullable|string|max:100';
+        $rules['paid_on'] = $refund ? 'required|date|before_or_equal:today' : 'nullable|date';
+        $rules['note'] = $refund ? 'nullable|string|max:500' : 'required|string|max:500';
+        $data = $request->validate($rules, [
+            'note.required' => 'Say how the credit will be used, e.g. "Taken off the next order".',
+            'reference.required' => 'Enter the reference number of the refund.',
+        ]);
+
+        return $this->moneyResponse(fn () => $payments->settleCredit($this->getOwnerId($request), (int) $id, $data));
     }
 
     public function approve(Request $request, $id)
@@ -198,54 +281,33 @@ class AccountingFundingRequestController extends Controller
                     }
                 }
 
+                // The budget: more than ₱0, never more than what was asked, and
+                // never more than the approved products plus the delivery fee
+                if ($amount <= 0) {
+                    throw new \Symfony\Component\HttpKernel\Exception\HttpException(422, 'Enter a budget above ₱0, or reject the request.');
+                }
+                $extras = (float) $lockedFundingRequest->logistics_cost + (float) $lockedFundingRequest->tax_vat_estimate;
+                $ceiling = $lines->isNotEmpty()
+                    ? $lines->sum(fn ($l) => (int) $l->approved_quantity * (float) $l->unit_cost) + $extras
+                    : (float) $lockedFundingRequest->estimated_total_cost;
+                $ceiling = round(min($ceiling, (float) $lockedFundingRequest->estimated_total_cost ?: $ceiling), 2);
+                if (round($amount, 2) > $ceiling) {
+                    throw new \Symfony\Component\HttpKernel\Exception\HttpException(422, sprintf('The budget can be up to ₱%s: the approved products plus the delivery fee.', number_format($ceiling, 2)));
+                }
+
+                // Approving sets the budget. Nothing is paid yet: Finance pays the
+                // supplier later, when their payment terms say (see FundingPaymentService)
                 $lockedFundingRequest->update([
                     'request_status' => FundingRequest::STATUS_APPROVED,
-                    'payment_status' => 'paid',
-                    'paid_at' => $decisionAt,
+                    'payment_status' => 'unpaid',
+                    'paid_at' => null,
                     'reviewed_by_employee_id' => $employee->id,
                     'accounting_decision_at' => $decisionAt,
                     'approved_quantity' => $approvedQuantity,
-                    'approved_amount' => $amount,
+                    'approved_amount' => round($amount, 2),
                     'accounting_remarks' => $request->finance_remarks,
                     'rejection_reason' => null,
                     'rejection_notes' => null,
-                ]);
-
-                $vendorBalance = VendorBalance::query()
-                    ->lockForUpdate()
-                    ->firstOrCreate(
-                        ['vendor_id' => $ownerId],
-                        ['balance' => 0, 'total_earned' => 0, 'total_withdrawn' => 0]
-                    );
-
-                $balanceBefore = (float) $vendorBalance->balance;
-                $balanceAfter = max(0, $balanceBefore - $amount);
-
-                $vendorBalance->update([
-                    'balance' => $balanceAfter,
-                    'total_withdrawn' => (float) $vendorBalance->total_withdrawn + $amount,
-                ]);
-
-                VendorTransaction::create([
-                    'vendor_id' => $ownerId,
-                    'order_id' => null,
-                    'type' => 'debit',
-                    'category' => 'adjustment',
-                    'amount' => $amount,
-                    'balance_before' => $balanceBefore,
-                    'balance_after' => $balanceAfter,
-                    'description' => "Funding request approved: {$lockedFundingRequest->product_name} ({$approvedQuantity} " . ($lockedFundingRequest->uom ?: 'units') . ')',
-                    'status' => 'completed',
-                    'metadata' => [
-                        'funding_request_id' => $lockedFundingRequest->id,
-                        'finance_request_id' => $lockedFundingRequest->finance_request_id,
-                        'product_name' => $lockedFundingRequest->product_name,
-                        'approved_quantity' => $approvedQuantity,
-                        'approved_amount' => $amount,
-                        'approved_by_employee_id' => $employee->id,
-                        'approved_by_employee_name' => $employee->name,
-                        'approved_at' => $decisionAt->toIso8601String(),
-                    ],
                 ]);
 
                 return $lockedFundingRequest->fresh();
@@ -253,7 +315,7 @@ class AccountingFundingRequestController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Funding request approved successfully',
+                'message' => 'Approved. Pay the supplier once they confirm or deliver, as their terms say.',
                 'data' => $fundingRequest,
             ], 200);
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {

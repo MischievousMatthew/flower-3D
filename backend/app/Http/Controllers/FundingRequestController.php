@@ -496,6 +496,10 @@ class FundingRequestController extends Controller
                 ->orderBy('id')
                 ->get(['id', 'product_id', 'product_name', 'sku', 'uom', 'current_stock', 'quantity', 'approved_quantity', 'unit_cost', 'line_total']);
 
+            // Budget, what's due under the supplier's terms, and what was paid
+            $model = \App\Models\FundingRequest::with(['payments', 'linkedOrder.items', 'linkedOrder.supplier'])->find($fundingRequest->id);
+            $fundingRequest->payment = $model ? app(\App\Services\FundingPaymentService::class)->state($model) : null;
+
             return response()->json(['success' => true, 'data' => $fundingRequest], 200);
         } catch (Exception $e) {
             Log::error('Funding request show error: ' . $e->getMessage());

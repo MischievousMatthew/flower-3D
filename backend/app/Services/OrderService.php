@@ -265,7 +265,11 @@ class OrderService
             ]);
             PurchaseOrderEvent::record($order, 'cancelled', $from, 'cancelled', $reason);
             \App\Models\PurchaseOrderSupplierLink::revokeFor($order);
-            FundingRequest::where('linked_order_id', $order->id)->update(['linked_order_id' => null]);
+            // Freed to be ordered again, unless the supplier was already paid:
+            // then it stays linked so Finance sees what the supplier owes
+            $paidFor = \App\Models\FundingRequestPayment::where('purchase_order_id', $order->id)->pluck('funding_request_id')->all();
+            FundingRequest::where('linked_order_id', $order->id)->whereNotIn('id', $paidFor)
+                ->update(['linked_order_id' => null, 'payment_timing' => null, 'supplier_terms' => null, 'payment_due_days' => null]);
 
             return $order;
         });
@@ -643,7 +647,13 @@ class OrderService
                 $order->items()->create($line);
             }
 
-            $funding->update(['linked_order_id' => $order->id]);
+            // When the supplier is paid follows their payment terms, as they stand now
+            $funding->update([
+                'linked_order_id'  => $order->id,
+                'payment_timing'   => \App\Support\SupplierPaymentTerms::timing($supplier->payment_terms),
+                'supplier_terms'   => $supplier->payment_terms ? mb_substr($supplier->payment_terms, 0, 60) : null,
+                'payment_due_days' => \App\Support\SupplierPaymentTerms::dueDays($supplier->payment_terms),
+            ]);
 
             return $order->load('items', 'supplier');
         });

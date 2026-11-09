@@ -74,6 +74,7 @@ export const KIND = {
   sale: { label: "Sales", tone: "green", icon: "receipt" },
   refund: { label: "Refunds", tone: "pink", icon: "restore" },
   stock: { label: "Stock purchases", tone: "blue", icon: "box" },
+  stock_refund: { label: "Supplier refunds", tone: "teal", icon: "restore" },
   payroll: { label: "Payroll", tone: "violet", icon: "user" },
   expense: { label: "Expenses", tone: "amber", icon: "card" },
   withdrawal: { label: "Withdrawals", tone: "slate", icon: "truck" },

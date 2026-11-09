@@ -36,8 +36,8 @@
         <div class="sp-card-head"><div><h2>Finance decision</h2><p>{{ displayRequestStatus(request) }} by {{ request.reviewed_by_name || "Finance" }} · {{ formatDateTime(request.accounting_decision_at) }}</p></div></div>
         <dl class="fd-grid">
           <template v-if="request.request_status === 'Approved'">
-            <div><dt>Approved quantity</dt><dd>{{ request.approved_quantity }} {{ request.uom }}</dd></div>
-            <div><dt>Approved amount</dt><dd>{{ peso(request.approved_amount) }}</dd></div>
+            <div><dt>Approved quantity</dt><dd>{{ request.approved_quantity }} {{ request.uom || "units" }}</dd></div>
+            <div><dt>{{ pay && !pay.legacy ? "Budget" : "Approved amount" }}</dt><dd>{{ peso(request.approved_amount) }}</dd></div>
           </template>
           <template v-else>
             <div><dt>Reason</dt><dd class="neg">{{ request.rejection_reason || "—" }}</dd></div>
@@ -45,6 +45,47 @@
           </template>
           <div v-if="request.accounting_remarks" class="wide"><dt>Remarks</dt><dd>{{ request.accounting_remarks }}</dd></div>
         </dl>
+      </section>
+
+      <!-- Paying the supplier -->
+      <section v-if="pay && stage" class="sp-card fd-pay">
+        <div class="sp-card-head">
+          <div><h2>Payment</h2><p>{{ pay.legacy ? "Approved before supplier payments were tracked" : timingText(pay) }}<template v-if="pay.supplier_terms"> · terms: {{ pay.supplier_terms }}</template></p></div>
+          <div v-if="!isInventoryContext" class="fd-pay-actions">
+            <button v-if="pay.stage === 'to_pay'" type="button" class="sp-btn sp-btn-primary" :disabled="!canPay" :title="canPay ? '' : PERMISSION_TOOLTIPS.approve" @click="payMode = 'pay'"><span v-html="ICONS.wallet"></span>Pay {{ peso(pay.to_pay) }}</button>
+            <button v-if="pay.stage === 'supplier_owes'" type="button" class="sp-btn sp-btn-primary" :disabled="!canPay" @click="payMode = 'credit'">Settle {{ peso(pay.supplier_owes) }}</button>
+          </div>
+        </div>
+
+        <div class="fd-pay-state" :class="stage.tone">
+          <span class="fx-icon" :class="`tone-${stage.tone}`" v-html="ICONS[stage.icon]"></span>
+          <div><b>{{ stage.label }}</b><p>{{ stage.text }}</p></div>
+        </div>
+
+        <ol v-if="!pay.legacy" class="fd-steps" aria-label="Payment steps">
+          <li v-for="st in steps" :key="st.key" :class="st.state"><span class="fd-dot" aria-hidden="true"></span><b>{{ st.label }}</b><small>{{ st.sub }}</small></li>
+        </ol>
+
+        <dl v-if="!pay.legacy" class="fd-money">
+          <div><dt>Budget</dt><dd>{{ peso(pay.budget) }}</dd></div>
+          <div v-if="pay.confirmed_value !== null && pay.confirmed_value !== undefined"><dt>Supplier confirmed</dt><dd>{{ peso(pay.confirmed_value) }}</dd></div>
+          <div v-if="pay.received_value > 0"><dt>Received</dt><dd>{{ peso(pay.received_value) }}</dd></div>
+          <div v-if="pay.due !== null && pay.due !== undefined"><dt>Due{{ pay.due_date ? ` by ${dateText(pay.due_date)}` : "" }}</dt><dd :class="{ neg: pay.overdue }">{{ peso(pay.due) }}</dd></div>
+          <div><dt>Paid</dt><dd>{{ peso(pay.net_paid) }}</dd></div>
+          <div v-if="pay.released > 0"><dt>Not needed</dt><dd class="muted">{{ peso(pay.released) }}</dd></div>
+          <div v-if="pay.supplier_owes > 0"><dt>Supplier owes</dt><dd class="neg">{{ peso(pay.supplier_owes) }}</dd></div>
+        </dl>
+
+        <ul v-if="pay.payments?.length" class="fd-payments">
+          <li v-for="m in pay.payments" :key="m.id">
+            <span class="sp-chip" :class="PAYMENT_KIND[m.kind]?.tone">{{ PAYMENT_KIND[m.kind]?.label || m.kind }}</span>
+            <div class="grow">
+              <b>{{ m.kind === "refund" ? "+" : "" }}{{ peso(m.amount) }}<template v-if="m.payment_channel"> · {{ m.payment_channel }}</template></b>
+              <small>{{ dateText(m.paid_on) }}<template v-if="m.reference"> · ref. {{ m.reference }}</template><template v-if="m.recorded_by_name"> · {{ m.recorded_by_name }}</template></small>
+              <small v-if="m.note">{{ m.note }}</small>
+            </div>
+          </li>
+        </ul>
       </section>
 
       <!-- What's being bought -->
@@ -100,6 +141,7 @@
         </section>
       </div>
     </template>
+    <FundingPayModal :open="!!payMode" :request="request ?? {}" :mode="payMode || 'pay'" @close="payMode = ''" @done="afterPay" />
   </HrPage>
 </template>
 
@@ -111,7 +153,9 @@ import api from "../../../../plugins/axios";
 import HrPage from "../../../../components/hr/HrPage.vue";
 import { SHOP_ICONS as ICONS } from "../../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../../components/vendor/shop/useVendorCatalog";
-import { useAssignment } from "../../../../composables/useAssignment";
+import { PERMISSION_TOOLTIPS, useAssignment } from "../../../../composables/useAssignment";
+import FundingPayModal from "../../../../components/procurement/FundingPayModal.vue";
+import { paymentStage, timingText, dateText, PAYMENT_KIND } from "../../../../components/procurement/fundingPayment";
 import "../../../../components/vendor/finance/finance.css";
 
 const props = defineProps({
@@ -140,13 +184,41 @@ const isInventoryContext = computed(() => props.context === "inventory");
 const canEditFunding = computed(() => can("inventory_funding", "edit"));
 const requestId = () => props.id ?? route.params.id ?? window.history.state?.requestId;
 
-const displayRequestStatus = (r) => (r?.request_status === "Approved" && r?.payment_status === "paid" ? "Paid" : r?.request_status || "Unknown");
+const displayRequestStatus = (r) => (r?.request_status === "Approved" && (r?.payment ? r.payment.stage === "paid" : r?.payment_status === "paid") ? "Paid" : r?.request_status || "Unknown");
+
+// Paying the supplier
+const pay = computed(() => request.value?.payment ?? null);
+const stage = computed(() => paymentStage(pay.value));
+const canPay = computed(() => can("funding_requests", "approve"));
+const payMode = ref("");
+async function afterPay() {
+  payMode.value = "";
+  await fetchRequest();
+}
+const steps = computed(() => {
+  const p = pay.value;
+  if (!p) return [];
+  const o = p.order;
+  const confirmed = !!o?.supplier_confirmed_at && o.status !== "cancelled";
+  const delivered = ["completed"].includes(o?.status);
+  const paid = ["paid", "supplier_owes"].includes(p.stage) || p.net_paid > 0;
+  const before = p.timing === "before_delivery";
+  const st = (done, current) => (done ? "done" : current ? "current" : "");
+  const list = [
+    { key: "budget", label: "Budget approved", sub: peso(p.budget), state: "done" },
+    { key: "order", label: "Purchase order", sub: o ? `${o.order_number} · ${o.supplier_name || "supplier"}` : "Not made yet", state: st(!!o, !o) },
+    { key: "confirm", label: "Supplier confirms", sub: confirmed ? dateText(o.supplier_confirmed_at) : o?.status === "cancelled" ? "Cancelled" : "Waiting", state: st(confirmed, !!o && !confirmed) },
+  ];
+  const payStep = { key: "pay", label: "Paid", sub: paid ? peso(p.net_paid) : p.stage === "to_pay" ? `${peso(p.to_pay)} to pay` : "Not yet", state: st(paid && p.stage !== "to_pay", p.stage === "to_pay") };
+  const deliverStep = { key: "deliver", label: "Delivered", sub: delivered ? dateText(o.completed_at) : "Not yet", state: st(delivered, confirmed && !delivered) };
+  return before ? [...list, payStep, deliverStep] : [...list, deliverStep, payStep];
+});
 const status = computed(() => STATUS[displayRequestStatus(request.value)] ?? STATUS.Draft);
 const statusText = computed(() => {
   const r = request.value;
   const by = r.reviewed_by_name || "Finance";
-  if (displayRequestStatus(r) === "Paid") return `Paid by ${by} on ${formatDate(r.paid_at || r.accounting_decision_at)}.`;
-  if (r.request_status === "Approved") return `Approved by ${by} on ${formatDate(r.accounting_decision_at)}.`;
+  if (displayRequestStatus(r) === "Paid") return `Approved by ${by}; the supplier was paid${r.paid_at ? ` on ${formatDate(r.paid_at)}` : ""}.`;
+  if (r.request_status === "Approved") return `Approved by ${by} on ${formatDate(r.accounting_decision_at)}.${stage.value ? ` ${stage.value.label}.` : ""}`;
   if (r.request_status === "Rejected") return `Rejected by ${by} on ${formatDate(r.accounting_decision_at)}.`;
   if (r.request_status === "Pending") return `Waiting for ${r.approver_name || r.accounting_manager_name || "the Finance approver"} to review it${r.submitted_to_accounting_at ? ` · sent ${formatDateTime(r.submitted_to_accounting_at)}` : ""}.`;
   return canEditFunding.value && isInventoryContext.value ? "A draft. Edit it, then send it to Finance." : "A draft that hasn't been sent to Finance yet.";
@@ -416,6 +488,170 @@ onMounted(fetchRequest);
 }
 .fd-why:empty {
   display: none;
+}
+.fd-pay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fd-pay-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--v-subtle);
+}
+.fd-pay-state b {
+  font-size: 14px;
+  color: var(--v-text);
+}
+.fd-pay-state p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--v-text-2);
+}
+.fd-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+.fd-steps li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 18px;
+  min-width: 0;
+}
+.fd-steps li::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 12px;
+  right: -8px;
+  height: 2px;
+  background: var(--v-border);
+}
+.fd-steps li:last-child::before {
+  display: none;
+}
+.fd-steps li.done::before {
+  background: var(--bc-accent);
+}
+.fd-dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--v-border-strong);
+  border-radius: 50%;
+  background: var(--v-surface);
+}
+.fd-steps li.done .fd-dot {
+  border-color: var(--bc-accent);
+  background: var(--bc-accent);
+}
+.fd-steps li.current .fd-dot {
+  border-color: var(--v-amber-text);
+  background: var(--v-amber-soft);
+}
+.fd-steps b {
+  font-size: 12.5px;
+  color: var(--v-text);
+}
+.fd-steps small {
+  overflow: hidden;
+  font-size: 11.5px;
+  color: var(--v-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fd-steps li:not(.done):not(.current) b {
+  color: var(--v-muted);
+}
+.fd-money {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.fd-money div {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--v-subtle);
+}
+.fd-money dt {
+  font-size: 11.5px;
+  color: var(--v-muted);
+}
+.fd-money dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--v-text);
+  font-variant-numeric: tabular-nums;
+}
+.fd-money dd.muted {
+  color: var(--v-muted);
+}
+.fd-payments {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.fd-payments li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--v-border);
+  border-radius: 12px;
+}
+.fd-payments .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fd-payments b {
+  font-size: 13.5px;
+  color: var(--v-text);
+  font-variant-numeric: tabular-nums;
+}
+.fd-payments small {
+  font-size: 12px;
+  color: var(--v-muted);
+}
+@media (max-width: 720px) {
+  .fd-steps {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .fd-steps li {
+    padding: 0 0 12px 22px;
+  }
+  .fd-steps li::before {
+    top: 14px;
+    bottom: 0;
+    left: 5px;
+    right: auto;
+    width: 2px;
+    height: auto;
+  }
+  .fd-dot {
+    top: 2px;
+  }
+  .fd-steps small {
+    white-space: normal;
+  }
 }
 .fd-table-wrap {
   overflow-x: auto;
