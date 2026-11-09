@@ -1877,24 +1877,13 @@ onUnmounted(() => clearInterval(pollTimer));
 }
 
 /* ── Delivery list ─────────────────────────────────────────────── */
-/* The list takes the colour of the stage you picked: a soft glow, not a loud one */
+/* The list's border takes the colour of the stage you picked: a soft glow, not a loud one */
 .dl-list-card {
   transition: border-color 0.25s, box-shadow 0.25s;
 }
 .dl-list-card.toned {
   border-color: color-mix(in srgb, var(--tone) 40%, var(--v-border));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 9%, transparent), 0 12px 32px -20px color-mix(in srgb, var(--tone) 70%, transparent);
-}
-.dl-list-card.toned .dl-row {
-  background: color-mix(in srgb, var(--tone) 4%, transparent);
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--tone) 65%, transparent);
-}
-.dl-list-card.toned .dl-row:hover {
-  background: color-mix(in srgb, var(--tone) 9%, transparent);
-}
-.dl-list-card.toned .dl-row + .dl-row {
-  margin-top: 6px;
-  border-top-color: transparent;
 }
 @media (prefers-reduced-motion: reduce) {
   .dl-list-card {

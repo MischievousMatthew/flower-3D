@@ -496,24 +496,13 @@ onBeforeUnmount(() => clearTimeout(fetchTimer));
 }
 
 /* List */
-/* The list takes the colour of the stage you picked: a soft glow, not a loud one */
+/* The list's border takes the colour of the stage you picked: a soft glow, not a loud one */
 .vd-list-card {
   transition: border-color 0.25s, box-shadow 0.25s;
 }
 .vd-list-card.toned {
   border-color: color-mix(in srgb, var(--tone) 40%, var(--v-border));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 9%, transparent), 0 12px 32px -20px color-mix(in srgb, var(--tone) 70%, transparent);
-}
-.vd-list-card.toned .vd-row {
-  background: color-mix(in srgb, var(--tone) 4%, transparent);
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--tone) 65%, transparent);
-}
-.vd-list-card.toned .vd-row:hover {
-  background: color-mix(in srgb, var(--tone) 9%, transparent);
-}
-.vd-list-card.toned .vd-row + .vd-row {
-  margin-top: 6px;
-  border-top-color: transparent;
 }
 @media (prefers-reduced-motion: reduce) {
   .vd-list-card {
