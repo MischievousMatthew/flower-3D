@@ -84,6 +84,8 @@ class ReceivingInspectionTest extends TestCase
             'supplier_id' => $supplier, 'action' => 'approve',
             'items' => [['product_name' => 'Red rose', 'quantity' => 100, 'price' => 18.5], ['product_name' => 'Eucalyptus', 'quantity' => 10, 'price' => 150]],
         ])->assertCreated()->json('id');
+        // The supplier approved it: only then can anything arrive
+        DB::table('purchase_orders')->where('id', $id)->update(['status' => 'processing', 'supplier_confirmed_at' => now()]);
 
         return PurchaseOrder::with('items')->findOrFail($id);
     }

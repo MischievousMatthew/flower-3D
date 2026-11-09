@@ -31,7 +31,8 @@ class ReceivingService
     public function openOrders(int $ownerId)
     {
         return PurchaseOrder::where('owner_id', $ownerId)
-            ->whereIn('status', ['pending', 'processing', 'shipped', 'received', 'partially_received'])
+            // Only once the supplier has approved it: nothing comes before that
+            ->whereIn('status', ['processing', 'shipped', 'received', 'partially_received'])
             ->with('supplier:id,company_name,logo,email,phone', 'items')
             ->orderByRaw('CASE WHEN expected_date IS NULL THEN 1 ELSE 0 END')
             ->orderBy('expected_date')
@@ -47,10 +48,12 @@ class ReceivingService
     public function inspect(int $orderId, array $data, int $ownerId, ?UploadedFile $receiptFile, array $photos, $actor): PurchaseOrderReceipt
     {
         $order = PurchaseOrder::where('owner_id', $ownerId)->with('items')->findOrFail($orderId);
-        if (! in_array($order->status, ['pending', 'processing', 'shipped', 'received', 'partially_received'], true)) {
-            throw new \RuntimeException($order->status === 'completed'
-                ? 'Everything on this order has already been received.'
-                : 'Approve the order before receiving a delivery for it.');
+        if (! in_array($order->status, ['processing', 'shipped', 'received', 'partially_received'], true)) {
+            throw new \RuntimeException(match ($order->status) {
+                'completed' => 'Everything on this order has already been received.',
+                'pending' => 'The supplier hasn\'t approved this order yet, so nothing can arrive. Wait for them to confirm it, or mark it approved if they told you another way.',
+                default => 'Send the order to the supplier before receiving a delivery for it.',
+            });
         }
 
         // Check every line before storing anything

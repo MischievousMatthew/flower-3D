@@ -94,7 +94,7 @@
         <div v-if="funding" class="sp-modal-wrap">
           <div class="sp-modal wide" role="dialog" aria-modal="true" aria-labelledby="ol-fund-title">
             <div class="sp-modal-head">
-              <div><h3 id="ol-fund-title">Order from approved funding</h3><p>Finance already approved these, so the order goes straight to the supplier.</p></div>
+              <div><h3 id="ol-fund-title">Order from approved funding</h3><p>Finance already approved these, so no other approval is needed. The order starts as a draft: email it to the supplier from there.</p></div>
               <button type="button" class="sp-icon-btn" aria-label="Close" @click="funding = null"><span v-html="ICONS.close"></span></button>
             </div>
             <div v-if="funding.loading" class="ol-fund-sk"><div v-for="n in 3" :key="n" class="bc-skeleton sp-sk-block"></div></div>
@@ -265,7 +265,7 @@ async function orderFromFunding() {
   try {
     const res = await orderService.createFromFunding(f.selected.id, f.supplierId);
     funding.value = null;
-    toast.success(`${res.data?.order_number ?? "The order"} was created and is with the supplier.`);
+    toast.success(`${res.data?.order_number ?? "The order"} was created as a draft. Email it to the supplier when you're ready.`);
     if (res.data?.id) router.push({ name: "OrderDetail", params: { id: res.data.id } });
     else load();
   } catch (e) {

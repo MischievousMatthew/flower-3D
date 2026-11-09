@@ -35,8 +35,8 @@ export const isCancellable = (o) =>
 
 /** Where an "Ordered" order is right now, in words */
 export const ORDERED_STEP = {
-  pending: "Sent to supplier",
-  processing: "Supplier preparing",
+  pending: "Waiting for the supplier",
+  processing: "Supplier approved",
   shipped: "On the way",
   received: "Arrived, not in stock yet",
 };
@@ -44,14 +44,70 @@ export const ORDERED_STEP = {
 export const statusText = (status) => ORDERED_STEP[status] ?? stageOf(status).label;
 
 export const isEditable = (status) => status === "draft" || status === "pending_approval";
-export const isReceivable = (status) => ["pending", "processing", "shipped", "received", "partially_received"].includes(status);
+// Only once the supplier has approved it: nothing can arrive before that
+export const isReceivable = (status) => ["processing", "shipped", "received", "partially_received"].includes(status);
 
 /** The next existing step (shipments, scanning) an Ordered order can move to */
 export const NEXT_STEPS = {
-  pending: [{ status: "processing", label: "Supplier is preparing it" }],
+  pending: [{ status: "processing", label: "The supplier approved it (they told us by phone or message)" }],
   processing: [{ status: "shipped", label: "It's on the way" }],
   shipped: [{ status: "received", label: "It arrived" }],
 };
+
+const pesoFmt = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
+const RANK = { draft: 0, pending_approval: 0, pending: 1, processing: 2, shipped: 3, received: 4, partially_received: 4, completed: 5 };
+
+/**
+ * What has really happened to an order, step by step: drafted, (approved,)
+ * sent to the supplier, approved by the supplier, on the way, received,
+ * paid (orders paid through a funding request) and completed. The first step
+ * not done yet is the current one.
+ */
+export function orderSteps(o) {
+  if (!o) return [];
+  const rank = RANK[o.status] ?? 0;
+  const pay = o.funding?.payment && !o.funding.payment.legacy ? o.funding.payment : null;
+  const items = o.items ?? [];
+  const units = items.reduce((t, i) => t + Number(i.quantity || 0), 0);
+  const inStock = items.reduce((t, i) => t + Number(i.received_qty || 0), 0);
+  const confirmedLess = items.some((i) => Number(i.cancelled_qty) > 0) && !!o.supplier_confirmed_at;
+  const steps = [];
+
+  steps.push({ key: "draft", label: "Draft", note: o.funding ? `Finance approved · ${o.funding.finance_request_id}` : o.created_by_name ? `by ${o.created_by_name}` : "", done: rank >= 1 || (!o.funding && o.status === "pending_approval") });
+  // Orders not paid through a funding request are approved inside the shop first
+  if (!o.funding) {
+    steps.push({ key: "approval", label: "Approved", note: o.approved_at && rank >= 1 ? poDate(o.approved_at) : o.status === "pending_approval" ? "Waiting for approval" : "", done: rank >= 1 });
+  }
+  steps.push({ key: "sent", label: "Sent to supplier", note: o.sent_at ? poDate(o.sent_at) : rank >= 1 ? "Sent another way" : "Not sent yet", done: rank >= 1 });
+  steps.push({
+    key: "supplier",
+    label: "Supplier approval",
+    note: rank >= 2 ? (o.supplier_confirmed_at ? `Approved ${poDate(o.supplier_confirmed_at)}${confirmedLess ? " · less than ordered" : ""}` : "Approved") : rank === 1 ? "Waiting for them" : "",
+    done: rank >= 2,
+  });
+  const onTheWay = { key: "shipped", label: "On the way", note: o.supplier_shipped_at ? poDate(o.supplier_shipped_at) : rank >= 3 ? "Yes" : "", done: rank >= 3 };
+  const received = {
+    key: "received",
+    label: o.status === "partially_received" ? "Partly received" : "Received",
+    note: o.status === "completed" ? (o.completed_at ? poDate(o.completed_at) : "All in") : inStock && units ? `${Math.round((inStock / units) * 100)}% in` : "",
+    done: o.status === "completed",
+  };
+  const paid = pay
+    ? {
+        key: "paid",
+        label: "Paid",
+        note: pay.stage === "to_pay" ? `${pesoFmt.format(pay.to_pay)} to pay` : pay.net_paid > 0 ? pesoFmt.format(pay.net_paid) : pay.timing === "before_delivery" ? "Once they approve" : "After delivery",
+        done: ["paid", "supplier_owes"].includes(pay.stage),
+      }
+    : null;
+
+  if (paid && pay.timing === "before_delivery") steps.push(paid, onTheWay, received);
+  else steps.push(onTheWay, received, ...(paid ? [paid] : []));
+  steps.push({ key: "completed", label: "Completed", note: "", done: o.status === "completed" && (!paid || paid.done) });
+
+  const current = steps.findIndex((x) => !x.done);
+  return steps.map((x, i) => ({ ...x, state: x.done ? "done" : i === current ? "now" : "" }));
+}
 
 /** One line of history in words */
 export function eventText(e) {

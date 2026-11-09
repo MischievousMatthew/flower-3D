@@ -13,10 +13,10 @@
     <!-- Stages -->
     <section v-if="o?.status !== 'cancelled'" class="sp-card od-steps" aria-label="Stage">
       <template v-if="!o"><div class="bc-skeleton sp-sk-line w70"></div></template>
-      <ol v-else class="od-stepper">
-        <li v-for="(s, i) in PO_STAGES" :key="s.key" :class="{ done: i < stageIndex, now: i === stageIndex }" :aria-current="i === stageIndex ? 'step' : undefined">
-          <span class="od-step-dot"><span v-if="i < stageIndex" v-html="ICONS.check"></span><template v-else>{{ i + 1 }}</template></span>
-          <span class="od-step-text"><b>{{ s.label }}</b><small>{{ stepNote(s.key) }}</small></span>
+      <ol v-else class="od-stepper" :style="{ '--od-steps': steps.length }">
+        <li v-for="(s, i) in steps" :key="s.key" :class="s.state" :aria-current="s.state === 'now' ? 'step' : undefined">
+          <span class="od-step-dot"><span v-if="s.state === 'done'" v-html="ICONS.check"></span><template v-else>{{ i + 1 }}</template></span>
+          <span class="od-step-text"><b>{{ s.label }}</b><small>{{ s.note }}</small></span>
         </li>
       </ol>
     </section>
@@ -29,7 +29,12 @@
         <span>{{ nextAction.text }}</span>
       </div>
       <div class="od-next-actions">
-        <template v-if="o.status === 'draft'">
+        <template v-if="o.status === 'draft' && o.funding">
+          <router-link v-if="can('sc_orders', 'create')" :to="{ name: 'OrderCreate', query: { order: o.id } }" class="sp-btn sp-btn-ghost"><span v-html="ICONS.edit"></span>Edit</router-link>
+          <button v-if="canEdit('sc_orders')" type="button" class="sp-btn sp-btn-ghost" :disabled="busy" @click="markSent">Sent it another way</button>
+          <button v-if="canEdit('sc_orders')" type="button" class="sp-btn sp-btn-primary" :disabled="busy || !o.supplier?.email" :title="o.supplier?.email ? '' : 'Add the supplier\'s email first'" @click="emailAgain"><span v-html="ICONS.send"></span>Email supplier</button>
+        </template>
+        <template v-else-if="o.status === 'draft'">
           <button v-if="can('sc_orders', 'delete')" type="button" class="sp-btn sp-btn-ghost" @click="confirmDelete = true">Delete</button>
           <router-link v-if="can('sc_orders', 'create')" :to="{ name: 'OrderCreate', query: { order: o.id } }" class="sp-btn sp-btn-ghost"><span v-html="ICONS.edit"></span>Edit</router-link>
           <button v-if="can('sc_orders', 'create') && !canApprove" type="button" class="sp-btn sp-btn-primary" :disabled="busy" @click="submit">Send for approval</button>
@@ -40,10 +45,10 @@
           <button v-if="canApprove" type="button" class="sp-btn sp-btn-ghost" @click="openSendBack">Send back</button>
           <button v-if="canApprove" type="button" class="sp-btn sp-btn-primary" :disabled="busy" @click="openApprove">Approve &amp; send</button>
         </template>
-        <template v-else-if="isReceivable(o.status)">
-          <button v-if="canEdit('sc_orders') && o.supplier?.email" type="button" class="sp-btn sp-btn-ghost" :disabled="busy" @click="emailAgain"><span v-html="ICONS.send"></span>{{ o.sent_at ? "Email again" : "Email supplier" }}</button>
-          <button v-if="canEdit('sc_orders') && NEXT_STEPS[o.status]" type="button" class="sp-btn sp-btn-ghost" @click="stepModal = { next: NEXT_STEPS[o.status][0].status, busy: false }">Update progress</button>
-          <router-link v-if="canReceive" :to="{ name: 'BatchesToReceive', query: { order: o.id } }" class="sp-btn sp-btn-primary"><span v-html="ICONS.box"></span>Receive &amp; inspect</router-link>
+        <template v-else-if="o.status === 'pending' || isReceivable(o.status)">
+          <button v-if="canEdit('sc_orders') && o.supplier?.email && ['pending', 'processing'].includes(o.status)" type="button" class="sp-btn sp-btn-ghost" :disabled="busy" @click="emailAgain"><span v-html="ICONS.send"></span>{{ o.sent_at ? "Email again" : "Email supplier" }}</button>
+          <button v-if="canEdit('sc_orders') && NEXT_STEPS[o.status]" type="button" class="sp-btn" :class="o.status === 'pending' ? 'sp-btn-primary' : 'sp-btn-ghost'" @click="stepModal = { next: NEXT_STEPS[o.status][0].status, busy: false }">{{ o.status === "pending" ? "Supplier approved it" : "Update progress" }}</button>
+          <router-link v-if="canReceive && isReceivable(o.status)" :to="{ name: 'BatchesToReceive', query: { order: o.id } }" class="sp-btn sp-btn-primary"><span v-html="ICONS.box"></span>Receive &amp; inspect</router-link>
         </template>
         <!-- Stop the order while nothing has arrived -->
         <button v-if="canApprove && isCancellable(o)" type="button" class="sp-btn sp-btn-ghost od-cancel-btn" :disabled="busy" @click="openCancel">Cancel order</button>
@@ -313,7 +318,7 @@ import { SHOP_ICONS as ICONS } from "../../../../../components/vendor/shop/shopI
 import { apiMessage } from "../../../../../components/vendor/shop/useVendorCatalog";
 import { money } from "../../../../../components/vendor/finance/financeUi";
 import { initials } from "../../../../../components/procurement/supplierUi";
-import { PO_STAGES, NEXT_STEPS, EVENT_TONE, stageOf, statusText, eventText, isEditable, isReceivable, isCancellable, poDate, poDateTime, dueText, daysUntil } from "../../../../../components/procurement/poUi";
+import { orderSteps, NEXT_STEPS, EVENT_TONE, stageOf, statusText, eventText, isEditable, isReceivable, isCancellable, poDate, poDateTime, dueText, daysUntil } from "../../../../../components/procurement/poUi";
 import { useAssignment } from "../../../../../composables/useAssignment";
 import { orderService } from "../../../../../services/orderService";
 import { toast } from "@/utils/snackbar";
@@ -337,7 +342,9 @@ const openReceipt = ref(null);
 const canReceive = computed(() => can("warehouse", "create") || canEdit("sc_orders"));
 const showRejected = computed(() => (o.value?.items ?? []).some((i) => i.rejected_qty || i.cancelled_qty));
 
-const stageIndex = computed(() => PO_STAGES.findIndex((s) => s.key === stageOf(o.value?.status).key));
+const steps = computed(() => orderSteps(o.value));
+const pay = computed(() => (o.value?.funding?.payment && !o.value.funding.payment.legacy ? o.value.funding.payment : null));
+const pesoOf = (n) => money(n);
 const units = computed(() => (o.value?.items ?? []).reduce((s, i) => s + Number(i.quantity), 0));
 const received = computed(() => ({ done: (o.value?.items ?? []).reduce((s, i) => s + Number(i.received_qty ?? 0), 0) }));
 const showReceived = computed(() => ["partially_received", "completed"].includes(o.value?.status) || received.value.done > 0);
@@ -346,20 +353,21 @@ const subtitle = computed(() => [o.value.supplier?.company_name, `${money(o.valu
 // Why it's a draft again: sent back by an approver, or declined by the supplier (newest first)
 const lastSentBack = computed(() => (o.value?.events ?? []).find((e) => e.event === "sent_back" || e.event === "supplier_declined"));
 
-function stepNote(key) {
-  const x = o.value;
-  if (key === "draft") return x.created_by_name ? `by ${x.created_by_name}` : "";
-  if (key === "pending_approval") return x.submitted_at && x.status !== "draft" ? poDate(x.submitted_at) : "";
-  if (key === "ordered") return x.approved_at ? poDate(x.approved_at) : "";
-  if (key === "partially_received") return received.value.done && x.status !== "completed" ? `${Math.round((received.value.done / units.value) * 100)}% in` : "";
-  if (key === "completed") return x.completed_at ? poDate(x.completed_at) : "";
-  return "";
-}
-
 const nextAction = computed(() => {
   const x = o.value;
+  const supplier = x.supplier?.company_name ?? "the supplier";
+  // Paid through a funding request: where the money stands decides what's next once it's in
+  if (x.status === "completed" && pay.value?.stage === "to_pay") {
+    return { tone: "amber", icon: "wallet", title: "Everything's in. Waiting for payment", text: `Finance pays ${supplier} ${pesoOf(pay.value.to_pay)} for what arrived${pay.value.due_date ? `, by ${poDate(pay.value.due_date)}` : ""}.` };
+  }
+  if (pay.value?.stage === "supplier_owes") {
+    return { tone: "red", icon: "alert", title: `${supplier} owes ${pesoOf(pay.value.supplier_owes)}`, text: "They were paid for more than arrived. Finance records the refund, or keeps it as credit." };
+  }
   switch (x.status) {
     case "draft":
+      if (x.funding && lastSentBack.value?.event !== "supplier_declined") {
+        return { tone: "slate", icon: "send", title: "Ready to send", text: `Finance already approved it (${x.funding.finance_request_id}). Email it to ${supplier}: they approve it, or say what they can supply, from the email.` };
+      }
       if (lastSentBack.value?.event === "supplier_declined") {
         return { tone: "amber", icon: "restore", title: `${lastSentBack.value.actor_name || "The supplier"} can't supply it`, text: `“${lastSentBack.value.note}” Pick another supplier or change the order, then approve it again. Or cancel it.` };
       }
@@ -368,6 +376,14 @@ const nextAction = computed(() => {
         : { tone: "slate", icon: "edit", title: "This is a draft", text: canApprove.value ? "Finish it, then approve it to send it to the supplier." : "Finish it, then send it for approval." };
     case "pending_approval":
       return { tone: "amber", icon: "clock", title: "Waiting for approval", text: canApprove.value ? "Check the items and prices. Approving sends it to the supplier." : "Someone who can approve orders needs to check it. You can still change it until then." };
+    case "pending":
+      return x.sent_at
+        ? { tone: "amber", icon: "clock", title: `Waiting for ${supplier} to approve it`, text: `Emailed ${poDate(x.sent_at)}. They approve it, or say what they can supply, from the email link. If they tell you another way, mark it approved.` }
+        : { tone: "amber", icon: "clock", title: `Waiting for ${supplier} to approve it`, text: "Sent another way. Mark it approved once they say yes." };
+    case "processing":
+      return pay.value?.stage === "to_pay" && pay.value.timing === "before_delivery"
+        ? { tone: "blue", icon: "check", title: `${supplier} approved it`, text: `Finance pays ${pesoOf(pay.value.to_pay)} before they deliver. Receive the items when they arrive.` }
+        : { tone: "blue", icon: "check", title: `${supplier} approved it`, text: x.expected_date ? `Expected ${poDate(x.expected_date)}. Receive the items when they arrive.` : "Receive the items when they arrive." };
     case "partially_received":
       return { tone: "violet", icon: "box", title: "Part of it has arrived", text: `${received.value.done.toLocaleString("en-PH")} of ${units.value.toLocaleString("en-PH")} units are in stock. Receive the rest when it comes.` };
     case "completed":
@@ -462,6 +478,19 @@ async function sendBack() {
   } catch (e) {
     m.busy = false;
     m.error = apiMessage(e, "Couldn't send it back.");
+  }
+}
+
+async function markSent() {
+  busy.value = true;
+  try {
+    const res = await orderService.markSent(o.value.id);
+    toast.success(res.data.message);
+    await load();
+  } catch (e) {
+    toast.error(apiMessage(e, "Couldn't update the order."));
+  } finally {
+    busy.value = false;
   }
 }
 
@@ -561,7 +590,7 @@ onMounted(load);
 .od-stepper {
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--od-steps, 5), minmax(0, 1fr));
   gap: 8px;
   margin: 0;
   padding: 0;
@@ -994,6 +1023,16 @@ onMounted(load);
 @media (max-width: 1000px) {
   .od-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* Seven steps don't fit in one row on a narrower screen */
+@media (max-width: 1280px) {
+  .od-stepper {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    row-gap: 14px;
+  }
+  .od-stepper li:nth-child(4n + 1)::before {
+    display: none;
   }
 }
 @media (max-width: 760px) {

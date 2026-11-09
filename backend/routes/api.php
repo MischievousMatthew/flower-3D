@@ -1037,6 +1037,7 @@ Route::middleware('token.auth')->group(function () {
                 Route::patch('/{id}/status',                    [OrderController::class, 'updateStatus']);
                 Route::post('/{id}/recalculate',                [OrderController::class, 'recalculateTotals']);
                 Route::post('/{id}/email',                      [OrderController::class, 'email']);
+                Route::post('/{id}/mark-sent',                  [OrderController::class, 'markSent']);
                 Route::post('/{id}/receive',                    [OrderController::class, 'receive']);
             });
             Route::delete('/{id}', [OrderController::class, 'destroy'])->middleware('employee.module:sc_orders,delete');

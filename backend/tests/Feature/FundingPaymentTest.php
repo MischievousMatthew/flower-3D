@@ -55,6 +55,10 @@ class FundingPaymentTest extends TestCase
             $t->string('status')->default('pending');
             $t->decimal('total_amount', 15, 2)->default(0);
             $t->timestamp('supplier_confirmed_at')->nullable();
+            $t->timestamp('submitted_at')->nullable();
+            $t->timestamp('sent_at')->nullable();
+            $t->timestamp('supplier_declined_at')->nullable();
+            $t->timestamp('supplier_shipped_at')->nullable();
             $t->timestamp('completed_at')->nullable();
             $t->timestamps();
         });
@@ -280,5 +284,41 @@ class FundingPaymentTest extends TestCase
         $this->postJson(self::BASE . "/{$id}/paymongo", ['amount' => 2100, 'payment_channel' => 'QR Ph'])->assertOk();
         Http::assertSent(fn ($request) => $request['data']['attributes']['payment_method_types'] === ['qrph']);
         $this->assertNotContains('QR Ph', \App\Support\PayMongoChannels::payoutNames());
+    }
+
+    public function test_an_order_from_funding_stays_a_draft_until_it_is_sent(): void
+    {
+        $id = $this->request();
+        $this->approve($id)->assertOk();
+        $order = $this->order($id, 'Pay before delivery', 'draft');
+        $orders = '/api/procurement/supply-chain/orders';
+        // What the order page loads with it
+        foreach (['shipments', 'purchase_order_events', 'purchase_order_receipts', 'purchase_order_receipt_lines', 'purchase_order_receipt_files'] as $t) {
+            Schema::dropIfExists($t);
+            Schema::create($t, function (Blueprint $t) {
+                $t->id();
+                $t->unsignedBigInteger('owner_id')->nullable();
+                $t->unsignedBigInteger('purchase_order_id')->nullable();
+                $t->unsignedBigInteger('purchase_order_receipt_id')->nullable();
+                $t->string('event')->nullable();
+                $t->string('from_status')->nullable();
+                $t->string('to_status')->nullable();
+                $t->text('note')->nullable();
+                $t->string('actor_name')->nullable();
+                $t->string('actor_type')->nullable();
+                $t->timestamps();
+            });
+        }
+
+        // Shown as Finance-approved, with nothing to pay while it's a draft
+        $this->signIn($this->vendor)->getJson("{$orders}/{$order}")->assertOk()
+            ->assertJsonPath('status', 'draft')
+            ->assertJsonPath('funding.payment.stage', 'with_supplier');
+
+        // No email address: can't be emailed, but it can be marked sent
+        $this->postJson("{$orders}/{$order}/email")->assertStatus(422);
+        $this->postJson("{$orders}/{$order}/mark-sent")->assertOk();
+        $this->assertSame('pending', DB::table('purchase_orders')->where('id', $order)->value('status'));
+        $this->postJson("{$orders}/{$order}/mark-sent")->assertStatus(422);
     }
 }

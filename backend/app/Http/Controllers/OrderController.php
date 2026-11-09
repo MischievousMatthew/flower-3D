@@ -42,7 +42,22 @@ class OrderController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        return response()->json($this->service->findOrder($id, $this->getOwnerId()));
+        $order = $this->service->findOrder($id, $this->getOwnerId());
+        $data = $order->toArray();
+
+        // Paid for by an approved funding request: Finance already approved it, and
+        // where its payment stands (the supplier's account number stays masked here)
+        $data['funding'] = null;
+        if ($funding = $this->service->fundingFor($order)) {
+            $state = app(\App\Services\FundingPaymentService::class)->state($funding->load(['payments', 'linkedOrder.items', 'linkedOrder.supplier']));
+            if (isset($state['order']['payout']['account_number'])) {
+                $state['order']['payout']['account_number'] = \App\Support\SupplierPayout::mask($state['order']['payout']['account_number']);
+            }
+            unset($state['payments']);
+            $data['funding'] = ['id' => $funding->id, 'finance_request_id' => $funding->finance_request_id, 'payment' => $state];
+        }
+
+        return response()->json($data);
     }
 
     public function store(Request $request): JsonResponse
@@ -157,10 +172,38 @@ class OrderController extends Controller
         return response()->json(['message' => $message, 'order' => $order, 'supplier_told' => $result['supplier_told']]);
     }
 
+    /** POST /orders/{id}/mark-sent: a Finance-approved draft went to the supplier another way (phone, printed copy) */
+    public function markSent(int $id): JsonResponse
+    {
+        try {
+            $result = $this->service->sendFundedDraft($id, $this->getOwnerId(), false);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['message' => 'Marked as sent. Update it once the supplier approves it.', 'order' => $result['order']]);
+    }
+
     /** POST /orders/{id}/email: send the order to the supplier again */
     public function email(int $id): JsonResponse
     {
         $order = $this->service->findOrder($id, $this->getOwnerId());
+        // A draft Finance already approved (from a funding request) is sent by emailing it
+        if ($order->status === 'draft' && $this->service->fundingFor($order)) {
+            if (! $order->supplier?->email) {
+                return response()->json(['message' => "{$order->supplier?->company_name} has no email address. Add one on the supplier's details, or send it another way and mark it sent."], 422);
+            }
+            try {
+                $result = $this->service->sendFundedDraft($id, $this->getOwnerId(), true);
+            } catch (\RuntimeException $e) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+            if (! $result['emailed']) {
+                return response()->json(['message' => "The email couldn't be sent right now, so it's still a draft. Try again in a few minutes."], 502);
+            }
+
+            return response()->json(['message' => "Sent to {$order->supplier->email}. It's waiting for them to approve it.", 'sent_at' => $result['order']->sent_at]);
+        }
         if ($order->status === 'cancelled') {
             return response()->json(['message' => 'This order is cancelled, so it can\'t be sent.'], 422);
         }

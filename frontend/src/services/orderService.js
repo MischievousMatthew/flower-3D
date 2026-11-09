@@ -19,6 +19,8 @@ export const orderService = {
   sendBack: (id, reason) => api.post(`${BASE}/${id}/send-back`, { reason }),
   cancel: (id, reason) => api.post(`${BASE}/${id}/cancel`, { reason }),
   email: (id) => api.post(`${BASE}/${id}/email`),
+  // A Finance-approved draft that went to the supplier another way
+  markSent: (id) => api.post(`${BASE}/${id}/mark-sent`),
   // What arrived: [{ id, qty }]
   receive: (id, items, note) => api.post(`${BASE}/${id}/receive`, { items, note }),
   stockItems: (search) => api.get(`${BASE}/stock-items`, { params: { search } }),

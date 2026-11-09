@@ -220,6 +220,55 @@ class OrderService
         return ['order' => $order->fresh(['supplier', 'items', 'events']), 'emailed' => $emailed];
     }
 
+    /** The approved funding request paying for this order, if there is one (Finance already approved it) */
+    public function fundingFor(PurchaseOrder $order): ?FundingRequest
+    {
+        return FundingRequest::where('linked_order_id', $order->id)->where('request_status', 'Approved')->first();
+    }
+
+    /**
+     * A draft paid for by an approved funding request goes to the supplier:
+     * emailed (it only counts as sent once the email goes), or marked sent
+     * when it went another way (phone, printed copy).
+     *
+     * @return array{order: PurchaseOrder, emailed: ?bool}
+     */
+    public function sendFundedDraft(int $orderId, int $ownerId, bool $email): array
+    {
+        $order = DB::transaction(function () use ($orderId, $ownerId) {
+            $order = PurchaseOrder::where('owner_id', $ownerId)->with('supplier', 'items')->lockForUpdate()->findOrFail($orderId);
+            if ($order->status !== 'draft') {
+                throw new \RuntimeException('This order was already sent to the supplier.');
+            }
+            if (! $this->fundingFor($order)) {
+                throw new \RuntimeException('This order needs approving before it goes to the supplier.');
+            }
+            if ($order->items->isEmpty() || $order->items->contains(fn ($i) => (float) $i->price <= 0)) {
+                throw new \RuntimeException('Every item needs its agreed price before the order goes to the supplier.');
+            }
+            if ($order->supplier?->status !== 'active') {
+                throw new \RuntimeException("{$order->supplier?->company_name} isn't active any more. Pick another supplier first.");
+            }
+            $order->quietlyMoveTo(['status' => 'pending', 'submitted_at' => now(), 'supplier_declined_at' => null]);
+
+            return $order;
+        });
+
+        if (! $email) {
+            PurchaseOrderEvent::record($order, 'status', 'draft', 'pending', 'Sent to the supplier another way (not by email)');
+
+            return ['order' => $order->fresh(['supplier', 'items', 'events']), 'emailed' => null];
+        }
+
+        $emailed = $this->emailSupplier($order);
+        if ($emailed !== true) {
+            // Not sent, so it stays a draft
+            $order->quietlyMoveTo(['status' => 'draft', 'submitted_at' => null]);
+        }
+
+        return ['order' => $order->fresh(['supplier', 'items', 'events']), 'emailed' => $emailed];
+    }
+
     /** Waiting for approval → back to draft, with the reason */
     public function sendBack(int $orderId, int $ownerId, string $reason): PurchaseOrder
     {
@@ -627,21 +676,21 @@ class OrderService
             }
             $orderTotal = array_sum(array_map(fn ($l) => $l['quantity'] * $l['price'], $lines));
 
-            // Finance already approved the funding request, so the order goes straight to the supplier
+            // Finance already approved the money, so it needs no other approval. It
+            // starts as a draft and goes to the supplier when someone sends it
             $order = PurchaseOrder::create([
                 'owner_id'        => $ownerId,
                 'supplier_id'     => $supplier->id,
                 'order_number'    => $this->generateOrderNumber(),
-                'status'          => 'pending',
+                'status'          => 'draft',
                 'total_amount'    => $orderTotal,
                 'order_date'      => now()->toDateString(),
                 'created_by_name' => PurchaseOrderEvent::nameOf(auth()->user()),
-                'submitted_at'    => now(),
                 'approved_at'     => now(),
-                'approved_by_name' => 'Funding request ' . ($funding->finance_request_id ?? "#{$funding->id}"),
+                'approved_by_name' => 'Finance · ' . ($funding->finance_request_id ?? "funding request #{$funding->id}"),
                 'notes'           => "From approved funding request " . ($funding->finance_request_id ?? "#{$funding->id}"),
             ]);
-            PurchaseOrderEvent::record($order, 'created', null, 'pending', 'From an approved funding request');
+            PurchaseOrderEvent::record($order, 'created', null, 'draft', 'From an approved funding request');
 
             foreach ($lines as $line) {
                 $order->items()->create($line);

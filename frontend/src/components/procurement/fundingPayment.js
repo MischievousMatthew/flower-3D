@@ -13,6 +13,9 @@ export function paymentStage(p) {
     case "needs_order":
       return { key: p.stage, label: "Needs a purchase order", tone: "slate", icon: "clock", text: "Procurement orders it from a supplier next. Nothing is paid until then." };
     case "with_supplier":
+      if (p.order?.status === "draft") {
+        return { key: p.stage, label: "Order not sent yet", tone: "slate", icon: "edit", text: `Procurement made the purchase order. It goes to ${p.order.supplier_name || "the supplier"} when they email it. ${timingText(p)}${terms}.` };
+      }
       return { key: p.stage, label: "Waiting for the supplier", tone: "slate", icon: "clock", text: `Sent to ${p.order?.supplier_name || "the supplier"}. ${timingText(p)}${terms}.` };
     case "awaiting_delivery":
       return { key: p.stage, label: "Pay after delivery", tone: "blue", icon: "truck", text: `${p.order?.supplier_name || "The supplier"} is paid once the stock is in${terms}.` };
