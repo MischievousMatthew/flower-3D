@@ -697,7 +697,8 @@ class VendorOrdersController extends Controller
                 'pending' => ['to_processed', 'cancelled'],
                 'to_processed' => ['to_ship', 'cancelled'],
                 'to_ship' => ['to_received'],
-                'to_received' => ['completed'],
+                // Only the customer completes an order, from their side
+                'to_received' => [],
                 'completed' => ['returned', 'refunded'],
                 'returned' => [],
                 'cancelled' => [],
@@ -710,7 +711,9 @@ class VendorOrdersController extends Controller
                 if (! in_array($newStatus, $permitted, true)) {
                     return response()->json([
                         'success' => false,
-                        'message' => "Cannot update order from {$oldStatus} to {$newStatus}",
+                        'message' => $oldStatus === 'to_received' && $newStatus === 'completed'
+                            ? 'Only the customer can complete this order, by marking it received on their side.'
+                            : "Cannot update order from {$oldStatus} to {$newStatus}",
                     ], 422);
                 }
             }

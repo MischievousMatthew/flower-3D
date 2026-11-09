@@ -124,4 +124,19 @@ class OrderScannerTest extends TestCase
         $this->assertSame('https://img.test/delivery-photos/order.jpg', $row->photo_url);
         $this->assertNotNull($row->photo_taken_at);
     }
+
+    public function test_only_the_customer_completes_an_order(): void
+    {
+        $vendor = $this->shopOwner();
+        $id = $this->delivery($vendor, 'to_received');
+        $orderId = (int) DB::table('deliveries')->where('id', $id)->value('order_id');
+        $this->signIn($vendor);
+
+        // Not from the shop's order page...
+        $this->putJson("/api/vendor/orders/{$orderId}/status", ['status' => 'completed'])
+            ->assertStatus(422)->assertJsonPath('message', 'Only the customer can complete this order, by marking it received on their side.');
+        // ...nor from Deliveries in the ERP
+        $this->expectExceptionMessage('Only the customer can complete this order');
+        app(\App\Services\DeliveryService::class)->advanceStatus(\App\Models\Delivery::findOrFail($id), 'completed');
+    }
 }

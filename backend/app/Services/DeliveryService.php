@@ -163,6 +163,9 @@ class DeliveryService
      */
     public function advanceStatus(Delivery $delivery, string $targetStatus, bool $recordScanContext = true): Delivery
     {
+        if ($targetStatus === 'completed' && $delivery->status === 'to_received') {
+            throw new RuntimeException('Only the customer can complete this order, by marking it received on their side.');
+        }
         if (! $delivery->canTransitionTo($targetStatus)) {
             throw new RuntimeException(
                 "Invalid transition: {$delivery->status} → {$targetStatus}"

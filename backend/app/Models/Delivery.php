@@ -41,7 +41,8 @@ class Delivery extends Model
         'pending'      => ['to_processed'],
         'to_processed' => ['to_ship'],
         'to_ship'      => ['to_received'],
-        'to_received'  => ['completed'],
+        // Only the customer completes an order ("Mark as received" on their side)
+        'to_received'  => [],
         'completed'    => ['returned', 'refunded'],
         'returned'     => [],
         'refunded'     => [],

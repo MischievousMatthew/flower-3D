@@ -301,6 +301,23 @@
               </div>
             </div>
 
+            <!-- Out for delivery: the customer is the one who completes the order -->
+            <div v-if="canComplete(order)" class="ot-receive" @click.stop>
+              <img v-if="order.delivery?.photo_url" :src="order.delivery.photo_url" alt="Your order before delivery" class="ot-receive__img" loading="lazy" />
+              <div class="ot-receive__text">
+                <strong>Your order is on its way</strong>
+                <span>Once it's in your hands, mark it received. That's how the order is completed.</span>
+              </div>
+              <button
+                type="button"
+                class="ot-btn ot-btn--green ot-receive__btn"
+                :disabled="actionLoading === order.id + '_c'"
+                @click.stop="doComplete(order)"
+              >
+                {{ actionLoading === order.id + "_c" ? "Confirming…" : "Mark as received" }}
+              </button>
+            </div>
+
             <!-- ── Expanded detail ──────────────────────────────────────────── -->
             <Transition name="expand">
               <div v-if="expandedId === order.id" class="ot-detail">
@@ -1081,9 +1098,9 @@ const hasReviewed = (order) => reviewedOrderIds.value.has(order.id);
 function doComplete(order) {
   confirmModal.show = true;
   confirmModal.loading = false;
-  confirmModal.title = "Confirm Delivery";
+  confirmModal.title = "Got your order?";
   confirmModal.icon = "✅";
-  confirmModal.body = `Have you received order ${order.order_number}? This will mark it as delivered.`;
+  confirmModal.body = `Mark order ${order.order_number} as received? This completes the order. If something is wrong with it, you can still ask for a return or refund afterwards.`;
   confirmModal.confirmLabel = "Yes, I received it";
   confirmModal.loadingLabel = "Confirming…";
   confirmModal.variant = "success";
@@ -2181,6 +2198,52 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.ot-receive {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid #b9e2c8;
+  border-radius: 14px;
+  background: #eef8f2;
+}
+.ot-receive__img {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.ot-receive__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ot-receive__text strong {
+  font-size: 14.5px;
+  color: #363f4e;
+}
+.ot-receive__text span {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #5b6472;
+}
+.ot-receive__btn {
+  flex: none;
+}
+@media (max-width: 560px) {
+  .ot-receive {
+    flex-wrap: wrap;
+  }
+  .ot-receive__btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .ot-photo {

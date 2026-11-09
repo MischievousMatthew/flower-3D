@@ -43,7 +43,8 @@ class VendorFulfillmentController extends Controller
         'pending' => [['to' => 'to_processed', 'label' => 'Confirm & start preparing']],
         'to_processed' => [['to' => 'to_ship', 'label' => 'Mark as ready']],
         'to_ship' => [['to' => 'to_received', 'label' => 'Send out for delivery']],
-        'to_received' => [['to' => 'completed', 'label' => 'Mark as delivered']],
+        // Out for delivery: the customer marks it received, not the shop
+        'to_received' => [],
     ];
 
     /** GET /vendor/fulfillment/orders */

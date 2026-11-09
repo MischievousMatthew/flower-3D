@@ -128,54 +128,30 @@
       </div>
     </template>
 
-    <!-- ── Requests KPI strip ─────────────────────────────────────────── -->
-    <div class="kpi-strip" v-if="currentView === 'requests'">
-      <div
-        v-for="rTab in reqTabs"
-        :key="rTab.value"
-        class="kpi-card"
-        :class="[rTab.color, { active: reqActiveFilter === rTab.value }]"
-        @click="
-          reqActiveFilter = rTab.value;
-          fetchRequests();
-        "
-      >
-        <div class="kpi-icon-box" :class="rTab.color">
-          <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
-            <path
-              v-if="rTab.value === 'all'"
-              d="M3 4h14v2H3zm0 5h14v2H3zm0 5h14v2H3z"
-            />
-            <path
-              v-else-if="rTab.value === 'pending'"
-              d="M10 2a8 8 0 100 16A8 8 0 0010 2zm1 9H9V5h2v6zm0 2H9v2h2v-2z"
-            />
-            <path
-              v-else-if="rTab.value === 'approved' || rTab.value === 'completed'"
-              d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z"
-            />
-            <path
-              v-else-if="rTab.value === 'rejected'"
-              d="M10 1a9 9 0 100 18A9 9 0 0010 1zm4.3 12.7a1 1 0 01-1.4 0L10 11l-2.9 2.7a1 1 0 01-1.4-1.4L8.6 10 5.7 7.3a1 1 0 011.4-1.4L10 9l2.9-2.7a1 1 0 011.4 1.4L11.4 10l2.9 2.7a1 1 0 010 1.4z"
-            />
-            <path
-              v-else-if="rTab.value === 'return'"
-              fill-rule="evenodd"
-              d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 110 14 1 1 0 110-2 5 5 0 100-10H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-              clip-rule="evenodd"
-            />
-            <path
-              v-else-if="rTab.value === 'refund'"
-              d="M10 2a8 8 0 100 16A8 8 0 0010 2zm1 11H9v-2h2v2zm0-4H9V5h2v4z"
-            />
-          </svg>
-        </div>
-        <div class="kpi-text">
-          <span class="kpi-label">{{ rTab.label }}</span>
-          <span class="kpi-num">{{ reqCountFor(rTab.value) }}</span>
+    <!-- ── Returns and refunds: where each one stands ─────────────────── -->
+    <template v-if="currentView === 'requests'">
+      <section class="dl-pipe dl-pipe--req" aria-label="Returns and refunds by stage">
+        <button
+          v-for="st in REQ_STAGES"
+          :key="st.key"
+          type="button"
+          class="dl-pipe-step"
+          :class="[`tone-${st.tone}`, { on: reqActiveFilter === st.filter }]"
+          @click="setReqFilter(st.filter)"
+        >
+          <span class="dl-pipe-label"><span class="dl-pipe-dot"></span>{{ st.label }}</span>
+          <strong>{{ reqCounts[st.key] ?? 0 }}</strong>
+          <span class="dl-pipe-hint">{{ st.hint }}</span>
+        </button>
+      </section>
+      <div class="dl-tabs">
+        <div class="sp-seg" role="tablist" aria-label="Filter returns and refunds">
+          <button v-for="t in reqTabs" :key="t.value" type="button" role="tab" :aria-selected="reqActiveFilter === t.value" :class="{ on: reqActiveFilter === t.value }" @click="setReqFilter(t.value)">
+            {{ t.label }}<span class="count">{{ reqCountFor(t.value) }}</span>
+          </button>
         </div>
       </div>
-    </div>
+    </template>
 
     <!-- ── Toolbar ────────────────────────────────────────────────────── -->
     <div class="toolbar">
@@ -209,25 +185,6 @@
             }
           "
         />
-      </div>
-      <!-- Request type filter (requests view only) -->
-      <div v-if="currentView === 'requests'" class="req-type-filter">
-        <button
-          v-for="t in [
-            { label: 'All Types', value: '' },
-            { label: 'Returns', value: 'return' },
-            { label: 'Refunds', value: 'refund' },
-          ]"
-          :key="t.value"
-          class="req-type-btn"
-          :class="{ active: reqTypeFilter === t.value }"
-          @click="
-            reqTypeFilter = t.value;
-            fetchRequests();
-          "
-        >
-          {{ t.label }}
-        </button>
       </div>
       <div
         class="toolbar-note"
@@ -285,6 +242,7 @@
             <span class="sp-chip" :class="STATUS_TONE[d.status] ?? 'slate'">{{ STATUS_LABEL[d.status] ?? d.status_label }}</span>
             <div class="dl-actions">
               <button v-if="NEXT[d.status]" type="button" class="sp-btn sp-btn-primary sp-btn-sm" @click="openAdvance(d, NEXT[d.status].value)">{{ NEXT[d.status].label }}</button>
+              <span v-else-if="d.status === 'to_received'" class="dl-wait" title="Only the customer completes the order, by marking it received">Waiting for the customer</span>
               <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="openDetail(d)">Details</button>
               <button type="button" class="sp-icon-btn" title="Barcode" :aria-label="`Barcode for ${d.order?.order_number ?? d.delivery_id}`" @click="barcodeModalRef.open(d.order?.id, d.delivery_id)"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" width="16" height="16" aria-hidden="true"><path d="M3 4v12M6 4v12M8.5 4v12M11 4v12M14 4v12M17 4v12" /></svg></button>
               <button type="button" class="sp-icon-btn" title="History" :aria-label="`History of ${d.order?.order_number ?? d.delivery_id}`" @click="openLogs(d)"><span v-html="ICONS.history"></span></button>
@@ -427,189 +385,65 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════════
-         REQUESTS VIEW  ← NEW
+         RETURNS AND REFUNDS
     ══════════════════════════════════════════════════════════════════ -->
-    <div v-if="currentView === 'requests'" class="card">
-      <!-- Header bar inside card -->
-      <div class="req-card-header">
-        <div>
-          <h2 class="req-card-title">Return & Refund Requests</h2>
-          <p class="req-card-sub">Settle each one with the customer: agree, send the refund or replacement, and they confirm.</p>
-        </div>
+    <section v-if="currentView === 'requests'" class="sp-card dl-list-card" aria-label="Returns and refunds">
+      <ul v-if="reqLoading && !requests.length" class="dl-list">
+        <li v-for="n in 4" :key="n" class="dl-row">
+          <div class="bc-skeleton dl-thumb"></div>
+          <div class="dl-grow"><div class="bc-skeleton sp-sk-line w30"></div><div class="bc-skeleton sp-sk-line w70"></div></div>
+          <div class="bc-skeleton dl-sk-btn"></div>
+        </li>
+      </ul>
+      <div v-else-if="!requests.length" class="sp-empty">
+        <span class="sp-empty-icon" v-html="ICONS.restore"></span>
+        <h3>{{ reqSearch ? "No returns or refunds match" : "No returns or refunds here" }}</h3>
+        <p>{{ reqSearch ? "Try another order number or customer." : "When a customer asks to return an order or get money back, it shows up here." }}</p>
       </div>
-
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Order</th>
-              <th>Customer</th>
-              <th>Type</th>
-              <th>Reason</th>
-              <th>Proof</th>
-              <th>Status</th>
-              <th>Submitted</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- Loading -->
-            <tr v-if="reqLoading">
-              <td colspan="8" class="loading-row">
-                <div class="bc-skeleton sk-line"></div><div class="bc-skeleton sk-line sk-short"></div>
-              </td>
-            </tr>
-            <!-- Empty -->
-            <tr v-else-if="!requests.length">
-              <td colspan="8" class="empty-row">
-                <div class="req-empty">
-                  <svg viewBox="0 0 48 48" fill="none" class="req-empty-ico">
-                    <circle
-                      cx="24"
-                      cy="24"
-                      r="20"
-                      stroke="#e5e7eb"
-                      stroke-width="2"
-                    />
-                    <path
-                      d="M24 16v8M24 28v2"
-                      stroke="#9ca3af"
-                      stroke-width="2.5"
-                      stroke-linecap="round"
-                    />
-                  </svg>
-                  <p>No requests found</p>
-                </div>
-              </td>
-            </tr>
-            <!-- Rows -->
-            <tr v-for="req in requests" :key="req.id" class="data-row req-row">
-              <!-- Order -->
-              <td>
-                <div class="order-cell">
-                  <span class="order-ref">{{
-                    req.order?.order_number ?? "—"
-                  }}</span>
-                  <span class="order-amount"
-                    >₱{{
-                      Number(req.order?.total_amount ?? 0).toFixed(2)
-                    }}</span
-                  >
-                </div>
-              </td>
-              <!-- Customer -->
-              <td>
-                <div class="req-customer">
-                  <span class="req-customer-name">{{
-                    req.customer?.name ?? "—"
-                  }}</span>
-                  <span class="req-customer-email">{{
-                    req.customer?.email ?? ""
-                  }}</span>
-                </div>
-              </td>
-              <!-- Type -->
-              <td>
-                <span
-                  class="req-type-badge"
-                  :class="'req-type--' + (req.type ?? 'return')"
-                >
-                  {{
-                    req.type === "return"
-                      ? "↩ Return"
-                      : req.type === "refund"
-                        ? "💰 Refund"
-                        : "—"
-                  }}
-                </span>
-              </td>
-              <!-- Reason -->
-              <td>
-                <div class="req-reason" :title="req.reason">
-                  {{
-                    req.reason?.length > 80
-                      ? req.reason.slice(0, 80) + "…"
-                      : req.reason
-                  }}
-                </div>
-              </td>
-              <!-- Proof media -->
-              <td>
-                <div
-                  v-if="req.media_url"
-                  class="req-media-thumb"
-                  @click="openMediaModal(req)"
-                  title="Click to view proof"
-                >
-                  <video
-                    v-if="req.media_type === 'video'"
-                    :src="req.media_url"
-                    class="req-media-preview"
-                    muted
-                  ></video>
-                  <img
-                    v-else
-                    :src="req.media_url"
-                    :alt="req.type + ' proof'"
-                    class="req-media-preview"
-                  />
-                  <div class="req-media-overlay">
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      stroke="white"
-                      stroke-width="1.8"
-                      width="18"
-                    >
-                      <path
-                        d="M10 4v12M4 10h12"
-                        v-if="req.media_type === 'video'"
-                      />
-                      <template v-else>
-                        <circle cx="10" cy="10" r="7" />
-                        <path
-                          d="M13 10l-4 3V7l4 3z"
-                          fill="white"
-                          stroke="none"
-                        />
-                      </template>
-                    </svg>
-                  </div>
-                </div>
-                <span v-else class="req-no-proof">No proof</span>
-              </td>
-              <!-- Status -->
-              <td>
-                <span class="req-status-badge" :class="'req-status--' + (req.status ?? 'pending')">
-                  {{ CASE_STAGE_LABEL[req.stage] ?? req.status }}
-                </span>
-                <div v-if="req.next_actor === 'vendor'" class="req-turn">Your turn</div>
-                <div v-else-if="req.next_actor === 'customer'" class="req-turn req-turn--wait">Waiting for customer</div>
-                <div v-if="req.settled" class="req-admin-note">Agreed: {{ describeResolution(req.settled.resolution, req.settled.amount) }}</div>
-                <div v-else-if="req.offer" class="req-admin-note">
-                  {{ req.offer.by === "vendor" ? "You offered" : "Asked for" }} {{ describeResolution(req.offer.resolution, req.offer.amount) }}
-                </div>
-              </td>
-              <!-- Date -->
-              <td class="muted-cell">{{ formatTime(req.created_at) }}</td>
-              <!-- Actions -->
-              <td>
-                <button
-                  class="req-action-btn"
-                  :class="req.next_actor === 'vendor' ? 'req-approve-btn' : ''"
-                  @click="openCase(req)"
-                >
-                  {{ req.next_actor === "vendor" ? "Respond" : "Open" }}
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Pagination -->
+      <ul v-else class="dl-list" :class="{ dim: reqLoading }">
+        <li v-for="req in requests" :key="req.id" class="dl-row" :class="{ 'dl-row--turn': req.next_actor === 'vendor' }">
+          <button type="button" class="dl-main" @click="openCase(req)">
+            <span class="dl-thumb-wrap">
+              <span v-if="req.media_url" class="dl-proof" role="button" tabindex="0" :aria-label="`See the customer's proof for ${req.order?.order_number ?? 'this order'}`" @click.stop="openMediaModal(req)" @keydown.enter.stop.prevent="openMediaModal(req)">
+                <video v-if="req.media_type === 'video'" :src="req.media_url" class="dl-thumb" muted></video>
+                <img v-else :src="req.media_url" :alt="`${req.type} proof`" class="dl-thumb" loading="lazy" />
+                <span v-if="req.media_type === 'video'" class="dl-proof-play" v-html="ICONS.play"></span>
+              </span>
+              <span v-else class="dl-thumb blank" v-html="ICONS.restore"></span>
+            </span>
+            <span class="dl-text">
+              <span class="dl-top">
+                <strong>{{ req.customer?.name ?? "Customer" }}</strong>
+                <span class="dl-num">{{ req.order?.order_number ?? "—" }}</span>
+                <span class="sp-chip" :class="req.type === 'refund' ? 'blue' : 'violet'">{{ req.type === "refund" ? "Refund" : "Return" }}</span>
+              </span>
+              <span class="dl-items" :title="req.reason">“{{ req.reason || "No reason given" }}”</span>
+              <span class="dl-meta">
+                <span>Asked {{ formatTime(req.created_at) }}</span>
+                <span v-if="req.settled" class="dl-agreed">Agreed: {{ describeResolution(req.settled.resolution, req.settled.amount) }}</span>
+                <span v-else-if="req.offer">{{ req.offer.by === "vendor" ? "You offered" : "They asked for" }} {{ describeResolution(req.offer.resolution, req.offer.amount) }}</span>
+                <span v-if="!req.media_url">No proof attached</span>
+              </span>
+            </span>
+          </button>
+          <div class="dl-side">
+            <div class="dl-money">
+              <strong>₱{{ Number(req.order?.total_amount ?? 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong>
+              <span>order total</span>
+            </div>
+            <div class="dl-req-state">
+              <span class="sp-chip" :class="REQ_TONE[req.status] ?? 'slate'">{{ CASE_STAGE_LABEL[req.stage] ?? req.status }}</span>
+              <small v-if="req.next_actor === 'vendor'" class="dl-turn">Your turn</small>
+              <small v-else-if="req.next_actor === 'customer'" class="dl-turn wait">Waiting for the customer</small>
+            </div>
+            <div class="dl-actions">
+              <button type="button" class="sp-btn sp-btn-sm" :class="req.next_actor === 'vendor' ? 'sp-btn-primary' : 'sp-btn-ghost'" @click="openCase(req)">{{ req.next_actor === "vendor" ? "Respond" : "Open" }}</button>
+            </div>
+          </div>
+        </li>
+      </ul>
       <ShowMore v-if="requests.length" tone="vendor" :has-more="reqPager.hasMore.value" :loading="reqPager.loadingMore.value" :shown="requests.length" :total="reqPager.total.value" @more="reqPager.showMore()" />
-    </div>
+    </section>
 
     <!-- ── Existing modals (unchanged) ────────────────────────────────── -->
 
@@ -1086,14 +920,15 @@ const PIPELINE = [
   { key: "pending", label: "Pending", hint: "Confirm them", tone: "amber" },
   { key: "to_processed", label: "Preparing", hint: "Being arranged", tone: "blue" },
   { key: "to_ship", label: "Ready", hint: "Photo, then send out", tone: "violet" },
-  { key: "to_received", label: "Out for delivery", hint: "On the way", tone: "teal" },
+  { key: "to_received", label: "Out for delivery", hint: "Customer confirms it", tone: "teal" },
+  { key: "completed", label: "Completed", hint: "Customer has it", tone: "green" },
 ];
 // The one next step from each stage
 const NEXT = {
   pending: { value: "to_processed", label: "Start preparing" },
   to_processed: { value: "to_ship", label: "Mark ready" },
   to_ship: { value: "to_received", label: "Send out for delivery" },
-  to_received: { value: "completed", label: "Mark delivered" },
+  // Out for delivery: only the customer completes it, by marking it received
 };
 const NEXT_LABEL = { to_processed: "Start preparing", to_ship: "Mark ready", to_received: "Send out for delivery", completed: "Mark delivered", returned: "Mark returned", refunded: "Mark refunded" };
 const ADVANCE_TEXT = {
@@ -1106,7 +941,7 @@ const TRANSITIONS = {
   pending: [{ value: "to_processed", label: "Preparing" }],
   to_processed: [{ value: "to_ship", label: "Ready" }],
   to_ship: [{ value: "to_received", label: "Out for delivery" }],
-  to_received: [{ value: "completed", label: "Completed" }],
+  to_received: [],
   completed: [
     { value: "returned", label: "Returned" },
     { value: "refunded", label: "Refunded" },
@@ -1126,14 +961,27 @@ const statusTabs = [
 
 // NEW: request filter tabs
 const reqTabs = [
-  { value: "all", label: "All", color: "kpi-gray" },
-  { value: "pending", label: "Agreeing", color: "kpi-amber" },
-  { value: "approved", label: "Agreed · in progress", color: "kpi-blue" },
-  { value: "completed", label: "Settled", color: "kpi-green" },
-  { value: "rejected", label: "Declined / withdrawn", color: "kpi-red" },
-  { value: "return", label: "Returns", color: "kpi-indigo" },
-  { value: "refund", label: "Refunds only", color: "kpi-blue" },
+  { value: "all", label: "All" },
+  { value: "pending", label: "Agreeing" },
+  { value: "approved", label: "In progress" },
+  { value: "completed", label: "Settled" },
+  { value: "rejected", label: "Declined or withdrawn" },
+  { value: "return", label: "Returns" },
+  { value: "refund", label: "Refunds" },
 ];
+// Where returns and refunds stand, as cards like the order stages
+const REQ_STAGES = [
+  { key: "needs_shop", filter: "all", label: "Your turn", hint: "Waiting on the shop", tone: "amber" },
+  { key: "pending", filter: "pending", label: "Agreeing", hint: "Settling what to do", tone: "blue" },
+  { key: "approved", filter: "approved", label: "In progress", hint: "Refund or item on its way", tone: "violet" },
+  { key: "completed", filter: "completed", label: "Settled", hint: "Customer confirmed", tone: "green" },
+];
+const REQ_TONE = { pending: "amber", approved: "blue", completed: "green", rejected: "red", withdrawn: "slate" };
+function setReqFilter(value) {
+  reqActiveFilter.value = value;
+  reqTypeFilter.value = "";
+  fetchRequests();
+}
 const CASE_STAGE_LABEL = {
   awaiting_vendor: "New request",
   awaiting_customer: "Offer sent",
@@ -1760,7 +1608,7 @@ onUnmounted(() => clearInterval(pollTimer));
 /* ── Stages, like the vendor's Orders page ─────────────────────── */
 .dl-pipe {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 .dl-pipe-step {
@@ -1794,6 +1642,62 @@ onUnmounted(() => clearInterval(pollTimer));
 .tone-blue { --tone: #63b3ed; --tone-soft: var(--v-blue-soft); --tone-ink: var(--v-blue-text); }
 .tone-violet { --tone: #b794f4; --tone-soft: var(--v-purple-soft); --tone-ink: var(--v-purple-text); }
 .tone-teal { --tone: #4fd1c5; --tone-soft: var(--v-teal-soft); --tone-ink: var(--v-teal-text); }
+.tone-green { --tone: #68d391; --tone-soft: var(--v-green-soft); --tone-ink: var(--v-green-text); }
+.dl-pipe--req {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.dl-row--turn {
+  box-shadow: inset 3px 0 0 var(--v-amber-text);
+}
+.dl-proof {
+  position: relative;
+  display: block;
+  cursor: zoom-in;
+  border-radius: 12px;
+}
+.dl-proof:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: 2px;
+}
+.dl-proof-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+.dl-proof-play :deep(svg) {
+  width: 20px;
+  height: 20px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+.dl-agreed {
+  color: var(--v-green-text);
+  font-weight: 500;
+}
+.dl-req-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+.dl-turn {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--v-amber-text);
+}
+.dl-turn.wait {
+  font-weight: 400;
+  color: var(--v-muted);
+}
+.dl-wait {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--v-subtle);
+  font-size: 12px;
+  color: var(--v-muted);
+  white-space: nowrap;
+}
 .dl-pipe-label {
   display: flex;
   align-items: center;
@@ -2112,6 +2016,14 @@ onUnmounted(() => clearInterval(pollTimer));
   margin-bottom: 12px;
 }
 
+@media (max-width: 1280px) {
+  .dl-pipe {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .dl-pipe-arrow {
+    display: none;
+  }
+}
 @media (max-width: 1100px) {
   .dl-pipe {
     grid-template-columns: repeat(2, minmax(0, 1fr));
