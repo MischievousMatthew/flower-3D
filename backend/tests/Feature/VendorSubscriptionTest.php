@@ -156,11 +156,13 @@ class VendorSubscriptionTest extends TestCase
         $this->assertTrue($business['free_trial_available']);
         $this->assertSame(1, $business['trial_duration_months']);
         $this->assertTrue(SubscriptionPlans::includesModule(SubscriptionPlans::BUSINESS, 'warehouse'));
-        $this->assertSame(3, SubscriptionPlans::resourceLimit(SubscriptionPlans::PROFESSIONAL, 'branches'));
         $this->assertSame(30, SubscriptionPlans::resourceLimit(SubscriptionPlans::PROFESSIONAL, 'staff_employees'));
-        $this->assertNull(SubscriptionPlans::resourceLimit(SubscriptionPlans::ENTERPRISE, 'warehouses'));
-        $this->assertSame('Business', SubscriptionPlans::requiredPlanForModule('warehouse')['name']);
-        $this->assertSame('Professional', SubscriptionPlans::requiredPlanForModule('payroll')['name']);
+        // Branches and Enterprise are gone: three plans, named Basic, Pro and Premium
+        $this->assertNull(SubscriptionPlans::resourceLimit(SubscriptionPlans::PROFESSIONAL, 'branches'));
+        $this->assertSame(['Basic', 'Pro', 'Premium'], array_values(array_column(SubscriptionPlans::all(), 'name')));
+        $this->assertFalse(SubscriptionPlans::exists('enterprise'));
+        $this->assertSame('Pro', SubscriptionPlans::requiredPlanForModule('warehouse')['name']);
+        $this->assertSame('Premium', SubscriptionPlans::requiredPlanForModule('payroll')['name']);
     }
 
     public function test_plan_matrix_keeps_starter_business_and_professional_boundaries(): void
@@ -177,11 +179,10 @@ class VendorSubscriptionTest extends TestCase
         // Photo to 3D is a Business-and-up feature
         $this->assertFalse(SubscriptionPlans::includesModule(SubscriptionPlans::STARTER, 'photo_to_3d'));
         $this->assertTrue(SubscriptionPlans::includesModule(SubscriptionPlans::BUSINESS, 'photo_to_3d'));
-        $this->assertSame('Business', SubscriptionPlans::requiredPlanForModule('photo_to_3d')['name']);
+        $this->assertSame('Pro', SubscriptionPlans::requiredPlanForModule('photo_to_3d')['name']);
 
         foreach (SubscriptionPlans::MODULES as $module) {
             $this->assertTrue(SubscriptionPlans::includesModule(SubscriptionPlans::PROFESSIONAL, $module));
-            $this->assertTrue(SubscriptionPlans::includesModule(SubscriptionPlans::ENTERPRISE, $module));
         }
     }
 
@@ -272,12 +273,15 @@ class VendorSubscriptionTest extends TestCase
         $limits->assertCanCreateResource($vendor, 'warehouses');
     }
 
-    public function test_enterprise_resource_limits_are_unlimited(): void
+    public function test_a_limit_an_admin_leaves_empty_is_unlimited(): void
     {
+        (require base_path('database/migrations/2026_11_10_100000_plans_without_enterprise.php'))->up();
+        \DB::table('subscription_plan_settings')->insert(['plan_key' => SubscriptionPlans::PROFESSIONAL, 'resource_limits' => json_encode(['warehouses' => null, 'staff_employees' => null])]);
+        SubscriptionPlans::flush();
         $vendor = $this->vendor();
         VendorSubscription::create([
             'vendor_id' => $vendor->id,
-            'plan_key' => SubscriptionPlans::ENTERPRISE,
+            'plan_key' => SubscriptionPlans::PROFESSIONAL,
             'status' => SubscriptionStatus::Active,
             'subscription_started_at' => now(),
         ]);
@@ -314,8 +318,9 @@ class VendorSubscriptionTest extends TestCase
 
         $this->assertSame(422, $response->getStatusCode());
         $this->assertSame('Warehouse limit reached.', $response->getData(true)['message']);
-        $this->assertStringContainsString('Professional plan includes 1 warehouse.', $response->getData(true)['detail']);
-        $this->assertStringContainsString('Upgrade to Enterprise', $response->getData(true)['detail']);
+        $this->assertStringContainsString('Premium plan includes 1 warehouse.', $response->getData(true)['detail']);
+        // Premium is the top plan: there's nothing to upgrade to
+        $this->assertStringNotContainsString('Upgrade', $response->getData(true)['detail']);
     }
 
     public function test_employee_direct_module_access_requires_both_company_plan_and_employee_permission(): void

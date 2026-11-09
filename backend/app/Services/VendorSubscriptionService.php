@@ -16,7 +16,7 @@ class VendorSubscriptionService
     /** Start the single, calendar-month Business trial for an approved vendor. */
     /**
      * An admin puts a vendor on any plan (or none), starting now. Months null
-     * means no end date (e.g. an Enterprise contract). No payment is taken.
+     * means no end date (e.g. a plan an admin gave). No payment is taken.
      */
     public function setPlanByAdmin(User $vendor, ?string $planKey, ?int $months): ?VendorSubscription
     {

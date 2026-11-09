@@ -10,14 +10,12 @@ use App\Subscriptions\SubscriptionPlans;
 use LogicException;
 
 /**
- * The single enforcement point for vendor-company resource capacity.
- * Branches are intentionally represented but have no usage resolver until a
- * real branch model/creation flow exists.
+ * The single enforcement point for vendor-company resource capacity:
+ * products, staff accounts and warehouses.
  */
 class ResourceLimitService
 {
     private const RESOURCES = [
-        SubscriptionPlans::RESOURCE_BRANCHES => ['label' => 'Branch', 'plural' => 'branches', 'model' => null],
         SubscriptionPlans::RESOURCE_WAREHOUSES => ['label' => 'Warehouse', 'plural' => 'warehouses', 'model' => Warehouse::class],
         SubscriptionPlans::RESOURCE_STAFF_EMPLOYEES => ['label' => 'Staff member', 'plural' => 'staff members', 'model' => Employee::class],
         SubscriptionPlans::RESOURCE_PRODUCTS => ['label' => 'Product', 'plural' => 'products', 'model' => Product::class],

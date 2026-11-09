@@ -88,9 +88,10 @@ class VendorAccountController extends Controller
                 'key'                   => $p['key'],
                 'name'                  => $p['name'],
                 'monthly_price'         => $p['monthly_price'],
-                'minimum_monthly_price' => $p['minimum_monthly_price'] ?? null,
                 'currency'              => $p['currency'],
-                'custom_pricing'        => $p['custom_pricing'],
+                'description'           => $p['description'],
+                'highlights'            => $p['highlights'],
+                'featured'              => $p['featured'],
                 'free_trial_available'  => $p['free_trial_available'],
                 'modules'               => $p['included_modules'],
                 'limits'                => $p['resource_limits'],
@@ -216,8 +217,7 @@ class VendorAccountController extends Controller
         $plan = SubscriptionPlans::get($planKey);
 
         $resources = collect($limits->summary($vendor))->map(function (array $r, string $key) use ($planKey) {
-            // There is one shop location until branch tools exist
-            $usage = $key === SubscriptionPlans::RESOURCE_BRANCHES ? 1 : $r['usage'];
+            $usage = $r['usage'];
             $next = $r['unlimited'] ? null : SubscriptionPlans::nextPlanWithMoreOf($planKey, $key);
 
             return [
@@ -242,13 +242,12 @@ class VendorAccountController extends Controller
     }
 
     private const RESOURCE_LABELS = [
-        'products' => 'Products', 'staff_employees' => 'Employee accounts', 'warehouses' => 'Warehouses', 'branches' => 'Shop locations',
+        'products' => 'Products', 'staff_employees' => 'Employee accounts', 'warehouses' => 'Warehouses',
     ];
     private const RESOURCE_HINTS = [
         'products'        => 'Active, draft and hidden products all count. Deleted ones don\'t.',
         'staff_employees' => 'Every employee account, active or not.',
         'warehouses'      => 'Stock locations used by the warehouse tools.',
-        'branches'        => 'Your shop counts as one. Tools for more locations are on the way.',
     ];
 
     // ── Shop settings ────────────────────────────────────────────────────

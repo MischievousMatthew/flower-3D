@@ -19,7 +19,6 @@ class VendorSubscriptionCheckoutService
         if (! $vendor->isVendor()) throw new LogicException('Only vendor owners can purchase subscriptions.');
         if (! SubscriptionPlans::exists($planKey)) throw new LogicException('Unknown subscription plan.');
         $plan = SubscriptionPlans::get($planKey);
-        if ($plan['custom_pricing']) throw new LogicException('Enterprise subscriptions require a custom agreement.');
         if ($plan['monthly_price'] === null) throw new LogicException('This plan does not have online monthly pricing.');
         $key = config('services.paymongo.secret_key');
         if (! $key) throw new LogicException('Subscription payments are not configured.');

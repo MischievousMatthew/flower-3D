@@ -3,10 +3,9 @@
 // the plan data plus the "pending plan" a visitor picked before logging in.
 
 export const SUBSCRIPTION_PLANS = [
-  { key: "starter", name: "STARTER", price: "₱999", priceSuffix: "/month", description: "Essential ecommerce and day-to-day business tools for getting started.", highlights: ["Ecommerce functionality", "Products, reservations, calendar, and chat", "Basic business management"], action: "Get started" },
-  { key: "business", name: "BUSINESS", price: "₱2,999", priceSuffix: "/month", description: "Everything in Starter with the foundational ERP tools for a connected business.", highlights: ["Everything in Starter", "Basic ERP functionality", "Finance, procurement, and supplier workflows"], action: "Choose Business" },
-  { key: "professional", name: "PROFESSIONAL", price: "₱4,999", priceSuffix: "/month", description: "The complete normal BloomCraft ERP for teams running end-to-end operations.", highlights: ["Everything in Business", "Full ERP functionality", "Warehouse, supply chain, CRM, and HR"], action: "Choose Professional", featured: true },
-  { key: "enterprise", name: "ENTERPRISE", price: "₱6,999+", priceSuffix: "/month", description: "Professional ERP capabilities with enterprise-scale flexibility and support.", highlights: ["Everything in Professional", "Multi-branch and multi-warehouse", "Custom integrations and dedicated support"], action: "Talk to us" },
+  { key: "starter", name: "BASIC", price: "₱999", priceSuffix: "/month", description: "Essential ecommerce and day-to-day business tools for getting started.", highlights: ["Ecommerce functionality", "Products, reservations, calendar, and chat", "Basic business management"], action: "Get started" },
+  { key: "business", name: "PRO", price: "₱2,999", priceSuffix: "/month", description: "Everything in Basic with the foundational ERP tools for a connected business.", highlights: ["Everything in Basic", "Basic ERP functionality", "Finance, procurement, and supplier workflows"], action: "Choose Pro" },
+  { key: "professional", name: "PREMIUM", price: "₱4,999", priceSuffix: "/month", description: "The complete normal BloomCraft ERP for teams running end-to-end operations.", highlights: ["Everything in Pro", "Full ERP functionality", "Warehouse, supply chain, CRM, and HR"], action: "Choose Premium", featured: true },
 ];
 
 export const findPlan = (key) => SUBSCRIPTION_PLANS.find((plan) => plan.key === key) || null;

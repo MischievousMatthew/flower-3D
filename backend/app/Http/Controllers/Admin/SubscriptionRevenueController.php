@@ -294,8 +294,7 @@ class SubscriptionRevenueController extends Controller
             return [
                 'key' => $key,
                 'name' => $plan['name'],
-                'price' => $plan['monthly_price'] ?? $plan['minimum_monthly_price'] ?? null,
-                'custom_pricing' => $plan['custom_pricing'],
+                'price' => $plan['monthly_price'],
                 'paying' => $paying->where('plan_key', $key)->count(),
                 'trialing' => $subscriptions->where('plan_key', $key)->filter(fn ($s) => $s->isTrialActive($now))->count(),
                 'mrr' => round($planMrr, 2),
@@ -399,7 +398,7 @@ class SubscriptionRevenueController extends Controller
             && ($s->subscription_ends_at === null || $now->lt($s->subscription_ends_at));
     }
 
-    /** What the subscription is worth per month (custom Enterprise deals use the amount paid) */
+    /** What the subscription is worth per month (a shop on an older price uses the amount paid) */
     private function monthlyValue(VendorSubscription $s): float
     {
         if ($s->paid_amount !== null) {

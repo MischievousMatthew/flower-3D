@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\EnterpriseInquiry;
 use App\Models\User;
 use App\Models\VendorSubscription;
 use Illuminate\Database\Schema\Blueprint;
@@ -14,8 +13,7 @@ use Tests\Concerns\SignsInWithApiToken;
 use Tests\TestCase;
 
 /**
- * Admins can put a shop on any plan after confirming with the shop's name,
- * and the Enterprise "Talk to us" form reaches them as an inquiry.
+ * Admins can put a shop on any plan after confirming with the shop's name.
  */
 class AdminPlanChangeTest extends TestCase
 {
@@ -35,7 +33,7 @@ class AdminPlanChangeTest extends TestCase
         if (! Schema::hasColumn('vendor_applications', 'store_name')) {
             Schema::table('vendor_applications', fn (Blueprint $t) => $t->string('store_name')->nullable());
         }
-        foreach (['admin_roles', 'user_notifications', 'admin_audit_logs', 'account_events', 'vendor_subscriptions', 'vendor_subscription_checkouts', 'enterprise_inquiries'] as $table) {
+        foreach (['admin_roles', 'user_notifications', 'admin_audit_logs', 'account_events', 'vendor_subscriptions', 'vendor_subscription_checkouts'] as $table) {
             Schema::dropIfExists($table);
         }
         Schema::create('admin_roles', function (Blueprint $t) {
@@ -106,20 +104,6 @@ class AdminPlanChangeTest extends TestCase
             $t->timestamp('paid_at')->nullable();
             $t->timestamps();
         });
-        Schema::create('enterprise_inquiries', function (Blueprint $t) {
-            $t->id();
-            $t->unsignedBigInteger('vendor_id')->nullable();
-            foreach (['name', 'shop_name', 'email', 'phone'] as $c) {
-                $t->string($c);
-            }
-            $t->unsignedSmallInteger('branches')->nullable();
-            $t->text('message');
-            $t->string('status')->default('new');
-            $t->text('admin_note')->nullable();
-            $t->unsignedBigInteger('handled_by')->nullable();
-            $t->timestamp('handled_at')->nullable();
-            $t->timestamps();
-        });
 
         $this->admin = $this->adminWith(['*'], 'admin@example.com');
     }
@@ -144,21 +128,21 @@ class AdminPlanChangeTest extends TestCase
     public function test_an_admin_moves_a_shop_to_any_plan_after_typing_its_name(): void
     {
         $shop = $this->shop();
-        VendorSubscription::create(['vendor_id' => $shop->id, 'plan_key' => 'professional', 'status' => 'active', 'subscription_ends_at' => now()->addDays(5)]);
+        VendorSubscription::create(['vendor_id' => $shop->id, 'plan_key' => 'starter', 'status' => 'active', 'subscription_ends_at' => now()->addDays(5)]);
 
         $this->signIn($this->admin)->postJson("/api/admin/vendors/{$shop->id}/plan", [
-            'plan_key' => 'enterprise', 'months' => null, 'reason' => 'Signed the Enterprise contract', 'confirm' => 'flux flower store',
-        ])->assertOk()->assertJsonPath('data.subscription.current.plan_key', 'enterprise');
+            'plan_key' => 'professional', 'months' => null, 'reason' => 'Partner shop, on us', 'confirm' => 'flux flower store',
+        ])->assertOk()->assertJsonPath('data.subscription.current.plan_key', 'professional');
 
         $sub = VendorSubscription::where('vendor_id', $shop->id)->sole();
-        $this->assertSame('enterprise', $sub->plan_key);
+        $this->assertSame('professional', $sub->plan_key);
         $this->assertTrue($sub->isActive());
         $this->assertNull($sub->subscription_ends_at);
 
         $event = DB::table('account_events')->where('user_id', $shop->id)->sole();
         $this->assertSame('plan_changed', $event->action);
-        $this->assertStringContainsString('Professional → Enterprise with no end date', $event->reason);
-        $this->assertSame('Your plan is now Enterprise', DB::table('user_notifications')->where('user_id', $shop->id)->value('title'));
+        $this->assertStringContainsString('Basic → Premium with no end date', $event->reason);
+        $this->assertSame('Your plan is now Premium', DB::table('user_notifications')->where('user_id', $shop->id)->value('title'));
     }
 
     public function test_the_plan_does_not_change_without_the_shop_name(): void
@@ -197,37 +181,5 @@ class AdminPlanChangeTest extends TestCase
             'plan_key' => 'starter', 'months' => 1, 'reason' => 'Testing access', 'confirm' => 'Flux Flower Store',
         ])->assertForbidden();
         $this->assertSame(0, VendorSubscription::count());
-    }
-
-    public function test_talk_to_us_creates_an_inquiry_the_admin_sees_and_updates(): void
-    {
-        $this->postJson('/api/enterprise-inquiries', [
-            'name' => 'Ana Cruz', 'shop_name' => 'Bloom Co', 'email' => 'ana@bloom.test', 'phone' => '09171234567',
-            'branches' => 4, 'message' => 'We run four branches and need one ERP for all of them.',
-        ])->assertCreated();
-
-        $inquiry = EnterpriseInquiry::sole();
-        $this->assertSame('0917 123 4567', $inquiry->phone);
-        $this->assertNull($inquiry->vendor_id);
-        $this->assertSame('Enterprise inquiry from Bloom Co', DB::table('user_notifications')->where('user_id', $this->admin->id)->value('title'));
-
-        $this->signIn($this->admin)->getJson('/api/admin/subscriptions/enterprise-inquiries')
-            ->assertOk()->assertJsonPath('data.inquiries.0.shop_name', 'Bloom Co')->assertJsonPath('data.counts.new', 1);
-        $this->signIn($this->admin)->postJson("/api/admin/subscriptions/enterprise-inquiries/{$inquiry->id}", ['status' => 'contacted', 'note' => 'Called, sending a quote'])
-            ->assertOk();
-        $this->assertSame('contacted', $inquiry->fresh()->status);
-        $this->assertSame($this->admin->id, $inquiry->fresh()->handled_by);
-    }
-
-    public function test_a_signed_in_vendor_inquiry_is_linked_to_their_shop(): void
-    {
-        $shop = $this->shop();
-
-        $this->signIn($shop)->postJson('/api/vendor/enterprise-inquiries', [
-            'name' => 'John Doe', 'shop_name' => 'Flux Flower Store', 'email' => 'flux@example.com', 'phone' => '0917 123 4567',
-            'message' => 'We are opening a second branch next month.',
-        ])->assertCreated();
-
-        $this->assertSame($shop->id, EnterpriseInquiry::sole()->vendor_id);
     }
 }

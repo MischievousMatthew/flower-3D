@@ -6,10 +6,11 @@ use App\Http\Controllers\Customer\CustomerProductController;
 use App\Http\Controllers\Admin\VendorApplicationController;
 use App\Http\Controllers\Admin\LoginAuditLogController;
 use App\Http\Controllers\Admin\SubscriptionRevenueController;
+use App\Http\Controllers\Admin\SubscriptionPlanController;
+use App\Subscriptions\SubscriptionPlans;
 use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminVendorController;
-use App\Http\Controllers\Admin\EnterpriseInquiryController as AdminEnterpriseInquiryController;
 use App\Http\Controllers\Admin\AdminProductController;
 use App\Http\Controllers\Admin\AdminCustomerController;
 use App\Http\Controllers\Admin\AdminContentController;
@@ -20,7 +21,6 @@ use App\Http\Controllers\Admin\AdminReportsController;
 use App\Http\Controllers\Admin\AdminReviewController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SupportController;
-use App\Http\Controllers\EnterpriseInquiryController;
 use App\Http\Controllers\ProductTaxonomyController;
 use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\AuthController;
@@ -205,10 +205,10 @@ Route::post('/paymongo/webhook', [CheckoutController::class, 'handleWebhook'])
     ->middleware('paymongo.webhook');
 Route::get('/payment/callback',  [CheckoutController::class, 'paymentCallback']);
 Route::get('/subscription/payment/callback', [VendorSubscriptionController::class, 'paymentCallback']);
+// The plans and prices, for the landing, pricing and sign-up pages
+Route::get('/subscription-plans', fn () => response()->json(['success' => true, 'data' => SubscriptionPlans::publicList()]));
 // PayMongo sends Finance back here after paying a supplier; the payment is checked at PayMongo
 Route::get('/funding-payments/callback', [AccountingFundingRequestController::class, 'payMongoCallback'])->middleware('throttle:30,1');
-// Enterprise plan "Talk to us" from the landing and pricing pages
-Route::post('/enterprise-inquiries', [EnterpriseInquiryController::class, 'store'])->middleware('throttle:5,60');
 
 // ============================================================
 // 5. PUBLIC — EMPLOYEE LEAVE (QR token, no auth)
@@ -262,8 +262,6 @@ Route::middleware('token.auth')->group(function () {
         Route::get('/support/tickets', [SupportController::class, 'index']);
         Route::get('/support/unread', [SupportController::class, 'unread']);
         Route::post('/support/tickets', [SupportController::class, 'store']);
-        // Enterprise "Talk to us" from a signed-in vendor (linked to their shop)
-        Route::post('/vendor/enterprise-inquiries', [EnterpriseInquiryController::class, 'store'])->middleware('throttle:5,60');
         Route::get('/support/tickets/{id}', [SupportController::class, 'show'])->whereNumber('id');
         Route::post('/support/tickets/{id}/messages', [SupportController::class, 'reply'])->whereNumber('id');
         Route::post('/support/tickets/{id}/resolve', [SupportController::class, 'resolve'])->whereNumber('id');
@@ -1196,9 +1194,13 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/transactions', [SubscriptionRevenueController::class, 'transactions']);
             Route::get('/transactions/export', [SubscriptionRevenueController::class, 'export'])->middleware('admin.can:finance.export');
             Route::get('/subscribers', [SubscriptionRevenueController::class, 'subscribers']);
-            // Enterprise "Talk to us" inquiries
-            Route::get('/enterprise-inquiries', [AdminEnterpriseInquiryController::class, 'index']);
-            Route::post('/enterprise-inquiries/{id}', [AdminEnterpriseInquiryController::class, 'update'])->whereNumber('id')->middleware('admin.can:subscriptions.manage');
+        });
+
+        // Plans & pricing: each plan's name, price, description and limits
+        Route::prefix('subscription-plans')->group(function () {
+            Route::get('/', [SubscriptionPlanController::class, 'index'])->middleware('admin.can:revenue.view');
+            Route::put('/{key}', [SubscriptionPlanController::class, 'update'])->middleware('admin.can:subscriptions.manage');
+            Route::post('/{key}/reset', [SubscriptionPlanController::class, 'reset'])->middleware('admin.can:subscriptions.manage');
         });
 
         // Read-only oversight of vendor orders (plus private admin notes)
