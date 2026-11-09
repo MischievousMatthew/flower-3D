@@ -214,7 +214,7 @@
     <!-- ══════════════════════════════════════════════════════════════════
          LIST VIEW
     ══════════════════════════════════════════════════════════════════ -->
-    <section v-if="currentView === 'table'" class="sp-card dl-list-card" aria-label="Deliveries">
+    <section v-if="currentView === 'table'" class="sp-card dl-list-card" :class="TAB_TONE[activeTab] ? ['toned', `tone-${TAB_TONE[activeTab]}`] : null" aria-label="Deliveries">
       <ul v-if="loading && !orders.length" class="dl-list">
         <li v-for="n in 5" :key="n" class="dl-row">
           <div class="bc-skeleton dl-thumb"></div>
@@ -973,6 +973,8 @@ const DUE_TILES = [
   { key: "overdue", label: "Overdue", hint: "Past their delivery date", empty: "Nothing late", icon: "alert", tone: "red" },
 ];
 const DUE_FILTER = { due_today: "today", overdue: "overdue" };
+// The colour of each stage, for the list's glow
+const TAB_TONE = { pending: "amber", to_processed: "blue", to_ship: "violet", to_received: "teal", completed: "green", returned: "red", due_today: "green", overdue: "red" };
 
 const statusTabs = [
   { value: "all", label: "All" },
@@ -1875,6 +1877,31 @@ onUnmounted(() => clearInterval(pollTimer));
 }
 
 /* ── Delivery list ─────────────────────────────────────────────── */
+/* The list takes the colour of the stage you picked: a soft glow, not a loud one */
+.dl-list-card {
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.dl-list-card.toned {
+  border-color: color-mix(in srgb, var(--tone) 40%, var(--v-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 9%, transparent), 0 12px 32px -20px color-mix(in srgb, var(--tone) 70%, transparent);
+}
+.dl-list-card.toned .dl-row {
+  background: color-mix(in srgb, var(--tone) 4%, transparent);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--tone) 65%, transparent);
+}
+.dl-list-card.toned .dl-row:hover {
+  background: color-mix(in srgb, var(--tone) 9%, transparent);
+}
+.dl-list-card.toned .dl-row + .dl-row {
+  margin-top: 6px;
+  border-top-color: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dl-list-card {
+    transition: none;
+  }
+}
+
 .dl-list-card {
   padding: 6px;
 }
