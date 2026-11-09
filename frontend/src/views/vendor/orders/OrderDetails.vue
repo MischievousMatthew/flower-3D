@@ -108,7 +108,7 @@
             <div class="sp-card-head"><div><h2>Delivery</h2><p>{{ order.fulfillment.handled_by }}</p></div></div>
             <!-- Photo of the order: attached while it's prepared or ready, needed before it goes out -->
             <div v-if="canAttachPhoto" class="od-photo-box">
-              <DeliveryPhotoPicker v-model:file="photoFile" :existing-url="order.photo_url || ''" :disabled="photoBusy" />
+              <DeliveryPhotoPicker v-model:file="photoFile" :existing-url="order.photo_url || ''" :order-number="order.order_number || ''" :disabled="photoBusy" />
               <div v-if="photoFile" class="od-photo-actions">
                 <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" :disabled="photoBusy" @click="photoFile = null">Cancel</button>
                 <button type="button" class="sp-btn sp-btn-primary sp-btn-sm" :disabled="photoBusy" @click="savePhoto">{{ photoBusy ? "Uploading…" : "Save photo" }}</button>

@@ -825,7 +825,7 @@
             </div>
             <p v-else class="dl-adv-text">{{ ADVANCE_TEXT[advanceModal.target] }}</p>
 
-            <DeliveryPhotoPicker v-if="advanceModal.target === 'to_received'" v-model:file="advanceModal.photo" :existing-url="advanceModal.delivery?.photo_url || ''" :disabled="advancing" />
+            <DeliveryPhotoPicker v-if="advanceModal.target === 'to_received'" v-model:file="advanceModal.photo" :existing-url="advanceModal.delivery?.photo_url || ''" :order-number="advanceModal.delivery?.order?.order_number || advanceModal.delivery?.delivery_id || ''" :disabled="advancing" />
 
             <p v-if="advanceModal.error" class="sp-error" role="alert">{{ advanceModal.error }}</p>
             <div class="sp-modal-foot">

@@ -17,7 +17,7 @@
           </div>
           <p class="oa-text">{{ explanation }}</p>
           <!-- A photo of the order before it goes out; the customer sees it -->
-          <DeliveryPhotoPicker v-if="needsPhoto" v-model:file="photo" :existing-url="order.photo_url || ''" :disabled="busy" class="oa-photo" />
+          <DeliveryPhotoPicker v-if="needsPhoto" v-model:file="photo" :existing-url="order.photo_url || ''" :order-number="order.order_number || ''" :disabled="busy" class="oa-photo" />
           <p v-if="error" class="sp-error">{{ error }}</p>
           <div class="sp-modal-foot">
             <button type="button" class="sp-btn sp-btn-ghost" :disabled="busy" @click="close">Not now</button>
