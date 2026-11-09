@@ -50,6 +50,7 @@ class FinanceFundingRequestAccessTest extends TestCase
             }
         }
         $row['finance_request_id'] = 'FR-2026-0001';
+        $row['request_status'] = 'Pending'; // Finance only sees requests that were sent
 
         Schema::disableForeignKeyConstraints();
         $id = DB::table('funding_requests')->insertGetId($row);

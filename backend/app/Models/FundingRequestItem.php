@@ -18,12 +18,14 @@ class FundingRequestItem extends Model
         'uom',
         'current_stock',
         'quantity',
+        'approved_quantity',
         'unit_cost',
         'line_total',
     ];
 
     protected $casts = [
         'quantity'      => 'integer',
+        'approved_quantity' => 'integer',
         'current_stock' => 'integer',
         'unit_cost'     => 'decimal:2',
         'line_total'    => 'decimal:2',

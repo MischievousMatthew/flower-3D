@@ -64,6 +64,8 @@ class AccountingFundingRequestController extends Controller
                 ->leftJoin('employees as approver', 'fr.approver_id', '=', 'approver.id')
                 ->leftJoin('employees as reviewer', 'fr.reviewed_by_employee_id', '=', 'reviewer.id')
                 ->where('fr.owner_id', $this->getOwnerId($request))
+                // Drafts stay with Procurement until they're sent
+                ->where('fr.request_status', '!=', 'Draft')
                 ->select(
                     'fr.*',
                     'requester.name as submitted_by_name',
@@ -71,6 +73,10 @@ class AccountingFundingRequestController extends Controller
                     'approver.name as approver_name',
                     'approver.email as approver_email',
                     'reviewer.name as reviewed_by_name'
+                )
+                ->selectSub(
+                    DB::table('funding_request_items')->selectRaw('count(*)')->whereColumn('funding_request_items.funding_request_id', 'fr.id'),
+                    'items_count'
                 )
                 ->orderBy('fr.created_at', 'desc')
                 ->get();
@@ -96,6 +102,10 @@ class AccountingFundingRequestController extends Controller
                 'approved_quantity' => 'required|numeric|min:0',
                 'approved_amount' => 'required|numeric|min:0',
                 'finance_remarks' => 'nullable|string|max:500',
+                // How much of each product is approved; left out, everything asked for is
+                'items' => 'nullable|array',
+                'items.*.id' => 'required|integer',
+                'items.*.approved_quantity' => 'required|integer|min:0',
             ]);
 
             if ($validator->fails()) {
@@ -165,6 +175,29 @@ class AccountingFundingRequestController extends Controller
                 $amount = (float) $request->approved_amount;
                 $approvedQuantity = (float) $request->approved_quantity;
 
+                // Per-product amounts: never more than was asked for
+                $lines = $lockedFundingRequest->items()->get()->keyBy('id');
+                if ($lines->isNotEmpty()) {
+                    $given = collect($request->input('items', []))->keyBy(fn ($i) => (int) $i['id']);
+                    foreach ($given->keys() as $lineId) {
+                        if (!$lines->has($lineId)) {
+                            throw new \Symfony\Component\HttpKernel\Exception\HttpException(422, 'One of the products isn\'t on this request.');
+                        }
+                    }
+                    $approvedQuantity = 0;
+                    foreach ($lines as $line) {
+                        $qty = $given->has($line->id) ? (int) $given[$line->id]['approved_quantity'] : (int) $line->quantity;
+                        if ($qty > (int) $line->quantity) {
+                            throw new \Symfony\Component\HttpKernel\Exception\HttpException(422, "You can't approve more {$line->product_name} than was asked for.");
+                        }
+                        $line->update(['approved_quantity' => $qty]);
+                        $approvedQuantity += $qty;
+                    }
+                    if ($approvedQuantity <= 0) {
+                        throw new \Symfony\Component\HttpKernel\Exception\HttpException(422, 'Approve at least one product, or reject the request.');
+                    }
+                }
+
                 $lockedFundingRequest->update([
                     'request_status' => FundingRequest::STATUS_APPROVED,
                     'payment_status' => 'paid',
@@ -201,7 +234,7 @@ class AccountingFundingRequestController extends Controller
                     'amount' => $amount,
                     'balance_before' => $balanceBefore,
                     'balance_after' => $balanceAfter,
-                    'description' => "Funding request approved: {$lockedFundingRequest->product_name} ({$approvedQuantity} {$lockedFundingRequest->uom})",
+                    'description' => "Funding request approved: {$lockedFundingRequest->product_name} ({$approvedQuantity} " . ($lockedFundingRequest->uom ?: 'units') . ')',
                     'status' => 'completed',
                     'metadata' => [
                         'funding_request_id' => $lockedFundingRequest->id,

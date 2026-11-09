@@ -494,7 +494,7 @@ class FundingRequestController extends Controller
             $fundingRequest->items = DB::table('funding_request_items')
                 ->where('funding_request_id', $fundingRequest->id)
                 ->orderBy('id')
-                ->get(['id', 'product_id', 'product_name', 'sku', 'uom', 'current_stock', 'quantity', 'unit_cost', 'line_total']);
+                ->get(['id', 'product_id', 'product_name', 'sku', 'uom', 'current_stock', 'quantity', 'approved_quantity', 'unit_cost', 'line_total']);
 
             return response()->json(['success' => true, 'data' => $fundingRequest], 200);
         } catch (Exception $e) {

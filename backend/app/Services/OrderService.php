@@ -601,10 +601,11 @@ class OrderService
             $lines = $funding->items()->get()->map(fn ($i) => [
                 'product_id'   => $i->product_id,
                 'product_name' => $i->product_name,
-                'quantity'     => (int) $i->quantity,
+                // What Finance approved, when they cut it down
+                'quantity'     => (int) ($i->approved_quantity ?? $i->quantity),
                 'price'        => (float) $i->unit_cost,
                 'unit'         => $unitOf[$i->uom] ?? 'stem',
-            ])->all();
+            ])->filter(fn ($l) => $l['quantity'] > 0)->values()->all();
 
             if (!$lines) {
                 // Look up the product so we can store product_id on the item,

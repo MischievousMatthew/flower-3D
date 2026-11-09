@@ -38,7 +38,7 @@ class FundingRequestFormTest extends TestCase
         });
         foreach (['2026_02_07_085208_create_funding_requests_table', '2026_03_10_065051_add_linked_order_id_to_funding_requests_table',
             '2026_04_02_120100_add_requester_and_approver_to_funding_requests_table', '2026_04_05_110000_add_payment_status_to_funding_requests_table',
-            '2026_11_09_120000_add_items_and_payment_method_to_funding_requests'] as $m) {
+            '2026_11_09_120000_add_items_and_payment_method_to_funding_requests', '2026_11_09_130000_add_approved_quantity_to_funding_request_items'] as $m) {
             (require base_path("database/migrations/{$m}.php"))->up();
         }
         // purchase_orders isn't built here; the request's link to it stays empty
@@ -46,7 +46,7 @@ class FundingRequestFormTest extends TestCase
 
         $this->vendor = $this->shopOwner();
         $this->buyer = $this->staff(['view', 'create', 'edit']);
-        $this->approver = $this->staff(['approve'], 'funding_requests');
+        $this->approver = $this->staff(['view', 'approve'], 'funding_requests');
     }
 
     private function staff(array $permissions, string $module = 'inventory_funding'): Employee
@@ -137,6 +137,66 @@ class FundingRequestFormTest extends TestCase
         $this->postJson('/api/procurement/inventory/funding-requests', $this->form([
             ['product_id' => $other, 'quantity' => 1, 'unit_cost' => 1],
         ]))->assertStatus(422);
+    }
+
+    public function test_finance_approves_part_of_a_request_and_never_sees_drafts(): void
+    {
+        foreach (['vendor_balances', 'vendor_transactions'] as $t) {
+            Schema::dropIfExists($t);
+        }
+        Schema::create('vendor_balances', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('vendor_id');
+            $t->decimal('balance', 12, 2)->default(0);
+            $t->decimal('total_earned', 12, 2)->default(0);
+            $t->decimal('total_withdrawn', 12, 2)->default(0);
+            $t->timestamps();
+        });
+        Schema::create('vendor_transactions', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('vendor_id');
+            $t->unsignedBigInteger('order_id')->nullable();
+            $t->string('type');
+            $t->string('category')->nullable();
+            $t->decimal('amount', 12, 2);
+            $t->decimal('balance_before', 12, 2)->default(0);
+            $t->decimal('balance_after', 12, 2)->default(0);
+            $t->string('description')->nullable();
+            $t->string('status')->nullable();
+            $t->json('metadata')->nullable();
+            $t->timestamps();
+        });
+
+        $rose = $this->product('Red rose');
+        $tulip = $this->product('Tulip');
+        $id = $this->signIn($this->buyer)->postJson('/api/procurement/inventory/funding-requests', $this->form([
+            ['product_id' => $rose, 'quantity' => 100, 'unit_cost' => 20],
+            ['product_id' => $tulip, 'quantity' => 10, 'unit_cost' => 150],
+        ]))->assertCreated()->json('id');
+        $this->postJson('/api/procurement/inventory/funding-requests', ['is_draft' => true])->assertCreated();
+        $lines = DB::table('funding_request_items')->where('funding_request_id', $id)->orderBy('id')->pluck('id');
+
+        $this->app['auth']->forgetGuards();
+        $this->signIn($this->approver)->getJson('/api/finance/funding-requests')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.items_count', 2);
+
+        // More than was asked for is refused
+        $this->postJson("/api/finance/funding-requests/{$id}/approve", [
+            'approved_quantity' => 1, 'approved_amount' => 1,
+            'items' => [['id' => $lines[0], 'approved_quantity' => 101]],
+        ])->assertStatus(422);
+
+        // Half the roses, no tulips
+        $this->postJson("/api/finance/funding-requests/{$id}/approve", [
+            'approved_quantity' => 50, 'approved_amount' => 1150,
+            'items' => [['id' => $lines[0], 'approved_quantity' => 50], ['id' => $lines[1], 'approved_quantity' => 0]],
+        ])->assertOk();
+
+        $this->assertSame([50, 0], DB::table('funding_request_items')->where('funding_request_id', $id)->orderBy('id')->pluck('approved_quantity')->map(fn ($q) => (int) $q)->all());
+        $row = DB::table('funding_requests')->find($id);
+        $this->assertSame('Approved', $row->request_status);
+        $this->assertEquals(50, $row->approved_quantity);
+        $this->assertEquals(1150, $row->approved_amount);
     }
 
     public function test_a_half_filled_draft_is_edited_then_sent(): void

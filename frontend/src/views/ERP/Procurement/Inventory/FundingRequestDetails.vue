@@ -58,7 +58,7 @@
             <tbody>
               <tr v-for="l in lines" :key="l.key">
                 <td><b>{{ l.name }}</b><small v-if="l.sub">{{ l.sub }}</small></td>
-                <td class="num">{{ l.qty }} {{ (l.uom || "").toLowerCase() }}</td>
+                <td class="num">{{ l.qty }} {{ (l.uom || "").toLowerCase() }}<small v-if="l.approved !== null && l.approved !== undefined && Number(l.approved) !== Number(l.qty)" class="fd-approved">{{ l.approved }} approved</small></td>
                 <td class="num">{{ peso(l.cost) }}</td>
                 <td class="num">{{ peso(l.total) }}</td>
               </tr>
@@ -174,6 +174,7 @@ const lines = computed(() => {
       uom: i.uom,
       cost: i.unit_cost,
       total: i.line_total,
+      approved: i.approved_quantity,
     }));
   }
   if (!r.product_name) return [];
@@ -451,6 +452,10 @@ onMounted(fetchRequest);
   text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+.fd-approved {
+  display: block;
+  color: var(--v-amber-text) !important;
 }
 .fd-table tfoot td {
   border-bottom: 0;
