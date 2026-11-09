@@ -97,16 +97,14 @@
     <h3 id="compare" class="st-section-title">Compare plans</h3>
     <div class="sb-plans">
       <template v-if="!data">
-        <div v-for="n in 4" :key="n" class="sp-card"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-block"></div></div>
+        <div v-for="n in 3" :key="n" class="sp-card"><div class="bc-skeleton sp-sk-line w50"></div><div class="bc-skeleton sp-sk-block"></div></div>
       </template>
       <article v-for="p in data?.plans ?? []" v-else :key="p.key" class="sp-card sb-plan" :class="{ current: isCurrent(p) }">
         <span v-if="isCurrent(p)" class="sp-chip green sb-plan-tag">Your plan</span>
-        <span v-else-if="p.key === 'professional'" class="sp-chip violet sb-plan-tag">Most complete</span>
+        <span v-else-if="p.featured" class="sp-chip violet sb-plan-tag">Most popular</span>
         <h3>{{ p.name }}</h3>
-        <p class="sb-plan-price">
-          <template v-if="p.custom_pricing">From {{ pesoWhole(p.minimum_monthly_price) }}<small>/month</small></template>
-          <template v-else>{{ pesoWhole(p.monthly_price) }}<small>/month</small></template>
-        </p>
+        <p class="sb-plan-price">{{ pesoWhole(p.monthly_price) }}<small>/month</small></p>
+        <p v-if="p.description" class="sb-plan-desc">{{ p.description }}</p>
         <ul class="sb-plan-limits">
           <li v-for="[key, label, unit] in LIMIT_ROWS" :key="key">
             <span>{{ label }}</span><b :class="{ 'ac-muted': p.limits[key] === 0 }">{{ limitText(p.limits[key], unit) }}</b>
@@ -120,7 +118,6 @@
 
         <div class="sb-plan-foot">
           <button v-if="isCurrent(p) && !canRenew" type="button" class="sp-btn sp-btn-ghost" disabled><span v-html="ICONS.check"></span>Current plan</button>
-          <button v-else-if="p.custom_pricing" type="button" class="sp-btn sp-btn-ghost" @click="talkOpen = true">Talk to us</button>
           <button v-else-if="trialFor(p)" type="button" class="sp-btn sp-btn-primary" :disabled="!!busy" @click="startTrial">
             {{ busy === "trial" ? "Starting…" : "Start 1-month free trial" }}
           </button>
@@ -150,7 +147,6 @@
         </div>
       </div>
     </Transition>
-    <EnterpriseInquiryForm :open="talkOpen" vendor :prefill="talkPrefill" @close="talkOpen = false" />
   </ShopLayout>
 </template>
 
@@ -165,16 +161,6 @@ import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { LIMIT_ROWS, PLAN_STATUS, limitText, longDate, pesoWhole, startPlanCheckout } from "../../../components/vendor/account/accountUi";
 import { loadSubscriptionAccess } from "../../../composables/useSubscriptionAccess";
 import { clearPendingPlan } from "../../../constants/subscriptionPlans";
-import { useAuth } from "../../../composables/useAuth";
-import EnterpriseInquiryForm from "../../../components/pricing/EnterpriseInquiryForm.vue";
-
-// Enterprise "Talk to us": an inquiry linked to this shop
-const { user } = useAuth();
-const talkOpen = ref(false);
-const talkPrefill = computed(() => {
-  const u = user.value ?? {};
-  return { name: [u.name, u.surname].filter(Boolean).join(" "), shop_name: u.store_name, email: u.email, phone: u.contact_number };
-});
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/staff/staff.css";
 import "../../../components/vendor/account/account.css";
@@ -426,9 +412,15 @@ onMounted(async () => {
 .sb-empty {
   padding: 18px 0;
 }
+.sb-plan-desc {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--v-muted);
+}
 .sb-plans {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 .sb-plan {

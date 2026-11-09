@@ -50,3 +50,39 @@ export function clearPendingPlan() {
     // Ignore storage failures.
   }
 }
+
+// ---- Plans from the server --------------------------------------------------
+// Admins change names, prices and wording on the admin "Plans & Pricing" page.
+// The list above is only what shows until the server answers (or if it can't).
+const ACTION = { starter: "Get started" };
+const peso = (n) => `₱${Number(n || 0).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`;
+
+export const planFromServer = (p) => ({
+  key: p.key,
+  name: String(p.name || "").toUpperCase(),
+  price: peso(p.monthly_price),
+  priceSuffix: "/month",
+  description: p.description || "",
+  highlights: p.highlights ?? [],
+  action: ACTION[p.key] ?? `Choose ${p.name}`,
+  featured: !!p.featured,
+});
+
+let plansRequest = null;
+/** The plans as admins set them; falls back to the list above */
+export function loadPlans(api) {
+  plansRequest ??= api
+    .get("/subscription-plans")
+    .then(({ data }) => {
+      const list = (data?.data ?? []).map(planFromServer);
+      if (!list.length) throw new Error("no plans");
+      // Keep findPlan() in step with what the pages show
+      SUBSCRIPTION_PLANS.splice(0, SUBSCRIPTION_PLANS.length, ...list);
+      return list;
+    })
+    .catch(() => {
+      plansRequest = null;
+      return SUBSCRIPTION_PLANS;
+    });
+  return plansRequest;
+}

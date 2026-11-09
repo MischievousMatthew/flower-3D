@@ -468,7 +468,6 @@
       @register="continueWithRegister"
     />
 
-    <EnterpriseInquiryForm :open="talkOpen" :vendor="talkAsVendor" :prefill="talkPrefill" @close="talkOpen = false" />
 
     <!-- Footer -->
     <footer class="footer" ref="footerSection">
@@ -563,11 +562,12 @@ import { useSiteContent } from "../../composables/useSiteContent";
 import LandingLoader from "../../components/landing/LandingLoader.vue";
 import PlanAccountModal from "../../components/landing/PlanAccountModal.vue";
 import PricingPlanCard from "../../components/pricing/PricingPlanCard.vue";
-import EnterpriseInquiryForm from "../../components/pricing/EnterpriseInquiryForm.vue";
 import {
   SUBSCRIPTION_PLANS,
   savePendingPlan,
+  loadPlans,
 } from "../../constants/subscriptionPlans";
+import api from "../../plugins/axios";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -821,7 +821,9 @@ const scrollToSection = (sectionId) => {
 // Logged-in vendors go straight to that plan's checkout on their Subscription page. Guests
 // are asked whether they have a vendor account; the chosen plan is kept so
 // their next vendor login lands on that checkout (see useAuth).
-const subscriptionPlans = SUBSCRIPTION_PLANS;
+// Shown straight away, then replaced by the plans as admins set them
+const subscriptionPlans = ref([...SUBSCRIPTION_PLANS]);
+loadPlans(api).then((list) => (subscriptionPlans.value = list));
 const accountModalPlan = ref(null);
 const planNotice = ref("");
 
@@ -833,20 +835,8 @@ function storedUserRole() {
   }
 }
 
-// Enterprise "Talk to us": a short inquiry form for anyone, signed in or not
-const talkOpen = ref(false);
-const talkAsVendor = computed(() => !!getStoredUserToken() && (authUser.value?.role || storedUserRole()) === "vendor");
-const talkPrefill = computed(() => {
-  const u = talkAsVendor.value ? authUser.value : null;
-  return u ? { name: [u.name, u.surname].filter(Boolean).join(" "), shop_name: u.store_name, email: u.email, phone: u.contact_number } : {};
-});
-
 function handlePlanSelect(plan) {
   planNotice.value = "";
-  if (plan.key === "enterprise") {
-    talkOpen.value = true;
-    return;
-  }
   if (getStoredUserToken()) {
     const role = authUser.value?.role || storedUserRole();
     if (role === "vendor") {
@@ -863,7 +853,6 @@ function handlePlanSelect(plan) {
 }
 
 // Freeze smooth scrolling behind the open modal.
-watch(talkOpen, (open) => (open ? lenis?.stop() : lenis?.start()));
 watch(accountModalPlan, (plan) => {
   if (plan) lenis?.stop();
   else lenis?.start();

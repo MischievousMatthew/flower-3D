@@ -72,7 +72,7 @@ import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/account/account.css";
 
-const RESOURCE_ICONS = { products: "flower", staff_employees: "users", warehouses: "box", branches: "store" };
+const RESOURCE_ICONS = { products: "flower", staff_employees: "users", warehouses: "box" };
 const FILTERS = [
   { key: "all", label: "All" },
   { key: "on", label: "In my plan" },
@@ -91,7 +91,7 @@ const subtitle = computed(() =>
 const pct = (r) => (r.limit ? Math.round((r.usage / r.limit) * 100) : 0);
 const tone = (r) => (r.unlimited ? "green" : r.limit === 0 ? "slate" : pct(r) >= 100 ? "red" : pct(r) >= 80 ? "amber" : "green");
 const meterClass = (r) => (r.unlimited ? "open" : { near: pct(r) >= 80 && pct(r) < 100, full: pct(r) >= 100 });
-const atLimit = computed(() => (data.value?.resources ?? []).filter((r) => !r.unlimited && r.limit > 0 && !r.can_add && r.key !== "branches"));
+const atLimit = computed(() => (data.value?.resources ?? []).filter((r) => !r.unlimited && r.limit > 0 && !r.can_add));
 const included = computed(() => (data.value?.features ?? []).filter((f) => f.included).length);
 const features = computed(() =>
   (data.value?.features ?? []).filter((f) => filter.value === "all" || (filter.value === "on") === f.included),

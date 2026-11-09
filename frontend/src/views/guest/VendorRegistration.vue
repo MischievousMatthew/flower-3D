@@ -449,7 +449,7 @@ import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
-import { findPlan, readPendingPlan } from "../../constants/subscriptionPlans";
+import { findPlan, readPendingPlan, loadPlans } from "../../constants/subscriptionPlans";
 import { PHONE_MESSAGE, formatPhone, isPhone } from "../../utils/phone";
 
 const router = useRouter();
@@ -502,6 +502,8 @@ const showApplicationModal = ref(false);
 const applicationId = ref("");
 // Plan picked on the landing page before registering (see subscriptionPlans.js).
 const pendingPlanName = ref(findPlan(readPendingPlan())?.name || "");
+// The plan as admins named it
+loadPlans(api).then(() => (pendingPlanName.value = findPlan(readPendingPlan())?.name || ""));
 const saveInterval = ref(null);
 const activeModal = ref(null);
 

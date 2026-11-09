@@ -308,7 +308,7 @@ const RANGES = [
 ];
 const MODULE_NAME = { orders: "Orders", products: "Products", finance: "Finance" };
 const PLAN_STATUS = { active: "Active", trial: "Free trial", inactive: "Inactive", none: "No plan" };
-const LIMIT_LABEL = { branches: "Branches", warehouses: "Warehouses", staff_employees: "Staff" };
+const LIMIT_LABEL = { warehouses: "Warehouses", staff_employees: "Staff", products: "Products" };
 
 const icon = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const ICONS = {

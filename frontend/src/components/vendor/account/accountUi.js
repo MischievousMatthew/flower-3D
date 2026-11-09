@@ -42,7 +42,6 @@ export const LIMIT_ROWS = [
   ["products", "Products", "products"],
   ["staff_employees", "Employee accounts", "employees"],
   ["warehouses", "Warehouses", "warehouses"],
-  ["branches", "Shop locations", "locations"],
 ];
 
 /**

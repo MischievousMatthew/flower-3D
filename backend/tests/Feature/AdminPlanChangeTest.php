@@ -182,4 +182,43 @@ class AdminPlanChangeTest extends TestCase
         ])->assertForbidden();
         $this->assertSame(0, VendorSubscription::count());
     }
+
+    public function test_admins_edit_a_plans_name_price_and_limits_everywhere(): void
+    {
+        \Illuminate\Support\Facades\Schema::dropIfExists('subscription_plan_settings');
+        (require base_path('database/migrations/2026_11_10_100000_plans_without_enterprise.php'))->up();
+        $plan = [
+            'name' => 'Growth', 'monthly_price' => 3499, 'description' => 'For growing shops.',
+            'highlights' => ['Everything in Basic', 'Finance tools'], 'featured' => true,
+            'limits' => ['products' => 500, 'staff_employees' => null, 'warehouses' => 2],
+        ];
+
+        // Seeing the plans isn't enough to change them; ₱20 is the least PayMongo takes
+        $viewer = $this->adminWith(['revenue.view'], 'viewer@example.com');
+        $this->signIn($viewer)->getJson('/api/admin/subscription-plans')->assertOk()->assertJsonCount(3, 'data.plans');
+        $this->signIn($viewer)->putJson('/api/admin/subscription-plans/business', $plan)->assertForbidden();
+        $this->signIn($this->admin)->putJson('/api/admin/subscription-plans/business', ['monthly_price' => 10] + $plan)
+            ->assertStatus(422)->assertJsonValidationErrors('monthly_price');
+        $this->signIn($this->admin)->putJson('/api/admin/subscription-plans/business', ['name' => 'Basic'] + $plan)->assertStatus(422);
+        $this->signIn($this->admin)->putJson('/api/admin/subscription-plans/enterprise', $plan)->assertNotFound();
+
+        $this->signIn($this->admin)->putJson('/api/admin/subscription-plans/business', $plan)->assertOk();
+        \App\Subscriptions\SubscriptionPlans::flush();
+
+        // The pricing pages, checkout and limits all read the edited plan
+        $public = collect($this->getJson('/api/subscription-plans')->assertOk()->json('data'))->keyBy('key');
+        $this->assertSame('Growth', $public['business']['name']);
+        $this->assertEquals(3499, $public['business']['monthly_price']);
+        $this->assertTrue($public['business']['featured']);
+        $this->assertFalse($public['professional']['featured']); // one "Most popular" at a time
+        $this->assertSame(500, \App\Subscriptions\SubscriptionPlans::resourceLimit('business', 'products'));
+        $this->assertNull(\App\Subscriptions\SubscriptionPlans::resourceLimit('business', 'staff_employees'));
+        $this->assertSame('Growth', \App\Subscriptions\SubscriptionPlans::requiredPlanForModule('warehouse')['name']);
+
+        // Back to the original
+        $this->signIn($this->admin)->postJson('/api/admin/subscription-plans/business/reset')->assertOk();
+        \App\Subscriptions\SubscriptionPlans::flush();
+        $this->assertSame('Pro', \App\Subscriptions\SubscriptionPlans::get('business')['name']);
+        $this->assertEquals(2999, \App\Subscriptions\SubscriptionPlans::get('business')['monthly_price']);
+    }
 }

@@ -654,15 +654,14 @@ const APP_STATUS_LABELS = {
 const ORDER_STATUS = { pending: "Pending", processing: "Processing", out_for_delivery: "Out for delivery", completed: "Completed", cancelled: "Cancelled", failed: "Failed", returned: "Returned", refunded: "Refunded" };
 const SUB_STATUS = { active: "Paid", trialing: "Free trial", expired: "Expired", cancelled: "Cancelled", past_due: "Past due", pending: "Pending" };
 const PAYMENT_STATUS = { paid: "Paid", pending: "Not completed", failed: "Failed", cancelled: "Cancelled" };
-const LIMIT_LABELS = { branches: "branches", warehouses: "warehouses", staff_employees: "staff" };
+const LIMIT_LABELS = { warehouses: "warehouses", staff_employees: "staff", products: "products" };
 const DIALOG_CONFIRM = { approve: "Approve", reject: "Reject application", resubmission: "Send request", again: "Ask again", suspend: "Suspend vendor", reactivate: "Reactivate", plan: "Change plan" };
 const HISTORY_LABEL = { suspended: "Suspended", reactivated: "Reactivated", plan_changed: "Plan changed" };
 // Admin → change a shop's plan (AdminVendorController@changePlan)
 const PLAN_CHOICES = [
-  { key: "starter", label: "Starter" },
-  { key: "business", label: "Business" },
-  { key: "professional", label: "Professional" },
-  { key: "enterprise", label: "Enterprise" },
+  { key: "starter", label: "Basic" },
+  { key: "business", label: "Pro" },
+  { key: "professional", label: "Premium" },
   { key: "none", label: "No plan (remove it)" },
 ];
 const PLAN_LENGTHS = [

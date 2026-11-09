@@ -988,6 +988,11 @@ const routes = [
         component: () => import("../views/admin/SubscriptionRevenue.vue"),
       },
       {
+        path: "subscription-plans",
+        name: "AdminSubscriptionPlans",
+        component: () => import("../views/admin/SubscriptionPlans.vue"),
+      },
+      {
         path: "analytics",
         name: "AdminAnalytics",
         component: () => import("../views/admin/Analytics.vue"),

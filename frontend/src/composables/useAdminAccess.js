@@ -23,6 +23,7 @@ export const ADMIN_PAGES = [
   { path: "/admin/finance", permission: "finance.view" },
   { path: "/admin/refunds", permission: "finance.view" },
   { path: "/admin/subscription-revenue", permission: "revenue.view" },
+  { path: "/admin/subscription-plans", permission: "revenue.view" },
   { path: "/admin/analytics", permission: "reports.view" },
   { path: "/admin/vendor-requests", permission: "vendors.view" },
   { path: "/admin/customers", permission: "customers.view" },

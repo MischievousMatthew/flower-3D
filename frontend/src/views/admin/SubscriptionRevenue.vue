@@ -245,7 +245,7 @@
                         <span class="plan-chip" :style="planChipStyle(plan.key)">{{ plan.name }}</span>
                       </td>
                       <td class="num muted">
-                        {{ plan.custom_pricing ? "from " + money(plan.price) : money(plan.price) }}
+                        {{ money(plan.price) }}
                       </td>
                       <td class="num">{{ plan.paying }}</td>
                       <td class="num">{{ plan.trialing }}</td>
@@ -363,19 +363,9 @@
                   Subscribers
                   <span class="tab-count">{{ subscribers.length }}</span>
                 </button>
-                <button type="button" class="tab" :class="{ active: tab === 'enterprise' }" @click="switchTab('enterprise')">
-                  Enterprise inquiries
-                  <span class="tab-count" :class="{ hot: enterprise.counts.new }">{{ enterprise.counts.new ?? 0 }} new</span>
-                </button>
               </div>
 
-              <div v-if="tab === 'enterprise'" class="filters">
-                <select v-model="enterprise.status" class="select" aria-label="Inquiry status">
-                  <option value="">Every inquiry</option>
-                  <option v-for="(label, value) in INQUIRY_STATUS" :key="value" :value="value">{{ label }}</option>
-                </select>
-              </div>
-              <div v-else class="filters">
+              <div class="filters">
                 <div class="search-wrap">
                   <svg class="search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                   <input
@@ -450,39 +440,6 @@
               </table>
             </div>
 
-            <!-- Enterprise "Talk to us" inquiries -->
-            <div v-else-if="tab === 'enterprise'" class="eq-list">
-              <template v-if="enterprise.loading && !enterprise.rows.length">
-                <div v-for="n in 3" :key="n" class="eq-item"><div class="sk sk-line" style="width: 40%"></div><div class="sk sk-line"></div><div class="sk sk-line" style="width: 70%"></div></div>
-              </template>
-              <p v-else-if="!enterprise.rows.length" class="empty-cell">{{ enterprise.status ? "No inquiries with this status" : "No one has asked about Enterprise yet. The \"Talk to us\" form on the pricing page sends them here." }}</p>
-              <article v-for="row in enterprise.rows" v-else :key="row.id" class="eq-item" :class="{ fresh: row.status === 'new' }">
-                <header class="eq-item-head">
-                  <div>
-                    <span class="vendor-name">{{ row.shop_name }}</span>
-                    <span class="vendor-sub">{{ row.name }}<template v-if="row.branches"> · {{ row.branches }} {{ row.branches === 1 ? "branch" : "branches" }}</template> · {{ formatDateTime(row.created_at) }}</span>
-                  </div>
-                  <span class="status-pill" :class="'iq-' + row.status">{{ INQUIRY_STATUS[row.status] ?? row.status }}</span>
-                </header>
-                <p class="eq-message">{{ row.message }}</p>
-                <div class="eq-contact">
-                  <a :href="`mailto:${row.email}?subject=${encodeURIComponent('BloomCraft Enterprise plan')}`" class="ghost-btn">{{ row.email }}</a>
-                  <a :href="`tel:${row.phone.replace(/\s/g, '')}`" class="ghost-btn">{{ row.phone }}</a>
-                  <router-link v-if="row.vendor" :to="{ path: '/admin/vendor-requests', query: { tab: 'active', vendor: row.vendor.id } }" class="ghost-btn">Open {{ row.vendor.store_name }} →</router-link>
-                  <span v-else class="vendor-sub">Not a vendor yet</span>
-                </div>
-                <div v-if="canManagePlans" class="eq-update">
-                  <select v-model="row.draftStatus" class="select" :aria-label="`Status for ${row.shop_name}`">
-                    <option v-for="(label, value) in INQUIRY_STATUS" :key="value" :value="value">{{ label }}</option>
-                  </select>
-                  <input v-model="row.draftNote" class="search-input eq-note" maxlength="1000" placeholder="Private note (e.g. sent a quote)" :aria-label="`Note for ${row.shop_name}`" />
-                  <button type="button" class="ghost-btn" :disabled="row.saving || (row.draftStatus === row.status && (row.draftNote ?? '') === (row.admin_note ?? ''))" @click="saveInquiry(row)">{{ row.saving ? "Saving…" : "Save" }}</button>
-                </div>
-                <p v-else-if="row.admin_note" class="vendor-sub">Note: {{ row.admin_note }}</p>
-                <p v-if="row.handled_by" class="vendor-sub">Last updated by {{ row.handled_by }} · {{ formatDateTime(row.handled_at) }}</p>
-              </article>
-            </div>
-
             <!-- Subscribers -->
             <div v-else class="table-scroll">
               <table class="data-table">
@@ -547,8 +504,6 @@ import VendorAvatar from "./components/VendorAvatar.vue";
 import api from "../../plugins/axios";
 import ShowMore from "../../components/common/ShowMore.vue";
 import { useShowMoreRows } from "../../composables/useShowMore";
-import { useAdminAccess } from "../../composables/useAdminAccess";
-import { useRoute } from "vue-router";
 
 const { toggleMobile } = useSidebarState();
 
@@ -569,13 +524,11 @@ const PLAN_COLORS = {
   starter: "#94a3b8",
   business: "#38bdf8",
   professional: "#7c6ff7",
-  enterprise: "#f59e0b",
 };
 const PLAN_OPTIONS = [
-  { value: "starter", label: "Starter" },
-  { value: "business", label: "Business" },
-  { value: "professional", label: "Professional" },
-  { value: "enterprise", label: "Enterprise" },
+  { value: "starter", label: "Basic" },
+  { value: "business", label: "Pro" },
+  { value: "professional", label: "Premium" },
 ];
 const STATUS_LABELS = {
   active: "Active",
@@ -803,7 +756,6 @@ const renderPlanChart = () => {
 watch(trendMetric, renderTrendChart);
 
 // ── Transactions & subscribers ───────────────────────────────────
-const route = useRoute();
 const tab = ref("transactions");
 const filters = reactive({ search: "", status: "", plan: "" });
 const transactions = ref([]);
@@ -865,7 +817,6 @@ const fetchSubscribers = async () => {
 const switchTab = (value) => {
   if (tab.value === value) return;
   tab.value = value;
-  if (value === "enterprise") return void fetchInquiries();
   // The two tabs use different statuses; clearing one refetches via the watcher
   if (filters.status) return void (filters.status = "");
   if (value === "transactions") txList.load();
@@ -883,39 +834,6 @@ watch(
     }, 300);
   },
 );
-
-// ── Enterprise "Talk to us" inquiries ────────────────────────────
-const INQUIRY_STATUS = { new: "New", contacted: "Contacted", won: "Now on Enterprise", closed: "Closed" };
-const { can: adminCan } = useAdminAccess();
-const canManagePlans = computed(() => adminCan("subscriptions.manage"));
-const enterprise = reactive({ rows: [], counts: {}, status: "", loading: false });
-let inquiryRequest = 0;
-const fetchInquiries = async () => {
-  const id = ++inquiryRequest;
-  enterprise.loading = true;
-  try {
-    const { data } = await api.get("/admin/subscriptions/enterprise-inquiries", { params: { status: enterprise.status || undefined } });
-    if (id !== inquiryRequest) return;
-    enterprise.rows = data.data.inquiries.map((r) => ({ ...r, draftStatus: r.status, draftNote: r.admin_note ?? "", saving: false }));
-    enterprise.counts = data.data.counts ?? {};
-  } catch {
-    if (id === inquiryRequest) toast.error("The Enterprise inquiries couldn't be loaded.");
-  } finally {
-    if (id === inquiryRequest) enterprise.loading = false;
-  }
-};
-watch(() => enterprise.status, fetchInquiries);
-const saveInquiry = async (row) => {
-  row.saving = true;
-  try {
-    const { data } = await api.post(`/admin/subscriptions/enterprise-inquiries/${row.id}`, { status: row.draftStatus, note: row.draftNote.trim() || null });
-    toast.success(row.draftStatus === "won" ? `Saved. To move ${row.shop_name} to Enterprise, open the shop and use Change plan.` : data.message || "Saved.");
-    await fetchInquiries();
-  } catch (error) {
-    toast.error(error?.response?.data?.message || "That didn't save. Try again.");
-    row.saving = false;
-  }
-};
 
 const exportCsv = async () => {
   exporting.value = true;
@@ -965,9 +883,6 @@ onMounted(() => {
   fetchOverview();
   txList.load();
   fetchSubscribers();
-  fetchInquiries();
-  // A "new Enterprise inquiry" notification links straight to this tab
-  if (route.query.tab === "enterprise") tab.value = "enterprise";
   clockTimer = setInterval(() => (now.value = Date.now()), 30_000);
 });
 
@@ -1520,65 +1435,6 @@ onBeforeUnmount(() => {
 }
 
 /* ── Status pills and bars ──────────────────────────── */
-.tab-count.hot {
-  background: var(--a-red-soft);
-  color: var(--a-red-text);
-}
-.eq-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.eq-item {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  border: 1px solid var(--a-border);
-  border-radius: 14px;
-  background: var(--a-surface);
-}
-.eq-item.fresh {
-  border-color: var(--a-accent-muted);
-  box-shadow: inset 3px 0 0 #6366f1;
-}
-.eq-item-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-.eq-item-head > div {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.eq-message {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.55;
-  color: var(--a-text-2);
-  white-space: pre-line;
-  overflow-wrap: anywhere;
-}
-.eq-contact,
-.eq-update {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.eq-contact a {
-  text-decoration: none;
-}
-.eq-note {
-  flex: 1 1 220px;
-  min-width: 0;
-}
-.iq-new { background: var(--a-accent-soft-2); color: var(--a-accent-text); }
-.iq-contacted { background: var(--a-amber-soft); color: var(--a-amber-text); }
-.iq-won { background: var(--a-green-soft); color: var(--a-green-text); }
-.iq-closed { background: var(--a-subtle-2); color: var(--a-text-2); }
 .status-pill {
   display: inline-block;
   padding: 3px 9px;
