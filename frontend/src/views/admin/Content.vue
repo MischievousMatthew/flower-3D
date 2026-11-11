@@ -873,7 +873,7 @@ const TAG_RULES = [
   { tag: "sale", name: "Sale", enable: "sale_enabled", desc: "Products with a discounted price.", fields: [
     { key: "sale_min_percent", label: "Discount of at least", suffix: "%", min: 1, max: 90 },
   ] },
-  { tag: "best_seller", name: "Best seller", enable: "best_enabled", desc: "The products that sell the most.", fields: [
+  { tag: "best_seller", name: "Best seller", enable: "best_enabled", desc: "The products that sell the most. They are also the shop's Top Selling Flowers row.", fields: [
     { key: "best_top", label: "Top", suffix: "products", min: 1, max: 100 },
     { key: "best_days", label: "Sales in the last", suffix: "days", min: 7, max: 365 },
     { key: "best_min_sold", label: "At least", suffix: "sold", min: 1, max: 1000 },
@@ -906,7 +906,7 @@ const ALWAYS_ON = {
 };
 const TAG_DEFAULTS = {
   order: TAG_ORDER_DEFAULT, sale_enabled: true, sale_min_percent: 5,
-  best_enabled: true, best_top: 10, best_days: 90, best_min_sold: 3,
+  best_enabled: true, best_top: 20, best_days: 365, best_min_sold: 1,
   new_enabled: true, new_days: 14, new_max: 12,
   trend_enabled: true, trend_top: 8, trend_days: 7, trend_min_score: 3,
   rated_enabled: true, rated_min_rating: 4.5, rated_min_reviews: 3, rated_max: 20,

@@ -86,20 +86,21 @@
     <section class="shop-picks" aria-label="Flowers">
       <div class="bc-container shop-picks-grid">
         <div class="shop-picks-main">
-          <template v-if="loadingPopular || showTopSelling">
+          <template v-if="loadingBest || showTopSelling">
           <div class="shop-row-head">
             <h2>Top Selling Flowers</h2>
             <button type="button" class="shop-row-all" @click="viewAllPopular">View all <span aria-hidden="true">→</span></button>
           </div>
-          <div v-if="loadingPopular" class="top-grid" aria-label="Loading top sellers">
+          <div v-if="loadingBest" class="top-grid" aria-label="Loading top sellers">
             <span v-for="n in 5" :key="n" class="bc-skeleton top-skel"></span>
           </div>
           <div v-else class="top-grid">
+            <!-- The best sellers (the admin sets how many), most sold first -->
             <ShopProductTile
-              v-for="(product, i) in topSelling"
+              v-for="product in topSelling"
               :key="`top-${product.id}`"
               :product="product"
-              :best-seller="i === 0 && Number(product.sold_count) > 0"
+              context-tag="best_seller"
               :adding="addingToCartProductId === product.id"
               @open="openProductModal"
               @add="addToCartDirect"
@@ -108,9 +109,9 @@
           </template>
 
           <!-- Everything; filters from occasions, the finder, search and admin links land here -->
-          <section id="products" class="fresh" :class="{ first: !loadingPopular && !showTopSelling }" aria-labelledby="fresh-title">
+          <section id="products" class="fresh" :class="{ first: !loadingBest && !showTopSelling }" aria-labelledby="fresh-title">
             <div class="shop-row-head">
-              <h2 id="fresh-title">{{ selectedFilters.onSale ? "Flowers on sale" : "Fresh Flowers" }}</h2>
+              <h2 id="fresh-title">{{ selectedFilters.bestSellers ? "Best sellers" : selectedFilters.onSale ? "Flowers on sale" : "Fresh Flowers" }}</h2>
               <span class="fresh-count" v-if="!isLoading">{{ pagination.total }} {{ pagination.total === 1 ? "flower" : "flowers" }}</span>
             </div>
             <div class="fresh-tools">
@@ -276,11 +277,33 @@ const fetchPopular = async () => {
     loadingPopular.value = false;
   }
 };
-// Top Selling leaves out what "In bloom this month" already shows, and only
-// appears once there are enough flowers for it to add something
-const featuredIds = computed(() => new Set(featuredProducts.value.map((product) => product.id)));
-const topSelling = computed(() => popularProducts.value.filter((product) => !featuredIds.value.has(product.id)).slice(0, 5));
-const showTopSelling = computed(() => topSelling.value.length >= 3 && popularProducts.value.length >= 8);
+// Top Selling Flowers: the best sellers only (products that actually sold),
+// most sold first. How many count as best sellers is set by the admin
+// (Content → Product tags); the row shows the first few, "View all" the rest.
+const bestSellers = ref([]);
+const loadingBest = ref(true);
+const fetchBestSellers = async () => {
+  try {
+    const { data } = await api.get("customer/products", {
+      params: {
+        page: 1,
+        per_page: 100,
+        best_sellers: 1,
+        sort_by: "popular_desc",
+        in_stock_only: 1,
+        ...(nearMe.value ? { owner_ids: idsParam(nearMe.value.ownerIds) } : {}),
+      },
+    });
+    const list = Array.isArray(data?.data?.data) ? data.data.data : [];
+    bestSellers.value = list.filter((p) => isShopVisibleProduct(p) && Number(p.sold_count) > 0);
+  } catch {
+    bestSellers.value = [];
+  } finally {
+    loadingBest.value = false;
+  }
+};
+const topSelling = computed(() => bestSellers.value.slice(0, 5));
+const showTopSelling = computed(() => topSelling.value.length > 0);
 const productImage = (p) => p.primary_image?.image_url || p.images?.[0]?.image_url || null;
 const occasionImages = computed(() => {
   const images = {};
@@ -376,6 +399,7 @@ const selectedFilters = ref({
   variety: [],
   inStockOnly: true,
   onSale: false, // "Sales" in the navbar: only flowers selling below their price
+  bestSellers: false, // "View all" on Top Selling Flowers
 });
 // True once the filter options request has finished (drives the occasion skeletons).
 const filterOptionsLoaded = ref(false);
@@ -533,6 +557,7 @@ const buildQueryParams = () => {
     p.max_price = selectedFilters.value.priceMax;
   p.in_stock_only = selectedFilters.value.inStockOnly ? 1 : 0;
   if (selectedFilters.value.onSale) p.on_sale = 1;
+  if (selectedFilters.value.bestSellers) p.best_sellers = 1;
   p.sort_by = sortBy.value;
   if (nearMe.value) p.owner_ids = idsParam(nearMe.value.ownerIds);
   if (activeSearch.value) p.search = activeSearch.value;
@@ -565,6 +590,7 @@ const activeFilterChips = computed(() => {
   if (nearMe.value) chips.unshift({ key: "near-me", type: "near-me", label: `Within ${nearMe.value.km} km of you` });
   if (activeSearch.value) chips.unshift({ key: "search", type: "search", label: `"${activeSearch.value}"` });
   if (f.onSale) chips.unshift({ key: "sale", type: "sale", label: "On sale" });
+  if (f.bestSellers) chips.unshift({ key: "best", type: "best", label: "Best sellers" });
   if (f.priceMin !== null || (f.priceMax !== null && f.priceMax !== Math.round(filterOptions.value.price_range?.max ?? -1))) {
     const min = f.priceMin !== null ? `₱${f.priceMin}` : "";
     const max = f.priceMax !== null ? `₱${f.priceMax}` : "";
@@ -582,7 +608,9 @@ const removeFilterChip = (chip) => {
     clearSearch();
     return;
   }
-  if (chip.type === "sale") {
+  if (chip.type === "best") {
+    f.bestSellers = false;
+  } else if (chip.type === "sale") {
     f.onSale = false;
   } else if (chip.type === "price") {
     f.priceMin = null;
@@ -756,6 +784,7 @@ watch(nearMeKey, (now, before) => {
   pagination.value.current_page = 1;
   fetchProducts();
   fetchPopular();
+  fetchBestSellers();
 });
 // The shops list doesn't narrow to the circle; it only re-sorts once the distances are known
 const shopOrderKey = computed(() => Object.entries(shopDistances.value).sort((a, b) => a[1] - b[1]).map(([id]) => id).join());
@@ -936,6 +965,7 @@ watch(
 
 // "View all" on Top Selling: the full list, most popular first
 const viewAllPopular = () => {
+  selectedFilters.value.bestSellers = true;
   sortBy.value = "popular_desc";
   pagination.value.current_page = 1;
   fetchProducts();
@@ -1065,7 +1095,7 @@ onMounted(async () => {
     router.replace({ query: rest });
   }
   const fromContentLink = applyContentLink(route.query);
-  await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors(), fetchFeatured(), fetchPopular()]);
+  await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors(), fetchFeatured(), fetchPopular(), fetchBestSellers()]);
   if (fromContentLink) setTimeout(() => document.getElementById("products")?.scrollIntoView({ behavior: "smooth" }), 50);
   else if (route.query.section === "occasions") setTimeout(() => scrollToSection("occasions"), 50);
   if (isAuthenticated.value) {

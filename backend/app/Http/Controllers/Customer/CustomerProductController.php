@@ -111,6 +111,12 @@ class CustomerProductController extends Controller
                 $ownerIds = array_slice(array_values(array_filter(array_map('intval', explode(',', (string) $request->owner_ids)))), 0, 200);
                 $query->whereIn('owner_id', $ownerIds ?: [0]);
             }
+            // Only the best sellers (the shop's Top Selling row and its "View all"), most sold first
+            $bestIds = [];
+            if (filter_var($request->get('best_sellers', false), FILTER_VALIDATE_BOOLEAN)) {
+                $bestIds = $this->tags()->bestSellerIds();
+                $query->whereIn('id', $bestIds ?: [0]);
+            }
             // Just these products (the "Recently viewed" row refreshing what the browser saved)
             if ($request->filled('ids')) {
                 $ids = array_slice(array_values(array_filter(array_map('intval', explode(',', (string) $request->ids)))), 0, 24);
@@ -125,7 +131,9 @@ class CustomerProductController extends Controller
 
             $sortBy = $request->get('sort_by', 'created_at_desc');
 
-            if ($sortBy === 'popular_desc') {
+            if ($bestIds && in_array($sortBy, [null, '', 'popular_desc'], true)) {
+                $query->orderByRaw('CASE id ' . collect($bestIds)->map(fn ($id, $i) => 'WHEN ' . (int) $id . ' THEN ' . $i)->implode(' ') . ' END');
+            } elseif ($sortBy === 'popular_desc') {
                 $query->orderByRaw($this->soldCountSubquery() . ' DESC')
                     ->orderBy('created_at', 'desc');
             } else {

@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\DB;
 class ProductTags
 {
     public const ORDER = ['sale', 'best_seller', 'trending', 'new_arrival', 'top_rated', 'recommended', 'seasonal'];
-    private const CACHE_KEY = 'product_tags:sets:v1';
+    private const CACHE_KEY = 'product_tags:sets:v2'; // v2: best sellers keep their rank
     private const CACHE_SECONDS = 600;
 
     private ?array $sets = null;
@@ -41,6 +41,15 @@ class ProductTags
     public function sets(): array
     {
         return $this->sets ??= Cache::remember(self::CACHE_KEY, self::CACHE_SECONDS, fn () => $this->compute($this->rules()));
+    }
+
+    /** The best sellers' ids, most sold first (empty when the tag is off) */
+    public function bestSellerIds(): array
+    {
+        $ranks = $this->sets()['best_seller'] ?? [];
+        asort($ranks);
+
+        return array_keys($ranks);
     }
 
     public static function forget(): void
@@ -168,7 +177,8 @@ class ProductTags
             : [];
 
         return [
-            'best_seller' => $flip($best),
+            // Ranked: product id => 1 for the most sold (the Top Selling row keeps this order)
+            'best_seller' => collect($best)->values()->mapWithKeys(fn ($id, $i) => [(int) $id => $i + 1])->all(),
             'trending' => $flip($trending),
             'new_arrival' => $flip($new),
             'top_rated' => $flip($rated),

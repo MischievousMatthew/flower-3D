@@ -56,10 +56,10 @@ class SiteSetting extends Model
         'order' => self::PRODUCT_TAG_ORDER,
         'sale_enabled' => true,        // SALE: discounted by at least…
         'sale_min_percent' => 5,
-        'best_enabled' => true,        // BEST SELLER: the top N by units sold in the last D days
-        'best_top' => 10,
-        'best_days' => 90,
-        'best_min_sold' => 3,
+        'best_enabled' => true,        // BEST SELLER (and the shop's Top Selling row): the top N by
+        'best_top' => 20,              // units sold in the last D days, only products that sold
+        'best_days' => 365,
+        'best_min_sold' => 1,
         'new_enabled' => true,         // NEW ARRIVAL: added in the last D days, at most N
         'new_days' => 14,
         'new_max' => 12,
