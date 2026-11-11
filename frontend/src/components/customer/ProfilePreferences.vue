@@ -1,184 +1,267 @@
 <template>
   <section class="pp-card" aria-labelledby="pp-title">
-    <div class="pp-head">
-      <div>
-        <h2 id="pp-title">Flowers <em>you love</em></h2>
-        <p>Tell shops what you like and the days that matter to you, so your bouquets feel personal.</p>
-      </div>
-    </div>
+    <header class="pp-head">
+      <h2 id="pp-title">Flowers <em>you love</em></h2>
+      <p>Tell shops what you like, so the bouquets they make for you feel personal. Everything here is optional.</p>
+    </header>
 
-    <div v-if="loadError" class="pp-alert">{{ loadError }} <button type="button" class="bc-link" @click="load">Try again</button></div>
-    <div v-else-if="!data" class="pp-sk">
+    <div v-if="loadError" class="pp-alert" role="alert">
+      {{ loadError }}
+      <button type="button" class="pp-link" @click="load">Try again</button>
+    </div>
+    <div v-else-if="!data" class="pp-sk" aria-label="Loading">
       <span v-for="n in 4" :key="n" class="bc-skeleton pp-sk-line"></span>
     </div>
 
     <template v-else>
-      <!-- Sharing -->
-      <label class="pp-share" :class="{ on: form.share_with_shops }">
-        <span class="pp-share-text">
-          <strong>{{ form.share_with_shops ? "Shared with your shops" : "Kept private" }}</strong>
-          <small v-if="form.share_with_shops">The {{ shopsText }} you've ordered from or messaged can see your preferences and special days below.</small>
-          <small v-else>Only you can see what you save here. Turn this on to let the {{ shopsText }} you've ordered from or messaged see it.</small>
-        </span>
-        <span class="pp-switch"><input v-model="form.share_with_shops" type="checkbox" aria-label="Share with shops" @change="save(true)" /><span></span></span>
-      </label>
-
-      <!-- Preferences -->
-      <div class="pp-grid">
-        <div v-for="f in FIELDS" :key="f.key" class="pp-field">
-          <span class="pp-label">{{ f.label }}</span>
-          <small class="pp-hint">{{ f.hint }}</small>
-          <TagInput v-model="form[f.key]" :suggestions="SUGGEST[f.key]" :label="f.label" :placeholder="f.placeholder" />
+      <!-- ── 1. Taste ─────────────────────────────────────────────────── -->
+      <div class="pp-block">
+        <div class="pp-block__head">
+          <span class="pp-num" aria-hidden="true">1</span>
+          <div>
+            <h3>Your flower taste</h3>
+            <p>Tap the ones that fit you. Tap again to remove.</p>
+          </div>
         </div>
-        <label class="pp-field pp-wide">
-          <span class="pp-label">Anything else</span>
-          <small class="pp-hint">Like “no plastic wrapping” or “I'm sensitive to strong scents”.</small>
-          <textarea v-model="form.note" class="pp-input" rows="2" maxlength="500"></textarea>
+
+        <fieldset v-for="q in QUESTIONS" :key="q.key" class="pp-q">
+          <legend>
+            {{ q.question }}
+            <small v-if="q.hint">{{ q.hint }}</small>
+          </legend>
+          <div class="pp-chips">
+            <button
+              v-for="option in optionsFor(q.key)"
+              :key="option"
+              type="button"
+              class="pp-chip"
+              :class="{ on: picked(q.key, option), avoid: q.key === 'avoid' }"
+              :aria-pressed="picked(q.key, option)"
+              @click="toggle(q.key, option)"
+            >
+              <svg v-if="picked(q.key, option)" viewBox="0 0 24 24" aria-hidden="true">
+                <path v-if="q.key === 'avoid'" d="M6 6l12 12M18 6 6 18" />
+                <path v-else d="m5 12.5 4.5 4.5L19 7.5" />
+              </svg>
+              {{ option }}
+            </button>
+            <form class="pp-own" @submit.prevent="addOwn(q.key)">
+              <input
+                v-model="drafts[q.key]"
+                type="text"
+                maxlength="40"
+                :placeholder="q.own"
+                :aria-label="`Add your own: ${q.question}`"
+              />
+              <button type="submit" :disabled="!drafts[q.key].trim()" aria-label="Add">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+              </button>
+            </form>
+          </div>
+        </fieldset>
+
+        <label class="pp-q pp-note">
+          <span class="pp-legend">Anything else shops should know? <small>Like "no plastic wrapping" or "I'm sensitive to strong scents".</small></span>
+          <textarea v-model="form.note" rows="2" maxlength="500" placeholder="Write a note for shops (optional)"></textarea>
         </label>
-      </div>
-      <div class="pp-actions">
-        <small v-if="savedAt" class="pp-hint">Saved</small>
-        <button type="button" class="bc-btn bc-btn--dark pp-btn" :disabled="busy === 'save' || !changed" @click="save()">{{ busy === "save" ? "Saving…" : "Save preferences" }}</button>
+
+        <!-- Who sees it, and saving -->
+        <div class="pp-save">
+          <div class="pp-who" role="radiogroup" aria-label="Who can see your taste and special days">
+            <span class="pp-who__label">Who can see this?</span>
+            <div class="pp-seg">
+              <button type="button" role="radio" :aria-checked="!form.share_with_shops" :class="{ on: !form.share_with_shops }" :disabled="busy === 'save'" @click="setSharing(false)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+                Only me
+              </button>
+              <button type="button" role="radio" :aria-checked="form.share_with_shops" :class="{ on: form.share_with_shops }" :disabled="busy === 'save'" @click="setSharing(true)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9l2-5h12l2 5M4 9h16v11H4zM9 20v-5h6v5" /></svg>
+                My shops
+              </button>
+            </div>
+            <small>{{ form.share_with_shops ? `The ${shopsText} you've ordered from or messaged can see it.` : "Nobody else can see it until you choose My shops." }}</small>
+          </div>
+          <div class="pp-save__btn">
+            <span v-if="changed" class="pp-unsaved" role="status">Unsaved changes</span>
+            <span v-else-if="savedAt" class="pp-saved" role="status">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
+              Saved
+            </span>
+            <button type="button" class="pp-btn" :disabled="busy === 'save' || !changed" @click="save()">
+              {{ busy === "save" ? "Saving…" : "Save my taste" }}
+            </button>
+          </div>
+        </div>
       </div>
 
-      <!-- Special days -->
-      <div class="pp-sub">
-        <h3>Special <em>days</em></h3>
-        <p>Birthdays, anniversaries and other days you buy flowers for. Add only what you want to share.</p>
+      <!-- ── 2. Special days ──────────────────────────────────────────── -->
+      <div class="pp-block">
+        <div class="pp-block__head">
+          <span class="pp-num" aria-hidden="true">2</span>
+          <div>
+            <h3>Special days</h3>
+            <p>Birthdays, anniversaries and other days you buy flowers for. You'll see how many days are left.</p>
+          </div>
+        </div>
+
+        <ul v-if="data.dates.length" class="pp-days">
+          <li v-for="d in data.dates" :key="d.id" class="pp-day">
+            <span class="pp-day__ico" :class="d.kind" aria-hidden="true" v-html="kindOf(d.kind).icon"></span>
+            <span class="pp-day__body">
+              <strong>{{ d.label }}</strong>
+              <small>{{ monthDay(d) }}<template v-if="d.year">, {{ d.year }}</template><template v-if="d.note"> · {{ d.note }}</template></small>
+            </span>
+            <span class="pp-day__when">{{ whenText(d.days_away) }}</span>
+            <button type="button" class="pp-x" :aria-label="`Remove ${d.label}`" :disabled="busy === `d${d.id}`" @click="removeDate(d)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+            </button>
+          </li>
+        </ul>
+        <p v-else-if="!addingDay" class="pp-empty">No special days yet.</p>
+
+        <button v-if="!addingDay" type="button" class="pp-add" @click="openDayForm">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          Add a special day
+        </button>
+
+        <form v-else class="pp-dayform" @submit.prevent="addDate">
+          <div class="pp-kinds" role="radiogroup" aria-label="Kind of day">
+            <button
+              v-for="k in DATE_KINDS"
+              :key="k.value"
+              type="button"
+              role="radio"
+              class="pp-kind"
+              :class="{ on: dateForm.kind === k.value }"
+              :aria-checked="dateForm.kind === k.value"
+              @click="dateForm.kind = k.value"
+            >
+              <span aria-hidden="true" v-html="k.icon"></span>
+              {{ k.label }}
+            </button>
+          </div>
+          <label class="pp-field pp-field--wide">
+            <span>What is it?</span>
+            <input ref="dayLabel" v-model="dateForm.label" maxlength="80" :placeholder="dateForm.kind === 'birthday' ? 'e.g. Mom\'s birthday' : dateForm.kind === 'anniversary' ? 'e.g. Our wedding anniversary' : 'e.g. Graduation day'" />
+          </label>
+          <label class="pp-field">
+            <span>Month</span>
+            <select v-model="dateForm.month">
+              <option value="" disabled>Choose…</option>
+              <option v-for="(m, i) in MONTHS" :key="m" :value="i + 1">{{ m }}</option>
+            </select>
+          </label>
+          <label class="pp-field">
+            <span>Day</span>
+            <select v-model="dateForm.day">
+              <option value="" disabled>Choose…</option>
+              <option v-for="n in daysIn(dateForm.month)" :key="n" :value="n">{{ n }}</option>
+            </select>
+          </label>
+          <label class="pp-field">
+            <span>Year <small>(optional)</small></span>
+            <input v-model="dateForm.year" type="number" min="1900" :max="thisYear" placeholder="e.g. 2018" />
+          </label>
+          <div class="pp-dayform__actions">
+            <button type="button" class="pp-btn pp-btn--quiet" @click="addingDay = false">Cancel</button>
+            <button type="submit" class="pp-btn" :disabled="busy === 'date' || !dateForm.month || !dateForm.day">
+              {{ busy === "date" ? "Saving…" : "Save this day" }}
+            </button>
+          </div>
+        </form>
       </div>
-      <ul v-if="data.dates.length" class="pp-dates">
-        <li v-for="d in data.dates" :key="d.id">
-          <span class="pp-date-icon" :class="d.kind" v-html="kindOf(d.kind).icon"></span>
-          <span class="pp-grow">
-            <strong>{{ d.label }}</strong>
-            <small>{{ monthDay(d) }}<template v-if="d.year">, {{ d.year }}</template> · {{ whenText(d.days_away) }}<template v-if="d.note"> · {{ d.note }}</template></small>
+
+      <!-- ── 3. Offers ────────────────────────────────────────────────── -->
+      <div id="offers" class="pp-block">
+        <div class="pp-block__head">
+          <span class="pp-num" aria-hidden="true">3</span>
+          <div>
+            <h3>Offers from shops</h3>
+            <p>Shops you've bought from can send you a birthday treat or a welcome-back discount. Only if you say yes.</p>
+          </div>
+        </div>
+
+        <label class="pp-toggle" :class="{ on: data.accept_offers }">
+          <span>
+            <strong>{{ data.accept_offers ? "You get offers" : "Offers are off" }}</strong>
+            <small>{{ data.accept_offers ? "At most one from each shop every few days." : "Turn on to get offers from shops you've ordered from." }}</small>
           </span>
-          <button type="button" class="pp-x" :aria-label="`Remove ${d.label}`" :disabled="busy === `d${d.id}`" @click="removeDate(d)">×</button>
-        </li>
-      </ul>
-      <form class="pp-date-form" @submit.prevent="addDate">
-        <label class="pp-field">
-          <span class="pp-label">Kind</span>
-          <select v-model="dateForm.kind" class="pp-input">
-            <option v-for="k in DATE_KINDS" :key="k.value" :value="k.value">{{ k.label }}</option>
-          </select>
+          <span class="pp-switch">
+            <input type="checkbox" role="switch" :checked="data.accept_offers" aria-label="Get offers from shops" :disabled="busy === 'offers'" @change="setOffers($event.target.checked)" />
+            <span aria-hidden="true"></span>
+          </span>
         </label>
-        <label class="pp-field">
-          <span class="pp-label">What is it?</span>
-          <input v-model="dateForm.label" class="pp-input" maxlength="80" :placeholder="dateForm.kind === 'birthday' ? 'e.g. My birthday' : dateForm.kind === 'anniversary' ? 'e.g. Our wedding anniversary' : 'e.g. Mom’s retirement'" />
-        </label>
-        <label class="pp-field">
-          <span class="pp-label">Month</span>
-          <select v-model="dateForm.month" class="pp-input">
-            <option value="" disabled>Choose…</option>
-            <option v-for="(m, i) in MONTHS" :key="m" :value="i + 1">{{ m }}</option>
-          </select>
-        </label>
-        <label class="pp-field">
-          <span class="pp-label">Day</span>
-          <select v-model="dateForm.day" class="pp-input">
-            <option value="" disabled>Choose…</option>
-            <option v-for="n in daysIn(dateForm.month)" :key="n" :value="n">{{ n }}</option>
-          </select>
-        </label>
-        <label class="pp-field">
-          <span class="pp-label">Year <small class="pp-hint">(optional)</small></span>
-          <input v-model="dateForm.year" class="pp-input" type="number" min="1900" :max="thisYear" />
-        </label>
-        <button type="submit" class="pp-add" :disabled="busy === 'date' || !dateForm.month || !dateForm.day">+ Add day</button>
-      </form>
 
-      <!-- Offers from shops -->
-      <div id="offers" class="pp-sub">
-        <h3>Offers <em>for you</em></h3>
-        <p>Shops you've bought from can send you offers, like a birthday treat or a welcome-back discount. Only if you say yes.</p>
-      </div>
-      <label class="pp-share" :class="{ on: data.accept_offers }">
-        <span class="pp-share-text">
-          <strong>{{ data.accept_offers ? "You get offers from your shops" : "No offers" }}</strong>
-          <small>{{ data.accept_offers ? "At most one from each shop every few days. You can stop a single shop below." : "Turn this on to get offers from shops you've ordered from." }}</small>
-        </span>
-        <span class="pp-switch"><input type="checkbox" :checked="data.accept_offers" aria-label="Get offers from shops" :disabled="busy === 'offers'" @change="setOffers($event.target.checked)" /><span></span></span>
-      </label>
-      <div v-if="offers === null" class="pp-sk"><span class="bc-skeleton pp-sk-line"></span></div>
-      <p v-else-if="!offers.length" class="pp-empty">{{ data.accept_offers ? "No offers yet. They'll show up here and in your notifications." : "Offers you get will show up here." }}</p>
-      <ul v-else class="pp-offers">
-        <li v-for="o in offers" :key="o.id" :class="{ fresh: o.new }">
-          <div class="pp-offer-top">
-            <small>{{ o.shop }} · {{ agoText(o.at) }}</small>
-            <span v-if="o.new" class="pp-new">New</span>
-          </div>
-          <strong>{{ o.title }}</strong>
-          <p>{{ o.body }}</p>
-          <div class="pp-offer-foot">
-            <span v-if="o.promotion" class="pp-promo" :class="{ ended: !o.promotion.running }">{{ o.promotion.label }} · {{ o.promotion.name }}{{ o.promotion.running ? ` · until ${shortDay(o.promotion.ends_at)}` : " · ended" }}</span>
-            <router-link v-if="o.product_id" :to="{ name: 'ProductDetails', params: { id: String(o.product_id) } }" class="bc-link">View product</router-link>
-            <button v-if="!isMuted(o.vendor_id)" type="button" class="pp-mute" :disabled="busy === `m${o.vendor_id}`" @click="mute(o.vendor_id, true)">Stop offers from {{ o.shop }}</button>
-          </div>
-        </li>
-      </ul>
-      <div v-if="data.muted_shops?.length" class="pp-muted">
-        <span class="pp-label">Shops you stopped</span>
-        <span v-for="m in data.muted_shops" :key="m.vendor_id" class="pp-muted-shop">
-          {{ m.shop }}
-          <button type="button" class="pp-mute" :disabled="busy === `m${m.vendor_id}`" @click="mute(m.vendor_id, false)">Allow again</button>
-        </span>
+        <div v-if="offers === null" class="pp-sk"><span class="bc-skeleton pp-sk-line"></span></div>
+        <p v-else-if="!offers.length" class="pp-empty">{{ data.accept_offers ? "No offers yet. They'll show up here and in your notifications." : "Offers you get will show up here." }}</p>
+        <ul v-else class="pp-offers">
+          <li v-for="o in offers" :key="o.id" class="pp-offer" :class="{ fresh: o.new }">
+            <div class="pp-offer__top">
+              <small>{{ o.shop }} · {{ agoText(o.at) }}</small>
+              <span v-if="o.new" class="pp-new">New</span>
+            </div>
+            <strong>{{ o.title }}</strong>
+            <p>{{ o.body }}</p>
+            <div class="pp-offer__foot">
+              <span v-if="o.promotion" class="pp-promo" :class="{ ended: !o.promotion.running }">{{ o.promotion.label }} · {{ o.promotion.name }}{{ o.promotion.running ? ` · until ${shortDay(o.promotion.ends_at)}` : " · ended" }}</span>
+              <router-link v-if="o.product_id" :to="{ name: 'ProductDetails', params: { id: String(o.product_id) } }" class="pp-link">View product</router-link>
+              <button v-if="!isMuted(o.vendor_id)" type="button" class="pp-link muted" :disabled="busy === `m${o.vendor_id}`" @click="mute(o.vendor_id, true)">Stop offers from {{ o.shop }}</button>
+            </div>
+          </li>
+        </ul>
+        <div v-if="data.muted_shops?.length" class="pp-muted">
+          <span>Shops you stopped:</span>
+          <span v-for="m in data.muted_shops" :key="m.vendor_id" class="pp-muted__shop">
+            {{ m.shop }}
+            <button type="button" class="pp-link" :disabled="busy === `m${m.vendor_id}`" @click="mute(m.vendor_id, false)">Allow again</button>
+          </span>
+        </div>
       </div>
 
-      <!-- Favorites -->
-      <div class="pp-sub">
-        <h3>Your <em>favorites</em></h3>
-        <p>Tap the heart on any product to keep it here.<template v-if="form.share_with_shops"> Shops see the favorites that are theirs.</template></p>
-      </div>
-      <p v-if="!data.favorites.length" class="pp-empty">No favorites yet. Tap the heart on any product page to save it here.</p>
-      <ul v-else class="pp-favs">
-        <li v-for="f in data.favorites" :key="f.product_id">
-          <router-link :to="{ name: 'ProductDetails', params: { id: String(f.product_id) } }" class="pp-fav">
-            <span class="pp-fav-img"><img v-if="f.image" :src="f.image" alt="" loading="lazy" /><span v-else class="pp-fav-ph" v-html="CRM_ICONS.flower"></span></span>
-            <span class="pp-grow"><strong>{{ f.name }}</strong><small>{{ f.available ? peso(f.price) : "No longer sold" }}</small></span>
-          </router-link>
-          <button type="button" class="pp-heart" :aria-label="`Remove ${f.name} from favorites`" :disabled="busy === `f${f.product_id}`" @click="unfavorite(f)"><span v-html="CRM_ICONS.heart"></span></button>
-        </li>
-      </ul>
-
-      <!-- What shops saved -->
-      <div class="pp-sub">
-        <h3>What shops <em>saved</em> about you</h3>
-        <p>Shops can note your preferences and special days when you tell them, so they remember next time. You can see it all here and remove it anytime.</p>
-      </div>
-      <p v-if="!data.shops.length" class="pp-empty">No shop has saved anything about you.</p>
-      <article v-for="s in data.shops" :key="s.vendor_id" class="pp-shop">
-        <header>
-          <strong>{{ s.shop }}</strong>
-          <button type="button" class="bc-link pp-remove" :disabled="busy === `s${s.vendor_id}`" @click="forget(s)">Remove</button>
-        </header>
-        <dl>
-          <template v-for="f in FIELDS" :key="f.key">
-            <template v-if="s[f.key].length"><dt>{{ f.label }}</dt><dd>{{ s[f.key].join(", ") }}</dd></template>
-          </template>
-          <template v-if="s.dates.length">
-            <dt>Special days</dt>
-            <dd>{{ s.dates.map((d) => `${d.label} (${monthDay(d)})`).join(", ") }}</dd>
-          </template>
-        </dl>
-      </article>
+      <!-- ── What shops saved (privacy) ───────────────────────────────── -->
+      <details class="pp-privacy">
+        <summary>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z" /></svg>
+          What shops saved about you
+          <span class="pp-count">{{ data.shops.length }}</span>
+          <svg class="pp-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        </summary>
+        <p class="pp-privacy__lede">When you tell a shop your preferences, it can note them to remember next time. You can see it here and remove it anytime.</p>
+        <p v-if="!data.shops.length" class="pp-empty">No shop has saved anything about you.</p>
+        <article v-for="s in data.shops" :key="s.vendor_id" class="pp-shop">
+          <header>
+            <strong>{{ s.shop }}</strong>
+            <button type="button" class="pp-link danger" :disabled="busy === `s${s.vendor_id}`" @click="forget(s)">Remove</button>
+          </header>
+          <dl>
+            <template v-for="q in QUESTIONS" :key="q.key">
+              <template v-if="s[q.key].length"><dt>{{ q.short }}</dt><dd>{{ s[q.key].join(", ") }}</dd></template>
+            </template>
+            <template v-if="s.dates.length">
+              <dt>Special days</dt>
+              <dd>{{ s.dates.map((d) => `${d.label} (${monthDay(d)})`).join(", ") }}</dd>
+            </template>
+          </dl>
+        </article>
+      </details>
     </template>
   </section>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
-import TagInput from "../crm/TagInput.vue";
-import { CRM_ICONS, DATE_KINDS, MONTHS, SUGGEST, blankDate, datePayload, daysIn, kindOf, monthDay, whenText } from "../crm/customerPrefs";
+import { DATE_KINDS, MONTHS, SUGGEST, blankDate, datePayload, daysIn, kindOf, monthDay, whenText } from "../crm/customerPrefs";
 
-const FIELDS = [
-  { key: "flowers", label: "Favorite flowers", hint: "The ones that always make you smile.", placeholder: "e.g. Tulips" },
-  { key: "colors", label: "Colors", hint: "Shades you like in a bouquet.", placeholder: "e.g. Pastel" },
-  { key: "avoid", label: "Please avoid", hint: "Allergies or flowers you'd rather not get.", placeholder: "e.g. Lilies" },
-  { key: "occasions", label: "Occasions", hint: "What you usually buy flowers for.", placeholder: "e.g. Anniversary" },
+// The taste questions, asked plainly; answers are tappable chips
+const QUESTIONS = [
+  { key: "flowers", short: "Favorite flowers", question: "Which flowers do you love?", own: "Another flower" },
+  { key: "colors", short: "Colors", question: "Which colors do you like?", own: "Another color" },
+  { key: "avoid", short: "Please avoid", question: "Anything shops should avoid?", hint: "Allergies or flowers you'd rather not get.", own: "Something else" },
+  { key: "occasions", short: "Occasions", question: "What do you usually buy flowers for?", own: "Another occasion" },
 ];
+const MAX_PER_QUESTION = 12;
 
 const thisYear = new Date().getFullYear();
 const offers = ref(null);
@@ -187,7 +270,10 @@ const loadError = ref("");
 const busy = ref("");
 const savedAt = ref(false);
 const dateForm = ref(blankDate());
+const addingDay = ref(false);
+const dayLabel = ref(null);
 const form = reactive({ flowers: [], colors: [], avoid: [], occasions: [], note: "", share_with_shops: false });
+const drafts = reactive({ flowers: "", colors: "", avoid: "", occasions: "" });
 let saved = "";
 
 const changed = computed(() => JSON.stringify(form) !== saved);
@@ -196,12 +282,35 @@ const shopsText = computed(() => {
   return n === 1 ? "1 shop" : n ? `${n} shops` : "shops";
 });
 
-const peso = (n) => `₱${Number(n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const reason = (e, fallback) => {
   const errors = e?.response?.data?.errors;
   return (errors && Object.values(errors)[0]?.[0]) || e?.response?.data?.message || fallback;
 };
 
+// ── Chips ─────────────────────────────────────────────────────────────
+const same = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+/** The suggestions, plus anything they added that isn't one of them */
+const optionsFor = (key) => [...SUGGEST[key], ...form[key].filter((v) => !SUGGEST[key].some((s) => same(s, v)))];
+const picked = (key, option) => form[key].some((v) => same(v, option));
+function toggle(key, option) {
+  if (picked(key, option)) {
+    form[key] = form[key].filter((v) => !same(v, option));
+  } else if (form[key].length < MAX_PER_QUESTION) {
+    form[key] = [...form[key], option];
+  } else {
+    toast.info(`Up to ${MAX_PER_QUESTION} for each question.`);
+  }
+  savedAt.value = false;
+}
+function addOwn(key) {
+  const value = drafts[key].trim();
+  if (!value) return;
+  const existing = optionsFor(key).find((o) => same(o, value));
+  if (!existing || !picked(key, existing)) toggle(key, existing || value);
+  drafts[key] = "";
+}
+
+// ── Loading and saving ────────────────────────────────────────────────
 function use(d) {
   data.value = d;
   Object.assign(form, { flowers: [...d.flowers], colors: [...d.colors], avoid: [...d.avoid], occasions: [...d.occasions], note: d.note ?? "", share_with_shops: d.share_with_shops });
@@ -233,14 +342,34 @@ async function run(key, request, message) {
   }
 }
 
-/** The sharing switch saves straight away; the rest waits for the button */
-async function save(fromSwitch = false) {
-  const message = fromSwitch ? (form.share_with_shops ? "Your shops can now see your preferences." : "Your preferences are private now.") : "Preferences saved.";
+/** Taste waits for the button; who can see it saves straight away (with any taste edits) */
+async function save(fromSharing = false) {
+  const message = fromSharing ? (form.share_with_shops ? "Your shops can now see your taste and special days." : "Only you can see them now.") : "Your taste is saved.";
   const ok = await run("save", () => api.put("customer/preferences", { ...form }), message);
   if (ok) savedAt.value = true;
-  else if (fromSwitch) form.share_with_shops = !form.share_with_shops;
+  else if (fromSharing) form.share_with_shops = !form.share_with_shops;
+}
+function setSharing(on) {
+  if (form.share_with_shops === on) return;
+  form.share_with_shops = on;
+  save(true);
 }
 
+// ── Special days ──────────────────────────────────────────────────────
+function openDayForm() {
+  dateForm.value = blankDate();
+  addingDay.value = true;
+  nextTick(() => dayLabel.value?.focus());
+}
+async function addDate() {
+  if (await run("date", () => api.post("customer/preferences/dates", datePayload(dateForm.value)), "Day saved.")) {
+    dateForm.value = blankDate();
+    addingDay.value = false;
+  }
+}
+const removeDate = (d) => run(`d${d.id}`, () => api.delete(`customer/preferences/dates/${d.id}`), "Day removed.");
+
+// ── Offers ────────────────────────────────────────────────────────────
 const isMuted = (vendorId) => (data.value?.muted_shops ?? []).some((m) => m.vendor_id === vendorId);
 const shortDay = (d) => (d ? new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "");
 function agoText(at) {
@@ -257,7 +386,7 @@ async function loadOffers() {
   }
 }
 
-/** The offers switch saves straight away, without touching unsaved preference edits */
+/** The offers switch saves straight away, without touching unsaved taste edits */
 async function setOffers(on) {
   const prev = data.value.accept_offers;
   data.value.accept_offers = on;
@@ -286,17 +415,6 @@ async function mute(vendorId, stop) {
   }
 }
 
-async function addDate() {
-  if (await run("date", () => api.post("customer/preferences/dates", datePayload(dateForm.value)), "Day saved.")) dateForm.value = blankDate();
-}
-const removeDate = (d) => run(`d${d.id}`, () => api.delete(`customer/preferences/dates/${d.id}`), "Day removed.");
-
-async function unfavorite(f) {
-  if (await run(`f${f.product_id}`, () => api.delete(`customer/favorites/${f.product_id}`))) {
-    data.value.favorites = data.value.favorites.filter((x) => x.product_id !== f.product_id);
-  }
-}
-
 function forget(s) {
   if (!confirm(`Remove everything ${s.shop} saved about you?`)) return;
   run(`s${s.vendor_id}`, () => api.delete(`customer/preferences/shops/${s.vendor_id}`), "Removed.");
@@ -310,517 +428,880 @@ onMounted(() => {
 
 <style scoped>
 .pp-card {
-  /* Tag input colors for the customer side */
-  --ti-border: var(--line);
-  --ti-bg: #fff;
-  --ti-accent: var(--leaf-deep);
-  --ti-tag-bg: color-mix(in srgb, var(--leaf) 16%, #fff);
-  --ti-tag-text: var(--leaf-deep);
-  --ti-text: var(--ink);
-  --ti-muted: var(--ink-soft);
-
-  padding: clamp(28px, 3vw, 44px);
-  border: 1px solid var(--line-soft);
+  --pp-green-bg: #e4f3ea;
+  --pp-red: #b4332a;
+  --pp-red-bg: #fbe9e7;
+  display: grid;
+  gap: 18px;
+  padding: clamp(20px, 2.6vw, 30px);
+  border: 1px solid var(--line);
   border-radius: 22px;
-  background: var(--paper);
+  background: #ffffff;
   color: var(--ink);
+  font-family: var(--font-sans);
 }
-.pp-head h2,
-.pp-sub h3 {
+
+.pp-card :is(p, h2, h3, dl, dd, ul) {
   margin: 0;
-  font-family: var(--font-display);
-  font-weight: 500;
-  color: var(--ink);
 }
+
 .pp-head h2 {
-  font-size: clamp(30px, 3vw, 40px);
+  font-family: var(--font-display);
+  font-size: clamp(28px, 2.6vw, 34px);
+  font-weight: 500;
+  line-height: 1.05;
 }
-.pp-head em,
-.pp-sub em {
+
+.pp-head h2 em {
   color: var(--leaf-deep);
+  font-style: italic;
 }
-.pp-head p,
-.pp-sub p {
-  margin: 6px 0 0;
-  max-width: 620px;
+
+.pp-head p {
+  max-width: 600px;
+  margin-top: 6px;
+  color: var(--ink-soft);
   font-size: 14px;
   line-height: 1.6;
-  color: var(--ink-soft);
-}
-.pp-sub {
-  margin: 36px 0 14px;
-  padding-top: 28px;
-  border-top: 1px solid var(--line-soft);
-}
-.pp-sub h3 {
-  font-size: 26px;
-}
-.pp-alert {
-  margin-top: 20px;
-  font-size: 14px;
-  color: #b42318;
-}
-.pp-sk {
-  display: grid;
-  gap: 12px;
-  margin-top: 24px;
-}
-.pp-sk-line {
-  display: block;
-  height: 44px;
-  border-radius: 12px;
 }
 
-/* Sharing switch */
-.pp-share {
+/* Blocks: numbered steps */
+.pp-block {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 18px;
+  background: var(--ivory);
+}
+
+.pp-block__head {
   display: flex;
-  align-items: center;
-  gap: 18px;
-  margin: 24px 0;
-  padding: 18px 20px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: #fff;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-}
-.pp-share.on {
-  border-color: color-mix(in srgb, var(--leaf) 55%, #fff);
-  background: color-mix(in srgb, var(--leaf) 8%, #fff);
-}
-.pp-share-text {
-  flex: 1;
-  display: grid;
-  gap: 3px;
-}
-.pp-share-text strong {
-  font-size: 15px;
-  font-weight: 600;
-}
-.pp-share-text small {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--ink-soft);
-}
-.pp-switch {
-  position: relative;
-  flex: none;
-  width: 48px;
-  height: 28px;
-}
-.pp-switch input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-.pp-switch span {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  background: var(--line);
-  transition: background 0.2s;
-  pointer-events: none;
-}
-.pp-switch span::after {
-  content: "";
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s;
-}
-.pp-switch input:checked + span {
-  background: var(--leaf);
-}
-.pp-switch input:checked + span::after {
-  transform: translateX(20px);
-}
-.pp-switch input:focus-visible + span {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
+  align-items: flex-start;
+  gap: 12px;
 }
 
-/* Fields */
-.pp-grid {
+.pp-num {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px 24px;
-}
-.pp-field {
-  display: grid;
-  gap: 4px;
-  align-content: start;
-}
-.pp-wide {
-  grid-column: 1 / -1;
-}
-.pp-label {
+  flex-shrink: 0;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
   font-size: 13px;
   font-weight: 600;
-  color: var(--ink);
 }
-.pp-hint {
-  font-size: 12.5px;
+
+.pp-block__head h3 {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.pp-block__head p {
+  margin-top: 2px;
   color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.5;
 }
-.pp-input {
+
+/* Questions with chips */
+.pp-q {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.pp-q legend,
+.pp-legend {
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  margin-bottom: 10px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pp-q legend small,
+.pp-legend small,
+.pp-field small {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 400;
+}
+
+.pp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ink);
+  font: 500 13.5px var(--font-sans);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.pp-chip:hover {
+  border-color: var(--leaf);
+}
+
+.pp-chip svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pp-chip.on {
+  border-color: var(--leaf);
+  background: var(--pp-green-bg);
+  color: var(--leaf-deep);
+}
+
+.pp-chip.avoid.on {
+  border-color: #e7b4ae;
+  background: var(--pp-red-bg);
+  color: var(--pp-red);
+}
+
+/* "Add your own" as a chip-shaped box */
+.pp-own {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 4px 0 14px;
+  border: 1px dashed #c3cbc6;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.pp-own:focus-within {
+  border-style: solid;
+  border-color: var(--leaf);
+}
+
+.pp-own input {
+  width: 130px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: 400 13.5px var(--font-sans);
+  outline: none;
+}
+
+.pp-own button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  cursor: pointer;
+}
+
+.pp-own button:disabled {
+  background: var(--ivory-deep);
+  color: var(--ink-soft);
+  cursor: default;
+}
+
+.pp-own button svg,
+.pp-add svg,
+.pp-x svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.pp-note textarea,
+.pp-field :is(input, select) {
   width: 100%;
   padding: 11px 14px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: #fff;
+  background: #ffffff;
   color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  box-sizing: border-box;
-}
-.pp-input:focus {
-  outline: none;
-  border-color: var(--leaf-deep);
-}
-textarea.pp-input {
+  font: 400 14px var(--font-sans);
   resize: vertical;
 }
-.pp-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 14px;
-  margin-top: 20px;
-}
-.pp-btn {
-  padding: 13px 26px;
-}
-.pp-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
+
+.pp-note textarea:focus,
+.pp-field :is(input, select):focus {
+  border-color: var(--leaf);
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(77, 177, 115, 0.14);
 }
 
-/* Dates */
-.pp-dates {
-  list-style: none;
-  margin: 0 0 14px;
-  padding: 0;
+/* Who sees it + save */
+.pp-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.pp-who {
   display: grid;
   gap: 8px;
 }
-.pp-dates li {
+
+.pp-who__label {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.pp-who small {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.pp-seg {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.pp-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-soft);
+  font: 500 13px var(--font-sans);
+  cursor: pointer;
+}
+
+.pp-seg button.on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.pp-seg svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pp-save__btn {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--line-soft);
-  border-radius: 14px;
-  background: #fff;
 }
-.pp-date-icon {
-  flex: none;
+
+.pp-unsaved {
+  color: #9a5b0b;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.pp-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--leaf-deep);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.pp-saved svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+}
+
+.pp-btn {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font: 500 14px var(--font-sans);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.pp-btn:hover:not(:disabled) {
+  background: var(--leaf-deep);
+}
+
+.pp-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pp-btn--quiet {
+  background: none;
+  color: var(--ink-soft);
+}
+
+.pp-btn--quiet:hover:not(:disabled) {
+  background: var(--ivory-deep);
+  color: var(--ink);
+}
+
+/* Special days */
+.pp-days {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-day {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 10px 12px;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.pp-day__ico {
   display: grid;
   place-items: center;
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--leaf) 14%, #fff);
+  background: var(--pp-green-bg);
   color: var(--leaf-deep);
 }
-.pp-date-icon.birthday {
-  background: #fdf3dc;
-  color: #a16207;
+
+.pp-day__ico.birthday {
+  background: #fdf1df;
+  color: #9a5b0b;
 }
-.pp-date-icon.anniversary {
-  background: #fdecee;
-  color: #c0364a;
+
+.pp-day__ico.anniversary {
+  background: #fbe9ef;
+  color: #a33a5e;
 }
-.pp-fav-ph {
-  display: inline-flex;
-  color: var(--leaf);
+
+.pp-day__ico :deep(svg),
+.pp-kind :deep(svg) {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.pp-fav-ph :deep(svg) {
-  width: 24px;
-  height: 24px;
-}
-.pp-grow {
-  flex: 1;
-  min-width: 0;
+
+.pp-day__body {
   display: grid;
-  gap: 2px;
+  min-width: 0;
 }
-.pp-grow strong {
-  overflow: hidden;
+
+.pp-day__body strong {
   font-size: 14px;
   font-weight: 600;
-  text-overflow: ellipsis;
+}
+
+.pp-day__body small {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.pp-day__when {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--ivory);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
   white-space: nowrap;
 }
-.pp-grow small {
-  font-size: 12.5px;
-  color: var(--ink-soft);
-}
+
 .pp-x {
-  flex: none;
-  width: 44px;
-  height: 44px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
   border: 0;
   border-radius: 50%;
   background: none;
   color: var(--ink-soft);
-  font-size: 20px;
   cursor: pointer;
 }
-.pp-x:hover {
-  background: var(--ivory-deep);
-  color: #b42318;
+
+.pp-x:hover:not(:disabled) {
+  background: var(--pp-red-bg);
+  color: var(--pp-red);
 }
-.pp-date-form {
-  display: grid;
-  grid-template-columns: 1fr 1.6fr 1fr 0.7fr 1fr auto;
-  align-items: end;
-  gap: 10px;
-}
+
 .pp-add {
-  padding: 0 18px;
-  border: 1px dashed var(--leaf-deep);
-  border-radius: 12px;
-  background: none;
-  color: var(--leaf-deep);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px dashed #c3cbc6;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ink);
+  font: 500 13.5px var(--font-sans);
   cursor: pointer;
-  white-space: nowrap;
 }
-.pp-add:disabled {
-  opacity: 0.45;
-  cursor: default;
+
+.pp-add:hover {
+  border-style: solid;
+  border-color: var(--leaf);
+  color: var(--leaf-deep);
+}
+
+.pp-dayform {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.pp-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: 8px;
+}
+
+.pp-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ink);
+  font: 500 13.5px var(--font-sans);
+  cursor: pointer;
+}
+
+.pp-kind.on {
+  border-color: var(--leaf);
+  background: var(--pp-green-bg);
+  color: var(--leaf-deep);
+}
+
+.pp-field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pp-field--wide {
+  grid-column: 1 / -1;
+}
+
+.pp-dayform__actions {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* Offers */
-.pp-offers {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 10px;
+.pp-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #ffffff;
+  cursor: pointer;
 }
-.pp-offers li {
+
+.pp-toggle span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.pp-toggle strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pp-toggle small {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.pp-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 52px;
+  height: 30px;
+}
+
+.pp-switch input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.pp-switch span {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #cfd5d1;
+  transition: background 0.2s ease;
+}
+
+.pp-switch span::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(38, 45, 57, 0.25);
+  transition: transform 0.2s ease;
+}
+
+.pp-switch input:checked + span {
+  background: var(--leaf);
+}
+
+.pp-switch input:checked + span::after {
+  transform: translateX(22px);
+}
+
+.pp-switch input:focus-visible + span {
+  outline: 2px solid var(--leaf);
+  outline-offset: 3px;
+}
+
+.pp-offers {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-offer {
   display: grid;
   gap: 4px;
   padding: 14px 16px;
-  border: 1px solid var(--line-soft);
-  border-radius: 16px;
-  background: #fff;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: #ffffff;
 }
-.pp-offers li.fresh {
-  border-color: color-mix(in srgb, var(--leaf) 55%, #fff);
+
+.pp-offer.fresh {
+  border-color: rgba(77, 177, 115, 0.4);
 }
-.pp-offer-top {
+
+.pp-offer__top {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
-.pp-offer-top small {
-  font-size: 12.5px;
+
+.pp-offer__top small {
   color: var(--ink-soft);
+  font-size: 12px;
 }
+
 .pp-new {
-  padding: 1px 9px;
+  padding: 2px 8px;
   border-radius: 999px;
   background: var(--leaf);
-  color: #fff;
-  font-size: 11.5px;
+  color: #ffffff;
+  font-size: 11px;
   font-weight: 600;
 }
-.pp-offers strong {
-  font-size: 15px;
+
+.pp-offer strong {
+  font-size: 14.5px;
   font-weight: 600;
 }
-.pp-offers p {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.55;
-  color: var(--ink);
+
+.pp-offer p {
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.5;
 }
-.pp-offer-foot {
+
+.pp-offer__foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 14px;
-  margin-top: 4px;
+  margin-top: 6px;
 }
+
 .pp-promo {
   padding: 3px 10px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--leaf) 16%, #fff);
+  background: var(--pp-green-bg);
   color: var(--leaf-deep);
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
 }
+
 .pp-promo.ended {
   background: var(--ivory-deep);
   color: var(--ink-soft);
 }
-.pp-mute {
-  min-height: 44px;
-  margin-left: auto;
-  padding: 0 4px;
-  border: 0;
-  background: none;
-  color: var(--ink-soft);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  text-decoration: underline;
-  cursor: pointer;
-}
+
 .pp-muted {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 14px;
-  margin-top: 12px;
+  color: var(--ink-soft);
+  font-size: 13px;
 }
-.pp-muted-shop {
+
+.pp-muted__shop {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding-left: 12px;
-  border: 1px solid var(--line);
+  gap: 8px;
+  padding: 4px 6px 4px 12px;
   border-radius: 999px;
-  font-size: 13px;
-}
-.pp-muted-shop .pp-mute {
-  margin-left: 0;
-  min-height: 36px;
-  padding: 0 12px 0 4px;
+  background: #ffffff;
+  color: var(--ink);
 }
 
-/* Favorites */
-.pp-empty {
-  margin: 0;
-  font-size: 14px;
+/* Links */
+.pp-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--leaf-deep);
+  font: 600 13px var(--font-sans);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.pp-link.muted {
   color: var(--ink-soft);
 }
-.pp-favs {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 10px;
-}
-.pp-favs li {
-  position: relative;
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--line-soft);
-  border-radius: 16px;
-  background: #fff;
-}
-.pp-fav {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  color: inherit;
-  text-decoration: none;
-}
-.pp-fav-img {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 54px;
-  height: 54px;
-  overflow: hidden;
-  border-radius: 12px;
-  background: var(--ivory-deep);
-  font-size: 22px;
-}
-.pp-fav-img img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.pp-heart {
-  flex: none;
-  display: grid;
-  place-items: center;
-  margin-right: 6px;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: #e0475a;
-  font-size: 19px;
-  cursor: pointer;
-}
-.pp-heart:hover {
-  background: #fdecee;
+
+.pp-link.danger {
+  color: var(--pp-red);
 }
 
-/* Shops */
-.pp-shop {
-  margin-bottom: 10px;
-  padding: 16px 18px;
-  border: 1px solid var(--line-soft);
+.pp-link:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Privacy panel */
+.pp-privacy {
+  border: 1px solid var(--line);
   border-radius: 16px;
-  background: #fff;
 }
-.pp-shop header {
+
+.pp-privacy summary {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-.pp-shop strong {
-  font-size: 15px;
-}
-.pp-remove {
-  min-height: 44px;
-  padding: 0 6px;
-  border: 0;
-  background: none;
-  color: #b42318;
-  font-family: var(--font-sans);
-  font-size: 13px;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  list-style: none;
   cursor: pointer;
 }
+
+.pp-privacy summary::-webkit-details-marker {
+  display: none;
+}
+
+.pp-privacy summary svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--leaf-deep);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pp-count {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--ivory-deep);
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.pp-chev {
+  margin-left: auto;
+  stroke: var(--ink-soft) !important;
+  transition: transform 0.2s ease;
+}
+
+.pp-privacy[open] .pp-chev {
+  transform: rotate(180deg);
+}
+
+.pp-privacy[open] {
+  padding-bottom: 16px;
+}
+
+.pp-privacy__lede,
+.pp-privacy > .pp-empty {
+  margin: 0 16px 12px !important;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.pp-shop {
+  margin: 0 16px 10px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--ivory);
+}
+
+.pp-shop header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
 .pp-shop dl {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
-  gap: 6px 12px;
-  margin: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 14px;
   font-size: 13px;
 }
+
 .pp-shop dt {
   color: var(--ink-soft);
 }
-.pp-shop dd {
-  margin: 0;
+
+/* Misc */
+.pp-empty {
+  color: var(--ink-soft);
+  font-size: 13.5px;
 }
 
-@media (max-width: 760px) {
-  .pp-grid {
-    grid-template-columns: minmax(0, 1fr);
+.pp-alert {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--pp-red-bg);
+  color: var(--pp-red);
+  font-size: 13.5px;
+}
+
+.pp-sk {
+  display: grid;
+  gap: 10px;
+}
+
+.pp-sk-line {
+  display: block;
+  height: 14px;
+  border-radius: 7px;
+}
+
+.pp-sk-line:nth-child(2n) {
+  width: 70%;
+}
+
+:is(.pp-chip, .pp-own button, .pp-seg button, .pp-btn, .pp-add, .pp-x, .pp-kind, .pp-link, .pp-privacy summary):focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .pp-block {
+    padding: 16px;
   }
-  .pp-date-form {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  .pp-dayform {
+    grid-template-columns: 1fr 1fr;
   }
-  .pp-date-form > :nth-child(2),
-  .pp-date-form > :last-child {
-    grid-column: 1 / -1;
+
+  .pp-day {
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
-  .pp-add {
-    height: 44px;
+
+  .pp-day__when {
+    grid-column: 2;
+    justify-self: start;
   }
-  .pp-shop dl {
-    grid-template-columns: minmax(0, 1fr);
+
+  .pp-day .pp-x {
+    grid-row: 1;
+    grid-column: 3;
+  }
+
+  .pp-save {
+    align-items: stretch;
+  }
+
+  .pp-save__btn {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-chip,
+  .pp-switch span,
+  .pp-switch span::after,
+  .pp-chev {
+    transition: none;
   }
 }
 </style>
