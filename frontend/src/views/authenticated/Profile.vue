@@ -1151,30 +1151,68 @@ const sections = computed(() => [
     : []),
 ]);
 
-// The section in view is the one lit in the menu
+// The section in view is the one lit in the menu. On every scroll it is the
+// last section whose top has passed the reading line just under the navbar;
+// at the very bottom of the page it is the last section, however short it is.
 const activeSection = ref("pf-personal");
+// px from the top of the window: under the navbar, or under the pill menu on phones
+const readingLine = () => (window.innerWidth <= 960 ? 190 : 140);
+let clickedTarget = null; // a menu click: keep it lit while the page glides there
+let clickedTimer = 0;
+
+function updateActiveSection() {
+  if (clickedTarget) return;
+  const list = sections.value;
+  if (!list.length) return;
+  const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+  if (atBottom) {
+    activeSection.value = list[list.length - 1].id;
+    return;
+  }
+  let current = list[0].id;
+  for (const section of list) {
+    const el = document.getElementById(section.id);
+    if (el && el.getBoundingClientRect().top <= readingLine()) current = section.id;
+  }
+  activeSection.value = current;
+}
+
+let spyFrame = 0;
+const onSpyScroll = () => {
+  cancelAnimationFrame(spyFrame);
+  spyFrame = requestAnimationFrame(updateActiveSection);
+};
+
+// The glide from a menu click has ended: back to following the scroll
+const releaseClick = () => {
+  if (!clickedTarget) return;
+  clickedTarget = null;
+  clearTimeout(clickedTimer);
+  updateActiveSection();
+};
+
 const goToSection = (id) => {
   activeSection.value = id;
+  clickedTarget = id;
+  clearTimeout(clickedTimer);
+  clickedTimer = setTimeout(releaseClick, 1200); // in case the browser has no scrollend
   const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   document.getElementById(id)?.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
 };
-let sectionObserver = null;
+
 function watchSections() {
-  sectionObserver?.disconnect();
-  if (!("IntersectionObserver" in window)) return;
-  sectionObserver = new IntersectionObserver(
-    (entries) => {
-      const shown = entries.filter((entry) => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-      if (shown) activeSection.value = shown.target.id;
-    },
-    { rootMargin: "-120px 0px -55% 0px" },
-  );
-  sections.value.forEach((s) => {
-    const el = document.getElementById(s.id);
-    if (el) sectionObserver.observe(el);
-  });
+  window.addEventListener("scroll", onSpyScroll, { passive: true });
+  window.addEventListener("resize", onSpyScroll, { passive: true });
+  window.addEventListener("scrollend", releaseClick);
+  updateActiveSection();
 }
-onBeforeUnmount(() => sectionObserver?.disconnect());
+onBeforeUnmount(() => {
+  window.removeEventListener("scroll", onSpyScroll);
+  window.removeEventListener("resize", onSpyScroll);
+  window.removeEventListener("scrollend", releaseClick);
+  cancelAnimationFrame(spyFrame);
+  clearTimeout(clickedTimer);
+});
 
 // Personal info, as tiles while reading
 const infoRows = computed(() => [
@@ -2275,6 +2313,12 @@ onMounted(async () => {
 
   .pf-meter {
     display: none;
+  }
+
+  /* Sections stop below the navbar and the pill menu */
+  .pf-card,
+  .pf-prefs {
+    scroll-margin-top: 170px;
   }
 
   .pf-address {
