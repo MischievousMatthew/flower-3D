@@ -26,6 +26,25 @@ export const PART_KEYS = ["flowers", "wrapper", "fillers"];
 export const PAPER_PRESETS = ["#d3b18f", "#f3e9dc", "#d7d2c8", "#e2c7cf", "#c8b6a6"];
 export const RIBBON_PRESETS = ["#caa6d9", "#d95f76", "#7d8f69", "#f0dfb2", "#6c5b7b"];
 
+// Filler kinds: a tint over the leaves' own textures (they are unlit, so the
+// tint multiplies the texture; white keeps the original greenery).
+export const FILLER_KINDS = [
+  { key: "greenery", label: "Greenery", tint: "#ffffff" },
+  { key: "eucalyptus", label: "Eucalyptus", tint: "#b7d2d6" },
+  { key: "fern", label: "Fern", tint: "#8fbf72" },
+  { key: "dried", label: "Dried gold", tint: "#e8c27e" },
+];
+
+// Filler arrangements: how far each piece moves out from the middle (share of
+// the wrapper's radius), up (share of its height), and how big it is.
+// `wave` lifts every other piece by that much and drops the rest.
+export const FILLER_LOOKS = [
+  { key: "classic", label: "Classic", spread: 0, lift: 0, scale: 1, wave: 0 },
+  { key: "full", label: "Full and lush", spread: 0.16, lift: 0.02, scale: 1.22, wave: 0 },
+  { key: "airy", label: "Light and airy", spread: 0.26, lift: 0.1, scale: 0.88, wave: 0.07 },
+  { key: "tucked", label: "Neatly tucked", spread: -0.12, lift: -0.06, scale: 0.92, wave: 0 },
+];
+
 // Materials in Boquet.glb: paper04_05_06 + Pink form the wrapper; Leaves*,
 // Sepals*, SmallPlants* are fillers; everything else (daisy Material.001,
 // lavender Material + Flower_01_Stem) is the flowers.
@@ -140,6 +159,91 @@ export function createLandingBouquet(canvas, { onProgress, reducedMotion = false
   let model = null;
   let bloom = null; // sculpted flower heads (see landingFlowers.js)
 
+  // Filler pieces: where each sits in the model, and which way is "out" and
+  // "up" for it, so a look can move it (see setFillerLook)
+  const fillerPieces = []; // { mesh, base, baseScale, pivot, out, up, odd }
+  const fillerTarget = { spread: 0, lift: 0, scale: 1, wave: 0 };
+  const fillerNow = { ...fillerTarget };
+  const fillerTint = new THREE.Color("#ffffff");
+  let fillerTintNow = new THREE.Color("#ffffff");
+  let fillerSize = { radius: 1, height: 1 };
+
+  function placeFillers() {
+    fillerPieces.forEach((piece) => {
+      const wave = piece.odd ? fillerNow.wave : -fillerNow.wave * 0.5;
+      // Sized around its own middle (pivot), so growing doesn't shift it
+      piece.mesh.position
+        .copy(piece.base)
+        .addScaledVector(piece.pivot.clone().sub(piece.base), 1 - fillerNow.scale)
+        .addScaledVector(piece.out, fillerNow.spread * fillerSize.radius)
+        .addScaledVector(piece.up, (fillerNow.lift + wave) * fillerSize.height);
+      piece.mesh.scale.copy(piece.baseScale).multiplyScalar(fillerNow.scale);
+    });
+    parts.fillers.materials.forEach((material) => material.color.copy(fillerTintNow));
+  }
+
+  /** Eases the fillers toward their chosen look and tint; true while still moving */
+  function stepFillers() {
+    if (!fillerPieces.length) return;
+    let moving = false;
+    const k = reducedMotion ? 1 : 0.07;
+    Object.keys(fillerTarget).forEach((key) => {
+      const gap = fillerTarget[key] - fillerNow[key];
+      if (Math.abs(gap) > 0.0005) {
+        fillerNow[key] += gap * k;
+        moving = true;
+      } else fillerNow[key] = fillerTarget[key];
+    });
+    const before = fillerTintNow.clone();
+    fillerTintNow.lerp(fillerTint, k);
+    const tintMoving = Math.abs(before.r - fillerTint.r) + Math.abs(before.g - fillerTint.g) + Math.abs(before.b - fillerTint.b) > 0.002;
+    if (!tintMoving) fillerTintNow = fillerTint.clone();
+    if (moving || tintMoving) placeFillers();
+  }
+
+  function setFillerLook(key) {
+    const look = FILLER_LOOKS.find((entry) => entry.key === key) || FILLER_LOOKS[0];
+    Object.assign(fillerTarget, { spread: look.spread, lift: look.lift, scale: look.scale, wave: look.wave });
+  }
+
+  function setFillerKind(key) {
+    const kind = FILLER_KINDS.find((entry) => entry.key === key) || FILLER_KINDS[0];
+    fillerTint.set(kind.tint);
+  }
+
+  /** Learns each filler piece's resting place and its out / up directions */
+  function measureFillers(wrapperBox) {
+    const center = wrapperBox.getCenter(new THREE.Vector3());
+    const size = wrapperBox.getSize(new THREE.Vector3());
+    fillerSize = { radius: Math.max(size.x, size.z) / 2, height: size.y };
+    spinner.updateMatrixWorld(true);
+    const axis = spinner.worldToLocal(center.clone());
+    parts.fillers.meshes.forEach((mesh, index) => {
+      const parent = mesh.parent;
+      if (!parent) return;
+      // The piece's middle and its direction away from the bouquet's axis, in the spinner's space
+      const middle = spinner.worldToLocal(new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3()));
+      const outward = new THREE.Vector3(middle.x - axis.x, 0, middle.z - axis.z);
+      if (outward.lengthSq() < 1e-6) outward.set(Math.cos(index * 2.4), 0, Math.sin(index * 2.4));
+      outward.normalize();
+      // The same directions in the piece's own parent space, one unit long in the spinner's space
+      const toParent = (vector) => {
+        const from = parent.worldToLocal(spinner.localToWorld(middle.clone()));
+        const to = parent.worldToLocal(spinner.localToWorld(middle.clone().add(vector)));
+        return to.sub(from);
+      };
+      fillerPieces.push({
+        mesh,
+        base: mesh.position.clone(),
+        baseScale: mesh.scale.clone(),
+        pivot: parent.worldToLocal(spinner.localToWorld(middle.clone())),
+        out: toParent(outward),
+        up: toParent(new THREE.Vector3(0, 1, 0)),
+        odd: index % 2 === 1,
+      });
+    });
+  }
+
   function resize(width = window.innerWidth, height = window.innerHeight) {
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
@@ -181,6 +285,7 @@ export function createLandingBouquet(canvas, { onProgress, reducedMotion = false
 
     glow.material.opacity = glowState.opacity;
     applyFocus();
+    stepFillers();
 
     camera.position.set(view.x, view.y, view.z);
     camera.lookAt(view.tx, view.ty, view.tz);
@@ -278,6 +383,7 @@ export function createLandingBouquet(canvas, { onProgress, reducedMotion = false
         parts.wrapper.meshes.forEach((mesh) => wrapperBox.expandByObject(mesh));
         const wSize = wrapperBox.getSize(new THREE.Vector3());
         const wCenter = wrapperBox.getCenter(new THREE.Vector3());
+        measureFillers(wrapperBox);
         bloom = createBloomLayer({
           anchor: new THREE.Vector3(wCenter.x, wrapperBox.max.y - wSize.y * 0.2, wCenter.z),
           radius: Math.max(wSize.x, wSize.z) * 0.3,
@@ -339,6 +445,8 @@ export function createLandingBouquet(canvas, { onProgress, reducedMotion = false
     setBloom(variety) {
       bloom?.setVariety(variety);
     },
+    setFillerLook,
+    setFillerKind,
     setPointer(x, y) {
       pointer.x = x;
       pointer.y = y;

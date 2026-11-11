@@ -246,10 +246,42 @@
                 <p class="story-step-label">Fillers</p>
                 <h3>Finish with <em>fillers</em></h3>
                 <p>
-                  Eucalyptus, baby's breath and greenery bring it together. Not
-                  sure where they go? One tap suggests where to place them,
-                  and you can try another look or undo it any time.
+                  Eucalyptus, fern and greenery bring it together. Not sure
+                  where they go? One tap suggests where to place them, and you
+                  can try another look or undo it any time.
                 </p>
+                <div class="bloom-picker" role="group" aria-label="Filler">
+                  <button
+                    v-for="kind in fillerKinds"
+                    :key="kind.key"
+                    type="button"
+                    class="bloom-option"
+                    :class="{ 'is-active': fillerKind === kind.key }"
+                    :aria-pressed="fillerKind === kind.key"
+                    @click="pickFillerKind(kind.key)"
+                  >
+                    <span class="filler-dot" :style="{ '--tint': kind.tint }" aria-hidden="true"></span>
+                    {{ kind.label }}
+                  </button>
+                </div>
+                <div class="filler-suggest">
+                  <button type="button" class="filler-suggest-btn" @click="suggestFillerLook">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 3l1.8 4.6L18.5 9.5l-4.7 1.9L12 16l-1.8-4.6L5.5 9.5l4.7-1.9z" />
+                      <path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" />
+                    </svg>
+                    {{ fillerLookHistory.length ? "Try another look" : "Suggest where they go" }}
+                  </button>
+                  <span class="filler-look" aria-live="polite">{{ fillerLookLabel }}</span>
+                  <button
+                    v-if="fillerLookHistory.length"
+                    type="button"
+                    class="filler-undo"
+                    @click="undoFillerLook"
+                  >
+                    Undo
+                  </button>
+                </div>
               </article>
 
               <article
@@ -554,6 +586,8 @@ import { getStoredUserToken } from "../../utils/authSession";
 import { BLOOM_VARIETIES } from "../../composables/landingFlowers";
 import {
   createLandingBouquet,
+  FILLER_KINDS,
+  FILLER_LOOKS,
   PAPER_PRESETS,
   RIBBON_PRESETS,
 } from "../../composables/useLandingBouquet";
@@ -651,6 +685,52 @@ function pickBloom(key) {
   userPickedBloom = true;
   bloomVariety.value = key;
   bouquet?.setBloom(key);
+}
+
+// Fillers: a kind (tint) and a look (where the pieces sit). Scrolling through
+// the Fillers step shows them off until the visitor picks one.
+const fillerKinds = FILLER_KINDS;
+const fillerKind = ref("greenery");
+const fillerLook = ref("classic");
+const fillerLookHistory = ref([]); // earlier looks, for Undo
+const fillerLookLabel = computed(() => FILLER_LOOKS.find((look) => look.key === fillerLook.value)?.label || "");
+let userPickedFiller = false;
+
+function pickFillerKind(key) {
+  userPickedFiller = true;
+  fillerKind.value = key;
+  bouquet?.setFillerKind(key);
+}
+
+function showFillerLook(key) {
+  fillerLook.value = key;
+  bouquet?.setFillerLook(key);
+}
+
+function suggestFillerLook() {
+  userPickedFiller = true;
+  const choices = FILLER_LOOKS.filter((look) => look.key !== fillerLook.value);
+  const next = choices[Math.floor(Math.random() * choices.length)];
+  fillerLookHistory.value = [...fillerLookHistory.value, fillerLook.value];
+  showFillerLook(next.key);
+}
+
+function undoFillerLook() {
+  const history = [...fillerLookHistory.value];
+  const previous = history.pop();
+  fillerLookHistory.value = history;
+  if (previous) showFillerLook(previous);
+}
+
+function cycleFiller(index) {
+  if (userPickedFiller) return;
+  const look = FILLER_LOOKS[index % FILLER_LOOKS.length];
+  const kind = FILLER_KINDS[index % FILLER_KINDS.length];
+  if (look.key !== fillerLook.value) showFillerLook(look.key);
+  if (kind.key !== fillerKind.value) {
+    fillerKind.value = kind.key;
+    bouquet?.setFillerKind(kind.key);
+  }
 }
 
 function cycleBloom(index) {
@@ -1242,6 +1322,18 @@ function setupJourney() {
       tl.to(bouquet.view, { ...fillers, duration: 1.4 }, 11.2);
       tl.to(rig.rotation, { y: -0.45, duration: 1.6 }, 11.2);
       tl.to(bouquet.focus, { flowers: 0.35, wrapper: 0.25, fillers: 1, duration: 1 }, 11.2);
+      // ...and show the filler kinds and looks moving into place
+      const fillerProxy = { i: 0 };
+      tl.to(
+        fillerProxy,
+        {
+          i: FILLER_LOOKS.length - 0.01,
+          duration: 2.4,
+          ease: "none",
+          onUpdate: () => cycleFiller(Math.floor(fillerProxy.i)),
+        },
+        11.5,
+      );
 
       // Reveal: full bouquet, one slow turn.
       tl.to(bouquet.view, { ...finale, duration: 1.6 }, 14);
@@ -2110,6 +2202,86 @@ onBeforeUnmount(() => {
 .swatch:focus-visible {
   outline: 2px solid var(--leaf);
   outline-offset: 4px;
+}
+
+.filler-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--tint) 55%, #4f8a5b);
+  vertical-align: 1px;
+}
+
+.filler-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-top: 20px;
+}
+
+.filler-suggest-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color 0.3s ease,
+    background 0.3s ease;
+}
+
+.filler-suggest-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--leaf-deep);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.filler-suggest-btn:hover {
+  border-color: var(--leaf);
+  background: #ffffff;
+}
+
+.filler-look {
+  color: var(--leaf-deep);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.filler-undo {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.filler-undo:hover {
+  color: var(--ink);
+}
+
+.filler-suggest-btn:focus-visible,
+.filler-undo:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 3px;
 }
 
 .swatch-row {
