@@ -110,7 +110,7 @@
           <!-- Everything; filters from occasions, the finder, search and admin links land here -->
           <section id="products" class="fresh" :class="{ first: !loadingPopular && !showTopSelling }" aria-labelledby="fresh-title">
             <div class="shop-row-head">
-              <h2 id="fresh-title">Fresh Flowers</h2>
+              <h2 id="fresh-title">{{ selectedFilters.onSale ? "Flowers on sale" : "Fresh Flowers" }}</h2>
               <span class="fresh-count" v-if="!isLoading">{{ pagination.total }} {{ pagination.total === 1 ? "flower" : "flowers" }}</span>
             </div>
             <div class="fresh-tools">
@@ -163,6 +163,8 @@
               {{
                 activeSearch
                   ? `No flowers match "${activeSearch}". Try another word or clear the search.`
+                  : selectedFilters.onSale && activeFilterChips.length === 1
+                    ? "No flowers are on sale right now. Check back soon, or remove \"On sale\" to see every flower."
                   : activeFilterChips.length
                     ? "Nothing matches these filters yet. Try removing one."
                     : "Flowers show up here as shops add them."
@@ -377,6 +379,7 @@ const selectedFilters = ref({
   season: [],
   variety: [],
   inStockOnly: true,
+  onSale: false, // "Sales" in the navbar: only flowers selling below their price
 });
 // True once the filter options request has finished (drives the occasion skeletons).
 const filterOptionsLoaded = ref(false);
@@ -533,6 +536,7 @@ const buildQueryParams = () => {
   if (selectedFilters.value.priceMax !== null)
     p.max_price = selectedFilters.value.priceMax;
   p.in_stock_only = selectedFilters.value.inStockOnly ? 1 : 0;
+  if (selectedFilters.value.onSale) p.on_sale = 1;
   p.sort_by = sortBy.value;
   if (nearMe.value) p.owner_ids = idsParam(nearMe.value.ownerIds);
   if (activeSearch.value) p.search = activeSearch.value;
@@ -564,6 +568,7 @@ const activeFilterChips = computed(() => {
   ];
   if (nearMe.value) chips.unshift({ key: "near-me", type: "near-me", label: `Within ${nearMe.value.km} km of you` });
   if (activeSearch.value) chips.unshift({ key: "search", type: "search", label: `"${activeSearch.value}"` });
+  if (f.onSale) chips.unshift({ key: "sale", type: "sale", label: "On sale" });
   if (f.priceMin !== null || (f.priceMax !== null && f.priceMax !== Math.round(filterOptions.value.price_range?.max ?? -1))) {
     const min = f.priceMin !== null ? `₱${f.priceMin}` : "";
     const max = f.priceMax !== null ? `₱${f.priceMax}` : "";
@@ -581,7 +586,9 @@ const removeFilterChip = (chip) => {
     clearSearch();
     return;
   }
-  if (chip.type === "price") {
+  if (chip.type === "sale") {
+    f.onSale = false;
+  } else if (chip.type === "price") {
     f.priceMin = null;
     f.priceMax = null;
   } else {
@@ -614,9 +621,9 @@ const fetchProducts = async () => {
     const r = await api.get(endpoint, { params });
     if (r.data.success) {
       if (selectedVendor.value) {
-        products.value = (Array.isArray(r.data.data) ? r.data.data : []).filter(
-          isShopVisibleProduct,
-        );
+        products.value = (Array.isArray(r.data.data) ? r.data.data : [])
+          .filter(isShopVisibleProduct)
+          .filter((p) => !selectedFilters.value.onSale || isOnSale(p));
         pagination.value = {
           current_page: 1,
           last_page: 1,
@@ -847,9 +854,26 @@ const closeAuthModal = () => {
 };
 const SECTION_ALIASES = { sale: "products" };
 const scrollToSection = (id) => {
+  // "Sales": the flower grid, showing only what's on sale
+  if (id === "sale") return showOnSale();
   const el = document.getElementById(SECTION_ALIASES[id] || id);
   if (el) el.scrollIntoView({ behavior: "smooth" });
 };
+
+/** Selling below its price right now (the sale price the card shows) */
+const isOnSale = (p) => {
+  const sale = Number(p?.discount_price);
+  const price = Number(p?.selling_price ?? p?.price);
+  return Boolean(p?.has_discount) || (sale > 0 && price > 0 && sale < price);
+};
+
+function showOnSale() {
+  selectedFilters.value.onSale = true;
+  pagination.value.current_page = 1;
+  fetchProducts();
+  const el = document.getElementById("products");
+  if (el) el.scrollIntoView({ behavior: "smooth" });
+}
 
 // Shop by category: filter the grid to one category and jump to it.
 // Links from banners, announcements and promotions arrive as
@@ -859,7 +883,9 @@ const applyContentLink = (query) => {
   const occasion = typeof query.occasion === "string" ? query.occasion : null;
   if (category) selectedFilters.value.category = [category];
   if (occasion) selectedFilters.value.occasion = [occasion];
-  return Boolean(category || occasion || query.section === "products");
+  // ?section=sale: "Sales" clicked on another page
+  if (query.section === "sale") selectedFilters.value.onSale = true;
+  return Boolean(category || occasion || query.section === "products" || query.section === "sale");
 };
 watch(
   () => route.query,
@@ -1003,7 +1029,8 @@ onMounted(async () => {
   }
   const fromContentLink = applyContentLink(route.query);
   await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors(), fetchFeatured(), fetchPopular()]);
-  if (fromContentLink) setTimeout(() => scrollToSection("products"), 50);
+  if (fromContentLink) setTimeout(() => document.getElementById("products")?.scrollIntoView({ behavior: "smooth" }), 50);
+  else if (route.query.section === "occasions") setTimeout(() => scrollToSection("occasions"), 50);
   if (isAuthenticated.value) {
     await loadCart();
   } else {

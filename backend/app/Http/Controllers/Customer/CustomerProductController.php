@@ -7,6 +7,7 @@ use App\Models\FeaturedProduct;
 use App\Models\Product;
 use App\Models\ProductTaxonomy;
 use App\Models\VendorApplication;
+use App\Models\VendorPromotion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +25,8 @@ class CustomerProductController extends Controller
         'min_price'     => 'nullable|numeric|min:0',
         'max_price'     => 'nullable|numeric|min:0',
         'in_stock_only' => 'nullable',
+        // Only flowers selling below their price right now (own discount or a shop promotion)
+        'on_sale'       => 'nullable',
         // Only these shops (owner user ids, comma separated), e.g. the ones near the customer
         'owner_ids'     => 'nullable|string|max:2000',
         // Words typed into the Shop page search (name, category, colour, flower type)
@@ -108,6 +111,9 @@ class CustomerProductController extends Controller
             }
             if (filter_var($request->get('in_stock_only', false), FILTER_VALIDATE_BOOLEAN)) {
                 $query->where('quantity_in_stock', '>', 0);
+            }
+            if (filter_var($request->get('on_sale', false), FILTER_VALIDATE_BOOLEAN)) {
+                $query->whereIn('id', $this->onSaleIds($query) ?: [0]);
             }
 
             $sortBy = $request->get('sort_by', 'created_at_desc');
@@ -441,6 +447,42 @@ class CustomerProductController extends Controller
       )
 )
 SQL;
+    }
+
+    /**
+     * Ids of the products in $query selling below their price right now: the
+     * same check as the sale price shown on them (their own discount inside its
+     * dates, or a running shop promotion that covers them). The database narrows
+     * it to likely ones; the price check decides.
+     */
+    private function onSaleIds($query): array
+    {
+        $now = now();
+        $promotionOwners = VendorPromotion::query()
+            ->where('is_active', true)->where('starts_at', '<=', $now)->where('ends_at', '>=', $now)
+            ->distinct()->pluck('owner_id')->all();
+
+        return (clone $query)->setEagerLoads([])
+            ->where(function ($q) use ($now, $promotionOwners) {
+                $q->where(function ($own) use ($now) {
+                    $own->whereNotNull('discount_price')->where('discount_price', '>', 0)
+                        ->whereColumn('discount_price', '<', 'selling_price')
+                        ->where(fn ($s) => $s->whereNull('discount_starts_at')->orWhere('discount_starts_at', '<=', $now))
+                        ->where(fn ($e) => $e->whereNull('discount_ends_at')->orWhere('discount_ends_at', '>=', $now));
+                });
+                if ($promotionOwners) {
+                    $q->orWhereIn('owner_id', $promotionOwners);
+                }
+            })
+            ->limit(2000)
+            ->get()
+            ->filter(function (Product $product) {
+                $sale = $product->discount_price;
+
+                return $sale !== null && (float) $sale < (float) $product->getRawOriginal('selling_price');
+            })
+            ->pluck('id')
+            ->all();
     }
 
     private function formatProduct(Product $product, ?array $stats = null, ?string $vendorName = null): array

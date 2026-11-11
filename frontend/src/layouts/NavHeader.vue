@@ -488,6 +488,10 @@ const closeMobileMenu = () => {
 };
 const navigateTo = (sectionId) => {
   closeMobileMenu();
+  if (router.currentRoute.value.name !== "Shop") {
+    router.push({ name: "Shop", query: { section: sectionId } });
+    return;
+  }
   scrollToSection(sectionId);
 };
 
