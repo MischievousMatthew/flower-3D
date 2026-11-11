@@ -317,6 +317,7 @@
                             <img :src="order.delivery.photo_url" alt="" loading="lazy" />
                             <span><strong>View proof of order</strong><small>Photo by {{ order.store_name || "the shop" }}</small></span>
                           </button>
+                          <p v-else-if="!order.delivery?.photo_url && ev.status === 'to_received'" class="ot-noproof">No photo from the shop for this order.</p>
                         </li>
                       </ol>
                     </template>
@@ -2269,6 +2270,12 @@ button.ot-pay {
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.ot-noproof {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-style: italic;
 }
 
 .ot-receive__photo {
