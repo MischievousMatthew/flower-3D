@@ -249,7 +249,9 @@
             </footer>
 
             <!-- ── Details ───────────────────────────────────────────── -->
-            <Transition name="expand">
+            <!-- Opening fades in; closing is instant (the leave hook finishes at once),
+                 so the page is already its new height when toggle() measures and scrolls -->
+            <Transition name="expand" @leave="(el, done) => done()">
               <div v-if="isOpen(order.id)" :id="`order-detail-${order.id}`" class="ot-detail">
                 <div class="ot-detail__grid">
                   <!-- Items and what it cost -->
