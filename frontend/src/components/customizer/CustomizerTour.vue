@@ -19,11 +19,7 @@
           <line :x1="drag.x1" :y1="drag.y1" :x2="drag.x2" :y2="drag.y2" marker-end="url(#ct-trail-head)" />
         </svg>
         <span class="ct-drop" :style="{ left: `${drag.x2}px`, top: `${drag.y2}px` }" aria-hidden="true"></span>
-        <span
-          class="ct-drag"
-          :style="{ left: `${drag.x1}px`, top: `${drag.y1}px`, '--dx': `${drag.x2 - drag.x1}px`, '--dy': `${drag.y2 - drag.y1}px` }"
-          aria-hidden="true"
-        >
+        <span ref="dragEl" class="ct-drag" aria-hidden="true">
           <span class="ct-drag-chip"><BcIcon :name="step.drag.icon || 'leaf'" /></span>
           <span class="ct-drag-pointer"><BcIcon name="pointer" /></span>
         </span>
@@ -88,6 +84,50 @@ const nextEl = ref(null);
 const hole = ref(null);
 const tip = reactive({ side: "center", left: 0, top: 0, arrow: null });
 const drag = ref(null); // { x1, y1, x2, y2 } on screen
+const dragEl = ref(null);
+let dragRun = null; // the running animation, and the path it follows
+let dragKey = "";
+
+/**
+ * Moves the item along the dotted line into the circle and back, on the very
+ * points the line is drawn between. Started again only when the path moves.
+ */
+function runDrag() {
+  const path = drag.value;
+  const el = dragEl.value;
+  if (!path || !el) {
+    dragRun?.cancel();
+    dragRun = null;
+    dragKey = "";
+    return;
+  }
+  const key = [path.x1, path.y1, path.x2, path.y2].map(Math.round).join(",");
+  if (key === dragKey && dragRun) return;
+  dragKey = key;
+  dragRun?.cancel();
+  const at = (x, y, size = 1) => `translate(${x}px, ${y}px) scale(${size})`;
+  const start = at(path.x1, path.y1);
+  const end = at(path.x2, path.y2);
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+    el.style.transform = end; // still shows where it goes
+    dragRun = null;
+    return;
+  }
+  el.style.transform = start;
+  dragRun = el.animate(
+    [
+      { offset: 0, transform: start },
+      { offset: 0.12, transform: start },
+      { offset: 0.18, transform: at(path.x1, path.y1, 1.12), easing: "cubic-bezier(0.45, 0, 0.25, 1)" },
+      { offset: 0.6, transform: at(path.x2, path.y2, 1.12) },
+      { offset: 0.68, transform: end },
+      { offset: 0.8, transform: end, easing: "ease-in-out" },
+      { offset: 1, transform: start },
+    ],
+    { duration: 2800, iterations: Infinity },
+  );
+}
+watch(drag, () => nextTick(runDrag));
 
 const centerOf = (el, down = 0.5) => {
   const rect = el?.getBoundingClientRect();
@@ -183,6 +223,7 @@ onUnmounted(() => {
   window.removeEventListener("keydown", onKey);
   clearInterval(poll);
   cancelAnimationFrame(frame);
+  dragRun?.cancel();
 });
 </script>
 
@@ -281,7 +322,7 @@ onUnmounted(() => {
   border: 3px dashed #ffffff;
   border-radius: 50%;
   background: rgba(77, 177, 115, 0.35);
-  animation: ct-drop 2.6s ease-in-out infinite;
+  animation: ct-drop 2.8s ease-in-out infinite;
 }
 
 @keyframes ct-drop {
@@ -290,20 +331,14 @@ onUnmounted(() => {
   100% { transform: scale(0.85); opacity: 0.6; }
 }
 
+/* Placed by transform alone (see runDrag): its point is the item's centre */
 .ct-drag {
   position: absolute;
+  left: 0;
+  top: 0;
   width: 0;
   height: 0;
-  animation: ct-drag 2.6s cubic-bezier(0.45, 0, 0.25, 1) infinite;
-}
-
-/* Pick up, carry over, drop, then glide back to start again */
-@keyframes ct-drag {
-  0%, 12% { transform: translate(0, 0) scale(1); }
-  18% { transform: translate(0, 0) scale(1.12); }
-  60% { transform: translate(var(--dx), var(--dy)) scale(1.12); }
-  68%, 78% { transform: translate(var(--dx), var(--dy)) scale(1); }
-  100% { transform: translate(0, 0) scale(1); }
+  will-change: transform;
 }
 
 .ct-drag-chip {
@@ -521,11 +556,6 @@ onUnmounted(() => {
   .ct-trail line,
   .ct-drop {
     animation: none;
-  }
-  /* Still shows where it goes: the item sits at the bouquet end of the path */
-  .ct-drag {
-    animation: none;
-    transform: translate(var(--dx), var(--dy));
   }
   .ct-hole,
   .ct-card,
