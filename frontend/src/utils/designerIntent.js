@@ -1,32 +1,38 @@
-// "Explore 3D Designer" pressed before signing in: remembered in memory only,
-// so it lasts while the visitor goes from the landing page to sign-up or
-// sign-in and on to the shop picker (see useAuth's resolveUserRedirect), and
-// a page refresh forgets it.
-let pendingAt = 0;
-const TTL_MS = 60 * 60 * 1000; // an hour: long enough to sign up with an emailed code
-
-// Earlier versions kept it in sessionStorage, where it outlived refreshes
-try {
-  sessionStorage.removeItem("bc.pendingDesigner");
-} catch {
-  // Storage unavailable: nothing to clear
-}
+// "Explore 3D Designer" pressed before signing in: remembered for 5 minutes
+// in this tab (sessionStorage), so it lasts through sign-up or sign-in, even
+// a refresh or two, and then lands them on the shop picker (see useAuth's
+// resolveUserRedirect). After 5 minutes a refresh no longer shows it.
+const KEY = "bc.pendingDesigner";
+const TTL_MS = 5 * 60 * 1000;
 
 export function savePendingDesigner() {
-  pendingAt = Date.now();
+  try {
+    sessionStorage.setItem(KEY, String(Date.now()));
+  } catch {
+    // Storage unavailable: they land on the Shop page and can open the designer from there
+  }
 }
 
 export function readPendingDesigner() {
-  if (!pendingAt) return false;
-  if (Date.now() - pendingAt > TTL_MS) {
-    pendingAt = 0;
+  try {
+    const savedAt = Number(sessionStorage.getItem(KEY));
+    if (!savedAt) return false;
+    if (Date.now() - savedAt > TTL_MS) {
+      clearPendingDesigner();
+      return false;
+    }
+    return true;
+  } catch {
     return false;
   }
-  return true;
 }
 
 export function clearPendingDesigner() {
-  pendingAt = 0;
+  try {
+    sessionStorage.removeItem(KEY);
+  } catch {
+    // Nothing to clear
+  }
 }
 
 // Where the shop picker opens: the Shop page with ?design=1
