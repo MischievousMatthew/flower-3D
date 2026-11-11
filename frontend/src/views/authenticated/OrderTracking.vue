@@ -113,6 +113,7 @@
         <div class="ot-list">
           <article
             v-for="order in orders"
+            :id="`order-card-${order.id}`"
             :key="order.id"
             class="ot-card"
             :class="[`tone-${statusTone(order)}`, { open: isOpen(order.id) }]"
@@ -573,14 +574,13 @@ const { isAuthenticated } = useAuth();
 const orders = ref([]);
 const loading = ref(false);
 const error = ref(null);
-// Orders open and close on their own: opening one never closes another, so
-// nothing above the one clicked moves and the page doesn't jump
-const openIds = ref(new Set());
-const isOpen = (id) => openIds.value.has(id);
-const openOrder = (id) => {
-  if (!isOpen(id)) openIds.value = new Set([...openIds.value, id]);
-};
-const closeAll = () => (openIds.value = new Set());
+// One order open at a time. Opening one closes the other, and the page then
+// scrolls by however much that moved things, so the order that was clicked
+// stays exactly where it was on screen (see toggle).
+const openId = ref(null);
+const isOpen = (id) => openId.value === id;
+const openOrder = (id) => (openId.value = id);
+const closeAll = () => (openId.value = null);
 const search = ref("");
 const activeTab = ref("all");
 const actionLoading = ref(null);
@@ -1080,12 +1080,24 @@ function closeProof() {
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
-const toggle = (id) => {
-  const next = new Set(openIds.value);
-  if (next.has(id)) next.delete(id);
-  else next.add(id);
-  openIds.value = next;
-};
+const NAV_CLEARANCE = 104; // the floating navbar's height plus a little room
+const cardTop = (id) => document.getElementById(`order-card-${id}`)?.getBoundingClientRect().top;
+
+async function toggle(id) {
+  const before = cardTop(id);
+  const closing = isOpen(id);
+  openId.value = closing ? null : id;
+  await nextTick();
+  const after = cardTop(id);
+  if (before == null || after == null) return;
+  if (closing && before < NAV_CLEARANCE) {
+    // Closed from far down a long order: bring its top back under the navbar
+    window.scrollBy({ top: after - NAV_CLEARANCE, behavior: "instant" });
+  } else if (Math.abs(after - before) > 1) {
+    // The order above closed: keep this one where it was
+    window.scrollBy({ top: after - before, behavior: "instant" });
+  }
+}
 const setTab = (v) => {
   clearFocus();
   activeTab.value = v;
@@ -1385,6 +1397,7 @@ onMounted(async () => {
 .ot-list {
   display: grid;
   gap: 16px;
+  overflow-anchor: none;
 }
 
 /* Buttons */
@@ -2785,13 +2798,11 @@ button.ot-pay {
 }
 
 /* ── Motion ───────────────────────────────────────────────── */
-.expand-enter-active,
-.expand-leave-active {
+.expand-enter-active {
   transition: opacity 0.22s ease, transform 0.22s ease;
 }
 
-.expand-enter-from,
-.expand-leave-to {
+.expand-enter-from {
   opacity: 0;
   transform: translateY(-6px);
 }
