@@ -1505,6 +1505,17 @@ onUnmounted(() => {
   margin: 0;
 }
 
+/* The site theme makes headings the display serif; the chat keeps one sans-serif */
+.chat-layout :is(h1, h2, h3, h4) {
+  font-family: var(--c-font);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.chat-layout .avatar {
+  font-family: var(--c-font);
+}
+
 .chat-layout ul {
   padding: 0;
   list-style: none;
@@ -2142,8 +2153,11 @@ onUnmounted(() => {
   cursor: default;
 }
 
-.conv--skeleton .avatar {
-  background: none;
+/* The avatar placeholder shimmers like the lines beside it */
+.conv--skeleton .avatar.skeleton {
+  border-radius: 50%;
+  background: linear-gradient(100deg, var(--c-skeleton) 30%, var(--c-skeleton-hi) 50%, var(--c-skeleton) 70%);
+  background-size: 300% 100%;
 }
 
 .conv--skeleton .line {
