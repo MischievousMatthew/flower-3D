@@ -24,7 +24,7 @@
           </div>
         </div>
 
-        <fieldset v-for="q in QUESTIONS" :key="q.key" class="pp-q">
+        <fieldset v-for="q in QUESTIONS" :key="q.key" :ref="(el) => (changeEls[q.key] = el)" class="pp-q" :class="{ flash: flashKey === q.key }">
           <legend>
             {{ q.question }}
             <small v-if="q.hint">{{ q.hint }}</small>
@@ -60,12 +60,12 @@
           </div>
         </fieldset>
 
-        <label class="pp-q pp-note">
+        <label :ref="(el) => (changeEls.note = el)" class="pp-q pp-note" :class="{ flash: flashKey === 'note' }">
           <span class="pp-legend">Anything else shops should know? <small>Like "no plastic wrapping" or "I'm sensitive to strong scents".</small></span>
           <textarea v-model="form.note" rows="2" maxlength="500" placeholder="Write a note for shops (optional)"></textarea>
         </label>
 
-        <!-- Who sees it, and saving -->
+        <!-- Who sees it (saves straight away) -->
         <div class="pp-save">
           <div class="pp-who" role="radiogroup" aria-label="Who can see your taste and special days">
             <span class="pp-who__label">Who can see this?</span>
@@ -81,18 +81,37 @@
             </div>
             <small>{{ form.share_with_shops ? `The ${shopsText} you've ordered from or messaged can see it.` : "Nobody else can see it until you choose My shops." }}</small>
           </div>
-          <div class="pp-save__btn">
-            <span v-if="changed" class="pp-unsaved" role="status">Unsaved changes</span>
-            <span v-else-if="savedAt" class="pp-saved" role="status">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
-              Saved
-            </span>
-            <button type="button" class="pp-btn" :disabled="busy === 'save' || !changed" @click="save()">
-              {{ busy === "save" ? "Saving…" : "Save my taste" }}
-            </button>
-          </div>
         </div>
       </div>
+
+      <!-- Unsaved taste edits: a bar at the bottom of the screen, with arrows to jump to each change -->
+      <Teleport to="body">
+        <Transition name="pp-bar">
+          <div v-if="changed" class="pp-bar" role="region" aria-label="Unsaved changes">
+            <span class="pp-bar__title">Unsaved changes</span>
+            <div class="pp-bar__view">
+              <span class="pp-bar__count" aria-live="polite">
+                View changes
+                <small>{{ changeAt >= 0 ? `${changeAt + 1} of ${changes.length}` : `${changes.length}` }}</small>
+              </span>
+              <div class="pp-bar__arrows">
+                <button type="button" aria-label="Go to the previous change" title="Previous change" @click="goToChange(-1)">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg>
+                </button>
+                <button type="button" aria-label="Go to the next change" title="Next change" @click="goToChange(1)">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                </button>
+              </div>
+            </div>
+            <span class="pp-bar__sep" aria-hidden="true"></span>
+            <button type="button" class="pp-bar__btn" :disabled="busy === 'save'" @click="discard">Discard</button>
+            <span class="pp-bar__sep" aria-hidden="true"></span>
+            <button type="button" class="pp-bar__btn pp-bar__btn--save" :disabled="busy === 'save'" @click="save()">
+              {{ busy === "save" ? "Saving…" : "Save" }}
+            </button>
+          </div>
+        </Transition>
+      </Teleport>
 
       <!-- ── 2. Special days ──────────────────────────────────────────── -->
       <div class="pp-block">
@@ -249,7 +268,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
 import { DATE_KINDS, MONTHS, SUGGEST, blankDate, datePayload, daysIn, kindOf, monthDay, whenText } from "../crm/customerPrefs";
@@ -268,7 +287,6 @@ const offers = ref(null);
 const data = ref(null);
 const loadError = ref("");
 const busy = ref("");
-const savedAt = ref(false);
 const dateForm = ref(blankDate());
 const addingDay = ref(false);
 const dayLabel = ref(null);
@@ -276,7 +294,51 @@ const form = reactive({ flowers: [], colors: [], avoid: [], occasions: [], note:
 const drafts = reactive({ flowers: "", colors: "", avoid: "", occasions: "" });
 let saved = "";
 
-const changed = computed(() => JSON.stringify(form) !== saved);
+const savedForm = ref(""); // the saved taste, so "what changed" stays reactive
+// Taste edits only: who can see it saves straight away
+const changed = computed(() => changes.value.length > 0);
+
+// ── Unsaved changes: which parts differ, and jumping between them ─────
+const CHANGE_KEYS = [...QUESTIONS.map((q) => q.key), "note"];
+const changes = computed(() => {
+  if (!savedForm.value) return [];
+  const before = JSON.parse(savedForm.value);
+  return CHANGE_KEYS.filter((key) => JSON.stringify(form[key]) !== JSON.stringify(before[key]));
+});
+const changeEls = {};
+const changeAt = ref(-1); // the change last jumped to
+const flashKey = ref("");
+let flashTimer = 0;
+
+function goToChange(step) {
+  const list = changes.value;
+  if (!list.length) return;
+  const now = changeAt.value < list.length ? changeAt.value : -1;
+  const next = now < 0 ? (step > 0 ? 0 : list.length - 1) : (now + step + list.length) % list.length;
+  changeAt.value = next;
+  const key = list[next];
+  const el = changeEls[key];
+  if (!el) return;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+  // Highlight it for a moment, so it's clear which part changed
+  flashKey.value = "";
+  clearTimeout(flashTimer);
+  nextTick(() => {
+    flashKey.value = key;
+    flashTimer = setTimeout(() => (flashKey.value = ""), 1800);
+  });
+}
+
+// The count starts over when the set of changes changes
+watch(() => changes.value.join(), () => (changeAt.value = -1));
+
+function discard() {
+  Object.assign(form, JSON.parse(savedForm.value));
+  Object.keys(drafts).forEach((k) => (drafts[k] = ""));
+  flashKey.value = "";
+  toast.info("Changes discarded.");
+}
 const shopsText = computed(() => {
   const n = data.value?.shop_count ?? 0;
   return n === 1 ? "1 shop" : n ? `${n} shops` : "shops";
@@ -300,7 +362,6 @@ function toggle(key, option) {
   } else {
     toast.info(`Up to ${MAX_PER_QUESTION} for each question.`);
   }
-  savedAt.value = false;
 }
 function addOwn(key) {
   const value = drafts[key].trim();
@@ -315,6 +376,7 @@ function use(d) {
   data.value = d;
   Object.assign(form, { flowers: [...d.flowers], colors: [...d.colors], avoid: [...d.avoid], occasions: [...d.occasions], note: d.note ?? "", share_with_shops: d.share_with_shops });
   saved = JSON.stringify(form);
+  savedForm.value = saved;
 }
 
 async function load() {
@@ -342,11 +404,11 @@ async function run(key, request, message) {
   }
 }
 
-/** Taste waits for the button; who can see it saves straight away (with any taste edits) */
+/** Taste waits for Save on the bar; who can see it saves straight away (with any taste edits) */
 async function save(fromSharing = false) {
   const message = fromSharing ? (form.share_with_shops ? "Your shops can now see your taste and special days." : "Only you can see them now.") : "Your taste is saved.";
   const ok = await run("save", () => api.put("customer/preferences", { ...form }), message);
-  if (ok) savedAt.value = true;
+  if (ok) changeAt.value = -1;
   else if (fromSharing) form.share_with_shops = !form.share_with_shops;
 }
 function setSharing(on) {
@@ -655,13 +717,8 @@ onMounted(() => {
   box-shadow: 0 0 0 4px rgba(77, 177, 115, 0.14);
 }
 
-/* Who sees it + save */
+/* Who sees it */
 .pp-save {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
@@ -681,10 +738,12 @@ onMounted(() => {
   font-size: 12.5px;
 }
 
+/* Compact: only as wide as its two choices */
 .pp-seg {
   display: inline-flex;
-  gap: 4px;
-  padding: 4px;
+  justify-self: start;
+  gap: 2px;
+  padding: 3px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: #ffffff;
@@ -693,15 +752,20 @@ onMounted(() => {
 .pp-seg button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 14px;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 12px;
   border: 0;
   border-radius: 999px;
   background: none;
   color: var(--ink-soft);
-  font: 500 13px var(--font-sans);
+  font: 500 12.5px var(--font-sans);
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pp-seg button:hover:not(.on) {
+  color: var(--ink);
 }
 
 .pp-seg button.on {
@@ -710,8 +774,8 @@ onMounted(() => {
 }
 
 .pp-seg svg {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
@@ -719,33 +783,167 @@ onMounted(() => {
   stroke-linejoin: round;
 }
 
-.pp-save__btn {
+/* Unsaved changes bar: looks like the site's snackbar, at the bottom of the
+   screen. It's moved to <body>, so colours carry fallbacks for outside the theme. */
+.pp-bar {
+  position: fixed;
+  z-index: 950;
+  left: 50%;
+  bottom: 24px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 6px 6px 6px 18px;
+  border: 1px solid rgba(54, 63, 78, 0.12);
+  border-radius: 14px;
+  background: #ffffff;
+  color: var(--ink, #363f4e);
+  box-shadow: 0 12px 32px rgba(30, 39, 57, 0.16), 0 2px 6px rgba(30, 39, 57, 0.08);
+  font-family: var(--font-sans, "Poppins", system-ui, sans-serif);
+  transform: translateX(-50%);
 }
 
-.pp-unsaved {
-  color: #9a5b0b;
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-.pp-saved {
+.pp-bar__title {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  color: var(--leaf-deep);
-  font-size: 12.5px;
+  gap: 8px;
+  font-size: 14px;
   font-weight: 600;
 }
 
-.pp-saved svg {
-  width: 14px;
-  height: 14px;
+.pp-bar__title::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d18a1c; /* waiting to be saved */
+}
+
+.pp-bar__view {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 6px;
+}
+
+.pp-bar__count {
+  display: grid;
+  line-height: 1.2;
+  color: var(--ink-soft, #5f6776);
+  font-size: 12.5px;
+  text-align: right;
+}
+
+.pp-bar__count small {
+  color: var(--ink, #363f4e);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Up and down, stacked */
+.pp-bar__arrows {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid rgba(54, 63, 78, 0.14);
+  border-radius: 10px;
+}
+
+.pp-bar__arrows button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 22px;
+  border: 0;
+  background: none;
+  color: var(--ink, #363f4e);
+  cursor: pointer;
+}
+
+.pp-bar__arrows button + button {
+  border-top: 1px solid rgba(54, 63, 78, 0.14);
+}
+
+.pp-bar__arrows button:hover {
+  background: rgba(54, 63, 78, 0.07);
+}
+
+.pp-bar__arrows svg {
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.4;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pp-bar__sep {
+  width: 1px;
+  height: 24px;
+  background: rgba(54, 63, 78, 0.14);
+}
+
+.pp-bar__btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink-soft, #5f6776);
+  font: 600 13.5px var(--font-sans, "Poppins", system-ui, sans-serif);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pp-bar__btn:hover:not(:disabled) {
+  background: rgba(54, 63, 78, 0.07);
+  color: var(--ink, #363f4e);
+}
+
+.pp-bar__btn--save {
+  background: var(--ink, #363f4e);
+  color: #ffffff;
+}
+
+.pp-bar__btn--save:hover:not(:disabled) {
+  background: var(--leaf-deep, #2e7a4f);
+  color: #ffffff;
+}
+
+.pp-bar__btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.pp-bar :is(button):focus-visible {
+  outline: 2px solid var(--leaf, #4db173);
+  outline-offset: 2px;
+}
+
+.pp-bar-enter-active,
+.pp-bar-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.pp-bar-enter-from,
+.pp-bar-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 14px);
+}
+
+/* The part a "View changes" arrow jumped to: a soft green highlight that fades */
+.pp-q {
+  scroll-margin: 120px;
+  border-radius: 14px;
+  transition: background 0.4s ease, box-shadow 0.4s ease;
+}
+
+.pp-q.flash {
+  background: rgba(77, 177, 115, 0.08);
+  box-shadow: 0 0 0 8px rgba(77, 177, 115, 0.08), 0 0 0 9px rgba(77, 177, 115, 0.35);
 }
 
 .pp-btn {
@@ -1286,13 +1484,18 @@ onMounted(() => {
     grid-column: 3;
   }
 
-  .pp-save {
-    align-items: stretch;
+  .pp-bar {
+    gap: 4px 8px;
+    padding: 8px 8px 8px 16px;
   }
 
-  .pp-save__btn {
-    width: 100%;
-    justify-content: space-between;
+  .pp-bar__title {
+    flex-basis: 100%;
+    padding-top: 2px;
+  }
+
+  .pp-bar__view {
+    margin-right: auto;
   }
 }
 
@@ -1300,7 +1503,10 @@ onMounted(() => {
   .pp-chip,
   .pp-switch span,
   .pp-switch span::after,
-  .pp-chev {
+  .pp-chev,
+  .pp-q,
+  .pp-bar-enter-active,
+  .pp-bar-leave-active {
     transition: none;
   }
 }
