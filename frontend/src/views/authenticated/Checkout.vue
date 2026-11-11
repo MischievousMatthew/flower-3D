@@ -2114,6 +2114,28 @@ onMounted(async () => {
 .short-anyway {
   justify-self: center;
   min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: rgba(54, 63, 78, 0.35);
+  cursor: pointer;
+  transition: color 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+.short-anyway::after {
+  display: none;
+}
+
+.short-anyway:hover {
+  color: var(--ink);
+  text-decoration-color: currentColor;
 }
 
 .order-item {
