@@ -469,14 +469,18 @@
           </div>
 
           <footer class="composer">
-            <div v-if="activeAbout" class="composer-about" role="status">
+            <div v-if="activeAbout" class="composer-about" :class="{ 'composer-about--order': activeAbout.type === 'order' }" role="status">
               <span class="composer-about-img" aria-hidden="true">
                 <img v-if="activeAbout.image" :src="activeAbout.image" alt="" />
                 <svg v-else viewBox="0 0 24 24"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
               </span>
               <span class="composer-about-main">
-                <small>Asking about {{ activeAbout.type === "order" ? "your order" : "this product" }}</small>
+                <small>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21.4 11.6-9.2 9.2a5.5 5.5 0 0 1-7.8-7.8l9.2-9.2a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.2a1.8 1.8 0 0 1-2.6-2.6l8.5-8.5" /></svg>
+                  {{ activeAbout.type === "order" ? "Order attached" : "Asking about this product" }}
+                </small>
                 <strong>{{ activeAbout.type === "order" ? activeAbout.order_number : activeAbout.name }}</strong>
+                <span v-if="activeAbout.type === 'order' && aboutOrderMeta" class="composer-about-meta">{{ aboutOrderMeta }}</span>
               </span>
               <button class="chip-remove" type="button" aria-label="Don't attach it to my message" @click="about = null">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
@@ -1247,6 +1251,34 @@ const about = ref(props.initialAbout ? { ...props.initialAbout, vendorId: Number
 const activeAbout = computed(() =>
   about.value && !isVendor.value && Number(selectedConversation.value?.vendor?.id) === about.value.vendorId ? about.value : null,
 );
+// "Out for delivery · 2 items · ₱1,020.00" under an attached order
+const aboutOrderMeta = computed(() => {
+  const a = activeAbout.value;
+  if (!a || a.type !== "order") return "";
+  const parts = [];
+  if (a.status) parts.push(a.status);
+  if (Number(a.items_count) > 0) parts.push(`${a.items_count} ${Number(a.items_count) === 1 ? "item" : "items"}`);
+  if (Number(a.total) > 0) parts.push(`₱${Number(a.total).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`);
+  return parts.join(" · ");
+});
+
+// From "Ask the shop" on an order: the question starts typed, ready to finish or send
+let aboutDraftDone = false;
+watch(activeAbout, (a) => {
+  if (!a || a.type !== "order" || aboutDraftDone) return;
+  aboutDraftDone = true;
+  if (!messageText.value.trim()) messageText.value = `Hi! I have a question about my order ${a.order_number}: `;
+  nextTick(() => {
+    resizeComposer?.();
+    const input = composerInput.value;
+    if (input) {
+      input.focus();
+      const end = input.value.length;
+      input.setSelectionRange?.(end, end);
+    }
+  });
+});
+
 const ORDER_STATUS_LABELS = { pending: "Waiting for the shop", processing: "Being prepared", ready: "Ready", out_for_delivery: "Out for delivery", delivered: "Delivered", completed: "Completed", cancelled: "Cancelled" };
 const statusLabel = (status) => ORDER_STATUS_LABELS[status] ?? String(status ?? "").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 
@@ -2435,9 +2467,37 @@ onUnmounted(() => {
   min-width: 0;
 }
 .composer-about-main small {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 11.5px;
   color: var(--c-accent);
   font-weight: 600;
+}
+.composer-about-main small svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.composer-about-meta {
+  overflow: hidden;
+  color: var(--c-soft);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* An attached order: a bigger photo, like a little order card */
+.composer-about--order {
+  padding: 10px 10px 10px 10px;
+}
+.composer-about--order .composer-about-img {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
 }
 .composer-about-main strong {
   overflow: hidden;

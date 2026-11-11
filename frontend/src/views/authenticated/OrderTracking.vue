@@ -791,7 +791,18 @@ const askShop = (order) =>
   router.push({
     path: "/customer/chat",
     query: { vendor_id: String(order.vendor_id), vendor_name: order.store_name || "" },
-    state: { chatAbout: JSON.stringify({ type: "order", id: order.id, order_number: order.order_number }) },
+    state: {
+      chatAbout: JSON.stringify({
+        type: "order",
+        id: order.id,
+        order_number: order.order_number,
+        // Shown on the order card above the message box
+        image: thumbs(order)[0] || "",
+        status: dlvLabel(order),
+        items_count: Number(order.items_count || 0),
+        total: Number(order.total_amount || 0),
+      }),
+    },
   });
 
 // ① canReview computed helper — true if order is completed
