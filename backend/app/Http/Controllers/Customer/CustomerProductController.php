@@ -511,6 +511,9 @@ SQL;
             'preparation_days'  => (int) ($product->preparation_days ?? 0),
             'freshness_days'    => $product->freshness_days ? (int) $product->freshness_days : null,
             'selling_type'      => $product->selling_type,
+            // Filled in by the shop; empty until then (the page hides them)
+            'color_options'     => $this->colorOptions($product->color_options),
+            'composition'       => $this->composition($product->composition),
             'owner_id'          => $product->owner_id,
             'vendor_id'         => $product->owner_id,
             'vendor_name'       => $vendorName ?? 'Local Vendor',
@@ -536,6 +539,32 @@ SQL;
                 'model_type' => $m->model_type,
             ])->values()->all(),
         ];
+    }
+
+    /** Colours to pick from: [{name, hex}], from names or {name, hex} entries */
+    private function colorOptions($raw): array
+    {
+        return collect(is_array($raw) ? $raw : [])
+            ->map(fn ($c) => is_array($c) ? ['name' => trim((string) ($c['name'] ?? '')), 'hex' => $c['hex'] ?? null] : ['name' => trim((string) $c), 'hex' => null])
+            ->filter(fn ($c) => $c['name'] !== '')
+            ->map(fn ($c) => ['name' => $c['name'], 'hex' => is_string($c['hex']) && preg_match('/^#[0-9a-f]{3,8}$/i', $c['hex']) ? $c['hex'] : null])
+            ->unique(fn ($c) => mb_strtolower($c['name']))
+            ->values()
+            ->all();
+    }
+
+    /** The flowers in it: [{flower, color, count}], count at least 1 */
+    private function composition($raw): array
+    {
+        return collect(is_array($raw) ? $raw : [])
+            ->filter(fn ($f) => is_array($f) && trim((string) ($f['flower'] ?? '')) !== '')
+            ->map(fn ($f) => [
+                'flower' => trim((string) $f['flower']),
+                'color'  => isset($f['color']) && trim((string) $f['color']) !== '' ? trim((string) $f['color']) : null,
+                'count'  => max(1, (int) ($f['count'] ?? 1)),
+            ])
+            ->values()
+            ->all();
     }
 
     private function sanitizeArray($input): array

@@ -168,9 +168,47 @@
 
             <p v-if="product.description" class="pd-lede">{{ shortDescription }}</p>
 
-            <!-- Its colour and the occasions it suits -->
-            <div v-if="product.color || occasions.length" class="pd-section pd-facts">
-              <div v-if="product.color" class="pd-fact">
+            <!-- Colours to choose from (when the shop offers more than one) -->
+            <div v-if="colorOptions.length" class="pd-section">
+              <div class="pd-label-row">
+                <h2 id="pd-color-label" class="pd-label">Color<span v-if="chosenColor" class="pd-label-value">{{ chosenColor }}</span></h2>
+              </div>
+              <div class="pd-colors" role="radiogroup" aria-labelledby="pd-color-label">
+                <button
+                  v-for="c in colorOptions"
+                  :key="c.name"
+                  type="button"
+                  role="radio"
+                  class="pd-color"
+                  :class="{ on: chosenColor === c.name }"
+                  :aria-checked="chosenColor === c.name"
+                  :aria-label="c.name"
+                  :title="c.name"
+                  @click="chosenColor = c.name"
+                >
+                  <i :style="{ background: swatchFor(c.name, c.hex) }" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- The flowers in the bouquet, and how many of each -->
+            <div v-if="composition.length" class="pd-section">
+              <div class="pd-label-row">
+                <h2 class="pd-label">What's inside</h2>
+                <span class="pd-muted pd-small">{{ totalStems }} {{ totalStems === 1 ? "stem" : "stems" }} in all</span>
+              </div>
+              <ul class="pd-compo">
+                <li v-for="(f, i) in composition" :key="i">
+                  <i class="pd-swatch" :style="{ background: swatchFor(f.color || f.flower) }" aria-hidden="true"></i>
+                  <span>{{ f.color ? `${titleCase(f.color)} ${f.flower.toLowerCase()}` : f.flower }}</span>
+                  <strong>× {{ f.count }}</strong>
+                </li>
+              </ul>
+            </div>
+
+            <!-- Its colour (when there's no choice) and the occasions it suits -->
+            <div v-if="(product.color && !colorOptions.length) || occasions.length" class="pd-section pd-facts">
+              <div v-if="product.color && !colorOptions.length" class="pd-fact">
                 <h2 class="pd-label">Color</h2>
                 <span class="pd-chip">
                   <i class="pd-swatch" :style="{ background: swatch }" aria-hidden="true"></i>
@@ -510,11 +548,29 @@ const titleCase = (s) => String(s || "").replace(/[-_]/g, " ").replace(/\b\w/g, 
 // "Focal" (the star flowers) or "Filler" (the greenery around them)
 const flowerRole = computed(() => ({ focal: "Focal flower", filler: "Filler" })[product.value?.flower_type] || titleCase(product.value?.flower_type));
 const occasions = computed(() => (product.value?.occasion_tags || []).map(titleCase).slice(0, 4));
-// A colour dot for the colour name, when the browser knows it
-const swatch = computed(() => {
-  const name = String(product.value?.color || "").toLowerCase().replace(/[^a-z]/g, "");
-  return name && typeof CSS !== "undefined" && CSS.supports("color", name) ? name : "conic-gradient(#f4a7b9, #f9e27d, #a7d8f4, #c7a7f4, #f4a7b9)";
-});
+// A colour dot: the shop's hex if given, else the colour's name when the
+// browser knows it ("Light pink" → lightpink), else a soft mixed dot
+const MIXED = "conic-gradient(#f4a7b9, #f9e27d, #a7d8f4, #c7a7f4, #f4a7b9)";
+function swatchFor(name, hex = null) {
+  if (hex) return hex;
+  const css = String(name || "").toLowerCase().replace(/[^a-z]/g, "");
+  return css && typeof CSS !== "undefined" && CSS.supports("color", css) ? css : MIXED;
+}
+const swatch = computed(() => swatchFor(product.value?.color));
+
+// Colours the customer can pick, and the flowers in the bouquet (both set by the shop)
+const colorOptions = computed(() => (Array.isArray(product.value?.color_options) ? product.value.color_options : []));
+const chosenColor = ref(null);
+const composition = computed(() => (Array.isArray(product.value?.composition) ? product.value.composition : []));
+const totalStems = computed(() => composition.value.reduce((sum, f) => sum + Number(f.count || 0), 0));
+/** Starts on the product's own colour if it's one of the choices, else the first */
+function pickDefaultColor() {
+  const list = colorOptions.value;
+  const own = String(product.value?.color || "").toLowerCase();
+  chosenColor.value = list.find((c) => c.name.toLowerCase() === own)?.name || list[0]?.name || null;
+}
+/** The colour that goes with the order: the one picked, else the product's own */
+const orderColor = () => chosenColor.value || product.value?.color || null;
 
 const availability = computed(() => {
   const stock = Number(product.value?.quantity_in_stock || 0);
@@ -529,7 +585,8 @@ const specs = computed(() => {
   return [
     { label: "Category", value: categoryLabel.value || "—" },
     { label: "Flower type", value: flowerRole.value || "—" },
-    { label: "Color", value: titleCase(p.color) || "—" },
+    { label: "Color", value: colorOptions.value.length ? colorOptions.value.map((c) => c.name).join(", ") : titleCase(p.color) || "—" },
+    ...(composition.value.length ? [{ label: "Stems", value: `${totalStems.value} in all` }] : []),
     { label: "Season", value: p.season === "all-year" ? "All year" : titleCase(p.season) || "—" },
     { label: "Occasions", value: (p.occasion_tags || []).join(", ") || "—" },
     { label: "Preparation", value: prepDays.value ? `${prepDays.value} ${prepDays.value === 1 ? "day" : "days"}` : "Ready to send" },
@@ -685,6 +742,7 @@ async function load(id) {
     document.title = `${product.value.product_name} · BloomCraft`;
     recent.value = recentlyViewed().filter((p) => String(p.id) !== String(product.value.id)).slice(0, 5);
     rememberViewed(product.value);
+    pickDefaultColor();
     loadRelated();
     loadDates();
     nextTick(watchBuyButtons);
@@ -760,7 +818,7 @@ async function addToCart() {
   if (needLogin()) return;
   busy.value = "cart";
   try {
-    await addItem(product.value, qty.value, imageEl.value);
+    await addItem({ ...product.value, color: orderColor() }, qty.value, imageEl.value);
     carryDate();
   } catch {
     toast.error("Couldn't add it to your cart. Please try again.");
@@ -789,7 +847,7 @@ function buyNow() {
   sessionStorage.setItem(
     "directCheckout",
     JSON.stringify({
-      items: [{ product_id: p.id, quantity: qty.value, product_name: p.product_name, price: p.selling_price, image: images.value[0]?.image_url || null }],
+      items: [{ product_id: p.id, quantity: qty.value, color: orderColor(), product_name: p.product_name, price: p.selling_price, image: images.value[0]?.image_url || null }],
       total: parseFloat(p.selling_price) * qty.value,
       isDirectCheckout: true,
     }),
@@ -1321,6 +1379,82 @@ watch(
   line-height: 1.3;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.pd-label-value {
+  margin-left: 8px;
+  color: var(--ink-soft);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Colour choices: round swatches with a ring on the chosen one */
+.pd-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pd-color {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--pd-line);
+  border-radius: 50%;
+  background: var(--pd-surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pd-color i {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.pd-color:hover {
+  border-color: var(--pd-line-strong);
+}
+
+.pd-color.on {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+/* What's inside: one line per flower, the count on the right */
+.pd-compo {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pd-compo li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--pd-line);
+  font-size: 13.5px;
+}
+
+.pd-compo li:last-child {
+  border-bottom: 0;
+}
+
+.pd-compo span {
+  flex: 1;
+  min-width: 0;
+}
+
+.pd-compo strong {
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .pd-facts {

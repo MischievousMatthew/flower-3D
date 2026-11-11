@@ -1176,6 +1176,7 @@ async function loadCheckoutData() {
         : {
             product_id: directCheckoutData.value.items[0].product_id,
             quantity: directCheckoutData.value.items[0].quantity,
+            color: directCheckoutData.value.items[0].color || null, // picked on the product page
           };
       const response = await api.post("/checkout/initialize", directCheckoutPayload);
 
@@ -1323,6 +1324,7 @@ async function placeOrder() {
           : {
               product_id: directCheckoutData.value.items[0].product_id,
               quantity: directCheckoutData.value.items[0].quantity,
+              color: directCheckoutData.value.items[0].color || null,
             }
         : {
             cart_item_ids:

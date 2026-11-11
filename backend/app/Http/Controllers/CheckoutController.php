@@ -43,6 +43,7 @@ class CheckoutController extends Controller
                 'cart_item_ids.*' => 'required|integer|exists:carts,id',
                 'product_id' => 'required_without_all:cart_item_ids,custom_items|integer|exists:products,id',
                 'quantity' => 'required_with:product_id|integer|min:1',
+                'color' => 'nullable|string|max:100', // Buy now: the colour picked on the product page
                 'custom_items' => 'required_without_all:cart_item_ids,product_id|array|min:1|max:' . BouquetPresets::MAX_SIZE,
                 'custom_items.*.product_id' => 'required|integer|exists:products,id',
                 'custom_items.*.quantity' => 'nullable|integer|min:1',
@@ -317,6 +318,7 @@ class CheckoutController extends Controller
                 'cart_item_ids' => 'required_without_all:product_id,custom_items|array|min:1',
                 'product_id' => 'required_without_all:cart_item_ids,custom_items|integer|exists:products,id',
                 'quantity' => 'required_with:product_id|integer|min:1',
+                'color' => 'nullable|string|max:100', // Buy now: the colour picked on the product page
                 'custom_items' => 'required_without_all:cart_item_ids,product_id|array|min:1|max:' . BouquetPresets::MAX_SIZE,
                 'custom_items.*.product_id' => 'required|integer|exists:products,id',
                 'custom_items.*.quantity' => 'nullable|integer|min:1',

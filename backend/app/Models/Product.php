@@ -136,6 +136,8 @@ class Product extends Model
         'care_instructions',
         'occasion_tags',
         'notes',
+        'color_options', // [{name, hex}] colours the customer can pick
+        'composition',   // [{flower, color?, count}] flowers in the bouquet
 
         // Status
         'status',
@@ -158,6 +160,8 @@ class Product extends Model
         'discount_starts_at'     => 'datetime',
         'discount_ends_at'       => 'datetime',
         'occasion_tags'          => 'array',
+        'color_options'          => 'array',
+        'composition'            => 'array',
         'preparation_days'       => 'integer',
         'supplier_lead_time'     => 'integer',
     ];
