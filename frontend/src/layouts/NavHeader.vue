@@ -685,8 +685,10 @@ const goToOrders = (notification) => {
     return;
   }
   markOrderNotificationsAsSeen([notification]);
+  // Passed in history state, like the app's other record links (?order= is
+  // moved there by the router anyway); force so it works from My orders too
   const order = String(notification.orderNumber || "").replace(/^#/, "");
-  router.push({ path: "/customer/orders", query: order ? { order } : {} });
+  router.push({ path: "/customer/orders", state: { focusOrder: order || null }, force: true });
 };
 
 const loadOrderNotifications = async () => {

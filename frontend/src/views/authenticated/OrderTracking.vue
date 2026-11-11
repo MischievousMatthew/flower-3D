@@ -930,7 +930,7 @@
 </template>
 
 <script setup>
-import { watch, ref, reactive, onMounted, nextTick } from "vue";
+import { watch, ref, reactive, onMounted, onUnmounted, nextTick } from "vue";
 import ShowMore from "../../components/common/ShowMore.vue";
 import { useShowMorePaged } from "../../composables/useShowMore";
 import { useRoute, useRouter } from "vue-router";
@@ -1094,17 +1094,27 @@ async function fetchOrders() {
 }
 
 // ── One order, from a notification ──────────────────────────────────────────
-// ?order=ORD-… shows just that order; a tab, a search or "View all orders"
-// goes back to the full list
-const readFocus = () => (typeof route.query.order === "string" ? route.query.order.replace(/^#/, "").trim() : "");
+// The notification passes the order number in history state (focusOrder);
+// a tab, a search or "View all orders" goes back to the full list
+const readFocus = () => {
+  try {
+    const value = window.history.state?.focusOrder;
+    return typeof value === "string" ? value.replace(/^#/, "").trim() : "";
+  } catch {
+    return "";
+  }
+};
 const focusOrder = ref(readFocus());
 
 function clearFocus() {
   if (!focusOrder.value) return;
   focusOrder.value = "";
-  const next = { ...route.query };
-  delete next.order;
-  router.replace({ query: next });
+  // Forget it in this history entry too, so a refresh shows every order
+  try {
+    window.history.replaceState({ ...window.history.state, focusOrder: null }, "");
+  } catch {
+    // Nothing to forget
+  }
 }
 
 function showAllOrders() {
@@ -1115,16 +1125,15 @@ function showAllOrders() {
 }
 
 // Another notification clicked while already on this page
-watch(
-  () => route.query.order,
-  () => {
-    const next = readFocus();
-    if (next === focusOrder.value) return;
-    focusOrder.value = next;
-    expandedId.value = null;
-    fetchOrders();
-  },
-);
+const stopFocusWatch = router.afterEach((to) => {
+  if (to.name !== route.name) return;
+  const next = readFocus();
+  if (!next || next === focusOrder.value) return;
+  focusOrder.value = next;
+  expandedId.value = null;
+  fetchOrders();
+});
+onUnmounted(stopFocusWatch);
 /** After an action (cancel, received…): reload, keeping as many orders showing */
 const refreshOrders = () => pager.refresh();
 

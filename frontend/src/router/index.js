@@ -1174,7 +1174,10 @@ const asObject = (location) => {
 const normalizeTarget = (location) => {
   const target = asObject(resolveOpaqueTarget(location));
   const state = typeof location === "object" ? location?.state : undefined;
-  return hideIdsInLocation(state && typeof target === "object" ? { ...target, state: { ...state, ...(target.state ?? {}) } } : target);
+  const withState = state && typeof target === "object" ? { ...target, state: { ...state, ...(target.state ?? {}) } } : target;
+  // force (navigate even to the same page, e.g. with new state) survives the rewrite
+  const force = typeof location === "object" && location?.force && typeof withState === "object";
+  return hideIdsInLocation(force ? { ...withState, force: true } : withState);
 };
 router.resolve = (location, currentLocation) => rawResolve(normalizeTarget(location), currentLocation);
 router.push = (location) => rawPush(normalizeTarget(location));
