@@ -77,7 +77,7 @@
             </p>
           </header>
 
-          <CustomizerSteps :steps="steps" :active="activeStep" :done="doneSteps" @select="activeStep = $event" />
+          <CustomizerSteps data-tour="steps" :steps="steps" :active="activeStep" :done="doneSteps" @select="activeStep = $event" />
 
           <div class="fc-sheet-body">
             <p v-if="!storeId" class="fc-note">Open the customizer from a flower shop's page to see the stems they offer.</p>
@@ -97,6 +97,7 @@
                 <span v-else-if="placedFlowers.length < 2" class="fc-suggest-name">Place two or more flowers first.</span>
               </div>
               <StemPicker
+                data-tour="flowers"
                 kind="flower"
                 :items="filteredFlowers"
                 :loading="loadingFlowers"
@@ -117,8 +118,8 @@
             </section>
 
             <section v-else-if="activeStep === 'fillers'" class="fc-step-panel">
-              <h2>Add fillers</h2>
-              <p class="fc-step-lede">Greenery and small blooms between the stems. {{ fillerTypesUsed }} of {{ maxFillers }} kinds used. Adding the same filler again doesn't count.</p>
+              <h2>Start with fillers</h2>
+              <p class="fc-step-lede">Fillers go in first: the greenery and small blooms your flowers sit in. Pick one, then click the bouquet. {{ fillerTypesUsed }} of {{ maxFillers }} kinds used. Adding the same filler again doesn't count.</p>
               <div class="fc-suggest">
                 <button type="button" class="fc-suggest-btn" :disabled="!placedFillers.length" @click="suggestArrangement('filler')">
                   <BcIcon name="sparkle" />
@@ -131,6 +132,7 @@
                 <span v-else-if="!placedFillers.length" class="fc-suggest-name">Add a filler first.</span>
               </div>
               <StemPicker
+                data-tour="fillers"
                 kind="filler"
                 :items="filteredFillers"
                 :search="search"
@@ -332,6 +334,7 @@
           </div>
 
           <OrderReceipt
+            data-tour="receipt"
             :stems="placedFlowers.length"
             :max-stems="maxFlowers"
             :lines="orderLines"
@@ -349,6 +352,7 @@
         <main
           ref="stageEl"
           class="fc-stage"
+          data-tour="stage"
           :class="{ over: isDragOver, dragging: isTransformDragging, placing: pendingFlower || draggedFlower }"
           @dragover.prevent="onCanvasDragOver"
           @dragleave="onCanvasDragLeave"
@@ -357,6 +361,7 @@
           <div ref="viewerContainer" class="fc-viewer"></div>
 
           <StageTools
+            @guide="startTour"
             :modes="TRANSFORM_MODES"
             :mode="transformMode"
             :has-target="hasTransformTarget"
@@ -455,6 +460,49 @@
             </span>
           </div>
         </main>
+
+        <!-- First visit: offer the step-by-step guide. Inside the layout so it shows in full screen too -->
+        <div v-if="tour.welcome" class="fc-modal-backdrop">
+          <div
+            class="fc-modal fc-welcome"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fc-welcome-title"
+            aria-describedby="fc-welcome-copy"
+            @keydown.esc="skipTour"
+          >
+            <span class="fc-welcome-mark" aria-hidden="true"><BcIcon name="bouquet" /></span>
+            <p class="bc-label">New here?</p>
+            <h2 id="fc-welcome-title">Let's make your first bouquet together</h2>
+            <p id="fc-welcome-copy" class="fc-confirm-copy">
+              We'll point at each part and tell you what to do, one step at a time: fillers first, then flowers, then the finishing touches.
+              It takes about a minute.
+            </p>
+            <ol class="fc-welcome-steps">
+              <li><span>1</span>Add fillers</li>
+              <li><span>2</span>Add flowers</li>
+              <li><span>3</span>Finish the look and add to cart</li>
+            </ol>
+            <p class="fc-welcome-note">
+              <BcIcon name="help" />
+              <span>You can open this guide again anytime with the <strong>Guide</strong> button at the top right.</span>
+            </p>
+            <div class="fc-modal-actions">
+              <button type="button" class="bc-link fc-modal-cancel" @click="skipTour">I already know how</button>
+              <button ref="tourStartButton" type="button" class="bc-btn bc-btn--dark" @click="beginTour">Show me how</button>
+            </div>
+          </div>
+        </div>
+
+        <CustomizerTour
+          v-if="tour.open && tourStep"
+          :step="tourStep"
+          :index="tour.index"
+          :total="tourSteps.length"
+          @next="nextTourStep"
+          @back="prevTourStep"
+          @close="endTour"
+        />
       </div>
     </div>
 
@@ -589,6 +637,7 @@ import StemPicker from "../../components/customizer/StemPicker.vue";
 import SelectionCard from "../../components/customizer/SelectionCard.vue";
 import OrderReceipt from "../../components/customizer/OrderReceipt.vue";
 import StageTools from "../../components/customizer/StageTools.vue";
+import CustomizerTour from "../../components/customizer/CustomizerTour.vue";
 import { useAuth } from "../../composables/useAuth";
 import { useCart } from "../../composables/useCart";
 import { checkoutPausedNotice, showCheckoutPaused, usePlatformStatus } from "../../composables/usePlatformStatus";
@@ -804,7 +853,7 @@ const occasionLine = computed(() =>
 );
 
 // One step's choices show at a time; steps for parts this bouquet doesn't have are left out
-const activeStep = ref("flowers");
+const activeStep = ref("fillers");
 const steps = computed(() =>
   buildSteps({
     hasFillers: fillers.value.length > 0,
@@ -823,8 +872,167 @@ const doneSteps = computed(() => {
   return done;
 });
 watch(steps, (list) => {
-  if (!list.some((step) => step.key === activeStep.value)) activeStep.value = "flowers";
+  if (!list.some((step) => step.key === activeStep.value)) activeStep.value = list[0]?.key || "flowers";
 });
+
+// ── Guide ──────────────────────────────────────────────────────────────
+// A first-time customer is offered a walk through their first bouquet: a
+// card with an arrow points at each part and says what to do. Steps where
+// they have to do something (add a filler, add a flower) move on by
+// themselves once it's done. The Guide button on the stage starts it again.
+const TOUR_SEEN_KEY = "bc.customizerGuide.seen";
+const tour = reactive({ welcome: false, open: false, index: 0 });
+const tourStartButton = ref(null);
+
+function tourSeen() {
+  try {
+    return localStorage.getItem(TOUR_SEEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function markTourSeen() {
+  try {
+    localStorage.setItem(TOUR_SEEN_KEY, "1");
+  } catch {
+    // Private window: the welcome may show again next time, which is fine
+  }
+}
+
+const listWords = (words) => (words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`);
+
+const tourSteps = computed(() => {
+  const list = [];
+  const pending = pendingFlower.value;
+  const pendingKind = pending ? pending.kind || "flower" : null;
+  list.push({
+    key: "steps",
+    target: "steps",
+    title: "Your bouquet, step by step",
+    body: "These tabs are the steps, from left to right. Do them in order. You can tap any tab later to go back and change it.",
+  });
+  if (steps.value.some((step) => step.key === "fillers")) {
+    const placing = pendingKind === "filler";
+    const done = placedFillers.value.length > 0;
+    list.push({
+      key: "fillers",
+      step: "fillers",
+      target: placing ? "stage" : "fillers",
+      title: placing ? "Now click the bouquet" : "First, add a filler",
+      body: placing
+        ? `Click anywhere on the bouquet to put the ${pending.product_name} in. It spreads out on its own.`
+        : "Fillers are the greenery your flowers sit in, so they go in first. Tap a filler in this list.",
+      waiting: done ? "" : placing ? "Waiting for you to click the bouquet…" : "Waiting for you to pick a filler…",
+      doneText: done ? "Nice! Your filler is in." : "",
+    });
+  }
+  {
+    const placing = pendingKind === "flower";
+    const done = placedFlowers.value.length > 0;
+    list.push({
+      key: "flowers",
+      step: "flowers",
+      target: placing ? "stage" : "flowers",
+      title: placing ? "Click where it should go" : "Now add a flower",
+      body: placing
+        ? `Click the spot on the bouquet where the ${pending.product_name} should stand. You can move it after.`
+        : `Tap a flower in this list. Your bouquet holds ${maxFlowers.value} flowers.`,
+      waiting: done ? "" : placing ? "Waiting for you to click the bouquet…" : "Waiting for you to pick a flower…",
+      doneText: done ? "Your first flower is in!" : "",
+    });
+  }
+  list.push({
+    key: "tools",
+    target: "tools",
+    title: "Move, turn and resize",
+    body: "Click any flower on the bouquet to select it, then use these buttons to move, turn or resize it. Drag an empty spot to look around the bouquet.",
+  });
+  list.push({
+    key: "fill",
+    target: "receipt",
+    title: "Fill up your bouquet",
+    body: `Keep adding flowers until this bar is full (${placedFlowers.value.length} of ${maxFlowers.value} so far). The price updates as you go.`,
+  });
+  const finishing = steps.value.filter((step) => ["wrap", "ribbon", "card"].includes(step.key)).map((step) => `“${step.label}”`);
+  if (finishing.length) {
+    list.push({
+      key: "finish",
+      target: "steps",
+      title: "Add the finishing touches",
+      body: `When the flowers are in, tap ${listWords(finishing)} up here to choose how it looks.`,
+    });
+  }
+  list.push({
+    key: "cart",
+    target: "receipt",
+    title: "Done? Add it to your cart",
+    body: "Happy with your bouquet? Add it to your cart or check out right here. Need help again? Tap Guide at the top right.",
+  });
+  return list;
+});
+const tourStep = computed(() => tourSteps.value[tour.index] || null);
+
+function showTourStep(index) {
+  tour.index = Math.max(0, Math.min(index, tourSteps.value.length - 1));
+  const step = tourSteps.value[tour.index];
+  if (step?.step) activeStep.value = step.step;
+}
+function beginTour() {
+  tour.welcome = false;
+  markTourSeen();
+  clearSelection();
+  tour.open = true;
+  showTourStep(0);
+}
+function skipTour() {
+  tour.welcome = false;
+  markTourSeen();
+}
+function startTour() {
+  if (startStep.value) return;
+  tour.open = false;
+  tour.welcome = true;
+  nextTick(() => tourStartButton.value?.focus());
+}
+function endTour() {
+  tour.open = false;
+  markTourSeen();
+}
+function nextTourStep() {
+  if (tour.index >= tourSteps.value.length - 1) return endTour();
+  if (tourStep.value?.waiting) pendingFlower.value = null; // skipped: stop placing
+  showTourStep(tour.index + 1);
+}
+function prevTourStep() {
+  showTourStep(tour.index - 1);
+}
+
+// A step the customer had to do moves on by itself once it's done
+let tourAdvance = 0;
+watch(
+  () => [placedFillers.value.length, placedFlowers.value.length],
+  ([fillerCount, flowerCount], before) => {
+    if (!tour.open || !before) return;
+    const key = tourStep.value?.key;
+    const did = (key === "fillers" && fillerCount > before[0]) || (key === "flowers" && flowerCount > before[1]);
+    if (!did) return;
+    clearTimeout(tourAdvance);
+    const at = tour.index;
+    tourAdvance = setTimeout(() => {
+      if (tour.open && tour.index === at) showTourStep(at + 1);
+    }, 1400);
+  },
+);
+
+// Offered once, the first time the bouquet is ready and the start screen is closed
+watch(
+  () => sceneReady.value && !isLoading3D.value && !bouquetLoadError.value && !startStep.value && !!storeId.value,
+  (ready) => {
+    if (!ready || tour.open || tour.welcome || tourSeen()) return;
+    tour.welcome = true;
+    nextTick(() => tourStartButton.value?.focus());
+  },
+);
 
 const orderLines = computed(() =>
   receiptLines({
@@ -2717,7 +2925,7 @@ function onKeydown(event) {
     },
     {
       ready: sceneReady.value,
-      modalOpen: cardEditor.open || incompleteCheckout.value || checkoutPausedNotice.open,
+      modalOpen: cardEditor.open || incompleteCheckout.value || checkoutPausedNotice.open || tour.welcome,
       hasTarget: hasTransformTarget.value,
       bouquetSelected: bouquetSelected.value,
       hasSelectedFlower: !!selectedFlower.value,
@@ -3565,6 +3773,81 @@ function showToast(message, type = "success") {
 .fc-modal-head h2 {
   margin-top: 8px;
   font-size: 32px;
+}
+
+/* First-visit guide offer */
+.fc-welcome {
+  max-width: 460px;
+  gap: 12px;
+}
+
+.fc-welcome h2 {
+  font-size: 32px;
+  line-height: 1.1;
+}
+
+.fc-welcome-mark {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: rgba(77, 177, 115, 0.14);
+  color: var(--leaf-deep);
+}
+
+.fc-welcome-mark :deep(svg) {
+  width: 28px;
+  height: 28px;
+}
+
+.fc-welcome-steps {
+  display: grid;
+  gap: 8px;
+  margin: 2px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fc-welcome-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.fc-welcome-steps span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--leaf);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fc-welcome-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--ivory);
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.fc-welcome-note :deep(svg) {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  color: var(--leaf-deep);
 }
 
 .fc-modal-close {

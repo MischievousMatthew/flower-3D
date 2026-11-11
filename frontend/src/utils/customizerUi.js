@@ -2,8 +2,9 @@
 // lines, what each key does, and where the selection card sits on the stage.
 
 const STEP_ORDER = [
-  { key: "flowers", label: "Flowers" },
+  // Fillers go in first as the bed of greenery; the flowers sit in it
   { key: "fillers", label: "Fillers", needs: "hasFillers" },
+  { key: "flowers", label: "Flowers" },
   { key: "wrap", label: "Wrap", needs: "hasWrapper" },
   { key: "ribbon", label: "Ribbon", needs: "hasRibbon" },
   { key: "card", label: "Card", needs: "hasCards" },
@@ -32,6 +33,49 @@ export function receiptLines({ flowers = [], fillers = [], outerWrapper, innerWr
   if (ribbon) lines.push({ label: ribbon.name, amount: 0 });
   if (card) lines.push({ label: `Card: ${card.product_name} (${card.size})`, amount: Number(card.price || 0) });
   return lines;
+}
+
+// Where the guide's message card goes beside the part it points at: the first
+// side with room (right, left, below, above). Narrow screens, or no side with
+// room, dock it to the top or bottom edge, away from the part. `arrow` is where
+// the pointing arrow sits and which way it points.
+export function placeTip(target, view, { width, height, gap = 30, margin = 16, narrow = 720 }) {
+  const clamp = (value, min, max) => Math.max(min, Math.min(value, Math.max(min, max)));
+  if (!target) {
+    return { side: "center", left: (view.width - width) / 2, top: (view.height - height) / 2, arrow: null };
+  }
+  const cx = target.left + target.width / 2;
+  const cy = target.top + target.height / 2;
+  const sideTop = clamp(cy - height / 2, margin, view.height - height - margin);
+  const sideLeft = clamp(cx - width / 2, margin, view.width - width - margin);
+  const fits = {
+    right: target.left + target.width + gap + width <= view.width - margin,
+    left: target.left - gap - width >= margin,
+    bottom: target.top + target.height + gap + height <= view.height - margin,
+    top: target.top - gap - height >= margin,
+  };
+  if (view.width >= narrow) {
+    if (fits.right) {
+      const left = target.left + target.width + gap;
+      return { side: "right", left, top: sideTop, arrow: { dir: "left", x: left - gap / 2, y: clamp(cy, sideTop + 18, sideTop + height - 18) } };
+    }
+    if (fits.left) {
+      const left = target.left - gap - width;
+      return { side: "left", left, top: sideTop, arrow: { dir: "right", x: left + width + gap / 2, y: clamp(cy, sideTop + 18, sideTop + height - 18) } };
+    }
+  }
+  if (fits.bottom) {
+    const top = target.top + target.height + gap;
+    return { side: "bottom", left: sideLeft, top, arrow: { dir: "up", x: clamp(cx, sideLeft + 18, sideLeft + width - 18), y: top - gap / 2 } };
+  }
+  if (fits.top) {
+    const top = target.top - gap - height;
+    return { side: "top", left: sideLeft, top, arrow: { dir: "down", x: clamp(cx, sideLeft + 18, sideLeft + width - 18), y: top + height + gap / 2 } };
+  }
+  // No room beside it (a big part, or a phone): dock to the edge farther from it
+  const below = cy < view.height / 2;
+  const top = below ? view.height - height - margin : margin;
+  return { side: below ? "dock-bottom" : "dock-top", left: sideLeft, top, arrow: { dir: below ? "up" : "down", x: clamp(cx, sideLeft + 18, sideLeft + width - 18), y: below ? top - 14 : top + height + 14 } };
 }
 
 // Arrow keys match the on-screen pad; E / Q move away from / toward you

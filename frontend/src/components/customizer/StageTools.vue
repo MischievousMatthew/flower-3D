@@ -1,5 +1,5 @@
 <template>
-  <div v-if="ready" class="st-stack" role="toolbar" aria-label="Move, rotate and size" aria-orientation="vertical">
+  <div v-if="ready" class="st-stack" data-tour="tools" role="toolbar" aria-label="Move, rotate and size" aria-orientation="vertical">
     <button
       type="button"
       class="st-tool"
@@ -33,6 +33,10 @@
   </div>
 
   <div class="st-view">
+    <button type="button" class="st-guide" aria-label="Show the step-by-step guide" @click="$emit('guide')">
+      <CustomizerIcon name="help" />
+      <span>Guide</span>
+    </button>
     <button type="button" class="st-tool bare" data-tip="Start over" aria-label="Start over" :disabled="!canReset" @click="$emit('reset')">
       <CustomizerIcon name="reset" />
     </button>
@@ -64,7 +68,7 @@ defineProps({
   fullscreen: { type: Boolean, default: false },
   canReset: { type: Boolean, default: false },
 });
-defineEmits(["mode", "toggle-bouquet", "focus", "reset", "screenshot", "fullscreen"]);
+defineEmits(["guide", "mode", "toggle-bouquet", "focus", "reset", "screenshot", "fullscreen"]);
 </script>
 
 <style scoped>
@@ -95,6 +99,40 @@ defineEmits(["mode", "toggle-bouquet", "focus", "reset", "screenshot", "fullscre
   z-index: 5;
   display: flex;
   gap: 2px;
+}
+
+/* The guide button: words, not just an icon, so anyone can find it */
+.st-guide {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  margin-right: 6px;
+  padding: 0 14px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(250, 251, 250, 0.92);
+  backdrop-filter: blur(6px);
+  color: var(--ink);
+  font: 600 13px var(--font-sans);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.st-guide :deep(svg) {
+  width: 18px;
+  height: 18px;
+  color: var(--leaf-deep);
+}
+
+.st-guide:hover {
+  border-color: var(--leaf);
+  background: #ffffff;
+}
+
+.st-guide:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
 }
 
 .st-tool {

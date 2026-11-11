@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { anchorCard, buildSteps, keyAction, receiptLines } from "../src/utils/customizerUi.js";
+import { anchorCard, buildSteps, keyAction, placeTip, receiptLines } from "../src/utils/customizerUi.js";
 
 const label = (steps) => steps.map((s) => `${s.number} ${s.label}`);
 const ready = { ready: true, modalOpen: false, hasTarget: true, bouquetSelected: false, hasSelectedFlower: true, placing: false };
@@ -8,8 +8,8 @@ const key = (k, extra = {}) => ({ key: k, ctrlKey: false, metaKey: false, altKey
 
 test("all steps when everything exists", () => {
   assert.deepEqual(label(buildSteps({ hasFillers: true, hasWrapper: true, hasRibbon: true, hasCards: true })), [
-    "01 Flowers",
-    "02 Fillers",
+    "01 Fillers",
+    "02 Flowers",
     "03 Wrap",
     "04 Ribbon",
     "05 Card",
@@ -140,4 +140,38 @@ test("Ctrl+G groups, Ctrl+Shift+G ungroups, Esc stops picking", () => {
   assert.equal(keyAction(key("g", { ctrlKey: true, shiftKey: true }), ready), null);
   assert.equal(keyAction(key("g", { ctrlKey: true, shiftKey: true }), { ...ready, grouped: true }), "ungroup");
   assert.equal(keyAction(key("Escape"), { ...ready, grouping: true, placing: true }), "cancel-grouping");
+});
+
+const view = { width: 1400, height: 900 };
+const card = { width: 320, height: 200 };
+
+test("guide card sits right of a part with room, arrow pointing left at it", () => {
+  const tip = placeTip({ left: 100, top: 300, width: 300, height: 200 }, view, card);
+  assert.equal(tip.side, "right");
+  assert.equal(tip.left, 430);
+  assert.equal(tip.arrow.dir, "left");
+});
+
+test("guide card flips left near the right edge", () => {
+  const tip = placeTip({ left: 1150, top: 300, width: 200, height: 100 }, view, card);
+  assert.equal(tip.side, "left");
+  assert.equal(tip.arrow.dir, "right");
+});
+
+test("guide card docks away from a part filling the screen", () => {
+  const tip = placeTip({ left: 0, top: 0, width: 1400, height: 400 }, view, card);
+  assert.equal(tip.side, "bottom");
+  const big = placeTip({ left: 0, top: 0, width: 1400, height: 800 }, view, card);
+  assert.equal(big.side, "dock-bottom");
+  assert.equal(big.arrow.dir, "up");
+});
+
+test("phones stack the card above or below, never beside", () => {
+  const tip = placeTip({ left: 20, top: 100, width: 100, height: 60 }, { width: 390, height: 800 }, card);
+  assert.equal(tip.side, "bottom");
+  assert.ok(tip.left >= 16 && tip.left + card.width <= 390 - 16 + 1);
+});
+
+test("no part to point at centres the card", () => {
+  assert.equal(placeTip(null, view, card).side, "center");
 });
