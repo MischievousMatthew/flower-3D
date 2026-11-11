@@ -1092,6 +1092,11 @@ function restoreCheckoutDraft() {
     const draft = JSON.parse(sessionStorage.getItem(CHECKOUT_DRAFT_KEY) || "null");
     if (!draft) return;
     selectedDate.value = draft.selectedDate || null;
+    // A date picked on the product page may be next month: open the calendar there
+    if (/^\d{4}-\d{2}-\d{2}$/.test(selectedDate.value || "")) {
+      const [year, month] = selectedDate.value.split("-").map(Number);
+      calendarDate.value = new Date(year, month - 1, 1);
+    }
     customerNotes.value = draft.customerNotes || "";
     selectedPaymentMethod.value = draft.selectedPaymentMethod || selectedPaymentMethod.value;
   } catch (error) {

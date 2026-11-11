@@ -507,6 +507,10 @@ SQL;
             'quantity_in_stock' => (int) $product->quantity_in_stock,
             'occasion_tags'     => $product->occasion_tags ?? [],
             'care_instructions' => $product->care_instructions ?? '',
+            // Made to order: days the shop needs to prepare it; how long it stays fresh
+            'preparation_days'  => (int) ($product->preparation_days ?? 0),
+            'freshness_days'    => $product->freshness_days ? (int) $product->freshness_days : null,
+            'selling_type'      => $product->selling_type,
             'owner_id'          => $product->owner_id,
             'vendor_id'         => $product->owner_id,
             'vendor_name'       => $vendorName ?? 'Local Vendor',
