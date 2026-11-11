@@ -338,6 +338,14 @@ const cancelTwoFactorLogin = () => {
   clearInterval(resendTimer);
   resendIn.value = 0;
   codeUntil.value = 0;
+  // A different account starts from empty boxes, ready to type
+  form.username = "";
+  form.password = "";
+  fieldError.username = "";
+  fieldError.password = "";
+  notice.value = null;
+  if (route.query.u) router.replace({ query: { ...route.query, u: undefined } });
+  nextTick(() => userInput.value?.focus());
 };
 
 // Losing the connection is shown as it happens, and cleared when it's back
