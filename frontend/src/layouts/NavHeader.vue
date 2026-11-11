@@ -52,14 +52,14 @@
           id="cart-icon"
           class="btn-cart nav-icon-btn"
           :class="{ 'cart-pulse': cartPulse }"
-          :aria-label="`Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}`"
+          :aria-label="cartCount ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart, empty'"
+          title="Cart"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6 7h12l-1 13H7L6 7Z" />
             <path d="M9 7a3 3 0 0 1 6 0" />
           </svg>
-          <span class="nav-icon-label">Cart</span>
-          <span class="nav-count">{{ cartCount }}</span>
+          <span v-if="cartCount > 0" class="nav-badge nav-badge--cart" aria-hidden="true">{{ cartCount > 99 ? "99+" : cartCount }}</span>
         </router-link>
 
         <div v-if="user?.role === 'customer'" class="notification-wrapper">
@@ -807,8 +807,12 @@ onUnmounted(() => {
   position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  min-width: 40px;
+  height: 40px;
   padding: 0;
+  border-radius: 999px;
   border: none;
   background: none;
   color: var(--ink);
@@ -822,6 +826,7 @@ onUnmounted(() => {
 
 .nav-icon-btn:hover {
   color: var(--leaf-deep);
+  background: rgba(54, 63, 78, 0.06);
 }
 
 .nav-icon-btn svg,
@@ -836,33 +841,31 @@ onUnmounted(() => {
   stroke-linejoin: round;
 }
 
-.nav-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--ivory);
-  font-size: 11px;
-  font-weight: 500;
-}
-
+/* A count on the icon's top-right corner (cart and bell) */
 .nav-badge {
   position: absolute;
-  top: -6px;
-  right: -8px;
+  top: 2px;
+  right: 0;
   display: grid;
   place-items: center;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border: 2px solid var(--paper, #fafbfa);
   border-radius: 999px;
   background: var(--leaf);
   color: #fff;
   font-size: 10px;
   font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-sizing: content-box;
+  transform: translate(25%, -25%);
+  pointer-events: none;
+}
+
+.nav-badge--cart {
+  background: var(--ink);
 }
 
 .cart-pulse {
@@ -1459,17 +1462,6 @@ onUnmounted(() => {
 
   .btn-user {
     padding: 0;
-  }
-
-  /* Cart count becomes a corner badge, like notifications */
-  .nav-count {
-    position: absolute;
-    top: -6px;
-    right: -9px;
-    min-width: 17px;
-    height: 17px;
-    padding: 0 4px;
-    font-size: 10px;
   }
 }
 

@@ -53,7 +53,12 @@ const syncItems = (cartItems = []) => {
   items.value = cloneItems(cartItems);
 };
 
-const count = computed(() =>
+// The cart badge: how many things the cart lists (5 roses and 1 tulip is 2),
+// the same as the rows on the cart page
+const count = computed(() => items.value.length);
+
+// Every piece across those lines (5 roses and 1 tulip is 6)
+const totalQuantity = computed(() =>
   items.value.reduce((total, item) => total + Number(item.quantity || 0), 0),
 );
 
@@ -178,6 +183,7 @@ export function useCart() {
   return {
     items,
     count,
+    totalQuantity,
     uniqueCount,
     isLoading,
     isInitialized,
