@@ -853,8 +853,31 @@ const scrollToSection = (sectionId) => {
     return;
   }
   const element = document.getElementById(sectionId);
-  if (element) scrollToElement(element);
+  if (element) scrollToSectionHeading(element);
 };
+
+// Nav links: the section's heading lands just under the floating navbar,
+// not the section's padded top edge (which left the heading mid-screen).
+const NAV_HEADING_GAP = 28; // px between the navbar and the heading
+
+function navbarBottom() {
+  const nav = document.querySelector(".navbar");
+  if (!nav) return 96;
+  // Its resting place, even while it's slid away
+  return nav.offsetTop + nav.offsetHeight;
+}
+
+function scrollToSectionHeading(section) {
+  const heading = section.querySelector(".bc-label, h2") || section;
+  // A pinned section may be fixed right now: measure from its pin spacer,
+  // which stays where the section sits in the page
+  const spacer = section.parentElement?.classList.contains("pin-spacer") ? section.parentElement : null;
+  const sectionTop = (spacer || section).getBoundingClientRect().top + window.scrollY;
+  const headingInside = heading.getBoundingClientRect().top - section.getBoundingClientRect().top;
+  const y = Math.max(0, sectionTop + headingInside - navbarBottom() - NAV_HEADING_GAP);
+  if (lenis) lenis.scrollTo(y);
+  else window.scrollTo({ top: y, behavior: prefersReducedMotion ? "auto" : "smooth" });
+}
 
 // ---- Subscription plans ----
 // Logged-in vendors go straight to that plan's checkout on their Subscription page. Guests
@@ -1881,7 +1904,7 @@ onBeforeUnmount(() => {
   transform: translate(-50%, calc(-100% - 32px));
 }
 
-.navbar--hidden:focus-within {
+.navbar--hidden:has(:focus-visible) {
   transform: translateX(-50%);
 }
 
