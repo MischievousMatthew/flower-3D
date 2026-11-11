@@ -2,19 +2,26 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { explainLoginProblem, formatWait, loginProblem } from "../src/utils/loginProblems.js";
 
-test("a wrong password points at the password and offers a reset", () => {
-  const n = explainLoginProblem({ code: "invalid_credentials", attemptsLeft: 4 });
+test("every wrong password says the tries left and how long the lock lasts", () => {
+  const n = explainLoginProblem({ code: "invalid_credentials", attemptsLeft: 4, lockoutMinutes: 15 });
   assert.equal(n.tone, "info");
   assert.equal(n.field, "password");
+  assert.equal(n.inline, true);
   assert.deepEqual(n.actions, ["forgot"]);
-  assert.doesNotMatch(n.body, /tries left/);
+  assert.equal(n.body, "Wrong username or password: 4 tries left before sign-in locks for 15 minutes.");
 });
 
-test("the last tries are counted and get more attention", () => {
-  const n = explainLoginProblem({ code: "invalid_credentials", attemptsLeft: 1 });
+test("the last try gets more attention, in one sentence", () => {
+  const n = explainLoginProblem({ code: "invalid_credentials", attemptsLeft: 1, lockoutMinutes: 1 });
   assert.equal(n.tone, "warn");
-  assert.match(n.body, /1 try left/);
-  assert.ok(n.body.length < 70, "fits the message space");
+  assert.equal(n.body, "Wrong username or password: 1 try left, then sign-in locks for 1 minute.");
+  assert.equal(n.body.split(". ").length, 1, "one sentence");
+});
+
+test("without the count (admin setting off) it still says what went wrong", () => {
+  const n = explainLoginProblem({ code: "invalid_credentials" });
+  assert.doesNotMatch(n.body, /tries? left/);
+  assert.equal(n.inline, true);
 });
 
 test("a lock shows a countdown and a way out", () => {
@@ -32,7 +39,7 @@ test("no answer from the server is not called a wrong password", () => {
 
 test("server details are passed through", () => {
   const p = loginProblem({ response: { status: 422, data: { code: "account_locked", retry_after: 90 } } });
-  assert.deepEqual(p, { status: 422, code: "account_locked", attemptsLeft: null, retryAfter: 90 });
+  assert.deepEqual(p, { status: 422, code: "account_locked", attemptsLeft: null, lockoutMinutes: null, retryAfter: 90 });
   assert.equal(loginProblem({ response: { status: 429, data: {}, headers: { "retry-after": "30" } } }).retryAfter, 30);
 });
 

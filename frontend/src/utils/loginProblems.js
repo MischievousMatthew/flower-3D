@@ -14,6 +14,7 @@ export function loginProblem(err) {
     status: res.status,
     code: d.code ?? (res.status === 429 ? "too_many_requests" : res.status >= 500 ? "unreachable" : null),
     attemptsLeft: d.attempts_left ?? null,
+    lockoutMinutes: d.lockout_minutes ?? null,
     retryAfter: d.retry_after ?? (Number(res.headers?.["retry-after"]) || null),
   };
 }
@@ -27,18 +28,27 @@ export function loginProblem(err) {
  */
 export function explainLoginProblem(result = {}) {
   const left = result.attemptsLeft;
-  const counted = left !== null && left !== undefined && left <= 3;
+  const counted = left !== null && left !== undefined;
   switch (result.code) {
+    // inline: shown in the form above the username, not as a snackbar
     case "invalid_credentials":
       return {
         tone: counted && left <= 2 ? "warn" : "info",
         title: "That didn't match",
-        body: counted ? `Check your username and password. ${left} ${left === 1 ? "try" : "tries"} left.` : "Check your username and password.",
+        body: counted ? triesLeftSentence(left, result.lockoutMinutes) : "Wrong username or password, so check both and try again.",
         field: "password",
         actions: ["forgot"],
+        inline: true,
       };
     case "account_locked":
-      return { tone: "lock", title: "Sign-in paused", body: "Too many wrong passwords.", countdown: result.retryAfter || null, actions: ["forgot"] };
+      return {
+        tone: "lock",
+        title: "Sign-in paused",
+        body: "Too many wrong passwords, so sign-in is locked for now.",
+        countdown: result.retryAfter || null,
+        actions: ["forgot"],
+        inline: true,
+      };
     case "account_suspended":
       return { tone: "warn", title: "Account on hold", body: result.error || "Your account has been suspended.", actions: ["support"] };
     case "account_inactive":
@@ -54,6 +64,13 @@ export function explainLoginProblem(result = {}) {
     default:
       return { tone: "info", title: "We couldn't sign you in", body: result.error || "Please try again.", actions: ["retry"] };
   }
+}
+
+/** One sentence: how many tries are left and how long the lock after them lasts */
+export function triesLeftSentence(left, lockoutMinutes) {
+  const lock = lockoutMinutes ? `for ${lockoutMinutes} ${lockoutMinutes === 1 ? "minute" : "minutes"}` : "for a while";
+  if (left <= 1) return `Wrong username or password: 1 try left, then sign-in locks ${lock}.`;
+  return `Wrong username or password: ${left} tries left before sign-in locks ${lock}.`;
 }
 
 /** "4:05" / "45s" */

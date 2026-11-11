@@ -240,7 +240,11 @@ class AuthController extends Controller
             $this->refuseLogin('account_locked', LoginGuard::lockedMessage(max(1, (int) ceil($seconds / 60))), ['retry_after' => $seconds]);
         }
         // How many tries are left is only shared when the admin turned it on (Security → Sign-in protection)
-        $this->refuseLogin('invalid_credentials', "That username or password doesn't match our records.", PlatformSettings::get('login_show_attempts') ? ['attempts_left' => $left] : []);
+        // With it, how long the lock lasts, so the page can warn before it happens
+        $this->refuseLogin('invalid_credentials', "That username or password doesn't match our records.", PlatformSettings::get('login_show_attempts') ? [
+            'attempts_left' => $left,
+            'lockout_minutes' => max(1, (int) PlatformSettings::get('login_lockout_minutes')),
+        ] : []);
     }
 
     public function login(Request $request)

@@ -61,7 +61,7 @@ class LoginTroublesTest extends TestCase
         $this->customer();
         // By default nobody is told how close the lock is
         foreach (range(1, 4) as $try) {
-            $this->login('nope')->assertStatus(422)->assertJson(['code' => 'invalid_credentials'])->assertJsonMissingPath('attempts_left');
+            $this->login('nope')->assertStatus(422)->assertJson(['code' => 'invalid_credentials'])->assertJsonMissingPath('attempts_left')->assertJsonMissingPath('lockout_minutes');
         }
         $locked = $this->login('nope')->assertStatus(422)->assertJson(['code' => 'account_locked'])->json();
         $this->assertGreaterThan(800, $locked['retry_after']);
@@ -73,7 +73,7 @@ class LoginTroublesTest extends TestCase
     {
         \App\Support\PlatformSettings::save(['login_show_attempts' => true]);
         $this->customer();
-        $this->login('nope')->assertStatus(422)->assertJson(['code' => 'invalid_credentials', 'attempts_left' => 4]);
+        $this->login('nope')->assertStatus(422)->assertJson(['code' => 'invalid_credentials', 'attempts_left' => 4, 'lockout_minutes' => 15]);
         foreach ([3, 2, 1] as $left) {
             $this->login('nope')->assertJson(['attempts_left' => $left]);
         }

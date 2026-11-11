@@ -15,6 +15,18 @@
 
     <!-- Username and password -->
     <form v-if="!twoFactorRequired" class="af-form" novalidate @submit.prevent="handleLogin()">
+      <!-- Wrong password or a lock: one sentence right above the username -->
+      <div v-if="inlineNotice" id="lg-alert" class="lg-alert" :class="`lg-alert--${inlineNotice.tone}`" role="alert">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <template v-if="inlineNotice.tone === 'lock'"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></template>
+          <template v-else><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5M12 16.5v.01" /></template>
+        </svg>
+        <p>
+          {{ inlineNotice.body }}<template v-if="inlineNotice.tone === 'lock' && lockLeft > 0"> Try again in {{ formatWait(lockLeft) }}.</template>
+          <router-link :to="{ name: 'ForgotPassword', query: { u: form.username || undefined } }" class="lg-alert-link">Forgot password?</router-link>
+        </p>
+      </div>
+
       <div class="af-field">
         <label class="af-label" for="lg-user">Username or email</label>
         <input
@@ -26,8 +38,8 @@
           autocomplete="username"
           autocapitalize="none"
           spellcheck="false"
-          :aria-invalid="fieldError.username ? 'true' : 'false'"
-          aria-describedby="lg-user-note"
+          :aria-invalid="fieldError.username || inlineNotice ? 'true' : 'false'"
+          :aria-describedby="inlineNotice ? 'lg-alert lg-user-note' : 'lg-user-note'"
           @input="fieldError.username = ''"
         />
         <p v-if="fieldError.username" id="lg-user-note" class="af-note bad">{{ fieldError.username }}</p>
@@ -176,18 +188,35 @@ const show = (result) => {
     nextTick(() => passInput.value?.focus());
   }
 };
-// Every sign-in message is a snackbar, with what to do next as its button
+// A wrong password or a lock shows in the form above the username (inline);
+// every other sign-in message is a snackbar, with what to do next as its button
+const inlineNotice = computed(() => (notice.value?.inline ? notice.value : null));
+const lockLeft = ref(0); // seconds until a lock ends, counting down in the alert
+let lockTick = null;
+let snackId = null;
 let lockTimer = null;
 const SNACK_TYPE = { success: "success", info: "info", warn: "warning", lock: "warning", offline: "error" };
 watch(notice, (n) => {
+  clearInterval(lockTick);
+  lockLeft.value = 0;
   if (!n) return;
+  if (n.inline) {
+    if (snackId) toast.dismiss(snackId);
+    clearTimeout(lockTimer);
+    if (n.tone === "lock" && n.countdown) {
+      lockLeft.value = n.countdown;
+      lockTick = setInterval(() => (lockLeft.value = Math.max(0, lockLeft.value - 1)), 1000);
+      lockTimer = setTimeout(lockEnded, n.countdown * 1000);
+    }
+    return;
+  }
   const wait = n.countdown ? ` Try again in ${formatWait(n.countdown)}.` : "";
   let action = null;
   if (n.actions?.includes("forgot")) action = { label: "Forgot password", to: { name: "ForgotPassword", query: { u: form.username || undefined } } };
   else if (n.actions?.includes("retry")) action = { label: "Try again", onClick: () => (twoFactorRequired.value ? completeTwoFactorLogin() : handleLogin()) };
   else if (n.actions?.includes("support") && supportEmail.value) action = { label: "Contact support", onClick: () => (window.location.href = `mailto:${supportEmail.value}`) };
   const title = n.title.replace(/[.!]$/, "");
-  toast[SNACK_TYPE[n.tone] ?? "error"](`${title}. ${n.body ?? ""}${wait}`.trim(), {
+  snackId = toast[SNACK_TYPE[n.tone] ?? "error"](`${title}. ${n.body ?? ""}${wait}`.trim(), {
     toastId: "login-notice",
     action,
     // A lock or being offline stays until it's over (or closed)
@@ -196,7 +225,10 @@ watch(notice, (n) => {
   clearTimeout(lockTimer);
   if (n.tone === "lock" && n.countdown) lockTimer = setTimeout(lockEnded, n.countdown * 1000);
 });
-onBeforeUnmount(() => clearTimeout(lockTimer));
+onBeforeUnmount(() => {
+  clearTimeout(lockTimer);
+  clearInterval(lockTick);
+});
 
 const lockEnded = () => {
   locked.value = false;
@@ -412,5 +444,68 @@ onBeforeUnmount(() => {
 .lg-modal .lg-modal-note {
   margin: 6px 0 0;
   font-size: 13px;
+}
+</style>
+
+<style scoped>
+/* Wrong password / lock: one line above the username */
+.lg-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #c9dfd1;
+  border-radius: 12px;
+  background: #eef6f1;
+  color: var(--ink, #363f4e);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.lg-alert svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lg-alert p {
+  margin: 0;
+}
+
+.lg-alert--info svg {
+  color: var(--leaf-deep, #2e7a4f);
+}
+
+.lg-alert--warn,
+.lg-alert--lock {
+  border-color: #efd3a6;
+  background: #fdf3e3;
+  color: #6e4a10;
+}
+
+.lg-alert--warn svg,
+.lg-alert--lock svg {
+  color: #b86e0b;
+}
+
+.lg-alert-link {
+  margin-left: 6px;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+.lg-alert-link:focus-visible {
+  outline: 2px solid var(--leaf, #4db173);
+  outline-offset: 2px;
+  border-radius: 3px;
 }
 </style>
