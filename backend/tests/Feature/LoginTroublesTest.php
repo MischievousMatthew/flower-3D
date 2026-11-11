@@ -69,6 +69,25 @@ class LoginTroublesTest extends TestCase
         $this->login('Secret-pass1')->assertJson(['code' => 'account_locked']);
     }
 
+    public function test_the_lock_runs_its_full_length_from_the_wrong_password_that_locked_it(): void
+    {
+        $this->customer();
+        $this->login('nope'); // the first wrong password, 10 minutes before the rest
+        $this->travel(10)->minutes();
+        foreach (range(1, 3) as $try) {
+            $this->login('nope')->assertJson(['code' => 'invalid_credentials']);
+        }
+        $locked = $this->login('nope')->assertJson(['code' => 'account_locked'])->json();
+        // The whole 15 minutes, not what was left of the first try's window (5)
+        $this->assertGreaterThan(890, $locked['retry_after']);
+
+        // Still locked 10 minutes later, open again once the 15 are over
+        $this->travel(10)->minutes();
+        $this->login('Secret-pass1')->assertJson(['code' => 'account_locked']);
+        $this->travel(6)->minutes();
+        $this->login('Secret-pass1')->assertOk();
+    }
+
     public function test_the_admin_can_choose_to_show_how_many_tries_are_left(): void
     {
         \App\Support\PlatformSettings::save(['login_show_attempts' => true]);

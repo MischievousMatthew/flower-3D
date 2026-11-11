@@ -38,14 +38,22 @@ class LoginGuard
     /** Seconds left on a lock, or 0 when sign-in is allowed */
     public function lockedSeconds(string $identifier): int
     {
-        [$failures, $max, $window] = $this->recentFailures($identifier);
+        // Look back two windows: a lock that started near the end of one
+        // window still has to run its full length into the next
+        [$failures, $max, $window] = $this->recentFailures($identifier, 2);
         if ($failures->count() < $max) {
             return 0;
         }
-        // Locked until the oldest of the last $max failures ages out
-        $unlockAt = CarbonImmutable::parse($failures->last())->addMinutes($window);
+        // The last $max wrong passwords came within one window of each other:
+        // the newest one locked the account, for the full lock time from then
+        $newest = CarbonImmutable::parse($failures->first());
+        $oldest = CarbonImmutable::parse($failures->get($max - 1));
+        if ($oldest->diffInSeconds($newest, true) > $window * 60) {
+            return 0;
+        }
+        $left = (int) ceil(now()->diffInSeconds($newest->addMinutes($window), false));
 
-        return max(1, (int) ceil(now()->diffInSeconds($unlockAt, false)));
+        return max(0, $left);
     }
 
     /** Wrong passwords still allowed before the account is locked */
@@ -91,8 +99,11 @@ class LoginGuard
         return "Too many wrong passwords. For your safety, sign-in is paused for {$minutes} " . ($minutes === 1 ? 'minute' : 'minutes') . '.';
     }
 
-    /** @return array{0: Collection, 1: int, 2: int} the latest wrong passwords (newest first), the limit and the window in minutes */
-    private function recentFailures(string $identifier): array
+    /**
+     * @param int $windows how many lock windows back to look
+     * @return array{0: Collection, 1: int, 2: int} the latest wrong passwords (newest first), the limit and the window in minutes
+     */
+    private function recentFailures(string $identifier, int $windows = 1): array
     {
         $max = 5;
         $window = 15;
@@ -103,7 +114,7 @@ class LoginGuard
         try {
             $max = max(1, (int) PlatformSettings::get('login_max_attempts'));
             $window = max(1, (int) PlatformSettings::get('login_lockout_minutes'));
-            $since = CarbonImmutable::now()->subMinutes($window);
+            $since = CarbonImmutable::now()->subMinutes($window * $windows);
 
             $lastSuccess = DB::table('login_audit_logs')
                 ->where(fn ($q) => $q->whereRaw('lower(username) = ?', [$identifier])->orWhereRaw('lower(email) = ?', [$identifier]))
