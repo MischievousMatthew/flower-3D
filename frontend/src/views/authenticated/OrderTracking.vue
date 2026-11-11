@@ -115,7 +115,7 @@
             v-for="order in orders"
             :key="order.id"
             class="ot-card"
-            :class="[`tone-${statusTone(order)}`, { open: expandedId === order.id }]"
+            :class="[`tone-${statusTone(order)}`, { open: isOpen(order.id) }]"
           >
             <!-- ── Summary ───────────────────────────────────────────── -->
             <div class="ot-card__head">
@@ -238,18 +238,18 @@
               <button
                 type="button"
                 class="ot-toggle"
-                :aria-expanded="expandedId === order.id"
+                :aria-expanded="isOpen(order.id)"
                 :aria-controls="`order-detail-${order.id}`"
                 @click="toggle(order.id)"
               >
-                {{ expandedId === order.id ? "Hide details" : "Details" }}
+                {{ isOpen(order.id) ? "Hide details" : "Details" }}
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
               </button>
             </footer>
 
             <!-- ── Details ───────────────────────────────────────────── -->
             <Transition name="expand">
-              <div v-if="expandedId === order.id" :id="`order-detail-${order.id}`" class="ot-detail">
+              <div v-if="isOpen(order.id)" :id="`order-detail-${order.id}`" class="ot-detail">
                 <div class="ot-detail__grid">
                   <!-- Items and what it cost -->
                   <section class="ot-panel" aria-label="Items">
@@ -573,7 +573,14 @@ const { isAuthenticated } = useAuth();
 const orders = ref([]);
 const loading = ref(false);
 const error = ref(null);
-const expandedId = ref(null);
+// Orders open and close on their own: opening one never closes another, so
+// nothing above the one clicked moves and the page doesn't jump
+const openIds = ref(new Set());
+const isOpen = (id) => openIds.value.has(id);
+const openOrder = (id) => {
+  if (!isOpen(id)) openIds.value = new Set([...openIds.value, id]);
+};
+const closeAll = () => (openIds.value = new Set());
 const search = ref("");
 const activeTab = ref("all");
 const actionLoading = ref(null);
@@ -709,7 +716,7 @@ async function fetchOrders() {
   if (pager.error.value) error.value = pager.error.value || "Could not load orders. Please try again.";
   loading.value = false;
   // The order from a notification opens up, showing its details
-  if (focusOrder.value && orders.value.length === 1) expandedId.value = orders.value[0].id;
+  if (focusOrder.value && orders.value.length === 1) openOrder(orders.value[0].id);
 }
 
 // ── One order, from a notification ──────────────────────────────────────────
@@ -739,7 +746,7 @@ function clearFocus() {
 function showAllOrders() {
   clearFocus();
   activeTab.value = "all";
-  expandedId.value = null;
+  closeAll();
   fetchOrders();
 }
 
@@ -749,7 +756,7 @@ const stopFocusWatch = router.afterEach((to) => {
   const next = readFocus();
   if (!next || next === focusOrder.value) return;
   focusOrder.value = next;
-  expandedId.value = null;
+  closeAll();
   fetchOrders();
 });
 onUnmounted(stopFocusWatch);
@@ -895,7 +902,7 @@ async function onCaseChanged(order, detail) {
 }
 
 function scrollToCase(order) {
-  expandedId.value = order.id;
+  openOrder(order.id);
   nextTick(() => document.getElementById(`case-${order.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
 }
 
@@ -1074,12 +1081,15 @@ function closeProof() {
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
 const toggle = (id) => {
-  expandedId.value = expandedId.value === id ? null : id;
+  const next = new Set(openIds.value);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  openIds.value = next;
 };
 const setTab = (v) => {
   clearFocus();
   activeTab.value = v;
-  expandedId.value = null;
+  closeAll();
   fetchOrders();
 };
 const debounceSearch = () => {
