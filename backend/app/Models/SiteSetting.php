@@ -45,6 +45,40 @@ class SiteSetting extends Model
 
     public const DISMISS_FOR = ['forever', '1', '7'];
 
+    /**
+     * The rules for the tags on products (see App\Services\ProductTags).
+     * Stock tags (In stock / Low stock / Out of stock) follow the stock itself
+     * and aren't set here. Also kept out of KEYS.
+     */
+    public const PRODUCT_TAG_DEFAULTS = [
+        'card_max' => 2,               // tags shown on one shop card
+        'sale_enabled' => true,        // SALE: discounted by at least…
+        'sale_min_percent' => 5,
+        'best_enabled' => true,        // BEST SELLER: the top N by units sold in the last D days
+        'best_top' => 10,
+        'best_days' => 90,
+        'best_min_sold' => 3,
+        'new_enabled' => true,         // NEW ARRIVAL: added in the last D days, at most N
+        'new_days' => 14,
+        'new_max' => 12,
+        'trend_enabled' => true,       // TRENDING: the top N by recent interest (orders, carts, hearts)
+        'trend_top' => 8,
+        'trend_days' => 7,
+        'trend_min_score' => 3,
+        'rated_enabled' => true,       // TOP RATED: at least this rating from this many reviews, at most N
+        'rated_min_rating' => 4.5,
+        'rated_min_reviews' => 3,
+        'rated_max' => 20,
+        'recommended_enabled' => true, // RECOMMENDED: the admin's Featured products
+        'seasonal_enabled' => true,    // SEASONAL: products for a season, not all year
+    ];
+
+    /** @return array<string, mixed> */
+    public static function productTags(): array
+    {
+        return static::group('product_tags', self::PRODUCT_TAG_DEFAULTS);
+    }
+
     /** @return array<string, mixed> */
     public static function slideshow(): array
     {

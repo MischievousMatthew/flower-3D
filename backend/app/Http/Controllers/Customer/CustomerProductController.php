@@ -516,6 +516,10 @@ SQL;
             // Filled in by the shop; empty until then (the page hides them)
             'color_options'     => $this->colorOptions($product->color_options),
             'composition'       => $this->composition($product->composition),
+            // SALE, BEST SELLER, TRENDING… most important first (App\Services\ProductTags)
+            'tags'              => $tags = $this->tags()->tagsFor($product),
+            // The first few, as many as the admin allows on a shop card
+            'card_tags'         => array_slice($tags, 0, max(0, (int) $this->tags()->rules()['card_max'])),
             'owner_id'          => $product->owner_id,
             'vendor_id'         => $product->owner_id,
             'vendor_name'       => $vendorName ?? 'Local Vendor',
@@ -541,6 +545,14 @@ SQL;
                 'model_type' => $m->model_type,
             ])->values()->all(),
         ];
+    }
+
+    private ?\App\Services\ProductTags $tagService = null;
+
+    /** One tag service per request: its lists are worked out once */
+    private function tags(): \App\Services\ProductTags
+    {
+        return $this->tagService ??= app(\App\Services\ProductTags::class);
     }
 
     /** Colours to pick from: [{name, hex}], from names or {name, hex} entries */

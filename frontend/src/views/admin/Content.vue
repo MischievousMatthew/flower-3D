@@ -311,6 +311,75 @@
           </div>
         </section>
 
+        <!-- ── Product tags: the rules behind Best seller, Trending, New arrival… ── -->
+        <section v-else-if="tab === 'tags'" class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Product tags</h2>
+              <p class="panel-sub">The tags on shop cards and product pages. They update on their own from sales, carts, hearts and reviews. Set which ones show and how many products get each.</p>
+            </div>
+            <div class="show-save">
+              <span v-if="tagsDirty" class="hint">Unsaved changes</span>
+              <button type="button" class="ghost-btn" :disabled="!tagsDirty || tagsSaving" @click="resetTagRules">Undo</button>
+              <button type="button" class="primary-btn" :disabled="!tagsDirty || tagsSaving" @click="saveTagRules">{{ tagsSaving ? "Saving…" : "Save rules" }}</button>
+            </div>
+          </div>
+
+          <SkeletonRows v-if="!tagsLoaded" :rows="4" />
+          <template v-else>
+            <div class="tag-cardmax">
+              <div>
+                <span class="field-label">Tags on each shop card</span>
+                <span class="hint">The most important ones show first. Sold out and the row's own tag always come first.</span>
+              </div>
+              <div class="stepper">
+                <button type="button" aria-label="One tag fewer" :disabled="tagRules.card_max <= 0" @click="tagRules.card_max--">−</button>
+                <output>{{ tagRules.card_max }}</output>
+                <button type="button" aria-label="One tag more" :disabled="tagRules.card_max >= 3" @click="tagRules.card_max++">+</button>
+              </div>
+            </div>
+
+            <div class="tag-grid">
+              <article v-for="rule in TAG_RULES" :key="rule.tag" class="tag-card" :class="{ off: !tagRules[rule.enable] }">
+                <header class="tag-card-head">
+                  <ProductTag :tag="rule.tag" />
+                  <span class="tag-count" :class="{ zero: !tagCounts[rule.tag] }" aria-live="polite">{{ countText(rule) }}</span>
+                  <label class="toggle tag-switch">
+                    <input v-model="tagRules[rule.enable]" type="checkbox" role="switch" :aria-label="'Show the ' + rule.name + ' tag'" />
+                    <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+                  </label>
+                </header>
+                <p class="tag-desc">{{ rule.desc }}</p>
+                <div v-if="rule.fields.length" class="tag-fields">
+                  <label v-for="field in rule.fields" :key="field.key" class="tag-field">
+                    <span>{{ field.label }}</span>
+                    <input
+                      v-model.number="tagRules[field.key]"
+                      type="number"
+                      class="input tag-num"
+                      :min="field.min"
+                      :max="field.max"
+                      :step="field.step || 1"
+                      :disabled="!tagRules[rule.enable]"
+                    />
+                    <span>{{ field.suffix }}</span>
+                  </label>
+                </div>
+                <p v-if="rule.note" class="hint">{{ rule.note }}</p>
+              </article>
+            </div>
+
+            <div class="tag-fixed">
+              <span class="field-label">Always on</span>
+              <p class="hint">
+                <ProductTag tag="in_stock" /> <ProductTag tag="low_stock" /> <ProductTag tag="out_of_stock" />
+                follow the stock (low stock is 5 or fewer).
+                <ProductTag tag="you_may_like" /> and <ProductTag tag="recently_viewed" /> show on those rows of the product page.
+              </p>
+            </div>
+          </template>
+        </section>
+
       </div>
     </main>
 
@@ -569,6 +638,7 @@ import LinkPicker from "./components/LinkPicker.vue";
 import AnnouncementBar from "../../components/site/AnnouncementBar.vue";
 import PromoCard from "../../components/shop/PromoCard.vue";
 import ShopHero from "../../components/shop/ShopHero.vue";
+import ProductTag from "../../components/shop/ProductTag.vue";
 import { ANNOUNCEMENT_TONES } from "../../constants/announcementTones";
 import "../../styles/bloomcraft.css"; // shop look for the review preview
 import { articleBlocks } from "../../utils/articleBlocks";
@@ -589,6 +659,7 @@ const TABS = [
   { key: "featured", label: "Featured products", icon: svg('<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>') },
   { key: "journal", label: "Journal", icon: svg('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>') },
   { key: "announcements", label: "Announcements & promos", icon: svg('<path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>') },
+  { key: "tags", label: "Product tags", icon: svg('<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><path d="M7.5 7.5h.01"/>') },
 ];
 const STATE = { showing: "Showing", scheduled: "Scheduled", ended: "Ended", off: "Off" };
 const ARTICLE_STATE = { draft: "Draft", scheduled: "Scheduled", published: "Published" };
@@ -771,7 +842,99 @@ const loadTab = (key) => {
   }
   if (key === "journal") fetchArticles();
   if (key === "announcements") fetchAnnouncements();
+  if (key === "tags") loadTagRules();
 };
+// ── Product tags ─────────────────────────────────────────────────
+// One card per tag: its switch, the numbers behind it, and how many products get it
+const TAG_RULES = [
+  { tag: "sale", name: "Sale", enable: "sale_enabled", desc: "Products with a discounted price.", fields: [
+    { key: "sale_min_percent", label: "Discount of at least", suffix: "%", min: 1, max: 90 },
+  ] },
+  { tag: "best_seller", name: "Best seller", enable: "best_enabled", desc: "The products that sell the most.", fields: [
+    { key: "best_top", label: "Top", suffix: "products", min: 1, max: 100 },
+    { key: "best_days", label: "Sales in the last", suffix: "days", min: 7, max: 365 },
+    { key: "best_min_sold", label: "At least", suffix: "sold", min: 1, max: 1000 },
+  ] },
+  { tag: "trending", name: "Trending", enable: "trend_enabled", desc: "Products getting a lot of interest right now.", note: "Interest score: each order counts 3, each add to cart 2, each heart 1.", fields: [
+    { key: "trend_top", label: "Top", suffix: "products", min: 1, max: 100 },
+    { key: "trend_days", label: "Interest in the last", suffix: "days", min: 1, max: 30 },
+    { key: "trend_min_score", label: "Score of at least", suffix: "points", min: 1, max: 1000 },
+  ] },
+  { tag: "new_arrival", name: "New arrival", enable: "new_enabled", desc: "Products shops added recently.", fields: [
+    { key: "new_days", label: "Added in the last", suffix: "days", min: 1, max: 90 },
+    { key: "new_max", label: "At most", suffix: "products", min: 1, max: 100 },
+  ] },
+  { tag: "top_rated", name: "Top rated", enable: "rated_enabled", desc: "Products customers rate highly.", fields: [
+    { key: "rated_min_rating", label: "Rating of at least", suffix: "★", min: 1, max: 5, step: 0.1 },
+    { key: "rated_min_reviews", label: "From at least", suffix: "reviews", min: 1, max: 1000 },
+    { key: "rated_max", label: "At most", suffix: "products", min: 1, max: 100 },
+  ] },
+  { tag: "recommended", name: "Recommended", enable: "recommended_enabled", desc: "The products you pick under Featured products.", fields: [] },
+  { tag: "seasonal", name: "Seasonal", enable: "seasonal_enabled", desc: "Products a shop set to a season rather than all year.", fields: [] },
+];
+const TAG_DEFAULTS = {
+  card_max: 2, sale_enabled: true, sale_min_percent: 5,
+  best_enabled: true, best_top: 10, best_days: 90, best_min_sold: 3,
+  new_enabled: true, new_days: 14, new_max: 12,
+  trend_enabled: true, trend_top: 8, trend_days: 7, trend_min_score: 3,
+  rated_enabled: true, rated_min_rating: 4.5, rated_min_reviews: 3, rated_max: 20,
+  recommended_enabled: true, seasonal_enabled: true,
+};
+const tagRules = reactive({ ...TAG_DEFAULTS });
+const savedTagRules = ref({ ...TAG_DEFAULTS });
+const tagCounts = ref({});
+const tagsLoaded = ref(false);
+const tagsSaving = ref(false);
+const tagsDirty = computed(() => Object.keys(TAG_DEFAULTS).some((k) => tagRules[k] !== savedTagRules.value[k]));
+const countText = (rule) => {
+  if (!tagRules[rule.enable]) return "Off";
+  const n = tagCounts.value[rule.tag] ?? 0;
+  return n + (n === 1 ? " product now" : " products now");
+};
+const applyTagRules = (data) => {
+  savedTagRules.value = { ...TAG_DEFAULTS, ...(data.rules || {}) };
+  Object.assign(tagRules, savedTagRules.value);
+  if (data.counts) tagCounts.value = data.counts;
+};
+const resetTagRules = () => Object.assign(tagRules, savedTagRules.value);
+async function loadTagRules() {
+  try {
+    applyTagRules((await api.get("/admin/content/product-tags")).data.data);
+  } catch {
+    toast.error("The tag rules couldn't be loaded. Try refreshing.");
+  } finally {
+    tagsLoaded.value = true;
+  }
+}
+// The counts follow the numbers as they change, before saving
+let tagPreviewTimer = 0;
+let tagPreviewSeq = 0;
+watch(tagRules, () => {
+  if (!tagsLoaded.value) return;
+  clearTimeout(tagPreviewTimer);
+  tagPreviewTimer = setTimeout(async () => {
+    const mine = ++tagPreviewSeq;
+    try {
+      const { data } = await api.post("/admin/content/product-tags/preview", { ...tagRules });
+      if (mine === tagPreviewSeq) tagCounts.value = data.data.counts;
+    } catch {
+      // a number out of range: the save shows why
+    }
+  }, 450);
+});
+async function saveTagRules() {
+  tagsSaving.value = true;
+  try {
+    const { data } = await api.put("/admin/content/product-tags", { ...tagRules });
+    applyTagRules(data.data);
+    toast.success(data.message || "Product tag rules saved.");
+  } catch (e) {
+    toast.error(firstError(e));
+  } finally {
+    tagsSaving.value = false;
+  }
+}
+
 const setTab = (key) => {
   tab.value = key;
   router.replace({ query: { ...route.query, tab: key } });
@@ -1697,6 +1860,94 @@ textarea.input {
 }
 
 /* Slideshow settings */
+/* Product tags */
+.tag-cardmax {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--a-border);
+  border-radius: 12px;
+  background: var(--a-subtle);
+}
+.tag-cardmax > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+.tag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+.tag-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--a-border);
+  border-radius: 12px;
+  background: var(--a-surface);
+}
+.tag-card.off .tag-desc,
+.tag-card.off .tag-fields {
+  opacity: 0.5;
+}
+.tag-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tag-count {
+  margin-left: auto;
+  color: var(--a-text-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.tag-switch {
+  flex: none;
+  position: relative;
+  min-height: 0;
+  align-items: center;
+}
+.tag-desc {
+  margin: 0;
+  color: var(--a-text);
+  font-size: 13px;
+}
+.tag-fields {
+  display: grid;
+  gap: 8px;
+}
+.tag-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px minmax(52px, auto);
+  align-items: center;
+  gap: 8px;
+  color: var(--a-text-2);
+  font-size: 12.5px;
+}
+.tag-num {
+  padding: 7px 9px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tag-num:disabled {
+  opacity: 0.6;
+}
+.tag-fixed {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 12px 16px;
+  border: 1px dashed var(--a-border);
+  border-radius: 12px;
+}
+.tag-fixed .hint {
+  line-height: 2;
+}
 .show-settings {
   border: 1px solid var(--a-border);
   background: var(--a-subtle);

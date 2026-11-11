@@ -143,6 +143,11 @@
               <span v-if="categoryLabel" class="pd-cat">{{ categoryLabel }}</span>
             </div>
 
+            <!-- Sale, Best seller, Trending, Top rated… (rules set by the admin) -->
+            <div v-if="product.tags?.length" class="pd-tags">
+              <ProductTag v-for="tag in product.tags" :key="tag" :tag="tag" />
+            </div>
+
             <h1 class="pd-name">{{ product.product_name }}</h1>
 
             <p class="pd-rating">
@@ -224,9 +229,9 @@
             </div>
 
             <!-- Availability -->
-            <p class="pd-avail" :class="availability.tone">
-              <i aria-hidden="true"></i>
-              <strong>{{ availability.title }}</strong>
+            <p class="pd-avail">
+              <ProductTag :tag="stockTag(product.quantity_in_stock)" />
+              <strong v-if="availability.title">{{ availability.title }}</strong>
               <span v-if="availability.note">{{ availability.note }}</span>
             </p>
 
@@ -396,6 +401,7 @@
               v-for="item in related"
               :key="item.id"
               :product="item"
+              context-tag="you_may_like"
               :adding="addingRelatedId === item.id"
               @open="openProduct"
               @add="addRelated"
@@ -413,6 +419,7 @@
               v-for="item in recent"
               :key="item.id"
               :product="item"
+              context-tag="recently_viewed"
               :adding="addingRelatedId === item.id"
               @open="openProduct"
               @add="addRelated"
@@ -467,6 +474,7 @@ import ProductQuestions from "../../layouts/components/ProductQuestions.vue";
 import SiteFooter from "../../components/site/SiteFooter.vue";
 import ShopProductTile from "../../components/shop/ShopProductTile.vue";
 import ImageLightbox from "../../components/shop/ImageLightbox.vue";
+import ProductTag, { LOW_STOCK, stockTag } from "../../components/shop/ProductTag.vue";
 import { useAuth } from "../../composables/useAuth";
 import { useCart } from "../../composables/useCart";
 import { useFlyToCart } from "../../composables/useFlyToCart";
@@ -572,12 +580,14 @@ function pickDefaultColor() {
 /** The colour that goes with the order: the one picked, else the product's own */
 const orderColor = () => chosenColor.value || product.value?.color || null;
 
+// Next to the stock tag: how many, and whether it's made to order
 const availability = computed(() => {
   const stock = Number(product.value?.quantity_in_stock || 0);
-  if (stock <= 0) return { tone: "out", title: "Sold out", note: "Check back soon, or ask the shop." };
-  const made = prepDays.value > 0 ? `Made to order · ready in ${prepDays.value} ${prepDays.value === 1 ? "day" : "days"}` : "";
-  if (stock <= 5) return { tone: "low", title: `Only ${stock} left`, note: made };
-  return { tone: "in", title: made ? "Made to order" : "In stock", note: made ? `Ready in ${prepDays.value} ${prepDays.value === 1 ? "day" : "days"}` : `${stock} available` };
+  if (stock <= 0) return { title: "", note: "Check back soon, or ask the shop." };
+  const days = prepDays.value;
+  const ready = days > 0 ? `Made to order · ready in ${days} ${days === 1 ? "day" : "days"}` : "";
+  if (stock <= LOW_STOCK) return { title: `Only ${stock} left`, note: ready };
+  return { title: `${stock} available`, note: ready };
 });
 
 const specs = computed(() => {
@@ -1270,6 +1280,13 @@ watch(
   font-size: 11.5px;
 }
 
+.pd-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: -4px;
+}
+
 .pd-name {
   margin: -6px 0 0;
   font-family: var(--font-display);
@@ -1499,7 +1516,7 @@ watch(
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
 
-/* In stock / Only 3 left / Sold out */
+/* IN STOCK / LOW STOCK / OUT OF STOCK, then a short note */
 .pd-avail {
   display: flex;
   flex-wrap: wrap;
@@ -1509,38 +1526,12 @@ watch(
   font-size: 13px;
 }
 
-.pd-avail i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--leaf);
-  box-shadow: 0 0 0 4px rgba(77, 177, 115, 0.16);
-}
-
 .pd-avail strong {
   font-weight: 600;
 }
 
 .pd-avail span {
   color: var(--ink-soft);
-}
-
-.pd-avail.low i {
-  background: #d18a1c;
-  box-shadow: 0 0 0 4px rgba(209, 138, 28, 0.16);
-}
-
-.pd-avail.low strong {
-  color: var(--pd-amber);
-}
-
-.pd-avail.out i {
-  background: var(--pd-red);
-  box-shadow: 0 0 0 4px rgba(180, 51, 42, 0.14);
-}
-
-.pd-avail.out strong {
-  color: var(--pd-red);
 }
 
 /* Delivery dates: a row of day cards */

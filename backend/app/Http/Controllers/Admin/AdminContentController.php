@@ -340,6 +340,75 @@ class AdminContentController extends Controller
     /**
      * GET /api/admin/content/announcements/settings
      */
+    // ── Product tags ──────────────────────────────────────────────────
+
+    /** GET /api/admin/content/product-tags: the rules, and how many products each tag is on */
+    public function productTagSettings(): JsonResponse
+    {
+        $rules = SiteSetting::productTags();
+
+        return response()->json(['success' => true, 'data' => [
+            'rules' => $rules,
+            'counts' => app(\App\Services\ProductTags::class)->counts($rules),
+        ]]);
+    }
+
+    /** POST /api/admin/content/product-tags/preview: the counts these rules would give, without saving */
+    public function previewProductTags(Request $request): JsonResponse
+    {
+        $rules = $this->productTagRules($request);
+
+        return response()->json(['success' => true, 'data' => [
+            'counts' => app(\App\Services\ProductTags::class)->counts($rules),
+        ]]);
+    }
+
+    /** PUT /api/admin/content/product-tags */
+    public function saveProductTagSettings(Request $request): JsonResponse
+    {
+        $rules = $this->productTagRules($request);
+        SiteSetting::updateOrCreate(['key' => 'product_tags'], ['value' => $rules]);
+        \App\Services\ProductTags::forget(); // the shop shows the new tags straight away
+
+        return response()->json(['success' => true, 'message' => 'Product tag rules saved. The shop uses them straight away.', 'data' => [
+            'rules' => SiteSetting::productTags(),
+            'counts' => app(\App\Services\ProductTags::class)->counts(SiteSetting::productTags()),
+        ]]);
+    }
+
+    private function productTagRules(Request $request): array
+    {
+        $data = $request->validate([
+            'card_max' => 'required|integer|min:0|max:3',
+            'sale_enabled' => 'required|boolean',
+            'sale_min_percent' => 'required|integer|min:1|max:90',
+            'best_enabled' => 'required|boolean',
+            'best_top' => 'required|integer|min:1|max:100',
+            'best_days' => 'required|integer|min:7|max:365',
+            'best_min_sold' => 'required|integer|min:1|max:1000',
+            'new_enabled' => 'required|boolean',
+            'new_days' => 'required|integer|min:1|max:90',
+            'new_max' => 'required|integer|min:1|max:100',
+            'trend_enabled' => 'required|boolean',
+            'trend_top' => 'required|integer|min:1|max:100',
+            'trend_days' => 'required|integer|min:1|max:30',
+            'trend_min_score' => 'required|integer|min:1|max:1000',
+            'rated_enabled' => 'required|boolean',
+            'rated_min_rating' => 'required|numeric|min:1|max:5',
+            'rated_min_reviews' => 'required|integer|min:1|max:1000',
+            'rated_max' => 'required|integer|min:1|max:100',
+            'recommended_enabled' => 'required|boolean',
+            'seasonal_enabled' => 'required|boolean',
+        ], [
+            'card_max.max' => 'Show at most 3 tags on a card, or it covers the photo.',
+        ]);
+
+        return collect(SiteSetting::PRODUCT_TAG_DEFAULTS)->mapWithKeys(function ($default, $key) use ($data) {
+            $value = $data[$key];
+            return [$key => is_bool($default) ? (bool) $value : (is_float($default) ? round((float) $value, 1) : (int) $value)];
+        })->all();
+    }
+
     public function announcementBarSettings(): JsonResponse
     {
         return response()->json(['success' => true, 'data' => SiteSetting::announcementBar()]);

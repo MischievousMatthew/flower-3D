@@ -1284,6 +1284,11 @@ Route::middleware('token.auth')->group(function () {
 
             Route::get('/settings', [AdminContentController::class, 'settings']);
             Route::put('/settings', [AdminContentController::class, 'saveSettings']);
+
+            // Rules for the tags on products (Best seller, Trending, New arrival…)
+            Route::get('/product-tags', [AdminContentController::class, 'productTagSettings']);
+            Route::post('/product-tags/preview', [AdminContentController::class, 'previewProductTags']);
+            Route::put('/product-tags', [AdminContentController::class, 'saveProductTagSettings']);
         });
 
         // Notifications & support: inbox, announcements, alerts, activity

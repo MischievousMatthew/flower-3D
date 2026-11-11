@@ -3,7 +3,10 @@
     <button type="button" class="pt-media" :aria-label="`View ${product.product_name}`" @click="$emit('open', product)">
       <img v-if="image" ref="imageEl" :src="sizedImage(image, 320)" :srcset="sizedSrcset(image, 320)" :alt="product.product_name" loading="lazy" decoding="async" />
       <span v-else class="pt-noimg" aria-hidden="true">✿</span>
-      <span v-if="badge" class="pt-badge" :class="badge.tone">{{ badge.text }}</span>
+      <!-- Tags, top left: why this card is here (row), then sold out, then the shop's tags -->
+      <span v-if="tags.length" class="pt-tags">
+        <ProductTag v-for="tag in tags" :key="tag" :tag="tag" on-photo />
+      </span>
     </button>
     <div class="pt-body">
       <button type="button" class="pt-name" @click="$emit('open', product)">{{ product.product_name }}</button>
@@ -36,6 +39,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import { sizedImage, sizedSrcset } from "../../utils/cloudinaryImage.js";
+import ProductTag from "./ProductTag.vue";
 
 /** Small product card for the shop's Top Selling row and the bouquet finder */
 const props = defineProps({
@@ -43,6 +47,8 @@ const props = defineProps({
   bestSeller: { type: Boolean, default: false },
   adding: { type: Boolean, default: false },
   compact: { type: Boolean, default: false },
+  // The row it sits in can add its own tag: "you_may_like", "recently_viewed"
+  contextTag: { type: String, default: "" },
 });
 defineEmits(["open", "add"]);
 
@@ -51,11 +57,16 @@ const image = computed(() => props.product.primary_image?.image_url || props.pro
 const onSale = computed(
   () => props.product.has_discount && Number(props.product.discount_price) > 0 && Number(props.product.discount_price) < Number(props.product.selling_price),
 );
-const badge = computed(() => {
-  if (props.product.quantity_in_stock === 0) return { text: "Sold out", tone: "muted" };
-  if (onSale.value) return { text: "On sale", tone: "sale" };
-  if (props.bestSeller) return { text: "Best seller", tone: "best" };
-  return null;
+/**
+ * The shop's tags come with the product (card_tags, as many as the admin
+ * allows). A product saved before tags existed falls back to Sale / Best seller.
+ */
+const tags = computed(() => {
+  const own = Array.isArray(props.product.card_tags)
+    ? props.product.card_tags
+    : [onSale.value && "sale", props.bestSeller && "best_seller"].filter(Boolean);
+  const list = [props.contextTag, Number(props.product.quantity_in_stock) === 0 && "out_of_stock", ...own].filter(Boolean);
+  return [...new Set(list)].slice(0, 3);
 });
 const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`;
 </script>
@@ -118,29 +129,15 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
 }
 
 /* Same badge as the featured cards (FeaturedPicks) */
-.pt-badge {
+.pt-tags {
   position: absolute;
   top: 10px;
   left: 10px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #fff;
-}
-
-.pt-badge.best {
-  background: var(--leaf-deep);
-}
-
-.pt-badge.sale {
-  background: #b3413b;
-}
-
-.pt-badge.muted {
-  background: rgba(54, 63, 78, 0.78);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  pointer-events: none;
 }
 
 .pt-body {
