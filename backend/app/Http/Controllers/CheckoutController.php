@@ -309,8 +309,10 @@ class CheckoutController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'payment_method' => 'required|in:ewallet,cod',
-                'delivery_address' => 'required|string',
-                'contact_number' => 'required|string',
+                // The e-wallet the customer picked at checkout; PayMongo then opens only that one
+                'ewallet_type' => 'nullable|in:gcash,paymaya',
+                'delivery_address' => 'required|string|max:500',
+                'contact_number' => 'required|string|max:30',
                 'delivery_notes' => 'nullable|string',
                 'customer_notes' => 'nullable|string',
                 'reservation_date' => 'required|date_format:Y-m-d',
@@ -636,7 +638,7 @@ class CheckoutController extends Controller
 
                 // Handle payment
                 if ($paymentMethod === 'ewallet') {
-                    $paymentResponse = $this->createPayMongoPayment($order, $paymentMethod);
+                    $paymentResponse = $this->createPayMongoPayment($order, $paymentMethod, $request->input('ewallet_type'));
                     
                     if ($paymentResponse['success']) {
                         $order->update([
@@ -904,8 +906,10 @@ class CheckoutController extends Controller
     /**
      * Create PayMongo payment
      */
-    private function createPayMongoPayment(Order $order, string $paymentMethod)
+    private function createPayMongoPayment(Order $order, string $paymentMethod, ?string $ewalletType = null)
     {
+        // GCash or Maya, as picked at checkout; both when it wasn't (older pages)
+        $walletTypes = in_array($ewalletType, ['gcash', 'paymaya'], true) ? [$ewalletType] : ['gcash', 'paymaya'];
         $paymentMethod = $this->normalizePaymentMethod($paymentMethod);
         $secretKey = $this->getPayMongoSecretKey();
 
@@ -953,7 +957,7 @@ class CheckoutController extends Controller
                                 'name' => 'Order #' . $order->order_number,
                             ]
                         ],
-                        'payment_method_types' => ['gcash', 'paymaya'],
+                        'payment_method_types' => $walletTypes,
                         'success_url' => $callbackUrl
                             . '?success=true&order_id=' . urlencode((string) $order->id)
                             . '&reference=' . urlencode($referenceNumber),
@@ -976,7 +980,7 @@ class CheckoutController extends Controller
             Log::info('Creating PayMongo checkout session', [
                 'order_id' => $order->id,
                 'payment_method' => $paymentMethod,
-                'checkout_methods' => ['gcash', 'paymaya'],
+                'checkout_methods' => $walletTypes,
                 'amount_centavos' => $checkoutData['data']['attributes']['line_items'][0]['amount'],
                 'success_url' => $checkoutData['data']['attributes']['success_url'],
                 'cancel_url' => $checkoutData['data']['attributes']['cancel_url'],

@@ -3,401 +3,248 @@
   <div class="checkout-page bc-theme">
     <NavHeader :cartCount="0" />
 
-    <main class="bc-container checkout-container">
-      <header class="checkout-header">
-        <div>
-          <p class="bc-label">Secure checkout</p>
-          <h1>Complete your <em>order</em></h1>
+    <main class="bc-container co-main">
+      <!-- Title and the three steps -->
+      <header class="co-head">
+        <div class="co-title">
+          <p class="co-eyebrow">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+            Secure checkout
+          </p>
+          <h1>Checkout</h1>
         </div>
-        <ol class="step-indicator" aria-label="Checkout steps">
+        <ol class="co-steps" aria-label="Checkout steps">
           <li
-            class="step"
-            :class="{ active: currentStep >= 1, completed: currentStep > 1 }"
-            :aria-current="currentStep === 1 ? 'step' : undefined"
+            v-for="s in STEPS"
+            :key="s.n"
+            class="co-step"
+            :class="{ on: currentStep === s.n, done: currentStep > s.n }"
+            :aria-current="currentStep === s.n ? 'step' : undefined"
           >
-            <span class="step-number">i</span>
-            <span class="step-label">Delivery date</span>
-          </li>
-          <li class="step-line" :class="{ active: currentStep > 1 }" aria-hidden="true"></li>
-          <li
-            class="step"
-            :class="{ active: currentStep >= 2, completed: currentStep > 2 }"
-            :aria-current="currentStep === 2 ? 'step' : undefined"
-          >
-            <span class="step-number">ii</span>
-            <span class="step-label">Review order</span>
-          </li>
-          <li class="step-line" :class="{ active: currentStep > 2 }" aria-hidden="true"></li>
-          <li
-            class="step"
-            :class="{ active: currentStep >= 3 }"
-            :aria-current="currentStep === 3 ? 'step' : undefined"
-          >
-            <span class="step-number">iii</span>
-            <span class="step-label">Payment</span>
+            <button type="button" :disabled="s.n >= currentStep || isProcessing" @click="goToStep(s.n)">
+              <span class="co-step-num">
+                <svg v-if="currentStep > s.n" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
+                <template v-else>{{ s.n }}</template>
+              </span>
+              <span class="co-step-text">
+                <small>Step {{ s.n }}</small>
+                {{ s.label }}
+              </span>
+            </button>
           </li>
         </ol>
       </header>
 
-      <!-- Skeleton while checkout details load -->
-      <div
-        v-if="isLoading"
-        class="checkout-content"
-        aria-label="Loading checkout details"
-      >
-        <div class="section-card">
-          <span class="bc-skeleton skeleton-line skeleton-title"></span>
-          <span class="bc-skeleton skeleton-line skeleton-text"></span>
-          <div class="skeleton-calendar">
-            <span v-for="n in 35" :key="n" class="bc-skeleton skeleton-day"></span>
+      <!-- Loading: the same shapes as the page -->
+      <div v-if="isLoading" class="co-grid" aria-label="Loading checkout details">
+        <div class="co-card">
+          <span class="bc-skeleton sk-line sk-title"></span>
+          <span class="bc-skeleton sk-line"></span>
+          <div class="sk-fields">
+            <span v-for="n in 4" :key="n" class="bc-skeleton sk-field"></span>
           </div>
+          <div class="sk-cal"><span v-for="n in 35" :key="n" class="bc-skeleton sk-day"></span></div>
         </div>
-        <aside class="summary-card">
-          <span class="bc-skeleton skeleton-line skeleton-title"></span>
-          <div v-for="n in 2" :key="n" class="skeleton-summary-item">
-            <span class="bc-skeleton skeleton-thumb"></span>
-            <span class="bc-skeleton skeleton-line"></span>
+        <aside class="co-summary">
+          <span class="bc-skeleton sk-line sk-title"></span>
+          <div v-for="n in 2" :key="n" class="sk-item">
+            <span class="bc-skeleton sk-thumb"></span>
+            <span class="bc-skeleton sk-line"></span>
           </div>
-          <span class="bc-skeleton skeleton-line skeleton-total"></span>
+          <span class="bc-skeleton sk-line sk-total"></span>
         </aside>
       </div>
 
-      <div v-else class="checkout-content">
-        <!-- Left: steps -->
-        <div class="checkout-steps">
-          <!-- Step 1: Choose Delivery Date -->
-          <section v-if="currentStep === 1" class="section-card">
-            <h2>Choose your <em>delivery date</em></h2>
-            <p class="section-description">
-              Select a date for your order delivery. Available dates are shown
-              in the calendar.
-            </p>
-
-            <ul class="calendar-legend">
-              <li class="legend-item">
-                <span class="legend-dot dot-today"></span>
-                <span class="legend-text">{{ todayLegendText }}</span>
-              </li>
-              <li class="legend-item">
-                <span class="legend-dot dot-prep"></span>
-                <span class="legend-text">Preparation time</span>
-              </li>
-              <li class="legend-item">
-                <span class="legend-dot dot-available"></span>
-                <span class="legend-text">Available</span>
-              </li>
-              <li class="legend-item">
-                <span class="legend-dot dot-almost"></span>
-                <span class="legend-text">Almost full</span>
-              </li>
-              <li class="legend-item">
-                <span class="legend-dot dot-full"></span>
-                <span class="legend-text">Fully booked</span>
-              </li>
-              <li class="legend-item">
-                <span class="legend-dot dot-disabled"></span>
-                <span class="legend-text">Not available</span>
-              </li>
-            </ul>
-
-            <div class="inline-calendar">
-              <p v-if="vendorReservationNotice" class="vendor-calendar-note">
-                {{ vendorReservationNotice }}
-              </p>
-
-              <div class="calendar-header">
-                <button
-                  @click="previousMonth"
-                  class="btn-nav"
-                  :disabled="!canGoPrevious"
-                  aria-label="Previous month"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M15 6l-6 6 6 6" />
-                  </svg>
-                </button>
-                <h3 class="calendar-title" aria-live="polite">
-                  {{ currentMonthName }} {{ currentYear }}
-                </h3>
-                <button
-                  @click="nextMonth"
-                  class="btn-nav"
-                  :disabled="!canGoNext"
-                  aria-label="Next month"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M9 6l6 6-6 6" />
-                  </svg>
-                </button>
+      <div v-else class="co-grid">
+        <div class="co-flow">
+          <!-- ═══ Step 1: Delivery information ═══ -->
+          <section v-if="currentStep === 1" class="co-card" aria-labelledby="co-step1">
+            <div class="co-card-head">
+              <span class="co-card-num" aria-hidden="true">1</span>
+              <div>
+                <h2 id="co-step1">Delivery information</h2>
+                <p>Who it's for, where it goes, and when.</p>
               </div>
+            </div>
 
-              <div class="calendar-grid">
-                <div
-                  v-for="day in dayHeaders"
-                  :key="day"
-                  class="day-header"
-                  aria-hidden="true"
-                >
-                  {{ day }}
-                </div>
-
-                <button
-                  v-for="day in calendarDays"
-                  :key="day.dateString"
-                  type="button"
-                  class="calendar-day"
-                  :class="{
-                    'other-month': !day.isCurrentMonth,
-                    'is-selected': selectedDate === day.dateString,
-                    'is-disabled': day.isDisabled,
-                    [day.colorClass]: true,
-                  }"
-                  :aria-disabled="day.isDisabled"
-                  :aria-pressed="selectedDate === day.dateString"
-                  :aria-label="`${day.dateString}${day.label ? ', ' + day.label : ''}`"
-                  @click="selectDate(day)"
-                >
-                  <span class="day-number">{{ day.day }}</span>
-                  <span v-if="day.label" class="day-label">{{ day.label }}</span>
-                </button>
+            <!-- Customer details -->
+            <div class="co-block">
+              <div class="co-block-head">
+                <h3>Your details</h3>
+                <router-link :to="{ name: 'Profile' }" class="co-link">Edit in profile</router-link>
               </div>
-
-              <p v-if="selectedDate" class="selected-date-display">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <rect x="4" y="5" width="16" height="15" rx="2" />
-                  <path d="M4 10h16M9 3v4M15 3v4" />
-                </svg>
-                <span
-                  >Selected date: <strong>{{ formatSelectedDate }}</strong></span
-                >
-              </p>
-            </div>
-
-            <div class="step-actions">
-              <button
-                class="bc-link step-back"
-                @click="$router.push('/customer/cart')"
-              >
-                Back to cart
-              </button>
-              <button
-                class="bc-btn bc-btn--dark"
-                @click="goToStep(2)"
-                :disabled="!selectedDate"
-              >
-                Continue to review
-                <span class="bc-btn-arrow" aria-hidden="true">→</span>
-              </button>
-            </div>
-          </section>
-
-          <!-- Step 2: Review Order -->
-          <section v-if="currentStep === 2" class="section-card">
-            <h2>Review your <em>order</em></h2>
-
-            <div class="info-section">
-              <h3 class="bc-label">Delivery information</h3>
-              <dl class="info-grid">
-                <div class="info-row">
-                  <dt class="info-label">Name</dt>
-                  <dd class="info-value">{{ checkoutData.user?.name || "N/A" }}</dd>
+              <div class="co-person">
+                <span class="co-avatar" aria-hidden="true">{{ initials }}</span>
+                <div>
+                  <strong>{{ checkoutData.user?.name || "Your name" }}</strong>
+                  <span>{{ checkoutData.user?.email }}</span>
                 </div>
-                <div class="info-row">
-                  <dt class="info-label">Email</dt>
-                  <dd class="info-value">{{ checkoutData.user?.email || "N/A" }}</dd>
-                </div>
-                <div class="info-row">
-                  <dt class="info-label">Phone</dt>
-                  <dd class="info-value">
-                    {{ checkoutData.user?.contact_number || "N/A" }}
-                  </dd>
-                </div>
-                <div class="info-row">
-                  <dt class="info-label">Address</dt>
-                  <dd class="info-value">{{ checkoutData.user?.address || "N/A" }}</dd>
-                </div>
-                <div class="info-row">
-                  <dt class="info-label">Delivery date</dt>
-                  <dd class="info-value">{{ formatSelectedDate }}</dd>
-                </div>
-              </dl>
-            </div>
-
-            <div class="info-section">
-              <h3 class="bc-label">Store information</h3>
-              <dl class="info-grid">
-                <div class="info-row">
-                  <dt class="info-label">Store name</dt>
-                  <dd class="info-value">
-                    {{
-                      checkoutData.vendor?.store_name ||
-                      checkoutData.vendor?.display_name ||
-                      "N/A"
-                    }}
-                  </dd>
-                </div>
-                <div class="info-row">
-                  <dt class="info-label">Email</dt>
-                  <dd class="info-value">{{ checkoutData.vendor?.email || "N/A" }}</dd>
-                </div>
-                <div class="info-row">
-                  <dt class="info-label">Contact</dt>
-                  <dd class="info-value">
-                    {{ checkoutData.vendor?.contact_number || "N/A" }}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-
-            <div class="info-section">
-              <h3 class="bc-label">Order items</h3>
-              <div
-                v-for="entry in shortBouquets"
-                :key="entry.key"
-                class="short-note"
-                role="status"
-              >
-                <span class="short-note-icon" aria-hidden="true">!</span>
-                <div class="short-note-copy">
-                  <strong>{{ shortBouquets.length > 1 ? "A custom bouquet isn't full" : "Your custom bouquet isn't full" }}</strong>
-                  <span>
-                    You chose {{ entry.short.size }} flowers but only placed {{ entry.short.placed }}.
-                    {{ entry.short.missing === 1 ? "1 spot is" : `${entry.short.missing} spots are` }} still empty, so it will look smaller than you picked.
-                  </span>
-                </div>
-                <button type="button" class="short-note-fill" @click="fillBouquet(entry)">Fill it</button>
               </div>
-              <ul class="order-items-list">
-                <li
-                  v-for="(item, index) in checkoutData.items"
-                  :key="item.cart_item_id ?? `${item.product_id}-${index}`"
-                  class="order-item"
-                >
-                  <div class="item-image-small">
-                    <img
-                      :src="item.product_image || FALLBACK_IMAGE"
-                      :alt="item.product_name"
-                      @error="handleImageError"
-                    />
-                  </div>
+            </div>
 
-                  <div class="item-info">
-                    <h4>{{ item.product_name || "Unknown Product" }}</h4>
-                    <p class="item-meta">Quantity {{ item.quantity }}</p>
-                    <p v-if="hasDiscount(item)" class="item-price-group">
-                      <span class="price-discounted"
-                        >₱{{ formatPrice(effectivePrice(item)) }}</span
-                      >
-                      <span class="price-original"
-                        >₱{{ formatPrice(originalPrice(item)) }}</span
-                      >
-                      <span class="price-badge"
-                        >{{ discountPercent(item) }}% off</span
-                      >
-                    </p>
-                    <p v-else class="item-price">
-                      ₱{{ formatPrice(effectivePrice(item)) }} ×
-                      {{ item.quantity }}
-                    </p>
-                  </div>
+            <!-- Address and contact number (from the profile; changes here are for this order only) -->
+            <div class="co-block">
+              <h3>Delivery address</h3>
+              <label class="co-field">
+                <span class="sr-only">Delivery address</span>
+                <textarea
+                  v-model="deliveryAddress"
+                  rows="2"
+                  maxlength="500"
+                  placeholder="House number, street, barangay, city"
+                  :class="{ invalid: touched.address && !addressOk }"
+                  @blur="touched.address = true"
+                ></textarea>
+              </label>
+              <p v-if="touched.address && !addressOk" class="co-error" role="alert">Add the full address so the shop can find it.</p>
 
-                  <div class="item-total">
-                    ₱{{ formatPrice(lineTotal(item)) }}
-                  </div>
-                </li>
+              <h3 class="co-mt">Contact number</h3>
+              <label class="co-field co-field--icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></svg>
+                <span class="sr-only">Contact number</span>
+                <input
+                  v-model="contactNumber"
+                  type="tel"
+                  inputmode="tel"
+                  autocomplete="tel"
+                  maxlength="20"
+                  placeholder="09XX XXX XXXX"
+                  :class="{ invalid: touched.contact && !contactOk }"
+                  @blur="touched.contact = true"
+                />
+              </label>
+              <p v-if="touched.contact && !contactOk" class="co-error" role="alert">Enter a mobile number the rider can call, like 0917 123 4567.</p>
+              <p class="co-hint">Changes here are for this order only. Your profile stays the same.</p>
+            </div>
+
+            <!-- Preferred delivery date -->
+            <div class="co-block">
+              <div class="co-block-head">
+                <h3>Preferred delivery date</h3>
+                <span v-if="selectedDate" class="co-chosen">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
+                  {{ formatSelectedDate }}
+                </span>
+              </div>
+              <ul class="co-facts">
+                <li v-for="fact in deliveryFacts" :key="fact">{{ fact }}</li>
               </ul>
+
+              <div class="co-cal">
+                <div class="co-cal-head">
+                  <button type="button" class="co-icon-btn" :disabled="!canGoPrevious" aria-label="Previous month" @click="previousMonth">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+                  </button>
+                  <h4 aria-live="polite">{{ currentMonthName }} {{ currentYear }}</h4>
+                  <button type="button" class="co-icon-btn" :disabled="!canGoNext" aria-label="Next month" @click="nextMonth">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                  </button>
+                </div>
+                <div class="co-cal-grid">
+                  <span v-for="d in dayHeaders" :key="d" class="co-dow" aria-hidden="true">{{ d.slice(0, 2) }}</span>
+                  <button
+                    v-for="day in calendarDays"
+                    :key="day.dateString"
+                    type="button"
+                    class="co-day"
+                    :class="{
+                      out: !day.isCurrentMonth,
+                      picked: selectedDate === day.dateString,
+                      off: day.isDisabled,
+                      [day.colorClass]: true,
+                    }"
+                    :aria-disabled="day.isDisabled"
+                    :aria-pressed="selectedDate === day.dateString"
+                    :aria-label="`${day.dateString}${day.label ? ', ' + day.label : ''}`"
+                    @click="selectDate(day)"
+                  >
+                    <span>{{ day.day }}</span>
+                    <small v-if="day.label">{{ day.label }}</small>
+                  </button>
+                </div>
+                <ul class="co-legend">
+                  <li><i class="lg-available"></i>Available</li>
+                  <li><i class="lg-almost"></i>Almost full</li>
+                  <li><i class="lg-prep"></i>Preparing</li>
+                  <li><i class="lg-full"></i>Fully booked</li>
+                  <li><i class="lg-off"></i>Closed</li>
+                </ul>
+              </div>
             </div>
 
-            <div class="info-section">
-              <label class="bc-label" for="customer-notes"
-                >Special instructions (optional)</label
-              >
+            <!-- Notes for the shop -->
+            <div class="co-block">
+              <label class="co-block-head" for="co-notes"><h3>Notes for the shop <small>(optional)</small></h3></label>
               <textarea
-                id="customer-notes"
+                id="co-notes"
                 v-model="customerNotes"
-                class="notes-textarea"
-                placeholder="Add any special instructions for your order..."
-                rows="4"
+                class="co-textarea"
+                rows="3"
+                maxlength="1000"
+                placeholder="Gate code, card message, “please call when outside”…"
               ></textarea>
             </div>
 
-            <div class="step-actions">
-              <button class="bc-link step-back" @click="goToStep(1)">
-                Back to calendar
+            <div class="co-actions">
+              <button type="button" class="co-back" @click="$router.push('/customer/cart')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+                Back to cart
               </button>
-              <button class="bc-btn bc-btn--dark" @click="goToStep(3)">
+              <button type="button" class="co-btn" @click="goToStep(2)">
                 Continue to payment
-                <span class="bc-btn-arrow" aria-hidden="true">→</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
               </button>
             </div>
           </section>
 
-          <!-- Step 3: Payment -->
-          <section v-if="currentStep === 3" class="section-card">
-            <h2>Payment <em>method</em></h2>
-            <p class="section-description">Choose your preferred payment method</p>
+          <!-- ═══ Step 2: Payment method ═══ -->
+          <section v-if="currentStep === 2" class="co-card" aria-labelledby="co-step2">
+            <div class="co-card-head">
+              <span class="co-card-num" aria-hidden="true">2</span>
+              <div>
+                <h2 id="co-step2">Payment method</h2>
+                <p>How would you like to pay?</p>
+              </div>
+            </div>
 
-            <div
-              class="payment-methods-grid"
-              role="radiogroup"
-              aria-label="Payment method"
-            >
+            <div class="co-pay" role="radiogroup" aria-label="Payment method">
               <label
-                v-for="method in availablePaymentMethods"
-                :key="method.type"
-                class="payment-method-card"
-                :class="{
-                  selected: selectedPaymentMethod === method.type,
-                  'is-locked': isProcessing,
-                }"
+                v-for="option in payOptions"
+                :key="option.key"
+                class="co-pay-option"
+                :class="{ on: payChoice === option.key, locked: isProcessing }"
               >
-                <input
-                  type="radio"
-                  name="payment"
-                  :value="method.type"
-                  v-model="selectedPaymentMethod"
-                  :disabled="isProcessing"
-                />
-                <span class="payment-icon" aria-hidden="true">
-                  <svg v-if="method.type === 'ewallet'" viewBox="0 0 24 24">
-                    <rect x="6" y="3" width="12" height="18" rx="2.5" />
-                    <path d="M11 18h2" />
-                  </svg>
-                  <svg v-else viewBox="0 0 24 24">
-                    <rect x="3" y="7" width="18" height="11" rx="2" />
-                    <circle cx="12" cy="12.5" r="2.5" />
-                  </svg>
+                <input v-model="payChoice" type="radio" name="payment" :value="option.key" :disabled="isProcessing" />
+                <span class="co-pay-mark" :class="option.key" aria-hidden="true">
+                  <svg v-if="option.key === 'cod'" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="11" rx="2" /><circle cx="12" cy="12.5" r="2.5" /></svg>
+                  <template v-else>{{ option.mark }}</template>
                 </span>
-                <span class="payment-info">
-                  <span class="payment-name">{{ method.name }}</span>
-                  <span class="payment-description">{{ method.description }}</span>
+                <span class="co-pay-text">
+                  <strong>{{ option.name }}</strong>
+                  <small>{{ option.desc }}</small>
                 </span>
-                <span class="payment-radio" aria-hidden="true"></span>
+                <span class="co-radio" aria-hidden="true"></span>
               </label>
             </div>
+            <p v-if="!payOptions.length" class="co-error">This shop can't take payments right now. Please try again later or message the shop.</p>
 
-            <div
-              v-if="selectedPaymentMethod === 'ewallet'"
-              class="payment-note"
-            >
-              <h3 class="bc-label">Payment details</h3>
-              <p>
-                You will be redirected to a secure payment page to complete your
-                transaction.
-              </p>
+            <div v-if="payChoice === 'cod'" class="co-note">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
+              <div>
+                <strong>Pay the rider when it arrives</strong>
+                <span>Have ₱{{ formatPrice(totalAmount) }} ready, and keep your phone on so the rider can reach you.</span>
+              </div>
             </div>
-
-            <div v-if="selectedPaymentMethod === 'cod'" class="payment-note">
-              <h3 class="bc-label">Cash on delivery instructions</h3>
-              <ul class="instructions-list">
-                <li>Pay when you receive your order</li>
-                <li>Have exact amount ready for delivery</li>
-                <li>Ensure contact number is correct</li>
-              </ul>
+            <div v-else-if="payChoice" class="co-note">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+              <div>
+                <strong>You'll pay on PayMongo's secure page</strong>
+                <span>After you place the order, we open {{ payChoice === "gcash" ? "GCash" : "Maya" }} to finish paying. Nothing is charged until you confirm there.</span>
+              </div>
             </div>
 
             <!-- Offers: unticked unless they choose it; hidden if they already get offers -->
-            <label v-if="showOfferOptIn" class="offer-optin">
+            <label v-if="showOfferOptIn" class="co-optin">
               <input v-model="offerOptIn" type="checkbox" />
               <span>
                 <strong>Send me offers from shops I order from</strong>
@@ -405,108 +252,154 @@
               </span>
             </label>
 
-            <div class="step-actions">
-              <button
-                class="bc-link step-back"
-                :disabled="isProcessing"
-                @click="goToStep(2)"
-              >
-                Back to review
+            <div class="co-actions">
+              <button type="button" class="co-back" :disabled="isProcessing" @click="goToStep(1)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+                Delivery
               </button>
-              <button
-                class="bc-btn bc-btn--dark btn-place-order"
-                @click="placeOrder"
-                :disabled="!selectedPaymentMethod || isProcessing"
-                :aria-busy="isProcessing"
-              >
-                <span v-if="isProcessing">Processing...</span>
-                <span v-else>Place order</span>
+              <button type="button" class="co-btn" :disabled="!payChoice" @click="goToStep(3)">
+                Review order
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
               </button>
             </div>
           </section>
-        </div>
 
-        <!-- Right: order summary -->
-        <aside class="summary-card" aria-labelledby="summary-title">
-          <div class="summary-header">
-            <h2 id="summary-title">Order <em>summary</em></h2>
-            <span class="item-count-badge">
-              {{ checkoutData.items?.length || 0 }} item{{
-                checkoutData.items?.length !== 1 ? "s" : ""
-              }}
-            </span>
-          </div>
-
-          <ul class="summary-items-list">
-            <li
-              v-for="(item, index) in checkoutData.items"
-              :key="item.cart_item_id ?? `${item.product_id}-${index}`"
-              class="summary-item"
-            >
-              <div class="summary-item-img">
-                <img
-                  :src="item.product_image || FALLBACK_IMAGE"
-                  :alt="item.product_name"
-                  @error="handleImageError"
-                />
-                <span class="summary-item-qty">{{ item.quantity }}</span>
+          <!-- ═══ Step 3: Review and place order ═══ -->
+          <section v-if="currentStep === 3" class="co-card" aria-labelledby="co-step3">
+            <div class="co-card-head">
+              <span class="co-card-num" aria-hidden="true">3</span>
+              <div>
+                <h2 id="co-step3">Review and place order</h2>
+                <p>Check everything once more.</p>
               </div>
-              <div class="summary-item-info">
-                <p class="summary-item-name">{{ item.product_name }}</p>
-                <p class="summary-item-pricing">
-                  <template v-if="item.discount_price">
-                    <span class="summary-item-price"
-                      >₱{{ formatPrice(item.discount_price) }}</span
-                    >
-                    <span class="summary-item-original"
-                      >₱{{ formatPrice(item.original_price) }}</span
-                    >
-                  </template>
-                  <span v-else class="summary-item-price"
-                    >₱{{ formatPrice(item.unit_price) }}</span
-                  >
+            </div>
+
+            <div class="co-review">
+              <div class="co-review-box">
+                <div class="co-block-head">
+                  <h3>Delivery</h3>
+                  <button type="button" class="co-link" :disabled="isProcessing" @click="goToStep(1)">Edit</button>
+                </div>
+                <dl class="co-dl">
+                  <div><dt>To</dt><dd>{{ checkoutData.user?.name }} · {{ contactNumber }}</dd></div>
+                  <div><dt>Address</dt><dd>{{ deliveryAddress }}</dd></div>
+                  <div><dt>Date</dt><dd>{{ formatSelectedDate }}</dd></div>
+                  <div v-if="customerNotes"><dt>Notes</dt><dd class="co-pre">{{ customerNotes }}</dd></div>
+                </dl>
+              </div>
+              <div class="co-review-box">
+                <div class="co-block-head">
+                  <h3>Payment</h3>
+                  <button type="button" class="co-link" :disabled="isProcessing" @click="goToStep(2)">Edit</button>
+                </div>
+                <p class="co-paid-with">
+                  <span class="co-pay-mark sm" :class="payChoice" aria-hidden="true">
+                    <svg v-if="payChoice === 'cod'" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="11" rx="2" /><circle cx="12" cy="12.5" r="2.5" /></svg>
+                    <template v-else>{{ payChoice === "gcash" ? "G" : "M" }}</template>
+                  </span>
+                  {{ chosenPayName }}
                 </p>
               </div>
-              <div class="summary-item-total">
-                ₱{{ formatPrice(effectivePrice(item) * item.quantity) }}
+            </div>
+
+            <!-- Ordered products -->
+            <div class="co-block">
+              <div class="co-block-head">
+                <h3>Ordered products</h3>
+                <span class="co-soft">From {{ checkoutData.vendor?.store_name || "the shop" }}</span>
               </div>
+              <div v-for="entry in shortBouquets" :key="entry.key" class="co-warn" role="status">
+                <span class="co-warn-icon" aria-hidden="true">!</span>
+                <div>
+                  <strong>{{ shortBouquets.length > 1 ? "A custom bouquet isn't full" : "Your custom bouquet isn't full" }}</strong>
+                  <span>
+                    You chose {{ entry.short.size }} flowers but only placed {{ entry.short.placed }}.
+                    {{ entry.short.missing === 1 ? "1 spot is" : `${entry.short.missing} spots are` }} still empty.
+                  </span>
+                </div>
+                <button type="button" class="co-link" @click="fillBouquet(entry)">Fill it</button>
+              </div>
+              <ul class="co-items">
+                <li v-for="(item, index) in checkoutData.items" :key="item.cart_item_id ?? `${item.product_id}-${index}`" class="co-item">
+                  <span class="co-item-img">
+                    <img :src="item.product_image || FALLBACK_IMAGE" :alt="item.product_name" @error="handleImageError" />
+                  </span>
+                  <span class="co-item-main">
+                    <strong>{{ item.product_name || "Product" }}</strong>
+                    <small>
+                      Qty {{ item.quantity }}
+                      <template v-if="item.color"> · {{ item.color }}</template>
+                      · ₱{{ formatPrice(effectivePrice(item)) }} each
+                      <span v-if="hasDiscount(item)" class="co-off">−{{ discountPercent(item) }}%</span>
+                    </small>
+                  </span>
+                  <span class="co-item-total">₱{{ formatPrice(lineTotal(item)) }}</span>
+                </li>
+              </ul>
+            </div>
+
+            <!-- Amounts -->
+            <dl class="co-totals">
+              <div><dt>Subtotal</dt><dd>₱{{ formatPrice(checkoutOriginalTotal) }}</dd></div>
+              <div v-if="checkoutTotalSavings > 0" class="save"><dt>Discount</dt><dd>−₱{{ formatPrice(checkoutTotalSavings) }}</dd></div>
+              <div><dt>Delivery fee</dt><dd class="free">{{ deliveryFee > 0 ? `₱${formatPrice(deliveryFee)}` : "Free" }}</dd></div>
+              <div class="grand"><dt>Total amount</dt><dd>₱{{ formatPrice(totalAmount) }}</dd></div>
+            </dl>
+
+            <div class="co-actions co-actions--final">
+              <button type="button" class="co-back" :disabled="isProcessing" @click="goToStep(2)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+                Payment
+              </button>
+              <button type="button" class="co-btn co-btn--place" :disabled="!selectedPaymentMethod || isProcessing" :aria-busy="isProcessing" @click="placeOrder">
+                <template v-if="isProcessing">Placing your order…</template>
+                <template v-else>
+                  {{ payChoice === "cod" ? "Place order" : "Place order and pay" }} · ₱{{ formatPrice(totalAmount) }}
+                </template>
+              </button>
+            </div>
+            <p class="co-terms">By placing your order you agree to the shop's terms and BloomCraft's policies.</p>
+          </section>
+        </div>
+
+        <!-- ═══ Order summary (every step) ═══ -->
+        <aside class="co-summary" aria-labelledby="co-sum-title">
+          <div class="co-sum-head">
+            <h2 id="co-sum-title">Order summary</h2>
+            <span class="co-count">{{ itemCount }} {{ itemCount === 1 ? "item" : "items" }}</span>
+          </div>
+          <p v-if="checkoutData.vendor?.store_name" class="co-shop">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9l2-5h12l2 5M4 9h16v11H4zM9 20v-5h6v5" /></svg>
+            {{ checkoutData.vendor.store_name }}
+          </p>
+          <ul class="co-sum-items">
+            <li v-for="(item, index) in checkoutData.items" :key="item.cart_item_id ?? `${item.product_id}-${index}`">
+              <span class="co-sum-img">
+                <img :src="item.product_image || FALLBACK_IMAGE" :alt="item.product_name" @error="handleImageError" />
+                <b>{{ item.quantity }}</b>
+              </span>
+              <span class="co-sum-name">{{ item.product_name }}</span>
+              <span class="co-sum-price">₱{{ formatPrice(effectivePrice(item) * item.quantity) }}</span>
             </li>
           </ul>
-
-          <div class="summary-breakdown">
-            <div class="breakdown-row">
-              <span>Original price</span>
-              <span>₱{{ formatPrice(checkoutOriginalTotal) }}</span>
-            </div>
-            <div class="breakdown-row savings-row" v-if="checkoutTotalSavings > 0">
-              <span>Discount savings</span>
-              <span class="savings-amount"
-                >−₱{{ formatPrice(checkoutTotalSavings) }}</span
-              >
-            </div>
-          </div>
-
-          <p v-if="checkoutTotalSavings > 0" class="savings-banner">
-            You save ₱{{ formatPrice(checkoutTotalSavings) }} on this order.
+          <dl class="co-totals co-totals--side">
+            <div><dt>Subtotal</dt><dd>₱{{ formatPrice(checkoutOriginalTotal) }}</dd></div>
+            <div v-if="checkoutTotalSavings > 0" class="save"><dt>Discount</dt><dd>−₱{{ formatPrice(checkoutTotalSavings) }}</dd></div>
+            <div><dt>Delivery fee</dt><dd class="free">{{ deliveryFee > 0 ? `₱${formatPrice(deliveryFee)}` : "Free" }}</dd></div>
+            <div class="grand"><dt>Total</dt><dd>₱{{ formatPrice(totalAmount) }}</dd></div>
+          </dl>
+          <p v-if="selectedDate" class="co-sum-date">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></svg>
+            Delivery on <strong>{{ formatSelectedDate }}</strong>
           </p>
-
-          <div class="summary-total-row">
-            <div class="total-label">
-              <span>Total</span>
-              <span class="total-note">Final order total</span>
-            </div>
-            <span class="total-amount">₱{{ formatPrice(totalAmount) }}</span>
-          </div>
-
-          <ul class="summary-notes">
-            <li>Your order will be thoughtfully prepared.</li>
-            <li>No delivery fee is included in this checkout.</li>
-          </ul>
+          <p class="co-secure">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z" /><path d="m9 12 2 2 4-4" /></svg>
+            Payments are handled securely by PayMongo.
+          </p>
         </aside>
       </div>
     </main>
 
-    <!-- Back from PayMongo without paying: say why -->
     <!-- Asked before placing an order with a custom bouquet that isn't full -->
     <Teleport to="body">
       <div v-if="shortAsk" class="short-backdrop bc-theme" @click.self="shortAsk = false">
@@ -518,9 +411,9 @@
           aria-describedby="short-message"
           @keydown.esc="shortAsk = false"
         >
-          <p class="bc-label">Before you place the order</p>
+          <p class="co-eyebrow">Before you place the order</p>
           <h2 id="short-title">
-            {{ shortBouquets.length === 1 ? "Your bouquet isn't" : `${shortBouquets.length} bouquets aren't` }} <em>full</em> yet
+            {{ shortBouquets.length === 1 ? "Your bouquet isn't" : `${shortBouquets.length} bouquets aren't` }} full yet
           </h2>
           <p id="short-message">
             <template v-if="shortBouquets.length === 1">
@@ -530,15 +423,14 @@
             <template v-else>Some of your custom bouquets still have empty flower spots, so they'll look smaller than you picked.</template>
           </p>
           <div class="short-actions">
-            <button ref="shortFillButton" type="button" class="bc-btn bc-btn--dark" @click="fillBouquet(shortBouquets[0])">
-              Fill the rest of the flowers
-            </button>
-            <button type="button" class="bc-link short-anyway" @click="placeShortAnyway">Place order as it is</button>
+            <button ref="shortFillButton" type="button" class="co-btn" @click="fillBouquet(shortBouquets[0])">Fill the rest of the flowers</button>
+            <button type="button" class="co-link" @click="placeShortAnyway">Place order as it is</button>
           </div>
         </div>
       </div>
     </Teleport>
 
+    <!-- Back from PayMongo without paying: say why -->
     <PaymentFailedModal
       :show="paymentFailure.show"
       :failure="paymentFailure.failure"
@@ -550,7 +442,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import NavHeader from "../../layouts/NavHeader.vue";
 import PaymentFailedModal from "../../components/customer/PaymentFailedModal.vue";
@@ -573,6 +465,13 @@ const {
 } = usePrice();
 const router = useRouter();
 const route = useRoute();
+
+// The three steps
+const STEPS = [
+  { n: 1, label: "Delivery" },
+  { n: 2, label: "Payment" },
+  { n: 3, label: "Review" },
+];
 
 // State
 const currentStep = ref(1);
@@ -740,6 +639,68 @@ const customerNotes = ref("");
 const selectedPaymentMethod = ref(null);
 const availablePaymentMethods = ref([]);
 
+// ── Delivery details: from the profile, changeable for this order only ──
+const deliveryAddress = ref("");
+const contactNumber = ref("");
+const touched = reactive({ address: false, contact: false });
+const addressOk = computed(() => deliveryAddress.value.trim().length >= 8);
+// A Philippine mobile (09…, +63…) or any 10 to 13 digit number
+const contactOk = computed(() => {
+  const digits = contactNumber.value.replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 13;
+});
+const initials = computed(() =>
+  String(checkoutData.value.user?.name || "?")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join(""),
+);
+const itemCount = computed(() => (checkoutData.value.items || []).reduce((n, item) => n + Number(item.quantity || 0), 0));
+const deliveryFee = computed(() => Number(checkoutData.value.summary?.delivery_fee || 0));
+
+// ── Payment: GCash and Maya (both through PayMongo) or cash on delivery ──
+const payChoice = ref(null); // "gcash" | "paymaya" | "cod"
+const payOptions = computed(() => {
+  const types = availablePaymentMethods.value.map((m) => m.type);
+  const list = [];
+  if (types.includes("ewallet")) {
+    list.push({ key: "gcash", mark: "G", name: "GCash", desc: "Pay with your GCash wallet on PayMongo's secure page" });
+    list.push({ key: "paymaya", mark: "M", name: "Maya", desc: "Pay with your Maya wallet on PayMongo's secure page" });
+  }
+  if (types.includes("cod")) {
+    list.push({ key: "cod", name: "Cash on Delivery", desc: "Pay the rider in cash when your flowers arrive" });
+  }
+  return list;
+});
+const chosenPayName = computed(() => payOptions.value.find((o) => o.key === payChoice.value)?.name || "");
+// The order still says "ewallet" or "cod"; the wallet goes along as ewallet_type
+watch(payChoice, (choice) => {
+  if (choice) selectedPaymentMethod.value = choice === "cod" ? "cod" : "ewallet";
+});
+function syncPayChoice(saved = null) {
+  const keys = payOptions.value.map((o) => o.key);
+  if (saved && keys.includes(saved)) payChoice.value = saved;
+  else if (selectedPaymentMethod.value === "cod" && keys.includes("cod")) payChoice.value = "cod";
+  else payChoice.value = keys[0] || null;
+}
+
+// ── Delivery date hints, in place of the long notice ──
+const deliveryFacts = computed(() => {
+  const facts = [];
+  const lead = leadTimeDays.value;
+  const earliest = getPhilippinesToday();
+  earliest.setDate(earliest.getDate() + lead + 1);
+  facts.push(`Earliest: ${earliest.toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric" })}`);
+  if (lead > 0) facts.push(`${lead} ${lead === 1 ? "day" : "days"} to prepare`);
+  const s = vendorReservationSettings.value;
+  if (s.sameDayDelivery && s.sameDayAvailableToday) facts.push(`Same day until ${formatCutoffTime(s.cutoffTimeToday)}`);
+  else facts.push("No same-day delivery today");
+  if (selectedDate.value) facts.push(`${selectedDateRemainingCapacity.value} slots left that day`);
+  return facts;
+});
+
 // Day headers
 const dayHeaders = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -753,61 +714,6 @@ const currentYear = computed(() => calendarDate.value.getFullYear());
 const currentMonthName = computed(() =>
   calendarDate.value.toLocaleString("default", { month: "long" }),
 );
-
-const todayLegendText = computed(() =>
-  vendorReservationSettings.value.sameDayAvailableToday
-    ? "Today (Available)"
-    : "Today",
-);
-
-const selectedDateRemainingCapacity = computed(() => {
-  const availability = selectedDate.value
-    ? calendarData.value[selectedDate.value]
-    : null;
-  const maxOrders = Number(
-    availability?.max_orders ?? vendorReservationSettings.value.maxOrdersPerDay,
-  );
-  const ordersCount = Number(availability?.orders_count ?? 0);
-
-  return Math.max(
-    0,
-    (Number.isFinite(maxOrders) ? maxOrders : 0) -
-      (Number.isFinite(ordersCount) ? ordersCount : 0),
-  );
-});
-
-const vendorReservationNotice = computed(() => {
-  const parts = [];
-  const leadDays = leadTimeDays.value;
-
-  parts.push(
-    `Vendor capacity: ${selectedDateRemainingCapacity.value} orders remaining.`,
-  );
-  if (leadDays === 0) {
-    parts.push("No lead time required for future dates.");
-  } else if (leadDays === 1) {
-    parts.push("1 day lead time (starts tomorrow).");
-  } else {
-    parts.push(`${leadDays} days lead time (starts tomorrow).`);
-  }
-  parts.push(
-    `Earliest future delivery date is after ${leadDays} ${leadDays === 1 ? "day" : "days"} from tomorrow.`,
-  );
-
-  if (vendorReservationSettings.value.sameDayDelivery) {
-    if (vendorReservationSettings.value.sameDayAvailableToday) {
-      parts.push(
-        `Same-day delivery is available until ${formatCutoffTime(vendorReservationSettings.value.cutoffTimeToday)} PH time.`,
-      );
-    } else {
-      parts.push("Same-day delivery is not available for today.");
-    }
-  } else {
-    parts.push("Same-day delivery is not available.");
-  }
-
-  return parts.join(" ");
-});
 
 const formatSelectedDate = computed(() => {
   if (!selectedDate.value) return "";
@@ -1070,10 +976,26 @@ function nextMonth() {
   loadCalendarData();
 }
 
+/** Step 1 is done when the address, number and date are there */
+function deliveryReady() {
+  touched.address = true;
+  touched.contact = true;
+  if (!addressOk.value) return toast.warning("Add your delivery address first."), false;
+  if (!contactOk.value) return toast.warning("Add a contact number the rider can call."), false;
+  if (!selectedDate.value) return toast.warning("Pick a delivery date first."), false;
+  return true;
+}
+
 function goToStep(step) {
-  if (step === 2 && !selectedDate.value) {
-    toast.warning("Please select a delivery date first");
-    return;
+  if (step > currentStep.value) {
+    if (step >= 2 && !deliveryReady()) {
+      currentStep.value = 1;
+      return;
+    }
+    if (step === 3 && !payChoice.value) {
+      toast.warning("Choose how you'll pay first.");
+      return;
+    }
   }
   currentStep.value = step;
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1084,6 +1006,9 @@ function saveCheckoutDraft() {
     selectedDate: selectedDate.value,
     customerNotes: customerNotes.value,
     selectedPaymentMethod: selectedPaymentMethod.value,
+    payChoice: payChoice.value,
+    deliveryAddress: deliveryAddress.value,
+    contactNumber: contactNumber.value,
   }));
 }
 
@@ -1099,6 +1024,9 @@ function restoreCheckoutDraft() {
     }
     customerNotes.value = draft.customerNotes || "";
     selectedPaymentMethod.value = draft.selectedPaymentMethod || selectedPaymentMethod.value;
+    if (draft.deliveryAddress) deliveryAddress.value = draft.deliveryAddress;
+    if (draft.contactNumber) contactNumber.value = draft.contactNumber;
+    syncPayChoice(draft.payChoice);
   } catch (error) {
     console.warn("Unable to restore checkout draft", error);
   }
@@ -1239,6 +1167,9 @@ async function loadCheckoutData() {
         selectedPaymentMethod.value = availablePaymentMethods.value[0].type;
       }
     }
+    deliveryAddress.value = checkoutData.value.user?.address || "";
+    contactNumber.value = checkoutData.value.user?.contact_number || "";
+    syncPayChoice();
     // PayMongo replaces this page. Restore the draft only after payment
     // options are loaded, so its selected method can be retained safely.
     restoreCheckoutDraft();
@@ -1294,6 +1225,11 @@ async function placeOrder() {
     toast.error("Please select a payment method");
     return;
   }
+  if (!addressOk.value || !contactOk.value || !selectedDate.value) {
+    goToStep(1);
+    deliveryReady();
+    return;
+  }
   if (shortBouquets.value.length && !shortAccepted && !isProcessing.value) {
     shortAsk.value = true;
     setTimeout(() => shortFillButton.value?.focus(), 50);
@@ -1313,8 +1249,10 @@ async function placeOrder() {
     const orderData = {
       reservation_date: selectedDate.value,
       payment_method: selectedPaymentMethod.value,
-      delivery_address: checkoutData.value.user?.address || "",
-      contact_number: checkoutData.value.user?.contact_number || "",
+      delivery_address: deliveryAddress.value.trim(),
+      contact_number: contactNumber.value.trim(),
+      // GCash or Maya: PayMongo opens only that one
+      ewallet_type: payChoice.value === "cod" ? null : payChoice.value,
       customer_notes: customerNotes.value,
       checkout_key: checkoutKeyFor(itemsKey),
 
@@ -1503,7 +1441,7 @@ onMounted(async () => {
       // That order is finished for good: paying again places a new order
       forgetPendingOrder();
       finishCheckoutKey(checkoutItemsKey());
-      currentStep.value = 3;
+      currentStep.value = 2;
       if (cameBack) {
         paymentFailure.value.failure = paymentFailure.value.failure || PAYMENT_FALLBACK;
         paymentFailure.value.show = true;
@@ -1515,1116 +1453,1373 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* Tokens, type, labels, buttons, links, skeletons and the navbar come from
-   src/styles/bloomcraft.css (shared with the landing page, Shop and Cart). */
-
-@layer bc-reset {
-  .checkout-page :is(p, h1, h2, h3, h4, ul, ol, dl, dd) {
-    margin: 0;
-  }
-
-  .checkout-page :is(ul, ol) {
-    padding: 0;
-    list-style: none;
-  }
-}
-
-:global(body) {
-  margin: 0;
+/* Checkout: three steps on the left, the order summary on the right.
+   Tokens come from styles/bloomcraft.css (navy --ink, green --leaf). */
+.checkout-page,
+.checkout-page * {
+  box-sizing: border-box;
 }
 
 .checkout-page {
+  --co-surface: #ffffff;
+  --co-line: rgba(54, 63, 78, 0.1);
+  --co-line-strong: rgba(54, 63, 78, 0.2);
+  --co-soft-bg: rgba(54, 63, 78, 0.04);
+  --co-red: #b4332a;
   min-height: 100vh;
   background: var(--ivory);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.checkout-page :is(h1, h2, h3, h4, p, dl, dd, ul, ol) {
+  margin: 0;
+}
+
+.checkout-page :is(h2, h3, h4) {
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+  line-height: 1.3;
 }
 
 .checkout-page button {
   font-family: var(--font-sans);
 }
 
-.checkout-container {
-  padding-top: 150px;
-  padding-bottom: var(--section-space);
+.checkout-page svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-/* ---- Header + steps ---- */
-.checkout-header {
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.co-main {
+  padding-top: 104px;
+  padding-bottom: 72px;
+}
+
+/* ── Header + steps ───────────────────────────────────────────── */
+.co-head {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
   flex-wrap: wrap;
-  gap: 32px;
-  margin-bottom: 56px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
 }
 
-.checkout-header h1 {
-  margin-top: 22px;
-  font-size: clamp(48px, 5.6vw, 84px);
-}
-
-.step-indicator {
-  display: flex;
+.co-eyebrow {
+  display: inline-flex;
   align-items: center;
-  gap: 14px;
-}
-
-.step {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--ink-soft);
-  opacity: 0.55;
-  transition: opacity 0.4s ease;
-}
-
-.step.active {
-  color: var(--ink);
-  opacity: 1;
-}
-
-.step-number {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  font-family: var(--font-display);
-  font-size: 16px;
-  font-style: italic;
-}
-
-.step.active .step-number {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--ivory);
-}
-
-.step.completed .step-number {
-  background: transparent;
-  color: var(--ink);
-}
-
-.step-label {
-  font-size: 11.5px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
+  gap: 6px;
+  color: var(--leaf-deep);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.step-line {
-  width: 36px;
-  height: 1px;
-  background: var(--line);
+.co-eyebrow svg {
+  width: 14px;
+  height: 14px;
 }
 
-.step-line.active {
-  background: var(--ink);
+.co-title h1 {
+  margin-top: 4px;
+  font-family: var(--font-display);
+  font-size: clamp(32px, 4vw, 42px);
+  font-weight: 500;
+  line-height: 1.05;
 }
 
-/* ---- Layout ---- */
-.checkout-content {
+.co-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.co-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.co-step + .co-step::before {
+  content: "";
+  width: 28px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--co-line-strong);
+}
+
+.co-step.done + .co-step::before,
+.co-step.on::before {
+  background: var(--leaf);
+}
+
+.co-step button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid var(--co-line);
+  border-radius: 999px;
+  background: var(--co-surface);
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: default;
+}
+
+.co-step.done button {
+  cursor: pointer;
+}
+
+.co-step.done button:hover {
+  border-color: var(--leaf);
+}
+
+.co-step.on button {
+  border-color: var(--ink);
+  color: var(--ink);
+  box-shadow: 0 4px 14px rgba(54, 63, 78, 0.1);
+}
+
+.co-step-num {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: clamp(32px, 4vw, 64px);
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--co-soft-bg);
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.co-step.on .co-step-num {
+  background: var(--ink);
+  color: #ffffff;
+}
+
+.co-step.done .co-step-num {
+  background: var(--leaf);
+  color: #ffffff;
+}
+
+.co-step-num svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.6;
+}
+
+.co-step-text {
+  display: grid;
+  line-height: 1.2;
+}
+
+.co-step-text small {
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── Layout ───────────────────────────────────────────────────── */
+.co-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 24px;
   align-items: start;
 }
 
-.section-card {
+.co-card,
+.co-summary {
+  border: 1px solid var(--co-line);
+  border-radius: 20px;
+  background: var(--co-surface);
+  box-shadow: 0 1px 2px rgba(54, 63, 78, 0.04);
+}
+
+.co-card {
+  display: grid;
+  gap: 0;
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.co-card-head {
   display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: clamp(28px, 3vw, 44px);
-  border: 1px solid var(--line-soft);
-  border-radius: 22px;
-  background: var(--paper);
+  align-items: flex-start;
+  gap: 14px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--co-line);
 }
 
-.section-card h2 {
-  font-size: clamp(34px, 3.2vw, 46px);
-}
-
-.section-description {
-  margin-top: -12px;
-  color: var(--ink-soft);
+.co-card-num {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: #ffffff;
   font-size: 15px;
+  font-weight: 600;
 }
 
-/* ---- Calendar ---- */
-.calendar-legend {
+.co-card-head h2 {
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.co-card-head p {
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+}
+
+.co-block {
+  display: grid;
+  gap: 10px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--co-line);
+}
+
+.co-block h3 {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.co-block h3 small {
+  color: var(--ink-soft);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.co-block-head {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px 20px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.legend-item {
+.co-mt {
+  margin-top: 8px !important;
+}
+
+.co-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--leaf-deep);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.co-link:hover {
+  text-decoration: underline;
+}
+
+.co-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.co-soft {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.co-hint {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.co-error {
+  color: var(--co-red);
+  font-size: 12.5px;
+}
+
+/* Customer details */
+.co-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--co-soft-bg);
+}
+
+.co-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.co-person div {
+  display: grid;
+  min-width: 0;
+}
+
+.co-person strong {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.co-person span {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 13px;
+  text-overflow: ellipsis;
+}
+
+/* Fields */
+.co-field {
+  position: relative;
+  display: block;
+}
+
+.co-field textarea,
+.co-field input,
+.co-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--co-line-strong);
+  border-radius: 12px;
+  background: var(--co-surface);
+  color: var(--ink);
+  font: 400 14px/1.5 var(--font-sans);
+  resize: vertical;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.co-field--icon input {
+  padding-left: 42px;
+}
+
+.co-field--icon svg {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  width: 17px;
+  height: 17px;
+  color: var(--ink-soft);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.co-field :is(textarea, input):focus,
+.co-textarea:focus {
+  border-color: var(--leaf);
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(77, 177, 115, 0.14);
+}
+
+.co-field .invalid {
+  border-color: var(--co-red);
+}
+
+/* Delivery date */
+.co-chosen {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(77, 177, 115, 0.12);
+  color: var(--leaf-deep);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.co-chosen svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.4;
+}
+
+.co-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.co-facts li {
+  padding: 4px 10px;
+  border: 1px solid var(--co-line);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.co-cal {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--co-line);
+  border-radius: 16px;
+}
+
+.co-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.co-cal-head h4 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.co-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--co-line);
+  border-radius: 10px;
+  background: var(--co-surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.co-icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.co-icon-btn:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.co-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.co-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.co-dow {
+  padding: 4px 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.co-day {
+  position: relative;
+  display: grid;
+  place-content: center;
+  gap: 0;
+  min-height: 48px;
+  padding: 4px 2px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.co-day small {
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.co-day.day-available {
+  background: rgba(77, 177, 115, 0.1);
+}
+
+.co-day.day-available:hover {
+  border-color: var(--leaf);
+}
+
+.co-day.day-almost-full {
+  background: rgba(209, 138, 28, 0.13);
+  color: #8a520f;
+}
+
+.co-day.day-prep-time {
+  background: rgba(54, 63, 78, 0.06);
+  color: var(--ink-soft);
+}
+
+.co-day.day-fully-booked {
+  background: rgba(180, 51, 42, 0.1);
+  color: var(--co-red);
+  text-decoration: line-through;
+}
+
+.co-day.day-today {
+  border-color: var(--co-line-strong);
+}
+
+.co-day.day-disabled,
+.co-day.off {
+  color: rgba(54, 63, 78, 0.35);
+  cursor: not-allowed;
+}
+
+.co-day.day-disabled {
+  background: transparent;
+}
+
+.co-day.out {
+  visibility: hidden;
+}
+
+.co-day.picked {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #ffffff;
+}
+
+.co-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+.co-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.co-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.lg-available { background: rgba(77, 177, 115, 0.35); }
+.lg-almost { background: rgba(209, 138, 28, 0.4); }
+.lg-prep { background: rgba(54, 63, 78, 0.15); }
+.lg-full { background: rgba(180, 51, 42, 0.3); }
+.lg-off { background: transparent; box-shadow: inset 0 0 0 1px var(--co-line-strong); }
+
+/* Actions */
+.co-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 20px;
+}
+
+.co-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.co-back:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.co-back svg {
+  width: 16px;
+  height: 16px;
+}
+
+.co-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--ink);
+  color: #ffffff;
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.co-btn:hover:not(:disabled) {
+  background: var(--leaf-deep);
+}
+
+.co-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.co-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.co-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.co-btn--place {
+  min-width: 260px;
+  background: var(--leaf-deep);
+}
+
+.co-btn--place:hover:not(:disabled) {
+  background: var(--ink);
+}
+
+.co-terms {
+  margin-top: 10px !important;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  text-align: right;
+}
+
+/* ── Payment ─────────────────────────────────────────────────── */
+.co-pay {
+  display: grid;
+  gap: 10px;
+  padding: 20px 0 14px;
+}
+
+.co-pay-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--co-line-strong);
+  border-radius: 14px;
+  background: var(--co-surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.co-pay-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.co-pay-option:hover {
+  border-color: var(--ink);
+}
+
+.co-pay-option.on {
+  border-color: var(--ink);
+  background: var(--co-soft-bg);
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+.co-pay-option.locked {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.co-pay-option:has(input:focus-visible) {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+/* Simple wallet marks: a letter on the wallet's colour */
+.co-pay-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.co-pay-mark.gcash { background: #0a6cff; }
+.co-pay-mark.paymaya { background: #0c8f5a; }
+.co-pay-mark.cod { background: var(--ink); }
+
+.co-pay-mark svg {
+  width: 20px;
+  height: 20px;
+}
+
+.co-pay-mark.sm {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.co-pay-mark.sm svg {
+  width: 15px;
+  height: 15px;
+}
+
+.co-pay-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.co-pay-text strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.co-pay-text small {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.co-radio {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--co-line-strong);
+  border-radius: 50%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.co-pay-option.on .co-radio {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 4px var(--co-surface);
+  background: var(--ink);
+}
+
+.co-note {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(77, 177, 115, 0.08);
+}
+
+.co-note svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--leaf-deep);
+}
+
+.co-note div {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.co-note span {
+  color: var(--ink-soft);
+}
+
+.co-optin {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px dashed var(--co-line-strong);
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.co-optin input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--leaf-deep);
+}
+
+.co-optin span {
+  display: grid;
+  gap: 2px;
+  font-size: 13.5px;
+}
+
+.co-optin small {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+/* ── Review ──────────────────────────────────────────────────── */
+.co-review {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 12px;
+  padding-top: 20px;
+}
+
+.co-review-box {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--co-line);
+  border-radius: 14px;
+}
+
+.co-dl {
+  display: grid;
+  gap: 6px;
+}
+
+.co-dl div {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 13px;
+}
+
+.co-dl dt {
+  color: var(--ink-soft);
+}
+
+.co-dl dd {
+  overflow-wrap: anywhere;
+}
+
+.co-pre {
+  white-space: pre-line;
+}
+
+.co-paid-with {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.co-warn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fdf0e3;
+}
+
+.co-warn-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #d18a1c;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.co-warn div {
+  display: grid;
+  flex: 1;
+  font-size: 13px;
+}
+
+.co-warn span {
+  color: var(--ink-soft);
+}
+
+.co-items {
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  list-style: none;
+}
+
+.co-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.co-item + .co-item {
+  border-top: 1px dashed var(--co-line);
+}
+
+.co-item-img {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--ivory-deep);
+}
+
+.co-item-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.co-item-main {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.co-item-main strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.co-item-main small {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.co-off {
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: #fdecea;
+  color: var(--co-red);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.co-item-total {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.co-totals {
+  display: grid;
+  gap: 8px;
+  padding: 18px 0 0;
+}
+
+.co-totals div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.co-totals dt {
+  color: var(--ink-soft);
+}
+
+.co-totals dd {
+  font-variant-numeric: tabular-nums;
+}
+
+.co-totals .save dd {
+  color: var(--co-red);
+}
+
+.co-totals .free {
+  color: var(--leaf-deep);
+  font-weight: 600;
+}
+
+.co-totals .grand {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--co-line);
+  font-size: 17px;
+}
+
+.co-totals .grand dt {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.co-totals .grand dd {
+  font-weight: 700;
+}
+
+.co-actions--final {
+  border-top: 0;
+}
+
+/* ── Summary ─────────────────────────────────────────────────── */
+.co-summary {
+  position: sticky;
+  top: 96px;
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.co-sum-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.co-sum-head h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.co-count {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--co-soft-bg);
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.co-shop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--leaf-deep);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.co-shop svg {
+  width: 15px;
+  height: 15px;
+}
+
+.co-sum-items {
+  display: grid;
+  gap: 12px;
+  max-height: 280px;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.co-sum-items li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.co-sum-img {
+  position: relative;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: var(--ivory-deep);
+}
+
+.co-sum-img img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+.co-sum-img b {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 2px solid var(--co-surface);
+  border-radius: 999px;
+  background: var(--ink);
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.co-sum-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.co-sum-price {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.co-totals--side {
+  padding-top: 14px;
+  border-top: 1px solid var(--co-line);
+}
+
+.co-totals--side div {
+  font-size: 13.5px;
+}
+
+.co-totals--side .grand {
+  font-size: 16px;
+}
+
+.co-sum-date,
+.co-secure {
+  display: flex;
+  align-items: flex-start;
   gap: 8px;
   color: var(--ink-soft);
   font-size: 12.5px;
 }
 
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-/* Status colours, shared by the legend and the calendar days */
-.checkout-page {
-  --day-available: #7d8f69;
-  --day-almost: #c99a4a;
-  --day-full: var(--leaf);
-}
-
-.dot-today {
-  border: 1.5px solid var(--ink);
-}
-
-.dot-prep {
-  background: var(--ivory-deep);
-  border: 1px solid var(--line);
-}
-
-.dot-available {
-  background: var(--day-available);
-}
-
-.dot-almost {
-  background: var(--day-almost);
-}
-
-.dot-full {
-  background: var(--day-full);
-}
-
-.dot-disabled {
-  background: var(--line);
-}
-
-.vendor-calendar-note {
-  margin-bottom: 16px;
-  padding: 12px 16px;
+.co-sum-date {
+  padding: 10px 12px;
   border-radius: 12px;
-  background: var(--ivory);
-  color: var(--ink-soft);
-  font-size: 13.5px;
-}
-
-.calendar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 18px;
-}
-
-.checkout-page .calendar-title {
-  font-family: var(--font-display);
-  font-size: 28px;
-}
-
-.btn-nav {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: none;
+  background: var(--co-soft-bg);
   color: var(--ink);
-  cursor: pointer;
-  transition: border-color 0.3s;
 }
 
-.btn-nav:hover:not(:disabled) {
-  border-color: var(--ink);
-}
-
-.btn-nav:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.btn-nav svg,
-.selected-date-display svg,
-.payment-icon svg {
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.day-header {
-  padding-bottom: 8px;
-  color: var(--ink-soft);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-align: center;
-  text-transform: uppercase;
-}
-
-.calendar-day {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-height: 62px;
-  padding: 6px 2px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  background: #fff;
-  color: var(--ink);
-  cursor: pointer;
-  transition:
-    border-color 0.25s,
-    background 0.25s,
-    transform 0.25s var(--ease-out);
-}
-
-.calendar-day:hover:not(.is-disabled) {
-  border-color: var(--ink);
-}
-
-.day-number {
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 500;
-  line-height: 1;
-}
-
-.day-label {
-  font-size: 9.5px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-/* Status: a coloured bottom bar keeps the grid calm but readable */
-.calendar-day::after {
-  content: "";
-  position: absolute;
-  left: 30%;
-  right: 30%;
-  bottom: 6px;
-  height: 2px;
-  border-radius: 2px;
-  background: transparent;
-}
-
-.calendar-day.day-available::after {
-  background: var(--day-available);
-}
-
-.calendar-day.day-almost-full::after {
-  background: var(--day-almost);
-}
-
-.calendar-day.day-fully-booked {
-  background: rgba(77, 177, 115, 0.07);
-  color: var(--ink-soft);
-}
-
-.calendar-day.day-fully-booked::after {
-  background: var(--day-full);
-}
-
-.calendar-day.day-prep-time {
-  background: var(--ivory-deep);
-  color: var(--ink-soft);
-}
-
-.calendar-day.day-today {
-  border-color: var(--ink);
-}
-
-/* Unavailable days stay clickable: selectDate() explains why they can't be chosen. */
-.calendar-day.day-disabled,
-.calendar-day.is-disabled {
-  cursor: not-allowed;
-}
-
-.calendar-day.day-disabled {
-  background: transparent;
-  color: rgba(54, 63, 78, 0.3);
-}
-
-.calendar-day.other-month {
-  opacity: 0.45;
-}
-
-.calendar-day.is-selected {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--ivory);
-}
-
-.calendar-day.is-selected::after {
-  background: var(--ivory);
-}
-
-.calendar-day:focus-visible {
-  outline: 2px solid var(--leaf);
-  outline-offset: 2px;
-}
-
-.selected-date-display {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 18px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: var(--ivory);
-  color: var(--ink-soft);
-  font-size: 14px;
-}
-
-.selected-date-display strong {
-  color: var(--ink);
-  font-weight: 500;
-}
-
-/* ---- Step actions ---- */
-.offer-optin {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin: 8px 0 20px;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
-  cursor: pointer;
-}
-.offer-optin input {
+.co-sum-date svg,
+.co-secure svg {
   flex: none;
-  width: 20px;
-  height: 20px;
-  margin: 2px 0 0;
-  accent-color: var(--leaf-deep);
-  cursor: pointer;
-}
-.offer-optin span {
-  display: grid;
-  gap: 2px;
-}
-.offer-optin strong {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.offer-optin small {
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--ink-soft);
-}
-.offer-optin:focus-within {
-  outline: 2px solid var(--leaf-deep);
-  outline-offset: 2px;
+  width: 16px;
+  height: 16px;
+  color: var(--leaf-deep);
 }
 
-.step-actions {
+/* ── Loading ─────────────────────────────────────────────────── */
+.sk-line {
+  display: block;
+  height: 14px;
+  margin-bottom: 10px;
+  border-radius: 7px;
+}
+
+.sk-title {
+  width: 40%;
+  height: 22px;
+}
+
+.sk-fields {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.sk-field {
+  height: 46px;
+  border-radius: 12px;
+}
+
+.sk-cal {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.sk-day {
+  height: 44px;
+  border-radius: 10px;
+}
+
+.sk-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-  padding-top: 24px;
-  border-top: 1px solid var(--line);
-}
-
-.step-back {
-  border: none;
-  background: none;
-  cursor: pointer;
-}
-
-.step-back:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.step-actions .bc-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-/* ---- Review ---- */
-.info-section {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-top: 1px solid var(--line);
-}
-
-.info-row {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.info-row:nth-child(odd) {
-  padding-right: 20px;
-}
-
-.info-label {
-  color: var(--ink-soft);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.info-value {
-  margin-top: 2px;
-  font-size: 14.5px;
-  word-break: break-word;
-}
-
-.order-items-list {
-  border-top: 1px solid var(--line);
-}
-
-/* A custom bouquet with empty flower spots */
-.short-note {
-  display: flex;
-  align-items: flex-start;
   gap: 12px;
-  margin-bottom: 14px;
-  padding: 12px 14px;
-  border: 1px solid #f0d9b0;
-  border-radius: 14px;
-  background: #fdf3e3;
-  color: #6e4a10;
+  margin: 12px 0;
 }
 
-.short-note-icon {
-  display: grid;
-  flex-shrink: 0;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #d68a1c;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 700;
+.sk-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
 }
 
-.short-note-copy {
-  display: grid;
+.sk-item .sk-line {
   flex: 1;
-  gap: 2px;
-  min-width: 0;
-  font-size: 13.5px;
-  line-height: 1.5;
+  margin: 0;
 }
 
-.short-note-copy strong {
-  font-weight: 600;
+.sk-total {
+  height: 22px;
+  margin-top: 16px;
 }
 
-.short-note-fill {
-  flex-shrink: 0;
-  align-self: center;
-  min-height: 36px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--paper);
-  font: 600 13px var(--font-sans);
-  cursor: pointer;
-}
-
-.short-note-fill:hover {
-  background: var(--leaf-deep);
-}
-
-.short-note-fill:focus-visible {
-  outline: 2px solid var(--leaf);
-  outline-offset: 2px;
-}
-
-@media (max-width: 520px) {
-  .short-note {
-    flex-wrap: wrap;
-  }
-  .short-note-fill {
-    margin-left: 36px;
-  }
-}
-
+/* ── Unfilled bouquet modal ──────────────────────────────────── */
 .short-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  z-index: 2000;
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgba(38, 45, 57, 0.45);
-  backdrop-filter: blur(4px);
+  background: rgba(30, 36, 46, 0.45);
 }
 
 .short-modal {
   display: grid;
   gap: 10px;
   width: min(440px, 100%);
-  padding: 26px 24px 20px;
-  border-radius: 22px;
-  background: var(--paper);
-  color: var(--ink);
-  box-shadow: 0 30px 80px rgba(38, 45, 57, 0.25);
+  padding: 24px;
+  border-radius: 20px;
+  background: var(--co-surface);
+  box-shadow: 0 30px 80px rgba(30, 36, 46, 0.25);
 }
 
 .short-modal h2 {
-  font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 500;
-  line-height: 1.1;
-}
-
-.short-modal p:not(.bc-label) {
-  color: var(--ink-soft);
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.short-actions {
-  display: grid;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-.short-actions .bc-btn {
-  justify-content: center;
-  width: 100%;
-}
-
-.short-anyway {
-  justify-self: center;
-  min-height: 44px;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--ink-soft);
-  font-family: var(--font-sans);
-  font-size: 13.5px;
-  font-weight: 500;
-  text-decoration: underline;
-  text-underline-offset: 4px;
-  text-decoration-color: rgba(54, 63, 78, 0.35);
-  cursor: pointer;
-  transition: color 0.2s ease, text-decoration-color 0.2s ease;
-}
-
-.short-anyway::after {
-  display: none;
-}
-
-.short-anyway:hover {
-  color: var(--ink);
-  text-decoration-color: currentColor;
-}
-
-.order-item {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) auto;
-  gap: 16px;
-  align-items: center;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.item-image-small {
-  width: 64px;
-  aspect-ratio: 4 / 5;
-  overflow: hidden;
-  border-radius: 10px;
-  background: var(--ivory-deep);
-}
-
-.item-image-small img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.item-info h4 {
-  font-family: var(--font-display);
   font-size: 20px;
-  font-weight: 500;
-  line-height: 1.15;
-}
-
-.item-meta,
-.item-price {
-  color: var(--ink-soft);
-  font-size: 13px;
-}
-
-.item-price-group {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.price-original {
-  color: var(--ink-soft);
-  text-decoration: line-through;
-}
-
-.price-badge {
-  color: var(--leaf-deep);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.item-total {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 500;
-}
-
-.notes-textarea {
-  width: 100%;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  resize: vertical;
-}
-
-.notes-textarea:focus {
-  outline: none;
-  border-color: var(--ink);
-}
-
-/* ---- Payment ---- */
-.payment-methods-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.payment-method-card {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: #fff;
-  cursor: pointer;
-  transition: border-color 0.3s;
-}
-
-.payment-method-card:hover {
-  border-color: rgba(54, 63, 78, 0.35);
-}
-
-.payment-method-card.selected {
-  border-color: var(--ink);
-}
-
-.payment-method-card.is-locked {
-  cursor: not-allowed;
-}
-
-.payment-method-card input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.payment-method-card:focus-within {
-  outline: 2px solid var(--leaf);
-  outline-offset: 3px;
-}
-
-.payment-icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: var(--ivory);
-  color: var(--ink);
-}
-
-.payment-info {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.payment-name {
-  font-family: var(--font-display);
-  font-size: 21px;
-  font-weight: 500;
-  line-height: 1.15;
-}
-
-.payment-description {
-  color: var(--ink-soft);
-  font-size: 12.5px;
-  line-height: 1.5;
-}
-
-.payment-radio {
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  transition: border 0.25s;
-}
-
-.payment-method-card.selected .payment-radio {
-  border: 5px solid var(--ink);
-}
-
-.payment-note {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 18px 20px;
-  border-radius: 14px;
-  background: var(--ivory);
-  color: var(--ink-soft);
-  font-size: 14px;
-}
-
-.instructions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.instructions-list li::before {
-  content: "—";
-  margin-right: 10px;
-  color: var(--leaf);
-}
-
-/* ---- Summary ---- */
-.summary-card {
-  position: sticky;
-  top: 110px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  padding: 32px 30px;
-  border: 1px solid var(--line-soft);
-  border-radius: 22px;
-  background: var(--paper);
-}
-
-.summary-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-.summary-header h2 {
-  font-size: 32px;
-}
-
-.item-count-badge {
-  color: var(--ink-soft);
-  font-size: 11.5px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.summary-items-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  max-height: 300px;
-  padding-top: 16px;
-  overflow-y: auto;
-  border-top: 1px solid var(--line);
-}
-
-.summary-item {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-}
-
-.summary-item-img {
-  position: relative;
-  width: 48px;
-  height: 56px;
-}
-
-.summary-item-img img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: 8px;
-  object-fit: cover;
-  background: var(--ivory-deep);
-}
-
-.summary-item-qty {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  display: grid;
-  place-items: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--ivory);
-  font-size: 10px;
   font-weight: 600;
 }
 
-.summary-item-name {
-  overflow: hidden;
-  font-size: 13.5px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.summary-item-pricing {
-  display: flex;
-  gap: 6px;
-  color: var(--ink-soft);
-  font-size: 12px;
-}
-
-.summary-item-original {
-  text-decoration: line-through;
-}
-
-.summary-item-total {
-  font-size: 13.5px;
-  font-weight: 500;
-}
-
-.summary-breakdown {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-}
-
-.breakdown-row {
-  display: flex;
-  justify-content: space-between;
+.short-modal p:not(.co-eyebrow) {
   color: var(--ink-soft);
   font-size: 14px;
+  line-height: 1.55;
 }
 
-.breakdown-row span:last-child {
-  color: var(--ink);
-}
-
-.savings-row .savings-amount {
-  color: var(--leaf-deep);
-}
-
-.savings-banner {
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: rgba(77, 177, 115, 0.08);
-  color: var(--leaf-deep);
-  font-size: 13px;
-}
-
-.summary-total-row {
+.short-actions {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-}
-
-.total-label {
-  display: flex;
-  flex-direction: column;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.total-note {
-  color: var(--ink-soft);
-  font-size: 12px;
-  font-weight: 300;
-}
-
-.total-amount {
-  font-family: var(--font-display);
-  font-size: 40px;
-  font-weight: 500;
-  line-height: 1;
-}
-
-.summary-notes {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: var(--ink-soft);
-  font-size: 12.5px;
-}
-
-.summary-notes li::before {
-  content: "—";
-  margin-right: 8px;
-  color: var(--leaf);
-}
-
-.btn-nav:focus-visible,
-.step-back:focus-visible {
-  outline: 2px solid var(--leaf);
-  outline-offset: 3px;
-}
-
-/* ---- Skeleton ---- */
-.skeleton-line {
-  display: block;
-  height: 13px;
-}
-
-.skeleton-title {
-  width: 55%;
-  height: 32px;
-}
-
-.skeleton-text {
-  width: 75%;
-}
-
-.skeleton-calendar {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.skeleton-day {
-  height: 62px;
-  border-radius: 12px;
-}
-
-.skeleton-summary-item {
-  display: grid;
-  grid-template-columns: 48px 1fr;
-  gap: 12px;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 14px;
+  margin-top: 8px;
 }
 
-.skeleton-thumb {
-  height: 56px;
-  border-radius: 8px;
+/* Focus */
+.checkout-page :is(button, a, input, textarea):focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
 }
 
-.skeleton-total {
-  height: 36px;
+.co-field :is(textarea, input):focus-visible,
+.co-textarea:focus-visible {
+  outline: none;
 }
 
-/* ---- Responsive ---- */
-@media (max-width: 1024px) {
-  .checkout-content {
-    grid-template-columns: 1fr;
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 980px) {
+  .co-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .summary-card {
+  .co-summary {
     position: static;
+    order: -1;
+  }
+
+  .co-sum-items {
+    max-height: none;
   }
 }
 
 @media (max-width: 640px) {
-  .checkout-container {
-    padding-top: 120px;
+  .co-main {
+    padding-top: 88px;
   }
 
-  .step-label {
+  .co-steps {
+    width: 100%;
+  }
+
+  .co-step {
+    flex: 1;
+  }
+
+  .co-step + .co-step::before {
+    width: 12px;
+  }
+
+  .co-step button {
+    width: 100%;
+    padding-right: 6px;
+  }
+
+  .co-step-text small {
     display: none;
   }
 
-  .step-line {
-    width: 20px;
+  .co-step:not(.on) .co-step-text {
+    display: none;
   }
 
-  .calendar-grid,
-  .skeleton-calendar {
-    gap: 4px;
+  .co-review {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .calendar-day,
-  .skeleton-day {
-    min-height: 48px;
-    height: auto;
-    border-radius: 10px;
+  .co-day {
+    min-height: 42px;
   }
 
-  .day-number {
-    font-size: 17px;
+  .co-day small {
+    display: none;
   }
 
-  .day-label {
-    font-size: 8px;
-    letter-spacing: 0;
-  }
-
-  .info-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .info-row:nth-child(odd) {
-    padding-right: 0;
-  }
-
-  .step-actions {
+  .co-actions {
     flex-direction: column-reverse;
     align-items: stretch;
+  }
+
+  .co-btn,
+  .co-btn--place {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .co-terms {
     text-align: center;
   }
+}
 
-  .step-actions .bc-btn {
-    justify-content: center;
-  }
-
-  .step-back {
-    align-self: center;
+@media (prefers-reduced-motion: reduce) {
+  .co-btn,
+  .co-day,
+  .co-pay-option {
+    transition: none;
   }
 }
 </style>
