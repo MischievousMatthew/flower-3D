@@ -1033,6 +1033,7 @@ function beginTour() {
   markTourSeen();
   clearSelection();
   tour.withStart = !!startStep.value;
+  tourResumeKey = null;
   tour.open = true;
   showTourStep(0);
 }
@@ -1075,16 +1076,43 @@ watch(
   },
 );
 
-// Choosing the occasion and size moves the guide on by itself
+// The guide follows the occasion screen: while it's open the guide is on its
+// occasion or size step, never on a part hidden behind it; once it closes the
+// guide goes back to where the customer was (or on to the next step)
+const tourIndexOf = (key) => tourSteps.value.findIndex((step) => step.key === key);
+let tourResumeKey = null; // the step to go back to when the occasion screen closes
+let tourStartMove = 0;
 watch(startStep, (now, before) => {
   if (!tour.open) return;
+  clearTimeout(tourStartMove);
   const key = tourStep.value?.key;
-  if ((key === "occasion" && before === "occasion" && now === "size") || (key === "size" && before && !now && preset.value)) {
-    const at = tour.index;
-    setTimeout(() => {
-      if (tour.open && tour.index === at) showTourStep(at + 1);
-    }, 900);
+  const onStart = key === "occasion" || key === "size";
+
+  if (now) {
+    // Opened (Change) or moved between occasion and size: show the matching step
+    if (!onStart) {
+      tourResumeKey = key;
+      tour.withStart = true; // adds the occasion and size steps
+    }
+    const want = tourIndexOf(now === "occasion" ? "occasion" : "size");
+    if (want < 0) return;
+    // Picking an occasion counts as done for a moment before the size step shows
+    const delay = onStart && key === "occasion" && now === "size" ? 900 : 0;
+    const go = () => tour.open && startStep.value === now && showTourStep(want);
+    if (delay) tourStartMove = setTimeout(go, delay);
+    else go();
+    return;
   }
+
+  // Closed: leave the occasion and size steps
+  if (!onStart || !before) return;
+  const at = tour.index;
+  tourStartMove = setTimeout(() => {
+    if (!tour.open || tour.index !== at || startStep.value) return;
+    const resume = tourResumeKey ? tourIndexOf(tourResumeKey) : -1;
+    tourResumeKey = null;
+    showTourStep(resume >= 0 ? resume : tourIndexOf("size") + 1);
+  }, preset.value ? 900 : 0);
 });
 
 // Offered once, the first time the bouquet is ready: on a new bouquet that's
