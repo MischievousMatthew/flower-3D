@@ -646,12 +646,29 @@
             v-model="userSearchQuery"
             type="search"
             :placeholder="`Search ${counterpartLabel} by name`"
+            autocomplete="off"
             @input="searchUsers"
           />
         </label>
         <div class="dialog-results">
+          <!-- Shops load once when this opens; typing then filters instantly -->
+          <template v-if="!isVendor && shopsLoading">
+            <div v-for="n in 4" :key="n" class="conv conv--skeleton" aria-hidden="true">
+              <span class="skeleton avatar"></span>
+              <span class="conv-text">
+                <span class="skeleton line"></span>
+                <span class="skeleton line short"></span>
+              </span>
+            </div>
+            <span class="sr-only">Loading shops…</span>
+          </template>
+          <p v-else-if="!isVendor && shopsError" class="muted dialog-note">
+            Couldn't load the shops.
+            <button type="button" class="dialog-retry" @click="loadShops(true)">Try again</button>
+          </p>
+          <p v-if="!isVendor && !shopsLoading && !shopsError && !userSearchQuery.trim() && newChatResults.length" class="dialog-label">All shops</p>
           <button
-            v-for="result in searchedUsers"
+            v-for="result in newChatResults"
             :key="result.id"
             type="button"
             class="conv"
@@ -667,12 +684,14 @@
               <span class="conv-preview">{{ isVendor ? result.email : result.location || "Flower shop" }}</span>
             </span>
           </button>
-          <p v-if="searchedUsers.length === 0 && userSearchQuery" class="muted dialog-note">
-            No {{ counterpartLabel }} match "{{ userSearchQuery }}".
-          </p>
-          <p v-else-if="!userSearchQuery" class="muted dialog-note">
-            Type a name to find {{ counterpartLabel }}.
-          </p>
+          <template v-if="!(shopsLoading || shopsError) || isVendor">
+            <p v-if="newChatResults.length === 0 && userSearchQuery.trim()" class="muted dialog-note">
+              No {{ counterpartLabel }} match "{{ userSearchQuery.trim() }}".
+            </p>
+            <p v-else-if="newChatResults.length === 0 && !userSearchQuery.trim()" class="muted dialog-note">
+              {{ isVendor ? `Type a name to find ${counterpartLabel}.` : "No shops to message yet." }}
+            </p>
+          </template>
         </div>
       </div>
     </div>
@@ -1202,24 +1221,78 @@ const openNewChat = () => {
   userSearchQuery.value = "";
   searchedUsers.value = [];
   showNewChatModal.value = true;
+  if (!isVendor.value) loadShops();
   nextTick(() => newChatSearchInput.value?.focus());
 };
 
-const searchUsers = async () => {
-  if (!canStartConversation.value || !userSearchQuery.value.trim()) {
+// ── Finding a shop: every shop is loaded once, then typing filters right
+// away in the browser (no waiting on the server, no out-of-order results)
+const allShops = ref(null);
+const shopsLoading = ref(false);
+const shopsError = ref(false);
+// Lower case, accents dropped ("Café" matches "cafe")
+const plain = (text) => String(text ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+
+async function loadShops(force = false) {
+  if ((allShops.value && !force) || shopsLoading.value) return;
+  shopsLoading.value = true;
+  shopsError.value = false;
+  try {
+    const { data } = await api.get("/chat/search-vendors", { params: { all: 1 } });
+    allShops.value = data.success ? data.vendors : [];
+  } catch (error) {
+    console.error("Error loading shops:", error);
+    shopsError.value = true;
+  } finally {
+    shopsLoading.value = false;
+  }
+}
+
+/**
+ * Shops whose name (or area) has every word typed, best matches first:
+ * names starting with it, then a word in the name starting with it, then the rest.
+ */
+const newChatResults = computed(() => {
+  if (isVendor.value) return searchedUsers.value;
+  const shops = allShops.value || [];
+  const query = plain(userSearchQuery.value);
+  if (!query) return shops;
+  const words = query.split(/\s+/);
+  return shops
+    .map((shop) => {
+      const name = plain(shop.display_name || shop.store_name);
+      const area = plain(shop.location);
+      if (!words.every((w) => name.includes(w) || area.includes(w))) return null;
+      const rank = name.startsWith(query) ? 0 : name.split(/\s+/).some((part) => part.startsWith(words[0])) ? 1 : words.every((w) => name.includes(w)) ? 2 : 3;
+      return { shop, rank, name };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name))
+    .map((hit) => hit.shop);
+});
+
+// Customers (shop side): asked of the server, a moment after typing stops;
+// only the answer to the latest text is used
+let customerSearchTimer = 0;
+let customerSearchSeq = 0;
+const searchUsers = () => {
+  if (!isVendor.value) return; // shops filter in newChatResults
+  clearTimeout(customerSearchTimer);
+  const text = userSearchQuery.value.trim();
+  if (!canStartConversation.value || !text) {
+    customerSearchSeq++;
     searchedUsers.value = [];
     return;
   }
-
-  try {
-    const endpoint = isVendor.value ? "/chat/search-customers" : "/chat/search-vendors";
-    const { data } = await api.get(endpoint, { params: { search: userSearchQuery.value } });
-    if (data.success) {
-      searchedUsers.value = isVendor.value ? data.customers : data.vendors;
+  customerSearchTimer = setTimeout(async () => {
+    const seq = ++customerSearchSeq;
+    try {
+      const { data } = await api.get("/chat/search-customers", { params: { search: text } });
+      if (seq === customerSearchSeq && data.success) searchedUsers.value = data.customers;
+    } catch (error) {
+      console.error("Error searching users:", error);
     }
-  } catch (error) {
-    console.error("Error searching users:", error);
-  }
+  }, 250);
 };
 
 const startNewConversation = async (otherUser) => {
@@ -3026,6 +3099,27 @@ onUnmounted(() => {
 .dialog-results {
   min-height: 80px;
   overflow-y: auto;
+}
+
+.dialog-label {
+  padding: 2px 10px 6px;
+  color: var(--c-faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dialog-retry {
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-signal-text);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .dialog-note {

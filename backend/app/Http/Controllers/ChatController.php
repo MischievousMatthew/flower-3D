@@ -719,7 +719,7 @@ class ChatController extends Controller
 
             // A customer looking for a shop finds it by its name, and sees only the shop
             if (! $isVendorContext) {
-                return response()->json(['success' => true, 'vendors' => $this->searchShops(trim((string) $search))]);
+                return response()->json(['success' => true, 'vendors' => $this->searchShops(trim((string) $search), $request->boolean('all'))]);
             }
 
             $matchingVendorEmails = [];
@@ -735,10 +735,13 @@ class ChatController extends Controller
             $users = User::where('role', $targetRole)
                 ->when($targetRole === User::ROLE_VENDOR, fn ($q) => $q->where('is_verified', true))
                 ->where(function ($q) use ($search, $targetRole, $matchingVendorEmails) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('surname', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('username', 'like', "%{$search}%");
+                    // Any capitals: PostgreSQL's LIKE is case-sensitive, so compare in lower case
+                    $like = '%' . addcslashes(mb_strtolower($search), '%_\\') . '%';
+                    $q->whereRaw('LOWER(name) LIKE ?', [$like])
+                        ->orWhereRaw('LOWER(surname) LIKE ?', [$like])
+                        ->orWhereRaw('LOWER(email) LIKE ?', [$like])
+                        ->orWhereRaw('LOWER(username) LIKE ?', [$like])
+                        ->orWhereRaw("LOWER(CONCAT(name, ' ', surname)) LIKE ?", [$like]); // "maria lopez"
 
                     if ($targetRole === User::ROLE_VENDOR && !empty($matchingVendorEmails)) {
                         $q->orWhereIn('email', $matchingVendorEmails);
@@ -957,23 +960,27 @@ class ChatController extends Controller
      * exposing a vendor's public store identity to customers.
      */
     /**
-     * Shops a customer can start a chat with, matched on the shop's name.
-     * Only shop details go out (name, logo, address); never the owner's
-     * name, email or phone.
+     * Shops a customer can start a chat with, matched on the shop's name,
+     * or every shop with `all` (the New message box loads them once and
+     * filters as the customer types). Only shop details go out (name, logo,
+     * address); never the owner's name, email or phone.
      */
-    private function searchShops(string $search): \Illuminate\Support\Collection
+    private function searchShops(string $search, bool $all = false): \Illuminate\Support\Collection
     {
-        if ($search === '') {
+        if ($search === '' && ! $all) {
             return collect();
         }
+        // Lower case on both sides: PostgreSQL's LIKE cares about capitals ("flux" must find "Flux")
+        $like = addcslashes(mb_strtolower($search), '%_\\');
 
         $shops = VendorApplication::query()
             ->where('status', 'approved')
-            ->where('store_name', 'like', '%' . addcslashes($search, '%_\\') . '%')
-            ->orderByRaw('store_name LIKE ? DESC', [addcslashes($search, '%_\\') . '%']) // names starting with it first
+            ->whereNotNull('store_name')
+            ->when($search !== '', fn ($q) => $q->whereRaw('LOWER(store_name) LIKE ?', ["%{$like}%"])
+                ->orderByRaw('LOWER(store_name) LIKE ? DESC', ["{$like}%"])) // names starting with it first
             ->orderBy('store_name')
-            ->limit(20)
-            ->get();
+            ->limit($all && $search === '' ? 500 : 20)
+            ->get(['email', 'store_name', 'store_logo_path', 'store_address']);
         if ($shops->isEmpty()) {
             return collect();
         }
