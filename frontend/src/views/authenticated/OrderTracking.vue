@@ -1080,7 +1080,12 @@ function closeProof() {
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
-const NAV_CLEARANCE = 104; // the floating navbar's height plus a little room
+// Just under the floating navbar, measured each time (its height changes with the screen)
+const navClearance = () => {
+  const nav = document.querySelector(".navbar, nav.bc-navbar, header .navbar");
+  const bottom = nav ? nav.getBoundingClientRect().bottom : 96;
+  return Math.max(16, bottom) + 12;
+};
 const cardTop = (id) => document.getElementById(`order-card-${id}`)?.getBoundingClientRect().top;
 
 async function toggle(id) {
@@ -1090,9 +1095,10 @@ async function toggle(id) {
   await nextTick();
   const after = cardTop(id);
   if (before == null || after == null) return;
-  if (closing && before < NAV_CLEARANCE) {
+  const clearance = navClearance();
+  if (closing && before < clearance) {
     // Closed from far down a long order: bring its top back under the navbar
-    window.scrollBy({ top: after - NAV_CLEARANCE, behavior: "instant" });
+    window.scrollBy({ top: after - clearance, behavior: "instant" });
   } else if (Math.abs(after - before) > 1) {
     // The order above closed: keep this one where it was
     window.scrollBy({ top: after - before, behavior: "instant" });
@@ -1100,9 +1106,9 @@ async function toggle(id) {
   // Opened: glide it up so its top sits just under the navbar
   if (!closing) {
     const top = cardTop(id);
-    if (top != null && Math.abs(top - NAV_CLEARANCE) > 4) {
+    if (top != null && Math.abs(top - clearance) > 4) {
       const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-      window.scrollBy({ top: top - NAV_CLEARANCE, behavior: still ? "instant" : "smooth" });
+      window.scrollBy({ top: top - clearance, behavior: still ? "instant" : "smooth" });
     }
   }
 }
