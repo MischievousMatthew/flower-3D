@@ -4,6 +4,12 @@
       Have an account? <router-link to="/guest/login" class="af-link">Sign in</router-link>
     </template>
 
+
+    <p v-if="designerNext" class="af-next" role="note">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 11 5-11" /><circle cx="9" cy="7" r="2.5" /><circle cx="15" cy="7" r="2.5" /></svg>
+      <span><strong>Next: the 3D designer.</strong> Once your account is ready, choose a flower shop and start building your bouquet.</span>
+    </p>
+
     <!-- Sign-ups closed by an admin (Security → Platform settings) -->
     <template v-if="!platform.registrations_open">
       <AuthNotice tone="info" title="We're not taking new customer accounts right now" body="Please check back soon. If you already have an account, you can still sign in." />
@@ -118,6 +124,7 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import AuthShell from "../../components/auth/AuthShell.vue";
+import { readPendingDesigner } from "../../utils/designerIntent";
 import AuthNotice from "../../components/auth/AuthNotice.vue";
 import { toast } from "@/utils/snackbar";
 import PasswordField from "../../components/auth/PasswordField.vue";
@@ -128,6 +135,9 @@ import { useAuth } from "../../composables/useAuth";
 import { usePlatformStatus } from "../../composables/usePlatformStatus";
 import { passwordOk } from "../../utils/passwordRules";
 import api from "../../plugins/axios";
+
+// Came from "Explore 3D Designer": say the shop picker comes next
+const designerNext = readPendingDesigner();
 
 const STEPS = [
   { short: "Your name", title: "Create your account", lead: "Order bouquets from local florists, or design your own in 3D." },

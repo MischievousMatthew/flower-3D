@@ -7,6 +7,12 @@
       New to BloomCraft? <router-link to="/guest/register" class="af-link">Create an account</router-link>
     </template>
 
+
+    <p v-if="designerNext" class="af-next" role="note">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 11 5-11" /><circle cx="9" cy="7" r="2.5" /><circle cx="15" cy="7" r="2.5" /></svg>
+      <span><strong>Next: the 3D designer.</strong> Once you're signed in, choose a flower shop and start building your bouquet.</span>
+    </p>
+
     <!-- Username and password -->
     <form v-if="!twoFactorRequired" class="af-form" novalidate @submit.prevent="handleLogin()">
       <div class="af-field">
@@ -102,6 +108,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AuthShell from "../../components/auth/AuthShell.vue";
+import { readPendingDesigner } from "../../utils/designerIntent";
 import PasswordField from "../../components/auth/PasswordField.vue";
 import CodeBoxes from "../../components/auth/CodeBoxes.vue";
 import CodeTimer from "../../components/auth/CodeTimer.vue";
@@ -114,6 +121,8 @@ import { hasStoredAuthSession, getPreferredAuthToken, getPreferredUserType } fro
 
 const route = useRoute();
 const router = useRouter();
+// Came from "Explore 3D Designer": say the shop picker comes next
+const designerNext = readPendingDesigner();
 const { combinedLogin, completeTwoFactorLogin: finishTwoFactorLogin, loading, serverWaking } = useAuth();
 const { site } = useSiteContent();
 const supportEmail = computed(() => site.settings?.contact_email || "");

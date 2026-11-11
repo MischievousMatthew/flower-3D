@@ -995,6 +995,12 @@ const buyNowDirect = async (product) => {
 };
 
 onMounted(async () => {
+  // Sent here to pick a shop for the 3D designer (landing page, after signing in)
+  if (route.query.design === "1") {
+    openDesigner();
+    const { design, ...rest } = route.query;
+    router.replace({ query: rest });
+  }
   const fromContentLink = applyContentLink(route.query);
   await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors(), fetchFeatured(), fetchPopular()]);
   if (fromContentLink) setTimeout(() => scrollToSection("products"), 50);

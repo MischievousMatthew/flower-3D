@@ -583,6 +583,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 import { useAuth } from "../../composables/useAuth";
 import { getStoredUserToken } from "../../utils/authSession";
+import { DESIGNER_PICKER_ROUTE, savePendingDesigner } from "../../utils/designerIntent";
 import { BLOOM_VARIETIES } from "../../composables/landingFlowers";
 import {
   createLandingBouquet,
@@ -950,8 +951,16 @@ function continueWithRegister() {
   router.push("/guest/vendor_register");
 }
 
+// "Explore 3D Designer": signed in, the shop picker opens right away;
+// otherwise sign up (or sign in) first and land on the picker after
 const handleLearnMore = (type) => {
-  console.log("Learn more about:", type);
+  if (type === "3d-designer") {
+    if (isAuthenticated.value) {
+      router.push(DESIGNER_PICKER_ROUTE);
+      return;
+    }
+    savePendingDesigner();
+  }
   router.push("/guest/register");
 };
 

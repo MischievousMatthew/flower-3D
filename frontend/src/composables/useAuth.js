@@ -15,6 +15,7 @@ import { clearSubscriptionAccess } from "./useSubscriptionAccess";
 import { clearVendorProfile } from "./useVendorProfile";
 import { useAdminAccess } from "./useAdminAccess";
 import { readPendingPlan } from "../constants/subscriptionPlans";
+import { DESIGNER_PICKER_ROUTE, clearPendingDesigner, readPendingDesigner } from "../utils/designerIntent";
 import { getDeviceId } from "../utils/deviceId";
 import { clearSessionReplaced } from "../utils/sessionReplaced";
 import { clearSessionExpired } from "../utils/sessionExpired";
@@ -117,6 +118,12 @@ export function useAuth() {
     if (userData?.role === "vendor") {
       const planKey = readPendingPlan();
       if (planKey) return { name: "VendorSubscription", query: { plan: planKey } };
+    }
+    // Pressed "Explore 3D Designer" on the landing page: choose a shop next
+    const customer = !userData?.role || userData.role === "customer";
+    if (customer && readPendingDesigner()) {
+      clearPendingDesigner();
+      return { ...DESIGNER_PICKER_ROUTE };
     }
     return serverRedirect || "/shop";
   };
@@ -373,7 +380,7 @@ export function useAuth() {
 
       const { data } = await api.post("/auth/register", payload);
       setAuthData(data?.token, data?.user);
-      await router.push("/shop");
+      await router.push(resolveUserRedirect(data?.user, "/shop"));
       toast.success("Account created successfully!");
 
       return { success: true, data };

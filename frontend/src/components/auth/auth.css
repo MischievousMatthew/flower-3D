@@ -59,6 +59,35 @@
   color: var(--ink-soft);
 }
 /* Field messages: quiet, in the brand's rose, never a red box */
+/* What happens after signing in (e.g. the 3D designer is next) */
+.af-next {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid rgba(77, 177, 115, 0.3);
+  border-radius: 12px;
+  background: rgba(77, 177, 115, 0.08);
+  color: var(--ink);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.af-next svg {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  fill: none;
+  stroke: var(--leaf-deep, #2e7a4f);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.af-next strong {
+  font-weight: 600;
+}
+
 .af-note {
   display: block;
   margin: 0;
