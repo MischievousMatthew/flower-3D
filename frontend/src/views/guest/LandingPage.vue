@@ -314,35 +314,8 @@
         </div>
       </section>
 
-      <!-- How it works -->
-      <section
-        id="how-it-works"
-        ref="processSection"
-        class="process"
-        aria-labelledby="process-heading"
-      >
-        <div class="bc-container">
-          <div class="bc-section-head">
-            <p class="bc-label">How it works</p>
-            <h2 id="process-heading">
-              From a local florist's bench <em>to your door</em>
-            </h2>
-          </div>
-          <ol class="process-list">
-            <li
-              v-for="(step, i) in processSteps"
-              :key="step.title"
-              class="process-step"
-            >
-              <span class="process-num" aria-hidden="true"
-                >{{ ["i", "ii", "iii"][i] }}.</span
-              >
-              <h3>{{ step.title }}</h3>
-              <p>{{ step.text }}</p>
-            </li>
-          </ol>
-        </div>
-      </section>
+      <!-- How it works: scroll-driven walkthrough (components/landing/HowItWorks.vue) -->
+      <HowItWorks ref="processWalk" />
 
       <!-- Plans: pinned horizontal track of subscription cards -->
       <section
@@ -596,6 +569,7 @@ import "../../styles/bloomcraft.css";
 import { useSiteContent } from "../../composables/useSiteContent";
 import LandingLoader from "../../components/landing/LandingLoader.vue";
 import PlanAccountModal from "../../components/landing/PlanAccountModal.vue";
+import HowItWorks from "../../components/landing/HowItWorks.vue";
 import PricingPlanCard from "../../components/pricing/PricingPlanCard.vue";
 import {
   SUBSCRIPTION_PLANS,
@@ -620,7 +594,7 @@ const isAuthenticated = computed(
 const heroSection = ref(null);
 const storySection = ref(null);
 const storyProgressFill = ref(null);
-const processSection = ref(null);
+const processWalk = ref(null); // the How it works walkthrough
 const plansSection = ref(null);
 const plansViewport = ref(null);
 const plansTrack = ref(null);
@@ -808,22 +782,6 @@ const features = ref([
       "Connect with local florists and artisans. Support small businesses while getting fresh, quality flowers.",
   },
 ]);
-
-// How it works (replaces the old placeholder marketplace stats).
-const processSteps = [
-  {
-    title: "Find a local florist",
-    text: "Browse storefronts from flower shops near you and choose who will craft your arrangement.",
-  },
-  {
-    title: "Design it in 3D",
-    text: "Pick blooms, wrapping and fillers in the 3D studio, then tap Suggest an arrangement for a ready-made layout.",
-  },
-  {
-    title: "Hand-tied and delivered",
-    text: "Your florist prepares the bouquet you designed and delivers it fresh to the door.",
-  },
-];
 
 // Website content from Admin → Website (falls back to the original copy)
 const { site } = useSiteContent();
@@ -1353,8 +1311,14 @@ function setupJourney() {
       storyTrigger = tl.scrollTrigger;
     }
 
+    // ---- How it works: pinned on wide screens, plays per step on phones ----
+    processWalk.value?.build({
+      mode: prefersReducedMotion ? "static" : isMobile ? "stack" : "live",
+      scrollTo: (y) => (lenis ? lenis.scrollTo(y) : window.scrollTo({ top: y, behavior: "smooth" })),
+    });
+
     // ---- After the story the bouquet steps aside for content ----
-    const stats = processSection.value;
+    const stats = processWalk.value?.el;
     if (stats && stage) {
       gsap.to(stage, {
         autoAlpha: 0,
@@ -2405,53 +2369,6 @@ onBeforeUnmount(() => {
 }
 
 /* ============================================================
-   HOW IT WORKS
-============================================================= */
-.process {
-  position: relative;
-  padding-block: var(--section-space);
-}
-
-.process-list {
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 88px;
-  border-top: 1px solid var(--line);
-}
-
-.process-step {
-  padding: 44px 44px 0 0;
-}
-
-.process-step + .process-step {
-  padding-left: 44px;
-  border-left: 1px solid var(--line);
-}
-
-.process-num {
-  display: block;
-  margin-bottom: 40px;
-  font-family: var(--font-display);
-  font-size: 54px;
-  font-style: italic;
-  line-height: 1;
-  color: var(--leaf);
-}
-
-.process-step h3 {
-  margin-bottom: 16px;
-  font-size: clamp(28px, 2.4vw, 36px);
-}
-
-.process-step p {
-  max-width: 330px;
-  color: var(--ink-soft);
-  font-size: 15.5px;
-  line-height: 1.8;
-}
-
-/* ============================================================
    PLANS (pinned horizontal track)
 ============================================================= */
 .plans-section {
@@ -2957,26 +2874,6 @@ onBeforeUnmount(() => {
 
   .story--static .story-step {
     position: static;
-  }
-
-  .process-list {
-    grid-template-columns: 1fr;
-    margin-top: 56px;
-  }
-
-  .process-step,
-  .process-step + .process-step {
-    padding: 36px 0;
-    border-left: none;
-  }
-
-  .process-step + .process-step {
-    border-top: 1px solid var(--line);
-  }
-
-  .process-num {
-    margin-bottom: 22px;
-    font-size: 44px;
   }
 
   .plans-section {
