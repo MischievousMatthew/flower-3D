@@ -450,7 +450,7 @@ function build({ mode = "live", scrollTo = null } = {}) {
     }
     scenes[i].duration(0.72);
     scenes[i].paused(false);
-    master.add(scenes[i], i + 0.12);
+    master.add(scenes[i], i + 0.04);
   });
   master.set({}, {}, STEPS.length);
 }
@@ -481,13 +481,13 @@ defineExpose({ build, el: rootEl });
 }
 
 .hiw-head h2 {
-  margin-top: 14px;
+  margin: 14px 0 0;
   font-size: clamp(38px, 4.6vw, 64px);
   line-height: 1.04;
 }
 
 .hiw-lede {
-  margin-top: 16px;
+  margin: 16px 0 0;
   color: var(--ink-soft);
   font-size: 16px;
   line-height: 1.7;
@@ -509,7 +509,7 @@ defineExpose({ build, el: rootEl });
   position: absolute;
   left: 10%;
   right: 10%;
-  top: 21px;
+  top: 19px;
   height: 2px;
   border-radius: 2px;
   background: var(--line);
@@ -540,16 +540,21 @@ defineExpose({ build, el: rootEl });
 }
 
 .hiw-rail-num {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 1.5px solid var(--line);
+  width: 40px;
+  height: 40px;
+  border: 1.5px solid #d5dbd6;
   border-radius: 50%;
   background: var(--paper);
   color: var(--ink-soft);
-  font-family: var(--font-display);
-  font-size: 20px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1;
   transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
 }
 
@@ -560,7 +565,7 @@ defineExpose({ build, el: rootEl });
 
 .hiw-rail-btn.done .hiw-rail-num {
   border-color: var(--leaf);
-  background: rgba(77, 177, 115, 0.12);
+  background: #e4f3ea;
   color: var(--leaf-deep);
 }
 
@@ -573,7 +578,7 @@ defineExpose({ build, el: rootEl });
   border-color: var(--leaf);
   background: var(--leaf);
   color: #ffffff;
-  transform: scale(1.08);
+  box-shadow: 0 0 0 6px rgba(77, 177, 115, 0.16);
 }
 
 .hiw-rail-btn:focus-visible {
@@ -1239,25 +1244,29 @@ defineExpose({ build, el: rootEl });
   font-size: 12px;
 }
 
-/* ── Live: the section pins and one step shows at a time ── */
+/* ── Live: the section pins and one step shows at a time ──
+   The pinned view is exactly one screen tall: the header and rail take what
+   they need below the floating nav, and the step fills the rest, so the scene
+   window is never cut off. */
 .hiw--live {
   padding-block: 0;
 }
 
 .hiw--live .hiw-pin {
-  display: flex;
-  align-items: center;
-  min-height: 100vh;
-  min-height: 100svh;
-  padding-block: 88px 24px;
-}
-
-.hiw--live .hiw-head {
-  max-width: none;
+  height: 100vh;
+  height: 100svh;
+  padding-block: clamp(128px, 15vh, 150px) clamp(20px, 4vh, 40px);
 }
 
 .hiw--live .hiw-inner {
-  width: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.hiw--live .hiw-head {
+  flex-shrink: 0;
+  max-width: none;
 }
 
 .hiw--live .hiw-lede-live {
@@ -1265,33 +1274,62 @@ defineExpose({ build, el: rootEl });
 }
 
 .hiw--live .hiw-head h2 {
-  font-size: clamp(30px, 3.1vw, 46px);
+  margin-top: 10px;
+  font-size: clamp(28px, 2.8vw, 42px);
 }
 
 .hiw--live .hiw-lede {
-  margin-top: 10px;
+  margin-top: 8px;
+  font-size: 15px;
 }
 
 .hiw--live .hiw-rail {
   display: grid;
+  flex-shrink: 0;
+  margin-top: clamp(14px, 2.4vh, 26px);
 }
 
 .hiw--live .hiw-steps {
   position: relative;
   display: block;
-  height: min(430px, 46vh);
-  margin-top: 28px;
+  flex: 1;
+  min-height: 0;
+  margin-top: clamp(16px, 3vh, 32px);
 }
 
 .hiw--live .hiw-step {
   position: absolute;
   inset: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.hiw--live .hiw-copy h3 {
+  font-size: clamp(26px, 2.5vw, 38px);
+}
+
+.hiw--live .hiw-text {
+  margin-top: 12px;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.hiw--live .hiw-tip {
+  margin-top: 16px;
+}
+
+.hiw--live .hiw-scene {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 0;
 }
 
 .hiw--live .hiw-window {
-  max-height: min(430px, 46vh);
   width: auto;
   height: 100%;
+  max-width: 100%;
+  max-height: 440px;
 }
 
 /* Phones and narrow windows: the scene goes under its text */
