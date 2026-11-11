@@ -54,15 +54,23 @@
                 <button type="button" @click="$emit('open', product)">{{ product.product_name }}</button>
               </h3>
               <p class="fp-stats">
-                <span class="fp-star" aria-hidden="true">★</span>
-                <strong>{{ product.average_rating ? Number(product.average_rating).toFixed(1) : "New" }}</strong>
-                <template v-if="product.sold_count"> · {{ sold(product.sold_count) }} sold</template>
+                <template v-if="Number(product.total_reviews)">
+                  <span class="fp-star" aria-hidden="true">★</span>
+                  <strong>{{ Number(product.average_rating || 0).toFixed(1) }}</strong>
+                  <span class="fp-soft">({{ product.total_reviews }})</span>
+                </template>
+                <span v-else class="fp-soft">No reviews yet</span>
+                <template v-if="Number(product.sold_count)"> · {{ sold(product.sold_count) }} sold</template>
               </p>
+              <p class="fp-stock" :class="stockOf(product).tone"><i aria-hidden="true"></i>{{ stockOf(product).text }}</p>
 
               <div class="fp-buy">
                 <p class="fp-price">
-                  <span class="fp-now">₱{{ money(product.discount_price || product.selling_price) }}</span>
-                  <span v-if="product.discount_price" class="fp-was">₱{{ money(product.selling_price) }}</span>
+                  <span class="fp-now">₱{{ money(onSale(product) ? product.discount_price : product.selling_price) }}</span>
+                  <template v-if="onSale(product)">
+                    <span class="fp-was">₱{{ money(product.selling_price) }}</span>
+                    <span class="fp-off">−{{ discountOf(product) }}%</span>
+                  </template>
                 </p>
                 <button
                   type="button"
@@ -76,6 +84,7 @@
                   <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2" /><circle cx="9.5" cy="20" r="1.2" /><circle cx="17.5" cy="20" r="1.2" /></svg>
                 </button>
               </div>
+              <button type="button" class="fp-view" @click="$emit('open', product)">View details</button>
             </div>
           </article>
         </li>
@@ -85,7 +94,7 @@
 </template>
 
 <script setup>
-import ProductTag from "./ProductTag.vue";
+import ProductTag, { LOW_STOCK } from "./ProductTag.vue";
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { sizedImage, sizedSrcset } from "../../utils/cloudinaryImage.js";
 
@@ -123,6 +132,14 @@ function onImageError(event) {
 const money = (value) => Number(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const sold = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n % 1000 ? 1 : 0)}k` : String(n));
 const inStock = (product) => Number(product.quantity_in_stock ?? 1) > 0;
+const onSale = (p) => Number(p.discount_price) > 0 && Number(p.discount_price) < Number(p.selling_price);
+const discountOf = (p) => Math.max(1, Math.round((1 - Number(p.discount_price) / Number(p.selling_price)) * 100));
+function stockOf(p) {
+  const n = Number(p.quantity_in_stock ?? 0);
+  if (n <= 0) return { tone: "out", text: "Sold out" };
+  if (n <= LOW_STOCK) return { tone: "low", text: `Only ${n} left` };
+  return { tone: "in", text: "In stock" };
+}
 
 
 // Arrows show only when the cards don't all fit
@@ -358,6 +375,57 @@ watch(
   top: 10px;
   left: 10px;
   pointer-events: none;
+}
+
+.fp-soft {
+  color: var(--ink-soft);
+}
+
+.fp-off {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: #fdecea;
+  color: #b4332a;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.fp-stock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: var(--leaf-deep);
+}
+
+.fp-stock i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--leaf);
+}
+
+.fp-stock.low { color: #a55a12; }
+.fp-stock.low i { background: #d18a1c; }
+.fp-stock.out { color: #b4332a; }
+.fp-stock.out i { background: #b4332a; }
+
+.fp-view {
+  width: 100%;
+  min-height: 40px;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: 500 12.5px var(--font-sans);
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.fp-view:hover {
+  border-color: var(--ink);
 }
 
 .fp-body {

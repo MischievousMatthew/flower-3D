@@ -9,29 +9,49 @@
       </span>
     </button>
     <div class="pt-body">
-      <button type="button" class="pt-name" @click="$emit('open', product)">{{ product.product_name }}</button>
+      <button type="button" class="pt-name" :title="product.product_name" @click="$emit('open', product)">{{ product.product_name }}</button>
+
+      <!-- Stars and reviews, then how many sold -->
+      <p class="pt-meta">
+        <template v-if="reviews">
+          <span class="pt-star" aria-hidden="true">★</span>
+          <strong>{{ rating.toFixed(1) }}</strong>
+          <span class="pt-soft">({{ reviews }})</span>
+          <span class="sr-only">{{ rating.toFixed(1) }} out of 5 from {{ reviews }} {{ reviews === 1 ? "review" : "reviews" }}</span>
+        </template>
+        <span v-else class="pt-soft">No reviews yet</span>
+        <template v-if="sold">
+          <span class="pt-dot" aria-hidden="true"></span>
+          <span class="pt-soft">{{ soldText }} sold</span>
+        </template>
+      </p>
+
+      <!-- Price, the original price and the discount when on sale -->
       <p class="pt-price">
+        <strong :class="{ sale: onSale }">{{ peso(price) }}</strong>
         <template v-if="onSale">
           <s>{{ peso(product.selling_price) }}</s>
-          <strong class="sale">{{ peso(product.discount_price) }}</strong>
+          <span class="pt-off">−{{ discount }}%</span>
         </template>
-        <strong v-else>{{ peso(product.selling_price) }}</strong>
       </p>
-      <p v-if="Number(product.total_reviews)" class="pt-rating">
-        <span aria-hidden="true">★</span> {{ Number(product.average_rating || 0).toFixed(1) }}
-        <small>({{ product.total_reviews }})</small>
+
+      <p class="pt-stock" :class="stock">
+        <i aria-hidden="true"></i>{{ stockText }}
       </p>
-      <p v-else class="pt-rating muted">New</p>
-      <button
-        type="button"
-        class="pt-cart"
-        :disabled="adding || product.quantity_in_stock === 0"
-        :aria-label="product.quantity_in_stock === 0 ? `${product.product_name} is sold out` : `Add ${product.product_name} to cart`"
-        :title="product.quantity_in_stock === 0 ? 'Sold out' : 'Add to cart'"
-        @click="$emit('add', product, { imageEl })"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2" /><circle cx="9.5" cy="20" r="1.2" /><circle cx="17.5" cy="20" r="1.2" /></svg>
-      </button>
+
+      <div class="pt-actions">
+        <button type="button" class="pt-view" @click="$emit('open', product)">View details</button>
+        <button
+          type="button"
+          class="pt-cart"
+          :disabled="adding || soldOut"
+          :aria-label="soldOut ? `${product.product_name} is sold out` : `Add ${product.product_name} to cart`"
+          :title="soldOut ? 'Sold out' : 'Add to cart'"
+          @click="$emit('add', product, { imageEl })"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2" /><circle cx="9.5" cy="20" r="1.2" /><circle cx="17.5" cy="20" r="1.2" /></svg>
+        </button>
+      </div>
     </div>
   </article>
 </template>
@@ -39,7 +59,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import { sizedImage, sizedSrcset } from "../../utils/cloudinaryImage.js";
-import ProductTag, { cardTag, useTagOrder } from "./ProductTag.vue";
+import ProductTag, { LOW_STOCK, cardTag, useTagOrder } from "./ProductTag.vue";
 
 /** Small product card for the shop's Top Selling row and the bouquet finder */
 const props = defineProps({
@@ -71,6 +91,18 @@ const tag = computed(() =>
     productId: props.product.id,
   }),
 );
+// What the card shows under the name
+const price = computed(() => (onSale.value ? Number(props.product.discount_price) : Number(props.product.selling_price || 0)));
+const discount = computed(() => Math.max(1, Math.round((1 - price.value / Number(props.product.selling_price)) * 100)));
+const rating = computed(() => Number(props.product.average_rating || 0));
+const reviews = computed(() => Number(props.product.total_reviews || 0));
+const sold = computed(() => Number(props.product.sold_count || 0));
+const soldText = computed(() => (sold.value >= 1000 ? `${(sold.value / 1000).toFixed(sold.value % 1000 >= 100 ? 1 : 0)}k` : String(sold.value)));
+const stockCount = computed(() => Number(props.product.quantity_in_stock ?? 0));
+const soldOut = computed(() => stockCount.value <= 0);
+const stock = computed(() => (soldOut.value ? "out" : stockCount.value <= LOW_STOCK ? "low" : "in"));
+const stockText = computed(() => (soldOut.value ? "Sold out" : stock.value === "low" ? `Only ${stockCount.value} left` : "In stock"));
+
 const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`;
 </script>
 
@@ -144,18 +176,19 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
 }
 
 .pt-body {
-  position: relative;
-  display: grid;
-  gap: 4px;
-  padding: 12px 12px 14px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px;
 }
 
 .pt-name {
   overflow: hidden;
-  padding: 0 34px 0 0;
+  padding: 0;
   border: 0;
   background: none;
-  font: 500 13px var(--font-sans);
+  font: 500 13.5px var(--font-sans);
   color: var(--ink);
   text-align: left;
   text-overflow: ellipsis;
@@ -163,21 +196,58 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
   cursor: pointer;
 }
 
+.pt-name:hover {
+  color: var(--leaf-deep);
+}
+
+.pt-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.pt-meta strong {
+  font-weight: 600;
+}
+
+.pt-star {
+  color: #e2a23b;
+}
+
+.pt-soft {
+  color: var(--ink-soft);
+}
+
+.pt-dot {
+  width: 3px;
+  height: 3px;
+  margin: 0 2px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+  opacity: 0.6;
+}
+
 .pt-price {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
-  margin: 0;
-  font-size: 14px;
+  margin: 2px 0 0;
   color: var(--ink);
 }
 
 .pt-price strong {
+  font-size: 15px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .pt-price strong.sale {
-  color: var(--leaf-deep);
+  color: #b4332a;
 }
 
 .pt-price s {
@@ -185,50 +255,96 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
   color: var(--ink-soft);
 }
 
-.pt-rating {
+.pt-off {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: #fdecea;
+  color: #b4332a;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* In stock / Only 3 left / Sold out */
+.pt-stock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0;
-  font-size: 12px;
-  color: var(--ink);
+  font-size: 11.5px;
+  color: var(--leaf-deep);
 }
 
-.pt-rating span {
-  color: #e2a23b;
+.pt-stock i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--leaf);
 }
 
-.pt-rating small {
-  color: var(--ink-soft);
+.pt-stock.low {
+  color: #a55a12;
 }
 
-.pt-rating.muted {
-  color: var(--ink-soft);
+.pt-stock.low i {
+  background: #d18a1c;
 }
 
-.pt-cart {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
+.pt-stock.out {
+  color: #b4332a;
+}
+
+.pt-stock.out i {
+  background: #b4332a;
+}
+
+/* View details + quick add, at the bottom of every card */
+.pt-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.pt-view {
+  flex: 1;
+  min-height: 40px;
+  padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 9px;
   background: var(--paper);
-  color: var(--leaf-deep);
+  color: var(--ink);
+  font: 500 12.5px var(--font-sans);
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.pt-view:hover {
+  border-color: var(--ink);
+}
+
+.pt-cart {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: var(--leaf-deep);
+  color: var(--paper);
+  cursor: pointer;
+  transition: background 0.2s ease;
 }
 
 .pt-cart:hover:not(:disabled) {
-  border-color: var(--leaf-deep);
-  background: var(--leaf-deep);
-  color: var(--paper);
+  background: var(--ink);
 }
 
 .pt-cart:disabled {
+  background: var(--ivory-deep);
+  color: var(--ink-soft);
   cursor: not-allowed;
-  opacity: 0.45;
 }
 
 .pt-cart svg {
@@ -236,9 +352,18 @@ const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maxim
   height: 17px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.6;
+  stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .pt :focus-visible {
