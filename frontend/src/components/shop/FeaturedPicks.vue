@@ -42,7 +42,8 @@
                 loading="lazy"
                 @error="onImageError"
               />
-              <span v-if="badge(product)" class="fp-badge" :class="badge(product).tone">{{ badge(product).label }}</span>
+              <!-- These are BloomCraft's own picks, so they say so (unless sold out) -->
+              <span class="fp-badge"><ProductTag :tag="inStock(product) ? 'recommended' : 'out_of_stock'" on-photo /></span>
             </button>
 
             <div class="fp-body">
@@ -84,6 +85,7 @@
 </template>
 
 <script setup>
+import ProductTag from "./ProductTag.vue";
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { sizedImage, sizedSrcset } from "../../utils/cloudinaryImage.js";
 
@@ -122,13 +124,6 @@ const money = (value) => Number(value || 0).toLocaleString("en-PH", { minimumFra
 const sold = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n % 1000 ? 1 : 0)}k` : String(n));
 const inStock = (product) => Number(product.quantity_in_stock ?? 1) > 0;
 
-// The same badges as the product tiles (ShopProductTile)
-function badge(product) {
-  if (!inStock(product)) return { label: "Sold out", tone: "muted" };
-  if (Number(product.discount_price) > 0 && Number(product.discount_price) < Number(product.selling_price)) return { label: "On sale", tone: "sale" };
-  if ((product.sold_count ?? 0) >= 10) return { label: "Best seller", tone: "best" };
-  return null;
-}
 
 // Arrows show only when the cards don't all fit
 function measure() {
@@ -357,30 +352,12 @@ watch(
   transform: scale(1.05);
 }
 
-/* Same badge as the product tiles */
+/* The tag, top left, like the product tiles */
 .fp-badge {
   position: absolute;
   top: 10px;
   left: 10px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.fp-badge.best {
-  background: var(--leaf-deep);
-}
-
-.fp-badge.sale {
-  background: #b3413b;
-}
-
-.fp-badge.muted {
-  background: rgba(54, 63, 78, 0.78);
+  pointer-events: none;
 }
 
 .fp-body {
