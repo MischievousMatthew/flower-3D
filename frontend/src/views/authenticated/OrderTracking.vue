@@ -191,7 +191,9 @@
 
             <!-- Out for delivery: the customer completes the order -->
             <div v-if="canComplete(order)" class="ot-receive">
-              <img v-if="order.delivery?.photo_url" :src="order.delivery.photo_url" alt="Your order before delivery" loading="lazy" />
+              <button v-if="order.delivery?.photo_url" type="button" class="ot-receive__photo" aria-label="View proof of order" @click="openProof(order)">
+                <img :src="order.delivery.photo_url" alt="" loading="lazy" />
+              </button>
               <div class="ot-receive__text">
                 <strong>Your order is on its way</strong>
                 <span>Once it's in your hands, mark it received. That completes the order.</span>
@@ -292,12 +294,16 @@
                       </div>
                     </dl>
 
-                    <figure v-if="order.delivery?.photo_url" class="ot-photo">
-                      <a :href="order.delivery.photo_url" target="_blank" rel="noopener" aria-label="Open the photo of your order in full size">
-                        <img :src="order.delivery.photo_url" :alt="`Photo of order ${order.order_number} before delivery`" loading="lazy" />
-                      </a>
-                      <figcaption>{{ order.store_name || "The shop" }} took this before sending it out<template v-if="order.delivery.photo_taken_at"> · {{ fmtDT(order.delivery.photo_taken_at) }}</template>.</figcaption>
-                    </figure>
+                    <button
+                      v-if="order.delivery?.photo_url && !order.delivery?.timeline?.length"
+                      type="button"
+                      class="ot-proof ot-proof--wide"
+                      @click="openProof(order)"
+                    >
+                      <img :src="order.delivery.photo_url" alt="" loading="lazy" />
+                      <span><strong>View proof of order</strong><small>{{ order.store_name || "The shop" }}'s photo before sending it out</small></span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" /></svg>
+                    </button>
 
                     <template v-if="order.delivery?.timeline?.length">
                       <h4 class="ot-panel__sub">Updates</h4>
@@ -306,6 +312,11 @@
                           <strong>{{ ev.label }}</strong>
                           <time>{{ fmtDT(ev.scanned_at) }}</time>
                           <p v-if="ev.notes">{{ ev.notes }}</p>
+                          <!-- The shop's photo, on the update when it went out -->
+                          <button v-if="idx === proofIndex(order)" type="button" class="ot-proof" @click="openProof(order)">
+                            <img :src="order.delivery.photo_url" alt="" loading="lazy" />
+                            <span><strong>View proof of order</strong><small>Photo by {{ order.store_name || "the shop" }}</small></span>
+                          </button>
                         </li>
                       </ol>
                     </template>
@@ -501,6 +512,30 @@
       @close="paymentFailure.show = false"
       @secondary="askShop(paymentFailure.order)"
     />
+
+    <!-- Proof of order: the shop's photo, without leaving the page -->
+    <Transition name="modal">
+      <div v-if="proof.show" class="ot-overlay ot-overlay--dark" @click.self="closeProof">
+        <figure class="ot-proof-modal" role="dialog" aria-modal="true" aria-labelledby="ot-proof-title" @keydown.esc="closeProof">
+          <header class="ot-proof-modal__head">
+            <div>
+              <h3 id="ot-proof-title">Proof of order</h3>
+              <p>{{ proof.orderNumber }}</p>
+            </div>
+            <button ref="proofClose" type="button" class="ot-modal__close" aria-label="Close" @click="closeProof">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+            </button>
+          </header>
+          <div class="ot-proof-modal__img">
+            <img :src="proof.url" :alt="`Photo of order ${proof.orderNumber} before delivery`" />
+          </div>
+          <figcaption>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
+            {{ proof.store }} took this photo before sending your order out<template v-if="proof.takenAt"> · {{ fmtDT(proof.takenAt) }}</template>.
+          </figcaption>
+        </figure>
+      </div>
+    </Transition>
 
     <ReviewModal
       :show="reviewModal.show"
@@ -997,6 +1032,43 @@ function onReviewed(orderId) {
   });
   // Refresh orders list in background
   refreshOrders();
+}
+
+// ── Proof of order (the shop's photo) ───────────────────────────────────────
+/**
+ * The update the photo belongs to: the one when the order went out for
+ * delivery, else the first one at or after the photo was taken, else the newest.
+ */
+function proofIndex(order) {
+  const timeline = order.delivery?.timeline || [];
+  if (!order.delivery?.photo_url || !timeline.length) return -1;
+  const out = timeline.findIndex((ev) => ev.status === "to_received");
+  if (out >= 0) return out;
+  const taken = Date.parse(order.delivery.photo_taken_at || "");
+  if (!Number.isNaN(taken)) {
+    const after = timeline.findIndex((ev) => Date.parse(ev.scanned_at || "") >= taken - 60000);
+    if (after >= 0) return after;
+  }
+  return timeline.length - 1;
+}
+
+const proof = reactive({ show: false, url: "", orderNumber: "", store: "", takenAt: "" });
+const proofClose = ref(null);
+let proofReturnFocus = null;
+function openProof(order) {
+  proofReturnFocus = document.activeElement;
+  Object.assign(proof, {
+    show: true,
+    url: order.delivery.photo_url,
+    orderNumber: order.order_number,
+    store: order.store_name || "The shop",
+    takenAt: order.delivery.photo_taken_at || "",
+  });
+  nextTick(() => proofClose.value?.focus());
+}
+function closeProof() {
+  proof.show = false;
+  proofReturnFocus?.focus?.();
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
@@ -2126,22 +2198,163 @@ button.ot-pay {
   font-style: italic;
 }
 
-.ot-photo {
-  margin-top: 16px;
+/* "View proof of order" on a delivery update */
+.ot-proof {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: start;
+  margin-top: 8px;
+  padding: 6px 14px 6px 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.ot-photo img {
-  display: block;
-  width: 100%;
-  max-height: 240px;
-  border-radius: 12px;
+.ot-proof:hover {
+  border-color: var(--leaf);
+  box-shadow: 0 8px 18px -12px rgba(54, 63, 78, 0.4);
+}
+
+.ot-proof:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+.ot-proof img {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
   object-fit: cover;
 }
 
-.ot-photo figcaption {
-  margin-top: 8px;
+.ot-proof span {
+  display: grid;
+  gap: 1px;
+}
+
+.ot-proof strong {
+  color: var(--leaf-deep);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ot-proof small {
   color: var(--ink-soft);
-  font-size: 12px;
+  font-size: 11.5px;
+}
+
+.ot-proof--wide {
+  display: flex;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.ot-proof--wide img {
+  width: 56px;
+  height: 56px;
+}
+
+.ot-proof--wide svg {
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ot-receive__photo {
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  cursor: zoom-in;
+}
+
+.ot-receive__photo:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+/* The photo pop-up */
+.ot-overlay--dark {
+  background: rgba(24, 28, 36, 0.72);
+}
+
+.ot-proof-modal {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(720px, 100%);
+  max-height: min(92vh, 900px);
+  overflow: hidden;
+  border-radius: 22px;
+  background: var(--paper);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+
+.ot-proof-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 14px 22px;
+}
+
+.ot-proof-modal__head h3 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.ot-proof-modal__head p {
+  margin-top: 2px !important;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.ot-proof-modal__img {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 0 18px;
+}
+
+.ot-proof-modal__img img {
+  display: block;
+  max-width: 100%;
+  max-height: min(68vh, 640px);
+  border-radius: 14px;
+  object-fit: contain;
+  background: var(--ivory-deep);
+}
+
+.ot-proof-modal figcaption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 22px 18px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ot-proof-modal figcaption svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--leaf-deep);
+  stroke-width: 1.7;
+  stroke-linejoin: round;
 }
 
 .ot-timeline {
@@ -2571,8 +2784,8 @@ button.ot-pay {
   transition: opacity 0.2s ease;
 }
 
-.modal-enter-active .ot-modal,
-.modal-leave-active .ot-modal {
+.modal-enter-active :is(.ot-modal, .ot-proof-modal),
+.modal-leave-active :is(.ot-modal, .ot-proof-modal) {
   transition: transform 0.22s var(--ease-out, ease);
 }
 
@@ -2581,8 +2794,8 @@ button.ot-pay {
   opacity: 0;
 }
 
-.modal-enter-from .ot-modal,
-.modal-leave-to .ot-modal {
+.modal-enter-from :is(.ot-modal, .ot-proof-modal),
+.modal-leave-to :is(.ot-modal, .ot-proof-modal) {
   transform: translateY(12px) scale(0.98);
 }
 
