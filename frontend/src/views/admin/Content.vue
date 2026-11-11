@@ -327,16 +327,39 @@
 
           <SkeletonRows v-if="!tagsLoaded" :rows="4" />
           <template v-else>
-            <div class="tag-cardmax">
-              <div>
-                <span class="field-label">Tags on each shop card</span>
-                <span class="hint">The most important ones show first. Sold out and the row's own tag always come first.</span>
+            <!-- The ranking: a shop card shows only the highest tag a product has -->
+            <div class="tag-order">
+              <div class="tag-order-head">
+                <span class="field-label">Tag order</span>
+                <span class="hint">A shop card shows one tag: the highest one on this list that the product has. Drag to change the order, or use the arrows.</span>
               </div>
-              <div class="stepper">
-                <button type="button" aria-label="One tag fewer" :disabled="tagRules.card_max <= 0" @click="tagRules.card_max--">−</button>
-                <output>{{ tagRules.card_max }}</output>
-                <button type="button" aria-label="One tag more" :disabled="tagRules.card_max >= 3" @click="tagRules.card_max++">+</button>
-              </div>
+              <ol class="tag-rank" aria-label="Tag order, highest first">
+                <li
+                  v-for="(t, i) in tagRules.order"
+                  :key="t"
+                  :ref="(el) => (rankEls[t] = el)"
+                  class="rank-item"
+                  :class="{ dragging: dragTag === t, off: !tagIsOn(t) }"
+                >
+                  <button
+                    type="button"
+                    class="rank-handle"
+                    :aria-label="'Move ' + tagName(t) + ', number ' + (i + 1) + '. Use the up and down arrow keys.'"
+                    @pointerdown="startTagDrag($event, t)"
+                    @keydown.up.prevent="moveTag(i, -1)"
+                    @keydown.down.prevent="moveTag(i, 1)"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.4" /><circle cx="15" cy="6" r="1.4" /><circle cx="9" cy="12" r="1.4" /><circle cx="15" cy="12" r="1.4" /><circle cx="9" cy="18" r="1.4" /><circle cx="15" cy="18" r="1.4" /></svg>
+                  </button>
+                  <span class="rank-num">{{ i + 1 }}</span>
+                  <ProductTag :tag="t" />
+                  <span class="rank-note">{{ tagNote(t) }}</span>
+                  <span class="rank-arrows">
+                    <button type="button" :disabled="i === 0" :aria-label="'Move ' + tagName(t) + ' up'" @click="moveTag(i, -1)">▲</button>
+                    <button type="button" :disabled="i === tagRules.order.length - 1" :aria-label="'Move ' + tagName(t) + ' down'" @click="moveTag(i, 1)">▼</button>
+                  </span>
+                </li>
+              </ol>
             </div>
 
             <div class="tag-grid">
@@ -872,31 +895,89 @@ const TAG_RULES = [
   { tag: "recommended", name: "Recommended", enable: "recommended_enabled", desc: "The products you pick under Featured products.", fields: [] },
   { tag: "seasonal", name: "Seasonal", enable: "seasonal_enabled", desc: "Products a shop set to a season rather than all year.", fields: [] },
 ];
+const TAG_ORDER_DEFAULT = [
+  "out_of_stock", "sale", "best_seller", "trending", "new_arrival",
+  "top_rated", "recommended", "seasonal", "you_may_like", "recently_viewed",
+];
+// Tags with no switch: always shown when they apply
+const ALWAYS_ON = {
+  out_of_stock: "When it's sold out",
+  you_may_like: "On the “You may also like” row",
+  recently_viewed: "On the “Recently viewed” row",
+};
 const TAG_DEFAULTS = {
-  card_max: 2, sale_enabled: true, sale_min_percent: 5,
+  order: TAG_ORDER_DEFAULT, sale_enabled: true, sale_min_percent: 5,
   best_enabled: true, best_top: 10, best_days: 90, best_min_sold: 3,
   new_enabled: true, new_days: 14, new_max: 12,
   trend_enabled: true, trend_top: 8, trend_days: 7, trend_min_score: 3,
   rated_enabled: true, rated_min_rating: 4.5, rated_min_reviews: 3, rated_max: 20,
   recommended_enabled: true, seasonal_enabled: true,
 };
-const tagRules = reactive({ ...TAG_DEFAULTS });
-const savedTagRules = ref({ ...TAG_DEFAULTS });
+const tagRules = reactive({ ...TAG_DEFAULTS, order: [...TAG_ORDER_DEFAULT] });
+const savedTagRules = ref({ ...TAG_DEFAULTS, order: [...TAG_ORDER_DEFAULT] });
 const tagCounts = ref({});
 const tagsLoaded = ref(false);
 const tagsSaving = ref(false);
-const tagsDirty = computed(() => Object.keys(TAG_DEFAULTS).some((k) => tagRules[k] !== savedTagRules.value[k]));
+const sameValue = (a, b) => (Array.isArray(a) ? a.join() === (b || []).join() : a === b);
+const tagsDirty = computed(() => Object.keys(TAG_DEFAULTS).some((k) => !sameValue(tagRules[k], savedTagRules.value[k])));
+// The form gets its own copy of the order, so dragging never changes the saved one
+const copyRules = (rules) => ({ ...rules, order: [...(rules.order || TAG_ORDER_DEFAULT)] });
+
+const ruleOf = (tag) => TAG_RULES.find((r) => r.tag === tag);
+const tagName = (tag) => ruleOf(tag)?.name || ALWAYS_ON[tag] && tag.replace(/_/g, " ") || tag;
+const tagIsOn = (tag) => (ALWAYS_ON[tag] ? true : !!tagRules[ruleOf(tag)?.enable]);
+const tagNote = (tag) => ALWAYS_ON[tag] || (tagIsOn(tag) ? countText(ruleOf(tag)) : "Off, never shown");
+
+function moveTag(i, step) {
+  const list = tagRules.order;
+  const to = i + step;
+  if (to < 0 || to >= list.length) return;
+  list.splice(to, 0, list.splice(i, 1)[0]);
+  nextTick(() => rankEls[list[to]]?.querySelector(".rank-handle")?.focus());
+}
+
+// Dragging: works with a mouse, a pen or a finger
+const rankEls = {};
+const dragTag = ref(null);
+function startTagDrag(event, tag) {
+  if (event.button !== undefined && event.button !== 0) return;
+  event.preventDefault();
+  dragTag.value = tag;
+  const onMove = (e) => {
+    const list = tagRules.order;
+    const from = list.indexOf(dragTag.value);
+    // The first item whose middle is below the pointer is where it goes
+    let to = list.length - 1;
+    for (let i = 0; i < list.length; i++) {
+      const box = rankEls[list[i]]?.getBoundingClientRect();
+      if (box && e.clientY < box.top + box.height / 2) {
+        to = i > from ? i - 1 : i;
+        break;
+      }
+    }
+    if (to !== from) list.splice(to, 0, list.splice(from, 1)[0]);
+  };
+  const onUp = () => {
+    dragTag.value = null;
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onUp);
+  };
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointercancel", onUp);
+}
 const countText = (rule) => {
   if (!tagRules[rule.enable]) return "Off";
   const n = tagCounts.value[rule.tag] ?? 0;
   return n + (n === 1 ? " product now" : " products now");
 };
 const applyTagRules = (data) => {
-  savedTagRules.value = { ...TAG_DEFAULTS, ...(data.rules || {}) };
-  Object.assign(tagRules, savedTagRules.value);
+  savedTagRules.value = copyRules({ ...TAG_DEFAULTS, ...(data.rules || {}) });
+  Object.assign(tagRules, copyRules(savedTagRules.value));
   if (data.counts) tagCounts.value = data.counts;
 };
-const resetTagRules = () => Object.assign(tagRules, savedTagRules.value);
+const resetTagRules = () => Object.assign(tagRules, copyRules(savedTagRules.value));
 async function loadTagRules() {
   try {
     applyTagRules((await api.get("/admin/content/product-tags")).data.data);
@@ -909,7 +990,7 @@ async function loadTagRules() {
 // The counts follow the numbers as they change, before saving
 let tagPreviewTimer = 0;
 let tagPreviewSeq = 0;
-watch(tagRules, () => {
+watch(() => Object.keys(TAG_DEFAULTS).filter((k) => k !== "order").map((k) => tagRules[k]).join("|"), () => {
   if (!tagsLoaded.value) return;
   clearTimeout(tagPreviewTimer);
   tagPreviewTimer = setTimeout(async () => {
@@ -1861,21 +1942,112 @@ textarea.input {
 
 /* Slideshow settings */
 /* Product tags */
-.tag-cardmax {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
+.tag-order {
+  display: grid;
+  gap: 10px;
   margin-bottom: 14px;
-  padding: 12px 16px;
+  padding: 14px 16px;
   border: 1px solid var(--a-border);
   border-radius: 12px;
   background: var(--a-subtle);
 }
-.tag-cardmax > div:first-child {
+.tag-order-head {
   display: grid;
   gap: 2px;
+}
+.tag-rank {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rank-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid var(--a-border);
+  border-radius: 10px;
+  background: var(--a-surface);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.rank-item.dragging {
+  position: relative;
+  z-index: 1;
+  border-color: var(--a-accent);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.14);
+}
+.rank-item.off .rank-num,
+.rank-item.off .rank-note {
+  opacity: 0.55;
+}
+.rank-handle {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--a-text-2);
+  cursor: grab;
+  touch-action: none;
+}
+.rank-item.dragging .rank-handle {
+  cursor: grabbing;
+}
+.rank-handle:hover {
+  background: var(--a-accent-soft);
+  color: var(--a-accent-text);
+}
+.rank-handle:focus-visible {
+  outline: 2px solid var(--a-accent);
+  outline-offset: 1px;
+}
+.rank-handle svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.rank-num {
+  min-width: 18px;
+  color: var(--a-text-2);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.rank-note {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--a-text-2);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rank-arrows {
+  display: flex;
+  gap: 2px;
+}
+.rank-arrows button {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--a-text-2);
+  font-size: 11px;
+  cursor: pointer;
+}
+.rank-arrows button:hover:not(:disabled) {
+  background: var(--a-accent-soft);
+  color: var(--a-accent-text);
+}
+.rank-arrows button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 .tag-grid {
   display: grid;

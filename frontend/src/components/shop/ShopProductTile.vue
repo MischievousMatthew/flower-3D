@@ -3,9 +3,9 @@
     <button type="button" class="pt-media" :aria-label="`View ${product.product_name}`" @click="$emit('open', product)">
       <img v-if="image" ref="imageEl" :src="sizedImage(image, 320)" :srcset="sizedSrcset(image, 320)" :alt="product.product_name" loading="lazy" decoding="async" />
       <span v-else class="pt-noimg" aria-hidden="true">✿</span>
-      <!-- Tags, top left: why this card is here (row), then sold out, then the shop's tags -->
-      <span v-if="tags.length" class="pt-tags">
-        <ProductTag v-for="tag in tags" :key="tag" :tag="tag" on-photo />
+      <!-- One tag, top left: the highest-ranked one this product has (the admin sets the ranking) -->
+      <span v-if="tag" class="pt-tags">
+        <ProductTag :tag="tag" on-photo />
       </span>
     </button>
     <div class="pt-body">
@@ -39,7 +39,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import { sizedImage, sizedSrcset } from "../../utils/cloudinaryImage.js";
-import ProductTag from "./ProductTag.vue";
+import ProductTag, { topTag, useTagOrder } from "./ProductTag.vue";
 
 /** Small product card for the shop's Top Selling row and the bouquet finder */
 const props = defineProps({
@@ -58,15 +58,17 @@ const onSale = computed(
   () => props.product.has_discount && Number(props.product.discount_price) > 0 && Number(props.product.discount_price) < Number(props.product.selling_price),
 );
 /**
- * The shop's tags come with the product (card_tags, as many as the admin
- * allows). A product saved before tags existed falls back to Sale / Best seller.
+ * Every tag this card could show: the product's own (from the server), the
+ * row's ("You may like"), and sold out. Only the highest-ranked one shows.
+ * A product saved before tags existed falls back to Sale / Best seller.
  */
-const tags = computed(() => {
-  const own = Array.isArray(props.product.card_tags)
-    ? props.product.card_tags
-    : [onSale.value && "sale", props.bestSeller && "best_seller"].filter(Boolean);
-  const list = [props.contextTag, Number(props.product.quantity_in_stock) === 0 && "out_of_stock", ...own].filter(Boolean);
-  return [...new Set(list)].slice(0, 3);
+const order = useTagOrder();
+const tag = computed(() => {
+  const own = Array.isArray(props.product.tags)
+    ? props.product.tags
+    : [onSale.value && "sale", props.bestSeller && "best_seller"];
+  const soldOut = Number(props.product.quantity_in_stock) === 0 && "out_of_stock";
+  return topTag([props.contextTag, soldOut, ...own], order.value);
 });
 const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`;
 </script>

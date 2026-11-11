@@ -48,12 +48,15 @@ class ProductTags
         Cache::forget(self::CACHE_KEY);
     }
 
-    /** The tags on one product, most important first */
+    /** The tags on one product, in the admin's order (highest first) */
     public function tagsFor(Product $product): array
     {
         $rules = $this->rules();
         $sets = $this->sets();
         $tags = [];
+        if ((int) $product->quantity_in_stock <= 0) {
+            $tags[] = 'out_of_stock';
+        }
         foreach (self::ORDER as $tag) {
             $on = match ($tag) {
                 'sale' => $rules['sale_enabled'] && $this->discountPercent($product) >= (float) $rules['sale_min_percent'],
@@ -64,6 +67,8 @@ class ProductTags
                 $tags[] = $tag;
             }
         }
+        $rank = array_flip($rules['order']);
+        usort($tags, fn ($a, $b) => ($rank[$a] ?? 99) <=> ($rank[$b] ?? 99));
         return $tags;
     }
 

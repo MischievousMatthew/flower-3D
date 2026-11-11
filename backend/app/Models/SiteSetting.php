@@ -51,7 +51,9 @@ class SiteSetting extends Model
      * and aren't set here. Also kept out of KEYS.
      */
     public const PRODUCT_TAG_DEFAULTS = [
-        'card_max' => 2,               // tags shown on one shop card
+        // The ranking, top first: a shop card shows only the highest tag a product has.
+        // The admin drags these into order.
+        'order' => self::PRODUCT_TAG_ORDER,
         'sale_enabled' => true,        // SALE: discounted by at least…
         'sale_min_percent' => 5,
         'best_enabled' => true,        // BEST SELLER: the top N by units sold in the last D days
@@ -73,10 +75,27 @@ class SiteSetting extends Model
         'seasonal_enabled' => true,    // SEASONAL: products for a season, not all year
     ];
 
+    /** Every tag a shop card can show, in the starting order */
+    public const PRODUCT_TAG_ORDER = [
+        'out_of_stock', 'sale', 'best_seller', 'trending', 'new_arrival',
+        'top_rated', 'recommended', 'seasonal', 'you_may_like', 'recently_viewed',
+    ];
+
     /** @return array<string, mixed> */
     public static function productTags(): array
     {
-        return static::group('product_tags', self::PRODUCT_TAG_DEFAULTS);
+        $rules = static::group('product_tags', self::PRODUCT_TAG_DEFAULTS);
+        $rules['order'] = self::tagOrder($rules['order']);
+
+        return $rules;
+    }
+
+    /** A saved order, made whole: unknown tags dropped, missing ones added at the end */
+    public static function tagOrder($order): array
+    {
+        $known = array_values(array_intersect(is_array($order) ? $order : [], self::PRODUCT_TAG_ORDER));
+
+        return array_values(array_unique([...$known, ...self::PRODUCT_TAG_ORDER]));
     }
 
     /** @return array<string, mixed> */

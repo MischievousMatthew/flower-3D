@@ -143,9 +143,9 @@
               <span v-if="categoryLabel" class="pd-cat">{{ categoryLabel }}</span>
             </div>
 
-            <!-- Sale, Best seller, Trending, Top rated… (rules set by the admin) -->
-            <div v-if="product.tags?.length" class="pd-tags">
-              <ProductTag v-for="tag in product.tags" :key="tag" :tag="tag" />
+            <!-- Sale, Best seller, Trending, Top rated… in the admin's order -->
+            <div v-if="pageTags.length" class="pd-tags">
+              <ProductTag v-for="tag in pageTags" :key="tag" :tag="tag" />
             </div>
 
             <h1 class="pd-name">{{ product.product_name }}</h1>
@@ -579,6 +579,9 @@ function pickDefaultColor() {
 }
 /** The colour that goes with the order: the one picked, else the product's own */
 const orderColor = () => chosenColor.value || product.value?.color || null;
+
+// The product's tags, in the admin's order; stock has its own tag below the price
+const pageTags = computed(() => (product.value?.tags || []).filter((t) => t !== "out_of_stock"));
 
 // Next to the stock tag: how many, and whether it's made to order
 const availability = computed(() => {

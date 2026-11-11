@@ -517,9 +517,8 @@ SQL;
             'color_options'     => $this->colorOptions($product->color_options),
             'composition'       => $this->composition($product->composition),
             // SALE, BEST SELLER, TRENDING… most important first (App\Services\ProductTags)
-            'tags'              => $tags = $this->tags()->tagsFor($product),
-            // The first few, as many as the admin allows on a shop card
-            'card_tags'         => array_slice($tags, 0, max(0, (int) $this->tags()->rules()['card_max'])),
+            // In the admin's order: a shop card shows only the first
+            'tags'              => $this->tags()->tagsFor($product),
             'owner_id'          => $product->owner_id,
             'vendor_id'         => $product->owner_id,
             'vendor_name'       => $vendorName ?? 'Local Vendor',
@@ -545,6 +544,16 @@ SQL;
                 'model_type' => $m->model_type,
             ])->values()->all(),
         ];
+    }
+
+    /**
+     * GET /api/customer/product-tags/order: the admin's tag ranking, so a shop
+     * card can also rank the tags it adds itself (You may like, Recently viewed)
+     */
+    public function tagOrder()
+    {
+        return response()->json(['success' => true, 'data' => $this->tags()->rules()['order']])
+            ->header('Cache-Control', 'public, max-age=300');
     }
 
     private ?\App\Services\ProductTags $tagService = null;

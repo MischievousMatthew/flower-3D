@@ -9,6 +9,9 @@
  * stock tags come from the stock; "You may like" and "Recently viewed"
  * come from the row a card sits in.
  */
+import { ref } from "vue";
+import api from "../../plugins/axios.js";
+
 export const PRODUCT_TAGS = {
   // Promotional
   sale: { label: "Sale", tone: "red", hint: "Has a discounted price" },
@@ -26,6 +29,37 @@ export const PRODUCT_TAGS = {
   top_rated: { label: "Top rated", tone: "teal", hint: "Excellent customer ratings" },
   recently_viewed: { label: "Recently viewed", tone: "grey", hint: "You looked at this before" },
 };
+
+/** The ranking until the admin's arrives (SiteSetting::PRODUCT_TAG_ORDER) */
+export const DEFAULT_TAG_ORDER = [
+  "out_of_stock", "sale", "best_seller", "trending", "new_arrival",
+  "top_rated", "recommended", "seasonal", "you_may_like", "recently_viewed",
+];
+
+// The admin's ranking, asked for once per visit and shared by every card
+const tagOrder = ref(DEFAULT_TAG_ORDER);
+let tagOrderAsked = false;
+export function useTagOrder() {
+  if (!tagOrderAsked) {
+    tagOrderAsked = true;
+    api
+      .get("customer/product-tags/order")
+      .then(({ data }) => {
+        if (Array.isArray(data?.data) && data.data.length) tagOrder.value = data.data;
+      })
+      .catch(() => {}); // the starting order is fine
+  }
+  return tagOrder;
+}
+
+/** The highest-ranked of these tags, or null */
+export function topTag(tags, order = tagOrder.value) {
+  const rank = (t) => {
+    const i = order.indexOf(t);
+    return i === -1 ? order.length : i;
+  };
+  return [...new Set(tags.filter(Boolean))].sort((a, b) => rank(a) - rank(b))[0] || null;
+}
 
 /** Low stock: this many or fewer left */
 export const LOW_STOCK = 5;

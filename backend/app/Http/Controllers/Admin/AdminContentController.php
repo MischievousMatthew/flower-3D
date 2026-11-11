@@ -379,7 +379,9 @@ class AdminContentController extends Controller
     private function productTagRules(Request $request): array
     {
         $data = $request->validate([
-            'card_max' => 'required|integer|min:0|max:3',
+            // The ranking the admin dragged into place; a shop card shows only the top tag a product has
+            'order' => 'required|array|max:' . count(SiteSetting::PRODUCT_TAG_ORDER),
+            'order.*' => ['required', 'string', Rule::in(SiteSetting::PRODUCT_TAG_ORDER)],
             'sale_enabled' => 'required|boolean',
             'sale_min_percent' => 'required|integer|min:1|max:90',
             'best_enabled' => 'required|boolean',
@@ -400,12 +402,17 @@ class AdminContentController extends Controller
             'recommended_enabled' => 'required|boolean',
             'seasonal_enabled' => 'required|boolean',
         ], [
-            'card_max.max' => 'Show at most 3 tags on a card, or it covers the photo.',
+            'order.*.in' => 'That tag order has a tag the shop doesn\'t know. Refresh and try again.',
         ]);
 
         return collect(SiteSetting::PRODUCT_TAG_DEFAULTS)->mapWithKeys(function ($default, $key) use ($data) {
             $value = $data[$key];
-            return [$key => is_bool($default) ? (bool) $value : (is_float($default) ? round((float) $value, 1) : (int) $value)];
+            return [$key => match (true) {
+                $key === 'order' => SiteSetting::tagOrder($value),
+                is_bool($default) => (bool) $value,
+                is_float($default) => round((float) $value, 1),
+                default => (int) $value,
+            }];
         })->all();
     }
 
