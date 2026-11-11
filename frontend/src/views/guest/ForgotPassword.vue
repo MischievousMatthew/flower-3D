@@ -46,6 +46,7 @@
         <label class="af-label" for="fp-pass">New password</label>
         <PasswordField id="fp-pass" ref="passInput" v-model="password" autocomplete="new-password" :invalid="!!errors.password" @update:model-value="errors.password = ''" />
         <PasswordRules :password="password" />
+          <PasswordSuggest :current="password" @use="(pw) => { password = pw; confirm = pw; errors.password = ''; errors.confirm = ''; }" />
         <p v-if="errors.password" class="af-note bad">{{ errors.password }}</p>
       </div>
       <div class="af-field">
@@ -69,6 +70,7 @@ import { useRoute, useRouter } from "vue-router";
 import AuthShell from "../../components/auth/AuthShell.vue";
 import PasswordField from "../../components/auth/PasswordField.vue";
 import PasswordRules from "../../components/auth/PasswordRules.vue";
+import PasswordSuggest from "../../components/auth/PasswordSuggest.vue";
 import CodeBoxes from "../../components/auth/CodeBoxes.vue";
 import CodeTimer from "../../components/auth/CodeTimer.vue";
 import { passwordOk } from "../../utils/passwordRules";

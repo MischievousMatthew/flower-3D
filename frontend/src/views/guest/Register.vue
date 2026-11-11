@@ -104,6 +104,7 @@
           <label class="af-label" for="rg-pass">Password</label>
           <PasswordField id="rg-pass" ref="passInput" v-model="form.password" autocomplete="new-password" :invalid="!!errors.password" @update:model-value="errors.password = ''" />
           <PasswordRules :password="form.password" />
+          <PasswordSuggest :current="form.password" @use="(pw) => { form.password = pw; form.password_confirmation = pw; errors.password = ''; errors.password_confirmation = ''; }" />
           <p v-if="errors.password" class="af-note bad">{{ errors.password }}</p>
         </div>
         <div class="af-field">
@@ -129,6 +130,7 @@ import AuthNotice from "../../components/auth/AuthNotice.vue";
 import { toast } from "@/utils/snackbar";
 import PasswordField from "../../components/auth/PasswordField.vue";
 import PasswordRules from "../../components/auth/PasswordRules.vue";
+import PasswordSuggest from "../../components/auth/PasswordSuggest.vue";
 import CodeBoxes from "../../components/auth/CodeBoxes.vue";
 import CodeTimer from "../../components/auth/CodeTimer.vue";
 import { useAuth } from "../../composables/useAuth";
