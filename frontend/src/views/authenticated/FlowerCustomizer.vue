@@ -15,7 +15,7 @@
               <p class="fc-start-step">Step 1 of 2</p>
               <h2>What's the bouquet for?</h2>
               <p class="fc-start-lede">Each occasion has its own style and sizes. You can change it later.</p>
-              <div class="fc-occasions">
+              <div class="fc-occasions" data-tour="occasions">
                 <button
                   v-for="p in presets"
                   :key="p.key"
@@ -38,7 +38,7 @@
               <p class="fc-start-step">{{ presets.length > 1 ? "Step 2 of 2" : "Choose a size" }}</p>
               <h2>How many flowers?</h2>
               <p class="fc-start-lede">{{ draftPreset.label }}<template v-if="occasionBlurb(draftPreset)">: {{ occasionBlurb(draftPreset) }}</template>{{ Number(draftPreset.base_price) > 0 ? ` Starts at ${formatPeso(draftPreset.base_price)} plus the flowers.` : "" }} Bigger bouquets come in a bigger wrap.</p>
-              <div class="fc-sizes">
+              <div class="fc-sizes" data-tour="sizes">
                 <button
                   v-for="(size, i) in draftPreset.sizes"
                   :key="size"
@@ -71,7 +71,7 @@
               {{ storeName || "Back" }}
             </button>
             <h1>Build your bouquet</h1>
-            <p class="fc-occasion-line">
+            <p class="fc-occasion-line" data-tour="occasion-line">
               <span>{{ occasionLine }}</span>
               <button type="button" class="fc-change" @click="openStart">Change</button>
             </p>
@@ -343,7 +343,7 @@
             :disabled="!placedFlowers.length"
             :editing="!!editingCartItemId"
             :format="formatPeso"
-            @add-to-cart="addCart"
+            @add-to-cart="requestAddCart"
             @checkout="requestCheckout"
           />
         </aside>
@@ -506,32 +506,44 @@
       </div>
     </div>
 
-    <!-- Asked before checking out a bouquet that still has empty stem slots -->
-    <div v-if="incompleteCheckout" class="fc-modal-backdrop" @click.self="incompleteCheckout = false">
+    <!-- Asked before checking out or adding to cart a bouquet with empty flower spots -->
+    <div v-if="incomplete" class="fc-modal-backdrop" @click.self="incomplete = null">
       <div
         class="fc-modal fc-confirm"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="fc-confirm-title"
         aria-describedby="fc-confirm-copy"
-        @keydown.esc="incompleteCheckout = false"
+        @keydown.esc="incomplete = null"
       >
         <div class="fc-modal-head">
           <div>
-            <p class="bc-label">{{ placedFlowers.length }} of {{ maxFlowers }} stems placed</p>
-            <h2 id="fc-confirm-title">Your bouquet isn't finished yet</h2>
+            <p class="bc-label">{{ placedFlowers.length }} of {{ maxFlowers }} flowers placed</p>
+            <h2 id="fc-confirm-title">Your bouquet isn't full yet</h2>
           </div>
-          <button type="button" class="fc-modal-close" aria-label="Close" @click="incompleteCheckout = false">
+          <button type="button" class="fc-modal-close" aria-label="Close" @click="incomplete = null">
             <BcIcon name="x" />
           </button>
         </div>
+        <div class="fc-slots" aria-hidden="true">
+          <span v-for="n in maxFlowers" :key="n" :class="{ on: n <= placedFlowers.length }">
+            <BcIcon :name="n <= placedFlowers.length ? 'flower' : 'plus'" />
+          </span>
+        </div>
         <p id="fc-confirm-copy" class="fc-confirm-copy">
-          There {{ maxFlowers - placedFlowers.length === 1 ? "is" : "are" }} still {{ maxFlowers - placedFlowers.length }}
-          empty stem {{ maxFlowers - placedFlowers.length === 1 ? "slot" : "slots" }} on this bouquet. Do you still want to checkout?
+          You chose {{ maxFlowers }} flowers but only placed {{ placedFlowers.length }}.
+          {{ emptySpots === 1 ? "1 spot is" : `${emptySpots} spots are` }} still empty, so the bouquet will look smaller than you picked.
         </p>
-        <div class="fc-modal-actions">
-          <button ref="keepBuildingButton" type="button" class="bc-link fc-modal-cancel" @click="incompleteCheckout = false">Keep building</button>
-          <button type="button" class="bc-btn bc-btn--dark fc-confirm-go" @click="confirmIncompleteCheckout">Checkout anyway</button>
+        <div class="fc-incomplete-actions">
+          <button v-if="fillChoice" ref="fillRestButton" type="button" class="bc-btn bc-btn--dark fc-confirm-go" @click="fillTheRest">
+            <BcIcon name="sparkle" />
+            Fill the rest with {{ fillChoice.product_name }}
+            <small v-if="Number(fillChoice.price) > 0">+{{ formatPeso(Number(fillChoice.price) * emptySpots) }}</small>
+          </button>
+          <button ref="keepBuildingButton" type="button" class="bc-btn fc-incomplete-pick" @click="pickTheRest">I'll pick the flowers myself</button>
+          <button type="button" class="bc-link fc-incomplete-anyway" @click="confirmIncomplete">
+            {{ incomplete === "cart" ? "Add to cart" : "Checkout" }} with {{ placedFlowers.length }} {{ placedFlowers.length === 1 ? "flower" : "flowers" }}
+          </button>
         </div>
       </div>
     </div>
@@ -625,7 +637,7 @@ import {
   setCardOpen,
   setCardSize,
 } from "../../utils/bouquetCard.js";
-import { anchorCard, buildSteps, keyAction, receiptLines } from "../../utils/customizerUi.js";
+import { anchorCard, buildSteps, fillFlowerChoice, keyAction, receiptLines } from "../../utils/customizerUi.js";
 import { createHistory, pickUnit, tidyGroups, togglePick } from "../../utils/customizerHistory.js";
 import { suggestFillers, suggestFlowers } from "../../utils/arrangementSuggest.js";
 import { buildFillerBunch } from "../../utils/fillerBunch.js";
@@ -881,7 +893,8 @@ watch(steps, (list) => {
 // they have to do something (add a filler, add a flower) move on by
 // themselves once it's done. The Guide button on the stage starts it again.
 const TOUR_SEEN_KEY = "bc.customizerGuide.seen";
-const tour = reactive({ welcome: false, open: false, index: 0 });
+// withStart: the guide began on the start screen, so it walks through the occasion and size too
+const tour = reactive({ welcome: false, open: false, index: 0, withStart: false });
 const tourStartButton = ref(null);
 
 function tourSeen() {
@@ -905,6 +918,39 @@ const tourSteps = computed(() => {
   const list = [];
   const pending = pendingFlower.value;
   const pendingKind = pending ? pending.kind || "flower" : null;
+  if (tour.withStart) {
+    if (presets.value.length > 1) {
+      const done = startStep.value !== "occasion";
+      list.push({
+        key: "occasion",
+        start: "occasion",
+        target: "occasions",
+        title: "What fits your occasion?",
+        body: "Pick what the bouquet is for. Each occasion has its own style, wrap and sizes, so choose the one that fits best.",
+        waiting: done ? "" : "Waiting for you to pick an occasion…",
+        doneText: done ? "Great choice!" : "",
+        canSkip: false,
+      });
+    }
+    const sized = !startStep.value && !!preset.value;
+    list.push({
+      key: "size",
+      start: "size",
+      target: "sizes",
+      title: "How many flowers do you want?",
+      body: "Pick a number. More flowers make a bigger, fuller bouquet in a bigger wrap. You'll fill exactly this many spots.",
+      waiting: sized ? "" : "Waiting for you to pick how many…",
+      doneText: sized ? `${maxFlowers.value} flowers it is!` : "",
+      canSkip: false,
+    });
+  } else {
+    list.push({
+      key: "occasion-line",
+      target: "occasion-line",
+      title: "Your occasion and size",
+      body: "This is what your bouquet is for and how many flowers it holds. Tap Change anytime to pick a different one.",
+    });
+  }
   list.push({
     key: "steps",
     target: "steps",
@@ -921,7 +967,8 @@ const tourSteps = computed(() => {
       title: placing ? "Now click the bouquet" : "First, add a filler",
       body: placing
         ? `Click anywhere on the bouquet to put the ${pending.product_name} in. It spreads out on its own.`
-        : "Fillers are the greenery your flowers sit in, so they go in first. Tap a filler in this list.",
+        : "Fillers are the greenery your flowers sit in, so they go in first. Drag a filler onto the bouquet like the arrow shows, or tap one and then tap the bouquet.",
+      drag: placing || done ? null : { from: '[data-tour="fillers"] .sp-row:not(.disabled)', to: "stage", icon: "leaf" },
       waiting: done ? "" : placing ? "Waiting for you to click the bouquet…" : "Waiting for you to pick a filler…",
       doneText: done ? "Nice! Your filler is in." : "",
     });
@@ -936,7 +983,8 @@ const tourSteps = computed(() => {
       title: placing ? "Click where it should go" : "Now add a flower",
       body: placing
         ? `Click the spot on the bouquet where the ${pending.product_name} should stand. You can move it after.`
-        : `Tap a flower in this list. Your bouquet holds ${maxFlowers.value} flowers.`,
+        : `Drag a flower onto the bouquet like the arrow shows, or tap one and then tap the spot. Your bouquet holds ${maxFlowers.value} flowers.`,
+      drag: placing || done ? null : { from: '[data-tour="flowers"] .sp-row:not(.disabled)', to: "stage", icon: "flower" },
       waiting: done ? "" : placing ? "Waiting for you to click the bouquet…" : "Waiting for you to pick a flower…",
       doneText: done ? "Your first flower is in!" : "",
     });
@@ -976,11 +1024,15 @@ function showTourStep(index) {
   tour.index = Math.max(0, Math.min(index, tourSteps.value.length - 1));
   const step = tourSteps.value[tour.index];
   if (step?.step) activeStep.value = step.step;
+  // Going back to the occasion or size step opens that screen again
+  if (step?.start === "occasion") startStep.value = "occasion";
+  else if (step?.start === "size" && startStep.value !== "size" && draftOccasion.value) startStep.value = "size";
 }
 function beginTour() {
   tour.welcome = false;
   markTourSeen();
   clearSelection();
+  tour.withStart = !!startStep.value;
   tour.open = true;
   showTourStep(0);
 }
@@ -989,7 +1041,6 @@ function skipTour() {
   markTourSeen();
 }
 function startTour() {
-  if (startStep.value) return;
   tour.open = false;
   tour.welcome = true;
   nextTick(() => tourStartButton.value?.focus());
@@ -1024,9 +1075,22 @@ watch(
   },
 );
 
-// Offered once, the first time the bouquet is ready and the start screen is closed
+// Choosing the occasion and size moves the guide on by itself
+watch(startStep, (now, before) => {
+  if (!tour.open) return;
+  const key = tourStep.value?.key;
+  if ((key === "occasion" && before === "occasion" && now === "size") || (key === "size" && before && !now && preset.value)) {
+    const at = tour.index;
+    setTimeout(() => {
+      if (tour.open && tour.index === at) showTourStep(at + 1);
+    }, 900);
+  }
+});
+
+// Offered once, the first time the bouquet is ready: on a new bouquet that's
+// with the occasion screen open, so the guide starts from choosing it
 watch(
-  () => sceneReady.value && !isLoading3D.value && !bouquetLoadError.value && !startStep.value && !!storeId.value,
+  () => sceneReady.value && !isLoading3D.value && !bouquetLoadError.value && !!storeId.value && !!(startStep.value || preset.value),
   (ready) => {
     if (!ready || tour.open || tour.welcome || tourSeen()) return;
     tour.welcome = true;
@@ -2925,7 +2989,7 @@ function onKeydown(event) {
     },
     {
       ready: sceneReady.value,
-      modalOpen: cardEditor.open || incompleteCheckout.value || checkoutPausedNotice.open || tour.welcome,
+      modalOpen: cardEditor.open || !!incomplete.value || checkoutPausedNotice.open || tour.welcome,
       hasTarget: hasTransformTarget.value,
       bouquetSelected: bouquetSelected.value,
       hasSelectedFlower: !!selectedFlower.value,
@@ -3259,9 +3323,39 @@ function enforceFlowerLimit(flower) {
   }
 }
 
-// Checking out with empty stem slots asks first
-const incompleteCheckout = ref(false);
+// Checking out or adding to cart with empty flower spots asks first: "checkout" | "cart" | null
+const incomplete = ref(null);
 const keepBuildingButton = ref(null);
+const fillRestButton = ref(null);
+const emptySpots = computed(() => Math.max(0, maxFlowers.value - placedFlowers.value.length));
+// The flower "Fill the rest" uses: the one placed most that still has stock
+const fillChoice = computed(() => {
+  const used = {};
+  placedFlowers.value.forEach((flower) => (used[flower.id] = (used[flower.id] || 0) + 1));
+  return fillFlowerChoice(flowers.value, used);
+});
+
+function askIncomplete(action) {
+  incomplete.value = action;
+  nextTick(() => (fillRestButton.value || keepBuildingButton.value)?.focus());
+}
+
+async function fillTheRest() {
+  const flower = fillChoice.value;
+  incomplete.value = null;
+  activeStep.value = "flowers";
+  if (flower) await fillWithFlower(flower);
+}
+
+function pickTheRest() {
+  incomplete.value = null;
+  activeStep.value = "flowers";
+}
+
+function requestAddCart() {
+  if (isAuthenticated.value && placedFlowers.value.length && placedFlowers.value.length < maxFlowers.value) return askIncomplete("cart");
+  addCart();
+}
 
 async function requestCheckout() {
   if (!placedFlowers.value.length || isCheckingOut.value) return;
@@ -3271,17 +3365,15 @@ async function requestCheckout() {
     showCheckoutPaused(platform.checkout_pause_message);
     return;
   }
-  if (placedFlowers.value.length < maxFlowers.value) {
-    incompleteCheckout.value = true;
-    nextTick(() => keepBuildingButton.value?.focus());
-    return;
-  }
+  if (placedFlowers.value.length < maxFlowers.value) return askIncomplete("checkout");
   checkout();
 }
 
-function confirmIncompleteCheckout() {
-  incompleteCheckout.value = false;
-  checkout();
+function confirmIncomplete() {
+  const action = incomplete.value;
+  incomplete.value = null;
+  if (action === "cart") addCart();
+  else checkout();
 }
 
 async function checkout() {
@@ -5036,5 +5128,74 @@ function showToast(message, type = "success") {
 .fc-page .fc-confirm-go,
 .fc-confirm-go {
   color: var(--paper);
+}
+
+/* One spot per flower chosen: filled ones green, empty ones dashed */
+.fc-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fc-slots span {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1.5px dashed rgba(54, 63, 78, 0.3);
+  border-radius: 50%;
+  color: var(--ink-soft);
+}
+
+.fc-slots span.on {
+  border: 0;
+  background: var(--leaf);
+  color: #ffffff;
+}
+
+.fc-slots :deep(svg) {
+  width: 16px;
+  height: 16px;
+}
+
+.fc-incomplete-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.fc-incomplete-actions .bc-btn {
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 20px;
+  gap: 8px;
+}
+
+.fc-incomplete-actions .fc-confirm-go :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+
+.fc-incomplete-actions small {
+  opacity: 0.8;
+  font-weight: 500;
+}
+
+.fc-incomplete-pick {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.fc-incomplete-pick:hover {
+  border-color: var(--leaf);
+  background: #ffffff;
+}
+
+.fc-incomplete-anyway {
+  justify-self: center;
+  min-height: 44px;
+  font-size: 13.5px;
 }
 </style>

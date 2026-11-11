@@ -42,6 +42,40 @@
       </Transition>
     </Teleport>
 
+    <!-- Asked before checking out a custom bouquet with fewer flowers than chosen -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="shortBouquets.length" class="modal-backdrop bc-theme" @click.self="shortBouquets = []">
+          <div
+            class="modal-card"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="short-title"
+            aria-describedby="short-message"
+            @keydown.esc="shortBouquets = []"
+          >
+            <p class="bc-label">Before you check out</p>
+            <h2 id="short-title" class="modal-title">
+              {{ shortBouquets.length === 1 ? "Your bouquet isn't" : `${shortBouquets.length} bouquets aren't` }} <em>full</em> yet
+            </h2>
+            <p id="short-message" class="modal-message">
+              <template v-if="shortBouquets.length === 1">
+                You chose {{ shortBouquets[0].short.size }} flowers but only placed {{ shortBouquets[0].short.placed }}.
+                {{ shortBouquets[0].short.missing === 1 ? "1 spot is" : `${shortBouquets[0].short.missing} spots are` }} still empty.
+              </template>
+              <template v-else>Some of your custom bouquets still have empty flower spots, so they'll look smaller than you picked.</template>
+            </p>
+            <div class="short-actions">
+              <button ref="fillRestButton" class="bc-btn bc-btn--dark" @click="editBouquet(shortBouquets[0].item)">
+                Fill the rest of the flowers
+              </button>
+              <button class="bc-link short-anyway" @click="checkoutShortAnyway">Check out as it is</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <main class="bc-container cart-container">
       <header class="cart-header">
         <p class="bc-label">Your selection</p>
@@ -174,6 +208,12 @@
                     <h3 class="item-name">
                       {{ getProductName(item.product, item) }}
                     </h3>
+                    <p v-if="bouquetShortfall(item.customizations)" class="item-short">
+                      <span class="item-short-dot" aria-hidden="true"></span>
+                      {{ bouquetShortfall(item.customizations).placed }} of {{ bouquetShortfall(item.customizations).size }} flowers ·
+                      {{ bouquetShortfall(item.customizations).missing }} {{ bouquetShortfall(item.customizations).missing === 1 ? "spot" : "spots" }} empty
+                      <button type="button" class="item-short-fill" @click="editBouquet(item)">Fill it</button>
+                    </p>
                     <p
                       v-if="item.product?.color || item.product?.variety"
                       class="item-specifications"
@@ -429,6 +469,7 @@ import { showCheckoutPaused, usePlatformStatus } from "../../composables/usePlat
 import { toast } from "@/utils/snackbar";
 import "../../styles/bloomcraft.css";
 import ThreeDModelViewer from "../../layouts/3D/3DModelViewer.vue";
+import { bouquetShortfall } from "../../utils/customizerUi.js";
 
 const router = useRouter();
 const { refresh: refreshPlatform } = usePlatformStatus();
@@ -454,6 +495,16 @@ const show3DModal = ref(false);
 const viewingArrangement = ref(null);
 
 const showProfileModal = ref(false);
+// Selected custom bouquets with empty flower spots, while that question is open: [{ item, short }]
+const shortBouquets = ref([]);
+const fillRestButton = ref(null);
+let shortAccepted = false;
+
+function checkoutShortAnyway() {
+  shortBouquets.value = [];
+  shortAccepted = true;
+  proceedToCheckout();
+}
 const userProfile = ref({ address: null, contact_number: null, city: null });
 
 // ✅ Which required fields are missing — used in the modal message
@@ -825,6 +876,20 @@ const proceedToCheckout = async () => {
     return;
   }
 
+  // A custom bouquet with fewer flowers than chosen asks first
+  if (!shortAccepted) {
+    const short = cartItems.value
+      .filter((item) => selectedItems.value.includes(item.id))
+      .map((item) => ({ item, short: bouquetShortfall(item.customizations) }))
+      .filter((entry) => entry.short);
+    if (short.length) {
+      shortBouquets.value = short;
+      setTimeout(() => fillRestButton.value?.focus(), 50);
+      return;
+    }
+  }
+  shortAccepted = false;
+
   // An admin may have paused checkout for every store
   const platform = await refreshPlatform();
   if (platform.checkout_paused) {
@@ -1081,6 +1146,64 @@ const handleImageError = (e) => {
   margin-top: 4px;
   font-size: 26px;
   line-height: 1.1;
+}
+
+.item-short {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #fdf3e3;
+  color: #8a5a12;
+  font-size: 13px;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.item-short-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d68a1c;
+}
+
+.item-short-fill {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font: 600 12px var(--font-sans);
+  cursor: pointer;
+}
+
+.item-short-fill:hover {
+  background: var(--leaf-deep);
+}
+
+.item-short-fill:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+.short-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.short-actions .bc-btn {
+  justify-content: center;
+  width: 100%;
+}
+
+.short-anyway {
+  justify-self: center;
+  min-height: 44px;
 }
 
 .item-specifications {

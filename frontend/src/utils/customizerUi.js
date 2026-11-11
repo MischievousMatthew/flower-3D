@@ -126,3 +126,21 @@ export function anchorCard(point, stage, { cardWidth, cardHeight, gap = 24, marg
   const top = Math.min(Math.max(point.y - cardHeight / 2, margin), stage.height - margin - cardHeight);
   return { left, top, side };
 }
+
+// How far a saved custom bouquet is from the size the customer chose:
+// { placed, size, missing } when it has empty flower spots, else null
+export function bouquetShortfall(customization) {
+  if (customization?.type !== "custom_flower_bouquet") return null;
+  const size = Number(customization.preset?.size || 0);
+  const placed = Array.isArray(customization.flowers) ? customization.flowers.length : 0;
+  if (!size || placed >= size) return null;
+  return { placed, size, missing: size - placed };
+}
+
+// The flower to fill the empty spots with: the one used most that still has
+// stock, else any flower with stock. `used` counts how many of each are placed.
+export function fillFlowerChoice(flowers = [], used = {}) {
+  const left = (flower) => Number(flower.quantity_in_stock || 0) - Number(used[flower.id] || 0);
+  const ready = flowers.filter((flower) => flower.model && left(flower) > 0);
+  return ready.sort((a, b) => Number(used[b.id] || 0) - Number(used[a.id] || 0))[0] || null;
+}

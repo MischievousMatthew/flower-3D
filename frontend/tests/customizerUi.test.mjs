@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { anchorCard, buildSteps, keyAction, placeTip, receiptLines } from "../src/utils/customizerUi.js";
+import { anchorCard, bouquetShortfall, buildSteps, fillFlowerChoice, keyAction, placeTip, receiptLines } from "../src/utils/customizerUi.js";
 
 const label = (steps) => steps.map((s) => `${s.number} ${s.label}`);
 const ready = { ready: true, modalOpen: false, hasTarget: true, bouquetSelected: false, hasSelectedFlower: true, placing: false };
@@ -174,4 +174,24 @@ test("phones stack the card above or below, never beside", () => {
 
 test("no part to point at centres the card", () => {
   assert.equal(placeTip(null, view, card).side, "center");
+});
+
+test("a bouquet with fewer flowers than its size is short", () => {
+  const bouquet = { type: "custom_flower_bouquet", preset: { key: "birthday", size: 3 }, flowers: [{ id: 1 }] };
+  assert.deepEqual(bouquetShortfall(bouquet), { placed: 1, size: 3, missing: 2 });
+  assert.equal(bouquetShortfall({ ...bouquet, flowers: [{}, {}, {}] }), null);
+  assert.equal(bouquetShortfall({ ...bouquet, preset: null }), null);
+  assert.equal(bouquetShortfall({ type: "other", preset: { size: 3 }, flowers: [] }), null);
+});
+
+test("fills with the most used flower that still has stock", () => {
+  const flowers = [
+    { id: 1, model: "a.glb", quantity_in_stock: 5 },
+    { id: 2, model: "b.glb", quantity_in_stock: 2 },
+    { id: 3, model: null, quantity_in_stock: 9 },
+  ];
+  assert.equal(fillFlowerChoice(flowers, { 1: 1, 2: 2 }).id, 1); // rose 2 is used up
+  assert.equal(fillFlowerChoice(flowers, { 1: 3 }).id, 1);
+  assert.equal(fillFlowerChoice(flowers, {}).id, 1);
+  assert.equal(fillFlowerChoice([{ id: 3, model: null, quantity_in_stock: 9 }], {}), null);
 });
