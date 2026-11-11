@@ -93,8 +93,21 @@
 
             <div class="nt-scroll">
               <!-- From BloomCraft: announcements and support replies -->
-              <section v-if="notices.length" class="nt-section" aria-label="From BloomCraft">
-                <p class="nt-section-label">From BloomCraft</p>
+              <section v-if="notices.length" class="nt-section" :class="{ open: ntOpen === 'bloomcraft' }">
+                <div class="nt-section-head">
+                  <button
+                    type="button"
+                    class="nt-toggle"
+                    :aria-expanded="ntOpen === 'bloomcraft'"
+                    aria-controls="nt-panel-bloomcraft"
+                    @click="toggleNtSection('bloomcraft')"
+                  >
+                    <span class="nt-section-label">From BloomCraft</span>
+                    <span v-if="noticeUnread" class="nt-count" :aria-label="`${noticeUnread} unread`">{{ noticeUnread }}</span>
+                    <svg class="nt-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                  </button>
+                </div>
+                <div v-show="ntOpen === 'bloomcraft'" id="nt-panel-bloomcraft" class="nt-panel">
                 <button
                   v-for="notice in notices"
                   :key="`notice-${notice.id}`"
@@ -114,17 +127,29 @@
                   </span>
                   <span v-if="!notice.read" class="nt-unread" aria-label="Unread"></span>
                 </button>
+                </div>
               </section>
 
               <!-- Order updates -->
-              <section class="nt-section" aria-label="Order updates">
+              <section class="nt-section" :class="{ open: ntOpen === 'orders' }">
                 <div class="nt-section-head">
-                  <p class="nt-section-label">Your orders</p>
-                  <button type="button" class="nt-refresh" aria-label="Refresh order updates" title="Refresh" :disabled="loadingNotifications" @click="loadOrderNotifications">
+                  <button
+                    type="button"
+                    class="nt-toggle"
+                    :aria-expanded="ntOpen === 'orders'"
+                    aria-controls="nt-panel-orders"
+                    @click="toggleNtSection('orders')"
+                  >
+                    <span class="nt-section-label">Your orders</span>
+                    <span v-if="freshIds.size" class="nt-count" :aria-label="`${freshIds.size} new`">{{ freshIds.size }}</span>
+                    <svg class="nt-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                  </button>
+                  <button v-show="ntOpen === 'orders'" type="button" class="nt-refresh" aria-label="Refresh order updates" title="Refresh" :disabled="loadingNotifications" @click="loadOrderNotifications">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7L20 8.5" /><path d="M20 4v4.5h-4.5" /></svg>
                   </button>
                 </div>
 
+                <div v-show="ntOpen === 'orders'" id="nt-panel-orders" class="nt-panel">
                 <div v-if="loadingNotifications && !orderNotifications.length" class="notification-skeletons">
                   <div v-for="n in 3" :key="n" class="notification-skeleton">
                     <span class="bc-skeleton nt-icon-skel"></span>
@@ -161,6 +186,7 @@
                     <span v-if="freshIds.has(notification.id)" class="nt-unread" aria-label="New"></span>
                   </button>
                 </template>
+                </div>
               </section>
             </div>
 
@@ -550,9 +576,17 @@ const readAllNotices = async () => {
   }
 };
 
+// Notification categories: one open at a time. The panel opens on Your
+// orders; opening From BloomCraft closes it, and closing the open one leaves both closed.
+const ntOpen = ref("orders"); // "orders" | "bloomcraft" | null
+const toggleNtSection = (key) => {
+  ntOpen.value = ntOpen.value === key ? null : key;
+};
+
 const toggleNotificationDropdown = async () => {
   showNotificationDropdown.value = !showNotificationDropdown.value;
   showUserDropdown.value = false;
+  if (showNotificationDropdown.value) ntOpen.value = "orders";
 
   if (showNotificationDropdown.value) {
     await Promise.all([loadOrderNotifications(), loadNotices(true)]);
@@ -1010,10 +1044,76 @@ onUnmounted(() => {
 }
 
 .nt-section-label {
-  margin: 6px 12px 6px;
-  font-size: 12px;
+  margin: 0;
+  font-size: 12.5px;
   font-weight: 600;
-  color: var(--ink-soft);
+  color: var(--ink);
+}
+
+/* A category header: the whole row opens or closes it */
+.nt-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  font-family: var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.nt-toggle:hover {
+  background: var(--ivory);
+}
+
+.nt-toggle:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: -2px;
+}
+
+.nt-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--leaf);
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.nt-chevron {
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.25s ease;
+}
+
+.nt-section.open .nt-chevron {
+  transform: rotate(180deg);
+}
+
+.nt-panel {
+  padding-top: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nt-chevron {
+    transition: none;
+  }
 }
 
 .nt-refresh {
