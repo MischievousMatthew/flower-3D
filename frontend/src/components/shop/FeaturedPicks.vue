@@ -32,61 +32,14 @@
 
       <ul ref="trackEl" class="fp-track" @scroll.passive="measure">
         <li v-for="product in products" :key="product.id" class="fp-item">
-          <article :ref="(el) => (cardEls[product.id] = el)" class="fp-card">
-            <button type="button" class="fp-photo" :aria-label="`View ${product.product_name}`" @click="$emit('open', product)">
-              <img
-                :ref="(el) => (imageEls[product.id] = el)"
-                :src="sizedImage(imageOf(product), 300)"
-                :srcset="sizedSrcset(imageOf(product), 300)"
-                :alt="product.product_name"
-                loading="lazy"
-                @error="onImageError"
-              />
-              <!-- These are BloomCraft's own picks, so they say so (unless sold out) -->
-              <span class="fp-badge"><ProductTag :tag="inStock(product) ? 'recommended' : 'out_of_stock'" on-photo /></span>
-            </button>
-
-            <div class="fp-body">
-              <button v-if="product.vendor_name" type="button" class="fp-shop" @click="$emit('vendor', product.vendor_id)">
-                {{ product.vendor_name }}
-              </button>
-              <h3 class="fp-name">
-                <button type="button" @click="$emit('open', product)">{{ product.product_name }}</button>
-              </h3>
-              <p class="fp-stats">
-                <template v-if="Number(product.total_reviews)">
-                  <span class="fp-star" aria-hidden="true">★</span>
-                  <strong>{{ Number(product.average_rating || 0).toFixed(1) }}</strong>
-                  <span class="fp-soft">({{ product.total_reviews }})</span>
-                </template>
-                <span v-else class="fp-soft">No reviews yet</span>
-                <template v-if="Number(product.sold_count)"> · {{ sold(product.sold_count) }} sold</template>
-              </p>
-              <p class="fp-stock" :class="stockOf(product).tone"><i aria-hidden="true"></i>{{ stockOf(product).text }}</p>
-
-              <div class="fp-buy">
-                <p class="fp-price">
-                  <span class="fp-now">₱{{ money(onSale(product) ? product.discount_price : product.selling_price) }}</span>
-                  <template v-if="onSale(product)">
-                    <span class="fp-was">₱{{ money(product.selling_price) }}</span>
-                    <span class="fp-off">−{{ discountOf(product) }}%</span>
-                  </template>
-                </p>
-                <button
-                  type="button"
-                  class="fp-cart"
-                  :aria-label="`Add ${product.product_name} to cart`"
-                  :title="inStock(product) ? 'Add to cart' : 'Sold out'"
-                  :disabled="!inStock(product) || addingId === product.id"
-                  @click="$emit('add', product, { imageEl: imageEls[product.id], cardEl: cardEls[product.id] })"
-                >
-                  <span v-if="addingId === product.id" class="fp-cart-dots" aria-hidden="true">···</span>
-                  <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2" /><circle cx="9.5" cy="20" r="1.2" /><circle cx="17.5" cy="20" r="1.2" /></svg>
-                </button>
-              </div>
-              <button type="button" class="fp-view" @click="$emit('open', product)">View details</button>
-            </div>
-          </article>
+          <!-- The same card as the rest of the shop; these are BloomCraft's picks, so they say so -->
+          <ShopProductTile
+            :product="product"
+            context-tag="recommended"
+            :adding="addingId === product.id"
+            @open="$emit('open', $event)"
+            @add="(p, ctx) => $emit('add', p, ctx)"
+          />
         </li>
       </ul>
     </div>
@@ -94,9 +47,8 @@
 </template>
 
 <script setup>
-import ProductTag, { LOW_STOCK } from "./ProductTag.vue";
+import ShopProductTile from "./ShopProductTile.vue";
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { sizedImage, sizedSrcset } from "../../utils/cloudinaryImage.js";
 
 /**
  * "In bloom this <month>" (Admin → Website → Featured): the heading on the left and
@@ -112,35 +64,10 @@ defineEmits(["open", "add", "buy", "vendor", "browse"]);
 // The month in the heading follows the calendar: "In bloom this November"
 const seasonMonth = new Date().toLocaleDateString("en-PH", { month: "long" });
 
-const imageEls = {};
-const cardEls = {};
 const trackEl = ref(null);
 const scrollable = ref(false);
 const atStart = ref(true);
 const atEnd = ref(false);
-
-const FALLBACK = "https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=800&h=1000&fit=crop";
-function imageOf(product) {
-  if (product?.primary_image?.image_url) return product.primary_image.image_url;
-  const images = product?.images || [];
-  return (images.find((i) => i.is_primary) || images[0])?.image_url || FALLBACK;
-}
-function onImageError(event) {
-  if (event.target.src !== FALLBACK) event.target.src = FALLBACK;
-}
-
-const money = (value) => Number(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const sold = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n % 1000 ? 1 : 0)}k` : String(n));
-const inStock = (product) => Number(product.quantity_in_stock ?? 1) > 0;
-const onSale = (p) => Number(p.discount_price) > 0 && Number(p.discount_price) < Number(p.selling_price);
-const discountOf = (p) => Math.max(1, Math.round((1 - Number(p.discount_price) / Number(p.selling_price)) * 100));
-function stockOf(p) {
-  const n = Number(p.quantity_in_stock ?? 0);
-  if (n <= 0) return { tone: "out", text: "Sold out" };
-  if (n <= LOW_STOCK) return { tone: "low", text: `Only ${n} left` };
-  return { tone: "in", text: "In stock" };
-}
-
 
 // Arrows show only when the cards don't all fit
 function measure() {
@@ -325,250 +252,15 @@ watch(
 }
 
 .fp-item {
-  flex: 0 0 196px;
+  display: flex;
+  flex: 0 0 210px;
   scroll-snap-align: start;
 }
 
-.fp-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: #fff;
-  transition: transform 0.25s var(--ease-out, ease-out), box-shadow 0.25s ease;
-}
-
-.fp-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 24px 40px -28px rgba(54, 63, 78, 0.5);
-}
-
-.fp-photo {
-  position: relative;
-  display: block;
-  aspect-ratio: 1 / 1;
-  margin: 6px 6px 0;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: 12px;
-  background: var(--ivory);
-  cursor: pointer;
-}
-
-.fp-photo img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.6s var(--ease-out, ease-out);
-}
-
-.fp-card:hover .fp-photo img {
-  transform: scale(1.05);
-}
-
-/* The tag, top left, like the product tiles */
-.fp-badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  pointer-events: none;
-}
-
-.fp-soft {
-  color: var(--ink-soft);
-}
-
-.fp-off {
-  padding: 1px 6px;
-  border-radius: 5px;
-  background: #fdecea;
-  color: #b4332a;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.fp-stock {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 2px 0 0;
-  font-size: 11.5px;
-  color: var(--leaf-deep);
-}
-
-.fp-stock i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--leaf);
-}
-
-.fp-stock.low { color: #a55a12; }
-.fp-stock.low i { background: #d18a1c; }
-.fp-stock.out { color: #b4332a; }
-.fp-stock.out i { background: #b4332a; }
-
-.fp-view {
-  width: 100%;
-  min-height: 40px;
-  margin-top: 8px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--ink);
-  font: 500 12.5px var(--font-sans);
-  cursor: pointer;
-  transition: border-color 0.2s ease;
-}
-
-.fp-view:hover {
-  border-color: var(--ink);
-}
-
-.fp-body {
-  display: flex;
+/* The shared card fills its slot, like in Top Selling */
+.fp-item > * {
   flex: 1;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px 12px;
-}
-
-.fp-shop {
-  align-self: flex-start;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--leaf-deep);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-}
-
-.fp-shop:hover {
-  text-decoration: underline;
-}
-
-.fp-name {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 19px;
-  font-weight: 500;
-  line-height: 1.15;
-}
-
-.fp-name button {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.fp-name button:hover {
-  color: var(--leaf-deep);
-}
-
-.fp-stats {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--ink-soft);
-}
-
-.fp-stats strong {
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.fp-star {
-  margin-right: 3px;
-  color: var(--gold);
-}
-
-.fp-buy {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: auto;
-  padding-top: 8px;
-}
-
-.fp-price {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px;
-  margin: 0;
-}
-
-.fp-now {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-
-.fp-was {
-  font-size: 13px;
-  color: var(--ink-soft);
-  text-decoration: line-through;
-}
-
-.fp-cart {
-  display: grid;
-  flex-shrink: 0;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--leaf-deep);
-  color: #fff;
-  cursor: pointer;
-  transition: background-color 0.18s ease, transform 0.18s ease;
-}
-
-.fp-cart:hover:not(:disabled) {
-  background: var(--ink);
-  transform: scale(1.05);
-}
-
-.fp-cart:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.fp-cart svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.fp-cart-dots {
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 1px;
-}
-
-.fp-browse:focus-visible,
-.fp-arrow:focus-visible,
-.fp-photo:focus-visible,
-.fp-shop:focus-visible,
-.fp-name button:focus-visible,
-.fp-cart:focus-visible {
-  outline: 2px solid var(--leaf);
-  outline-offset: 3px;
+  min-width: 0;
 }
 
 @media (max-width: 860px) {
@@ -590,15 +282,4 @@ watch(
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .fp-card,
-  .fp-photo img,
-  .fp-cart {
-    transition: none;
-  }
-
-  .fp-card:hover {
-    transform: none;
-  }
-}
 </style>
