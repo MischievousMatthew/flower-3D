@@ -3550,6 +3550,21 @@ async function addCart() {
 }
 
 async function loadEditingCustomization() {
+  // Back from checkout to fill the empty spots: the bouquet that was being bought
+  if (route.query.resume === "checkout" && !editingCartItemId.value) {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("directCheckout") || "null");
+      const customization = saved?.custom_items?.[0]?.customizations;
+      if (customization?.type === "custom_flower_bouquet" && Array.isArray(customization.flowers)) {
+        editingCustomization.value = customization;
+        legacyBase.value = !customization.design;
+        wrapperScale.value = Number(customization.wrapper_scale ?? 1);
+      }
+    } catch {
+      // Nothing saved to pick up: a fresh bouquet starts
+    }
+    return;
+  }
   if (!editingCartItemId.value || !isAuthenticated.value) return;
   await cartStore.refreshCart();
   const cartItem = cartStore.items.value.find((item) => String(item.id) === editingCartItemId.value);

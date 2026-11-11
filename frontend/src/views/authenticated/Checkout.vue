@@ -251,6 +251,22 @@
 
             <div class="info-section">
               <h3 class="bc-label">Order items</h3>
+              <div
+                v-for="entry in shortBouquets"
+                :key="entry.key"
+                class="short-note"
+                role="status"
+              >
+                <span class="short-note-icon" aria-hidden="true">!</span>
+                <div class="short-note-copy">
+                  <strong>{{ shortBouquets.length > 1 ? "A custom bouquet isn't full" : "Your custom bouquet isn't full" }}</strong>
+                  <span>
+                    You chose {{ entry.short.size }} flowers but only placed {{ entry.short.placed }}.
+                    {{ entry.short.missing === 1 ? "1 spot is" : `${entry.short.missing} spots are` }} still empty, so it will look smaller than you picked.
+                  </span>
+                </div>
+                <button type="button" class="short-note-fill" @click="fillBouquet(entry)">Fill it</button>
+              </div>
               <ul class="order-items-list">
                 <li
                   v-for="(item, index) in checkoutData.items"
@@ -491,6 +507,38 @@
     </main>
 
     <!-- Back from PayMongo without paying: say why -->
+    <!-- Asked before placing an order with a custom bouquet that isn't full -->
+    <Teleport to="body">
+      <div v-if="shortAsk" class="short-backdrop bc-theme" @click.self="shortAsk = false">
+        <div
+          class="short-modal"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="short-title"
+          aria-describedby="short-message"
+          @keydown.esc="shortAsk = false"
+        >
+          <p class="bc-label">Before you place the order</p>
+          <h2 id="short-title">
+            {{ shortBouquets.length === 1 ? "Your bouquet isn't" : `${shortBouquets.length} bouquets aren't` }} <em>full</em> yet
+          </h2>
+          <p id="short-message">
+            <template v-if="shortBouquets.length === 1">
+              You chose {{ shortBouquets[0].short.size }} flowers but only placed {{ shortBouquets[0].short.placed }}.
+              {{ shortBouquets[0].short.missing === 1 ? "1 spot is" : `${shortBouquets[0].short.missing} spots are` }} still empty.
+            </template>
+            <template v-else>Some of your custom bouquets still have empty flower spots, so they'll look smaller than you picked.</template>
+          </p>
+          <div class="short-actions">
+            <button ref="shortFillButton" type="button" class="bc-btn bc-btn--dark" @click="fillBouquet(shortBouquets[0])">
+              Fill the rest of the flowers
+            </button>
+            <button type="button" class="bc-link short-anyway" @click="placeShortAnyway">Place order as it is</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <PaymentFailedModal
       :show="paymentFailure.show"
       :failure="paymentFailure.failure"
@@ -511,6 +559,7 @@ import api from "../../plugins/axios.js";
 import { showCheckoutPaused } from "../../composables/usePlatformStatus";
 import { toast } from "@/utils/snackbar";
 import { usePrice } from "../../composables/usePrice.js";
+import { bouquetShortfall } from "../../utils/customizerUi.js";
 
 const PH_TIMEZONE = "Asia/Manila";
 
@@ -1198,11 +1247,53 @@ async function loadCheckoutData() {
   }
 }
 
+// Custom bouquets with fewer flowers than the size chosen: [{ key, item, short }].
+// A bouquet bought straight from the customizer comes as one item per flower,
+// all with the same design, so it counts once.
+const shortBouquets = computed(() => {
+  const seen = new Set();
+  const list = [];
+  for (const item of checkoutData.value?.items || []) {
+    const short = bouquetShortfall(item.customizations);
+    const key = item.cart_item_id ? `cart-${item.cart_item_id}` : "direct";
+    if (!short || seen.has(key)) continue;
+    seen.add(key);
+    list.push({ key, item, short });
+  }
+  return list;
+});
+const shortAsk = ref(false);
+const shortFillButton = ref(null);
+let shortAccepted = false;
+
+/** Opens the bouquet in the customizer to fill its empty spots */
+function fillBouquet(entry) {
+  shortAsk.value = false;
+  const design = entry?.item?.customizations || {};
+  const query = { store_id: design.store_id, owner_id: design.vendor_id };
+  // From the cart: edit that cart item. Bought straight from the customizer: pick up where it left off
+  if (entry?.item?.cart_item_id) query.cart_item_id = entry.item.cart_item_id;
+  else query.resume = "checkout";
+  router.push({ path: "/customize/flower", query });
+}
+
+function placeShortAnyway() {
+  shortAsk.value = false;
+  shortAccepted = true;
+  placeOrder();
+}
+
 async function placeOrder() {
   if (!selectedPaymentMethod.value) {
     toast.error("Please select a payment method");
     return;
   }
+  if (shortBouquets.value.length && !shortAccepted && !isProcessing.value) {
+    shortAsk.value = true;
+    setTimeout(() => shortFillButton.value?.focus(), 50);
+    return;
+  }
+  shortAccepted = false;
 
   if (isProcessing.value) return;
   const itemsKey = checkoutItemsKey();
@@ -1902,6 +1993,127 @@ onMounted(async () => {
 
 .order-items-list {
   border-top: 1px solid var(--line);
+}
+
+/* A custom bouquet with empty flower spots */
+.short-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid #f0d9b0;
+  border-radius: 14px;
+  background: #fdf3e3;
+  color: #6e4a10;
+}
+
+.short-note-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #d68a1c;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.short-note-copy {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.short-note-copy strong {
+  font-weight: 600;
+}
+
+.short-note-fill {
+  flex-shrink: 0;
+  align-self: center;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font: 600 13px var(--font-sans);
+  cursor: pointer;
+}
+
+.short-note-fill:hover {
+  background: var(--leaf-deep);
+}
+
+.short-note-fill:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+  .short-note {
+    flex-wrap: wrap;
+  }
+  .short-note-fill {
+    margin-left: 36px;
+  }
+}
+
+.short-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(38, 45, 57, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.short-modal {
+  display: grid;
+  gap: 10px;
+  width: min(440px, 100%);
+  padding: 26px 24px 20px;
+  border-radius: 22px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 30px 80px rgba(38, 45, 57, 0.25);
+}
+
+.short-modal h2 {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.short-modal p:not(.bc-label) {
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.short-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.short-actions .bc-btn {
+  justify-content: center;
+  width: 100%;
+}
+
+.short-anyway {
+  justify-self: center;
+  min-height: 44px;
 }
 
 .order-item {
