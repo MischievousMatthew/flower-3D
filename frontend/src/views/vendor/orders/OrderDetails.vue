@@ -138,9 +138,14 @@
           <section v-if="order.loves" class="sp-card loves" aria-labelledby="od-loves-title">
             <div class="loves-head">
               <span class="loves-icon" v-html="ICONS.flower"></span>
-              <div><h2 id="od-loves-title">Flowers they love</h2><p>Shared by the customer from their profile.</p></div>
+              <div><h2 id="od-loves-title">Flowers they love</h2><p>{{ order.loves.state === "shared" ? "Shared by the customer from their profile." : "From the customer's profile." }}</p></div>
             </div>
-            <dl class="loves-list">
+            <p v-if="order.loves.state !== 'shared'" class="loves-empty">
+              <strong>No flower preferences</strong>
+              {{ order.loves.state === "private" ? "This customer hasn't shared their preferences with shops." : "This customer hasn't added any preferences yet." }}
+              Follow the order details and their note.
+            </p>
+            <dl v-else class="loves-list">
               <template v-for="f in LOVE_FIELDS" :key="f.key">
                 <div v-if="order.loves[f.key]?.length" :class="{ avoid: f.key === 'avoid' }">
                   <dt><span v-if="f.key === 'avoid'" v-html="ICONS.alert"></span>{{ f.label }}</dt>
@@ -148,7 +153,7 @@
                 </div>
               </template>
             </dl>
-            <p v-if="order.loves.note" class="loves-note">“{{ order.loves.note }}”</p>
+            <p v-if="order.loves.state === 'shared' && order.loves.note" class="loves-note">“{{ order.loves.note }}”</p>
           </section>
 
           <section class="sp-card" aria-label="Payment">
@@ -628,6 +633,20 @@ onMounted(() => {
 }
 .loves-list .avoid .sp-chip {
   background: var(--v-surface);
+}
+.loves-empty {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--v-subtle);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--v-text-2);
+}
+.loves-empty strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--v-text);
 }
 .loves-note {
   margin: 14px 0 0;

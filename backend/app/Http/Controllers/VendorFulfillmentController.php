@@ -210,7 +210,8 @@ class VendorFulfillmentController extends Controller
 
     /**
      * The flowers the customer loves, for whoever makes the bouquet. Only what
-     * they chose to share with shops; null when they keep it to themselves.
+     * they chose to share with shops. `state` tells the shop why there is
+     * nothing to show: "private" (not shared) or "none" (shared, but empty).
      */
     private function loves(Order $order, ?array $unpaidCheckout): ?array
     {
@@ -219,12 +220,12 @@ class VendorFulfillmentController extends Controller
         }
         $shared = app(CustomerRecords::class)->shared((int) $order->user_id);
         if (! $shared) {
-            return null;
+            return ['state' => 'private'];
         }
         $loves = collect($shared)->only(['flowers', 'colors', 'avoid', 'occasions', 'note'])->all();
         $hasTags = $loves['flowers'] || $loves['colors'] || $loves['avoid'] || $loves['occasions'];
 
-        return $hasTags || $loves['note'] ? $loves : null;
+        return ['state' => $hasTags || $loves['note'] ? 'shared' : 'none'] + $loves;
     }
 
     /** GET /vendor/fulfillment/schedule — upcoming work by delivery date, with when to start preparing. */

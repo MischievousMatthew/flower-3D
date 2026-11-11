@@ -153,7 +153,8 @@
               <section class="cu-box shared">
                 <header><span v-html="ICONS.user"></span><div><strong>Shared by {{ firstName }}</strong><small>From their own profile. Only they can change it.</small></div></header>
                 <p v-if="!profile.shared" class="sp-hint">They haven't shared their preferences with shops. It shows here if they turn sharing on in their profile.</p>
-                <template v-else>
+                <p v-else-if="sharedEmpty" class="sp-hint"><strong>No preferences yet.</strong> {{ firstName }} shares with shops but hasn't added any favorite flowers, colors or notes. You can record what they tell you in your shop's record below.</p>
+                <template v-else-if="!sharedEmpty">
                   <dl class="cu-pref-list">
                     <template v-for="f in PREF_FIELDS" :key="f.key">
                       <dt>{{ f.label }}</dt>
@@ -340,6 +341,11 @@ const Avatar = defineComponent({
 });
 
 const firstName = computed(() => profile.value?.name.split(/\s+/)[0] || "they");
+// Sharing is on, but there's nothing in it: no tags, no note, no hearted products
+const sharedEmpty = computed(() => {
+  const s = profile.value?.shared;
+  return !!s && !s.note && !profile.value.hearted?.length && PREF_FIELDS.every((f) => !s[f.key]?.length);
+});
 const allDates = computed(() => {
   const p = profile.value;
   if (!p) return [];
