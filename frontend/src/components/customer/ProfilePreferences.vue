@@ -65,9 +65,9 @@
           <textarea v-model="form.note" rows="2" maxlength="500" placeholder="Write a note for shops (optional)"></textarea>
         </label>
 
-        <!-- Who sees it (saves straight away) -->
+        <!-- Who sees it (saved with Save on the bar, like the rest) -->
         <div class="pp-save">
-          <div class="pp-who" role="radiogroup" aria-label="Who can see your taste and special days">
+          <div :ref="(el) => (changeEls.share_with_shops = el)" class="pp-who" :class="{ flash: flashKey === 'share_with_shops' }" role="radiogroup" aria-label="Who can see your taste and special days">
             <span class="pp-who__label">Who can see this?</span>
             <div class="pp-seg">
               <button type="button" role="radio" :aria-checked="!form.share_with_shops" :class="{ on: !form.share_with_shops }" :disabled="busy === 'save'" @click="setSharing(false)">
@@ -79,7 +79,7 @@
                 My shops
               </button>
             </div>
-            <small>{{ form.share_with_shops ? `The ${shopsText} you've ordered from or messaged can see it.` : "Nobody else can see it until you choose My shops." }}</small>
+            <small>{{ form.share_with_shops ? `The ${shopsText} you've ordered from or messaged can see it${sharingChanged ? " once you save" : ""}.` : sharingChanged ? "Nobody else will see it once you save." : "Nobody else can see it until you choose My shops." }}</small>
           </div>
         </div>
       </div>
@@ -295,11 +295,11 @@ const drafts = reactive({ flowers: "", colors: "", avoid: "", occasions: "" });
 let saved = "";
 
 const savedForm = ref(""); // the saved taste, so "what changed" stays reactive
-// Taste edits only: who can see it saves straight away
+// Anything changed, who can see it included: nothing saves until Save
 const changed = computed(() => changes.value.length > 0);
 
 // ── Unsaved changes: which parts differ, and jumping between them ─────
-const CHANGE_KEYS = [...QUESTIONS.map((q) => q.key), "note"];
+const CHANGE_KEYS = [...QUESTIONS.map((q) => q.key), "note", "share_with_shops"];
 const changes = computed(() => {
   if (!savedForm.value) return [];
   const before = JSON.parse(savedForm.value);
@@ -404,17 +404,19 @@ async function run(key, request, message) {
   }
 }
 
-/** Taste waits for Save on the bar; who can see it saves straight away (with any taste edits) */
-async function save(fromSharing = false) {
-  const message = fromSharing ? (form.share_with_shops ? "Your shops can now see your taste and special days." : "Only you can see them now.") : "Your taste is saved.";
+/** Everything here, who can see it included, waits for Save on the bar */
+const sharingChanged = computed(() => changes.value.includes("share_with_shops"));
+async function save() {
+  const message = sharingChanged.value
+    ? form.share_with_shops
+      ? "Saved. Your shops can now see your taste and special days."
+      : "Saved. Only you can see them now."
+    : "Your taste is saved.";
   const ok = await run("save", () => api.put("customer/preferences", { ...form }), message);
   if (ok) changeAt.value = -1;
-  else if (fromSharing) form.share_with_shops = !form.share_with_shops;
 }
 function setSharing(on) {
-  if (form.share_with_shops === on) return;
   form.share_with_shops = on;
-  save(true);
 }
 
 // ── Special days ──────────────────────────────────────────────────────
@@ -940,7 +942,14 @@ onMounted(() => {
   transition: background 0.4s ease, box-shadow 0.4s ease;
 }
 
-.pp-q.flash {
+.pp-who {
+  scroll-margin: 120px;
+  border-radius: 14px;
+  transition: background 0.4s ease, box-shadow 0.4s ease;
+}
+
+.pp-q.flash,
+.pp-who.flash {
   background: rgba(77, 177, 115, 0.08);
   box-shadow: 0 0 0 8px rgba(77, 177, 115, 0.08), 0 0 0 9px rgba(77, 177, 115, 0.35);
 }
@@ -1504,6 +1513,7 @@ onMounted(() => {
   .pp-switch span::after,
   .pp-chev,
   .pp-q,
+  .pp-who,
   .pp-bar-enter-active,
   .pp-bar-leave-active {
     transition: none;
