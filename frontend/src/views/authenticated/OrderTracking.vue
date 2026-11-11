@@ -1097,6 +1097,14 @@ async function toggle(id) {
     // The order above closed: keep this one where it was
     window.scrollBy({ top: after - before, behavior: "instant" });
   }
+  // Opened: glide it up so its top sits just under the navbar
+  if (!closing) {
+    const top = cardTop(id);
+    if (top != null && Math.abs(top - NAV_CLEARANCE) > 4) {
+      const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      window.scrollBy({ top: top - NAV_CLEARANCE, behavior: still ? "instant" : "smooth" });
+    }
+  }
 }
 const setTab = (v) => {
   clearFocus();
