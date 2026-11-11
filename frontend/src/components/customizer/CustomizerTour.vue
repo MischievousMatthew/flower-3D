@@ -40,13 +40,29 @@
             <BcIcon name="x" />
           </button>
         </header>
-        <h2 id="ct-title" class="ct-title">{{ step.title }}</h2>
-        <p id="ct-body" class="ct-body" aria-live="polite">{{ step.body }}</p>
-        <p v-if="step.waiting" class="ct-wait">
+        <!-- Just did it: the win is the message, then on to the next step by itself -->
+        <template v-if="step.celebrate">
+          <div class="ct-win" role="status">
+            <span class="ct-win-badge" aria-hidden="true"><BcIcon name="check" /></span>
+            <div>
+              <h2 id="ct-title" class="ct-title">{{ step.celebrate.title }}</h2>
+              <p id="ct-body" class="ct-win-text">{{ step.celebrate.text }}</p>
+            </div>
+          </div>
+          <div class="ct-timer" aria-hidden="true">
+            <span :key="`${index}-${step.celebrate.text}`" :style="{ animationDuration: `${step.celebrate.ms}ms` }"></span>
+          </div>
+          <p class="ct-timer-label">{{ index === total - 1 ? "Finishing" : "Next step" }} in a moment…</p>
+        </template>
+        <template v-else>
+          <h2 id="ct-title" class="ct-title">{{ step.title }}</h2>
+          <p id="ct-body" class="ct-body" aria-live="polite">{{ step.body }}</p>
+        </template>
+        <p v-if="step.waiting && !step.celebrate" class="ct-wait">
           <span class="ct-wait-dot" aria-hidden="true"></span>
           {{ step.waiting }}
         </p>
-        <p v-else-if="step.doneText" class="ct-done">
+        <p v-else-if="step.doneText && !step.celebrate" class="ct-done">
           <BcIcon name="check" />
           {{ step.doneText }}
         </p>
@@ -66,13 +82,16 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import BcIcon from "./CustomizerIcon.js";
-import { placeTip } from "../../utils/customizerUi.js";
+import { cornerTip, placeTip } from "../../utils/customizerUi.js";
 
 const props = defineProps({
-  // { target: data-tour name or "", title, body, waiting?: text while the customer still has to do it, doneText? }
+  // { target: data-tour name or "", title, body, waiting?: text while the customer still has to do it, doneText?,
+  //   celebrate?: { title, text, ms } right after they did it; the guide moves on after `ms` }
   step: { type: Object, default: null },
   index: { type: Number, default: 0 },
   total: { type: Number, default: 0 },
+  // () => [{ left, top, width, height, weight }]: what the card must not cover when it can't sit beside its part
+  keepClear: { type: Function, default: null },
 });
 const emit = defineEmits(["next", "back", "close"]);
 
@@ -174,6 +193,11 @@ function place() {
   const width = card?.width || Math.min(340, view.width - 32);
   const height = card?.height || 220;
   Object.assign(tip, placeTip(rect, view, { width, height }));
+  // No room beside the part (the bouquet stage): a corner that keeps the bouquet in sight
+  if (tip.side.startsWith("dock") && props.keepClear) {
+    const corner = cornerTip(rect, view, { width, height }, props.keepClear() || []);
+    if (corner) Object.assign(tip, corner);
+  }
   drag.value = dragPath();
   // Keep the card off the drag path: beside the list it drops to the bottom of the screen
   if (drag.value && rect && (tip.side === "right" || tip.side === "left")) {
@@ -204,7 +228,12 @@ watch(
   { immediate: true },
 );
 // The text changes size (waiting → done), so the card may need to move
-watch(() => [props.step?.title, props.step?.body, props.step?.waiting, props.step?.doneText], () => nextTick(queue));
+watch(() => [props.step?.title, props.step?.body, props.step?.waiting, props.step?.doneText, props.step?.celebrate?.text], () => nextTick(queue));
+// The win takes the focus to Next, so Enter goes on without waiting
+watch(
+  () => props.step?.celebrate?.text,
+  (text) => text && nextTick(() => nextEl.value?.focus({ preventScroll: true })),
+);
 
 function onKey(event) {
   if (props.step && event.key === "Escape") emit("close");
@@ -480,6 +509,76 @@ onUnmounted(() => {
   height: 16px;
 }
 
+/* The win: a green badge that pops in, the message large, a bar running out */
+.ct-win {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ct-win-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--leaf);
+  color: #ffffff;
+  box-shadow: 0 0 0 6px rgba(77, 177, 115, 0.16);
+  animation: ct-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.ct-win-badge :deep(svg) {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2.6;
+}
+
+@keyframes ct-pop {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.ct-win .ct-title {
+  color: var(--leaf-deep);
+}
+
+.ct-win-text {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.ct-timer {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(77, 177, 115, 0.15);
+}
+
+.ct-timer span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--leaf);
+  transform-origin: left center;
+  animation: ct-timer linear both;
+}
+
+@keyframes ct-timer {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+.ct-timer-label {
+  margin: -4px 0 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
 .ct-dots {
   display: flex;
   gap: 5px;
@@ -554,7 +653,8 @@ onUnmounted(() => {
   .ct-arrow,
   .ct-wait-dot,
   .ct-trail line,
-  .ct-drop {
+  .ct-drop,
+  .ct-win-badge {
     animation: none;
   }
   .ct-hole,

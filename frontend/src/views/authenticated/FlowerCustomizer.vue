@@ -392,7 +392,7 @@
           </div>
 
           <SelectionCard
-            v-if="sceneReady && hasTransformTarget && !groupPick"
+            v-if="sceneReady && hasTransformTarget && !groupPick && !(tour.open && pendingFlower)"
             ref="selectionCardEl"
             :title="bouquetSelected ? 'Whole bouquet' : selectedGroup.length ? `Group of ${selectedGroup.length}` : activePiece ? `${selectedFlower.product_name} piece` : selectedFlower.product_name"
             :subtitle="selectedGroup.length ? '' : selectionSubtitle"
@@ -499,6 +499,7 @@
           :step="tourStep"
           :index="tour.index"
           :total="tourSteps.length"
+          :keep-clear="tourKeepClear"
           @next="nextTourStep"
           @back="prevTourStep"
           @close="endTour"
@@ -894,7 +895,7 @@ watch(steps, (list) => {
 // themselves once it's done. The Guide button on the stage starts it again.
 const TOUR_SEEN_KEY = "bc.customizerGuide.seen";
 // withStart: the guide began on the start screen, so it walks through the occasion and size too
-const tour = reactive({ welcome: false, open: false, index: 0, withStart: false });
+const tour = reactive({ welcome: false, open: false, index: 0, withStart: false, justDid: null });
 const tourStartButton = ref(null);
 
 function tourSeen() {
@@ -913,6 +914,67 @@ function markTourSeen() {
 }
 
 const listWords = (words) => (words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`);
+
+/**
+ * What the guide's card must not cover when it can't sit beside the part it
+ * explains (the 3D stage): the bouquet as it shows on screen, the stage's
+ * tools, the placing hint and the selection card.
+ */
+const tourBox = new THREE.Box3();
+const tourCorner = new THREE.Vector3();
+function bouquetScreenRect() {
+  if (!arrangement || !camera || !viewerContainer.value) return null;
+  tourBox.setFromObject(arrangement);
+  if (tourBox.isEmpty()) return null;
+  const view = viewerContainer.value.getBoundingClientRect();
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  for (const x of [tourBox.min.x, tourBox.max.x]) {
+    for (const y of [tourBox.min.y, tourBox.max.y]) {
+      for (const z of [tourBox.min.z, tourBox.max.z]) {
+        tourCorner.set(x, y, z).project(camera);
+        const sx = view.left + ((tourCorner.x + 1) / 2) * view.width;
+        const sy = view.top + ((1 - tourCorner.y) / 2) * view.height;
+        left = Math.min(left, sx);
+        right = Math.max(right, sx);
+        top = Math.min(top, sy);
+        bottom = Math.max(bottom, sy);
+      }
+    }
+  }
+  return { left, top, width: right - left, height: bottom - top };
+}
+function tourKeepClear() {
+  const rects = [];
+  const bouquet = bouquetScreenRect();
+  if (bouquet) rects.push({ ...bouquet, weight: 10 });
+  const stage = stageEl.value;
+  stage?.querySelectorAll(".st-stack, .st-view, .fc-hint.live").forEach((el) => {
+    const r = el.getBoundingClientRect();
+    if (r.width && r.height) rects.push({ left: r.left, top: r.top, width: r.width, height: r.height, weight: 4 });
+  });
+  const card = selectionCardEl.value?.$el;
+  if (card?.getBoundingClientRect) {
+    const r = card.getBoundingClientRect();
+    if (r.width && r.height) rects.push({ left: r.left, top: r.top, width: r.width, height: r.height, weight: 4 });
+  }
+  return rects;
+}
+
+// Just did the step: a clear "Great work!" naming what they added, and a
+// short countdown to the next step
+const TOUR_ADVANCE_MS = 3000;
+let tourAdvance = 0;
+const celebration = (key) => {
+  const did = tour.justDid?.key === key ? tour.justDid : null;
+  if (!did) return {};
+  return {
+    celebrate: {
+      title: "Great work!",
+      text: did.name ? `You added the ${did.name} to your bouquet.` : "You added it to your bouquet.",
+      ms: TOUR_ADVANCE_MS,
+    },
+  };
+};
 
 const tourSteps = computed(() => {
   const list = [];
@@ -971,6 +1033,7 @@ const tourSteps = computed(() => {
       drag: placing || done ? null : { from: '[data-tour="fillers"] .sp-row:not(.disabled)', to: "stage", icon: "leaf" },
       waiting: done ? "" : placing ? "Waiting for you to click the bouquet…" : "Waiting for you to pick a filler…",
       doneText: done ? "Nice! Your filler is in." : "",
+      ...celebration("fillers"),
     });
   }
   {
@@ -987,6 +1050,7 @@ const tourSteps = computed(() => {
       drag: placing || done ? null : { from: '[data-tour="flowers"] .sp-row:not(.disabled)', to: "stage", icon: "flower" },
       waiting: done ? "" : placing ? "Waiting for you to click the bouquet…" : "Waiting for you to pick a flower…",
       doneText: done ? "Your first flower is in!" : "",
+      ...celebration("flowers"),
     });
   }
   list.push({
@@ -1021,6 +1085,8 @@ const tourSteps = computed(() => {
 const tourStep = computed(() => tourSteps.value[tour.index] || null);
 
 function showTourStep(index) {
+  clearTimeout(tourAdvance);
+  tour.justDid = null;
   tour.index = Math.max(0, Math.min(index, tourSteps.value.length - 1));
   const step = tourSteps.value[tour.index];
   if (step?.step) activeStep.value = step.step;
@@ -1047,6 +1113,8 @@ function startTour() {
   nextTick(() => tourStartButton.value?.focus());
 }
 function endTour() {
+  clearTimeout(tourAdvance);
+  tour.justDid = null;
   tour.open = false;
   markTourSeen();
 }
@@ -1059,8 +1127,8 @@ function prevTourStep() {
   showTourStep(tour.index - 1);
 }
 
-// A step the customer had to do moves on by itself once it's done
-let tourAdvance = 0;
+// A step the customer had to do: once it's done the guide says so ("Great
+// work!") and moves on by itself after a few seconds, or on Next
 watch(
   () => [placedFillers.value.length, placedFlowers.value.length],
   ([fillerCount, flowerCount], before) => {
@@ -1068,11 +1136,13 @@ watch(
     const key = tourStep.value?.key;
     const did = (key === "fillers" && fillerCount > before[0]) || (key === "flowers" && flowerCount > before[1]);
     if (!did) return;
+    const list = key === "fillers" ? placedFillers.value : placedFlowers.value;
+    tour.justDid = { key, name: list[list.length - 1]?.product_name || "" };
     clearTimeout(tourAdvance);
     const at = tour.index;
     tourAdvance = setTimeout(() => {
       if (tour.open && tour.index === at) showTourStep(at + 1);
-    }, 1400);
+    }, TOUR_ADVANCE_MS);
   },
 );
 
@@ -1516,7 +1586,7 @@ async function onCanvasDrop(event) {
   isDragOver.value = false;
   dragFeedback.value = "";
   if (!draggedFlower.value) return;
-  const placement = getPlacement(event.clientX, event.clientY);
+  const placement = guidedPlacement(draggedFlower.value, getPlacement(event.clientX, event.clientY));
   if (!placement) {
     draggedFlower.value = null;
     hideHoverMarker();
@@ -1702,7 +1772,7 @@ function setupCanvasInteractions() {
     if (groupPick.value) return; // clicks only pick items while grouping
 
     if (pendingFlower.value) {
-      const placement = getPlacement(event.clientX, event.clientY);
+      const placement = guidedPlacement(pendingFlower.value, getPlacement(event.clientX, event.clientY));
       if (!placement) return showToast("Click directly on the bouquet to place the flower.", "error");
       await placeFlowerOnBouquet(pendingFlower.value, placement);
       pendingFlower.value = null;
@@ -1761,8 +1831,32 @@ function getPlacedFlowerHit(clientX, clientY) {
   return current?.userData?.sceneId ? { sceneId: current.userData.sceneId, object: current, piece } : null;
 }
 
+/**
+ * While the guide is open, a flower always lands in the bouquet's opening:
+ * a click on the side of the wrap (or past it) moves the spot onto the flower
+ * bed, so nothing floats outside. After the guide, it goes where they click.
+ */
+const GUIDED_REACH = 0.75; // share of the bed's radius a guided flower may sit from the middle
+function guidedPlacement(item, placement) {
+  if (!placement || !tour.open || !item || isFiller(item) || isCard(item)) return placement;
+  const frame = bedFrame();
+  if (!frame) return placement;
+  const local = placement.local.clone();
+  const dx = local.x - frame.center.x;
+  const dz = local.z - frame.center.z;
+  const off = Math.hypot(dx, dz);
+  const reach = frame.radius * GUIDED_REACH;
+  if (off > reach) {
+    local.x = frame.center.x + (dx / off) * reach;
+    local.z = frame.center.z + (dz / off) * reach;
+  }
+  local.y = bedSurface(frame, local.x, local.z) + 0.05;
+  flowerLayer.updateMatrixWorld();
+  return { point: flowerLayer.localToWorld(local.clone()), normal: new THREE.Vector3(0, 1, 0), local };
+}
+
 function updateHoverMarker(clientX, clientY) {
-  const placement = getPlacement(clientX, clientY);
+  const placement = guidedPlacement(pendingFlower.value || draggedFlower.value, getPlacement(clientX, clientY));
   if (!placement) return hideHoverMarker();
   hoverMarker.visible = true;
   hoverMarker.position.copy(placement.point);
@@ -2787,7 +2881,7 @@ function moveSelectedFlower(clientX, clientY, sceneId = selectedSceneId.value) {
     return;
   }
   const frame = isFiller(flower) ? bedFrame() : null;
-  if (!frame) return object.position.copy(placement.local);
+  if (!frame) return object.position.copy(guidedPlacement(flower, placement).local);
   if (object.userData.sprigs) {
     // A group of pieces moves by how far the pointer moved, not to the pointer
     if (transformDrag && !transformDrag.from) transformDrag.from = { pointer: placement.local.clone(), object: object.position.clone() };
@@ -3659,6 +3753,7 @@ async function restoreBouquet(customization) {
 
 function takeScreenshot() {
   if (!renderer) return;
+  clearGlow(); // the saved image shows the real colours; the glow comes back next frame
   scene.background = new THREE.Color("#f2f5f2");
   renderer.render(scene, camera);
   const link = document.createElement("a");
@@ -3742,8 +3837,58 @@ function keepCardInStage(stage, card) {
   if (top > maxTop + 1) selectionCardPosition.value = { ...selectionCardPosition.value, top: `${Math.round(maxTop)}px` };
 }
 
-function animateScene() {
+// ── Selection glow: the item the customer clicked glows softly ──
+const GLOW_COLOR = new THREE.Color(0xfff0c2);
+const GLOW_LOW = 0.12;
+const GLOW_HIGH = 0.24;
+let glowing = null; // { object, mats: [{ mat, emissive, intensity }] }
+const reduceMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+function glowTarget() {
+  if (bouquetSelected.value || !selectedFlower.value || isCard(selectedFlower.value)) return null;
+  return activePiece.value ? pieceObject() : placedObjects.get(selectedSceneId.value) || null;
+}
+
+function setGlow(object) {
+  if (glowing?.object === object) return;
+  clearGlow();
+  if (!object) return;
+  const mats = [];
+  object.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    // Copies share one material per model: give this one its own, so only it glows
+    if (!child.userData.ownMaterial) {
+      child.material = Array.isArray(child.material) ? child.material.map((m) => m.clone()) : child.material.clone();
+      child.userData.ownMaterial = true;
+    }
+    for (const mat of [].concat(child.material)) {
+      if (mat.emissive) mats.push({ mat, emissive: mat.emissive.clone(), intensity: mat.emissiveIntensity ?? 1 });
+    }
+  });
+  glowing = { object, mats };
+}
+
+function clearGlow() {
+  glowing?.mats.forEach(({ mat, emissive, intensity }) => {
+    mat.emissive.copy(emissive);
+    mat.emissiveIntensity = intensity;
+  });
+  glowing = null;
+}
+
+function stepGlow(time) {
+  setGlow(glowTarget());
+  if (!glowing) return;
+  const level = reduceMotion ? (GLOW_LOW + GLOW_HIGH) / 2 : GLOW_LOW + (GLOW_HIGH - GLOW_LOW) * (0.5 + 0.5 * Math.sin(time / 500));
+  glowing.mats.forEach(({ mat }) => {
+    mat.emissive.copy(GLOW_COLOR);
+    mat.emissiveIntensity = level;
+  });
+}
+
+function animateScene(time = 0) {
   animationFrameId = window.requestAnimationFrame(animateScene);
+  stepGlow(time);
   if (hasTransformTarget.value) placeSelectionCard();
   else anchoredTo = null;
   groupBoxes.forEach((box) => box.update());

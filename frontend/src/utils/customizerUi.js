@@ -78,6 +78,36 @@ export function placeTip(target, view, { width, height, gap = 30, margin = 16, n
   return { side: below ? "dock-bottom" : "dock-top", left: sideLeft, top, arrow: { dir: below ? "up" : "down", x: clamp(cx, sideLeft + 18, sideLeft + width - 18), y: below ? top - 14 : top + height + 14 } };
 }
 
+/**
+ * For a part too big to sit beside (the 3D stage): the screen corner, or a
+ * corner inside the part, that covers the least of what must stay visible.
+ * Each rect in `keep` has a weight (the bouquet counts most); covering the
+ * part itself counts a little, so a corner outside it wins a tie. Bottom
+ * corners come first, away from the header.
+ */
+export function cornerTip(target, view, { width, height, margin = 16 }, keep = []) {
+  const overlap = (a, b) =>
+    Math.max(0, Math.min(a.left + a.width, b.left + b.width) - Math.max(a.left, b.left)) *
+    Math.max(0, Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top));
+  const xs = [margin, view.width - width - margin];
+  const ys = [view.height - height - margin, margin];
+  if (target) {
+    xs.push(target.left + margin, target.left + target.width - width - margin);
+    ys.push(target.top + target.height - height - margin, target.top + margin);
+  }
+  let best = null;
+  for (const top of ys) {
+    for (const left of xs) {
+      if (left < margin || top < margin || left + width > view.width - margin || top + height > view.height - margin) continue;
+      const box = { left, top, width, height };
+      const score = keep.reduce((sum, r) => sum + overlap(box, r) * (r.weight || 1), 0) + (target ? overlap(box, target) * 0.5 : 0);
+      if (!best || score < best.score - 1) best = { left, top, score };
+    }
+  }
+  if (!best) return null;
+  return { side: "dock-corner", left: best.left, top: best.top, arrow: null };
+}
+
 // Arrow keys match the on-screen pad; E / Q move away from / toward you
 export const MOVE_KEYS = {
   arrowup: "up",

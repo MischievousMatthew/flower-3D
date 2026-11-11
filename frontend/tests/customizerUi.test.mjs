@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { anchorCard, bouquetShortfall, buildSteps, fillFlowerChoice, keyAction, placeTip, receiptLines } from "../src/utils/customizerUi.js";
+import { anchorCard, bouquetShortfall, buildSteps, cornerTip, fillFlowerChoice, keyAction, placeTip, receiptLines } from "../src/utils/customizerUi.js";
 
 const label = (steps) => steps.map((s) => `${s.number} ${s.label}`);
 const ready = { ready: true, modalOpen: false, hasTarget: true, bouquetSelected: false, hasSelectedFlower: true, placing: false };
@@ -194,4 +194,28 @@ test("fills with the most used flower that still has stock", () => {
   assert.equal(fillFlowerChoice(flowers, { 1: 3 }).id, 1);
   assert.equal(fillFlowerChoice(flowers, {}).id, 1);
   assert.equal(fillFlowerChoice([{ id: 3, model: null, quantity_in_stock: 9 }], {}), null);
+});
+
+// The guide's card on the 3D stage (layout from a 1366×768 laptop screen)
+const VIEW = { width: 1366, height: 768 };
+const STAGE = { left: 300, top: 155, width: 1066, height: 563 };
+const CARD = { width: 340, height: 250 };
+const meets = (a, b) => a.left < b.left + b.width && b.left < a.left + a.width && a.top < b.top + b.height && b.top < a.top + a.height;
+
+test("cornerTip keeps the card off the bouquet and the tools", () => {
+  const bouquet = { left: 700, top: 170, width: 290, height: 460, weight: 10 };
+  const rail = { left: 326, top: 180, width: 40, height: 195, weight: 4 };
+  const view = { left: 1155, top: 180, width: 190, height: 35, weight: 4 };
+  const tip = cornerTip(STAGE, VIEW, CARD, [bouquet, rail, view]);
+  const box = { left: tip.left, top: tip.top, ...CARD };
+  assert.equal(tip.side, "dock-corner");
+  assert.equal(meets(box, bouquet), false);
+  assert.equal(meets(box, rail), false);
+  assert.equal(meets(box, view), false);
+});
+
+test("cornerTip stays on screen, and gives up only when nothing fits", () => {
+  const tip = cornerTip(STAGE, VIEW, CARD, []);
+  assert.ok(tip.left >= 16 && tip.top >= 16 && tip.left + CARD.width <= VIEW.width - 16 && tip.top + CARD.height <= VIEW.height - 16);
+  assert.equal(cornerTip(STAGE, { width: 300, height: 200 }, CARD, []), null);
 });
