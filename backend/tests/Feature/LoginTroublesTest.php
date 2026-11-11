@@ -108,6 +108,27 @@ class LoginTroublesTest extends TestCase
         $this->assertSame(1, DB::table('login_attempts')->where('reason', 'wrong_password')->count());
     }
 
+    public function test_a_name_that_is_both_staff_and_customer_counts_a_wrong_password_once(): void
+    {
+        \App\Support\PlatformSettings::save(['login_show_attempts' => true]);
+        $this->customer();
+        DB::table('employees')->insert(['name' => 'Ana', 'username' => 'ana', 'email' => 'ana.staff@shop.test', 'password' => Hash::make('Staff-pass1'), 'status' => 'Active']);
+
+        foreach ([4, 3, 2] as $left) {
+            $this->postJson('/api/auth/employee-login', ['username' => 'ana', 'password' => 'nope'])->assertStatus(401);
+            $this->login('nope')->assertJson(['code' => 'invalid_credentials', 'attempts_left' => $left]);
+        }
+        $this->assertSame(3, DB::table('login_attempts')->where('reason', 'wrong_password')->count());
+    }
+
+    public function test_a_staff_only_name_still_counts_its_wrong_passwords(): void
+    {
+        DB::table('employees')->insert(['name' => 'Ben', 'username' => 'ben', 'email' => 'ben@shop.test', 'password' => Hash::make('Staff-pass1'), 'status' => 'Active']);
+
+        $this->postJson('/api/auth/employee-login', ['username' => 'ben', 'password' => 'nope'])->assertStatus(401);
+        $this->assertSame(1, DB::table('login_attempts')->where('reason', 'wrong_password')->count());
+    }
+
     public function test_names_without_an_account_never_lock(): void
     {
         foreach (range(1, 7) as $i) {

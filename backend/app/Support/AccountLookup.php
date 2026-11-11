@@ -18,6 +18,17 @@ final class AccountLookup
      * An exact match comes first; if two older accounts differ only by capitals,
      * the one whose password matches is used, so neither owner is locked out.
      */
+    /** Whether any account matches what was typed (username or email, any capitals) */
+    public static function exists(Builder $query, ?string $typed): bool
+    {
+        $lower = mb_strtolower(trim((string) $typed));
+        if ($lower === '') {
+            return false;
+        }
+
+        return $query->where(fn ($q) => $q->whereRaw('lower(username) = ?', [$lower])->orWhereRaw('lower(email) = ?', [$lower]))->exists();
+    }
+
     public static function signIn(Builder $query, ?string $typed, ?string $password): array
     {
         $typed = trim((string) $typed);

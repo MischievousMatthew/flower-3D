@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
+use App\Models\User;
 use App\Constants\ErpModule;
 use App\Services\LoginAuditService;
 use App\Services\AccountSuspensionService;
@@ -48,7 +49,12 @@ class EmployeeAuthController extends Controller
                 return response()->json(['success' => false, 'message' => 'Invalid credentials'], 401);
             }
             if (!$passwordOk) {
-                $guard->recordFailure($request, $identifier, 'wrong_password', null, 'employee');
+                // The login form tries the customer and vendor sign-in next. When a
+                // customer or vendor account has this name too, that sign-in counts
+                // the wrong password; counting it here as well made one typo cost two tries.
+                if (!AccountLookup::exists(User::query(), $request->username)) {
+                    $guard->recordFailure($request, $identifier, 'wrong_password', null, 'employee');
+                }
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid credentials',
