@@ -39,7 +39,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import { sizedImage, sizedSrcset } from "../../utils/cloudinaryImage.js";
-import ProductTag, { topTag, useTagOrder } from "./ProductTag.vue";
+import ProductTag, { cardTag, useTagOrder } from "./ProductTag.vue";
 
 /** Small product card for the shop's Top Selling row and the bouquet finder */
 const props = defineProps({
@@ -58,18 +58,19 @@ const onSale = computed(
   () => props.product.has_discount && Number(props.product.discount_price) > 0 && Number(props.product.discount_price) < Number(props.product.selling_price),
 );
 /**
- * Every tag this card could show: the product's own (from the server), the
- * row's ("You may like"), and sold out. Only the highest-ranked one shows.
- * A product saved before tags existed falls back to Sale / Best seller.
+ * The one tag on this card (see cardTag): the row's own, else Out of stock,
+ * else one of the product's tags, changing every hour. A product saved
+ * before tags existed falls back to Sale / Best seller.
  */
-const order = useTagOrder();
-const tag = computed(() => {
-  const own = Array.isArray(props.product.tags)
-    ? props.product.tags
-    : [onSale.value && "sale", props.bestSeller && "best_seller"];
-  const soldOut = Number(props.product.quantity_in_stock) === 0 && "out_of_stock";
-  return topTag([props.contextTag, soldOut, ...own], order.value);
-});
+useTagOrder();
+const tag = computed(() =>
+  cardTag({
+    contextTag: props.contextTag,
+    soldOut: Number(props.product.quantity_in_stock) === 0,
+    tags: Array.isArray(props.product.tags) ? props.product.tags : [onSale.value && "sale", props.bestSeller && "best_seller"],
+    productId: props.product.id,
+  }),
+);
 const peso = (value) => `₱${Number(value || 0).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`;
 </script>
 

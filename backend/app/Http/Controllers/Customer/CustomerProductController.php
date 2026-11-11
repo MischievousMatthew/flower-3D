@@ -659,8 +659,36 @@ SQL;
      */
     public function tagOrder()
     {
-        return response()->json(['success' => true, 'data' => $this->tags()->rules()['order']])
-            ->header('Cache-Control', 'public, max-age=300');
+        $rules = $this->tags()->rules();
+
+        return response()->json([
+            'success' => true,
+            'data' => $rules['order'],
+            // Cards show a different one of a product's tags each hour
+            'rotate_hourly' => (bool) $rules['rotate_hourly'],
+        ])->header('Cache-Control', 'public, max-age=300');
+    }
+
+    /**
+     * POST /api/customer/products/{id}/view: the product page was opened (for
+     * the POPULAR tag). Just a count per product per day, nothing about who.
+     */
+    public function recordView($id)
+    {
+        $id = (int) $id;
+        if ($id > 0 && Product::listedForCustomers()->where('status', 'active')->whereKey($id)->exists()) {
+            try {
+                DB::table('product_view_counts')->upsert(
+                    [['product_id' => $id, 'day' => now()->toDateString(), 'views' => 1]],
+                    ['product_id', 'day'],
+                    ['views' => DB::raw('product_view_counts.views + 1')],
+                );
+            } catch (\Throwable $e) {
+                Log::info('CustomerProductController@recordView: ' . $e->getMessage());
+            }
+        }
+
+        return response()->json(['success' => true]);
     }
 
     private ?\App\Services\ProductTags $tagService = null;

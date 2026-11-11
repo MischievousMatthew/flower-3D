@@ -766,6 +766,7 @@ async function load(id) {
     recent.value = recentlyViewed().filter((p) => String(p.id) !== String(product.value.id)).slice(0, 5);
     rememberViewed(product.value);
     refreshRecent();
+    countView(product.value.id);
     pickDefaultColor();
     loadRelated();
     loadDates();
@@ -773,6 +774,18 @@ async function load(id) {
   } else {
     loadingRelated.value = false;
   }
+}
+
+/** Counts this page being opened, once per product per visit (for the POPULAR tag) */
+function countView(id) {
+  try {
+    const seen = JSON.parse(sessionStorage.getItem("bc_viewed_products") || "[]");
+    if (seen.includes(id)) return;
+    sessionStorage.setItem("bc_viewed_products", JSON.stringify([...seen, id].slice(-200)));
+  } catch {
+    // storage blocked: count it anyway
+  }
+  api.post(`customer/products/${id}/view`).catch(() => {});
 }
 
 /**

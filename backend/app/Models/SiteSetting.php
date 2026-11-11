@@ -54,6 +54,8 @@ class SiteSetting extends Model
         // The ranking, top first: a shop card shows only the highest tag a product has.
         // The admin drags these into order.
         'order' => self::PRODUCT_TAG_ORDER,
+        // Cards show a different one of a product's tags each hour (off: always the highest)
+        'rotate_hourly' => true,
         'sale_enabled' => true,        // SALE: discounted by at least…
         'sale_min_percent' => 5,
         'best_enabled' => true,        // BEST SELLER (and the shop's Top Selling row): the top N by
@@ -67,6 +69,10 @@ class SiteSetting extends Model
         'trend_top' => 8,
         'trend_days' => 7,
         'trend_min_score' => 3,
+        'popular_enabled' => true,     // POPULAR: the top N by views and hearts in the last D days
+        'popular_top' => 10,
+        'popular_days' => 14,
+        'popular_min_score' => 10,
         'rated_enabled' => true,       // TOP RATED: at least this rating from this many reviews, at most N
         'rated_min_rating' => 4.5,
         'rated_min_reviews' => 3,
@@ -77,7 +83,7 @@ class SiteSetting extends Model
 
     /** Every tag a shop card can show, in the starting order */
     public const PRODUCT_TAG_ORDER = [
-        'out_of_stock', 'sale', 'best_seller', 'trending', 'new_arrival',
+        'out_of_stock', 'sale', 'best_seller', 'trending', 'popular', 'new_arrival',
         'top_rated', 'recommended', 'seasonal', 'you_may_like',
     ];
 

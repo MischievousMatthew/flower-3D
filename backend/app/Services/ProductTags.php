@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
  *   sale         discounted by at least the set percent
  *   best_seller  the top N by units sold in the last D days (at least M sold)
  *   trending     the top N by recent interest: orders x3, cart adds x2, hearts x1
+ *   popular      the top N by attention: page views x1, hearts x3
  *   new_arrival  added in the last D days, newest first, at most N
  *   top_rated    at least the set rating from enough reviews, at most N
  *   recommended  the admin's Featured products
@@ -25,8 +26,8 @@ use Illuminate\Support\Facades\DB;
  */
 class ProductTags
 {
-    public const ORDER = ['sale', 'best_seller', 'trending', 'new_arrival', 'top_rated', 'recommended', 'seasonal'];
-    private const CACHE_KEY = 'product_tags:sets:v2'; // v2: best sellers keep their rank
+    public const ORDER = ['sale', 'best_seller', 'trending', 'popular', 'new_arrival', 'top_rated', 'recommended', 'seasonal'];
+    private const CACHE_KEY = 'product_tags:sets:v3'; // v3: popular
     private const CACHE_SECONDS = 600;
 
     private ?array $sets = null;
@@ -91,6 +92,7 @@ class ProductTags
                 ->filter(fn ($p) => $this->discountPercent($p) >= (float) $rules['sale_min_percent'])->count() : 0,
             'best_seller' => count($sets['best_seller']),
             'trending' => count($sets['trending']),
+            'popular' => count($sets['popular']),
             'new_arrival' => count($sets['new_arrival']),
             'top_rated' => count($sets['top_rated']),
             'recommended' => count($sets['recommended']),
@@ -156,6 +158,23 @@ class ProductTags
             $trending = array_slice(array_keys(array_filter($score, fn ($s) => $s >= (int) $r['trend_min_score'])), 0, (int) $r['trend_top']);
         }
 
+        // Popular: how often it's looked at and hearted
+        $popular = [];
+        if ($r['popular_enabled'] && $ids->isNotEmpty()) {
+            $since = now()->subDays((int) $r['popular_days']);
+            $score = [];
+            foreach (DB::table('product_view_counts')->whereIn('product_id', $ids)->where('day', '>=', $since->toDateString())
+                ->groupBy('product_id')->select('product_id', DB::raw('SUM(views) as n'))->get() as $row) {
+                $score[$row->product_id] = ($score[$row->product_id] ?? 0) + (int) $row->n;
+            }
+            foreach (DB::table('favorite_products')->whereIn('product_id', $ids)->where('created_at', '>=', $since)
+                ->groupBy('product_id')->select('product_id', DB::raw('COUNT(*) as n'))->get() as $row) {
+                $score[$row->product_id] = ($score[$row->product_id] ?? 0) + 3 * (int) $row->n;
+            }
+            arsort($score);
+            $popular = array_slice(array_keys(array_filter($score, fn ($s) => $s >= (int) $r['popular_min_score'])), 0, (int) $r['popular_top']);
+        }
+
         $new = $r['new_enabled']
             ? $this->listed()->where('created_at', '>=', now()->subDays((int) $r['new_days']))
                 ->orderByDesc('created_at')->limit((int) $r['new_max'])->pluck('id')->all()
@@ -180,6 +199,7 @@ class ProductTags
             // Ranked: product id => 1 for the most sold (the Top Selling row keeps this order)
             'best_seller' => collect($best)->values()->mapWithKeys(fn ($id, $i) => [(int) $id => $i + 1])->all(),
             'trending' => $flip($trending),
+            'popular' => $flip($popular),
             'new_arrival' => $flip($new),
             'top_rated' => $flip($rated),
             'recommended' => $flip($recommended),

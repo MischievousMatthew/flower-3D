@@ -331,8 +331,18 @@
             <div class="tag-order">
               <div class="tag-order-head">
                 <span class="field-label">Tag order</span>
-                <span class="hint">A shop card shows one tag: the highest one on this list that the product has. Drag to change the order, or use the arrows.</span>
+                <span class="hint">A shop card shows one tag. Drag to change the order, or use the arrows.</span>
               </div>
+              <label class="toggle tag-rotate">
+                <input v-model="tagRules.rotate_hourly" type="checkbox" role="switch" />
+                <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+                <span class="toggle-text">
+                  <span class="strong">Change the card's tag every hour</span>
+                  <span class="hint">{{ tagRules.rotate_hourly
+                    ? "A product with several tags shows a different one each hour, so cards don't get stuck on one. Out of stock and a row's own tag never change."
+                    : "Cards always show the highest tag on this list that the product has." }}</span>
+                </span>
+              </label>
               <ol class="tag-rank" aria-label="Tag order, highest first">
                 <li
                   v-for="(t, i) in tagRules.order"
@@ -883,6 +893,11 @@ const TAG_RULES = [
     { key: "trend_days", label: "Interest in the last", suffix: "days", min: 1, max: 30 },
     { key: "trend_min_score", label: "Score of at least", suffix: "points", min: 1, max: 1000 },
   ] },
+  { tag: "popular", name: "Popular", enable: "popular_enabled", desc: "Products customers often look at or heart.", note: "Score: each product page view counts 1, each heart 3.", fields: [
+    { key: "popular_top", label: "Top", suffix: "products", min: 1, max: 100 },
+    { key: "popular_days", label: "Views in the last", suffix: "days", min: 1, max: 90 },
+    { key: "popular_min_score", label: "Score of at least", suffix: "points", min: 1, max: 100000 },
+  ] },
   { tag: "new_arrival", name: "New arrival", enable: "new_enabled", desc: "Products shops added recently.", fields: [
     { key: "new_days", label: "Added in the last", suffix: "days", min: 1, max: 90 },
     { key: "new_max", label: "At most", suffix: "products", min: 1, max: 100 },
@@ -896,7 +911,7 @@ const TAG_RULES = [
   { tag: "seasonal", name: "Seasonal", enable: "seasonal_enabled", desc: "Products a shop set to a season rather than all year.", fields: [] },
 ];
 const TAG_ORDER_DEFAULT = [
-  "out_of_stock", "sale", "best_seller", "trending", "new_arrival",
+  "out_of_stock", "sale", "best_seller", "trending", "popular", "new_arrival",
   "top_rated", "recommended", "seasonal", "you_may_like",
 ];
 // Tags with no switch: always shown when they apply
@@ -905,10 +920,11 @@ const ALWAYS_ON = {
   you_may_like: "On the “You may also like” row",
 };
 const TAG_DEFAULTS = {
-  order: TAG_ORDER_DEFAULT, sale_enabled: true, sale_min_percent: 5,
+  order: TAG_ORDER_DEFAULT, rotate_hourly: true, sale_enabled: true, sale_min_percent: 5,
   best_enabled: true, best_top: 20, best_days: 365, best_min_sold: 1,
   new_enabled: true, new_days: 14, new_max: 12,
   trend_enabled: true, trend_top: 8, trend_days: 7, trend_min_score: 3,
+  popular_enabled: true, popular_top: 10, popular_days: 14, popular_min_score: 10,
   rated_enabled: true, rated_min_rating: 4.5, rated_min_reviews: 3, rated_max: 20,
   recommended_enabled: true, seasonal_enabled: true,
 };
@@ -1949,6 +1965,13 @@ textarea.input {
   border: 1px solid var(--a-border);
   border-radius: 12px;
   background: var(--a-subtle);
+}
+.tag-rotate {
+  min-height: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--a-border);
+  border-radius: 10px;
+  background: var(--a-surface);
 }
 .tag-order-head {
   display: grid;

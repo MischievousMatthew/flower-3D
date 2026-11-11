@@ -18,6 +18,7 @@ export const PRODUCT_TAGS = {
   best_seller: { label: "Best seller", tone: "green", hint: "One of the most purchased products" },
   new_arrival: { label: "New arrival", tone: "blue", hint: "Recently added" },
   trending: { label: "Trending", tone: "purple", hint: "Getting a lot of interest right now" },
+  popular: { label: "Popular", tone: "green", hint: "Often viewed or hearted" },
   // Availability
   in_stock: { label: "In stock", tone: "green", hint: "Available to order" },
   low_stock: { label: "Low stock", tone: "orange", hint: "Only a few left" },
@@ -31,12 +32,13 @@ export const PRODUCT_TAGS = {
 
 /** The ranking until the admin's arrives (SiteSetting::PRODUCT_TAG_ORDER) */
 export const DEFAULT_TAG_ORDER = [
-  "out_of_stock", "sale", "best_seller", "trending", "new_arrival",
+  "out_of_stock", "sale", "best_seller", "trending", "popular", "new_arrival",
   "top_rated", "recommended", "seasonal", "you_may_like",
 ];
 
-// The admin's ranking, asked for once per visit and shared by every card
+// The admin's ranking and whether cards rotate, asked for once per visit and shared by every card
 const tagOrder = ref(DEFAULT_TAG_ORDER);
+const rotateHourly = ref(true);
 let tagOrderAsked = false;
 export function useTagOrder() {
   if (!tagOrderAsked) {
@@ -45,11 +47,44 @@ export function useTagOrder() {
       .get("customer/product-tags/order")
       .then(({ data }) => {
         if (Array.isArray(data?.data) && data.data.length) tagOrder.value = data.data;
+        if (typeof data?.rotate_hourly === "boolean") rotateHourly.value = data.rotate_hourly;
       })
       .catch(() => {}); // the starting order is fine
+    startHourClock();
   }
   return tagOrder;
 }
+
+// The hour, so a card's tag moves on when the hour changes (even with the page open)
+const hourNow = () => Math.floor(Date.now() / 3600000);
+const hour = ref(hourNow());
+function startHourClock() {
+  if (typeof window === "undefined") return;
+  window.setInterval(() => {
+    if (hourNow() !== hour.value) hour.value = hourNow();
+  }, 60000);
+}
+
+/**
+ * The one tag a shop card shows.
+ * - The row's own tag (Best seller row, Recommended picks, You may like) always.
+ * - Then Out of stock, always.
+ * - Then, with hourly rotation on, a different one of the product's tags each
+ *   hour (the same for everyone during that hour); with it off, the highest.
+ */
+export function cardTag({ contextTag = "", soldOut = false, tags = [], productId = 0 }) {
+  if (contextTag) return contextTag;
+  if (soldOut) return "out_of_stock";
+  const own = [...new Set(tags.filter((t) => t && t !== "out_of_stock"))];
+  if (!own.length) return null;
+  if (!rotateHourly.value || own.length === 1) return topTag(own);
+  const ranked = [...own].sort((a, b) => rankOf(a) - rankOf(b));
+  return ranked[(hour.value + Number(productId || 0)) % ranked.length];
+}
+const rankOf = (t) => {
+  const i = tagOrder.value.indexOf(t);
+  return i === -1 ? tagOrder.value.length : i;
+};
 
 /** The highest-ranked of these tags, or null */
 export function topTag(tags, order = tagOrder.value) {

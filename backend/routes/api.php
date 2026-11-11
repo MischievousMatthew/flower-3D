@@ -163,6 +163,8 @@ Route::prefix('customer')->group(function () {
     Route::get('/availability',                 [ReservationController::class, 'getAvailability']);
     Route::post('/check-date',                  [ReservationController::class, 'checkDateAvailability']);
     Route::get('/product-tags/order',           [CustomerProductController::class, 'tagOrder']);
+    // A product page was opened: counted per day for the POPULAR tag
+    Route::post('/products/{id}/view',          [CustomerProductController::class, 'recordView'])->whereNumber('id')->middleware('throttle:60,1');
     // "You may like": from the signed-in customer's Flowers you love (guests get similar flowers)
     Route::get('/recommendations',              [CustomerProductController::class, 'recommendations']);
     // Shop search bar: popular searches, and counting searches that found flowers
