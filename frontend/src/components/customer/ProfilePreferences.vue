@@ -96,10 +96,10 @@
               </span>
               <div class="pp-bar__arrows">
                 <button type="button" aria-label="Go to the previous change" title="Previous change" @click="goToChange(-1)">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 15l-5-5-5 5" /></svg>
                 </button>
                 <button type="button" aria-label="Go to the next change" title="Next change" @click="goToChange(1)">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" /></svg>
                 </button>
               </div>
             </div>
@@ -846,36 +846,35 @@ onMounted(() => {
 /* Up and down, stacked */
 .pp-bar__arrows {
   display: grid;
-  overflow: hidden;
-  border: 1px solid rgba(54, 63, 78, 0.14);
-  border-radius: 10px;
+  gap: 0;
 }
 
+/* Akar Icons chevron-up-small / chevron-down-small: bare chevrons, no box */
 .pp-bar__arrows button {
   display: grid;
   place-items: center;
   width: 32px;
   height: 22px;
+  padding: 0;
   border: 0;
+  border-radius: 6px;
   background: none;
   color: var(--ink, #363f4e);
   cursor: pointer;
-}
-
-.pp-bar__arrows button + button {
-  border-top: 1px solid rgba(54, 63, 78, 0.14);
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .pp-bar__arrows button:hover {
   background: rgba(54, 63, 78, 0.07);
+  color: var(--leaf-deep, #2e7a4f);
 }
 
 .pp-bar__arrows svg {
-  width: 16px;
-  height: 16px;
+  width: 22px;
+  height: 22px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.2;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
