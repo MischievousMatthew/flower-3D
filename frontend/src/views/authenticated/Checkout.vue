@@ -715,6 +715,23 @@ const currentMonthName = computed(() =>
   calendarDate.value.toLocaleString("default", { month: "long" }),
 );
 
+// How many more orders the shop can take on the chosen day ("3 slots left that day")
+const selectedDateRemainingCapacity = computed(() => {
+  const availability = selectedDate.value
+    ? calendarData.value[selectedDate.value]
+    : null;
+  const maxOrders = Number(
+    availability?.max_orders ?? vendorReservationSettings.value.maxOrdersPerDay,
+  );
+  const ordersCount = Number(availability?.orders_count ?? 0);
+
+  return Math.max(
+    0,
+    (Number.isFinite(maxOrders) ? maxOrders : 0) -
+      (Number.isFinite(ordersCount) ? ordersCount : 0),
+  );
+});
+
 const formatSelectedDate = computed(() => {
   if (!selectedDate.value) return "";
   const date = new Date(selectedDate.value);
