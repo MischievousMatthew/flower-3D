@@ -1254,7 +1254,7 @@ function goBack() {
   else router.push("/");
 }
 
-let scene, camera, renderer, controls, bouquetRoot, flowerLayer, hoverMarker, animationFrameId = 0, pointerDown = null, transformDrag = null, toastTimer;
+let scene, overlay, camera, renderer, controls, bouquetRoot, flowerLayer, hoverMarker, animationFrameId = 0, pointerDown = null, transformDrag = null, toastTimer;
 // arrangement holds the wrap and every placed item, so moving the bouquet moves them together
 let arrangement, gizmo, gizmoStartScale = 1;
 // Pointer moves are applied at most once per frame
@@ -1322,6 +1322,7 @@ onUnmounted(() => {
 function initScene() {
   if (!viewerContainer.value) return;
   scene = new THREE.Scene();
+  overlay = new THREE.Scene(); // move handles and group boxes, drawn on top
   camera = new THREE.PerspectiveCamera(42, viewerContainer.value.clientWidth / viewerContainer.value.clientHeight, 0.1, 100);
   camera.position.set(0, 2.1, 6.4);
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -1635,7 +1636,8 @@ function setupGizmo() {
     }
     followLead();
   });
-  scene.add(gizmo.getHelper());
+  // Drawn after the selection outline, so the handles get no outline of their own
+  overlay.add(gizmo.getHelper());
 }
 
 function updateGizmo() {
@@ -3456,12 +3458,12 @@ let groupBoxes = [];
 
 function refreshGroupBoxes() {
   groupBoxes.forEach((box) => {
-    scene?.remove(box);
+    overlay?.remove(box);
     box.geometry.dispose();
     box.material.dispose();
   });
   groupBoxes = [];
-  if (!scene) return;
+  if (!overlay) return;
   const picking = Boolean(groupPick.value);
   const ids = picking ? groupPick.value.ids : selectedGroup.value.map((item) => item.sceneId);
   for (const sceneId of ids) {
@@ -3472,7 +3474,7 @@ function refreshGroupBoxes() {
     box.material.transparent = true;
     box.material.opacity = 0.9;
     box.renderOrder = 10;
-    scene.add(box);
+    overlay.add(box);
     groupBoxes.push(box);
   }
 }
@@ -3901,12 +3903,13 @@ function setupOutline(width, height) {
   composer.setSize(width, height);
   composer.addPass(new RenderPass(scene, camera));
   outlinePass = new OutlinePass(new THREE.Vector2(width, height), scene, camera);
-  outlinePass.edgeStrength = 4;
-  outlinePass.edgeGlow = 0.6; // a little soft light around the line
-  outlinePass.edgeThickness = 1.5;
+  // Subtle: a thin line with only a hint of soft light around it
+  outlinePass.edgeStrength = 1.8;
+  outlinePass.edgeGlow = 0.15;
+  outlinePass.edgeThickness = 1;
   outlinePass.pulsePeriod = 0;
   outlinePass.visibleEdgeColor.set("#4db173");
-  outlinePass.hiddenEdgeColor.set("#2e7a4f"); // the part behind other flowers, quieter
+  outlinePass.hiddenEdgeColor.set("#9ccdab"); // the part behind other flowers, paler
   composer.addPass(outlinePass);
   composer.addPass(new OutputPass());
 }
@@ -3930,6 +3933,12 @@ function animateScene() {
     composer.render();
   } else {
     renderer.render(scene, camera);
+  }
+  // The move handles and group boxes on top, with no outline of their own
+  if (overlay?.children.length) {
+    renderer.autoClear = false;
+    renderer.render(overlay, camera);
+    renderer.autoClear = true;
   }
 }
 
