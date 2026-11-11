@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\OrderRequest;
 use App\Models\VendorApplication;
 use App\Models\VendorClosedDate;
+use App\Services\CustomerRecords;
 use App\Services\ReturnCaseService;
 use App\Traits\ResolvesOwner;
 use Carbon\Carbon;
@@ -193,6 +194,7 @@ class VendorFulfillmentController extends Controller
                 'delivery_fee' => (float) $order->delivery_fee,
                 'discount' => (float) $order->discount_amount,
                 'notes' => $order->customer_notes ?: null,
+                'loves' => $this->loves($order, $unpaidCheckout),
                 'paid_at' => $order->paid_at?->toIso8601String(),
                 'items' => $items,
                 'timeline' => $timeline->sortBy('at')->values(),
@@ -204,6 +206,25 @@ class VendorFulfillmentController extends Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * The flowers the customer loves, for whoever makes the bouquet. Only what
+     * they chose to share with shops; null when they keep it to themselves.
+     */
+    private function loves(Order $order, ?array $unpaidCheckout): ?array
+    {
+        if ($unpaidCheckout || ! $order->user_id) {
+            return null;
+        }
+        $shared = app(CustomerRecords::class)->shared((int) $order->user_id);
+        if (! $shared) {
+            return null;
+        }
+        $loves = collect($shared)->only(['flowers', 'colors', 'avoid', 'occasions', 'note'])->all();
+        $hasTags = $loves['flowers'] || $loves['colors'] || $loves['avoid'] || $loves['occasions'];
+
+        return $hasTags || $loves['note'] ? $loves : null;
     }
 
     /** GET /vendor/fulfillment/schedule — upcoming work by delivery date, with when to start preparing. */

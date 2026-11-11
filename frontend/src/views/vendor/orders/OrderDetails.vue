@@ -134,6 +134,23 @@
             </dl>
           </section>
 
+          <!-- What the customer shared in their profile, for whoever makes the bouquet -->
+          <section v-if="order.loves" class="sp-card loves" aria-labelledby="od-loves-title">
+            <div class="loves-head">
+              <span class="loves-icon" v-html="ICONS.flower"></span>
+              <div><h2 id="od-loves-title">Flowers they love</h2><p>Shared by the customer from their profile.</p></div>
+            </div>
+            <dl class="loves-list">
+              <template v-for="f in LOVE_FIELDS" :key="f.key">
+                <div v-if="order.loves[f.key]?.length" :class="{ avoid: f.key === 'avoid' }">
+                  <dt><span v-if="f.key === 'avoid'" v-html="ICONS.alert"></span>{{ f.label }}</dt>
+                  <dd><span v-for="t in order.loves[f.key]" :key="t" class="sp-chip" :class="f.tone">{{ t }}</span></dd>
+                </div>
+              </template>
+            </dl>
+            <p v-if="order.loves.note" class="loves-note">“{{ order.loves.note }}”</p>
+          </section>
+
           <section class="sp-card" aria-label="Payment">
             <div class="sp-card-head">
               <div><h2>Payment</h2><p>{{ PAYMENT_LABEL[order.payment_method] ?? order.payment_method }}</p></div>
@@ -183,6 +200,14 @@ import {
 } from "../../../components/vendor/orders/orderUi";
 import "../../../components/vendor/shop/shop.css";
 import { DEFAULT_PRESETS } from "../../../constants/bouquetPresets";
+
+// "Flowers they love": what the customer shared; flowers to avoid stand out in red
+const LOVE_FIELDS = [
+  { key: "avoid", label: "Please avoid", tone: "red" },
+  { key: "flowers", label: "Favorite flowers", tone: "pink" },
+  { key: "colors", label: "Colors", tone: "violet" },
+  { key: "occasions", label: "Usually for", tone: "slate" },
+];
 
 const router = useRouter();
 const ENDED = ["cancelled", "returned", "refunded", "unpaid_checkout"];
@@ -532,6 +557,87 @@ onMounted(() => {
 .note-icon :deep(svg) {
   width: 18px;
   height: 18px;
+}
+
+/* Flowers they love: the customer's shared preferences */
+.loves-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.loves-head h2 {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--v-text);
+}
+.loves-head p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--v-muted);
+}
+.loves-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--v-pink-soft);
+  color: var(--v-pink-text);
+}
+.loves-icon :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+.loves-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.loves-list > div {
+  display: grid;
+  gap: 6px;
+}
+.loves-list > div.avoid {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--v-red-soft);
+}
+.loves-list dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--v-muted);
+}
+.loves-list .avoid dt {
+  color: var(--v-red-text);
+}
+.loves-list dt :deep(svg) {
+  width: 14px;
+  height: 14px;
+}
+.loves-list dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+.loves-list .avoid .sp-chip {
+  background: var(--v-surface);
+}
+.loves-note {
+  margin: 14px 0 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--v-pink-soft);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--v-text-2);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 
 /* Unpaid checkout: neutral, not alarming; nothing is wrong on the shop's side */
