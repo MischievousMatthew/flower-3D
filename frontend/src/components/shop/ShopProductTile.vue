@@ -47,7 +47,7 @@ const props = defineProps({
   bestSeller: { type: Boolean, default: false },
   adding: { type: Boolean, default: false },
   compact: { type: Boolean, default: false },
-  // The row it sits in can add its own tag: "you_may_like", "recently_viewed"
+  // The row it sits in can add its own tag: "you_may_like"
   contextTag: { type: String, default: "" },
 });
 defineEmits(["open", "add"]);

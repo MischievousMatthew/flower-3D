@@ -419,7 +419,6 @@
               v-for="item in recent"
               :key="item.id"
               :product="item"
-              context-tag="recently_viewed"
               :adding="addingRelatedId === item.id"
               @open="openProduct"
               @add="addRelated"
@@ -755,12 +754,33 @@ async function load(id) {
     document.title = `${product.value.product_name} · BloomCraft`;
     recent.value = recentlyViewed().filter((p) => String(p.id) !== String(product.value.id)).slice(0, 5);
     rememberViewed(product.value);
+    refreshRecent();
     pickDefaultColor();
     loadRelated();
     loadDates();
     nextTick(watchBuyButtons);
   } else {
     loadingRelated.value = false;
+  }
+}
+
+/**
+ * The saved copies can be out of date (price, stock, tags), so the row is
+ * shown from them straight away, then swapped for the current details.
+ * Products no longer listed drop out.
+ */
+async function refreshRecent() {
+  const saved = recent.value;
+  if (!saved.length) return;
+  const id = product.value.id;
+  try {
+    const { data } = await api.get("customer/products", {
+      params: { ids: saved.map((p) => p.id).join(","), per_page: saved.length, page: 1, in_stock_only: 0 },
+    });
+    const fresh = new Map((data?.data?.data || []).map((p) => [String(p.id), p]));
+    if (product.value?.id === id) recent.value = saved.map((p) => fresh.get(String(p.id))).filter(Boolean);
+  } catch {
+    // keep the saved copies
   }
 }
 

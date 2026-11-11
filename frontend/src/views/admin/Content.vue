@@ -397,7 +397,7 @@
               <p class="hint">
                 <ProductTag tag="in_stock" /> <ProductTag tag="low_stock" /> <ProductTag tag="out_of_stock" />
                 follow the stock (low stock is 5 or fewer).
-                <ProductTag tag="you_may_like" /> and <ProductTag tag="recently_viewed" /> show on those rows of the product page.
+                <ProductTag tag="you_may_like" /> shows on that row of the product page.
               </p>
             </div>
           </template>
@@ -897,13 +897,12 @@ const TAG_RULES = [
 ];
 const TAG_ORDER_DEFAULT = [
   "out_of_stock", "sale", "best_seller", "trending", "new_arrival",
-  "top_rated", "recommended", "seasonal", "you_may_like", "recently_viewed",
+  "top_rated", "recommended", "seasonal", "you_may_like",
 ];
 // Tags with no switch: always shown when they apply
 const ALWAYS_ON = {
   out_of_stock: "When it's sold out",
   you_may_like: "On the “You may also like” row",
-  recently_viewed: "On the “Recently viewed” row",
 };
 const TAG_DEFAULTS = {
   order: TAG_ORDER_DEFAULT, sale_enabled: true, sale_min_percent: 5,

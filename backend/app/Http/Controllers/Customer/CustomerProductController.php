@@ -111,6 +111,11 @@ class CustomerProductController extends Controller
                 $ownerIds = array_slice(array_values(array_filter(array_map('intval', explode(',', (string) $request->owner_ids)))), 0, 200);
                 $query->whereIn('owner_id', $ownerIds ?: [0]);
             }
+            // Just these products (the "Recently viewed" row refreshing what the browser saved)
+            if ($request->filled('ids')) {
+                $ids = array_slice(array_values(array_filter(array_map('intval', explode(',', (string) $request->ids)))), 0, 24);
+                $query->whereIn('id', $ids ?: [0]);
+            }
             if (filter_var($request->get('in_stock_only', false), FILTER_VALIDATE_BOOLEAN)) {
                 $query->where('quantity_in_stock', '>', 0);
             }

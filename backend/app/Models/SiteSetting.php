@@ -78,7 +78,7 @@ class SiteSetting extends Model
     /** Every tag a shop card can show, in the starting order */
     public const PRODUCT_TAG_ORDER = [
         'out_of_stock', 'sale', 'best_seller', 'trending', 'new_arrival',
-        'top_rated', 'recommended', 'seasonal', 'you_may_like', 'recently_viewed',
+        'top_rated', 'recommended', 'seasonal', 'you_may_like',
     ];
 
     /** @return array<string, mixed> */

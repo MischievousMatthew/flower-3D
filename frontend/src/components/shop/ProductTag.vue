@@ -6,8 +6,8 @@
 /**
  * The tags shown on products. Promotional and recommendation tags come
  * from the server (App\Services\ProductTags, rules set by the admin);
- * stock tags come from the stock; "You may like" and "Recently viewed"
- * come from the row a card sits in.
+ * stock tags come from the stock; "You may like" comes from the row a
+ * card sits in.
  */
 import { ref } from "vue";
 import api from "../../plugins/axios.js";
@@ -27,13 +27,12 @@ export const PRODUCT_TAGS = {
   you_may_like: { label: "You may like", tone: "purple", hint: "Picked for you" },
   recommended: { label: "Recommended", tone: "blue", hint: "Recommended by BloomCraft" },
   top_rated: { label: "Top rated", tone: "teal", hint: "Excellent customer ratings" },
-  recently_viewed: { label: "Recently viewed", tone: "grey", hint: "You looked at this before" },
 };
 
 /** The ranking until the admin's arrives (SiteSetting::PRODUCT_TAG_ORDER) */
 export const DEFAULT_TAG_ORDER = [
   "out_of_stock", "sale", "best_seller", "trending", "new_arrival",
-  "top_rated", "recommended", "seasonal", "you_may_like", "recently_viewed",
+  "top_rated", "recommended", "seasonal", "you_may_like",
 ];
 
 // The admin's ranking, asked for once per visit and shared by every card
