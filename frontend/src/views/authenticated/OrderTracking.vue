@@ -2179,13 +2179,18 @@ button.ot-pay {
   height: 12px;
   border: 2px solid var(--card);
   border-radius: 50%;
-  background: #c3cbc6;
+  background: var(--leaf-light);
   box-sizing: border-box;
 }
 
-.ot-timeline li:first-child::before {
+/* The newest update (the list runs oldest to newest) is where the order is now */
+.ot-timeline li:last-child::before {
   background: var(--leaf);
   box-shadow: 0 0 0 3px rgba(77, 177, 115, 0.2);
+}
+
+.ot-timeline li:last-child strong {
+  color: var(--leaf-deep);
 }
 
 .ot-timeline time {
