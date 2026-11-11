@@ -679,9 +679,14 @@ const handleLogout = async () => {
 };
 
 const goToOrders = (notification) => {
-  if (notification) markOrderNotificationsAsSeen([notification]);
   showNotificationDropdown.value = false;
-  router.push("/customer/orders");
+  if (!notification) {
+    router.push("/customer/orders");
+    return;
+  }
+  markOrderNotificationsAsSeen([notification]);
+  const order = String(notification.orderNumber || "").replace(/^#/, "");
+  router.push({ path: "/customer/orders", query: order ? { order } : {} });
 };
 
 const loadOrderNotifications = async () => {

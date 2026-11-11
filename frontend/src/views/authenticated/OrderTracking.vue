@@ -44,7 +44,8 @@
           v-for="tab in statusTabs"
           :key="tab.value"
           class="ot-tab"
-          :class="{ active: activeTab === tab.value }"
+          :class="{ active: !focusOrder && activeTab === tab.value }"
+          :aria-pressed="!focusOrder && activeTab === tab.value"
           @click="setTab(tab.value)"
         >
           {{ tab.label }}
@@ -94,7 +95,7 @@
       </div>
 
       <!-- Empty -->
-      <div v-else-if="!orders.length" class="ot-empty">
+      <div v-else-if="!orders.length && !focusOrder" class="ot-empty">
         <span class="ot-empty__ico" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4V8Z" /><path d="M4 8l8 4 8-4M12 12v8" /></svg>
         </span>
@@ -104,8 +105,22 @@
         </p>
       </div>
 
+      <!-- Opened from a notification: just that order -->
+      <div v-else-if="focusOrder && !orders.length" class="ot-empty">
+        <span class="ot-empty__ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
+        </span>
+        <p class="ot-empty__title">We couldn't find order {{ focusOrder }}</p>
+        <p class="ot-empty__sub">It may have been removed. Your other orders are still here.</p>
+        <button class="ot-btn ot-btn--green" @click="showAllOrders">View all orders</button>
+      </div>
+
       <!-- Order list -->
       <template v-else>
+        <div v-if="focusOrder" class="ot-focus-note" role="status">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" /><path d="M10 20a2 2 0 0 0 4 0" /></svg>
+          <span>Showing order <strong>{{ focusOrder }}</strong> from your notifications.</span>
+        </div>
         <div class="ot-list">
           <div
             v-for="order in orders"
@@ -564,7 +579,14 @@
         </div>
 
         <!-- 10 orders, then 10 more, then 20 at a time -->
-        <ShowMore tone="customer" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="orders.length" :total="pager.total.value" @more="pager.showMore()" />
+        <div v-if="focusOrder" class="ot-focus-all">
+          <button type="button" class="ot-btn ot-btn--green" @click="showAllOrders">
+            View all orders
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </button>
+          <span>Or pick a tab above, like Processing or Delivered.</span>
+        </div>
+        <ShowMore v-else tone="customer" :has-more="pager.hasMore.value" :loading="pager.loadingMore.value" :shown="orders.length" :total="pager.total.value" @more="pager.showMore()" />
       </template>
     </div>
 
@@ -1040,6 +1062,15 @@ function authHeaders() {
 /** One page of orders from the server, for the "Show more" list */
 async function fetchOrdersPage(page) {
   const params = { page, per_page: meta.per_page };
+  if (focusOrder.value) {
+    // Opened from a notification: just that order (search matches part of a
+    // number, so keep only the exact one)
+    params.search = focusOrder.value;
+    const res = await api.get(API_BASE, { params, headers: authHeaders() });
+    const want = focusOrder.value.toUpperCase();
+    const items = (res.data.data ?? []).filter((o) => String(o.order_number || "").replace(/^#/, "").toUpperCase() === want);
+    return { items, lastPage: 1, total: items.length };
+  }
   if (activeTab.value !== "all") params.delivery_status = activeTab.value;
   if (search.value.trim()) params.search = search.value.trim();
 
@@ -1058,7 +1089,42 @@ async function fetchOrders() {
   await pager.load();
   if (pager.error.value) error.value = pager.error.value || "Could not load orders. Please try again.";
   loading.value = false;
+  // The order from a notification opens up, showing its details
+  if (focusOrder.value && orders.value.length === 1) expandedId.value = orders.value[0].id;
 }
+
+// ── One order, from a notification ──────────────────────────────────────────
+// ?order=ORD-… shows just that order; a tab, a search or "View all orders"
+// goes back to the full list
+const readFocus = () => (typeof route.query.order === "string" ? route.query.order.replace(/^#/, "").trim() : "");
+const focusOrder = ref(readFocus());
+
+function clearFocus() {
+  if (!focusOrder.value) return;
+  focusOrder.value = "";
+  const next = { ...route.query };
+  delete next.order;
+  router.replace({ query: next });
+}
+
+function showAllOrders() {
+  clearFocus();
+  activeTab.value = "all";
+  expandedId.value = null;
+  fetchOrders();
+}
+
+// Another notification clicked while already on this page
+watch(
+  () => route.query.order,
+  () => {
+    const next = readFocus();
+    if (next === focusOrder.value) return;
+    focusOrder.value = next;
+    expandedId.value = null;
+    fetchOrders();
+  },
+);
 /** After an action (cancel, received…): reload, keeping as many orders showing */
 const refreshOrders = () => pager.refresh();
 
@@ -1348,11 +1414,13 @@ const toggle = (id) => {
   expandedId.value = expandedId.value === id ? null : id;
 };
 const setTab = (v) => {
+  clearFocus();
   activeTab.value = v;
   expandedId.value = null;
   fetchOrders();
 };
 const debounceSearch = () => {
+  clearFocus();
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => fetchOrders(), 400);
 };
@@ -1829,6 +1897,52 @@ onMounted(async () => {
 }
 
 /* Empty / error */
+/* One order opened from a notification */
+.ot-focus-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: #eef6f1;
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+.ot-focus-note svg,
+.ot-focus-all svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ot-focus-note svg {
+  color: var(--leaf-deep);
+}
+
+.ot-focus-all {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-top: 22px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  text-align: center;
+}
+
+.ot-focus-all .ot-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
 .ot-empty {
   display: flex;
   flex-direction: column;
