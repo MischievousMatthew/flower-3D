@@ -8,6 +8,14 @@
         <BcIcon :name="ARROWS[tip.arrow.dir]" />
       </span>
 
+      <!-- Placing: an arrow and a ring on the exact spot the flower will land -->
+      <template v-if="spotMark">
+        <span class="ct-drop" :style="{ left: `${spotMark.x}px`, top: `${spotMark.y}px` }" aria-hidden="true"></span>
+        <span class="ct-arrow to-down ct-spot-arrow" :style="{ left: `${spotMark.x}px`, top: `${spotMark.y - 46}px` }" aria-hidden="true">
+          <BcIcon name="arrowDown" />
+        </span>
+      </template>
+
       <!-- Drag demo: a pointer carries the item from the list onto the bouquet, back and forth -->
       <template v-if="drag">
         <svg class="ct-trail" aria-hidden="true">
@@ -103,6 +111,7 @@ const nextEl = ref(null);
 const hole = ref(null);
 const tip = reactive({ side: "center", left: 0, top: 0, arrow: null });
 const drag = ref(null); // { x1, y1, x2, y2 } on screen
+const spotMark = ref(null); // { x, y }: where the flower will land, while placing
 const dragEl = ref(null);
 let dragRun = null; // the running animation, and the path it follows
 let dragKey = "";
@@ -159,7 +168,8 @@ function dragPath() {
   const spec = props.step?.drag;
   if (!spec) return null;
   const from = centerOf(document.querySelector(spec.from));
-  const to = centerOf(document.querySelector(`[data-tour="${spec.to}"]`), 0.45);
+  // The drop goes to the exact spot the item will land, when the step knows it
+  const to = props.step.spot?.() || centerOf(document.querySelector(`[data-tour="${spec.to}"]`), 0.45);
   if (!from || !to || from.y < 0 || from.y > window.innerHeight) return null;
   return { x1: from.x, y1: from.y, x2: to.x, y2: to.y };
 }
@@ -193,12 +203,15 @@ function place() {
   const width = card?.width || Math.min(340, view.width - 32);
   const height = card?.height || 220;
   Object.assign(tip, placeTip(rect, view, { width, height }));
-  // No room beside the part (the bouquet stage): a corner that keeps the bouquet in sight
-  if (tip.side.startsWith("dock") && props.keepClear) {
+  // No room beside the part (the bouquet stage), or no part on screen: a corner that keeps the bouquet in sight
+  if ((tip.side.startsWith("dock") || tip.side === "center") && props.keepClear) {
     const corner = cornerTip(rect, view, { width, height }, props.keepClear() || []);
     if (corner) Object.assign(tip, corner);
   }
   drag.value = dragPath();
+  // Placing (the bouquet is the part): mark the landing spot itself
+  const spot = !drag.value && props.step.target === "stage" && !props.step.celebrate ? props.step.spot?.() : null;
+  spotMark.value = spot && spot.y > 0 && spot.y < view.height ? spot : null;
   // Keep the card off the drag path: beside the list it drops to the bottom of the screen
   if (drag.value && rect && (tip.side === "right" || tip.side === "left")) {
     tip.top = Math.max(16, view.height - height - 16);
@@ -239,12 +252,22 @@ function onKey(event) {
   if (props.step && event.key === "Escape") emit("close");
 }
 
+// The spot moves on screen when the view is turned: keep the arrow on it every frame
+let spotFrame = 0;
+function followSpot() {
+  spotFrame = requestAnimationFrame(followSpot);
+  if (!spotMark.value || !props.step?.spot) return;
+  const spot = props.step.spot();
+  if (spot && (Math.abs(spot.x - spotMark.value.x) > 0.5 || Math.abs(spot.y - spotMark.value.y) > 0.5)) spotMark.value = spot;
+}
+
 let poll = 0;
 onMounted(() => {
   window.addEventListener("resize", queue);
   window.addEventListener("scroll", queue, true);
   window.addEventListener("keydown", onKey);
   poll = setInterval(() => props.step && queue(), 500); // panels open and close under it
+  followSpot();
 });
 onUnmounted(() => {
   window.removeEventListener("resize", queue);
@@ -252,6 +275,7 @@ onUnmounted(() => {
   window.removeEventListener("keydown", onKey);
   clearInterval(poll);
   cancelAnimationFrame(frame);
+  cancelAnimationFrame(spotFrame);
   dragRun?.cancel();
 });
 </script>
@@ -311,6 +335,11 @@ onUnmounted(() => {
 .ct-arrow.to-right { animation: ct-right 1s ease-in-out infinite; }
 .ct-arrow.to-up { animation: ct-up 1s ease-in-out infinite; }
 .ct-arrow.to-down { animation: ct-down 1s ease-in-out infinite; }
+
+/* Follows the spot every frame, so no easing behind it */
+.ct-spot-arrow {
+  transition: none;
+}
 
 @keyframes ct-left { 50% { transform: translateX(-6px); } }
 @keyframes ct-right { 50% { transform: translateX(6px); } }

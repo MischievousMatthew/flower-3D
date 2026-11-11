@@ -614,6 +614,10 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { OutlinePass } from "three/examples/jsm/postprocessing/OutlinePass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import api from "../../plugins/axios.js";
 import { LEGACY_DESIGN, createBouquetBase, designForOccasion, isModelDesign } from "../../utils/bouquetDesigns/index.js";
 import { PATTERN_DESIGNS, applyWrapPattern, normalizePattern } from "../../utils/wrapperPatterns.js";
@@ -967,13 +971,11 @@ let tourAdvance = 0;
 const celebration = (key) => {
   const did = tour.justDid?.key === key ? tour.justDid : null;
   if (!did) return {};
-  return {
-    celebrate: {
-      title: "Great work!",
-      text: did.name ? `You added the ${did.name} to your bouquet.` : "You added it to your bouquet.",
-      ms: TOUR_ADVANCE_MS,
-    },
-  };
+  const said = {
+    occasion: { title: "Great choice!", text: `${did.name || "Your occasion"} it is. Next, choose how many flowers.` },
+    size: { title: "Great choice!", text: `${did.name} flowers it is. Now let's build your bouquet.` },
+  }[key] || { title: "Great work!", text: did.name ? `You added the ${did.name} to your bouquet.` : "You added it to your bouquet." };
+  return { celebrate: { ...said, ms: TOUR_ADVANCE_MS } };
 };
 
 const tourSteps = computed(() => {
@@ -992,6 +994,7 @@ const tourSteps = computed(() => {
         waiting: done ? "" : "Waiting for you to pick an occasion…",
         doneText: done ? "Great choice!" : "",
         canSkip: false,
+        ...celebration("occasion"),
       });
     }
     const sized = !startStep.value && !!preset.value;
@@ -1004,6 +1007,7 @@ const tourSteps = computed(() => {
       waiting: sized ? "" : "Waiting for you to pick how many…",
       doneText: sized ? `${maxFlowers.value} flowers it is!` : "",
       canSkip: false,
+      ...celebration("size"),
     });
   } else {
     list.push({
@@ -1031,6 +1035,7 @@ const tourSteps = computed(() => {
         ? `Click anywhere on the bouquet to put the ${pending.product_name} in. It spreads out on its own.`
         : "Fillers are the greenery your flowers sit in, so they go in first. Drag a filler onto the bouquet like the arrow shows, or tap one and then tap the bouquet.",
       drag: placing || done ? null : { from: '[data-tour="fillers"] .sp-row:not(.disabled)', to: "stage", icon: "leaf" },
+      spot: done ? null : guideSpotOnScreen, // the bouquet's opening, where it goes
       waiting: done ? "" : placing ? "Waiting for you to click the bouquet…" : "Waiting for you to pick a filler…",
       doneText: done ? "Nice! Your filler is in." : "",
       ...celebration("fillers"),
@@ -1043,11 +1048,12 @@ const tourSteps = computed(() => {
       key: "flowers",
       step: "flowers",
       target: placing ? "stage" : "flowers",
-      title: placing ? "Click where it should go" : "Now add a flower",
+      title: placing ? "Click where the arrow points" : "Now add a flower",
       body: placing
-        ? `Click the spot on the bouquet where the ${pending.product_name} should stand. You can move it after.`
+        ? `Click the bouquet and the ${pending.product_name} goes right where the arrow points, inside the bouquet. You can move it after.`
         : `Drag a flower onto the bouquet like the arrow shows, or tap one and then tap the spot. Your bouquet holds ${maxFlowers.value} flowers.`,
       drag: placing || done ? null : { from: '[data-tour="flowers"] .sp-row:not(.disabled)', to: "stage", icon: "flower" },
+      spot: done ? null : guideSpotOnScreen, // exactly where the flower will land
       waiting: done ? "" : placing ? "Waiting for you to click the bouquet…" : "Waiting for you to pick a flower…",
       doneText: done ? "Your first flower is in!" : "",
       ...celebration("flowers"),
@@ -1166,8 +1172,10 @@ watch(startStep, (now, before) => {
     }
     const want = tourIndexOf(now === "occasion" ? "occasion" : "size");
     if (want < 0) return;
-    // Picking an occasion counts as done for a moment before the size step shows
-    const delay = onStart && key === "occasion" && now === "size" ? 900 : 0;
+    // Picking an occasion: "Great choice!" with the countdown, then the size step
+    const picked = onStart && key === "occasion" && now === "size";
+    if (picked) tour.justDid = { key: "occasion", name: draftPreset.value?.label || "" };
+    const delay = picked ? TOUR_ADVANCE_MS : 0;
     const go = () => tour.open && startStep.value === now && showTourStep(want);
     if (delay) tourStartMove = setTimeout(go, delay);
     else go();
@@ -1177,12 +1185,13 @@ watch(startStep, (now, before) => {
   // Closed: leave the occasion and size steps
   if (!onStart || !before) return;
   const at = tour.index;
+  if (key === "size" && preset.value) tour.justDid = { key: "size", name: String(maxFlowers.value) };
   tourStartMove = setTimeout(() => {
     if (!tour.open || tour.index !== at || startStep.value) return;
     const resume = tourResumeKey ? tourIndexOf(tourResumeKey) : -1;
     tourResumeKey = null;
     showTourStep(resume >= 0 ? resume : tourIndexOf("size") + 1);
-  }, preset.value ? 900 : 0);
+  }, preset.value ? TOUR_ADVANCE_MS : 0);
 });
 
 // Offered once, the first time the bouquet is ready: on a new bouquet that's
@@ -1321,6 +1330,7 @@ function initScene() {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
   viewerContainer.value.appendChild(renderer.domElement);
+  setupOutline(viewerContainer.value.clientWidth, viewerContainer.value.clientHeight);
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.target.set(0, 1.5, 0);
@@ -1586,7 +1596,7 @@ async function onCanvasDrop(event) {
   isDragOver.value = false;
   dragFeedback.value = "";
   if (!draggedFlower.value) return;
-  const placement = guidedPlacement(draggedFlower.value, getPlacement(event.clientX, event.clientY));
+  const placement = placingSpot(draggedFlower.value, getPlacement(event.clientX, event.clientY));
   if (!placement) {
     draggedFlower.value = null;
     hideHoverMarker();
@@ -1772,7 +1782,7 @@ function setupCanvasInteractions() {
     if (groupPick.value) return; // clicks only pick items while grouping
 
     if (pendingFlower.value) {
-      const placement = guidedPlacement(pendingFlower.value, getPlacement(event.clientX, event.clientY));
+      const placement = placingSpot(pendingFlower.value, getPlacement(event.clientX, event.clientY));
       if (!placement) return showToast("Click directly on the bouquet to place the flower.", "error");
       await placeFlowerOnBouquet(pendingFlower.value, placement);
       pendingFlower.value = null;
@@ -1832,13 +1842,51 @@ function getPlacedFlowerHit(clientX, clientY) {
 }
 
 /**
- * While the guide is open, a flower always lands in the bouquet's opening:
- * a click on the side of the wrap (or past it) moves the spot onto the flower
+ * While the guide is open, a flower always lands in the bouquet's opening.
+ * Placing (a click or a drop on the bouquet) puts it exactly on the spot the
+ * guide's arrow points at (guideSpot); moving one keeps it over the flower
  * bed, so nothing floats outside. After the guide, it goes where they click.
  */
 const GUIDED_REACH = 0.75; // share of the bed's radius a guided flower may sit from the middle
+const isGuidedFlower = (item) => tour.open && !!item && !isFiller(item) && !isCard(item);
+
+/** The free spot in the bouquet's opening, nearest the middle, for the next flower (flower-layer frame) */
+function guideSpot() {
+  const frame = bedFrame();
+  if (!frame) return null;
+  const reach = frame.radius * GUIDED_REACH;
+  const gap = (reach * 2) / Math.sqrt(maxFlowers.value + 1);
+  const taken = placedFlowers.value.map((f) => placedObjects.get(f.sceneId)?.position).filter(Boolean);
+  const at = (x, z) => new THREE.Vector3(x, bedSurface(frame, x, z) + 0.05, z);
+  for (const p of [{ x: 0, z: 0 }, ...spiralPoints(maxFlowers.value * 3, reach)]) {
+    const x = frame.center.x + p.x;
+    const z = frame.center.z + p.z;
+    if (!taken.some((t) => Math.hypot(t.x - x, t.z - z) < gap * 0.7)) return at(x, z);
+  }
+  return at(frame.center.x, frame.center.z);
+}
+
+/** Where the guide's arrow points, on screen */
+function guideSpotOnScreen() {
+  const spot = guideSpot();
+  if (!spot || !camera || !viewerContainer.value) return null;
+  flowerLayer.updateMatrixWorld();
+  const v = flowerLayer.localToWorld(spot.clone()).project(camera);
+  const view = viewerContainer.value.getBoundingClientRect();
+  return { x: view.left + ((v.x + 1) / 2) * view.width, y: view.top + ((1 - v.y) / 2) * view.height };
+}
+
+/** A click or drop while placing a flower in the guide: onto the guide's spot */
+function placingSpot(item, placement) {
+  if (!placement || !isGuidedFlower(item)) return placement;
+  const local = guideSpot();
+  if (!local) return placement;
+  flowerLayer.updateMatrixWorld();
+  return { point: flowerLayer.localToWorld(local.clone()), normal: new THREE.Vector3(0, 1, 0), local };
+}
+
 function guidedPlacement(item, placement) {
-  if (!placement || !tour.open || !item || isFiller(item) || isCard(item)) return placement;
+  if (!placement || !isGuidedFlower(item)) return placement;
   const frame = bedFrame();
   if (!frame) return placement;
   const local = placement.local.clone();
@@ -1856,7 +1904,10 @@ function guidedPlacement(item, placement) {
 }
 
 function updateHoverMarker(clientX, clientY) {
-  const placement = guidedPlacement(pendingFlower.value || draggedFlower.value, getPlacement(clientX, clientY));
+  const item = pendingFlower.value || draggedFlower.value;
+  // In the guide, its arrow and ring mark the spot instead
+  if (isGuidedFlower(item)) return hideHoverMarker();
+  const placement = getPlacement(clientX, clientY);
   if (!placement) return hideHoverMarker();
   hoverMarker.visible = true;
   hoverMarker.position.copy(placement.point);
@@ -3753,7 +3804,6 @@ async function restoreBouquet(customization) {
 
 function takeScreenshot() {
   if (!renderer) return;
-  clearGlow(); // the saved image shows the real colours; the glow comes back next frame
   scene.background = new THREE.Color("#f2f5f2");
   renderer.render(scene, camera);
   const link = document.createElement("a");
@@ -3837,65 +3887,50 @@ function keepCardInStage(stage, card) {
   if (top > maxTop + 1) selectionCardPosition.value = { ...selectionCardPosition.value, top: `${Math.round(maxTop)}px` };
 }
 
-// ── Selection glow: the item the customer clicked glows softly ──
-const GLOW_COLOR = new THREE.Color(0xfff0c2);
-const GLOW_LOW = 0.12;
-const GLOW_HIGH = 0.24;
-let glowing = null; // { object, mats: [{ mat, emissive, intensity }] }
-const reduceMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+// ── Selection outline: the item the customer clicked gets a soft green outline ──
+// Drawn only while something is selected; otherwise the scene renders as usual.
+let composer = null;
+let outlinePass = null;
 
-function glowTarget() {
+function setupOutline(width, height) {
+  const ratio = renderer.getPixelRatio();
+  // Keeps edges smooth like the normal render (antialias is lost in a render target)
+  const target = new THREE.WebGLRenderTarget(width * ratio, height * ratio, { type: THREE.HalfFloatType, samples: 4 });
+  composer = new EffectComposer(renderer, target);
+  composer.setPixelRatio(ratio);
+  composer.setSize(width, height);
+  composer.addPass(new RenderPass(scene, camera));
+  outlinePass = new OutlinePass(new THREE.Vector2(width, height), scene, camera);
+  outlinePass.edgeStrength = 4;
+  outlinePass.edgeGlow = 0.6; // a little soft light around the line
+  outlinePass.edgeThickness = 1.5;
+  outlinePass.pulsePeriod = 0;
+  outlinePass.visibleEdgeColor.set("#4db173");
+  outlinePass.hiddenEdgeColor.set("#2e7a4f"); // the part behind other flowers, quieter
+  composer.addPass(outlinePass);
+  composer.addPass(new OutputPass());
+}
+
+function outlineTarget() {
   if (bouquetSelected.value || !selectedFlower.value) return null;
   return activePiece.value ? pieceObject() : placedObjects.get(selectedSceneId.value) || null;
 }
 
-function setGlow(object) {
-  if (glowing?.object === object) return;
-  clearGlow();
-  if (!object) return;
-  const mats = [];
-  object.traverse((child) => {
-    if (!child.isMesh || !child.material) return;
-    // Copies share one material per model: give this one its own, so only it glows (a card already has its own)
-    if (!child.userData.ownMaterial && !object.userData.isCard) {
-      child.material = Array.isArray(child.material) ? child.material.map((m) => m.clone()) : child.material.clone();
-      child.userData.ownMaterial = true;
-    }
-    for (const mat of [].concat(child.material)) {
-      if (mat.emissive) mats.push({ mat, emissive: mat.emissive.clone(), intensity: mat.emissiveIntensity ?? 1 });
-    }
-  });
-  // White paper barely shows a soft glow, so the card glows a little more
-  glowing = { object, mats, boost: object.userData.isCard ? 1.6 : 1 };
-}
-
-function clearGlow() {
-  glowing?.mats.forEach(({ mat, emissive, intensity }) => {
-    mat.emissive.copy(emissive);
-    mat.emissiveIntensity = intensity;
-  });
-  glowing = null;
-}
-
-function stepGlow(time) {
-  setGlow(glowTarget());
-  if (!glowing) return;
-  const level = reduceMotion ? (GLOW_LOW + GLOW_HIGH) / 2 : GLOW_LOW + (GLOW_HIGH - GLOW_LOW) * (0.5 + 0.5 * Math.sin(time / 500));
-  glowing.mats.forEach(({ mat }) => {
-    mat.emissive.copy(GLOW_COLOR);
-    mat.emissiveIntensity = level * glowing.boost;
-  });
-}
-
-function animateScene(time = 0) {
+function animateScene() {
   animationFrameId = window.requestAnimationFrame(animateScene);
-  stepGlow(time);
   if (hasTransformTarget.value) placeSelectionCard();
   else anchoredTo = null;
   groupBoxes.forEach((box) => box.update());
   stepCameraTween();
   controls?.update();
-  renderer?.render(scene, camera);
+  if (!renderer) return;
+  const outlined = outlineTarget();
+  if (outlined && composer) {
+    if (outlinePass.selectedObjects[0] !== outlined) outlinePass.selectedObjects = [outlined];
+    composer.render();
+  } else {
+    renderer.render(scene, camera);
+  }
 }
 
 function handleResize() {
@@ -3904,6 +3939,7 @@ function handleResize() {
   camera.aspect = viewerContainer.value.clientWidth / viewerContainer.value.clientHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(viewerContainer.value.clientWidth, viewerContainer.value.clientHeight);
+  composer?.setSize(viewerContainer.value.clientWidth, viewerContainer.value.clientHeight);
 }
 
 function cleanupScene() {
@@ -3912,6 +3948,10 @@ function cleanupScene() {
   gizmo?.detach();
   gizmo?.dispose();
   controls?.dispose();
+  composer?.dispose();
+  outlinePass?.dispose();
+  composer = null;
+  outlinePass = null;
   renderer?.dispose();
   if (renderer?.domElement && viewerContainer.value?.contains(renderer.domElement)) {
     viewerContainer.value.removeChild(renderer.domElement);
