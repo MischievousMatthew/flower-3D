@@ -664,7 +664,7 @@
             </span>
             <span class="conv-text">
               <span class="conv-name">{{ getSearchResultDisplayName(result) }}</span>
-              <span class="conv-preview">{{ result.email }}</span>
+              <span class="conv-preview">{{ isVendor ? result.email : result.location || "Flower shop" }}</span>
             </span>
           </button>
           <p v-if="searchedUsers.length === 0 && userSearchQuery" class="muted dialog-note">

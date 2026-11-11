@@ -717,6 +717,11 @@ class ChatController extends Controller
 
             $targetRole = $isVendorContext ? User::ROLE_CUSTOMER : User::ROLE_VENDOR;
 
+            // A customer looking for a shop finds it by its name, and sees only the shop
+            if (! $isVendorContext) {
+                return response()->json(['success' => true, 'vendors' => $this->searchShops(trim((string) $search))]);
+            }
+
             $matchingVendorEmails = [];
             if ($targetRole === User::ROLE_VENDOR && $search !== '') {
                 $matchingVendorEmails = VendorApplication::query()
@@ -951,6 +956,46 @@ class ChatController extends Controller
      * Use the same approved vendor-application record as CartController when
      * exposing a vendor's public store identity to customers.
      */
+    /**
+     * Shops a customer can start a chat with, matched on the shop's name.
+     * Only shop details go out (name, logo, address); never the owner's
+     * name, email or phone.
+     */
+    private function searchShops(string $search): \Illuminate\Support\Collection
+    {
+        if ($search === '') {
+            return collect();
+        }
+
+        $shops = VendorApplication::query()
+            ->where('status', 'approved')
+            ->where('store_name', 'like', '%' . addcslashes($search, '%_\\') . '%')
+            ->orderByRaw('store_name LIKE ? DESC', [addcslashes($search, '%_\\') . '%']) // names starting with it first
+            ->orderBy('store_name')
+            ->limit(20)
+            ->get();
+        if ($shops->isEmpty()) {
+            return collect();
+        }
+
+        $owners = User::where('role', User::ROLE_VENDOR)
+            ->where('is_verified', true)
+            ->whereIn('email', $shops->pluck('email')->filter())
+            ->pluck('id', 'email');
+
+        return $shops
+            ->filter(fn ($shop) => isset($owners[$shop->email]))
+            ->unique('email')
+            ->map(fn ($shop) => [
+                'id' => $owners[$shop->email],
+                'store_name' => $shop->store_name,
+                'display_name' => $shop->store_name,
+                'avatar' => $shop->store_logo_url,
+                'location' => $shop->store_address ?: null,
+            ])
+            ->values();
+    }
+
     private function resolveVendorApplication(User $user): ?VendorApplication
     {
         return VendorApplication::query()
