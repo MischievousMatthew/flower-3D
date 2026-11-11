@@ -380,7 +380,22 @@
               Tips, trends, and stories from the world of flowers
             </p>
           </div>
-          <ul class="journal-list">
+          <!-- Loading: skeleton rows in the same shape -->
+          <ul v-if="!site.loaded" class="journal-list" aria-label="Loading journal posts">
+            <li v-for="n in 3" :key="n" class="journal-row journal-row--skeleton">
+              <span class="bc-skeleton journal-skel-index"></span>
+              <span class="bc-skeleton journal-skel-category"></span>
+              <span class="bc-skeleton journal-skel-title"></span>
+            </li>
+          </ul>
+
+          <!-- Nothing published yet -->
+          <div v-else-if="!blogPosts.length" class="journal-empty">
+            <p>New stories are on the way. Check the journal soon for flower care tips, seasonal guides and stories from our florists.</p>
+            <router-link to="/journal" class="bc-link">Visit the journal</router-link>
+          </div>
+
+          <ul v-else class="journal-list">
             <li v-for="(post, i) in blogPosts" :key="post.id">
               <a :href="post.slug ? `/journal/${post.slug}` : '/journal'" class="journal-row" @click.prevent="readBlog(post)">
                 <span class="journal-index">{{
@@ -785,15 +800,10 @@ const features = ref([
 
 // Website content from Admin → Website (falls back to the original copy)
 const { site } = useSiteContent();
-const PLACEHOLDER_POSTS = [
-  { id: 1, title: "Seasonal Flower Guide for Spring", category: "Seasonal guide" },
-  { id: 2, title: "How to Care for Your Custom Bouquet", category: "Flower care" },
-  { id: 3, title: "Meet Our Featured Vendor: Petal & Co", category: "Vendor stories" },
-];
+// The journal's live posts: one from each of up to three categories, picked
+// by the server (Article::teasers). Only what's published shows; no stand-ins.
 const blogPosts = computed(() =>
-  site.articles.length
-    ? site.articles.map((a) => ({ id: a.id, slug: a.slug, title: a.title, category: a.category_label }))
-    : PLACEHOLDER_POSTS,
+  (site.articles || []).slice(0, 3).map((a) => ({ id: a.id, slug: a.slug, title: a.title, category: a.category_label })),
 );
 const footerAbout = computed(
   () =>
@@ -2500,6 +2510,38 @@ onBeforeUnmount(() => {
   list-style: none;
   margin-top: 80px;
   border-top: 1px solid var(--line);
+}
+
+.journal-row--skeleton {
+  pointer-events: none;
+}
+
+.journal-skel-index {
+  width: 32px;
+  height: 14px;
+}
+
+.journal-skel-category {
+  width: 120px;
+  height: 14px;
+}
+
+.journal-skel-title {
+  width: min(520px, 100%);
+  height: 34px;
+}
+
+.journal-empty {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+  max-width: 560px;
+  margin-top: 80px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.7;
 }
 
 .journal-row {

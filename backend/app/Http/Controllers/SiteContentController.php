@@ -34,7 +34,8 @@ class SiteContentController extends Controller
                 ]),
                 'announcements' => $showing->where('kind', Announcement::ANNOUNCEMENT)->map->only($publicFields)->values(),
                 'promotions' => $showing->where('kind', Announcement::PROMOTION)->map->only($publicFields)->values(),
-                'articles' => Article::published()->orderByDesc('is_featured')->latest('published_at')->limit(3)->get()
+                // One post from each of up to three categories (see Article::teasers)
+                'articles' => Article::teasers(3)
                     ->map(fn ($a) => $this->card($a)),
                 'categories' => $this->taxonomyWithCounts(ProductTaxonomy::CATEGORY),
                 'occasions' => $this->taxonomyWithCounts(ProductTaxonomy::OCCASION),
