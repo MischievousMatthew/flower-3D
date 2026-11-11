@@ -95,13 +95,15 @@ class CustomerProductController extends Controller
             if ($request->filled('search')) {
                 $words = array_slice(preg_split('/\s+/u', trim((string) $request->search), -1, PREG_SPLIT_NO_EMPTY) ?: [], 0, 6);
                 foreach ($words as $word) {
-                    // % and _ typed by the customer are matched literally
-                    $like = '%' . addcslashes($word, '%_\\') . '%';
+                    // % and _ typed by the customer are matched literally; lower case on
+                    // both sides, since PostgreSQL's LIKE cares about capitals
+                    $like = '%' . addcslashes(mb_strtolower($word), '%_\\') . '%';
                     $query->where(function ($q) use ($like) {
-                        $q->where('product_name', 'like', $like)
-                            ->orWhere('category', 'like', $like)
-                            ->orWhere('color', 'like', $like)
-                            ->orWhere('flower_type', 'like', $like);
+                        $q->whereRaw('LOWER(product_name) LIKE ?', [$like])
+                            ->orWhereRaw('LOWER(category) LIKE ?', [$like])
+                            ->orWhereRaw('LOWER(color) LIKE ?', [$like])
+                            ->orWhereRaw('LOWER(flower_type) LIKE ?', [$like])
+                            ->orWhereRaw('LOWER(CAST(occasion_tags AS TEXT)) LIKE ?', [$like]);
                     });
                 }
             }

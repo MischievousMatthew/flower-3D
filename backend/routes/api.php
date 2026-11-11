@@ -162,6 +162,9 @@ Route::prefix('customer')->group(function () {
     Route::get('/product-models/{filename}',    [CustomerProductController::class, 'serveModel']);
     Route::get('/availability',                 [ReservationController::class, 'getAvailability']);
     Route::post('/check-date',                  [ReservationController::class, 'checkDateAvailability']);
+    // Shop search bar: popular searches, and counting searches that found flowers
+    Route::get('/search/popular',               [\App\Http\Controllers\Customer\ShopSearchController::class, 'popular']);
+    Route::post('/search/log',                  [\App\Http\Controllers\Customer\ShopSearchController::class, 'log'])->middleware('throttle:30,1');
 });
 
 // ── Public vendor storefront ──────────────────────────────────────────────

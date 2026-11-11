@@ -114,22 +114,17 @@
               <span class="fresh-count" v-if="!isLoading">{{ pagination.total }} {{ pagination.total === 1 ? "flower" : "flowers" }}</span>
             </div>
             <div class="fresh-tools">
-              <label class="fresh-search">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
-                <input
-                  v-model="searchInput"
-                  type="search"
-                  inputmode="search"
-                  enterkeyhint="search"
-                  maxlength="100"
-                  placeholder="Search roses, tulips, red…"
-                  aria-label="Search flowers"
-                  @keydown.enter.prevent="applySearch"
-                />
-                <button v-if="searchInput" type="button" class="fresh-search-clear" aria-label="Clear search" @click="clearSearch">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
-                </button>
-              </label>
+              <!-- Suggestions as you type: flowers, flower names, occasions, colours;
+                   popular searches and recently viewed when it's empty -->
+              <ShopSearch
+                v-model="searchInput"
+                :flowers="searchFlowers"
+                :occasions="searchOccasions"
+                :colors="searchColors"
+                @submit="applySearch"
+                @clear="clearSearch"
+                @pick="onSearchPick"
+              />
               <label class="fresh-sort">
                 <span>Sort</span>
                 <select v-model="sortBy" aria-label="Sort flowers" @change="onSortChange">
@@ -233,6 +228,7 @@ import ShopHero from "../../components/shop/ShopHero.vue";
 import ShopTrustStrip from "../../components/shop/ShopTrustStrip.vue";
 import ShopOccasions from "../../components/shop/ShopOccasions.vue";
 import ShopProductTile from "../../components/shop/ShopProductTile.vue";
+import ShopSearch from "../../components/shop/ShopSearch.vue";
 import BouquetFinder from "../../components/shop/BouquetFinder.vue";
 import FeaturedShops from "../../components/shop/FeaturedShops.vue";
 import DesignerShopPicker from "../../components/shop/DesignerShopPicker.vue";
@@ -704,6 +700,47 @@ function clearSearch() {
   searchInput.value = "";
   applySearch();
 }
+
+// ── Search suggestions ───────────────────────────────────────────────────
+const titleWords = (s) => String(s).replace(/[-_]/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+const searchFlowers = computed(() =>
+  (filterOptions.value.categories || []).map((v) => ({
+    value: v,
+    label: filterOptions.value.labels?.categories?.[v] || site.categories.find((c) => c.value === v)?.label || titleWords(v),
+  })),
+);
+const searchOccasions = computed(() =>
+  (filterOptions.value.occasions || []).map((v) => ({ value: v, label: filterOptions.value.labels?.occasions?.[v] || titleWords(v) })),
+);
+const searchColors = computed(() => (filterOptions.value.colors || []).map((v) => ({ value: v, label: titleWords(v) })));
+
+/** A suggestion was picked: open the flower, or show the shop filtered by it */
+function onSearchPick(item) {
+  if (item.type === "product") return openProductModal(item.product);
+  if (item.type === "term") {
+    searchInput.value = item.value;
+    applySearch();
+    return;
+  }
+  const key = { flower: "category", occasion: "occasion", color: "color" }[item.type];
+  if (!key) return;
+  clearTimeout(searchTimer);
+  searchInput.value = "";
+  activeSearch.value = "";
+  selectedFilters.value[key] = [item.value];
+  pagination.value.current_page = 1;
+  fetchProducts();
+  document.getElementById("products")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Searches that found flowers are counted (once per visit) for "Popular searches"
+const countedSearches = new Set();
+watch(isLoading, (loading) => {
+  const term = activeSearch.value.trim().toLowerCase();
+  if (loading || !term || term.length < 2 || countedSearches.has(term) || !(pagination.value.total > 0)) return;
+  countedSearches.add(term);
+  api.post("customer/search/log", { term }).catch(() => {});
+});
 watch(searchInput, () => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(applySearch, 350);
@@ -1347,80 +1384,9 @@ onUnmounted(() => {
   margin: -4px 0 16px;
 }
 
-.fresh-search {
-  position: relative;
-  display: flex;
-  flex: 1 1 260px;
-  align-items: center;
-  max-width: 420px;
-}
-
-.fresh-search > svg {
-  position: absolute;
-  left: 14px;
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: var(--ink-soft);
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  pointer-events: none;
-}
-
-.fresh-search input {
-  width: 100%;
-  min-height: 44px;
-  padding: 0 42px 0 42px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #fff;
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
-  appearance: none;
-}
-
-.fresh-search input::-webkit-search-cancel-button {
-  display: none;
-}
-
-.fresh-search input::placeholder {
-  color: var(--ink-soft);
-}
-
-.fresh-search input:focus-visible,
 .fresh-sort select:focus-visible {
   outline: 2px solid var(--leaf);
   outline-offset: 2px;
-}
-
-.fresh-search-clear {
-  position: absolute;
-  right: 6px;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: var(--ink-soft);
-  cursor: pointer;
-}
-
-.fresh-search-clear:hover {
-  background: var(--ivory);
-  color: var(--ink);
-}
-
-.fresh-search-clear svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
 }
 
 .fresh-sort {
