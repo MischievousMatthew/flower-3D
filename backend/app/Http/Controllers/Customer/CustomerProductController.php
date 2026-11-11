@@ -552,6 +552,100 @@ SQL;
     }
 
     /**
+     * GET /api/customer/recommendations?exclude={id}&category={c}&limit=5
+     *
+     * "You may like", from the customer's own "Flowers you love": favourite
+     * flowers count most, then colours and occasions; anything on their
+     * "please avoid" list never shows. Guests, and customers who haven't
+     * said what they like, get the same category's popular flowers instead
+     * (personalized: false), with their avoid list still respected.
+     */
+    public function recommendations(Request $request)
+    {
+        $limit = min(12, max(1, (int) $request->input('limit', 5)));
+        $exclude = (int) $request->input('exclude', 0);
+        $category = (string) $request->input('category', '');
+
+        $user = auth('sanctum')->user();
+        $pref = $user instanceof \App\Models\User ? \App\Models\CustomerPreference::find($user->id) : null;
+        $words = fn ($list) => collect(is_array($list) ? $list : [])->map(fn ($w) => $this->stem($w))->filter()->unique()->values();
+        $likes = ['flowers' => $words($pref?->flowers), 'colors' => $words($pref?->colors), 'occasions' => $words($pref?->occasions)];
+        $avoid = $words($pref?->avoid);
+        $hasLikes = $likes['flowers']->isNotEmpty() || $likes['colors']->isNotEmpty() || $likes['occasions']->isNotEmpty();
+
+        try {
+            $products = Product::listedForCustomers()->where('status', 'active')
+                ->whereIn('selling_type', ['per_piece', 'bouquet'])
+                ->where('quantity_in_stock', '>', 0)
+                ->when($exclude, fn ($q) => $q->where('id', '!=', $exclude))
+                ->with(['primaryImage', 'images', 'models', 'owner'])
+                ->latest()
+                ->limit(300)
+                ->get();
+
+            $scored = $products->map(function (Product $p) use ($likes, $avoid, $category) {
+                $text = $this->stem(implode(' ', [
+                    $p->product_name, $p->category, $p->flower_type,
+                    collect($p->composition ?? [])->pluck('flower')->implode(' '),
+                ]));
+                if ($avoid->contains(fn ($w) => str_contains($text, $w))) {
+                    return null; // never something they asked to avoid
+                }
+                $colors = $this->stem(implode(' ', [$p->color, collect($p->color_options ?? [])->map(fn ($c) => is_array($c) ? ($c['name'] ?? '') : $c)->implode(' ')]));
+                $occasions = $this->stem(implode(' ', $p->occasion_tags ?? []));
+
+                $score = 3 * $likes['flowers']->filter(fn ($w) => str_contains($text, $w))->count()
+                    + 2 * $likes['colors']->filter(fn ($w) => str_contains($colors, $w))->count()
+                    + 2 * $likes['occasions']->filter(fn ($w) => str_contains($occasions, $w))->count();
+
+                return ['product' => $p, 'score' => $score, 'same' => $category !== '' && $p->category === $category];
+            })->filter();
+
+            // Their likes first; then (or for guests) the same category, then the rest
+            $picked = $scored->filter(fn ($s) => $s['score'] > 0)->sortByDesc('score')->take($limit);
+            $personalized = $hasLikes && $picked->isNotEmpty();
+            if ($picked->count() < $limit) {
+                $more = $scored->reject(fn ($s) => $picked->contains(fn ($x) => $x['product']->id === $s['product']->id))
+                    ->sortByDesc(fn ($s) => (int) $s['same'])
+                    ->take($limit - $picked->count());
+                $picked = $picked->concat($more);
+            }
+            $list = $picked->pluck('product')->values();
+
+            $stats = $this->loadProductStats($list->pluck('id')->all());
+            $vendors = $this->loadVendorNames($list->pluck('owner.email')->filter()->unique()->all());
+
+            return response()->json([
+                'success' => true,
+                'personalized' => $personalized,
+                'data' => $list->map(fn ($p) => $this->formatProduct($p, $stats[$p->id] ?? null, $vendors[$p->owner->email ?? ''] ?? null))
+                    // Which ones came from their likes (they get the YOU MAY LIKE tag)
+                    ->map(fn ($row, $i) => $row + ['for_you' => $personalized && $i < $picked->filter(fn ($s) => $s['score'] > 0)->count()])
+                    ->values(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('CustomerProductController@recommendations: ' . $e->getMessage());
+            return response()->json(['success' => true, 'personalized' => false, 'data' => []]);
+        }
+    }
+
+    /** Lower case, plurals made singular, so "Roses" matches "rose" and "Lilies" matches "lily" */
+    private function stem($text): string
+    {
+        $words = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower((string) $text), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        return implode(' ', array_map(function ($w) {
+            if (mb_strlen($w) > 4 && str_ends_with($w, 'ies')) {
+                return mb_substr($w, 0, -3) . 'y';
+            }
+            if (mb_strlen($w) > 3 && str_ends_with($w, 's') && ! str_ends_with($w, 'ss')) {
+                return mb_substr($w, 0, -1);
+            }
+            return $w;
+        }, $words));
+    }
+
+    /**
      * GET /api/customer/product-tags/order: the admin's tag ranking, so a shop
      * card can also rank the tags it adds itself (You may like, Recently viewed)
      */

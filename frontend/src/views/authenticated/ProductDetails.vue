@@ -386,7 +386,17 @@
         <!-- ── You may also like ────────────────────────────────────── -->
         <section v-if="loadingRelated || related.length" class="pd-row" aria-labelledby="pd-related-title" :aria-busy="loadingRelated && !related.length">
           <div class="pd-row-head">
-            <h2 id="pd-related-title">You may also like</h2>
+            <div>
+              <h2 id="pd-related-title">{{ forYou ? "You may like" : "You may also like" }}</h2>
+              <!-- Personal picks come from the customer's "Flowers you love" -->
+              <p v-if="forYou" class="pd-row-sub">
+                Picked from the flowers you love.
+                <router-link :to="{ name: 'Profile', hash: '#pf-preferences' }">Change what you like</router-link>
+              </p>
+              <p v-else-if="isAuthenticated && !loadingRelated" class="pd-row-sub">
+                <router-link :to="{ name: 'Profile', hash: '#pf-preferences' }">Tell us the flowers you love</router-link> for picks made for you.
+              </p>
+            </div>
             <router-link :to="{ name: 'Shop', query: { section: 'products' } }" class="pd-viewall">View all <span aria-hidden="true">→</span></router-link>
           </div>
           <div v-if="!related.length" class="pd-grid" aria-label="Loading suggestions">
@@ -401,7 +411,7 @@
               v-for="item in related"
               :key="item.id"
               :product="item"
-              context-tag="you_may_like"
+              :context-tag="item.for_you ? 'you_may_like' : ''"
               :adding="addingRelatedId === item.id"
               @open="openProduct"
               @add="addRelated"
@@ -505,6 +515,7 @@ const product = ref(null);
 const loading = ref(true);
 const related = ref([]);
 const loadingRelated = ref(false); // "You may also like" shows skeleton tiles until it arrives
+const forYou = ref(false); // the row was picked from the customer's "Flowers you love"
 const recent = ref([]);
 const active = ref(0);
 const show3D = ref(false);
@@ -796,7 +807,32 @@ async function loadRelated() {
   }
 }
 
+/**
+ * "You may like": picked from the customer's "Flowers you love" (never what
+ * they asked to avoid). Guests and customers who haven't said get similar
+ * flowers; if that can't load, the older same-category list below.
+ */
 async function fillRelated(id) {
+  forYou.value = false;
+  try {
+    const { data } = await api.get("customer/recommendations", {
+      params: { exclude: id, category: product.value.category || "", limit: 5 },
+    });
+    const list = Array.isArray(data?.data) ? data.data : [];
+    if (list.length) {
+      if (product.value?.id === id) {
+        related.value = list;
+        forYou.value = !!data.personalized;
+      }
+      return;
+    }
+  } catch {
+    // fall back to the same-category list
+  }
+  await fillSimilar(id);
+}
+
+async function fillSimilar(id) {
   const pick = (list) => (Array.isArray(list) ? list : []).filter((p) => p.id !== id);
   const fetchList = async (params) => {
     try {
@@ -1968,6 +2004,17 @@ watch(
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(24px, 2.4vw, 30px);
+  font-weight: 500;
+}
+
+.pd-row-sub {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.pd-row-sub a {
+  color: var(--leaf-deep);
   font-weight: 500;
 }
 

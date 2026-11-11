@@ -1245,7 +1245,12 @@ const completeness = computed(() => {
 onMounted(async () => {
   await fetchUserProfile();
   renderLocationMap(); // the map container exists once the loading skeleton is gone
-  nextTick(watchSections);
+  nextTick(() => {
+    watchSections();
+    // A link to one part of the profile (e.g. "Flowers you love" from a product page)
+    const id = decodeURIComponent((window.location.hash || "").slice(1));
+    if (/^pf-[a-z-]+$/.test(id) && document.getElementById(id)) goToSection(id);
+  });
 });
 </script>
 
