@@ -3845,7 +3845,7 @@ let glowing = null; // { object, mats: [{ mat, emissive, intensity }] }
 const reduceMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 function glowTarget() {
-  if (bouquetSelected.value || !selectedFlower.value || isCard(selectedFlower.value)) return null;
+  if (bouquetSelected.value || !selectedFlower.value) return null;
   return activePiece.value ? pieceObject() : placedObjects.get(selectedSceneId.value) || null;
 }
 
@@ -3856,8 +3856,8 @@ function setGlow(object) {
   const mats = [];
   object.traverse((child) => {
     if (!child.isMesh || !child.material) return;
-    // Copies share one material per model: give this one its own, so only it glows
-    if (!child.userData.ownMaterial) {
+    // Copies share one material per model: give this one its own, so only it glows (a card already has its own)
+    if (!child.userData.ownMaterial && !object.userData.isCard) {
       child.material = Array.isArray(child.material) ? child.material.map((m) => m.clone()) : child.material.clone();
       child.userData.ownMaterial = true;
     }
@@ -3865,7 +3865,8 @@ function setGlow(object) {
       if (mat.emissive) mats.push({ mat, emissive: mat.emissive.clone(), intensity: mat.emissiveIntensity ?? 1 });
     }
   });
-  glowing = { object, mats };
+  // White paper barely shows a soft glow, so the card glows a little more
+  glowing = { object, mats, boost: object.userData.isCard ? 1.6 : 1 };
 }
 
 function clearGlow() {
@@ -3882,7 +3883,7 @@ function stepGlow(time) {
   const level = reduceMotion ? (GLOW_LOW + GLOW_HIGH) / 2 : GLOW_LOW + (GLOW_HIGH - GLOW_LOW) * (0.5 + 0.5 * Math.sin(time / 500));
   glowing.mats.forEach(({ mat }) => {
     mat.emissive.copy(GLOW_COLOR);
-    mat.emissiveIntensity = level;
+    mat.emissiveIntensity = level * glowing.boost;
   });
 }
 
