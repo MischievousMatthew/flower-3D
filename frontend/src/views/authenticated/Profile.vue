@@ -5,457 +5,382 @@
     :isAuthenticated="isAuthenticated"
     @scroll-to-section="scrollToSection"
   />
-  <div class="profile-page bc-theme">
-    <main class="bc-container profile-container">
-      <!-- Skeleton while the profile loads -->
-      <template v-if="isLoading">
-        <div class="profile-header" aria-label="Loading your profile">
-          <div class="profile-info">
-            <span class="bc-skeleton skeleton-avatar"></span>
-            <div class="skeleton-lines">
-              <span class="bc-skeleton skeleton-line skeleton-line--label"></span>
-              <span class="bc-skeleton skeleton-line skeleton-line--name"></span>
-              <span class="bc-skeleton skeleton-line skeleton-line--short"></span>
-            </div>
-          </div>
-        </div>
-        <section class="profile-card">
-          <span class="bc-skeleton skeleton-line skeleton-line--title"></span>
-          <div class="details-grid">
-            <div v-for="n in 8" :key="n" class="detail-item">
-              <span class="bc-skeleton skeleton-icon"></span>
-              <div class="skeleton-lines">
-                <span class="bc-skeleton skeleton-line skeleton-line--label"></span>
-                <span class="bc-skeleton skeleton-line"></span>
-              </div>
-            </div>
-          </div>
-        </section>
-      </template>
+  <div class="pf-page bc-theme" :class="{ editing: isEditing }">
+    <!-- ── Hero: photo, name, account chips ─────────────────────────────── -->
+    <section class="pf-hero" aria-label="Your account">
+      <div class="pf-wrap pf-hero__inner">
+        <template v-if="isLoading">
+          <span class="bc-skeleton pf-skel-avatar"></span>
+          <span class="pf-skel-lines">
+            <span class="bc-skeleton pf-skel-line w30"></span>
+            <span class="bc-skeleton pf-skel-line w60 tall"></span>
+            <span class="bc-skeleton pf-skel-line w40"></span>
+          </span>
+        </template>
 
-      <template v-else>
-        <!-- Profile header -->
-        <header class="profile-header">
-          <div class="profile-info">
-            <div class="avatar-wrapper">
-              <img
-                v-if="user.profile_picture"
-                :src="user.profile_picture"
-                :alt="user.name"
-                class="avatar"
-                @error="handleImageError"
-              />
-              <div v-else class="avatar avatar-placeholder">
-                {{ getInitials(user.name, user.surname) }}
-              </div>
-              <input
-                type="file"
-                ref="fileInput"
-                accept="image/*"
-                @change="handleProfilePictureUpload"
-                class="file-input"
-                style="display: none"
-              />
-              <button
-                v-if="isEditing"
-                class="btn-change-photo"
-                @click="triggerFileInput"
-              >
-                Change photo
-              </button>
-            </div>
-            <div class="user-details">
-              <p class="bc-label">Your account</p>
-              <h1 class="user-name">
-                {{ user.name }} <em>{{ user.surname }}</em>
-              </h1>
-              <p class="user-meta">
-                <span>Member since {{ formatDate(user.created_at) }}</span>
-                <span v-if="user.is_verified" class="verified-badge">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="m5 12.5 4.5 4.5L19 7.5" />
-                  </svg>
-                  Verified profile
-                </span>
-              </p>
-            </div>
-          </div>
-          <button
-            class="bc-btn"
-            :class="isEditing ? 'profile-btn-outline' : 'bc-btn--dark'"
-            @click="toggleEditMode"
-          >
-            {{ isEditing ? "Cancel editing" : "Edit profile" }}
-          </button>
-        </header>
-
-        <!-- Profile details -->
-        <section class="profile-card" aria-labelledby="details-title">
-          <div class="section-header">
-            <h2 id="details-title">Profile <em>details</em></h2>
-            <button v-if="!isEditing" class="bc-link btn-edit" @click="toggleEditMode">
-              Edit
+        <template v-else>
+          <div class="pf-avatar">
+            <img v-if="user.profile_picture" :src="user.profile_picture" :alt="`${user.name} ${user.surname}`" @error="handleImageError" />
+            <span v-else class="pf-avatar__initials" aria-hidden="true">{{ getInitials(user.name, user.surname) }}</span>
+            <input ref="fileInput" type="file" accept="image/*" class="pf-hidden" @change="handleProfilePictureUpload" />
+            <button type="button" class="pf-avatar__edit" aria-label="Change profile photo" title="Change photo" @click="triggerFileInput">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
             </button>
           </div>
 
-          <div class="details-grid">
-            <!-- Full Name -->
-            <div class="detail-item">
-              <span class="detail-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>
-              </span>
-              <div class="detail-content">
-                <label :for="isEditing ? 'pf-name' : undefined">Full name</label>
-                <div v-if="isEditing" class="name-fields">
-                  <input
-                    id="pf-name"
-                    v-model="editData.name"
-                    type="text"
-                    class="input-field"
-                    placeholder="First Name"
-                  />
-                  <input
-                    v-model="editData.surname"
-                    type="text"
-                    class="input-field"
-                    placeholder="Last Name"
-                    aria-label="Last name"
-                  />
-                </div>
-                <span v-else class="detail-value"
-                  >{{ user.name }} {{ user.surname }}</span
-                >
+          <div class="pf-identity">
+            <p class="bc-label">Your account</p>
+            <h1 class="pf-name">{{ user.name }} <em>{{ user.surname }}</em></h1>
+            <p v-if="user.username" class="pf-handle">@{{ user.username }}</p>
+            <ul class="pf-chips">
+              <li>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></svg>
+                Member since {{ formatDate(user.created_at) }}
+              </li>
+              <li v-if="user.is_verified" class="ok">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z" /><path d="m9 12 2 2 4-4" /></svg>
+                Verified profile
+              </li>
+              <li v-if="user.email_verified_at" class="ok">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
+                Email verified
+              </li>
+            </ul>
+          </div>
+
+          <div class="pf-hero__actions">
+            <button v-if="!isEditing" type="button" class="pf-btn pf-btn--primary" @click="toggleEditMode">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4Z" /><path d="m13.5 6.5 4 4" /></svg>
+              Edit profile
+            </button>
+            <span v-else class="pf-editing-pill" role="status">
+              <i aria-hidden="true"></i>
+              Editing your profile
+            </span>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <div class="pf-wrap pf-layout">
+      <!-- ── Side menu ──────────────────────────────────────────────────── -->
+      <aside class="pf-side" aria-label="Profile sections">
+        <nav class="pf-menu">
+          <a
+            v-for="s in sections"
+            :key="s.id"
+            :href="`#${s.id}`"
+            class="pf-menu__link"
+            :class="{ on: activeSection === s.id }"
+            :aria-current="activeSection === s.id ? 'true' : undefined"
+            @click.prevent="goToSection(s.id)"
+          >
+            <span class="pf-menu__ico" aria-hidden="true" v-html="s.icon"></span>
+            {{ s.label }}
+          </a>
+        </nav>
+
+        <div v-if="!isLoading" class="pf-meter">
+          <div class="pf-meter__top">
+            <strong>Profile {{ completeness.percent }}% complete</strong>
+          </div>
+          <div class="pf-meter__track" role="progressbar" :aria-valuenow="completeness.percent" aria-valuemin="0" aria-valuemax="100" aria-label="Profile complete">
+            <span :style="{ width: `${completeness.percent}%` }"></span>
+          </div>
+          <p v-if="completeness.missing.length">Add your {{ completeness.missing.slice(0, 2).join(" and ") }} so shops can deliver without asking.</p>
+          <p v-else>Everything's filled in. Shops have what they need.</p>
+        </div>
+      </aside>
+
+      <main class="pf-main">
+        <!-- Loading -->
+        <template v-if="isLoading">
+          <section class="pf-card" aria-label="Loading your profile">
+            <span class="bc-skeleton pf-skel-line w30 tall"></span>
+            <div class="pf-tiles">
+              <div v-for="n in 6" :key="n" class="pf-tile">
+                <span class="bc-skeleton pf-skel-ico"></span>
+                <span class="pf-skel-lines">
+                  <span class="bc-skeleton pf-skel-line w40"></span>
+                  <span class="bc-skeleton pf-skel-line w60"></span>
+                </span>
               </div>
             </div>
+          </section>
+        </template>
 
-            <!-- Email -->
-            <div class="detail-item">
-              <span class="detail-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
-              </span>
-              <div class="detail-content">
+        <template v-else>
+          <!-- ── Personal info ──────────────────────────────────────────── -->
+          <section id="pf-personal" class="pf-card" aria-labelledby="pf-personal-title">
+            <header class="pf-card__head">
+              <div>
+                <h2 id="pf-personal-title">Personal <em>info</em></h2>
+                <p>How shops know you and reach you.</p>
+              </div>
+              <button v-if="!isEditing" type="button" class="pf-btn pf-btn--ghost" @click="toggleEditMode">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4Z" /><path d="m13.5 6.5 4 4" /></svg>
+                Edit
+              </button>
+            </header>
+
+            <!-- Reading -->
+            <dl v-if="!isEditing" class="pf-tiles">
+              <div v-for="row in infoRows" :key="row.label" class="pf-tile">
+                <span class="pf-tile__ico" aria-hidden="true" v-html="row.icon"></span>
+                <span class="pf-tile__body">
+                  <dt>{{ row.label }}</dt>
+                  <dd :class="{ empty: !row.value }">
+                    {{ row.value || "Not added yet" }}
+                    <span v-if="row.badge" class="pf-badge">{{ row.badge }}</span>
+                  </dd>
+                </span>
+              </div>
+            </dl>
+
+            <!-- Editing -->
+            <div v-else class="pf-form">
+              <div class="pf-field">
+                <label for="pf-name">First name</label>
+                <input id="pf-name" v-model="editData.name" type="text" class="pf-input" autocomplete="given-name" />
+              </div>
+              <div class="pf-field">
+                <label for="pf-surname">Last name</label>
+                <input id="pf-surname" v-model="editData.surname" type="text" class="pf-input" autocomplete="family-name" />
+              </div>
+              <div class="pf-field">
+                <label for="pf-username">Username</label>
+                <input id="pf-username" v-model="editData.username" type="text" class="pf-input" autocomplete="username" />
+              </div>
+              <div class="pf-field">
                 <label>Email</label>
-                <div class="value-with-badge">
-                  <span class="detail-value">{{ user.email }}</span>
-                  <span v-if="user.email_verified_at" class="badge verified"
-                    >Verified</span
-                  >
-                </div>
+                <p class="pf-locked">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+                  {{ user.email }}
+                </p>
               </div>
-            </div>
-
-            <!-- Date of Birth -->
-            <div class="detail-item">
-              <span class="detail-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></svg>
-              </span>
-              <div class="detail-content">
-                <label :for="isEditing ? 'pf-dob' : undefined">Date of birth</label>
-                <!-- max enforces the 18+ rule -->
-                <input
-                  v-if="isEditing"
-                  id="pf-dob"
-                  v-model="editData.date_of_birth"
-                  type="date"
-                  class="input-field"
-                  :max="maxBirthDate"
-                />
-                <span v-else class="detail-value">{{
-                  formatDate(user.date_of_birth) || "-"
-                }}</span>
-              </div>
-            </div>
-
-            <!-- Username -->
-            <div class="detail-item">
-              <span class="detail-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.5 7.1" /></svg>
-              </span>
-              <div class="detail-content">
-                <label :for="isEditing ? 'pf-username' : undefined">Username</label>
-                <input
-                  v-if="isEditing"
-                  id="pf-username"
-                  v-model="editData.username"
-                  type="text"
-                  class="input-field"
-                  placeholder="Username"
-                />
-                <span v-else class="detail-value">{{
-                  user.username || "-"
-                }}</span>
-              </div>
-            </div>
-
-            <!-- Contact number -->
-            <div class="detail-item">
-              <span class="detail-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.5" /><path d="M11 18h2" /></svg>
-              </span>
-              <div class="detail-content">
-                <label :for="isEditing ? 'pf-number' : undefined">Number</label>
+              <div class="pf-field">
+                <label for="pf-number">Mobile number</label>
                 <!-- Types as 09XX XXX XXXX -->
                 <input
-                  v-if="isEditing"
                   id="pf-number"
                   v-model="editData.contact_number"
                   v-phone
                   type="tel"
-                  class="input-field"
-                  :class="{ 'input-error': contactNumberError }"
+                  class="pf-input"
+                  :class="{ bad: contactNumberError }"
+                  autocomplete="tel"
+                  :aria-invalid="contactNumberError ? 'true' : 'false'"
+                  :aria-describedby="contactNumberError ? 'pf-number-error' : undefined"
                 />
-                <span v-if="isEditing && contactNumberError" class="field-error">
-                  {{ contactNumberError }}
-                </span>
-                <span v-else-if="!isEditing" class="detail-value">{{
-                  user.contact_number || "-"
-                }}</span>
+                <span v-if="contactNumberError" id="pf-number-error" class="pf-error">{{ contactNumberError }}</span>
               </div>
-            </div>
-
-            <!-- Gender -->
-            <div class="detail-item">
-              <span class="detail-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /></svg>
-              </span>
-              <div class="detail-content">
-                <label :for="isEditing ? 'pf-gender' : undefined">Gender</label>
-                <select
-                  v-if="isEditing"
-                  id="pf-gender"
-                  v-model="editData.gender"
-                  class="input-field"
-                >
-                  <option value="">Select Gender</option>
+              <div class="pf-field">
+                <label for="pf-dob">Date of birth</label>
+                <!-- max enforces the 18+ rule -->
+                <input id="pf-dob" v-model="editData.date_of_birth" type="date" class="pf-input" :max="maxBirthDate" autocomplete="bday" />
+              </div>
+              <div class="pf-field">
+                <label for="pf-gender">Gender</label>
+                <select id="pf-gender" v-model="editData.gender" class="pf-input">
+                  <option value="">Prefer not to say</option>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                   <option value="Other">Other</option>
                 </select>
-                <span v-else class="detail-value">{{ user.gender || "-" }}</span>
+              </div>
+              <div class="pf-field">
+                <label for="pf-nationality">Nationality</label>
+                <input id="pf-nationality" v-model="editData.nationality" type="text" class="pf-input" placeholder="e.g. Filipino" />
               </div>
             </div>
+          </section>
 
-            <!-- Nationality -->
-            <div class="detail-item">
-              <span class="detail-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5a13 13 0 0 1 0 17M12 3.5a13 13 0 0 0 0 17" /></svg>
-              </span>
-              <div class="detail-content">
-                <label :for="isEditing ? 'pf-nationality' : undefined">Nationality</label>
-                <input
-                  v-if="isEditing"
-                  id="pf-nationality"
-                  v-model="editData.nationality"
-                  type="text"
-                  class="input-field"
-                  placeholder="Nationality"
-                />
-                <span v-else class="detail-value">{{
-                  user.nationality || "-"
-                }}</span>
+          <!-- ── Delivery address ───────────────────────────────────────── -->
+          <section id="pf-address" class="pf-card" aria-labelledby="pf-address-title">
+            <header class="pf-card__head">
+              <div>
+                <h2 id="pf-address-title">Delivery <em>address</em></h2>
+                <p>
+                  {{
+                    isEditing
+                      ? "Click the map or drag the pin to where your flowers should arrive, anywhere in Cavite or Metro Manila. Region, city and postal code fill in from the pin."
+                      : "Where your flowers are delivered."
+                  }}
+                </p>
               </div>
-            </div>
+              <button v-if="!isEditing" type="button" class="pf-btn pf-btn--ghost" @click="toggleEditMode">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
+                {{ hasSavedPin ? "Move pin" : "Add pin" }}
+              </button>
+            </header>
 
-          </div>
-
-          <!-- Delivery location: pin on the map fills region, city and postal code -->
-          <div class="location-block" aria-labelledby="location-title">
-            <div class="location-head">
-              <h3 id="location-title">Delivery location</h3>
-              <p>
-                {{
-                  isEditing
-                    ? "Click the map or drag the pin to where your flowers should arrive, anywhere in Cavite or Metro Manila. Region, city and postal code fill in from the pin."
-                    : "Where your flowers are delivered."
-                }}
-              </p>
-            </div>
-
-            <div class="location-grid">
-              <div class="location-map-wrap">
+            <div class="pf-address">
+              <div class="pf-map">
                 <div ref="locationMapEl" class="location-map" role="region" aria-label="Map of your delivery location"></div>
-                <button
-                  v-if="isEditing"
-                  type="button"
-                  class="location-locate"
-                  :disabled="isLocating"
-                  @click="useCurrentLocation"
-                >
+                <button v-if="isEditing" type="button" class="pf-map__locate" :disabled="isLocating" @click="useCurrentLocation">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /><circle cx="12" cy="12" r="7" /></svg>
                   {{ isLocating ? "Finding you..." : "Use my current location" }}
                 </button>
-                <p v-if="!isEditing && !hasSavedPin" class="location-map-empty">
-                  No location pinned yet. Choose Edit to drop a pin.
-                </p>
+                <p v-if="!isEditing && !hasSavedPin" class="pf-map__empty">No location pinned yet. Choose Add pin to drop one.</p>
               </div>
 
-              <div class="location-fields">
-                <div class="location-field">
-                  <label :for="isEditing ? 'pf-address' : undefined">Street, block or unit</label>
+              <div class="pf-address__fields">
+                <div class="pf-field">
+                  <label :for="isEditing ? 'pf-street' : undefined">Street, block or unit</label>
                   <input
                     v-if="isEditing"
-                    id="pf-address"
+                    id="pf-street"
                     v-model="editData.address"
                     type="text"
-                    class="input-field"
+                    class="pf-input"
                     placeholder="e.g. Blk 5 Lot 12, Sampaguita St."
                     autocomplete="address-line1"
                   />
-                  <span v-else class="detail-value">{{ user.address || "-" }}</span>
-                  <span v-if="isEditing && pinStreetHint" class="field-hint">
-                    Near {{ pinStreetHint }}
-                  </span>
+                  <p v-else class="pf-value" :class="{ empty: !user.address }">{{ user.address || "Not added yet" }}</p>
+                  <span v-if="isEditing && pinStreetHint" class="pf-hint">Near {{ pinStreetHint }}</span>
                 </div>
 
-                <div class="location-field">
-                  <label>Region</label>
-                  <span class="detail-value" :class="{ 'is-auto': isEditing }">
-                    {{ (isEditing ? editData.region : user.region) || "-" }}
-                  </span>
+                <div class="pf-address__auto">
+                  <div class="pf-field">
+                    <label>City</label>
+                    <p class="pf-value" :class="{ auto: isEditing, empty: !(isEditing ? editData.city : user.city) }">{{ (isEditing ? editData.city : user.city) || "—" }}</p>
+                  </div>
+                  <div class="pf-field">
+                    <label :for="isEditing && postalNeedsTyping ? 'pf-postal' : undefined">Postal code</label>
+                    <!-- Only typed by hand when the map has no postal code for the pin -->
+                    <input
+                      v-if="isEditing && postalNeedsTyping"
+                      id="pf-postal"
+                      v-model="editData.postal_code"
+                      type="text"
+                      inputmode="numeric"
+                      maxlength="4"
+                      class="pf-input"
+                      placeholder="e.g. 4109"
+                      autocomplete="postal-code"
+                    />
+                    <p v-else class="pf-value" :class="{ auto: isEditing, empty: !(isEditing ? editData.postal_code : user.postal_code) }">{{ (isEditing ? editData.postal_code : user.postal_code) || "—" }}</p>
+                  </div>
+                  <div class="pf-field pf-field--wide">
+                    <label>Region</label>
+                    <p class="pf-value" :class="{ auto: isEditing, empty: !(isEditing ? editData.region : user.region) }">{{ (isEditing ? editData.region : user.region) || "—" }}</p>
+                  </div>
                 </div>
 
-                <div class="location-field">
-                  <label>City</label>
-                  <span class="detail-value" :class="{ 'is-auto': isEditing }">
-                    {{ (isEditing ? editData.city : user.city) || "-" }}
-                  </span>
-                </div>
-
-                <div class="location-field">
-                  <label :for="isEditing && postalNeedsTyping ? 'pf-postal' : undefined">Postal code</label>
-                  <!-- Only typed by hand when the map has no postal code for the pin -->
-                  <input
-                    v-if="isEditing && postalNeedsTyping"
-                    id="pf-postal"
-                    v-model="editData.postal_code"
-                    type="text"
-                    inputmode="numeric"
-                    maxlength="4"
-                    class="input-field"
-                    placeholder="e.g. 4109"
-                    autocomplete="postal-code"
-                  />
-                  <span v-else class="detail-value" :class="{ 'is-auto': isEditing }">
-                    {{ (isEditing ? editData.postal_code : user.postal_code) || "-" }}
-                  </span>
-                </div>
-
-                <p v-if="isEditing" class="location-status" :class="{ 'is-error': lookupError }" aria-live="polite">
+                <p v-if="isEditing" class="pf-pin-status" :class="{ bad: lookupError }" aria-live="polite">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
                   {{
                     isLookingUp
                       ? "Finding the address for this pin..."
-                      : lookupError ||
-                        (editData.latitude === null ? "Drop a pin on the map to fill these in." : "Filled in from your pin.")
+                      : lookupError || (editData.latitude === null ? "Drop a pin on the map to fill these in." : "Filled in from your pin.")
                   }}
                 </p>
               </div>
             </div>
+          </section>
+
+          <!-- ── Flowers you love (preferences, special days, favourites) ── -->
+          <div v-if="user.role === 'customer'" id="pf-preferences" class="pf-prefs">
+            <ProfilePreferences />
           </div>
 
-          <div v-if="isEditing" class="action-buttons">
-            <button class="bc-link btn-cancel" @click="cancelEdit">Cancel</button>
-            <button
-              class="bc-btn bc-btn--dark"
-              @click="saveProfile"
-              :disabled="isSaving"
-            >
+          <!-- ── Security ───────────────────────────────────────────────── -->
+          <section v-if="user.role === 'customer'" id="pf-security" class="pf-card" aria-labelledby="pf-security-title">
+            <header class="pf-card__head">
+              <div>
+                <h2 id="pf-security-title">Sign-in <em>security</em></h2>
+                <p>Keep your account yours.</p>
+              </div>
+            </header>
+
+            <div class="pf-security">
+              <span class="pf-security__ico" :class="{ on: twoFactorEnabled }" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z" /><rect x="9" y="11" width="6" height="5" rx="1.2" /><path d="M10.2 11V9.6a1.8 1.8 0 0 1 3.6 0V11" /></svg>
+              </span>
+              <div class="pf-security__text">
+                <strong>
+                  Two-step sign-in
+                  <span class="pf-state" :class="{ on: twoFactorEnabled }">{{ twoFactorEnabled ? "On" : "Off" }}</span>
+                </strong>
+                <p>When it's on, signing in also asks for a six-digit passkey only you know.</p>
+              </div>
+              <!-- Keyed on the modal so the switch re-syncs if it is closed early -->
+              <label :key="`2fa-${twoFactorEnabled}-${showTwoFactorModal}`" class="pf-switch">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  :checked="twoFactorEnabled"
+                  :disabled="twoFactorLoading"
+                  :aria-checked="twoFactorEnabled"
+                  aria-label="Two-step sign-in"
+                  @change="beginTwoFactorChange"
+                />
+                <span aria-hidden="true"></span>
+              </label>
+            </div>
+          </section>
+        </template>
+      </main>
+    </div>
+
+    <!-- ── Save bar while editing ────────────────────────────────────────── -->
+    <Transition name="pf-bar">
+      <div v-if="isEditing" class="pf-savebar" role="region" aria-label="Save your changes">
+        <div class="pf-wrap pf-savebar__inner">
+          <p>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4Z" /></svg>
+            You're editing your profile.
+          </p>
+          <div class="pf-savebar__actions">
+            <button type="button" class="pf-btn pf-btn--quiet" :disabled="isSaving" @click="cancelEdit">Cancel</button>
+            <button type="button" class="pf-btn pf-btn--primary" :disabled="isSaving" @click="saveProfile">
               {{ isSaving ? "Saving..." : "Save changes" }}
             </button>
           </div>
-        </section>
-
-        <!-- Flower preferences, special days, favorites, what shops saved -->
-        <ProfilePreferences v-if="user.role === 'customer'" />
-
-        <!-- Two-factor authentication -->
-        <section
-          v-if="user.role === 'customer'"
-          class="profile-card two-factor-section"
-          aria-labelledby="security-title"
-        >
-          <span class="detail-icon detail-icon--lg" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
-          </span>
-          <div class="two-factor-content">
-            <p class="bc-label">Security</p>
-            <h2 id="security-title">Two-factor <em>authentication</em></h2>
-            <p>
-              Add an extra layer of security to your account with two-factor
-              authentication.
-            </p>
-          </div>
-          <!-- Keyed on the modal so the switch re-syncs if it is closed early -->
-          <label
-            :key="`2fa-${twoFactorEnabled}-${showTwoFactorModal}`"
-            class="toggle-switch"
-          >
-            <input
-              type="checkbox"
-              role="switch"
-              :checked="twoFactorEnabled"
-              :disabled="twoFactorLoading"
-              :aria-checked="twoFactorEnabled"
-              aria-label="Two-factor authentication"
-              @change="beginTwoFactorChange"
-            />
-            <span class="toggle-slider" aria-hidden="true"></span>
-            <span class="toggle-label">{{ twoFactorEnabled ? "On" : "Off" }}</span>
-          </label>
-        </section>
-      </template>
-
-      <div
-        v-if="showTwoFactorModal"
-        class="two-factor-modal-backdrop"
-        @click.self="closeTwoFactorModal"
-      >
-        <section
-          class="two-factor-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="two-factor-title"
-        >
-          <button
-            class="two-factor-modal-close"
-            aria-label="Close two-factor verification"
-            @click="closeTwoFactorModal"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
-          </button>
-
-          <template v-if="twoFactorStep === 'email'">
-            <p class="bc-label">Step one</p>
-            <h2 id="two-factor-title">Verify your <em>email</em></h2>
-            <p>
-              Enter the six-digit verification code sent to your registered
-              email address.
-            </p>
-            <form @submit.prevent="verifyInitialEmailOtp">
-              <div class="two-factor-code-boxes" @paste.prevent="pasteTwoFactorCode($event, 'otp')">
-                <input v-for="(_, index) in twoFactorOtp" :key="`setup-otp-${index}`" :ref="(element) => setTwoFactorInput(element, 'otp', index)" v-model="twoFactorOtp[index]" class="two-factor-code-box" inputmode="numeric" maxlength="1" autocomplete="one-time-code" :aria-label="`Digit ${index + 1}`" @input="advanceTwoFactorCode('otp', index)" @keydown.backspace="retreatTwoFactorCode($event, 'otp', index)" />
-              </div>
-              <button class="bc-btn bc-btn--dark btn-two-factor-primary" :disabled="twoFactorLoading">
-                {{ twoFactorLoading ? "Verifying..." : "Verify code" }}
-              </button>
-            </form>
-          </template>
-
-          <template v-else>
-            <p class="bc-label">Step two</p>
-            <h2 id="two-factor-title">Create a security <em>passkey</em></h2>
-            <p>Choose a six-digit passkey to turn on two-factor authentication.</p>
-            <form @submit.prevent="saveTwoFactorPasskey">
-              <div class="two-factor-code-boxes" @paste.prevent="pasteTwoFactorCode($event, 'passkey')">
-                <input v-for="(_, index) in twoFactorPasskey" :key="`setup-passkey-${index}`" :ref="(element) => setTwoFactorInput(element, 'passkey', index)" v-model="twoFactorPasskey[index]" class="two-factor-code-box" type="password" inputmode="numeric" maxlength="1" autocomplete="new-password" :aria-label="`Digit ${index + 1}`" @input="advanceTwoFactorCode('passkey', index)" @keydown.backspace="retreatTwoFactorCode($event, 'passkey', index)" />
-              </div>
-              <button class="bc-btn bc-btn--dark btn-two-factor-primary" :disabled="twoFactorLoading">
-                {{ twoFactorLoading ? "Saving..." : "Save passkey" }}
-              </button>
-            </form>
-          </template>
-        </section>
+        </div>
       </div>
-    </main>
+    </Transition>
+
+    <!-- ── Two-step sign-in setup ────────────────────────────────────────── -->
+    <div v-if="showTwoFactorModal" class="pf-overlay" @click.self="closeTwoFactorModal">
+      <section class="pf-modal" role="dialog" aria-modal="true" aria-labelledby="two-factor-title" @keydown.esc="closeTwoFactorModal">
+        <button type="button" class="pf-modal__close" aria-label="Close two-step sign-in setup" @click="closeTwoFactorModal">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+        </button>
+        <span class="pf-modal__badge" aria-hidden="true">
+          <svg v-if="twoFactorStep === 'email'" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
+          <svg v-else viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+        </span>
+
+        <template v-if="twoFactorStep === 'email'">
+          <p class="pf-modal__step">Step 1 of 2</p>
+          <h2 id="two-factor-title">Check your <em>email</em></h2>
+          <p class="pf-modal__text">Enter the six-digit code we sent to your email address.</p>
+          <form @submit.prevent="verifyInitialEmailOtp">
+            <div class="pf-code" @paste.prevent="pasteTwoFactorCode($event, 'otp')">
+              <input v-for="(_, index) in twoFactorOtp" :key="`setup-otp-${index}`" :ref="(element) => setTwoFactorInput(element, 'otp', index)" v-model="twoFactorOtp[index]" class="pf-code__box" inputmode="numeric" maxlength="1" autocomplete="one-time-code" :aria-label="`Digit ${index + 1}`" @input="advanceTwoFactorCode('otp', index)" @keydown.backspace="retreatTwoFactorCode($event, 'otp', index)" />
+            </div>
+            <button class="pf-btn pf-btn--primary pf-btn--block" :disabled="twoFactorLoading">
+              {{ twoFactorLoading ? "Checking..." : "Verify code" }}
+            </button>
+          </form>
+        </template>
+
+        <template v-else>
+          <p class="pf-modal__step">Step 2 of 2</p>
+          <h2 id="two-factor-title">Choose a <em>passkey</em></h2>
+          <p class="pf-modal__text">Pick six digits only you know. You'll enter them each time you sign in.</p>
+          <form @submit.prevent="saveTwoFactorPasskey">
+            <div class="pf-code" @paste.prevent="pasteTwoFactorCode($event, 'passkey')">
+              <input v-for="(_, index) in twoFactorPasskey" :key="`setup-passkey-${index}`" :ref="(element) => setTwoFactorInput(element, 'passkey', index)" v-model="twoFactorPasskey[index]" class="pf-code__box" type="password" inputmode="numeric" maxlength="1" autocomplete="new-password" :aria-label="`Digit ${index + 1}`" @input="advanceTwoFactorCode('passkey', index)" @keydown.backspace="retreatTwoFactorCode($event, 'passkey', index)" />
+            </div>
+            <button class="pf-btn pf-btn--primary pf-btn--block" :disabled="twoFactorLoading">
+              {{ twoFactorLoading ? "Saving..." : "Save passkey" }}
+            </button>
+          </form>
+        </template>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -1201,226 +1126,686 @@ const saveTwoFactorPasskey = async () => {
   }
 };
 
+// ── Side menu, profile meter and info tiles ─────────────────────────────────
+const ICONS = {
+  person: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>',
+  pin: '<svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z" /><circle cx="12" cy="9.5" r="2.5" /></svg>',
+  flower: '<svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="2.5" /><path d="M12 6.5a2.5 2.5 0 1 1 2.4 3.2M9.6 9.7A2.5 2.5 0 1 1 12 6.5M14.4 9.7a2.5 2.5 0 1 1-2.4 3.8M12 13.5a2.5 2.5 0 1 1-2.4-3.8M12 13.5V21M12 18c-2 0-3.5-1.2-4-3" /></svg>',
+  shield: '<svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z" /><path d="m9 12 2 2 4-4" /></svg>',
+  at: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.5 7.1" /></svg>',
+  mail: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>',
+  phone: '<svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.5" /><path d="M11 18h2" /></svg>',
+  cake: '<svg viewBox="0 0 24 24"><path d="M4 21h16v-8H4zM4 15c2.7 1.3 5.3 1.3 8 0s5.3-1.3 8 0M12 9V6M12 3.5v.01" /></svg>',
+  gender: '<svg viewBox="0 0 24 24"><circle cx="10" cy="14" r="5" /><path d="M14 10l6-6M15 4h5v5" /></svg>',
+  globe: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5a13 13 0 0 1 0 17M12 3.5a13 13 0 0 0 0 17" /></svg>',
+};
+
+const sections = computed(() => [
+  { id: "pf-personal", label: "Personal info", icon: ICONS.person },
+  { id: "pf-address", label: "Delivery address", icon: ICONS.pin },
+  ...(user.role === "customer"
+    ? [
+        { id: "pf-preferences", label: "Flowers you love", icon: ICONS.flower },
+        { id: "pf-security", label: "Security", icon: ICONS.shield },
+      ]
+    : []),
+]);
+
+// The section in view is the one lit in the menu
+const activeSection = ref("pf-personal");
+const goToSection = (id) => {
+  activeSection.value = id;
+  const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById(id)?.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
+};
+let sectionObserver = null;
+function watchSections() {
+  sectionObserver?.disconnect();
+  if (!("IntersectionObserver" in window)) return;
+  sectionObserver = new IntersectionObserver(
+    (entries) => {
+      const shown = entries.filter((entry) => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+      if (shown) activeSection.value = shown.target.id;
+    },
+    { rootMargin: "-120px 0px -55% 0px" },
+  );
+  sections.value.forEach((s) => {
+    const el = document.getElementById(s.id);
+    if (el) sectionObserver.observe(el);
+  });
+}
+onBeforeUnmount(() => sectionObserver?.disconnect());
+
+// Personal info, as tiles while reading
+const infoRows = computed(() => [
+  { label: "Full name", value: [user.name, user.surname].filter(Boolean).join(" "), icon: ICONS.person },
+  { label: "Username", value: user.username ? `@${user.username}` : "", icon: ICONS.at },
+  { label: "Email", value: user.email, icon: ICONS.mail, badge: user.email_verified_at ? "Verified" : "" },
+  { label: "Mobile number", value: user.contact_number, icon: ICONS.phone },
+  { label: "Date of birth", value: user.date_of_birth ? formatDate(user.date_of_birth) : "", icon: ICONS.cake },
+  { label: "Gender", value: user.gender, icon: ICONS.gender },
+  { label: "Nationality", value: user.nationality, icon: ICONS.globe },
+]);
+
+// How much of what shops need is filled in, and what to add next
+const completeness = computed(() => {
+  const checks = [
+    ["photo", !!user.profile_picture],
+    ["mobile number", !!user.contact_number],
+    ["delivery pin", user.latitude !== null && user.latitude !== undefined],
+    ["street address", !!user.address],
+    ["date of birth", !!user.date_of_birth],
+    ["username", !!user.username],
+  ];
+  const done = checks.filter(([, ok]) => ok).length;
+  return {
+    percent: Math.round((done / checks.length) * 100),
+    missing: checks.filter(([, ok]) => !ok).map(([label]) => label),
+  };
+});
+
 onMounted(async () => {
   await fetchUserProfile();
   renderLocationMap(); // the map container exists once the loading skeleton is gone
+  nextTick(watchSections);
 });
 </script>
 
 <style scoped>
-/* Tokens, type, labels, buttons, links, skeletons and the navbar come from
-   src/styles/bloomcraft.css (shared with the landing page and shop pages). */
+/* Profile. Tokens, type and the navbar come from styles/bloomcraft.css
+   (the logo's navy --ink and green --leaf, Cormorant headings, Poppins text). */
 
 @layer bc-reset {
-  .profile-page :is(p, h1, h2, h3) {
+  .pf-page :is(p, h1, h2, h3, dl, dd, ul) {
     margin: 0;
   }
 }
 
-:global(body) {
-  margin: 0;
-}
-
-.profile-page {
+.pf-page {
+  --card: #ffffff;
+  --green-bg: #e4f3ea;
+  --red: #b4332a;
   min-height: 100vh;
+  padding-bottom: 96px;
   background: var(--ivory);
-}
-
-.profile-page button {
+  color: var(--ink);
   font-family: var(--font-sans);
 }
 
-.profile-btn-outline {
-  background: transparent;
-  color: var(--ink);
-  border-color: var(--line);
+.pf-page.editing {
+  padding-bottom: 160px; /* room for the save bar */
 }
 
-.profile-btn-outline:hover {
-  border-color: var(--ink);
+.pf-wrap {
+  width: min(1120px, 100% - 32px);
+  margin-inline: auto;
 }
 
-.profile-container {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding-top: 150px;
-  padding-bottom: var(--section-space);
+.pf-hidden {
+  display: none;
 }
 
-/* ---- Header ---- */
-.profile-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 28px;
-  margin-bottom: 32px;
-}
-
-.profile-info {
-  display: flex;
-  align-items: center;
-  gap: 32px;
-}
-
-.avatar-wrapper {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.avatar {
-  width: 132px;
-  height: 132px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: var(--ivory-deep);
-}
-
-.avatar-placeholder {
-  display: grid;
-  place-items: center;
-  color: var(--leaf-deep);
-  font-family: var(--font-display);
-  font-size: 48px;
-  font-weight: 500;
-}
-
-.btn-change-photo {
-  position: absolute;
-  left: 50%;
-  bottom: -10px;
-  padding: 7px 14px;
-  border: none;
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--ivory);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  transform: translateX(-50%);
-  cursor: pointer;
-  transition: background 0.3s;
-}
-
-.btn-change-photo:hover {
-  background: var(--leaf-deep);
-}
-
-.user-name {
-  margin-top: 18px;
-  font-size: clamp(44px, 5vw, 76px);
-}
-
-.user-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  margin-top: 12px;
-  color: var(--ink-soft);
-  font-size: 14px;
-}
-
-.verified-badge {
+/* ── Buttons ──────────────────────────────────────────────── */
+.pf-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  color: var(--leaf-deep);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: 500 14px var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
-.verified-badge svg {
-  width: 14px;
-  height: 14px;
+.pf-btn svg {
+  width: 17px;
+  height: 17px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-/* ---- Cards ---- */
-.profile-card {
-  padding: clamp(28px, 3vw, 44px);
-  border: 1px solid var(--line-soft);
-  border-radius: 22px;
-  background: var(--paper);
+.pf-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 26px;
+.pf-btn--primary {
+  background: var(--ink);
+  color: var(--paper);
 }
 
-.section-header h2,
-.two-factor-content h2 {
-  font-size: clamp(32px, 3vw, 44px);
+.pf-btn--primary:hover:not(:disabled) {
+  background: var(--leaf-deep);
 }
 
-.btn-edit {
-  border: none;
+.pf-btn--ghost {
+  min-height: 40px;
+  padding: 0 16px;
+  border-color: var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+.pf-btn--ghost:hover:not(:disabled) {
+  border-color: var(--leaf);
+  color: var(--leaf-deep);
+}
+
+.pf-btn--quiet {
   background: none;
-  cursor: pointer;
+  color: var(--ink-soft);
 }
 
-.details-grid {
+.pf-btn--quiet:hover:not(:disabled) {
+  background: var(--ivory-deep);
+  color: var(--ink);
+}
+
+.pf-btn--block {
+  width: 100%;
+}
+
+:is(.pf-btn, .pf-menu__link, .pf-avatar__edit, .pf-map__locate, .pf-modal__close):focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+/* ── Hero ─────────────────────────────────────────────────── */
+.pf-hero {
+  padding: clamp(118px, 14vw, 140px) 0 36px;
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(60% 120% at 0% 0%, rgba(77, 177, 115, 0.14), transparent 60%),
+    radial-gradient(50% 120% at 100% 0%, rgba(54, 63, 78, 0.08), transparent 60%),
+    var(--paper);
+}
+
+.pf-hero__inner {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 40px;
-  border-top: 1px solid var(--line);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 28px;
 }
 
-.detail-item {
+.pf-avatar {
+  position: relative;
+  width: 120px;
+  height: 120px;
+}
+
+.pf-avatar img,
+.pf-avatar__initials {
+  width: 100%;
+  height: 100%;
+  border: 4px solid var(--card);
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--line), 0 18px 40px -18px rgba(54, 63, 78, 0.45);
+}
+
+.pf-avatar__initials {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--leaf) 0%, var(--leaf-deep) 100%);
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 500;
+}
+
+.pf-avatar__edit {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--card);
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.pf-avatar__edit:hover {
+  background: var(--leaf-deep);
+}
+
+.pf-avatar__edit svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+.pf-identity {
+  min-width: 0;
+}
+
+.pf-name {
+  margin-top: 8px !important;
+  font-family: var(--font-display);
+  font-size: clamp(36px, 4.6vw, 56px);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.pf-name em {
+  color: var(--leaf-deep);
+  font-style: italic;
+}
+
+.pf-handle {
+  margin-top: 6px !important;
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+.pf-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px !important;
+  padding: 0;
+  list-style: none;
+}
+
+.pf-chips li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.pf-chips li.ok {
+  border-color: transparent;
+  background: var(--green-bg);
+  color: var(--leaf-deep);
+}
+
+.pf-chips svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pf-editing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--green-bg);
+  color: var(--leaf-deep);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.pf-editing-pill i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--leaf);
+  animation: pf-blink 1.4s ease-in-out infinite;
+}
+
+@keyframes pf-blink {
+  50% { opacity: 0.35; }
+}
+
+/* ── Layout ───────────────────────────────────────────────── */
+.pf-layout {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  align-items: start;
+  gap: 28px;
+  padding-top: 28px;
+}
+
+.pf-side {
+  position: sticky;
+  top: 116px;
+  display: grid;
+  gap: 16px;
+}
+
+.pf-menu {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--card);
+}
+
+.pf-menu__link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.pf-menu__link:hover {
+  background: var(--ivory);
+  color: var(--ink);
+}
+
+.pf-menu__link.on {
+  background: var(--green-bg);
+  color: var(--leaf-deep);
+}
+
+.pf-menu__ico {
+  display: grid;
+  place-items: center;
+}
+
+.pf-menu__ico :deep(svg) {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pf-meter {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--card);
+}
+
+.pf-meter strong {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.pf-meter__track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ivory-deep);
+}
+
+.pf-meter__track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--leaf-light), var(--leaf));
+  transition: width 0.4s ease;
+}
+
+.pf-meter p {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.pf-main {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* ── Cards ────────────────────────────────────────────────── */
+.pf-card {
+  padding: clamp(20px, 2.6vw, 30px);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--card);
+  scroll-margin-top: 116px;
+}
+
+.pf-card__head {
   display: flex;
   align-items: flex-start;
+  justify-content: space-between;
   gap: 16px;
-  padding: 18px 0;
-  border-bottom: 1px solid var(--line-soft);
+  margin-bottom: 22px;
 }
 
-.detail-item--wide {
+.pf-card__head h2 {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 2.6vw, 34px);
+  font-weight: 500;
+  line-height: 1.05;
+}
+
+.pf-card__head h2 em {
+  color: var(--leaf-deep);
+  font-style: italic;
+}
+
+.pf-card__head p {
+  max-width: 560px;
+  margin-top: 6px !important;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Reading: icon tiles */
+.pf-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pf-tile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--ivory);
+}
+
+.pf-tile__ico {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--leaf-deep);
+  box-shadow: 0 1px 2px rgba(54, 63, 78, 0.06);
+}
+
+.pf-tile__ico :deep(svg) {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pf-tile__body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pf-tile dt {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.pf-tile dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  overflow-wrap: anywhere;
+  font-size: 14.5px;
+  font-weight: 500;
+}
+
+.pf-tile dd.empty,
+.pf-value.empty {
+  color: #8b929c;
+  font-weight: 400;
+  font-style: italic;
+}
+
+.pf-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--green-bg);
+  color: var(--leaf-deep);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* Editing: labelled fields */
+.pf-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 18px;
+}
+
+.pf-field {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+}
+
+.pf-field--wide {
   grid-column: 1 / -1;
 }
 
-/* ── Delivery location ─────────────────────────────────────────────── */
-.location-block {
-  margin-top: 32px;
+.pf-field label {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.location-head h3 {
-  font-size: 26px;
+.pf-input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font: 400 14.5px var(--font-sans);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.location-head p {
-  max-width: 62ch;
-  margin-top: 6px;
+.pf-input:focus {
+  border-color: var(--leaf);
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(77, 177, 115, 0.14);
+}
+
+.pf-input.bad {
+  border-color: var(--red);
+}
+
+.pf-error {
+  color: var(--red);
+  font-size: 12.5px;
+}
+
+.pf-hint {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.pf-locked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 14px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--ivory);
   color: var(--ink-soft);
   font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.location-grid {
+.pf-locked svg {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.pf-value {
+  font-size: 14.5px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.pf-value.auto {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--ivory);
+}
+
+/* ── Address ──────────────────────────────────────────────── */
+.pf-address {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-  gap: 28px;
-  margin-top: 20px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 22px;
 }
 
-.location-map-wrap {
+.pf-map {
   position: relative;
   overflow: hidden;
+  min-height: 300px;
   border: 1px solid var(--line);
   border-radius: 18px;
 }
 
 .location-map {
-  height: 320px;
+  height: 100%;
+  min-height: 300px;
   z-index: 0; /* keep Leaflet's panes under the fixed header */
 }
 
@@ -1428,7 +1813,7 @@ onMounted(async () => {
   cursor: crosshair;
 }
 
-.location-locate {
+.pf-map__locate {
   position: absolute;
   left: 12px;
   bottom: 12px;
@@ -1436,516 +1821,532 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 14px;
+  min-height: 40px;
+  padding: 0 14px;
   border: none;
   border-radius: 999px;
-  background: var(--paper);
+  background: var(--card);
   color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 500;
-  box-shadow: 0 4px 14px rgba(54, 63, 78, 0.16);
+  font: 500 13px var(--font-sans);
+  box-shadow: 0 6px 18px rgba(54, 63, 78, 0.18);
   cursor: pointer;
 }
 
-.location-locate svg {
+.pf-map__locate svg {
   width: 16px;
   height: 16px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.6;
+  stroke-width: 1.7;
   stroke-linecap: round;
 }
 
-.location-locate:disabled {
+.pf-map__locate:disabled {
   opacity: 0.7;
   cursor: wait;
 }
 
-.location-locate:focus-visible {
-  outline: 2px solid var(--leaf);
-  outline-offset: 3px;
-}
-
-.location-map-empty {
+.pf-map__empty {
   position: absolute;
   inset: auto 12px 12px;
   z-index: 1;
   padding: 10px 14px;
   border-radius: 12px;
-  background: rgba(250, 251, 250, 0.94);
+  background: rgba(255, 255, 255, 0.94);
   color: var(--ink-soft);
   font-size: 13px;
 }
 
-.location-fields {
-  display: flex;
-  flex-direction: column;
-  border-top: 1px solid var(--line);
-}
-
-.location-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.location-field label {
-  color: var(--ink-soft);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-/* Region, city and postal code come from the pin, so they read as filled-in
-   values rather than inputs */
-.detail-value.is-auto {
-  color: var(--ink);
-}
-
-.field-hint {
-  color: var(--ink-soft);
-  font-size: 12.5px;
-}
-
-.location-status {
-  margin-top: 12px;
-  color: var(--ink-soft);
-  font-size: 12.5px;
-}
-
-.location-status.is-error {
-  color: var(--leaf-deep);
-}
-
-@media (max-width: 760px) {
-  .location-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .location-map {
-    height: 260px;
-  }
-}
-
-.detail-icon {
+.pf-address__fields {
   display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: var(--ivory);
-  color: var(--ink);
+  align-content: start;
+  gap: 16px;
 }
 
-.detail-icon svg {
-  width: 17px;
-  height: 17px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.pf-address__auto {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
-.detail-icon--lg {
-  width: 52px;
-  height: 52px;
-}
-
-.detail-icon--lg svg {
-  width: 22px;
-  height: 22px;
-}
-
-.detail-content {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.detail-content label {
-  color: var(--ink-soft);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.detail-value {
-  font-size: 15px;
-  word-break: break-word;
-}
-
-.value-with-badge {
+.pf-pin-status {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.badge {
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: rgba(125, 143, 105, 0.14);
-  color: #5d7150;
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.name-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 8px;
-}
-
-.input-field {
-  width: 100%;
-  margin-top: 4px;
-  padding: 11px 14px;
-  border: 1px solid var(--line);
+  padding: 10px 12px;
   border-radius: 12px;
-  background: #fff;
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 14px;
-}
-
-.input-field:focus {
-  outline: none;
-  border-color: var(--ink);
-}
-
-.input-field:disabled {
-  background: var(--ivory);
-  color: var(--ink-soft);
-  cursor: not-allowed;
-}
-
-.input-error {
-  border-color: var(--leaf-deep);
-}
-
-.field-error {
+  background: var(--green-bg);
   color: var(--leaf-deep);
   font-size: 12.5px;
 }
 
-.action-buttons {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 24px;
-  margin-top: 28px;
+.pf-pin-status.bad {
+  background: #fbe9e7;
+  color: var(--red);
 }
 
-.btn-cancel {
-  border: none;
-  background: none;
-  cursor: pointer;
-}
-
-.action-buttons .bc-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* ---- Two-factor ---- */
-.two-factor-section {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-}
-
-.two-factor-content {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.two-factor-content h2 {
-  margin-top: 6px;
-}
-
-.two-factor-content p:last-child {
-  max-width: 520px;
-  color: var(--ink-soft);
-  font-size: 14.5px;
-}
-
-.toggle-switch {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
+.pf-pin-status svg {
   flex-shrink: 0;
-  cursor: pointer;
-}
-
-.toggle-switch input {
-  position: absolute;
-  opacity: 0;
-  width: 1px;
-  height: 1px;
-}
-
-.toggle-slider {
-  position: relative;
-  width: 48px;
-  height: 28px;
-  border-radius: 999px;
-  background: var(--line);
-  transition: background 0.3s;
-}
-
-.toggle-slider::after {
-  content: "";
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 6px rgba(54, 63, 78, 0.18);
-  transition: transform 0.35s var(--ease-out);
-}
-
-.toggle-switch input:checked + .toggle-slider {
-  background: var(--ink);
-}
-
-.toggle-switch input:checked + .toggle-slider::after {
-  transform: translateX(20px);
-}
-
-.toggle-switch input:disabled + .toggle-slider {
-  opacity: 0.5;
-}
-
-.toggle-switch input:focus-visible + .toggle-slider {
-  outline: 2px solid var(--leaf);
-  outline-offset: 3px;
-}
-
-.toggle-label {
-  min-width: 26px;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-/* ---- Two-factor modal ---- */
-.two-factor-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: rgba(38, 45, 57, 0.45);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-
-.two-factor-modal {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-  max-width: 460px;
-  padding: 40px 34px 32px;
-  border-radius: 26px;
-  background: var(--paper);
-  box-shadow: 0 30px 80px rgba(38, 45, 57, 0.25);
-}
-
-.two-factor-modal h2 {
-  font-size: 34px;
-}
-
-.two-factor-modal > p:not(.bc-label) {
-  margin-bottom: 8px;
-  color: var(--ink-soft);
-  font-size: 14.5px;
-  line-height: 1.7;
-}
-
-.two-factor-modal-close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: 50%;
-  background: var(--ivory);
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.two-factor-modal-close svg {
   width: 16px;
   height: 16px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
+  stroke-width: 1.8;
 }
 
-.two-factor-code-boxes {
+/* ── Flowers you love: the preferences block, matched to these cards ── */
+.pf-prefs {
+  scroll-margin-top: 116px;
+}
+
+.pf-prefs :deep(.pp-card) {
+  padding: clamp(20px, 2.6vw, 30px);
+  border-color: var(--line);
+  border-radius: 22px;
+  background: var(--card);
+}
+
+.pf-prefs :deep(.pp-head h2) {
+  font-size: clamp(28px, 2.6vw, 34px);
+}
+
+/* ── Security ─────────────────────────────────────────────── */
+.pf-security {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--ivory);
+}
+
+.pf-security__ico {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink-soft);
+}
+
+.pf-security__ico.on {
+  background: var(--green-bg);
+  color: var(--leaf-deep);
+}
+
+.pf-security__ico svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pf-security__text strong {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 18px;
+  font-size: 15px;
+  font-weight: 600;
 }
 
-.two-factor-code-box {
+.pf-security__text p {
+  margin-top: 3px !important;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.pf-state {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--ivory-deep);
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pf-state.on {
+  background: var(--green-bg);
+  color: var(--leaf-deep);
+}
+
+.pf-switch {
+  position: relative;
+  display: inline-block;
+  width: 52px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.pf-switch input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   width: 100%;
-  height: 56px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #fff;
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-size: 26px;
-  text-align: center;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
-.two-factor-code-box:focus {
-  outline: none;
-  border-color: var(--ink);
+.pf-switch span {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #cfd5d1;
+  transition: background 0.2s ease;
 }
 
-.btn-two-factor-primary {
-  justify-content: center;
-  width: 100%;
+.pf-switch span::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(38, 45, 57, 0.25);
+  transition: transform 0.2s ease;
 }
 
-.btn-two-factor-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.pf-switch input:checked + span {
+  background: var(--leaf);
 }
 
-.btn-change-photo:focus-visible,
-.btn-edit:focus-visible,
-.btn-cancel:focus-visible,
-.two-factor-modal-close:focus-visible {
+.pf-switch input:checked + span::after {
+  transform: translateX(22px);
+}
+
+.pf-switch input:disabled + span {
+  opacity: 0.6;
+}
+
+.pf-switch input:focus-visible + span {
   outline: 2px solid var(--leaf);
   outline-offset: 3px;
 }
 
-/* ---- Skeleton ---- */
-.skeleton-avatar {
-  width: 132px;
-  height: 132px;
-  border-radius: 50%;
+/* ── Save bar ─────────────────────────────────────────────── */
+.pf-savebar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 900;
+  padding: 14px 0 calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 -12px 30px -20px rgba(54, 63, 78, 0.35);
 }
 
-.skeleton-lines {
+.pf-savebar__inner {
   display: flex;
-  flex: 1;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pf-savebar p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.pf-savebar p svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: var(--leaf-deep);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+.pf-savebar__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pf-bar-enter-active,
+.pf-bar-leave-active {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.pf-bar-enter-from,
+.pf-bar-leave-to {
+  opacity: 0;
+  transform: translateY(100%);
+}
+
+/* ── Two-step setup ───────────────────────────────────────── */
+.pf-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(38, 45, 57, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.pf-modal {
+  position: relative;
+  display: grid;
+  justify-items: center;
   gap: 10px;
+  width: min(440px, 100%);
+  padding: 32px 26px 26px;
+  border-radius: 22px;
+  background: var(--paper);
+  text-align: center;
+  box-shadow: 0 30px 80px rgba(38, 45, 57, 0.25);
 }
 
-.skeleton-line {
-  display: block;
-  height: 13px;
+.pf-modal__close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ivory-deep);
+  color: var(--ink);
+  cursor: pointer;
 }
 
-.skeleton-line--label {
-  width: 90px;
-  height: 10px;
+.pf-modal__close svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 
-.skeleton-line--name {
-  width: 280px;
-  max-width: 60vw;
-  height: 44px;
+.pf-modal__badge {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--green-bg);
+  color: var(--leaf-deep);
 }
 
-.skeleton-line--short {
-  width: 160px;
+.pf-modal__badge svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.skeleton-line--title {
-  width: 220px;
-  height: 32px;
-  margin-bottom: 26px;
+.pf-modal__step {
+  color: var(--leaf-deep);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.skeleton-icon {
-  width: 38px;
-  height: 38px;
+.pf-modal h2 {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.pf-modal h2 em {
+  color: var(--leaf-deep);
+}
+
+.pf-modal__text {
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.pf-modal form {
+  display: grid;
+  gap: 18px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.pf-code {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pf-code__box {
+  width: 100%;
+  height: 54px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font: 600 22px var(--font-sans);
+  text-align: center;
+}
+
+.pf-code__box:focus {
+  border-color: var(--leaf);
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(77, 177, 115, 0.14);
+}
+
+/* ── Loading ──────────────────────────────────────────────── */
+.pf-skel-avatar {
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
 }
 
-/* ---- Responsive ---- */
-@media (max-width: 768px) {
-  .profile-container {
-    padding-top: 120px;
-  }
+.pf-skel-lines {
+  display: grid;
+  gap: 10px;
+  flex: 1;
+}
 
-  .profile-info {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 22px;
-  }
+.pf-skel-line {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+}
 
-  .avatar,
-  .skeleton-avatar {
-    width: 104px;
-    height: 104px;
-  }
+.pf-skel-line.tall { height: 30px; }
+.pf-skel-line.w30 { width: 30%; }
+.pf-skel-line.w40 { width: 40%; }
+.pf-skel-line.w60 { width: 60%; }
 
-  .details-grid {
+.pf-skel-ico {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+}
+
+/* ── Smaller screens ──────────────────────────────────────── */
+@media (max-width: 960px) {
+  .pf-layout {
     grid-template-columns: 1fr;
   }
 
-  .name-fields {
+  /* The menu becomes a row of pills under the hero */
+  .pf-side {
+    position: sticky;
+    top: 92px;
+    z-index: 5;
+    gap: 0;
+  }
+
+  .pf-menu {
+    display: flex;
+    overflow-x: auto;
+    padding: 6px;
+    scrollbar-width: none;
+  }
+
+  .pf-menu::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pf-menu__link {
+    flex-shrink: 0;
+    border-radius: 999px;
+  }
+
+  .pf-meter {
+    display: none;
+  }
+
+  .pf-address {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .pf-hero__inner {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .pf-avatar,
+  .pf-skel-avatar {
+    width: 88px;
+    height: 88px;
+  }
+
+  .pf-avatar__initials {
+    font-size: 32px;
+  }
+
+  .pf-hero__actions {
+    grid-column: 1 / -1;
+  }
+
+  .pf-hero__actions .pf-btn {
+    width: 100%;
+  }
+
+  .pf-tiles,
+  .pf-form {
     grid-template-columns: 1fr;
   }
 
-  .two-factor-section {
-    flex-direction: column;
-    align-items: flex-start;
+  .pf-card__head {
+    flex-wrap: wrap;
   }
 
-  .action-buttons {
-    flex-direction: column-reverse;
-    align-items: stretch;
+  .pf-security {
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .action-buttons .bc-btn {
-    justify-content: center;
+  .pf-security .pf-switch {
+    grid-column: 2;
   }
 
-  .btn-cancel {
-    align-self: center;
+  .pf-savebar p {
+    display: none;
   }
 
-  .two-factor-modal-backdrop {
-    align-items: flex-end;
-    padding: 0;
+  .pf-savebar__actions {
+    width: 100%;
   }
 
-  .two-factor-modal {
-    border-radius: 22px 22px 0 0;
+  .pf-savebar__actions .pf-btn {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-editing-pill i {
+    animation: none;
+  }
+
+  .pf-bar-enter-active,
+  .pf-bar-leave-active,
+  .pf-meter__track span,
+  .pf-switch span,
+  .pf-switch span::after {
+    transition: none;
   }
 }
 </style>
