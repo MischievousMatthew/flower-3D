@@ -182,12 +182,12 @@ onBeforeUnmount(() => clearInterval(timer));
   object-fit: cover;
 }
 
-/* A light shade on the far left only, so the photo stays bright */
+/* A navy shade from the left so the white text reads; the right stays bright */
 .sh-shade {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(90deg, rgba(38, 45, 57, 0.28) 0%, rgba(38, 45, 57, 0) 45%);
+  background: linear-gradient(90deg, rgba(38, 45, 57, 0.78) 0%, rgba(38, 45, 57, 0.55) 34%, rgba(38, 45, 57, 0.12) 62%, rgba(38, 45, 57, 0) 78%);
 }
 
 .sh-inner {
@@ -195,14 +195,11 @@ onBeforeUnmount(() => clearInterval(timer));
   padding: clamp(32px, 4vw, 56px) var(--sh-inline) clamp(72px, 7vw, 96px);
 }
 
-/* The copy on its own white card over the photo */
+/* The copy straight on the photo, in white */
 .sh-copy {
-  max-width: 520px;
-  padding: clamp(24px, 3vw, 40px);
-  border-radius: 28px;
-  background: rgba(250, 251, 250, 0.94);
-  box-shadow: 0 30px 70px -36px rgba(38, 45, 57, 0.6);
-  backdrop-filter: blur(10px);
+  max-width: 540px;
+  color: var(--paper);
+  text-shadow: 0 1px 18px rgba(38, 45, 57, 0.35);
 }
 
 .sh-eyebrow {
@@ -211,12 +208,15 @@ onBeforeUnmount(() => clearInterval(timer));
   gap: 10px;
   margin: 0 0 16px;
   padding: 6px 14px 6px 10px;
+  border: 1px solid rgba(250, 251, 250, 0.3);
   border-radius: 999px;
-  background: #e9f5ed;
+  background: rgba(250, 251, 250, 0.14);
+  backdrop-filter: blur(6px);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.04em;
-  color: var(--leaf-deep);
+  color: var(--paper);
+  text-shadow: none;
 }
 
 .sh-eyebrow-dot {
@@ -234,14 +234,14 @@ onBeforeUnmount(() => clearInterval(timer));
   font-weight: 500;
   line-height: 0.98;
   letter-spacing: -0.015em;
-  color: var(--ink);
+  color: var(--paper);
   text-wrap: balance;
 }
 
 .sh-title em {
   display: block;
   font-style: italic;
-  color: var(--leaf-deep);
+  color: var(--leaf-light);
 }
 
 .sh-sub {
@@ -249,7 +249,7 @@ onBeforeUnmount(() => clearInterval(timer));
   margin: 0 0 24px;
   font-size: 15px;
   line-height: 1.65;
-  color: var(--ink-soft);
+  color: rgba(250, 251, 250, 0.9);
 }
 
 .sh-actions {
@@ -281,25 +281,31 @@ onBeforeUnmount(() => clearInterval(timer));
   stroke-linejoin: round;
 }
 
+.sh-btn {
+  text-shadow: none;
+}
+
 .sh-btn--solid {
-  border: 1px solid var(--ink);
-  background: var(--ink);
-  color: var(--paper);
+  border: 1px solid var(--leaf);
+  background: var(--leaf);
+  color: var(--espresso);
 }
 
 .sh-btn--solid:hover {
-  border-color: var(--leaf-deep);
-  background: var(--leaf-deep);
+  border-color: var(--leaf-light);
+  background: var(--leaf-light);
 }
 
 .sh-btn--ghost {
-  border: 1px solid var(--line);
-  background: var(--paper);
-  color: var(--ink);
+  border: 1px solid rgba(250, 251, 250, 0.6);
+  background: rgba(250, 251, 250, 0.1);
+  color: var(--paper);
+  backdrop-filter: blur(6px);
 }
 
 .sh-btn--ghost:hover {
-  border-color: var(--ink);
+  border-color: var(--paper);
+  background: rgba(250, 251, 250, 0.2);
 }
 
 .sh-points {
@@ -310,7 +316,7 @@ onBeforeUnmount(() => clearInterval(timer));
   padding: 0;
   list-style: none;
   font-size: 13px;
-  color: var(--ink-soft);
+  color: rgba(250, 251, 250, 0.88);
 }
 
 .sh-points li {
@@ -323,7 +329,7 @@ onBeforeUnmount(() => clearInterval(timer));
   width: 16px;
   height: 16px;
   fill: none;
-  stroke: var(--leaf);
+  stroke: var(--leaf-light);
   stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -490,10 +496,46 @@ onBeforeUnmount(() => clearInterval(timer));
     padding: 0 var(--gutter) 72px;
   }
 
+  /* The copy sits under the photo on phones: a white card with dark text */
   .sh-copy {
     position: relative;
     max-width: none;
+    padding: 24px;
+    border-radius: 24px;
     background: var(--paper);
+    box-shadow: 0 24px 50px -30px rgba(38, 45, 57, 0.5);
+    color: var(--ink);
+    text-shadow: none;
+  }
+
+  .sh-eyebrow {
+    border-color: transparent;
+    background: #e9f5ed;
+    color: var(--leaf-deep);
+  }
+
+  .sh-title {
+    color: var(--ink);
+  }
+
+  .sh-title em {
+    color: var(--leaf-deep);
+  }
+
+  .sh-sub {
+    color: var(--ink-soft);
+  }
+
+  .sh-btn--solid {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .sh-btn--ghost {
+    border-color: var(--line);
+    background: var(--paper);
+    color: var(--ink);
   }
 
   .sh-btn {
