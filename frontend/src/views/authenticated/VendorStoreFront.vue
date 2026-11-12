@@ -117,10 +117,6 @@
                 <span class="sf-fact-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z" /><circle cx="7.5" cy="8.5" r="1.3" /></svg></span>
                 <span><small>Prices</small><strong>{{ peso(vendor.price_min) }} – {{ peso(vendor.price_max) }}</strong></span>
               </li>
-              <li v-if="vendor.default_delivery_fee">
-                <span class="sf-fact-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h11v10H3z" /><path d="M14 10h4l3 3v3h-7" /><circle cx="7" cy="17" r="2" /><circle cx="17" cy="17" r="2" /></svg></span>
-                <span><small>Delivery from</small><strong>{{ peso(vendor.default_delivery_fee) }}</strong></span>
-              </li>
               <li>
                 <span class="sf-fact-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></span>
                 <span><small>Same-day delivery</small><strong>{{ vendor.same_day_delivery ? "Available" : "Not offered" }}</strong></span>
