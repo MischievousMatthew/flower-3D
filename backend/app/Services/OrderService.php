@@ -615,12 +615,14 @@ class OrderService
         $shelfLife      = $batch['freshness_days'] ?? $funding?->shelf_life;
         $expirationDate = $batch['expiration_date'] ?? ($shelfLife ? now()->addDays((int) $shelfLife)->toDateString() : null);
         $batchNumber    = WarehouseBatch::generateBatchNumber($product->sku, now()->toDateString());
+        // Ordered in packs ("2 roll"): stocked in pieces (100 sheets). The order line keeps counting rolls.
+        $pieces = $product->isPackUnit($item->unit) ? $qty * $product->packSize() : $qty;
 
         $created = WarehouseBatch::create([
             'owner_id'              => $order->owner_id,
             'product_id'            => $product->id,
-            'qty_received'          => $qty,
-            'qty_remaining'         => $qty,
+            'qty_received'          => $pieces,
+            'qty_remaining'         => $pieces,
             'batch_number'          => $batchNumber,
             'barcode'               => $this->generateBatchBarcode(),
             'received_date'         => $batch['received_date'] ?? now()->toDateString(),
@@ -635,7 +637,7 @@ class OrderService
         ]);
 
         // Through the model, so a product counted per flower colour keeps its colours in step
-        Product::putBackStock($product->id, $qty);
+        Product::putBackStock($product->id, $pieces);
         $item->update(['received_qty' => (int) $item->received_qty + $qty]);
 
         return $created;

@@ -168,6 +168,28 @@ class Product extends Model
     // its own: it can sell as many as its flowers make (stock ÷ pieces, the
     // lowest of them), and selling one takes those pieces from the flowers.
 
+    // ── Bought in packs ─────────────────────────────────────────────────────
+    // Stock is counted in the smallest unit (stock_unit, e.g. "sheet"); a
+    // material bought in packs has pack_unit ("roll") holding pack_size of them.
+
+    public function packSize(): int
+    {
+        return $this->pack_unit && (int) $this->pack_size > 1 ? (int) $this->pack_size : 1;
+    }
+
+    /** A quantity in packs ($unit "pack") as pieces; pieces stay as they are */
+    public function toPieces(int $qty, ?string $unit): int
+    {
+        return $unit === 'pack' ? $qty * $this->packSize() : $qty;
+    }
+
+    /** True when a unit name (a purchase order line's "roll") is this product's pack */
+    public function isPackUnit(?string $unit): bool
+    {
+        return $this->packSize() > 1 && $unit !== null
+            && mb_strtolower(trim($unit)) === mb_strtolower(trim((string) $this->pack_unit));
+    }
+
     public const LINKED_STOCK_MESSAGE = "This bouquet's stock comes from its linked flowers. Change the flowers' stock instead.";
 
     /** The linked rows of a bouquet: [[product_id, colour|null, pieces], …] */
@@ -380,6 +402,8 @@ class Product extends Model
         'max_stock_level',
         'stock_kind',
         'stock_unit',
+        'pack_unit',  // what it's bought in, e.g. "roll" (stock is counted in stock_unit, e.g. "sheet")
+        'pack_size',  // how many stock_unit are in one pack_unit
 
         // Supplier
         'supplier_id',

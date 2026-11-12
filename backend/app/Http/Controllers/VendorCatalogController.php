@@ -125,6 +125,7 @@ class VendorCatalogController extends Controller
             'quantity' => 'required|integer|min:0|max:1000000',
             'reason' => ['required', Rule::in(array_keys(ProductStockAdjustment::REASONS))],
             'note' => 'nullable|string|max:500',
+            'unit' => 'nullable|in:piece,pack', // pack: the quantity is in packs (rolls)
         ]);
 
         $actor = $request->user();
@@ -136,6 +137,7 @@ class VendorCatalogController extends Controller
             if ($product->isLinkedBouquet()) {
                 return ['error' => Product::LINKED_STOCK_MESSAGE];
             }
+            $data['quantity'] = $product->toPieces((int) $data['quantity'], $data['unit'] ?? null);
 
             $before = (int) $product->quantity_in_stock;
             $after = match ($data['mode']) {

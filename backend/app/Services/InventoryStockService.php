@@ -51,7 +51,7 @@ class InventoryStockService
             ->where('status', '!=', 'discontinued')
             ->orderBy('product_name')
             ->get(['id', 'product_name', 'sku', 'category', 'stock_kind', 'stock_unit', 'moderation_status', 'status',
-                'quantity_in_stock', 'min_stock_level', 'max_stock_level', 'supplier_lead_time', 'purchase_price', 'selling_type', 'composition']);
+                'quantity_in_stock', 'min_stock_level', 'max_stock_level', 'supplier_lead_time', 'purchase_price', 'selling_type', 'composition', 'pack_unit', 'pack_size']);
         $ids = $products->pluck('id');
 
         // Still to come on approved purchase orders
@@ -131,6 +131,9 @@ class InventoryStockService
                 'kind'          => self::kindOf($p),
                 'kind_set'      => (bool) $p->stock_kind,
                 'unit'          => $p->stock_unit,
+                // Bought in packs: one pack_unit (roll) holds pack_size of the unit above
+                'pack_unit'     => $p->pack_unit && (int) $p->pack_size > 1 ? $p->pack_unit : null,
+                'pack_size'     => $p->pack_unit && (int) $p->pack_size > 1 ? (int) $p->pack_size : null,
                 'material'      => $p->moderation_status === Product::MODERATION_INTERNAL,
                 'status'        => $p->status,
                 'on_hand'       => $onHand,
@@ -264,7 +267,7 @@ class InventoryStockService
     /** Minimum, target, kind, unit and lead time */
     public function setLevels(Product $product, array $data): Product
     {
-        $product->update(array_intersect_key($data, array_flip(['min_stock_level', 'max_stock_level', 'stock_kind', 'stock_unit', 'supplier_lead_time'])));
+        $product->update(array_intersect_key($data, array_flip(['min_stock_level', 'max_stock_level', 'stock_kind', 'stock_unit', 'pack_unit', 'pack_size', 'supplier_lead_time'])));
 
         return $product->fresh();
     }
@@ -393,6 +396,8 @@ class InventoryStockService
                 'supplier_lead_time' => $data['supplier_lead_time'] ?? null,
                 'stock_kind'        => $data['stock_kind'],
                 'stock_unit'        => $data['stock_unit'] ?? null,
+                'pack_unit'         => ! empty($data['pack_unit']) ? $data['pack_unit'] : null,
+                'pack_size'         => ! empty($data['pack_unit']) ? ($data['pack_size'] ?? null) : null,
                 'status'            => 'active',
             ]);
             $product->owner_id = $ownerId;

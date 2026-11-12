@@ -48,6 +48,8 @@ class InventoryStockController extends Controller
             'max_stock_level'    => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000'],
             'stock_kind'         => ['sometimes', 'nullable', Rule::in(InventoryStockService::KINDS)],
             'stock_unit'         => ['sometimes', 'nullable', 'string', 'max:20'],
+            'pack_unit'          => ['sometimes', 'nullable', 'string', 'max:20'],
+            'pack_size'          => ['sometimes', 'nullable', 'integer', 'min:2', 'max:100000'],
             'supplier_lead_time' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:180'],
         ]);
         $product = $this->product($id);
@@ -65,6 +67,7 @@ class InventoryStockController extends Controller
         $data = $request->validate([
             'mode'     => ['required', Rule::in(['add', 'remove', 'set'])],
             'quantity' => ['required', 'integer', 'min:0', 'max:1000000'],
+            'unit'     => ['nullable', Rule::in(['piece', 'pack'])], // pack: the quantity is in packs (rolls)
             'reason'   => ['required', Rule::in(array_keys(ProductStockAdjustment::REASONS))],
             'note'     => ['nullable', 'string', 'max:500'],
         ], [
@@ -75,7 +78,10 @@ class InventoryStockController extends Controller
         }
 
         try {
-            $result = $this->stock->adjust($this->product($id), $data['mode'], $data['quantity'], $data['reason'], $data['note'] ?? null, $request->user());
+            $product = $this->product($id);
+            // In packs (2 rolls): counted in pieces (sheets) on the shelf
+            $qty = $product->toPieces((int) $data['quantity'], $data['unit'] ?? null);
+            $result = $this->stock->adjust($product, $data['mode'], $qty, $data['reason'], $data['note'] ?? null, $request->user());
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -91,6 +97,8 @@ class InventoryStockController extends Controller
             'stock_kind'         => ['required', Rule::in(array_diff(InventoryStockService::KINDS, ['flowers']))],
             'sku'                => ['nullable', 'string', 'max:100', 'unique:products,sku'],
             'stock_unit'         => ['nullable', 'string', 'max:20'],
+            'pack_unit'          => ['nullable', 'string', 'max:20'],
+            'pack_size'          => ['nullable', 'integer', 'min:2', 'max:100000', 'required_with:pack_unit'],
             'unit_cost'          => ['nullable', 'numeric', 'min:0', 'max:9999999'],
             'on_hand'            => ['nullable', 'integer', 'min:0', 'max:1000000'],
             'min_stock_level'    => ['nullable', 'integer', 'min:0', 'max:1000000'],
@@ -101,6 +109,8 @@ class InventoryStockController extends Controller
             'stock_kind.in'          => 'Flowers are added as products. Materials are wrapping, ribbons, vases, greenery or other supplies.',
             'sku.unique'             => 'Another product already uses that SKU.',
             'max_stock_level.gte'    => 'The target has to be at least the minimum.',
+            'pack_size.required_with' => 'Enter how many pieces are in one pack.',
+            'pack_size.min'          => 'A pack holds at least 2 pieces.',
         ]);
 
         return response()->json(['data' => $this->stock->createMaterial($this->getOwnerId(), $data, $request->user()), 'message' => 'Material added.'], 201);

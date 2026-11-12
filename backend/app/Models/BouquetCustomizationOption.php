@@ -51,6 +51,8 @@ class BouquetCustomizationOption extends Model
         'card_limit',
         'card_sizes',
         'sort_order',
+        'stock_product_id', // the material it uses up (e.g. a wrapper's sheets)
+        'stock_per_use',    // how many of that material one bouquet uses
     ];
 
     protected $casts = [
@@ -60,9 +62,51 @@ class BouquetCustomizationOption extends Model
         'card_limit' => 'integer',
         'pattern_size' => 'integer',
         'card_sizes' => 'array',
+        'stock_product_id' => 'integer',
+        'stock_per_use' => 'integer',
     ];
 
     protected $hidden = ['model_path', 'image_path'];
+
+    /**
+     * The materials custom bouquets use up: for each order item's chosen
+     * wrapper, inner wrapper, ribbon and fillers (every copy) that is linked to
+     * a material, [material id, null, pieces × the item's quantity].
+     */
+    public static function stockLinesFor(iterable $items): array
+    {
+        $uses = []; // option id => how many times it's used
+        foreach ($items as $item) {
+            $c = $item->customizations ?? null;
+            if (is_string($c)) {
+                $c = json_decode($c, true);
+            }
+            if (! is_array($c)) {
+                continue;
+            }
+            $qty = max(1, (int) ($item->quantity ?? 1));
+            $ids = [data_get($c, 'wrapper.id'), data_get($c, 'inner_wrapper.id'), data_get($c, 'ribbon.id')];
+            foreach ((array) data_get($c, 'fillers', []) as $filler) {
+                $ids[] = data_get($filler, 'id');
+            }
+            foreach ($ids as $id) {
+                if ((int) $id > 0) {
+                    $uses[(int) $id] = ($uses[(int) $id] ?? 0) + $qty;
+                }
+            }
+        }
+        if (! $uses) {
+            return [];
+        }
+
+        $lines = [];
+        static::query()->whereIn('id', array_keys($uses))->whereNotNull('stock_product_id')->get()
+            ->each(function (self $option) use ($uses, &$lines) {
+                $lines[] = [(int) $option->stock_product_id, null, max(1, (int) $option->stock_per_use) * $uses[$option->id]];
+            });
+
+        return $lines;
+    }
 
     /** How much of the card's allowance a message uses */
     public static function countCardMessage(string $message, ?string $limitType): int

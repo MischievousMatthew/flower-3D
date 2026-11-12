@@ -19,6 +19,8 @@ class VendorCustomizationOptionController extends Controller
     use ResolvesOwner;
 
     private const MODEL_EXTENSIONS = ['glb', 'gltf'];
+    // Options that can use up a material in stock when a custom bouquet is sold
+    private const STOCK_TYPES = [Option::TYPE_WRAPPER, Option::TYPE_RIBBON, Option::TYPE_FILLER];
 
     /**
      * GET /api/vendor/customization-options
@@ -196,6 +198,12 @@ class VendorCustomizationOptionController extends Controller
             $rules['model_file'] = ($creating ? 'required' : 'nullable') . '|file|max:10240';
         }
 
+        if (in_array($type, self::STOCK_TYPES, true)) {
+            // The material it uses up (a wrapper's sheets), checked to be the shop's own in payload()
+            $rules['stock_product_id'] = 'nullable|integer|min:1';
+            $rules['stock_per_use'] = 'nullable|integer|min:1|max:1000';
+        }
+
         if ($type === Option::TYPE_CARD) {
             // Each size the card comes in has its own price; the card's
             // `price` is kept as the lowest of them for listings.
@@ -235,6 +243,17 @@ class VendorCustomizationOptionController extends Controller
         // base price covers them. Cards are priced per size below.
         if ($type !== Option::TYPE_CARD) {
             $data['price'] = 0;
+        }
+        // The material it uses up: only the shop's own, never a bouquet
+        if ($request->has('stock_product_id') && in_array($type, self::STOCK_TYPES, true)) {
+            $productId = (int) $request->input('stock_product_id');
+            $valid = $productId > 0 && \App\Models\Product::query()
+                ->whereKey($productId)
+                ->where('owner_id', $this->resolveOwnerId($request))
+                ->where(fn ($q) => $q->whereNull('selling_type')->orWhere('selling_type', '!=', 'bouquet'))
+                ->exists();
+            $data['stock_product_id'] = $valid ? $productId : null;
+            $data['stock_per_use'] = $valid ? max(1, (int) ($request->input('stock_per_use') ?: 1)) : 1;
         }
         if ($request->has('color_hex') && !in_array($type, Option::MODEL_TYPES, true)) {
             $data['color_hex'] = strtolower($request->input('color_hex'));

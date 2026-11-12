@@ -327,7 +327,11 @@ class VendorFinanceService
 
         // A bouquet made from linked flowers takes those flowers, not itself.
         // Lock in id order so two checkouts of the same products can't deadlock.
-        $plan = Product::stockPlan($this->stockLines($items));
+        // Custom bouquets also use up the materials their wrapper, ribbon and fillers are linked to
+        $plan = Product::stockPlan(array_merge(
+            $this->stockLines($items),
+            \App\Models\BouquetCustomizationOption::stockLinesFor($items),
+        ));
         foreach ($plan as [$productId, $color, $quantity, $forBouquet]) {
             // Only takes stock that is there (the row is locked): when two people
             // check out the last ones at once, one gets them and the other is told

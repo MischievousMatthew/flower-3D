@@ -205,6 +205,38 @@ class ProductColorStockTest extends TestCase
         $this->assertSame(0, (int) $b->fresh()->quantity_in_stock);
     }
 
+    public function test_a_custom_bouquet_uses_up_the_materials_its_options_are_linked_to(): void
+    {
+        Schema::dropIfExists('bouquet_customization_options');
+        Schema::create('bouquet_customization_options', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('owner_id');
+            $t->string('type');
+            $t->string('name');
+            $t->unsignedBigInteger('stock_product_id')->nullable();
+            $t->unsignedInteger('stock_per_use')->default(1);
+            $t->timestamps();
+        });
+        $kraft = $this->flower('Kraft wrapper', 100);
+        $satin = $this->flower('Satin ribbon', 40);
+        $wrapper = \App\Models\BouquetCustomizationOption::forceCreate(['owner_id' => 1, 'type' => 'wrapper', 'name' => 'Kraft', 'stock_product_id' => $kraft->id, 'stock_per_use' => 2]);
+        $ribbon = \App\Models\BouquetCustomizationOption::forceCreate(['owner_id' => 1, 'type' => 'ribbon', 'name' => 'Satin', 'stock_product_id' => $satin->id, 'stock_per_use' => 1]);
+        $loose = \App\Models\BouquetCustomizationOption::forceCreate(['owner_id' => 1, 'type' => 'filler', 'name' => 'Pearls']); // not linked
+
+        // Two of the same design, plus one with the Kraft wrapper as the inner layer too
+        $items = [
+            (object) ['quantity' => 2, 'customizations' => ['wrapper' => ['id' => $wrapper->id], 'ribbon' => ['id' => $ribbon->id], 'fillers' => [['id' => $loose->id]]]],
+            (object) ['quantity' => 1, 'customizations' => json_encode(['wrapper' => ['id' => $wrapper->id], 'inner_wrapper' => ['id' => $wrapper->id]])],
+            (object) ['quantity' => 1, 'customizations' => null],
+        ];
+        $lines = collect(\App\Models\BouquetCustomizationOption::stockLinesFor($items))->keyBy(0);
+
+        $this->assertSame(2 * (2 + 1 + 1), $lines[$kraft->id][2], '2 sheets per use: 2 bouquets + 1 wrapper + 1 inner wrapper');
+        $this->assertSame(2, $lines[$satin->id][2]);
+        $this->assertCount(2, $lines, 'the unlinked filler uses nothing');
+        Schema::dropIfExists('bouquet_customization_options');
+    }
+
     public function test_links_must_be_the_shops_own_single_flowers(): void
     {
         $rose = $this->flower('Red rose', 100);

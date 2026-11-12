@@ -52,6 +52,8 @@ class InventoryReplenishmentTest extends TestCase
             $t->integer('preparation_days')->default(0);
             $t->string('selling_type')->nullable();
             $t->json('composition')->nullable();
+            $t->string('pack_unit', 20)->nullable();
+            $t->unsignedInteger('pack_size')->nullable();
         });
         Schema::create('product_stock_adjustments', function (Blueprint $t) {
             $t->id();
@@ -239,6 +241,34 @@ class InventoryReplenishmentTest extends TestCase
 
         // Flowers are added as products, not as materials
         $this->postJson(self::BASE . '/materials', ['name' => 'Rose', 'stock_kind' => 'flowers'])->assertStatus(422);
+    }
+
+    public function test_a_wrapper_bought_in_rolls_is_counted_in_sheets(): void
+    {
+        $vendor = $this->shopOwner();
+        $this->signIn($vendor);
+
+        // A roll holds 50 sheets; stock is always in sheets
+        $this->postJson(self::BASE . '/materials', ['name' => 'Kraft wrapper', 'stock_kind' => 'wrapping', 'stock_unit' => 'sheet', 'pack_unit' => 'roll'])
+            ->assertStatus(422)->assertJsonValidationErrors('pack_size');
+        $id = $this->postJson(self::BASE . '/materials', [
+            'name' => 'Kraft wrapper', 'stock_kind' => 'wrapping', 'stock_unit' => 'sheet', 'pack_unit' => 'roll', 'pack_size' => 50, 'on_hand' => 10,
+        ])->assertCreated()->json('data.id');
+
+        // Adding 2 rolls adds 100 sheets; taking 15 pieces takes 15 sheets
+        $this->postJson(self::BASE . "/{$id}/adjust", ['mode' => 'add', 'quantity' => 2, 'unit' => 'pack', 'reason' => 'count'])->assertOk();
+        $this->postJson(self::BASE . "/{$id}/adjust", ['mode' => 'remove', 'quantity' => 15, 'unit' => 'piece', 'reason' => 'used'])->assertOk();
+        $this->assertSame(95, (int) Product::findOrFail($id)->quantity_in_stock);
+
+        $item = collect($this->getJson(self::BASE)->json('data.items'))->firstWhere('id', $id);
+        $this->assertSame(['sheet', 'roll', 50, 95], [$item['unit'], $item['pack_unit'], $item['pack_size'], $item['on_hand']]);
+
+        // A purchase order line in rolls is stocked as sheets
+        $product = Product::findOrFail($id);
+        $this->assertTrue($product->isPackUnit('Roll'));
+        $this->assertFalse($product->isPackUnit('sheet'));
+        $this->assertSame(150, $product->toPieces(3, 'pack'));
+        $this->assertSame(3, $product->toPieces(3, null));
     }
 
     public function test_levels_need_the_edit_permission_and_a_sensible_target(): void

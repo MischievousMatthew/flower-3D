@@ -120,6 +120,7 @@
             </span>
             <span class="st-onhand">
               <b>{{ it.on_hand.toLocaleString("en-PH") }} <small>{{ unitOf(it) }}</small></b>
+              <small v-if="it.pack_size" class="st-packs">{{ packText(it, it.on_hand) }}</small>
               <span class="st-level" role="img" :aria-label="levelLabel(it)"><span :style="{ width: `${levelPct(it)}%` }"></span><i v-if="it.min && it.target" :style="{ left: `${(it.min / it.target) * 100}%` }"></i></span>
               <small :class="`st-state ${it.state}`">{{ STATE_TEXT[it.state] }}</small>
             </span>
@@ -136,7 +137,7 @@
             </span>
             <span class="st-suggest">
               <template v-if="it.suggestion.qty">
-                <b>Order {{ it.suggestion.qty.toLocaleString("en-PH") }}</b>
+                <b>Order {{ it.suggestion.qty.toLocaleString("en-PH") }}<template v-if="it.pack_size"> · {{ packsToOrder(it) }} {{ plural(it.pack_unit, packsToOrder(it)) }}</template></b>
                 <small :title="it.suggestion.why">{{ it.last_supplier ? `${it.last_supplier.name} · ${money(it.last_supplier.price)}` : it.suggestion.why }}</small>
               </template>
               <small v-else class="muted">{{ it.suggestion.why }}</small>
@@ -187,9 +188,15 @@
             <div class="sp-seg st-modes" role="radiogroup" aria-label="Change">
               <button v-for="m in MODES" :key="m.value" type="button" role="radio" :aria-checked="adj.mode === m.value" :class="{ on: adj.mode === m.value }" @click="setMode(m.value)">{{ m.label }}</button>
             </div>
+            <!-- Bought in packs: count in rolls or in single sheets -->
+            <div v-if="adj.item.pack_size" class="sp-seg st-units" role="radiogroup" aria-label="Count in">
+              <button type="button" role="radio" :aria-checked="adj.unit === 'piece'" :class="{ on: adj.unit === 'piece' }" @click="adj.unit = 'piece'">{{ plural(unitOf(adj.item), 2) }}</button>
+              <button type="button" role="radio" :aria-checked="adj.unit === 'pack'" :class="{ on: adj.unit === 'pack' }" @click="adj.unit = 'pack'">{{ plural(adj.item.pack_unit, 2) }} of {{ adj.item.pack_size }}</button>
+            </div>
             <label class="sp-field">
-              <span class="sp-label">{{ adj.mode === "set" ? "Counted on hand" : adj.mode === "add" ? "How many to add" : "How many to take away" }}</span>
+              <span class="sp-label">{{ adj.mode === "set" ? "Counted on hand" : adj.mode === "add" ? "How many to add" : "How many to take away" }}<template v-if="adj.item.pack_size"> ({{ plural(adj.unit === "pack" ? adj.item.pack_unit : unitOf(adj.item), 2) }})</template></span>
               <input v-model.number="adj.quantity" class="sp-input" :class="{ invalid: adj.errors.quantity }" type="number" min="0" step="1" inputmode="numeric" />
+              <small v-if="adj.item.pack_size && adj.unit === 'pack' && Number(adj.quantity) > 0" class="sp-hint">= {{ (Number(adj.quantity) * adj.item.pack_size).toLocaleString("en-PH") }} {{ plural(unitOf(adj.item), Number(adj.quantity) * adj.item.pack_size) }}</small>
               <small v-if="adj.errors.quantity" class="sp-error">{{ adj.errors.quantity }}</small>
               <small v-else-if="adjAfter !== null && adjAfter < 0" class="sp-error">Only {{ adj.item.on_hand.toLocaleString("en-PH") }} on hand, so you can take away at most that.</small>
               <small v-else-if="adjAfter !== null" class="sp-hint">Stock becomes {{ adjAfter.toLocaleString("en-PH") }}{{ adj.item.min && adjAfter <= adj.item.min ? ", at or under the minimum" : "" }}.</small>
@@ -241,9 +248,20 @@
                 <input v-model="lv.lead" class="sp-input" type="number" min="0" max="180" step="1" inputmode="numeric" :placeholder="lv.item.last_supplier ? 'Uses the supplier’s if empty' : ''" />
               </label>
               <label class="sp-field">
-                <span class="sp-label">Counted in</span>
-                <input v-model.trim="lv.unit" class="sp-input" maxlength="20" list="st-units" placeholder="e.g. stem, roll, piece" />
+                <span class="sp-label">Counted in <small>(the smallest unit you use)</small></span>
+                <input v-model.trim="lv.unit" class="sp-input" maxlength="20" list="st-units" placeholder="e.g. stem, sheet, piece" />
                 <datalist id="st-units"><option v-for="u in UNIT_HINTS" :key="u" :value="u" /></datalist>
+              </label>
+              <label class="sp-field">
+                <span class="sp-label">Bought in <small>(optional pack)</small></span>
+                <input v-model.trim="lv.pack_unit" class="sp-input" maxlength="20" list="st-packs" placeholder="e.g. roll, box, bundle" />
+                <datalist id="st-packs"><option v-for="u in PACK_HINTS" :key="u" :value="u" /></datalist>
+              </label>
+              <label v-if="lv.pack_unit" class="sp-field">
+                <span class="sp-label">{{ cap(plural(lv.unit || "piece", 2)) }} in one {{ lv.pack_unit }}</span>
+                <input v-model="lv.pack_size" class="sp-input" :class="{ invalid: lv.errors.pack_size }" type="number" min="2" step="1" inputmode="numeric" placeholder="e.g. 50" />
+                <small v-if="lv.errors.pack_size" class="sp-error">{{ lv.errors.pack_size }}</small>
+                <small v-else class="sp-hint">Measure one {{ lv.pack_unit }} once: its length ÷ one {{ lv.unit || "piece" }}.</small>
               </label>
               <label class="sp-field sp-span-all">
                 <span class="sp-label">Kind of stock</span>
@@ -286,11 +304,22 @@
                 </select>
               </label>
               <label class="sp-field">
-                <span class="sp-label">Counted in</span>
-                <input v-model.trim="mat.stock_unit" class="sp-input" maxlength="20" list="st-units" placeholder="e.g. roll" />
+                <span class="sp-label">Counted in <small>(the smallest unit you use)</small></span>
+                <input v-model.trim="mat.stock_unit" class="sp-input" maxlength="20" list="st-units" placeholder="e.g. sheet" />
               </label>
               <label class="sp-field">
-                <span class="sp-label">On hand now</span>
+                <span class="sp-label">Bought in <small>(optional pack)</small></span>
+                <input v-model.trim="mat.pack_unit" class="sp-input" maxlength="20" list="st-packs" placeholder="e.g. roll, box, bundle" />
+                <datalist id="st-packs"><option v-for="u in PACK_HINTS" :key="u" :value="u" /></datalist>
+              </label>
+              <label v-if="mat.pack_unit" class="sp-field">
+                <span class="sp-label">{{ cap(plural(mat.stock_unit || "piece", 2)) }} in one {{ mat.pack_unit }}</span>
+                <input v-model="mat.pack_size" class="sp-input" :class="{ invalid: mat.errors.pack_size }" type="number" min="2" step="1" inputmode="numeric" placeholder="e.g. 50" />
+                <small v-if="mat.errors.pack_size" class="sp-error">{{ mat.errors.pack_size }}</small>
+                <small v-else class="sp-hint">Measure one {{ mat.pack_unit }} once: its length ÷ one {{ mat.stock_unit || "piece" }}.</small>
+              </label>
+              <label class="sp-field">
+                <span class="sp-label">On hand now <small>({{ plural(mat.stock_unit || "piece", 2) }})</small></span>
                 <input v-model.number="mat.on_hand" class="sp-input" type="number" min="0" step="1" inputmode="numeric" />
               </label>
               <label class="sp-field">
@@ -364,7 +393,22 @@ const MODES = [
   { value: "add", label: "Add" },
   { value: "set", label: "Count" },
 ];
-const UNIT_HINTS = ["stem", "bunch", "roll", "piece", "pack", "box", "meter"];
+const UNIT_HINTS = ["stem", "sheet", "piece", "bunch", "meter"];
+const PACK_HINTS = ["roll", "box", "bundle", "pack", "bunch"];
+
+// ─── Bought in packs: stock counts the smallest unit (sheets), a pack (roll) holds pack_size ───
+const cap = (s) => String(s || "").charAt(0).toUpperCase() + String(s || "").slice(1);
+/** "roll" → "rolls" (words already ending in s, like "pcs", stay as they are) */
+const plural = (word, n) => (n === 1 || /s$/i.test(String(word || "")) ? word : `${word}s`);
+/** 95 sheets of 50 per roll → "≈ 1 roll + 45 sheets" */
+function packText(it, n) {
+  const packs = Math.floor(n / it.pack_size);
+  const rest = n % it.pack_size;
+  if (!packs) return `less than 1 ${it.pack_unit}`;
+  return `≈ ${packs} ${plural(it.pack_unit, packs)}${rest ? ` + ${rest} ${plural(unitOf(it), rest)}` : ""}`;
+}
+/** Whole packs to order for the suggested amount */
+const packsToOrder = (it) => Math.max(1, Math.ceil(it.suggestion.qty / it.pack_size));
 
 const router = useRouter();
 const { can, canEdit } = useAssignment();
@@ -462,7 +506,18 @@ function orderPicked() {
   const suppliers = [...new Set(items.map((it) => it.last_supplier?.active ? it.last_supplier.id : null).filter(Boolean))];
   const prefill = {
     supplier_id: suppliers.length === 1 ? suppliers[0] : null,
-    lines: items.map((it) => ({ product_id: it.id, product_name: it.name, quantity: it.suggestion.qty, unit: it.last_supplier?.unit || it.unit || (it.kind === "flowers" ? "stem" : "piece"), price: it.last_supplier?.price ?? it.unit_cost ?? 0 })),
+    lines: items.map((it) =>
+      // Bought in packs: order whole rolls (receiving them adds their sheets)
+      it.pack_size
+        ? {
+            product_id: it.id,
+            product_name: it.name,
+            quantity: packsToOrder(it),
+            unit: it.pack_unit,
+            price: String(it.last_supplier?.unit || "").toLowerCase() === it.pack_unit.toLowerCase() ? it.last_supplier.price : (it.unit_cost ?? 0) * it.pack_size,
+          }
+        : { product_id: it.id, product_name: it.name, quantity: it.suggestion.qty, unit: it.last_supplier?.unit || it.unit || (it.kind === "flowers" ? "stem" : "piece"), price: it.last_supplier?.price ?? it.unit_cost ?? 0 },
+    ),
   };
   if (suppliers.length > 1) toast.info("These were last bought from different suppliers. Pick one supplier for this order, then make another for the rest.");
   router.push({ name: "OrderCreate", state: { prefill: JSON.stringify(prefill) } });
@@ -471,13 +526,13 @@ function orderPicked() {
 // ─── Adjust ───
 const adjAfter = computed(() => {
   if (!adj.value || adj.value.quantity === "" || adj.value.quantity === null) return null;
-  const q = Number(adj.value.quantity) || 0;
+  const q = (Number(adj.value.quantity) || 0) * (adj.value.unit === "pack" ? adj.value.item.pack_size || 1 : 1);
   const b = adj.value.item.on_hand;
   return adj.value.mode === "add" ? b + q : adj.value.mode === "remove" ? b - q : q;
 });
 const reasonsFor = (mode) => (data.value?.reasons ?? []).filter((r) => (mode === "add" ? r.value !== "damaged" && r.value !== "used" && r.value !== "sold_offline" : mode === "remove" ? r.value !== "restock" && r.value !== "returned" : true));
 function openAdjust(it) {
-  adj.value = { item: it, mode: "remove", quantity: "", reason: "", note: "", errors: {}, error: "", busy: false };
+  adj.value = { item: it, mode: "remove", unit: "piece", quantity: "", reason: "", note: "", errors: {}, error: "", busy: false };
 }
 function setMode(m) {
   adj.value.mode = m;
@@ -493,7 +548,7 @@ async function saveAdjust() {
   if (Object.keys(a.errors).length) return;
   a.busy = true;
   try {
-    await inventoryStockService.adjust(a.item.id, { mode: a.mode, quantity: Number(a.quantity), reason: a.reason, note: a.note || null });
+    await inventoryStockService.adjust(a.item.id, { mode: a.mode, quantity: Number(a.quantity), unit: a.item.pack_size ? a.unit : null, reason: a.reason, note: a.note || null });
     toast.success(`${a.item.name}: stock is now ${adjAfter.value.toLocaleString("en-PH")}.`);
     adj.value = null;
     load();
@@ -506,7 +561,7 @@ async function saveAdjust() {
 
 // ─── Levels ───
 function openLevels(it) {
-  lv.value = { item: it, min: it.min, target: it.target ?? "", lead: it.lead_days ?? "", unit: it.unit ?? "", kind: it.kind, used: it.used_30d > 0, errors: {}, error: "", busy: false };
+  lv.value = { item: it, min: it.min, target: it.target ?? "", lead: it.lead_days ?? "", unit: it.unit ?? "", pack_unit: it.pack_unit ?? "", pack_size: it.pack_size ?? "", kind: it.kind, used: it.used_30d > 0, errors: {}, error: "", busy: false };
 }
 async function saveLevels() {
   const l = lv.value;
@@ -516,6 +571,10 @@ async function saveLevels() {
     l.errors.max_stock_level = "The target has to be at least the minimum.";
     return;
   }
+  if (l.pack_unit && !(Number(l.pack_size) >= 2)) {
+    l.errors.pack_size = `Enter how many ${plural(l.unit || "piece", 2)} are in one ${l.pack_unit} (2 or more).`;
+    return;
+  }
   l.busy = true;
   try {
     await inventoryStockService.setLevels(l.item.id, {
@@ -523,6 +582,8 @@ async function saveLevels() {
       max_stock_level: l.target === "" ? null : Number(l.target),
       supplier_lead_time: l.lead === "" ? null : Number(l.lead),
       stock_unit: l.unit || null,
+      pack_unit: l.pack_unit || null,
+      pack_size: l.pack_unit ? Number(l.pack_size) : null,
       stock_kind: l.kind,
     });
     toast.success(`Levels saved for ${l.item.name}.`);
@@ -537,7 +598,7 @@ async function saveLevels() {
 
 // ─── Add material ───
 function openMaterial() {
-  mat.value = { name: "", stock_kind: "wrapping", stock_unit: "", on_hand: 0, unit_cost: "", min_stock_level: 0, max_stock_level: "", sku: "", supplier_lead_time: "", errors: {}, error: "", busy: false };
+  mat.value = { name: "", stock_kind: "wrapping", stock_unit: "", pack_unit: "", pack_size: "", on_hand: 0, unit_cost: "", min_stock_level: 0, max_stock_level: "", sku: "", supplier_lead_time: "", errors: {}, error: "", busy: false };
 }
 async function saveMaterial() {
   const m = mat.value;
@@ -545,9 +606,10 @@ async function saveMaterial() {
   m.error = "";
   if (!m.name) m.errors.name = "Name the material.";
   if (m.max_stock_level !== "" && Number(m.max_stock_level) < Number(m.min_stock_level)) m.errors.max_stock_level = "The target has to be at least the minimum.";
+  if (m.pack_unit && !(Number(m.pack_size) >= 2)) m.errors.pack_size = `Enter how many ${plural(m.stock_unit || "piece", 2)} are in one ${m.pack_unit} (2 or more).`;
   if (Object.keys(m.errors).length) return;
   m.busy = true;
-  const body = { name: m.name, stock_kind: m.stock_kind, stock_unit: m.stock_unit || null, on_hand: Number(m.on_hand) || 0, unit_cost: m.unit_cost === "" ? null : Number(m.unit_cost), min_stock_level: Number(m.min_stock_level) || 0, max_stock_level: m.max_stock_level === "" ? null : Number(m.max_stock_level), sku: m.sku || null, supplier_lead_time: m.supplier_lead_time === "" ? null : Number(m.supplier_lead_time) };
+  const body = { name: m.name, stock_kind: m.stock_kind, stock_unit: m.stock_unit || null, pack_unit: m.pack_unit || null, pack_size: m.pack_unit ? Number(m.pack_size) : null, on_hand: Number(m.on_hand) || 0, unit_cost: m.unit_cost === "" ? null : Number(m.unit_cost), min_stock_level: Number(m.min_stock_level) || 0, max_stock_level: m.max_stock_level === "" ? null : Number(m.max_stock_level), sku: m.sku || null, supplier_lead_time: m.supplier_lead_time === "" ? null : Number(m.supplier_lead_time) };
   try {
     await inventoryStockService.addMaterial(body);
     toast.success(`${m.name} was added.`);
@@ -978,6 +1040,19 @@ onMounted(() => {
 .st-modes button {
   flex: 1;
   justify-content: center;
+}
+/* Count in sheets or in rolls */
+.st-units {
+  display: flex;
+}
+.st-units button {
+  flex: 1;
+  justify-content: center;
+}
+/* "≈ 1 roll + 45 sheets" under the on-hand count */
+.st-packs {
+  color: var(--v-muted);
+  font-size: 11.5px;
 }
 
 @media (max-width: 1180px) {
