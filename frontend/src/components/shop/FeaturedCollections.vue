@@ -91,7 +91,7 @@ const ALL_TABS = [
   { key: "season", label: "In season", sub: "Recommended by BloomCraft", tag: "recommended", icon: ICONS.leaf, view: "season", empty: "" },
   { key: "best", label: "Best sellers", tag: "best_seller", icon: ICONS.medal, view: "best", note: "The flowers customers buy the most, ranked by how many have sold.", params: { best_sellers: 1, sort_by: "popular_desc" }, empty: "Best sellers show up once flowers start selling." },
   { key: "new", label: "New arrivals", tag: "new_arrival", icon: ICONS.spark, view: "new", note: "Just added by our shops. The newest flowers come first.", params: { sort_by: "created_at_desc" }, empty: "New flowers show up here as shops add them." },
-  { key: "trending", label: "Trending", tag: "trending", icon: ICONS.trend, view: "trending", note: "Getting the most orders across our shops right now.", params: { sort_by: "popular_desc" }, empty: "Nothing is trending yet." },
+  { key: "trending", label: "Trending", tag: "trending", icon: ICONS.trend, view: "trending", note: "Ordered the most in the last 7 days across all our shops, most orders first.", params: { sort_by: "trending_desc" }, empty: "Nothing has been ordered in the last 7 days yet. Check back soon." },
   { key: "top", label: "Top rated", tag: "top_rated", icon: ICONS.star, view: "top", note: "Rated highest by customers who bought them, based on their reviews.", params: { sort_by: "rating_desc" }, empty: "Top rated flowers show up once customers leave reviews." },
 ];
 const tabs = computed(() => ALL_TABS.filter((t) => t.key !== "season" || props.featured.length));

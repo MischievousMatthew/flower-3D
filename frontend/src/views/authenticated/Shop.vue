@@ -340,6 +340,7 @@ const SORT_OPTIONS = [
   { value: "created_at_desc", label: "Newest" },
   { value: "popular_desc", label: "Most popular" },
   { value: "rating_desc", label: "Top rated" },
+  { value: "trending_desc", label: "Trending this week" },
   { value: "price_low", label: "Price: low to high" },
   { value: "price_high", label: "Price: high to low" },
   { value: "name_asc", label: "Name: A to Z" },
@@ -968,7 +969,7 @@ watch(
 // "View all" on a featured collection: the full catalog in that order
 const onViewAll = (view) => {
   selectedFilters.value.bestSellers = view === "best";
-  sortBy.value = { best: "popular_desc", new: "created_at_desc", trending: "popular_desc", top: "rating_desc" }[view] || sortBy.value;
+  sortBy.value = { best: "popular_desc", new: "created_at_desc", trending: "trending_desc", top: "rating_desc" }[view] || sortBy.value;
   pagination.value.current_page = 1;
   fetchProducts();
   scrollToSection("products");
@@ -1018,6 +1019,7 @@ const catalogTitle = computed(() => {
   if (activeSearch.value) return `Results for "${activeSearch.value}"`;
   if (f.bestSellers) return "Best sellers";
   if (f.onSale) return "Flowers on sale";
+  if (sortBy.value === "trending_desc") return "Trending this week";
   return "Every flower, one place";
 });
 const rangeText = computed(() => {
@@ -1030,6 +1032,7 @@ const rangeText = computed(() => {
 const emptyText = computed(() => {
   if (activeSearch.value) return `No flowers match "${activeSearch.value}". Try another word or clear the search.`;
   if (selectedFilters.value.onSale && activeFilterChips.value.length === 1) return 'No flowers are on sale right now. Check back soon, or remove "On sale" to see every flower.';
+  if (sortBy.value === "trending_desc" && !activeFilterChips.value.length) return "Nothing has been ordered in the last 7 days yet. Check back soon.";
   if (activeFilterChips.value.length) return "Nothing matches these filters yet. Try removing one.";
   return "Flowers show up here as shops add them.";
 });

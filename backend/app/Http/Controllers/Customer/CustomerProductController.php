@@ -31,7 +31,7 @@ class CustomerProductController extends Controller
         'owner_ids'     => 'nullable|string|max:2000',
         // Words typed into the Shop page search (name, category, colour, flower type)
         'search'        => 'nullable|string|max:100',
-        'sort_by'       => 'nullable|string|in:created_at_desc,price_low,price_high,name_asc,name_desc,popular_desc,rating_desc',
+        'sort_by'       => 'nullable|string|in:created_at_desc,price_low,price_high,name_asc,name_desc,popular_desc,rating_desc,trending_desc',
         'page'          => 'nullable|integer|min:1',
         'per_page'      => 'nullable|integer|min:1|max:100',
     ];
@@ -135,6 +135,18 @@ class CustomerProductController extends Controller
                 $query->orderByRaw('CASE id ' . collect($bestIds)->map(fn ($id, $i) => 'WHEN ' . (int) $id . ' THEN ' . $i)->implode(' ') . ' END');
             } elseif ($sortBy === 'popular_desc') {
                 $query->orderByRaw($this->soldCountSubquery() . ' DESC')
+                    ->orderBy('created_at', 'desc');
+            } elseif ($sortBy === 'trending_desc') {
+                // Trending: the most units ordered in the last 7 days (orders that
+                // weren't cancelled, failed, rejected or declined); flowers with
+                // no orders that week aren't trending, so they're left out
+                $since = now()->subDays(7)->toDateTimeString();
+                $weekUnits = "(SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi
+                    INNER JOIN orders o ON o.id = oi.order_id
+                    WHERE oi.product_id = products.id AND o.created_at >= ?
+                      AND o.status NOT IN ('cancelled', 'failed', 'rejected', 'declined'))";
+                $query->whereRaw("$weekUnits > 0", [$since])
+                    ->orderByRaw("$weekUnits DESC", [$since])
                     ->orderBy('created_at', 'desc');
             } elseif ($sortBy === 'rating_desc') {
                 // Top rated: highest average of visible reviews, then most reviews; unrated last
