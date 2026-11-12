@@ -493,6 +493,7 @@ class CartController extends Controller
         // Get vendor application info for store name
         $vendorStoreName = null;
         $vendorBusinessName = null;
+        $vendorStoreLogo = null;
         
         if ($product->owner && $product->owner->role === 'vendor') {
             $vendorApplication = VendorApplication::where('email', $product->owner->email)
@@ -502,6 +503,12 @@ class CartController extends Controller
             if ($vendorApplication) {
                 $vendorStoreName = $vendorApplication->store_name;
                 $vendorBusinessName = $vendorApplication->business_name;
+                $logo = $vendorApplication->store_logo_path;
+                if (!empty($logo)) {
+                    $vendorStoreLogo = (str_starts_with($logo, 'http://') || str_starts_with($logo, 'https://'))
+                        ? $logo
+                        : CloudinaryHelper::getUrl($logo);
+                }
             }
         }
 
@@ -541,6 +548,7 @@ class CartController extends Controller
                 'store_name' => $vendorStoreName,
                 'business_name' => $vendorBusinessName,
                 'display_name' => $vendorStoreName ?? $product->owner->name ?? 'Local Vendor',
+                'store_logo' => $vendorStoreLogo,
             ] : null,
         ];
     }

@@ -189,7 +189,16 @@
                   <svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
                 </span>
               </label>
-              <span class="vendor-avatar" aria-hidden="true">{{ vendorInitial(vendor.name) }}</span>
+              <span class="vendor-avatar" :class="{ 'has-logo': vendor.logo && !failedLogos[vendor.id] }" aria-hidden="true">
+                <img
+                  v-if="vendor.logo && !failedLogos[vendor.id]"
+                  :src="vendor.logo"
+                  alt=""
+                  loading="lazy"
+                  @error="failedLogos[vendor.id] = true"
+                />
+                <template v-else>{{ vendorInitial(vendor.name) }}</template>
+              </span>
               <div class="vendor-meta">
                 <span class="vendor-name">{{ vendor.name }}</span>
                 <span class="vendor-sub">
@@ -644,6 +653,7 @@ const vendorGroups = computed(() => {
       vendors[vendorId] = {
         id: vendorId,
         name: vendorName,
+        logo: vendor?.store_logo || null,
         items: [],
         subtotal: 0,
       };
@@ -909,6 +919,9 @@ const getStockStatus = (product) => {
 
 const getProductName = (p, item = null) => isCustomBouquet(item) ? "Custom Bouquet" : (p?.product_name || "Unknown Product");
 const getProductCategory = (p, item = null) => isCustomBouquet(item) ? "Custom flower arrangement" : (p?.category || "Uncategorized");
+
+// Shops whose logo image failed to load show their initial instead
+const failedLogos = ref({});
 
 // First letter of the shop's name, for its badge in the cart
 const vendorInitial = (name) => (name || "S").trim().charAt(0).toUpperCase() || "S";
@@ -1329,6 +1342,18 @@ const handleImageError = (e) => {
   font-size: 22px;
   font-weight: 500;
   line-height: 1;
+}
+
+.vendor-avatar.has-logo {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.vendor-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .vendor-meta {
