@@ -59,7 +59,8 @@ const SECTIONS = [
     id: "delivery",
     title: "Delivery",
     text: [
-      "Each shop delivers within its own service area. The delivery fee and available dates are shown at checkout before you pay.",
+      "Each shop books its own third-party courier to deliver your order. The delivery fee isn't included in your checkout total: the shop bills it to you separately. Available delivery dates are shown at checkout before you pay.",
+      "Shops deliver within their own service areas. An order outside a shop's areas needs the shop's approval first.",
       "Same-day delivery is offered by selected shops for orders placed before their cut-off time. You can follow your order on the Track my order page.",
     ],
   },
