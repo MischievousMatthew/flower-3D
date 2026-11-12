@@ -298,8 +298,12 @@ function clear() {
   inputEl.value?.focus();
 }
 
+// Highlighted with the arrow keys (Enter follows it) or only under the mouse
+// (Enter ignores it and searches, like "Search all flowers")
+let chosenByKeys = false;
 function hover(item) {
   activeId.value = item.id;
+  chosenByKeys = false;
 }
 
 function pick(item) {
@@ -318,10 +322,12 @@ function onKey(event) {
     const at = items.findIndex((i) => i.id === activeId.value);
     const next = event.key === "ArrowDown" ? (at + 1) % items.length : at <= 0 ? items.length - 1 : at - 1;
     activeId.value = items[next].id;
+    chosenByKeys = true;
     document.getElementById(activeId.value)?.scrollIntoView({ block: "nearest" });
   } else if (event.key === "Enter") {
     event.preventDefault();
-    const item = items.find((i) => i.id === activeId.value);
+    // Enter searches all flowers, unless something was picked with the arrow keys
+    const item = chosenByKeys ? items.find((i) => i.id === activeId.value) : null;
     if (item) pick(item);
     else {
       closePanel();
