@@ -934,7 +934,7 @@ function buyNow() {
       isDirectCheckout: true,
     }),
   );
-  router.push({ path: "/customer/checkout", query: { direct: "true", product_id: p.id, quantity: qty.value } });
+  router.push({ path: "/customer/checkout", query: { direct: "true" } });
 }
 
 // Opens the chat with this shop; the question is sent with a card for this product

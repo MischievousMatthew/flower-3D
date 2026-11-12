@@ -874,7 +874,7 @@ const buyNow = (product, quantity) => {
   closeModal();
   router.push({
     path: "/customer/checkout",
-    query: { direct: "true", product_id: product.id, quantity },
+    query: { direct: "true" },
   });
 };
 

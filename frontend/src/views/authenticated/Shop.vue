@@ -858,7 +858,7 @@ const buyNowAction = async (product, qty) => {
     closeModal();
     router.push({
       path: "/customer/checkout",
-      query: { direct: "true", product_id: product.id, quantity: qty },
+      query: { direct: "true" },
     });
   } catch (e) {
     toast.error("Failed to process order.", {
