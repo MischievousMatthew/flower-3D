@@ -1,7 +1,6 @@
 <template>
   <section class="sh" aria-roledescription="carousel" aria-label="Featured" @mouseenter="hovering = true" @mouseleave="hovering = false">
-    <div class="bc-container">
-      <div class="sh-card">
+    <div class="sh-card">
         <!-- Soft petals in the background of the card -->
         <svg class="sh-deco" viewBox="0 0 400 400" aria-hidden="true">
           <circle cx="330" cy="70" r="120" />
@@ -81,7 +80,6 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
           </button>
         </div>
-      </div>
     </div>
   </section>
 </template>
@@ -113,7 +111,7 @@ const FALLBACK = {
   id: "default",
   title: "Bespoke florals, built by you",
   subtitle: "Create your perfect bouquet with fresh flowers, customizable designs, and trusted local shops.",
-  image_url: "https://images.unsplash.com/photo-1563241527-3004b7be0ffd?w=1800&h=900&fit=crop&q=80",
+  image_url: "https://images.unsplash.com/photo-1487070183336-b863922373d4?w=1600&h=1280&fit=crop&q=80",
   button_label: "Shop now",
 };
 const slides = computed(() => (props.banners.length ? props.banners : [FALLBACK]));
@@ -165,16 +163,16 @@ onBeforeUnmount(() => clearInterval(timer));
   box-sizing: border-box;
 }
 
+/* Full width: the card runs edge to edge, its content lines up with the page */
 .sh {
-  padding-top: 4px;
+  --sh-inline: max(var(--gutter), calc((100% - 1240px) / 2));
 }
 
 /* One rounded card: copy on a soft mint panel, the photo framed on the right */
 .sh-card {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--line-soft);
-  border-radius: 32px;
+  border-block: 1px solid var(--line-soft);
   background: linear-gradient(120deg, #e6f2ea 0%, var(--paper) 55%, #f6ece6 100%);
   isolation: isolate;
 }
@@ -204,7 +202,7 @@ onBeforeUnmount(() => clearInterval(timer));
   align-items: center;
   gap: clamp(24px, 4vw, 56px);
   min-width: 0;
-  padding: clamp(28px, 4vw, 56px) clamp(24px, 4.5vw, 64px) clamp(56px, 6vw, 76px);
+  padding: clamp(32px, 4vw, 64px) var(--sh-inline) clamp(64px, 6vw, 84px);
 }
 
 .sh-eyebrow {
@@ -336,7 +334,7 @@ onBeforeUnmount(() => clearInterval(timer));
 /* The photo, framed with an arched top */
 .sh-media {
   position: relative;
-  padding: 18px 18px 18px 0;
+  padding: 12px 0;
 }
 
 .sh-frame {
@@ -422,7 +420,7 @@ onBeforeUnmount(() => clearInterval(timer));
 .sh-controls {
   position: absolute;
   bottom: clamp(16px, 2vw, 24px);
-  left: clamp(24px, 4.5vw, 64px);
+  left: var(--sh-inline);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -531,10 +529,6 @@ onBeforeUnmount(() => clearInterval(timer));
 }
 
 @media (max-width: 560px) {
-  .sh-card {
-    border-radius: 24px;
-  }
-
   .sh-float,
   .sh-points {
     display: none;
