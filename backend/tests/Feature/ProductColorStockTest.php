@@ -133,8 +133,13 @@ class ProductColorStockTest extends TestCase
         $controller = app(ProductController::class);
         $read = fn ($composition, $type = 'bouquet') => $method->invoke($controller, Request::create('/', 'POST', ['composition' => json_encode($composition)]), $type);
 
-        $ok = $read([['flower' => ' Rose ', 'color' => 'Red', 'count' => '12'], ['flower' => '', 'color' => '', 'count' => ''], ['flower' => "Baby's breath", 'count' => 5]]);
-        $this->assertSame([['flower' => 'Rose', 'color' => 'Red', 'count' => 12], ['flower' => "Baby's breath", 'color' => null, 'count' => 5]], $ok['attributes']['composition'], 'empty rows are skipped');
+        $ok = $read([['flower' => ' Rose ', 'color' => 'Red', 'count' => '12', 'cost' => '15.5'], ['flower' => '', 'color' => '', 'count' => ''], ['flower' => "Baby's breath", 'count' => 5, 'cost' => '']]);
+        $this->assertSame([
+            ['flower' => 'Rose', 'color' => 'Red', 'count' => 12, 'cost' => 15.5],
+            ['flower' => "Baby's breath", 'color' => null, 'count' => 5, 'cost' => null],
+        ], $ok['attributes']['composition'], 'empty rows are skipped; the cost per piece is optional');
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Rose', 'count' => 2, 'cost' => -1]]));
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Rose', 'count' => 2, 'cost' => 'a lot']]));
 
         $this->assertSame(['composition' => null], $read([['flower' => 'Rose', 'count' => 1]], 'per_piece')['attributes'], 'only bouquets keep a list');
         $this->assertArrayHasKey('errors', $read([['flower' => '', 'count' => 3]]));

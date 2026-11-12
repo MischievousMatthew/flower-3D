@@ -208,7 +208,7 @@
             </button>
           </div>
           <div v-if="form.selling_type === 'bouquet'" data-change="composition" class="ap-gap">
-            <BouquetFlowersInput v-model="form.composition" :error="errors.composition || ''" @update:model-value="clear('composition')" />
+            <BouquetFlowersInput v-model="form.composition" :error="errors.composition || ''" :cost-value="form.purchase_price" @update:model-value="clear('composition')" @use-cost="(v) => { form.purchase_price = v; clear('purchase_price'); }" />
           </div>
           <div v-if="multiColor" data-change="colors" class="ap-gap">
             <ColorStockInputs :model-value="form.colors" :error="errors.color_stock || ''" @update:model-value="setColors" />

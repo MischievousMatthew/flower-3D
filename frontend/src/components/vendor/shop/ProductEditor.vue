@@ -97,7 +97,7 @@
                   </select>
                 </label>
                 <div v-if="form.selling_type === 'bouquet'" class="sp-field sp-span-all">
-                  <BouquetFlowersInput v-model="form.composition" :error="errors.composition || ''" />
+                  <BouquetFlowersInput v-model="form.composition" :error="errors.composition || ''" :cost-value="form.purchase_price" @use-cost="(v) => (form.purchase_price = v)" />
                 </div>
                 <label class="sp-field">
                   <span>Season</span>

@@ -104,7 +104,7 @@ class InventoryReplenishmentTest extends TestCase
         $vendor = $this->shopOwner();
         // Needs 5 more (min 2, target 5, none on hand): 12 red roses + 3 baby's breath each
         $this->product($vendor, ['product_name' => 'Rose bouquet', 'selling_type' => 'bouquet', 'min_stock_level' => 2, 'max_stock_level' => 5,
-            'composition' => json_encode([['flower' => 'Rose', 'color' => 'Red', 'count' => 12], ['flower' => "Baby's breath", 'count' => 3]])]);
+            'composition' => json_encode([['flower' => 'Rose', 'color' => 'Red', 'count' => 12, 'cost' => 15], ['flower' => "Baby's breath", 'count' => 3]])]);
         // Needs 4 more (min 1, no target: twice the minimum = 2… plus nothing coming) → fills to 2
         $this->product($vendor, ['product_name' => 'Mixed bouquet', 'selling_type' => 'bouquet', 'min_stock_level' => 1,
             'composition' => json_encode([['flower' => 'rose', 'color' => 'red', 'count' => 6]])]);
@@ -123,6 +123,10 @@ class InventoryReplenishmentTest extends TestCase
         $this->assertSame(15, $flowers["Baby's breath"]['stems']);
         // Each bouquet that needs it, in name order: Mixed (make 2), Rose (make 5)
         $this->assertSame([2, 5], array_column($flowers['Rose']['bouquets'], 'make'));
+        // What they cost to buy: only the Rose bouquet's roses have a price (₱15 each); the Mixed one's don't
+        $this->assertEquals(60 * 15, $flowers['Rose']['cost']);
+        $this->assertSame(60, $flowers['Rose']['priced_stems']);
+        $this->assertSame(0, $flowers["Baby's breath"]['priced_stems']);
     }
 
     public function test_it_finds_what_is_low_and_suggests_how_much_to_order(): void

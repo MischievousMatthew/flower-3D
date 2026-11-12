@@ -181,6 +181,7 @@ class InventoryStockService
                 'flower' => trim((string) $f['flower']),
                 'color'  => isset($f['color']) && trim((string) $f['color']) !== '' ? trim((string) $f['color']) : null,
                 'count'  => (int) $f['count'],
+                'cost'   => isset($f['cost']) && is_numeric($f['cost']) ? (float) $f['cost'] : null, // paid per piece
             ])
             ->values()
             ->all();
@@ -188,8 +189,9 @@ class InventoryStockService
 
     /**
      * The flowers to buy for the bouquets that need restocking: each bouquet's
-     * suggested amount × its stems, added up per flower and colour, e.g.
-     * [{flower: Rose, color: Red, stems: 60, bouquets: [{id, name, make: 5, per: 12}]}]
+     * suggested amount × its stems, added up per flower and colour, with what
+     * they cost to buy (from the cost per piece the shop entered), e.g.
+     * [{flower: Rose, color: Red, stems: 60, cost: 900.0, priced_stems: 60, bouquets: [{id, name, make: 5, per: 12, cost_each: 15.0}]}]
      */
     private static function bouquetFlowers($items): array
     {
@@ -201,9 +203,14 @@ class InventoryStockService
             }
             foreach ($item['composition'] as $f) {
                 $key = mb_strtolower($f['flower'] . '|' . ($f['color'] ?? ''));
-                $totals[$key] ??= ['flower' => Str::ucfirst($f['flower']), 'color' => $f['color'] ? Str::ucfirst($f['color']) : null, 'stems' => 0, 'bouquets' => []];
-                $totals[$key]['stems'] += $make * $f['count'];
-                $totals[$key]['bouquets'][] = ['id' => $item['id'], 'name' => $item['name'], 'make' => $make, 'per' => $f['count']];
+                $totals[$key] ??= ['flower' => Str::ucfirst($f['flower']), 'color' => $f['color'] ? Str::ucfirst($f['color']) : null, 'stems' => 0, 'cost' => 0.0, 'priced_stems' => 0, 'bouquets' => []];
+                $stems = $make * $f['count'];
+                $totals[$key]['stems'] += $stems;
+                if ($f['cost'] !== null) {
+                    $totals[$key]['cost'] = round($totals[$key]['cost'] + $stems * $f['cost'], 2);
+                    $totals[$key]['priced_stems'] += $stems;
+                }
+                $totals[$key]['bouquets'][] = ['id' => $item['id'], 'name' => $item['name'], 'make' => $make, 'per' => $f['count'], 'cost_each' => $f['cost']];
             }
         }
 

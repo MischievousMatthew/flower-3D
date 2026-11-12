@@ -58,7 +58,12 @@
       <div class="sp-card-head">
         <div>
           <h2 id="st-bf">Flowers needed for bouquets</h2>
-          <p>Stems to make the bouquets that need restocking: each bouquet's order amount × the flowers in it</p>
+          <p>Stems to make the bouquets that need restocking: each bouquet's order amount × the flowers in it, at what the shop pays per piece</p>
+        </div>
+        <div v-if="bouquetFlowersCost > 0" class="st-bf-total">
+          <small>About</small>
+          <b>{{ money(bouquetFlowersCost) }}</b>
+          <small>to buy</small>
         </div>
       </div>
       <ul class="st-bf-list">
@@ -68,9 +73,13 @@
             <b>{{ f.color ? `${f.color} ${f.flower.toLowerCase()}` : f.flower }}</b>
           </span>
           <span class="st-bf-for">
-            <small v-for="b in f.bouquets" :key="b.id">{{ b.make }} × {{ b.name }} <span class="muted">({{ b.per }} each)</span></small>
+            <small v-for="b in f.bouquets" :key="b.id">{{ b.make }} × {{ b.name }} <span class="muted">({{ b.per }} each{{ b.cost_each != null ? ` at ${money(b.cost_each)}` : "" }})</span></small>
           </span>
-          <b class="st-bf-stems">{{ f.stems.toLocaleString("en-PH") }} <small>{{ f.stems === 1 ? "stem" : "stems" }}</small></b>
+          <span class="st-bf-stems">
+            <b>{{ f.stems.toLocaleString("en-PH") }} <small>{{ f.stems === 1 ? "stem" : "stems" }}</small></b>
+            <small v-if="f.priced_stems">{{ money(f.cost) }}<template v-if="f.priced_stems < f.stems"> · {{ f.stems - f.priced_stems }} not priced</template></small>
+            <small v-else class="muted">No cost entered</small>
+          </span>
         </li>
       </ul>
     </section>
@@ -106,7 +115,7 @@
                 <span v-if="it.sku">{{ it.sku }}</span>
               </small>
               <small v-if="it.composition?.length" class="st-compo" :title="'Flowers in one bouquet'">
-                {{ it.composition.map((f) => `${f.count} ${f.color ? `${f.color.toLowerCase()} ` : ""}${f.flower.toLowerCase()}`).join(" · ") }} per bouquet
+                {{ it.composition.map((f) => `${f.count} ${f.color ? `${f.color.toLowerCase()} ` : ""}${f.flower.toLowerCase()}`).join(" · ") }} per bouquet<template v-if="it.composition.some((f) => f.cost != null)"> · flowers {{ money(it.composition.reduce((s, f) => s + (f.cost != null ? f.cost * f.count : 0), 0)) }}</template>
               </small>
             </span>
             <span class="st-onhand">
@@ -404,6 +413,8 @@ const { visible, hasMore, showMore } = useShowMoreLocal(shown, computed(() => `$
 
 const pickedItems = computed(() => (data.value?.items ?? []).filter((it) => picked.value.includes(it.id)));
 const pickedUnits = computed(() => pickedItems.value.reduce((s, it) => s + it.suggestion.qty, 0));
+// What the stems for the bouquets to restock cost to buy (flowers with a cost per piece only)
+const bouquetFlowersCost = computed(() => (data.value?.bouquet_flowers || []).reduce((s, f) => s + Number(f.cost || 0), 0));
 
 const levelPct = (it) => {
   const scale = it.target || Math.max(it.min * 2, it.on_hand, 1);
@@ -859,15 +870,42 @@ onMounted(() => {
   color: var(--v-faint);
 }
 .st-bf-stems {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   color: var(--v-text);
-  font-size: 15px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.st-bf-stems b {
+  font-size: 15px;
 }
 .st-bf-stems small {
   color: var(--v-faint);
   font-size: 12px;
   font-weight: 500;
+}
+.st-bf-stems > small {
+  color: var(--v-text-2);
+}
+.st-bf-stems > small.muted {
+  color: var(--v-faint);
+}
+.st-bf-total {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--v-text);
+  white-space: nowrap;
+}
+.st-bf-total b {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.st-bf-total small {
+  color: var(--v-muted);
+  font-size: 12px;
 }
 @media (max-width: 640px) {
   .st-bf-row {

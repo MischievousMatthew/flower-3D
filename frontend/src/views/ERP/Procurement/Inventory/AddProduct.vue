@@ -395,6 +395,8 @@
                   <BouquetFlowersInput
                     v-model="formData.composition"
                     :error="errors.composition || ''"
+                    :cost-value="formData.purchase_price"
+                    @use-cost="(v) => { formData.purchase_price = v; clearError('purchase_price'); }"
                     @update:model-value="clearError('composition')"
                   />
                 </div>

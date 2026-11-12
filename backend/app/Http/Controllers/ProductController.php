@@ -363,7 +363,8 @@ class ProductController extends Controller
 
     /**
      * The flowers in a bouquet from the product form: composition as JSON
-     * [{flower, color?, count}]: what procurement buys to make it. Only kept
+     * [{flower, color?, count, cost?}] (cost = what the shop paid for one
+     * piece, never shown to customers): what procurement buys to make it. Only kept
      * for bouquets; anything else clears it. Returns null when not sent,
      * ['errors' => …] or ['attributes' => ['composition' => …]].
      */
@@ -405,7 +406,17 @@ class ProductController extends Controller
             if (! is_numeric($count) || (float) $count != (int) $count || (int) $count < 1 || (int) $count > 1000) {
                 return $fail("Enter how many {$flower} are in the bouquet (1 to 1000).");
             }
-            $list[] = ['flower' => $flower, 'color' => $color !== '' ? $color : null, 'count' => (int) $count];
+            // What the shop paid for one piece (not its selling price); optional
+            $cost = $row['cost'] ?? null;
+            if ($cost !== null && $cost !== '' && (! is_numeric($cost) || (float) $cost < 0 || (float) $cost > 1000000)) {
+                return $fail("Enter what one {$flower} cost you (₱0 or more).");
+            }
+            $list[] = [
+                'flower' => $flower,
+                'color'  => $color !== '' ? $color : null,
+                'count'  => (int) $count,
+                'cost'   => $cost === null || $cost === '' ? null : round((float) $cost, 2),
+            ];
         }
         if (count($list) > 30) {
             return $fail('A bouquet can list up to 30 flowers.');
