@@ -64,6 +64,33 @@ class DeliveryAreaTest extends TestCase
         $this->assertTrue(DeliveryArea::check($this->shop('["Bacoor"]'), 'Molino, Bacoor')['covered']);
     }
 
+    public function test_after_approval_wallet_orders_pay_in_full_and_cod_pays_half_online(): void
+    {
+        $base = ['outside_area' => true, 'status' => 'pending', 'payment_status' => 'unpaid', 'total_amount' => 1500];
+
+        // Nothing is due before the shop approves
+        $this->assertNull((new Order($base + ['payment_method' => 'ewallet']))->amountDueOnline());
+
+        $approved = $base + ['area_approved_at' => now(), 'pay_by' => now()->addHours(Order::OUTSIDE_PAY_HOURS)];
+        $wallet = new Order($approved + ['payment_method' => 'ewallet']);
+        $this->assertSame(1500.0, $wallet->amountDueOnline());
+        $this->assertTrue($wallet->awaitingOutsidePayment());
+        $this->assertNull((new Order(['payment_status' => 'paid'] + $approved + ['payment_method' => 'ewallet']))->amountDueOnline());
+
+        $cod = new Order($approved + ['payment_method' => 'cod', 'deposit_amount' => 750]);
+        $this->assertSame(750.0, $cod->amountDueOnline());
+        $this->assertSame(1500.0, $cod->cashOnDelivery());
+
+        // Down payment made: nothing more online, the rest in cash
+        $paid = new Order($approved + ['payment_method' => 'cod', 'deposit_amount' => 750, 'deposit_paid_at' => now()]);
+        $this->assertNull($paid->amountDueOnline());
+        $this->assertFalse($paid->awaitingOutsidePayment());
+        $this->assertSame(750.0, $paid->cashOnDelivery());
+
+        // Orders inside the areas are never asked to pay this way
+        $this->assertNull((new Order(['outside_area' => false, 'area_approved_at' => now()] + $base + ['payment_method' => 'cod']))->amountDueOnline());
+    }
+
     public function test_outside_area_orders_wait_until_approved(): void
     {
         $this->assertFalse((new Order(['outside_area' => false]))->awaitingAreaApproval());

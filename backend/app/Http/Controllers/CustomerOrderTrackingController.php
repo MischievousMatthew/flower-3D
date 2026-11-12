@@ -257,7 +257,16 @@ class CustomerOrderTrackingController extends Controller
             'total_amount' => (float) ($order->total_amount ?? 0),
             'delivery_address' => $order->delivery_address,
             // Outside the shop's delivery areas: waiting for the shop to approve (null when inside)
-            'outside_area' => $order->outside_area ? ['approved' => $order->area_approved_at !== null] : null,
+            'outside_area' => $order->outside_area ? [
+                'approved' => $order->area_approved_at !== null,
+                // To pay online now (in full, or the 50% down payment), and by when
+                'due' => $order->amountDueOnline(),
+                'pay_by' => $order->pay_by?->toIso8601String(),
+                'deposit' => $order->deposit_amount !== null ? (float) $order->deposit_amount : null,
+                'deposit_paid' => $order->deposit_paid_at !== null,
+                // Cash on delivery: what's left to pay the rider
+                'cash_to_collect' => $order->cashOnDelivery(),
+            ] : null,
             'delivery_contact_name' => $order->delivery_contact_name,
             'delivery_contact_number' => $order->delivery_contact_number,
             'store_name' => $storeName,

@@ -31,9 +31,23 @@ class PlatformNoticesTest extends TestCase
                 Schema::table('users', fn (Blueprint $t) => $type === 'boolean' ? $t->boolean($column)->default(false) : $t->{$type}($column)->nullable());
             }
         }
-        foreach (['admin_roles', 'user_notifications', 'site_settings', 'products', 'product_reviews', 'admin_audit_logs'] as $table) {
+        foreach (['admin_roles', 'user_notifications', 'site_settings', 'products', 'product_reviews', 'admin_audit_logs', 'announcements'] as $table) {
             Schema::dropIfExists($table);
         }
+        // Customers' notifications also bring in the shop's announcements (none here)
+        Schema::create('announcements', function (Blueprint $t) {
+            $t->id();
+            $t->string('kind', 20)->default('announcement');
+            $t->string('title', 120);
+            $t->string('message', 300)->nullable();
+            $t->string('link_type', 20)->nullable();
+            $t->string('link_value')->nullable();
+            $t->timestamp('starts_at')->nullable();
+            $t->timestamp('ends_at')->nullable();
+            $t->boolean('is_active')->default(true);
+            $t->unsignedInteger('sort_order')->default(0);
+            $t->timestamps();
+        });
         Schema::create('admin_roles', function (Blueprint $t) {
             $t->id();
             $t->string('name');

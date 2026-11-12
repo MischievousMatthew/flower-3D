@@ -34,7 +34,10 @@
           <h2 id="od-area-title">Outside your delivery areas</h2>
           <p>
             <template v-if="order.address">{{ order.address }} isn't</template><template v-else>This address isn't</template>
-            in the areas you deliver to. Approve it to deliver anyway, or cancel the order. It's cash on delivery, so nothing needs refunding.
+            in the areas you deliver to. Approve it to deliver anyway, or cancel the order. Nothing is paid yet, so cancelling needs no refund.
+            Once you approve, the customer has 24 hours to pay
+            {{ order.payment_method === "cod" ? `a 50% down payment (${money(order.outside_area.deposit)}) online, and the rest in cash on delivery` : `the full ${money(order.total)} with GCash or Maya` }}.
+            You start preparing once they've paid.
           </p>
         </div>
         <div class="od-area-actions">
@@ -186,6 +189,11 @@
               <div><dt>Delivery fee</dt><dd>{{ money(order.delivery_fee) }}</dd></div>
               <div v-if="order.discount"><dt>Discount</dt><dd>−{{ money(order.discount) }}</dd></div>
               <div class="grand"><dt>Total</dt><dd>{{ money(order.total) }}</dd></div>
+              <!-- Cash on delivery outside the areas: half paid online first -->
+              <template v-if="order.outside_area?.deposit">
+                <div><dt>Down payment (online)</dt><dd>{{ money(order.outside_area.deposit) }} · {{ order.outside_area.deposit_paid ? "paid" : "not paid yet" }}</dd></div>
+                <div v-if="order.outside_area.deposit_paid"><dt>Collect in cash</dt><dd>{{ money(order.cash_to_collect) }}</dd></div>
+              </template>
             </dl>
           </section>
 

@@ -245,6 +245,10 @@ class DeliveryService
         if ($order?->awaitingAreaApproval()) {
             throw new RuntimeException('This order is outside your delivery areas. Approve delivering it, or cancel it, before it goes any further.');
         }
+        // Approved: the customer pays online first (in full, or the down payment)
+        if ($order?->awaitingOutsidePayment()) {
+            throw new RuntimeException('The customer hasn\'t paid for this order yet. Start preparing it once they do.');
+        }
     }
 
     /**

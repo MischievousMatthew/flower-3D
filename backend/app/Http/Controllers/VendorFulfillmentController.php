@@ -116,16 +116,23 @@ class VendorFulfillmentController extends Controller
             return response()->json(['success' => false, 'message' => 'Only orders that are still Pending can be approved.'], 422);
         }
 
-        $order->update(['area_approved_at' => now()]);
+        // Now the customer pays online: in full (GCash / Maya) or the down payment (cash on delivery)
+        $order->update(['area_approved_at' => now(), 'pay_by' => now()->addHours(Order::OUTSIDE_PAY_HOURS)]);
+        $due = $order->fresh()->amountDueOnline();
+        $peso = fn (float $v) => '₱' . number_format($v, 2);
+        $what = $order->payment_method === 'cod'
+            ? "Pay the {$peso($due)} down payment (half the total) with GCash or Maya, and the rest in cash on delivery."
+            : "Pay {$peso($due)} with GCash or Maya to confirm it.";
         app(NotificationService::class)->notify(
             [$order->user_id],
             'order',
-            'Your order is approved for delivery',
-            "{$order->store_name} will deliver order {$order->order_number} to your address, even though it's outside their usual delivery areas.",
+            'Approved: pay within ' . Order::OUTSIDE_PAY_HOURS . ' hours',
+            "{$order->store_name} will deliver order {$order->order_number} to your address. {$what} If it isn't paid within " . Order::OUTSIDE_PAY_HOURS . ' hours, the order is cancelled.',
             '/customer/orders',
+            true,
         );
 
-        return response()->json(['success' => true, 'message' => 'Approved. You can start preparing this order.']);
+        return response()->json(['success' => true, 'message' => 'Approved. The customer has ' . Order::OUTSIDE_PAY_HOURS . ' hours to pay; you can start preparing once they do.']);
     }
 
     /** GET /vendor/fulfillment/orders/{id} */
@@ -384,7 +391,9 @@ class VendorFulfillmentController extends Controller
             ->where('vendor_id', $vendorId)
             ->where(fn ($q) => $q->where('payment_method', '!=', 'ewallet')->orWhereNull('payment_method')
                 ->orWhereIn('payment_status', ['paid', 'refunded'])
-                ->orWhereNotNull('paid_at'));
+                ->orWhereNotNull('paid_at')
+                // Outside the delivery areas: placed unpaid, waiting for the shop's approval
+                ->orWhere('outside_area', true));
     }
 
     /** What the shop should know about a checkout the customer didn't pay for */
@@ -431,16 +440,21 @@ class VendorFulfillmentController extends Controller
         $deliveryDate = $order->reservation_date?->toDateString();
         $prepDays = (int) $order->items->max(fn ($i) => (int) ($i->product?->preparation_days ?? 0));
         $prepareBy = $deliveryDate ? Carbon::parse($deliveryDate)->subDays($prepDays)->toDateString() : null;
-        $onlineUnpaid = $order->payment_method === 'ewallet' && $order->payment_status !== 'paid';
+        // (outside the delivery areas, paying comes after the shop approves: said below)
+        $onlineUnpaid = $order->payment_method === 'ewallet' && $order->payment_status !== 'paid' && ! $order->outside_area;
         $first = $order->items->first();
         $customer = $order->delivery_contact_name
             ?: trim(($order->user?->name ?? '') . ' ' . ($order->user?->surname ?? '')) ?: 'Customer';
 
         // Outside the shop's delivery areas: approve delivering it (or cancel) first
         $awaitingArea = $status === 'pending' && $order->awaitingAreaApproval();
-        $next = ($caseOpen || $onlineUnpaid || $awaitingArea) ? [] : (self::NEXT[$status] ?? []);
+        // Approved, and now the customer pays online (in full, or the down payment)
+        $due = $order->amountDueOnline();
+        $next = ($caseOpen || $onlineUnpaid || $awaitingArea || $due !== null) ? [] : (self::NEXT[$status] ?? []);
         $canCancel = $status === 'pending' && ! $caseOpen
-            && ! ($order->payment_method !== 'cod' && $order->payment_status === 'paid');
+            && ! ($order->payment_method !== 'cod' && $order->payment_status === 'paid')
+            // A down payment was made online: like a paid order, it isn't simply cancelled
+            && ! $order->deposit_paid_at;
 
         return [
             'id' => $order->id,
@@ -470,9 +484,21 @@ class VendorFulfillmentController extends Controller
             'next' => $next,
             'can_cancel' => $canCancel,
             // null: inside the areas. Otherwise whether the shop approved delivering it
-            'outside_area' => $order->outside_area ? ['approved' => $order->area_approved_at !== null, 'approved_at' => $order->area_approved_at?->toIso8601String()] : null,
+            'outside_area' => $order->outside_area ? [
+                'approved' => $order->area_approved_at !== null,
+                'approved_at' => $order->area_approved_at?->toIso8601String(),
+                // What the customer still has to pay online, and by when
+                'due' => $due,
+                'pay_by' => $order->pay_by?->toIso8601String(),
+                'deposit' => $order->deposit_amount !== null ? (float) $order->deposit_amount : null,
+                'deposit_paid' => $order->deposit_paid_at !== null,
+            ] : null,
+            // Cash on delivery: what the rider collects (less a down payment made online)
+            'cash_to_collect' => $order->cashOnDelivery(),
             'blocked_reason' => $caseOpen ? 'A return or refund is open on this order. Settle it first.'
-                : ($onlineUnpaid ? 'Waiting for the online payment to be confirmed.' : null),
+                : ($onlineUnpaid ? 'Waiting for the online payment to be confirmed.'
+                : ($due !== null ? 'Waiting for the customer to pay ₱' . number_format($due, 2) . ($order->payment_method === 'cod' ? ' (the 50% down payment)' : '') . ' online'
+                    . ($order->pay_by ? ', by ' . $order->pay_by->timezone(VendorApplication::RESERVATION_TIMEZONE)->format('M j, g:i A') : '') . '. Start preparing once it\'s paid.' : null)),
             'needs_action' => $awaitingArea
                 || ! empty($next) && in_array($status, ['pending', 'to_processed', 'to_ship'], true)
                 || ($caseSummary['next_actor'] ?? null) === 'vendor',

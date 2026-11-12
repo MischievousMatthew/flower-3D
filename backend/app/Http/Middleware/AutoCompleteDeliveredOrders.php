@@ -26,5 +26,11 @@ class AutoCompleteDeliveredOrders
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Order auto-complete sweep failed', ['error' => get_class($e)]);
         }
+        // Orders outside the delivery areas, approved but not paid within 24 hours
+        try {
+            app(\App\Services\OutsideAreaPayments::class)->sweepIfDue();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Outside-area payment sweep failed', ['error' => get_class($e)]);
+        }
     }
 }

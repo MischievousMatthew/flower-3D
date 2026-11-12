@@ -104,11 +104,12 @@
                 <div>
                   <strong>This address is outside {{ storeName }}'s delivery areas</strong>
                   <span v-if="areaList">They deliver to {{ areaList }}.</span>
-                  <span v-if="codAvailable">
-                    You can still order. {{ storeName }} needs to approve delivering it first, before your order goes out, and you'll pay cash on delivery.
+                  <span>
+                    You can still order. {{ storeName }} needs to approve delivering it first, and you pay nothing until then.
+                    Once they approve, you have 24 hours to pay: the full amount with GCash or Maya, or for cash on delivery,
+                    half as a down payment online and the rest in cash.
                     If they can't deliver here, they'll cancel it and you won't be charged.
                   </span>
-                  <span v-else>{{ storeName }} only takes online payment, so it can't take orders outside its areas. Use an address inside them.</span>
                 </div>
               </div>
 
@@ -245,16 +246,33 @@
             <div v-if="payChoice === 'cod'" class="co-note">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
               <div>
-                <strong>Pay the rider when it arrives</strong>
-                <span>Have ₱{{ formatPrice(totalAmount) }} ready, and keep your phone on so the rider can reach you.</span>
-                <span v-if="outsideArea">Your address is outside {{ storeName }}'s delivery areas, so cash on delivery is the only option. The shop approves delivering it first.</span>
+                <template v-if="outsideArea">
+                  <strong>Half now, half on delivery</strong>
+                  <span>
+                    Your address is outside {{ storeName }}'s delivery areas. Once they approve your order, pay a ₱{{ formatPrice(depositAmount) }} down payment
+                    with GCash or Maya within 24 hours. Then pay the rider the other ₱{{ formatPrice(totalAmount - depositAmount) }} in cash.
+                  </span>
+                </template>
+                <template v-else>
+                  <strong>Pay the rider when it arrives</strong>
+                  <span>Have ₱{{ formatPrice(totalAmount) }} ready, and keep your phone on so the rider can reach you.</span>
+                </template>
               </div>
             </div>
             <div v-else-if="payChoice" class="co-note">
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
               <div>
-                <strong>You'll pay on PayMongo's secure page</strong>
-                <span>After you place the order, we open {{ payChoice === "gcash" ? "GCash" : "Maya" }} to finish paying. Nothing is charged until you confirm there.</span>
+                <template v-if="outsideArea">
+                  <strong>You'll pay after {{ storeName }} approves</strong>
+                  <span>
+                    Your address is outside their delivery areas, so nothing is charged now. When they approve, we'll let you know.
+                    Then pay ₱{{ formatPrice(totalAmount) }} with {{ payChoice === "gcash" ? "GCash" : "Maya" }} from My orders within 24 hours.
+                  </span>
+                </template>
+                <template v-else>
+                  <strong>You'll pay on PayMongo's secure page</strong>
+                  <span>After you place the order, we open {{ payChoice === "gcash" ? "GCash" : "Maya" }} to finish paying. Nothing is charged until you confirm there.</span>
+                </template>
               </div>
             </div>
 
@@ -688,7 +706,8 @@ const areaList = computed(() => {
   const list = area.value?.areas ?? [];
   return list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}` : list[0] || "";
 });
-const codAvailable = computed(() => availablePaymentMethods.value.some((m) => m.type === "cod"));
+// Cash on delivery outside the areas: half online once the shop approves (matches the server's 50%)
+const depositAmount = computed(() => Math.round(Number(totalAmount.value || 0) * 50) / 100);
 async function checkArea(address) {
   const seq = ++areaSeq;
   try {
@@ -713,8 +732,7 @@ const payChoice = ref(null); // "gcash" | "paymaya" | "cod"
 const payOptions = computed(() => {
   const types = availablePaymentMethods.value.map((m) => m.type);
   const list = [];
-  // Outside the shop's delivery areas: cash on delivery only (nothing to refund if the shop declines)
-  if (types.includes("ewallet") && !outsideArea.value) {
+  if (types.includes("ewallet")) {
     list.push({ key: "gcash", mark: "G", name: "GCash", desc: "Pay with your GCash wallet on PayMongo's secure page" });
     list.push({ key: "paymaya", mark: "M", name: "Maya", desc: "Pay with your Maya wallet on PayMongo's secure page" });
   }
@@ -1053,7 +1071,6 @@ function deliveryReady() {
   if (!addressOk.value) return toast.warning("Add your delivery address first."), false;
   if (!contactOk.value) return toast.warning("Add a contact number the rider can call."), false;
   if (!selectedDate.value) return toast.warning("Pick a delivery date first."), false;
-  if (outsideArea.value && !codAvailable.value) return toast.warning(`${storeName.value} can't deliver to this address. Use one inside its delivery areas.`), false;
   return true;
 }
 

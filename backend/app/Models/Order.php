@@ -30,6 +30,9 @@ class Order extends Model
         'delivery_address',
         'outside_area',
         'area_approved_at',
+        'deposit_amount',
+        'deposit_paid_at',
+        'pay_by',
         'delivery_contact_name',
         'delivery_contact_number',
         'paymongo_payment_intent_id',
@@ -63,6 +66,9 @@ class Order extends Model
         'cancelled_at'      => 'datetime',
         'outside_area'      => 'boolean',
         'area_approved_at'  => 'datetime',
+        'deposit_amount'    => 'decimal:2',
+        'deposit_paid_at'   => 'datetime',
+        'pay_by'            => 'datetime',
         'reservation_date'  => 'date',
     ];
 
@@ -70,6 +76,46 @@ class Order extends Model
     public function awaitingAreaApproval(): bool
     {
         return (bool) $this->outside_area && $this->area_approved_at === null;
+    }
+
+    /**
+     * Orders outside the shop's delivery areas are paid only once the shop
+     * approves them: GCash / Maya in full, cash on delivery as a down payment
+     * of this share online, the rest in cash. The customer has PAY_HOURS to pay.
+     */
+    public const OUTSIDE_DEPOSIT_RATE = 0.5;
+    public const OUTSIDE_PAY_HOURS = 24;
+
+    /** What the customer pays online now (null: nothing, or not yet) */
+    public function amountDueOnline(): ?float
+    {
+        if (! $this->outside_area || $this->area_approved_at === null || $this->status !== 'pending') {
+            return null;
+        }
+        if ($this->payment_method === 'ewallet') {
+            return $this->payment_status === 'paid' ? null : (float) $this->total_amount;
+        }
+        if ($this->payment_method === 'cod' && $this->deposit_amount > 0) {
+            return $this->deposit_paid_at ? null : (float) $this->deposit_amount;
+        }
+
+        return null;
+    }
+
+    /** Approved, but the customer hasn't paid (in full or the down payment) yet */
+    public function awaitingOutsidePayment(): bool
+    {
+        return $this->amountDueOnline() !== null;
+    }
+
+    /** Cash still to collect on delivery for cash on delivery (the total less any down payment) */
+    public function cashOnDelivery(): ?float
+    {
+        if ($this->payment_method !== 'cod') {
+            return null;
+        }
+
+        return round((float) $this->total_amount - ($this->deposit_paid_at ? (float) $this->deposit_amount : 0), 2);
     }
 
     const DELIVERY_STATUSES = [
@@ -137,7 +183,9 @@ class Order extends Model
     {
         return $query->where(fn ($q) => $q->where('payment_method', '!=', 'ewallet')
             ->orWhereNull('payment_method')
-            ->orWhereIn('payment_status', ['paid', 'refunded']));
+            ->orWhereIn('payment_status', ['paid', 'refunded'])
+            // Outside the delivery areas: placed unpaid, paid after the shop approves
+            ->orWhere('outside_area', true));
     }
 
     /** How long an unpaid e-wallet checkout holds its stock and date before it's released */
@@ -150,7 +198,8 @@ class Order extends Model
             ->where(fn ($q) => $q->where('payment_method', '!=', 'ewallet')
                 ->orWhereNull('payment_method')
                 ->orWhereIn('payment_status', ['paid', 'refunded'])
-                ->orWhere('created_at', '>=', now()->subMinutes(self::PAYMENT_HOLD_MINUTES)));
+                ->orWhere('created_at', '>=', now()->subMinutes(self::PAYMENT_HOLD_MINUTES))
+                ->orWhere('outside_area', true));
     }
 
     public function scopePending($query)    { return $query->where('status', 'pending'); }

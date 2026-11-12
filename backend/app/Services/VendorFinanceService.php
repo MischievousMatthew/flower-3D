@@ -87,6 +87,10 @@ class VendorFinanceService
                 && $lockedOrder->payment_status === 'paid') {
                 throw new \RuntimeException('Paid online orders cannot be cancelled. Please contact support if you need help.');
             }
+            // Cash on delivery outside the delivery areas, with its down payment made online: the same
+            if ($lockedOrder->deposit_paid_at) {
+                throw new \RuntimeException('The down payment for this order was already paid online, so it can\'t be cancelled here. Please contact support if you need help.');
+            }
 
             if (! in_array($lockedOrder->status, ['pending', 'processing'], true)
                 || ($delivery && $delivery->status !== 'pending')) {

@@ -358,6 +358,8 @@ Route::middleware('token.auth')->group(function () {
         Route::post('/orders/{id}/complete',         [CustomerOrderTrackingController::class, 'complete'])->whereNumber('id');
         Route::post('/orders/{id}/confirm-received', [CustomerOrderTrackingController::class, 'confirmReceived'])->whereNumber('id');
         Route::post('/orders/{id}/cancel',           [CustomerOrderTrackingController::class, 'cancel'])->whereNumber('id');
+        // Outside the shop's delivery areas: pay (in full, or the down payment) once the shop approves
+        Route::post('/orders/{id}/pay',              [CheckoutController::class, 'payOutsideArea'])->whereNumber('id');
         Route::post('/orders/{id}/request-return',   [CustomerOrderTrackingController::class, 'requestReturn'])->whereNumber('id');
         Route::post('/orders/{id}/request-refund',   [CustomerOrderTrackingController::class, 'requestRefund'])->whereNumber('id');
 

@@ -158,13 +158,35 @@
             </div>
 
             <!-- Outside the shop's delivery areas: the shop approves it first -->
-            <p v-if="order.outside_area && order.status === 'pending'" class="ot-case-note" :class="order.outside_area.approved ? 'blue' : 'amber'" role="status">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
-              <template v-if="order.outside_area.approved">{{ order.store_name || "The shop" }} approved delivering to your address. Your order goes ahead as usual.</template>
-              <template v-else>
-                Your address is outside {{ order.store_name || "the shop" }}'s delivery areas. They need to approve delivering it before your order goes out. If they can't, they'll cancel it and you won't be charged.
-              </template>
-            </p>
+            <template v-if="order.outside_area && order.status === 'pending'">
+              <!-- Approved: pay now (in full, or the down payment for cash on delivery) -->
+              <div v-if="order.outside_area.due" class="ot-paynow" role="status">
+                <div class="ot-paynow__text">
+                  <strong>{{ order.store_name || "The shop" }} approved your order. Pay ₱{{ fmt(order.outside_area.due) }} to confirm it</strong>
+                  <span v-if="order.payment_method === 'cod'">
+                    This is the down payment, half the total. Pay the rider the other ₱{{ fmt(order.total_amount - order.outside_area.due) }} in cash.
+                  </span>
+                  <span v-if="order.outside_area.pay_by">Pay by {{ fmtDateTime(order.outside_area.pay_by) }}, or the order is cancelled.</span>
+                </div>
+                <div class="ot-paynow__btns">
+                  <button type="button" class="ot-paynow__btn" :disabled="paying === order.id" @click="payOutside(order, 'gcash')">
+                    {{ paying === order.id ? "Opening…" : "Pay with GCash" }}
+                  </button>
+                  <button type="button" class="ot-paynow__btn alt" :disabled="paying === order.id" @click="payOutside(order, 'paymaya')">Pay with Maya</button>
+                </div>
+              </div>
+              <p v-else class="ot-case-note" :class="order.outside_area.approved ? 'blue' : 'amber'" role="status">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
+                <template v-if="order.outside_area.approved">
+                  Paid. {{ order.store_name || "The shop" }} will deliver to your address.
+                  <template v-if="order.outside_area.cash_to_collect"> Pay the rider ₱{{ fmt(order.outside_area.cash_to_collect) }} in cash.</template>
+                </template>
+                <template v-else>
+                  Your address is outside {{ order.store_name || "the shop" }}'s delivery areas, so they need to approve delivering it first. You'll pay after they do.
+                  If they can't, they'll cancel it and you won't be charged.
+                </template>
+              </p>
+            </template>
 
             <!-- Return / refund in progress -->
             <p v-if="caseIsOpen(order)" class="ot-case-note" :class="order.return_case.next_actor === 'customer' ? 'amber' : 'blue'">
@@ -1193,6 +1215,22 @@ const moreItems = (order) => Math.max(0, Number(order.items_count || 0) - Math.m
 // formatters
 const fmt = (v) =>
   Number(v ?? 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+const fmtDateTime = (iso) =>
+  iso ? new Date(iso).toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+
+// Outside the shop's delivery areas, approved: pay in full, or the down payment, on PayMongo
+const paying = ref(null);
+async function payOutside(order, wallet) {
+  if (paying.value) return;
+  paying.value = order.id;
+  try {
+    const { data } = await api.post(`/customer/orders/${order.id}/pay`, { ewallet_type: wallet });
+    window.location.href = data.checkout_url;
+  } catch (e) {
+    toast.error(e?.response?.data?.message || "Couldn't open the payment page. Try again in a few minutes.");
+    paying.value = null;
+  }
+}
 const fmtDate = (iso) =>
   iso
     ? new Date(iso).toLocaleDateString("en-PH", {
@@ -1251,7 +1289,15 @@ onMounted(async () => {
   await fetchOrders();
   loadOfferAsk();
 
-  if (route.query.payment === "success") {
+  // Back from paying for an approved outside-area order without finishing
+  if (["later", "pending"].includes(route.query.payment)) {
+    toast.info(route.query.payment === "pending"
+      ? "We're still confirming your payment. This page updates once it's through."
+      : "The payment wasn't finished. You can pay from here until the time shown on your order.");
+    const nextQuery = { ...route.query };
+    delete nextQuery.payment;
+    router.replace({ query: nextQuery });
+  } else if (route.query.payment === "success") {
     toast.success("Payment confirmed. Your order has been updated.", {
       position: toast.POSITION.TOP_RIGHT,
     });
@@ -1854,6 +1900,71 @@ button.ot-pay {
 }
 
 .ot-case-note.amber { background: var(--amber-bg); color: var(--amber); }
+
+/* Approved outside the delivery areas: pay now */
+.ot-paynow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin: 16px 22px 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(154, 91, 11, 0.22);
+  border-radius: 14px;
+  background: var(--amber-bg);
+}
+
+.ot-paynow__text {
+  display: grid;
+  flex: 1 1 280px;
+  gap: 3px;
+  font-size: 13px;
+  color: var(--amber);
+}
+
+.ot-paynow__text strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ot-paynow__btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ot-paynow__btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--ink, #363f4e);
+  color: #ffffff;
+  font: 600 13.5px var(--font-sans, "Poppins", system-ui, sans-serif);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ot-paynow__btn.alt {
+  background: #ffffff;
+  color: var(--ink, #363f4e);
+  box-shadow: inset 0 0 0 1px rgba(54, 63, 78, 0.18);
+}
+
+.ot-paynow__btn:hover:not(:disabled) {
+  background: var(--leaf-deep, #2e7a4f);
+  color: #ffffff;
+}
+
+.ot-paynow__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ot-paynow__btn:focus-visible {
+  outline: 2px solid var(--leaf, #4db173);
+  outline-offset: 2px;
+}
 .ot-case-note.blue { background: var(--blue-bg); color: var(--blue); }
 
 .ot-case-note svg,

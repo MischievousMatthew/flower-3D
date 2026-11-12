@@ -47,6 +47,72 @@ class CheckoutController extends Controller
     }
 
     /**
+     * POST /api/customer/orders/{id}/pay  { ewallet_type: gcash|paymaya }
+     * An order outside the shop's delivery areas, once the shop approves it:
+     * opens PayMongo for the full total (GCash / Maya orders) or the 50% down
+     * payment (cash on delivery). Can be tried again until pay_by.
+     */
+    public function payOutsideArea(Request $request, int $id)
+    {
+        $data = $request->validate(['ewallet_type' => 'nullable|in:gcash,paymaya']);
+        $order = Order::query()->whereKey($id)->where('user_id', $request->user()->id)->first();
+        if (! $order) {
+            return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+        }
+
+        $due = $order->amountDueOnline();
+        if ($due === null) {
+            return response()->json([
+                'success' => false,
+                'message' => $order->awaitingAreaApproval() ? 'The shop hasn\'t approved this order yet. You\'ll be told when you can pay.' : 'Nothing to pay online for this order.',
+            ], 422);
+        }
+        if ($order->pay_by && $order->pay_by->isPast()) {
+            return response()->json(['success' => false, 'message' => 'The time to pay for this order has run out, so it was cancelled.'], 422);
+        }
+
+        // Only one payment page at a time: an older one stops taking payments
+        $this->expirePayMongoSession($order->paymongo_payment_intent_id);
+
+        $payment = $this->createPayMongoPayment($order, 'ewallet', $data['ewallet_type'] ?? null, $due);
+        if (! $payment['success']) {
+            return response()->json(['success' => false, 'message' => $payment['message'] ?? 'Couldn\'t open the payment page. Try again in a few minutes.'], 502);
+        }
+
+        $order->update([
+            'paymongo_payment_intent_id' => $payment['checkout_session_id'] ?? null,
+            'paymongo_source_id' => $payment['source_id'] ?? null,
+            'paymongo_checkout_url' => $payment['checkout_url'] ?? null,
+            'paymongo_response' => array_merge(is_array($order->paymongo_response) ? $order->paymongo_response : [], [
+                'checkout_session_id' => $payment['checkout_session_id'] ?? null,
+                'reference_number' => $payment['reference_number'] ?? null,
+                'payment_attempt' => $payment['payment_attempt'] ?? null,
+                'payment_method' => 'ewallet',
+                'amount_due' => $due,
+            ]),
+        ]);
+
+        return response()->json(['success' => true, 'checkout_url' => $payment['checkout_url']]);
+    }
+
+    /**
+     * Stops an order's open PayMongo page from taking a payment (an outside-area
+     * order cancelled for not being paid in time). A payment that still slips
+     * through is marked for a refund, never lost.
+     */
+    public function closePaymentPage(Order $order): void
+    {
+        $session = $order->paymongo_payment_intent_id;
+        if (! $session) {
+            return;
+        }
+        $this->expirePayMongoSession($session);
+        $order->update(['paymongo_response' => array_merge(is_array($order->paymongo_response) ? $order->paymongo_response : [], [
+            'cancelled_checkout_session_id' => $session,
+        ])]);
+    }
+
+    /**
      * Initialize checkout - now returns vendor delivery fee (no tax)
      */
     public function initializeCheckout(Request $request)
@@ -476,22 +542,17 @@ class CheckoutController extends Controller
                 ], 422);
             }
 
-            // Outside the shop's delivery areas: the shop approves it first, and
-            // it's paid on delivery so a declined order never needs a refund
+            // Outside the shop's delivery areas: placed unpaid, and the shop approves
+            // it first. Then the customer pays online: GCash / Maya in full, or for
+            // cash on delivery a 50% down payment (the rest in cash). Nothing is
+            // paid before approval, so a declined order never needs a refund.
             $area = DeliveryArea::check($vendor, $request->delivery_address, $user);
-            if (! $area['covered']) {
-                if (! $vendor->shopPreferences()['accept_cod']) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "This address is outside {$vendor->store_name}'s delivery areas, and the shop only takes online payment, so it can't take this order. Try an address inside its areas.",
-                    ], 422);
-                }
-                if ($paymentMethod !== 'cod') {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "This address is outside {$vendor->store_name}'s delivery areas, so the order is paid cash on delivery once the shop approves it.",
-                    ], 422);
-                }
+            $outside = ! $area['covered'];
+            if ($outside && ! $vendor->payment_details_completed) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "This address is outside {$vendor->store_name}'s delivery areas, and the shop can't take online payments yet, so it can't take this order. Try an address inside its areas.",
+                ], 422);
             }
 
             $settings = VendorApplication::buildReservationSettings($vendorUser, $vendor);
@@ -621,7 +682,8 @@ class CheckoutController extends Controller
                     'payment_method' => $paymentMethod,
                     'payment_status' => 'unpaid',
                     'delivery_address' => $request->delivery_address,
-                    'outside_area' => ! $area['covered'],
+                    'outside_area' => $outside,
+                    'deposit_amount' => $outside && $paymentMethod === 'cod' ? round($total * Order::OUTSIDE_DEPOSIT_RATE, 2) : null,
                     'delivery_contact_name' => $user->name,
                     'delivery_contact_number' => $request->contact_number,
                     'delivery_notes' => $request->delivery_notes ?? '',
@@ -678,8 +740,8 @@ class CheckoutController extends Controller
 
                 DB::commit();
 
-                // Handle payment
-                if ($paymentMethod === 'ewallet') {
+                // Handle payment (outside the delivery areas: after the shop approves, from the order)
+                if ($paymentMethod === 'ewallet' && ! $outside) {
                     $paymentResponse = $this->createPayMongoPayment($order, $paymentMethod, $request->input('ewallet_type'));
                     
                     if ($paymentResponse['success']) {
@@ -742,6 +804,8 @@ class CheckoutController extends Controller
                             'payment_method' => $order->payment_method,
                             'status' => $order->status,
                             'reservation_date' => $order->reservation_date,
+                            // Waiting for the shop to approve; paid after that
+                            'awaiting_approval' => $outside,
                         ]
                     ]
                 ]);
@@ -833,6 +897,8 @@ class CheckoutController extends Controller
 
         Order::query()
             ->where('payment_method', 'ewallet')
+            // Outside the delivery areas: unpaid on purpose until the shop approves
+            ->where('outside_area', false)
             ->where('payment_status', 'unpaid')
             ->where('status', 'pending')
             ->whereNotNull('stock_deducted_at')
@@ -948,8 +1014,14 @@ class CheckoutController extends Controller
     /**
      * Create PayMongo payment
      */
-    private function createPayMongoPayment(Order $order, string $paymentMethod, ?string $ewalletType = null)
+    /**
+     * @param float|null $amount what to charge now (default: the order's total);
+     *   the 50% down payment for a cash-on-delivery order outside the delivery areas
+     */
+    private function createPayMongoPayment(Order $order, string $paymentMethod, ?string $ewalletType = null, ?float $amount = null)
     {
+        $isDeposit = $amount !== null && round($amount, 2) < round((float) $order->total_amount, 2);
+        $amount ??= (float) $order->total_amount;
         // GCash or Maya, as picked at checkout; both when it wasn't (older pages)
         $walletTypes = in_array($ewalletType, ['gcash', 'paymaya'], true) ? [$ewalletType] : ['gcash', 'paymaya'];
         $paymentMethod = $this->normalizePaymentMethod($paymentMethod);
@@ -993,10 +1065,12 @@ class CheckoutController extends Controller
                         'line_items' => [
                             [
                                 'currency' => 'PHP',
-                                'amount' => (int) round($order->total_amount * 100),
-                                'description' => 'Order from ' . $order->store_name,
+                                'amount' => (int) round($amount * 100),
+                                'description' => $isDeposit
+                                    ? 'Down payment for an order from ' . $order->store_name . '. The rest is paid in cash on delivery.'
+                                    : 'Order from ' . $order->store_name,
                                 'quantity' => 1,
-                                'name' => 'Order #' . $order->order_number,
+                                'name' => ($isDeposit ? 'Down payment · ' : '') . 'Order #' . $order->order_number,
                             ]
                         ],
                         'payment_method_types' => $walletTypes,
@@ -1137,6 +1211,7 @@ class CheckoutController extends Controller
         }
 
         if ($order->payment_method !== 'ewallet'
+            || $order->outside_area // paid after approval, from the order; never closed from checkout
             || $order->payment_status === 'paid'
             || ! in_array($order->status, ['pending', 'payment_failed', 'failed'], true)) {
             return response()->json([
@@ -1379,7 +1454,11 @@ class CheckoutController extends Controller
         $metadata = $attributes['metadata'] ?? [];
         $order = $this->resolveWebhookOrder($attributes, $metadata);
 
-        if ($order && $this->isActivePayMongoAttempt($order, $paymentData, $attributes, $metadata)) {
+        // Outside the delivery areas, paying after approval: a failed try isn't
+        // the end, the customer can pay again until the order's pay-by time
+        if ($order?->outside_area) {
+            Log::info('Payment attempt failed for an outside-area order; it can be paid again', ['order_id' => $order->id]);
+        } elseif ($order && $this->isActivePayMongoAttempt($order, $paymentData, $attributes, $metadata)) {
             // Keep PayMongo's reason so the customer can see why it didn't go through
             $error = $attributes['last_payment_error'] ?? $attributes;
             // Failed: finished for good, stock back on the shelf
@@ -1560,6 +1639,24 @@ class CheckoutController extends Controller
 
         if (!$order) {
             return redirect($frontendUrl . '/customer/orders?payment=missing');
+        }
+
+        // Outside the delivery areas, paid after approval from the orders page:
+        // back there either way. A cancelled payment leaves the order as it was,
+        // so it can be paid again until its pay-by time.
+        if ($order->outside_area) {
+            if ($success && $order->amountDueOnline() !== null && $this->confirmPaidCheckoutSession($order)) {
+                $this->markOrderPaidFromWebhook($order, [
+                    'checkout_session_id' => $order->paymongo_payment_intent_id,
+                    'reference_number' => $reference ?: $this->buildPayMongoReference($order),
+                    'payment_attempt' => data_get($order->paymongo_response, 'payment_attempt'),
+                    'resource' => 'payment.callback.paymongo_lookup',
+                    'payment' => $this->confirmedPayment,
+                ]);
+            }
+            $paid = $order->fresh()->amountDueOnline() === null;
+
+            return redirect($frontendUrl . '/customer/orders?payment=' . ($paid ? 'success' : ($success ? 'pending' : 'later')));
         }
 
         if ($success) {
@@ -1827,7 +1924,14 @@ class CheckoutController extends Controller
             $receivedSession = $paymentContext['checkout_session_id'] ?? null;
             $receivedAttempt = $paymentContext['payment_attempt'] ?? null;
 
-            if ($lockedOrder->payment_method !== 'ewallet'
+            // Cash on delivery outside the delivery areas: this payment is the
+            // 50% down payment; the order stays unpaid until the rest is collected
+            $isDeposit = $lockedOrder->payment_method === 'cod' && $lockedOrder->outside_area && $lockedOrder->deposit_amount > 0;
+            if ($isDeposit && $lockedOrder->deposit_paid_at) {
+                return true;
+            }
+
+            if (($lockedOrder->payment_method !== 'ewallet' && ! $isDeposit)
                 || $lockedOrder->payment_status !== 'unpaid'
                 || $lockedOrder->status !== 'pending'
                 || ! $expectedSession
@@ -1838,7 +1942,7 @@ class CheckoutController extends Controller
                 // failed or expired): the order stays closed, so mark the money
                 // for a refund instead of losing track of it
                 $closedSession = $response['cancelled_checkout_session_id'] ?? null;
-                if ($lockedOrder->status === 'failed' && $receivedSession && $closedSession === $receivedSession) {
+                if (in_array($lockedOrder->status, ['failed', 'cancelled'], true) && $receivedSession && $closedSession === $receivedSession) {
                     $lockedOrder->update(['paymongo_response' => array_merge($response, [
                         'paid_after_close' => now()->toIso8601String(),
                         'needs_refund' => true,
@@ -1855,6 +1959,20 @@ class CheckoutController extends Controller
                     'received_attempt' => $receivedAttempt,
                 ]);
                 return false;
+            }
+
+            if ($isDeposit) {
+                // Stock was already held when the order was placed
+                $lockedOrder->update([
+                    'deposit_paid_at' => now(),
+                    'paymongo_response' => array_filter(array_merge($response, [
+                        'reference_number' => $paymentContext['reference_number'] ?? null,
+                        'webhook_resource' => $paymentContext['resource'] ?? null,
+                        'deposit_paid_at' => now()->toIso8601String(),
+                    ], $paymentContext['payment'] ?? []), fn ($value) => $value !== null),
+                ]);
+
+                return true;
             }
 
             $updates = [
