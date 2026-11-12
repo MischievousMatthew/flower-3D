@@ -503,12 +503,8 @@ class CartController extends Controller
             if ($vendorApplication) {
                 $vendorStoreName = $vendorApplication->store_name;
                 $vendorBusinessName = $vendorApplication->business_name;
-                $logo = $vendorApplication->store_logo_path;
-                if (!empty($logo)) {
-                    $vendorStoreLogo = (str_starts_with($logo, 'http://') || str_starts_with($logo, 'https://'))
-                        ? $logo
-                        : CloudinaryHelper::getUrl($logo);
-                }
+                // The model resolves Cloudinary ids, full URLs and local storage paths
+                $vendorStoreLogo = $vendorApplication->store_logo_url ?: null;
             }
         }
 
