@@ -1,4 +1,4 @@
-import { computed, getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, getCurrentInstance, markRaw, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { onBeforeRouteLeave, useRouter } from "vue-router";
 
 // Unsaved changes on a vendor page, shown in one bar at the bottom of the
@@ -98,7 +98,10 @@ export function useUnsavedChanges({ fields, save, discard, saving, saveLabel = "
     return out;
   });
 
-  const reg = {
+  // markRaw: kept as is inside the shared state. Otherwise Vue unwraps these
+  // computed values there, and `reg.dirty.value` reads as undefined (the bar
+  // never showed and leaving was never held back).
+  const reg = markRaw({
     changes,
     dirty: computed(() => changes.value.length > 0),
     saving: computed(() => !!(typeof saving === "function" ? saving() : saving?.value)),
@@ -106,7 +109,7 @@ export function useUnsavedChanges({ fields, save, discard, saving, saveLabel = "
     save: () => save(),
     discard: () => discard(),
     markClean,
-  };
+  });
 
   onMounted(() => (state.owner = reg));
   onBeforeUnmount(() => {
