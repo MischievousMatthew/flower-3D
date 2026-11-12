@@ -81,10 +81,10 @@ const props = defineProps({
 const emit = defineEmits(["pick"]);
 
 const TABS = [
-  { key: "flowerType", label: "Flower types", source: "flower_types", labels: "flower_types" },
   { key: "occasion", label: "Occasions", source: "occasions", labels: "occasions" },
-  { key: "color", label: "Colors", source: "colors" },
   { key: "category", label: "Arrangements", source: "categories", labels: "categories" },
+  { key: "flowerType", label: "Flower types", source: "flower_types", labels: "flower_types" },
+  { key: "color", label: "Colors", source: "colors" },
 ];
 const TINTS = ["#f6e6e1", "#e7f2ea", "#efe9f6", "#fbf0dc", "#e5eef6", "#f4e8ee"];
 
@@ -99,7 +99,7 @@ const listFor = (tab) =>
 
 // Tabs with nothing in them are hidden (once loaded)
 const visibleTabs = computed(() => (props.loading ? TABS : TABS.filter((t) => listFor(t).length)));
-const current = ref("flowerType");
+const current = ref("occasion");
 watch(visibleTabs, (tabs) => {
   if (tabs.length && !tabs.some((t) => t.key === current.value)) current.value = tabs[0].key;
 }, { immediate: true });
