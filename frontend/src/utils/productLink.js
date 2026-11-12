@@ -39,11 +39,9 @@ export function productCode(id) {
   return body + checkChar(body);
 }
 
-/** "x4Gk2Lq" → 1; an old numeric link still works; anything else → null */
+/** "x4Gk2Lq" → 1; a plain id like "1", or anything else → null (ids never open a page) */
 export function productIdFromCode(code) {
   const value = String(code ?? "");
-  // Codes are always 7 characters; a shorter number is an old link with the plain id
-  if (/^\d{1,6}$/.test(value)) return Number(value) || null;
   if (value.length !== LENGTH + 1) return null;
   const body = value.slice(0, LENGTH);
   if (checkChar(body) !== value[LENGTH] || [...body].some((c) => !ALPHABET.includes(c))) return null;

@@ -970,12 +970,8 @@ watch(
   () => route.params.id,
   (param) => {
     if (!param) return;
+    // Only a code opens a product; a typed-in id like /1 shows "not found"
     const id = productIdFromCode(param);
-    // An old link with the plain number: swap it for the code, keeping the page
-    if (id && String(param) === String(id)) {
-      router.replace({ ...productRoute(id), query: route.query, hash: route.hash });
-      return;
-    }
     window.scrollTo({ top: 0 });
     if (!id) {
       product.value = null;
