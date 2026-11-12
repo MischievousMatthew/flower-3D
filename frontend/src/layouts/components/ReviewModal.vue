@@ -388,6 +388,7 @@
 <script setup>
 import { ref, computed, watch } from "vue";
 import api from "../../plugins/axios.js";
+import { productCode } from "../../utils/productLink.js";
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -581,7 +582,7 @@ async function submit() {
         headers: { "Content-Type": "multipart/form-data" },
       });
     } else {
-      await api.post(`customer/products/${activeProduct.value.id}/review`, fd, {
+      await api.post(`customer/products/${productCode(activeProduct.value.id)}/review`, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
     }

@@ -465,7 +465,7 @@
 </template>
 
 <script setup>
-import { productIdFromCode, productRoute } from "../../utils/productLink.js";
+import { productCode, productIdFromCode, productRoute } from "../../utils/productLink.js";
 import { computed, defineAsyncComponent, h, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import api from "../../plugins/axios.js";
@@ -754,7 +754,7 @@ async function load(id) {
   activeTab.value = "description";
   tabsSeen.reviews = false;
   try {
-    const { data } = await api.get(`/customer/products/${id}`);
+    const { data } = await api.get(`/customer/products/${productCode(id)}`);
     product.value = data?.success ? data.data : null;
   } catch {
     // Couldn't reach the server: keep what the tile already showed
@@ -786,7 +786,7 @@ function countView(id) {
   } catch {
     // storage blocked: count it anyway
   }
-  api.post(`customer/products/${id}/view`).catch(() => {});
+  api.post(`customer/products/${productCode(id)}/view`).catch(() => {});
 }
 
 /**
@@ -866,7 +866,7 @@ async function fillSimilar(id) {
 
 async function refreshStats() {
   try {
-    const { data } = await api.get(`/customer/products/${product.value.id}`);
+    const { data } = await api.get(`/customer/products/${productCode(product.value.id)}`);
     if (data?.success) {
       product.value.average_rating = data.data.average_rating;
       product.value.total_reviews = data.data.total_reviews;

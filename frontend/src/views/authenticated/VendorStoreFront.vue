@@ -489,6 +489,7 @@ import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import api from "../../plugins/axios";
+import { productCode } from "../../utils/productLink.js";
 import NavHeader from "../../layouts/NavHeader.vue";
 import ModelViewer3D from "../../layouts/3D/3DModelViewer.vue";
 import ProductCard from "../../layouts/components/ProductCard.vue";
@@ -759,7 +760,7 @@ const fetchProductStats = async (productId) => {
   productStatsLoading.value = true;
   productStats.value = { average_rating: 0, total_reviews: 0, sold_count: 0 };
   try {
-    const res = await api.get(`products/${productId}/reviews`, { params: { per_page: 1 } });
+    const res = await api.get(`products/${productCode(productId)}/reviews`, { params: { per_page: 1 } });
     if (res.data.success !== false) {
       const s = res.data.summary ?? res.data.data?.summary ?? {};
       productStats.value = {

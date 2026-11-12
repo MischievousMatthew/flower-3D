@@ -52,6 +52,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
 import api from "../../plugins/axios";
+import { productCode } from "../../utils/productLink.js";
 import { useAuth } from "../../composables/useAuth";
 
 // One of the two: questions about a product (public once answered) or about one of my orders (private)
@@ -91,7 +92,7 @@ async function load() {
   loading.value = true;
   try {
     if (props.productId && !props.orderId) {
-      const { data } = await api.get(`products/${props.productId}/questions`);
+      const { data } = await api.get(`products/${productCode(props.productId)}/questions`);
       answered.value = data.data ?? [];
     }
   } catch {

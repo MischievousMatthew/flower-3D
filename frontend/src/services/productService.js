@@ -1,4 +1,5 @@
 import api from "../plugins/axios";
+import { productCode } from "../utils/productLink.js";
 
 const productService = {
   // Get all approved products (for customers) - PUBLIC
@@ -28,7 +29,7 @@ const productService = {
   // Get product by ID - PUBLIC
   async getProductById(id) {
     try {
-      const response = await api.get(`/customer/products/${id}`);
+      const response = await api.get(`/customer/products/${productCode(id)}`);
       return response.data;
     } catch (error) {
       console.error("Error fetching product:", error);

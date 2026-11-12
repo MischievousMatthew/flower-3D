@@ -284,6 +284,7 @@
 <script setup>
 import { computed, ref, reactive, onMounted, watch } from "vue";
 import api from "../../plugins/axios";
+import { productCode } from "../../utils/productLink.js";
 import ShowMore from "../../components/common/ShowMore.vue";
 import { useShowMoreRows } from "../../composables/useShowMore";
 
@@ -330,7 +331,7 @@ async function load(page = 1) {
   try {
     const endpoint = props.vendor
       ? `vendor/products/${props.productId}/reviews`
-      : `products/${props.productId}/reviews`;
+      : `products/${productCode(props.productId)}/reviews`;
 
     const res = await api.get(endpoint, {
       params: { page, per_page: meta.per_page, sort: sortBy.value },
@@ -355,7 +356,7 @@ const reviewList = useShowMoreRows(reviews, computed(() => meta), load);
 async function loadSummary() {
   if (summary.value) return; // already loaded with reviews
   try {
-    const res = await api.get(`products/${props.productId}/reviews/summary`);
+    const res = await api.get(`products/${productCode(props.productId)}/reviews/summary`);
     const body = res?.data ?? res;
     if (body?.data) summary.value = body.data;
   } catch (e) {

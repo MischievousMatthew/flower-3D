@@ -157,14 +157,15 @@ Route::prefix('customer')->group(function () {
     Route::get('/products/categories',          [CustomerProductController::class, 'categories']);
     Route::get('/products/filters',             [CustomerProductController::class, 'filters']);
     Route::get('/products/category/{category}', [CustomerProductController::class, 'byCategory']);
-    Route::get('/products/{id}',                [CustomerProductController::class, 'show']);
-    Route::get('/products/{id}/related',        [CustomerProductController::class, 'related']);
+    // Product routes for customers take the product's code, not its id (DecodeProductCode)
+    Route::get('/products/{id}',                [CustomerProductController::class, 'show'])->middleware('product.code');
+    Route::get('/products/{id}/related',        [CustomerProductController::class, 'related'])->middleware('product.code');
     Route::get('/product-models/{filename}',    [CustomerProductController::class, 'serveModel']);
     Route::get('/availability',                 [ReservationController::class, 'getAvailability']);
     Route::post('/check-date',                  [ReservationController::class, 'checkDateAvailability']);
     Route::get('/product-tags/order',           [CustomerProductController::class, 'tagOrder']);
     // A product page was opened: counted per day for the POPULAR tag
-    Route::post('/products/{id}/view',          [CustomerProductController::class, 'recordView'])->whereNumber('id')->middleware('throttle:60,1');
+    Route::post('/products/{id}/view',          [CustomerProductController::class, 'recordView'])->middleware(['throttle:60,1', 'product.code']);
     // "You may like": from the signed-in customer's Flowers you love (guests get similar flowers)
     Route::get('/recommendations',              [CustomerProductController::class, 'recommendations']);
     // Shop search bar: popular searches, and counting searches that found flowers
@@ -200,10 +201,10 @@ Route::get('/product-taxonomies', [ProductTaxonomyController::class, 'index']);
 
 // ── PUBLIC — Product reviews (no auth required) ───────────────────────────
 Route::get('/products/{productId}/reviews', [ProductReviewController::class, 'index'])
-    ->whereNumber('productId');
+    ->middleware('product.code');
 // Answered questions about a product (Customer relationships → Inquiries)
 Route::get('/products/{productId}/questions', [CustomerInquiryController::class, 'productQuestions'])
-    ->whereNumber('productId');
+    ->middleware('product.code');
 
 // ============================================================
 // 4. PUBLIC — PAYMONGO WEBHOOK
@@ -370,13 +371,13 @@ Route::middleware('token.auth')->group(function () {
         // ── Reviews ───────────────────────────────────────────────────────────
         Route::get('/reviewable-products',              [ProductReviewController::class, 'reviewableProducts']);
         Route::post('/products/{productId}/review',     [ProductReviewController::class, 'store'])
-            ->whereNumber('productId');
+            ->middleware('product.code');
     });
 
     // ── Customer — Report a product ───────────────────────────────────────
     // POST /api/products/{id}/report
     Route::post('/products/{id}/report', [ProductReportController::class, 'store'])
-        ->whereNumber('id');                                                          // ← NEW
+        ->middleware('product.code');                                                          // ← NEW
 
     // ── Standalone review CRUD ────────────────────────────────────────────
     Route::put('/reviews/{id}',    [ProductReviewController::class, 'update'])->whereNumber('id');

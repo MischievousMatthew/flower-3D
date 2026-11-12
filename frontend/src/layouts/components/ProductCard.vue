@@ -198,6 +198,7 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
+import { productCode } from "../../utils/productLink.js";
 import { useAuth } from "../../composables/useAuth";
 
 // ── Props / emits ─────────────────────────────────────
@@ -258,7 +259,7 @@ const submitReport = async () => {
   }
   submitting.value = true;
   try {
-    await api.post(`/products/${props.product.id}/report`, {
+    await api.post(`/products/${productCode(props.product.id)}/report`, {
       reason: reportForm.value.reason,
       description: reportForm.value.description || null,
     });
