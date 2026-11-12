@@ -400,8 +400,11 @@
             </div>
             <div class="summary-row">
               <span>Delivery</span>
-              <span class="summary-muted">Calculated at checkout</span>
+              <span class="summary-muted">Set by the shop</span>
             </div>
+            <p class="delivery-note">
+              Each shop books its own third-party courier, so the shop sets the delivery fee for your order.
+            </p>
           </div>
 
           <div v-if="discountedSelectedItems.length > 0" class="discount-breakdown">
@@ -1848,6 +1851,13 @@ const handleImageError = (e) => {
 .summary-row span:last-child {
   color: var(--ink);
   font-weight: 500;
+}
+
+.delivery-note {
+  margin-top: -4px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.55;
 }
 
 .summary-row .summary-muted {
