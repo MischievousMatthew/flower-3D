@@ -321,12 +321,6 @@
                         class="stock-pill stock-pill--low"
                         >Only {{ item.product?.quantity_in_stock }} left</span
                       >
-                      <span
-                        v-if="pendingUpdates[item.id]"
-                        class="sync-indicator"
-                        aria-live="polite"
-                        >Saving…</span
-                      >
                     </div>
 
                     <div class="item-actions">
@@ -522,13 +516,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import { usePrice } from "../../composables/usePrice";
 import { useCart } from "../../composables/useCart";
 import NavHeader from "../../layouts/NavHeader.vue";
 import api from "../../plugins/axios"; // ✅ needed to fetch profile
+import { getPreferredAuthToken } from "../../utils/authSession";
 import { showCheckoutPaused, usePlatformStatus } from "../../composables/usePlatformStatus";
 import { toast } from "@/utils/snackbar";
 import "../../styles/bloomcraft.css";
@@ -831,31 +826,92 @@ const handleQuantityInput = (itemId, event) => {
 
 // pendingUpdates[id] holds the newest quantity the shopper picked until the
 // server has it; quick clicks are sent as one request once they stop
+const QUANTITY_SAVE_DELAY = 400;
+const savesInFlight = new Set();
+
+const saveQuantity = async (itemId, quantity) => {
+  let failed = false;
+  try {
+    await cartStore.updateCartItem(itemId, quantity);
+  } catch {
+    failed = true;
+  }
+  if (failed) toast.error("Failed to update quantity");
+  // A newer change for this item is already on its way; it settles the number
+  if (pendingUpdates.value[itemId] !== quantity) return !failed;
+  delete pendingUpdates.value[itemId];
+  if (failed) {
+    await loadCart(false);
+    return false;
+  }
+  // Show what the server actually saved (it may have capped it to the stock)
+  const saved = cartStore.items.value.find((i) => i.id === itemId);
+  const local = cartItems.value.find((i) => i.id === itemId);
+  if (saved && local) local.quantity = saved.quantity;
+  return true;
+};
+
+const startSave = (itemId, quantity) => {
+  delete updateTimeouts.value[itemId];
+  const save = saveQuantity(itemId, quantity);
+  savesInFlight.add(save);
+  save.finally(() => savesInFlight.delete(save));
+  return save;
+};
+
 const scheduleQuantityUpdate = (itemId, quantity) => {
   clearTimeout(updateTimeouts.value[itemId]);
   pendingUpdates.value[itemId] = quantity;
-  updateTimeouts.value[itemId] = setTimeout(async () => {
-    delete updateTimeouts.value[itemId];
-    let failed = false;
-    try {
-      await cartStore.updateCartItem(itemId, quantity);
-    } catch {
-      failed = true;
-    }
-    if (failed) toast.error("Failed to update quantity");
-    // A newer change for this item is already on its way; it settles the number
-    if (pendingUpdates.value[itemId] !== quantity) return;
-    delete pendingUpdates.value[itemId];
-    if (failed) {
-      await loadCart(false);
-      return;
-    }
-    // Show what the server actually saved (it may have capped it to the stock)
-    const saved = cartStore.items.value.find((i) => i.id === itemId);
-    const local = cartItems.value.find((i) => i.id === itemId);
-    if (saved && local) local.quantity = saved.quantity;
-  }, 400);
+  updateTimeouts.value[itemId] = setTimeout(() => startSave(itemId, quantity), QUANTITY_SAVE_DELAY);
 };
+
+// Sends every waiting change now and waits for all saves; false if one failed
+const flushQuantityUpdates = async () => {
+  Object.keys(updateTimeouts.value).forEach((key) => {
+    clearTimeout(updateTimeouts.value[key]);
+    const itemId = cartItems.value.find((i) => String(i.id) === key)?.id ?? key;
+    if (pendingUpdates.value[itemId] != null) startSave(itemId, pendingUpdates.value[itemId]);
+  });
+  const results = await Promise.all([...savesInFlight]);
+  return results.every(Boolean);
+};
+
+// Closing or reloading the tab: the page is going away, so send waiting
+// changes with keepalive, which the browser finishes even after the page is gone
+const sendWaitingOnPageHide = () => {
+  const keys = Object.keys(updateTimeouts.value);
+  if (!keys.length) return;
+  const token = getPreferredAuthToken(window.location.pathname);
+  const base = String(api.defaults.baseURL || "").replace(/\/+$/, "");
+  keys.forEach((key) => {
+    clearTimeout(updateTimeouts.value[key]);
+    delete updateTimeouts.value[key];
+    const quantity = pendingUpdates.value[key];
+    if (quantity == null) return;
+    try {
+      fetch(`${base}/cart/update/${key}`, {
+        method: "PUT",
+        keepalive: true,
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ quantity }),
+      }).catch(() => {});
+    } catch {}
+  });
+};
+
+onMounted(() => window.addEventListener("pagehide", sendWaitingOnPageHide));
+
+// Leaving for another page in the app: save straight away instead of waiting
+onBeforeUnmount(() => {
+  window.removeEventListener("pagehide", sendWaitingOnPageHide);
+  flushQuantityUpdates();
+});
 
 // ── Other actions ─────────────────────────────────────────────
 const customizeItem = (item) => {
@@ -952,6 +1008,9 @@ const getProductImage = (product) => {
 
 // ✅ Modified: profile check runs first; no checkout API is called if incomplete
 const proceedToCheckout = async () => {
+  // Quantities changed a moment ago must reach the server before checkout reads it
+  if (!(await flushQuantityUpdates())) return;
+
   if (selectedItems.value.length === 0) {
     toast.warning("Please select items to checkout");
     return;
@@ -1743,11 +1802,6 @@ const handleImageError = (e) => {
 .stock-pill--low {
   background: var(--amber-bg);
   color: var(--amber-ink);
-}
-
-.sync-indicator {
-  color: var(--ink-soft);
-  font-size: 12px;
 }
 
 .item-actions {
