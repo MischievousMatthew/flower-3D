@@ -66,6 +66,7 @@
                 <strong>{{ p.name }}</strong>
                 <span class="sp-chip" :class="STATE[p.stock_state].tone">{{ STATE[p.stock_state].label }}</span>
                 <span v-if="p.status !== 'active'" class="sp-chip slate">{{ p.status === "draft" ? "Draft" : "Archived" }}</span>
+                <span v-if="p.material" class="sp-chip slate" title="A material the shop uses, not sold on its own">{{ p.stock_kind === "wrapping" ? "Wrapping" : "Material" }}</span>
               </div>
               <div class="inv-meter" :title="meterTitle(p)">
                 <span :class="p.stock_state" :style="{ width: `${meter({ ...p, stock: shown(p) })}%` }"></span>
@@ -73,7 +74,8 @@
               </div>
               <div class="inv-sub">
                 <span>
-                  <strong>{{ shown(p) }}</strong> in stock
+                  <strong>{{ shown(p) }}</strong> {{ p.unit ? `${unitWord(p, shown(p))} ` : "" }}in stock
+                  <em v-if="p.pack_size" class="inv-packs">{{ packText(p, shown(p)) }} · {{ p.pack_size }} per {{ p.pack_unit }}</em>
                   <em v-if="pending[p.id]" class="inv-pending" :class="pending[p.id] > 0 ? 'up' : 'down'" :title="`Was ${p.stock}. Not saved yet`">
                     {{ pending[p.id] > 0 ? "+" : "−" }}{{ Math.abs(pending[p.id]) }} not saved
                   </em>
@@ -137,17 +139,23 @@
             <div class="sp-modal-head">
               <div>
                 <h3 id="adj-title">Adjust stock</h3>
-                <p>{{ adjusting.name }} · {{ adjusting.stock }} in stock now</p>
+                <p>{{ adjusting.name }} · {{ adjusting.stock }} {{ unitWord(adjusting, adjusting.stock) }} in stock now</p>
               </div>
               <button type="button" class="sp-icon-btn" aria-label="Close" @click="adjusting = null"><span v-html="ICONS.close"></span></button>
             </div>
             <div class="adj-modes">
               <button v-for="m in MODES" :key="m.key" type="button" class="sp-pick" :class="{ on: adj.mode === m.key }" @click="setMode(m.key)">{{ m.label }}</button>
             </div>
+            <!-- Bought in rolls: count in sheets or in rolls -->
+            <div v-if="adjusting.pack_size" class="adj-modes">
+              <button type="button" class="sp-pick" :class="{ on: adj.unit === 'piece' }" @click="adj.unit = 'piece'">{{ unitWord(adjusting, 2) }}</button>
+              <button type="button" class="sp-pick" :class="{ on: adj.unit === 'pack' }" @click="adj.unit = 'pack'">{{ plural(adjusting.pack_unit, 2) }} of {{ adjusting.pack_size }}</button>
+            </div>
             <div class="sp-grid-2">
               <label class="sp-field">
-                <span>{{ adj.mode === "set" ? "New stock count" : "Quantity" }}</span>
+                <span>{{ adj.mode === "set" ? "New stock count" : "Quantity" }}<template v-if="adjusting.pack_size"> ({{ adj.unit === "pack" ? plural(adjusting.pack_unit, 2) : unitWord(adjusting, 2) }})</template></span>
                 <input v-model.number="adj.quantity" type="number" min="0" step="1" class="sp-input" required />
+                <small v-if="adjusting.pack_size && adj.unit === 'pack' && adj.quantity > 0">= {{ adj.quantity * adjusting.pack_size }} {{ unitWord(adjusting, 2) }}</small>
               </label>
               <label class="sp-field">
                 <span>Reason</span>
@@ -253,8 +261,34 @@ const history = ref(null);
 const historyError = ref("");
 const historyFor = ref(null);
 
+// Materials (wrapping…) are counted here too: the same stock items as ERP Stock
+// & replenishment and 3D Bouquet Management, so all three show one number
+const materials = ref([]);
+const loadMaterials = () =>
+  api
+    .get("vendor/catalog/materials")
+    .then(({ data }) => (materials.value = data.data ?? []))
+    .catch(() => {}); // the products still show
+const items = computed(() => (products.value ? [...products.value, ...materials.value] : null));
+/** Put an item returned by the API back in its list */
+function replaceItem(p) {
+  if (!p.material) return replace(p);
+  const i = materials.value.findIndex((m) => m.id === p.id);
+  if (i >= 0) materials.value.splice(i, 1, p);
+}
+const plural = (word, n) => (n === 1 || /s$/i.test(String(word || "")) ? word : `${word}s`);
+/** What it's counted in: "sheets" for a wrapper, nothing extra for products */
+const unitWord = (p, n) => (p.unit ? plural(p.unit, n) : n === 1 ? "item" : "items");
+/** 95 sheets of 50 per roll → "≈ 1 roll + 45 sheets" */
+function packText(p, n) {
+  const packs = Math.floor(n / p.pack_size);
+  const rest = n % p.pack_size;
+  if (!packs) return `less than 1 ${p.pack_unit}`;
+  return `≈ ${packs} ${plural(p.pack_unit, packs)}${rest ? ` + ${rest} ${unitWord(p, rest)}` : ""}`;
+}
+
 const counts = computed(() => {
-  const list = products.value ?? [];
+  const list = items.value ?? [];
   return {
     all: list.length,
     low: list.filter((p) => p.stock_state === "low").length,
@@ -263,13 +297,13 @@ const counts = computed(() => {
   };
 });
 const totals = computed(() => ({
-  units: (products.value ?? []).reduce((n, p) => n + Math.max(0, p.stock), 0),
-  value: (products.value ?? []).reduce((n, p) => n + (p.stock_value || 0), 0),
+  units: (items.value ?? []).reduce((n, p) => n + Math.max(0, p.stock), 0),
+  value: (items.value ?? []).reduce((n, p) => n + (p.stock_value || 0), 0),
 }));
 const rows = computed(() => {
   const q = search.value.trim().toLowerCase();
   const order = { out: 0, low: 1, ok: 2 };
-  return (products.value ?? [])
+  return (items.value ?? [])
     .filter((p) => (filter.value === "all" || p.stock_state === filter.value) && (!q || p.name.toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q)))
     .sort((a, b) => order[a.stock_state] - order[b.stock_state] || a.stock - b.stock);
 });
@@ -309,27 +343,30 @@ function showHistory(p) {
 
 // Adjust
 const adjusting = ref(null);
-const adj = reactive({ mode: "add", quantity: 1, reason: "restock", note: "" });
+const adj = reactive({ mode: "add", unit: "piece", quantity: 1, reason: "restock", note: "" });
 const adjBusy = ref(false);
 const adjError = ref("");
 const adjAfter = computed(() => {
   if (!adjusting.value) return 0;
-  const q = Number(adj.quantity) || 0;
+  const q = (Number(adj.quantity) || 0) * (adj.unit === "pack" ? adjusting.value.pack_size || 1 : 1);
   return adj.mode === "add" ? adjusting.value.stock + q : adj.mode === "remove" ? adjusting.value.stock - q : q;
 });
 function openAdjust(p) {
   adjusting.value = p;
-  Object.assign(adj, { mode: "add", quantity: 1, reason: "restock", note: "" });
+  Object.assign(adj, { mode: "add", unit: "piece", quantity: 1, reason: "restock", note: "" });
   adjError.value = "";
 }
 function setMode(mode) {
   adj.mode = mode;
   adj.reason = { add: "restock", remove: "damaged", set: "count" }[mode];
-  if (mode === "set") adj.quantity = adjusting.value.stock;
+  if (mode === "set") {
+    adj.unit = "piece";
+    adj.quantity = adjusting.value.stock;
+  }
 }
 async function sendAdjust(p, body) {
   const { data } = await api.post(`vendor/catalog/products/${p.id}/stock`, body);
-  replace(data.data);
+  replaceItem(data.data);
   if (!historyFor.value || historyFor.value.id === p.id) {
     history.value = [data.adjustment, ...(history.value ?? [])].slice(0, 40);
   }
@@ -340,7 +377,7 @@ async function submitAdjust() {
   adjBusy.value = true;
   adjError.value = "";
   try {
-    await sendAdjust(adjusting.value, { ...adj, note: adj.note || null });
+    await sendAdjust(adjusting.value, { ...adj, unit: adjusting.value.pack_size ? adj.unit : null, note: adj.note || null });
     toast.success(`${adjusting.value.name}: ${adjAfter.value} in stock.`);
     adjusting.value = null;
   } catch (e) {
@@ -368,7 +405,7 @@ async function saveStock() {
   let saved = 0;
   try {
     for (const [id, delta] of Object.entries(pending)) {
-      const p = products.value?.find((x) => String(x.id) === id);
+      const p = items.value?.find((x) => String(x.id) === id);
       if (!p) {
         delete pending[id];
         continue;
@@ -393,7 +430,7 @@ async function saveStock() {
 const { markClean } = useUnsavedChanges({
   fields: () =>
     Object.entries(pending).map(([id, delta]) => {
-      const p = products.value?.find((x) => String(x.id) === id);
+      const p = items.value?.find((x) => String(x.id) === id);
       return { key: `stock_${id}`, label: `${p?.name ?? "Product"} (${delta > 0 ? "+" : "−"}${Math.abs(delta)})`, value: delta, fallback: "[data-inv-table]" };
     }),
   save: saveStock,
@@ -423,7 +460,7 @@ async function submitLevels() {
       min_stock_level: levels.min || 0,
       max_stock_level: levels.max === "" || levels.max === null ? null : levels.max,
     });
-    replace(data.data);
+    replaceItem(data.data);
     toast.success(data.message);
     leveling.value = null;
   } catch (e) {
@@ -435,6 +472,7 @@ async function submitLevels() {
 
 onMounted(() => {
   load();
+  loadMaterials();
   loadHistory();
 });
 </script>
@@ -547,6 +585,13 @@ onMounted(() => {
 /* A − / + change waiting for Save */
 .inv-row.pending {
   background: var(--v-amber-soft);
+}
+/* A wrapper bought in rolls: "≈ 2 rolls + 20 sheets · 50 per roll" */
+.inv-packs {
+  margin-left: 6px;
+  color: var(--v-muted);
+  font-style: normal;
+  font-size: 12px;
 }
 .inv-pending {
   margin-left: 6px;

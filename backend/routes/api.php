@@ -514,6 +514,8 @@ Route::middleware('token.auth')->group(function () {
                 Route::patch('/products/{id}/stock-levels', [VendorCatalogController::class, 'stockLevels'])->whereNumber('id');
                 Route::patch('/products/{id}/discount',    [VendorCatalogController::class, 'discount'])->whereNumber('id');
                 Route::get('/stock-history',               [VendorCatalogController::class, 'stockHistory']);
+                // Materials the shop uses (wrapping…): counted in the same stock as ERP Stock & replenishment
+                Route::get('/materials',                   [VendorCatalogController::class, 'materials']);
             });
 
             // Seasonal offers

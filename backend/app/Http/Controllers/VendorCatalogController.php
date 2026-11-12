@@ -130,7 +130,7 @@ class VendorCatalogController extends Controller
 
         $actor = $request->user();
         $result = DB::transaction(function () use ($ownerId, $id, $data, $actor) {
-            $product = $this->query($ownerId)->whereKey($id)->lockForUpdate()->first();
+            $product = $this->stockQuery($ownerId)->whereKey($id)->lockForUpdate()->first();
             if (! $product) {
                 return null;
             }
@@ -193,7 +193,7 @@ class VendorCatalogController extends Controller
             'max_stock_level' => 'nullable|integer|gte:min_stock_level|max:1000000',
         ]);
 
-        $product = $this->query($ownerId)->whereKey($id)->first();
+        $product = $this->stockQuery($ownerId)->whereKey($id)->first();
         if (! $product) {
             return $this->fail('Product not found.', 404);
         }
@@ -269,10 +269,33 @@ class VendorCatalogController extends Controller
 
     private function query(int $ownerId)
     {
+        return $this->stockQuery($ownerId)->forSale();
+    }
+
+    /** Everything the shop counts in stock: its products and its materials (wrapping…) */
+    private function stockQuery(int $ownerId)
+    {
         return Product::withoutGlobalScopes()
             ->whereNull('deleted_at')
-            ->where('owner_id', $ownerId)
-            ->forSale();
+            ->where('owner_id', $ownerId);
+    }
+
+    /**
+     * GET /vendor/catalog/materials: the shop's materials (wrapping, ribbons…),
+     * the same stock items ERP Stock & replenishment and 3D Bouquet Management use.
+     */
+    public function materials(Request $request): JsonResponse
+    {
+        $materials = $this->stockQuery($this->resolveOwnerId($request))
+            ->where('moderation_status', Product::MODERATION_INTERNAL)
+            ->where('status', '!=', 'discontinued')
+            ->with(['images', 'models:id,product_id'])
+            ->orderBy('product_name')
+            ->get()
+            ->map(fn (Product $p) => $this->format($p))
+            ->values();
+
+        return response()->json(['success' => true, 'data' => $materials]);
     }
 
     private function format(Product $p): array
@@ -308,6 +331,12 @@ class VendorCatalogController extends Controller
             'stock' => $stock,
             // A bouquet whose stock comes from its linked flowers (can't be changed by hand)
             'stock_from_flowers' => $p->isLinkedBouquet(),
+            // A material (wrapping…) and what it's counted in: sheets, bought in rolls of pack_size
+            'material' => $p->isMaterial(),
+            'stock_kind' => $p->stock_kind,
+            'unit' => $p->stock_unit,
+            'pack_unit' => $p->packSize() > 1 ? $p->pack_unit : null,
+            'pack_size' => $p->packSize() > 1 ? $p->packSize() : null,
             'min_stock' => $min,
             'max_stock' => $p->max_stock_level !== null ? (int) $p->max_stock_level : null,
             'stock_state' => $stock <= 0 ? 'out' : ($min !== null && $min > 0 && $stock <= $min ? 'low' : 'ok'),

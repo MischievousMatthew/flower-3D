@@ -43,6 +43,8 @@ class BouquetCustomizationOptionTest extends TestCase
         (include database_path('migrations/2026_10_10_000001_create_bouquet_customization_options_table.php'))->up();
         (include database_path('migrations/2026_11_04_130000_add_pattern_to_bouquet_customization_options.php'))->up();
         (include database_path('migrations/2026_11_04_150000_add_pattern_size_to_bouquet_customization_options.php'))->up();
+        (include database_path('migrations/2026_11_13_130000_add_stock_item_to_customization_options.php'))->up();
+        $this->stockTables();
 
         $this->withoutMiddleware(EnsureSubscriptionModuleAccess::class);
     }
@@ -91,6 +93,116 @@ class BouquetCustomizationOptionTest extends TestCase
 
         $this->as($vendor)->deleteJson("/api/vendor/customization-options/{$created['id']}")->assertOk();
         $this->assertDatabaseCount('bouquet_customization_options', 0);
+    }
+
+    /** The wrapping stock item a wrapper shares with ERP Stock and Inventory */
+    private function stockTables(): void
+    {
+        Schema::dropIfExists('products');
+        Schema::dropIfExists('product_stock_adjustments');
+        Schema::dropIfExists('warehouse_batches');
+        Schema::create('products', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('owner_id')->nullable();
+            $t->string('product_name');
+            $t->text('description')->nullable();
+            $t->string('sku')->nullable();
+            $t->string('category')->nullable();
+            $t->string('flower_type')->nullable();
+            $t->string('color')->nullable();
+            $t->json('color_options')->nullable();
+            $t->json('composition')->nullable();
+            $t->decimal('purchase_price', 12, 2)->nullable();
+            $t->decimal('selling_price', 12, 2)->default(0);
+            $t->integer('quantity_in_stock')->default(0);
+            $t->integer('min_stock_level')->default(0);
+            $t->integer('max_stock_level')->nullable();
+            $t->integer('supplier_lead_time')->nullable();
+            $t->string('stock_kind', 20)->nullable();
+            $t->string('stock_unit', 20)->nullable();
+            $t->string('pack_unit', 20)->nullable();
+            $t->unsignedInteger('pack_size')->nullable();
+            $t->integer('preparation_days')->default(0);
+            $t->string('color_other')->nullable();
+            $t->string('selling_type')->nullable();
+            $t->string('status')->default('active');
+            $t->string('moderation_status')->nullable();
+            $t->timestamps();
+            $t->softDeletes();
+        });
+        Schema::create('product_stock_adjustments', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('owner_id');
+            $t->unsignedBigInteger('product_id');
+            $t->integer('change');
+            $t->integer('quantity_before');
+            $t->integer('quantity_after');
+            $t->string('reason', 30);
+            $t->string('note', 500)->nullable();
+            $t->string('actor_name')->nullable();
+            $t->timestamp('created_at')->useCurrent();
+        });
+        Schema::create('warehouse_batches', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('owner_id')->nullable();
+            $t->unsignedBigInteger('product_id');
+            $t->integer('qty_remaining')->default(0);
+            $t->string('status')->default('active');
+            $t->date('expiration_date')->nullable();
+            $t->date('received_date')->nullable();
+            $t->timestamps();
+        });
+    }
+
+    public function test_a_wrapper_shares_its_sheets_with_its_wrapping_stock_item(): void
+    {
+        $vendor = $this->vendor();
+
+        // A new wrapper with a new stock item: 120 sheets, 50 per roll
+        $kraft = $this->as($vendor)->postJson('/api/vendor/customization-options', [
+            'type' => 'wrapper', 'name' => 'Kraft Paper', 'color_hex' => '#C8A27A',
+            'stock_item' => 'new', 'stock_sheets' => 120, 'pack_size' => 50,
+        ])->assertCreated()->json('data');
+
+        $item = \App\Models\Product::findOrFail($kraft['stock_item']['id']);
+        $this->assertSame(['Kraft Paper', 'wrapping', 'sheet', 'roll', 50, 120, 'internal'],
+            [$item->product_name, $item->stock_kind, $item->stock_unit, $item->pack_unit, (int) $item->pack_size, (int) $item->quantity_in_stock, $item->moderation_status]);
+        $this->assertSame(120, $kraft['stock_item']['on_hand']);
+        $this->assertSame(50, $kraft['stock_item']['pack_size']);
+
+        // A second wrapper uses the same item; changing its count changes the one shared number
+        $love = $this->as($vendor)->postJson('/api/vendor/customization-options', [
+            'type' => 'wrapper', 'name' => 'Love Wrapper', 'color_hex' => '#E0AEDB',
+            'stock_item' => (string) $item->id, 'stock_sheets' => 100, 'pack_size' => 50,
+        ])->assertCreated()->json('data');
+        $this->assertSame($item->id, $love['stock_item']['id']);
+        $this->assertSame(100, (int) $item->fresh()->quantity_in_stock);
+        $this->assertSame(1, \Illuminate\Support\Facades\DB::table('product_stock_adjustments')->where('product_id', $item->id)->where('quantity_after', 100)->count(), 'logged as a count');
+
+        $list = $this->as($vendor)->getJson('/api/vendor/customization-options')->assertOk()->json();
+        $this->assertSame([100, 100], collect($list['data'])->pluck('stock_item.on_hand')->all());
+        $this->assertSame([$item->id], array_column($list['wrapping_items'], 'id'));
+
+        // A flower can't be picked as a wrapper's stock item
+        $rose = \App\Models\Product::forceCreate(['owner_id' => $vendor->id, 'product_name' => 'Rose', 'quantity_in_stock' => 50, 'selling_type' => 'per_piece']);
+        $this->as($vendor)->postJson("/api/vendor/customization-options/{$kraft['id']}", ['stock_item' => (string) $rose->id])
+            ->assertStatus(422)->assertJsonValidationErrors('stock_item');
+
+        // A custom bouquet with Kraft outside and Love inside, ordered twice: 4 sheets
+        $lines = BouquetCustomizationOption::stockLinesFor([(object) ['quantity' => 2, 'customizations' => ['wrapper' => ['id' => $kraft['id']], 'inner_wrapper' => ['id' => $love['id']]]]]);
+        $this->assertSame([[$item->id, null, 2], [$item->id, null, 2]], $lines);
+        $plan = \App\Models\Product::stockPlan($lines);
+        $this->assertSame([[$item->id, null, 4, null]], $plan);
+
+        // Out of sheets: the wrappers disappear from the customizer
+        $item->update(['quantity_in_stock' => 0]);
+        $this->assertSame(0, BouquetCustomizationOption::query()->available()->where('type', 'wrapper')->count());
+        $item->update(['quantity_in_stock' => 3]);
+        $this->assertSame(2, BouquetCustomizationOption::query()->available()->where('type', 'wrapper')->count());
+
+        // "Not counted" unlinks it
+        $this->as($vendor)->postJson("/api/vendor/customization-options/{$kraft['id']}", ['stock_item' => 'none'])
+            ->assertOk()->assertJsonPath('data.stock_item', null);
     }
 
     public function test_validation_requires_a_hex_colour_and_a_filler_model(): void

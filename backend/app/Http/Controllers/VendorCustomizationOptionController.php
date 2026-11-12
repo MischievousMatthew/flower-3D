@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Helpers\CloudinaryHelper;
 use App\Models\BouquetCustomizationOption as Option;
+use App\Models\Product;
 use App\Traits\ResolvesOwner;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -25,12 +26,103 @@ class VendorCustomizationOptionController extends Controller
      */
     public function index(Request $request)
     {
-        $options = Option::forOwner($this->resolveOwnerId($request))
+        $ownerId = $this->resolveOwnerId($request);
+        $options = Option::forOwner($ownerId)
+            ->with('stockItem')
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->map(fn (Option $o) => $this->withStock($o));
 
-        return response()->json(['success' => true, 'data' => $options]);
+        return response()->json([
+            'success' => true,
+            'data' => $options,
+            // Wrapping stock items a wrapper can use (the same ones ERP Stock and Inventory show)
+            'wrapping_items' => $this->wrappingItems($ownerId),
+        ]);
+    }
+
+    /** The option with its wrapping stock item, as the page shows it */
+    private function withStock(Option $option): array
+    {
+        $item = $option->type === Option::TYPE_WRAPPER ? $option->stockItem : null;
+
+        // The relation would serialize as the whole product under the same key: send the summary instead
+        return array_merge($option->withoutRelations()->toArray(), ['stock_item' => $item ? $this->stockItemData($item) : null]);
+    }
+
+    private function stockItemData(Product $p): array
+    {
+        return [
+            'id'        => $p->id,
+            'name'      => $p->product_name,
+            'on_hand'   => (int) $p->quantity_in_stock,
+            'unit'      => $p->stock_unit ?: 'sheet',
+            'pack_unit' => $p->packSize() > 1 ? $p->pack_unit : null,
+            'pack_size' => $p->packSize() > 1 ? $p->packSize() : null,
+        ];
+    }
+
+    /** The shop's wrapping materials */
+    private function wrappingItems(int $ownerId): array
+    {
+        return Product::query()
+            ->where('owner_id', $ownerId)
+            ->where('moderation_status', Product::MODERATION_INTERNAL)
+            ->where('stock_kind', 'wrapping')
+            ->orderBy('product_name')
+            ->get()
+            ->map(fn (Product $p) => $this->stockItemData($p))
+            ->all();
+    }
+
+    /**
+     * The wrapper form's Stock section: stock_item is "none", "new" (a wrapping
+     * item named like the wrapper) or the id of one of the shop's wrapping
+     * items; stock_sheets is the count on hand and pack_size the sheets per
+     * roll. A changed count is saved as a stock count in the item's history.
+     */
+    private function saveWrapperStock(Request $request, Option $option, int $ownerId): void
+    {
+        if ($option->type !== Option::TYPE_WRAPPER || ! $request->has('stock_item')) {
+            return;
+        }
+        $choice = (string) $request->input('stock_item');
+        if ($choice === '' || $choice === 'none') {
+            $option->update(['stock_product_id' => null]);
+            return;
+        }
+
+        $sheets = $request->filled('stock_sheets') ? max(0, (int) $request->input('stock_sheets')) : null;
+        $packSize = (int) $request->input('pack_size') >= 2 ? (int) $request->input('pack_size') : null;
+        $stock = app(\App\Services\InventoryStockService::class);
+
+        if ($choice === 'new') {
+            $item = $stock->createMaterial($ownerId, [
+                'name'       => $option->name,
+                'stock_kind' => 'wrapping',
+                'stock_unit' => 'sheet',
+                'pack_unit'  => $packSize ? 'roll' : null,
+                'pack_size'  => $packSize,
+                'on_hand'    => $sheets ?? 0,
+            ], $request->user());
+        } else {
+            $item = Product::query()
+                ->whereKey((int) $choice)
+                ->where('owner_id', $ownerId)
+                ->where('moderation_status', Product::MODERATION_INTERNAL)
+                ->where('stock_kind', 'wrapping')
+                ->first();
+            if (! $item) {
+                throw new \InvalidArgumentException('Pick one of your wrapping items.');
+            }
+            $item->update(['pack_unit' => $packSize ? ($item->pack_unit ?: 'roll') : null, 'pack_size' => $packSize]);
+            if ($sheets !== null && $sheets !== (int) $item->quantity_in_stock) {
+                $stock->adjust($item, 'set', $sheets, 'count', "Counted in 3D Bouquet Management ({$option->name})", $request->user());
+            }
+        }
+
+        $option->update(['stock_product_id' => $item->id]);
     }
 
     /**
@@ -65,8 +157,11 @@ class VendorCustomizationOptionController extends Controller
             }
 
             $option->save();
+            $this->saveWrapperStock($request, $option, $ownerId);
 
-            return response()->json(['success' => true, 'data' => $option->refresh(), 'message' => ($type === Option::TYPE_WRAP_MODEL ? '3D wrapper' : ucfirst($type)) . ' added.'], 201);
+            return response()->json(['success' => true, 'data' => $this->withStock($option->refresh()->load('stockItem')), 'wrapping_items' => $this->wrappingItems($ownerId), 'message' => ($type === Option::TYPE_WRAP_MODEL ? '3D wrapper' : ucfirst($type)) . ' added.'], 201);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'errors' => ['stock_item' => [$e->getMessage()]]], 422);
         } catch (\Throwable $e) {
             Log::error('VendorCustomizationOptionController@store: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => "The {$type} could not be saved."], 500);
@@ -104,6 +199,8 @@ class VendorCustomizationOptionController extends Controller
             }
 
             $option->save();
+            $ownerId = $this->resolveOwnerId($request);
+            $this->saveWrapperStock($request, $option, $ownerId);
 
             if ($previousModelPath && $previousModelPath !== $option->model_path) {
                 $this->destroyModel($previousModelPath);
@@ -112,7 +209,9 @@ class VendorCustomizationOptionController extends Controller
                 $this->destroyImage($previousImagePath);
             }
 
-            return response()->json(['success' => true, 'data' => $option, 'message' => 'Changes saved.']);
+            return response()->json(['success' => true, 'data' => $this->withStock($option->refresh()->load('stockItem')), 'wrapping_items' => $this->wrappingItems($ownerId), 'message' => 'Changes saved.']);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'errors' => ['stock_item' => [$e->getMessage()]]], 422);
         } catch (\Throwable $e) {
             Log::error('VendorCustomizationOptionController@update: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'The changes could not be saved.'], 500);

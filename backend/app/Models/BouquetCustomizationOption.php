@@ -51,6 +51,9 @@ class BouquetCustomizationOption extends Model
         'card_limit',
         'card_sizes',
         'sort_order',
+        // Wrappers: their wrapping stock item (counted in sheets), the same
+        // stock ERP Stock & replenishment and the vendor's Inventory show
+        'stock_product_id',
     ];
 
     protected $casts = [
@@ -60,9 +63,56 @@ class BouquetCustomizationOption extends Model
         'card_limit' => 'integer',
         'pattern_size' => 'integer',
         'card_sizes' => 'array',
+        'stock_product_id' => 'integer',
     ];
 
     protected $hidden = ['model_path', 'image_path'];
+
+    // One custom bouquet uses one sheet of each wrapper layer (outer and inner)
+    public const SHEETS_PER_LAYER = 1;
+
+    /** A wrapper's stock item (a wrapping material counted in sheets) */
+    public function stockItem(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Product::class, 'stock_product_id');
+    }
+
+    /**
+     * The wrapper sheets custom bouquets use: for each order item's outer and
+     * inner wrapper that has a stock item, [stock item id, null, sheets × quantity].
+     */
+    public static function stockLinesFor(iterable $items): array
+    {
+        $uses = []; // wrapper option id => layers used
+        foreach ($items as $item) {
+            $c = $item->customizations ?? null;
+            if (is_string($c)) {
+                $c = json_decode($c, true);
+            }
+            if (! is_array($c)) {
+                continue;
+            }
+            $qty = max(1, (int) ($item->quantity ?? 1));
+            foreach (['wrapper.id', 'inner_wrapper.id'] as $path) {
+                $id = (int) data_get($c, $path, 0);
+                if ($id > 0) {
+                    $uses[$id] = ($uses[$id] ?? 0) + $qty;
+                }
+            }
+        }
+        if (! $uses) {
+            return [];
+        }
+
+        return static::query()
+            ->whereIn('id', array_keys($uses))
+            ->where('type', self::TYPE_WRAPPER)
+            ->whereNotNull('stock_product_id')
+            ->get()
+            ->map(fn (self $w) => [(int) $w->stock_product_id, null, self::SHEETS_PER_LAYER * $uses[$w->id]])
+            ->values()
+            ->all();
+    }
 
     /** How much of the card's allowance a message uses */
     public static function countCardMessage(string $message, ?string $limitType): int
@@ -83,13 +133,16 @@ class BouquetCustomizationOption extends Model
     }
 
     /**
-     * Options a customer can pick: wrappers only when switched on, and
-     * fillers only when they have a 3D model.
+     * Options a customer can pick: wrappers only when switched on and not out
+     * of sheets, and fillers only when they have a 3D model.
      */
     public function scopeAvailable(Builder $query): Builder
     {
         return $query
             ->where(fn ($q) => $q->where('type', '!=', self::TYPE_WRAPPER)->orWhere('is_active', true))
+            ->where(fn ($q) => $q->where('type', '!=', self::TYPE_WRAPPER)
+                ->orWhereNull('stock_product_id')
+                ->orWhereHas('stockItem', fn ($p) => $p->where('quantity_in_stock', '>=', self::SHEETS_PER_LAYER)))
             ->where(fn ($q) => $q->whereNotIn('type', self::MODEL_TYPES)->orWhereNotNull('model_url'));
     }
 
