@@ -1,12 +1,5 @@
 <template>
   <ShopLayout section="account" title="Shop Settings" subtitle="How you take orders: delivery, business hours, days off and payment preferences. Checkout follows these right away.">
-    <template #actions>
-      <button type="button" class="sp-btn sp-btn-ghost" :disabled="!dirty || saving" @click="reset">Discard</button>
-      <button type="submit" form="settings-form" class="sp-btn sp-btn-primary" :disabled="!form || !dirty || saving">
-        <span v-html="ICONS.check"></span>{{ saving ? "Saving…" : "Save changes" }}
-      </button>
-    </template>
-
     <div v-if="loadError" class="sp-banner error">
       <span v-html="ICONS.alert"></span>{{ loadError }}
       <button type="button" @click="load">Try again</button>
@@ -222,7 +215,7 @@ const newClosed = reactive({ date: "", reason: "" });
 // What View changes steps through, in page order. The message and date only
 // show while orders are paused; otherwise they point at that card.
 const STATUS = '[data-change~="accepting_orders"]';
-const { markClean, dirty } = useUnsavedChanges({
+const { markClean } = useUnsavedChanges({
   fields: () => {
     const f = form.value;
     if (!f) return [];
@@ -243,7 +236,6 @@ const { markClean, dirty } = useUnsavedChanges({
   save: () => save(),
   discard: () => reset(),
   saving,
-  saveLabel: "Save changes",
 });
 
 const addDays = (iso, n) => {

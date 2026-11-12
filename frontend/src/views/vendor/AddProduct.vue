@@ -1,9 +1,6 @@
 <template>
   <ShopLayout title="Add product" subtitle="Fill in the steps on the left; the preview shows how customers will see it.">
     <template #actions>
-      <button type="button" class="sp-btn sp-btn-ghost" :disabled="submitting" @click="submit('draft')">
-        {{ submitting === "draft" ? "Saving…" : "Save as draft" }}
-      </button>
       <button type="button" class="sp-btn sp-btn-primary" :disabled="submitting" @click="submit('active')">
         <span v-html="ICONS.check"></span>{{ submitting === "active" ? "Publishing…" : "Publish" }}
       </button>

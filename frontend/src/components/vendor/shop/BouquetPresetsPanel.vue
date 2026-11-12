@@ -7,8 +7,6 @@
       </div>
       <div class="bp-actions">
         <button type="button" class="sp-btn sp-btn-ghost" :disabled="!presets || customCount >= MAX_CUSTOM" :title="customCount >= MAX_CUSTOM ? `Up to ${MAX_CUSTOM} occasions of your own` : ''" @click="addOccasion">+ Add an occasion</button>
-        <button type="button" class="sp-btn sp-btn-ghost" :disabled="!dirty || saving" @click="discard">Discard changes</button>
-        <button type="button" class="sp-btn sp-btn-primary" :disabled="!dirty || saving || !presets" @click="save">{{ saving ? "Saving…" : "Save" }}</button>
       </div>
     </div>
 

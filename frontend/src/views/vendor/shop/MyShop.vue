@@ -1,12 +1,5 @@
 <template>
   <ShopLayout title="Shop Profile" subtitle="Your shop's profile, photos and location, exactly as customers see them. Hours, delivery and order settings are in Shop settings.">
-    <template #actions>
-      <button type="button" class="sp-btn sp-btn-ghost" :disabled="!dirty || saving" @click="reset">Discard</button>
-      <button type="submit" form="shop-form" class="sp-btn sp-btn-primary" :disabled="!form || !dirty || saving">
-        <span v-html="ICONS.check"></span>{{ saving ? "Saving…" : "Save changes" }}
-      </button>
-    </template>
-
     <div v-if="loadError" class="sp-banner error">
       <span v-html="ICONS.alert"></span>{{ loadError }}
       <button type="button" @click="fetch">Try again</button>
@@ -195,7 +188,7 @@ const LABELS = {
   store_address: "City / Province",
   service_areas: "Areas you deliver to",
 };
-const { markClean, dirty } = useUnsavedChanges({
+const { markClean } = useUnsavedChanges({
   fields: () =>
     form.value
       ? [
@@ -206,7 +199,6 @@ const { markClean, dirty } = useUnsavedChanges({
   save: () => save(),
   discard: () => reset(),
   saving,
-  saveLabel: "Save changes",
 });
 
 function apply(data) {
