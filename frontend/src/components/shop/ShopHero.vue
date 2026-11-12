@@ -1,85 +1,72 @@
 <template>
   <section class="sh" aria-roledescription="carousel" aria-label="Featured" @mouseenter="hovering = true" @mouseleave="hovering = false">
-    <div class="sh-card">
-        <!-- Soft petals in the background of the card -->
-        <svg class="sh-deco" viewBox="0 0 400 400" aria-hidden="true">
-          <circle cx="330" cy="70" r="120" />
-          <circle cx="40" cy="360" r="90" />
-        </svg>
+    <div class="sh-track" :style="{ transform: `translateX(-${active * 100}%)` }">
+      <article
+        v-for="(slide, i) in slides"
+        :key="slide.id"
+        class="sh-slide"
+        :aria-hidden="i !== active"
+        :aria-label="`${i + 1} of ${slides.length}`"
+      >
+        <!-- The photo (or the admin's banner) fills the whole hero -->
+        <img class="sh-img" :src="slide.image_url" :alt="slide.title" :loading="i === 0 ? 'eager' : 'lazy'" />
+        <div class="sh-shade" aria-hidden="true"></div>
 
-        <div class="sh-track" :style="{ transform: `translateX(-${active * 100}%)` }">
-          <article
-            v-for="(slide, i) in slides"
-            :key="slide.id"
-            class="sh-slide"
-            :aria-hidden="i !== active"
-            :aria-label="`${i + 1} of ${slides.length}`"
-          >
-            <div class="sh-copy">
-              <p class="sh-eyebrow">
-                <span class="sh-eyebrow-dot" aria-hidden="true"></span>
-                {{ slide.eyebrow || "Fresh from local florists" }}
-              </p>
-              <h1 class="sh-title">
-                <template v-for="(part, p) in titleParts(slide.title)" :key="p">
-                  <em v-if="p === 1">{{ part }}</em><template v-else>{{ part }}</template>
-                </template>
-              </h1>
-              <p v-if="slide.subtitle" class="sh-sub">{{ slide.subtitle }}</p>
-              <div class="sh-actions">
-                <button type="button" class="sh-btn sh-btn--solid" :tabindex="i === active ? 0 : -1" @click="primary(slide)">
-                  {{ slide.button_label || "Shop now" }} <span aria-hidden="true">→</span>
-                </button>
-                <button type="button" class="sh-btn sh-btn--ghost" :tabindex="i === active ? 0 : -1" @click="$emit('design')">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9z" /><path d="M4 7.5 12 12l8-4.5M12 12v9" /></svg>
-                  Explore 3D Designer
-                </button>
-              </div>
-              <ul class="sh-points">
-                <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>Made by real local shops</li>
-                <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>Design it in 3D first</li>
-              </ul>
+        <div class="sh-inner">
+          <div class="sh-copy">
+            <p class="sh-eyebrow">
+              <span class="sh-eyebrow-dot" aria-hidden="true"></span>
+              {{ slide.eyebrow || "Fresh from local florists" }}
+            </p>
+            <h1 class="sh-title">
+              <template v-for="(part, p) in titleParts(slide.title)" :key="p">
+                <em v-if="p === 1">{{ part }}</em><template v-else>{{ part }}</template>
+              </template>
+            </h1>
+            <p v-if="slide.subtitle" class="sh-sub">{{ slide.subtitle }}</p>
+            <div class="sh-actions">
+              <button type="button" class="sh-btn sh-btn--solid" :tabindex="i === active ? 0 : -1" @click="primary(slide)">
+                {{ slide.button_label || "Shop now" }} <span aria-hidden="true">→</span>
+              </button>
+              <button type="button" class="sh-btn sh-btn--ghost" :tabindex="i === active ? 0 : -1" @click="$emit('design')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9z" /><path d="M4 7.5 12 12l8-4.5M12 12v9" /></svg>
+                Explore 3D Designer
+              </button>
             </div>
-
-            <div class="sh-media">
-              <div class="sh-frame">
-                <img class="sh-img" :src="slide.image_url" :alt="slide.title" :loading="i === 0 ? 'eager' : 'lazy'" />
-              </div>
-              <div class="sh-float sh-float--top" aria-hidden="true">
-                <span class="sh-float-icon sh-float-icon--leaf">
-                  <svg viewBox="0 0 24 24"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9z" /><path d="M4 7.5 12 12l8-4.5M12 12v9" /></svg>
-                </span>
-                <span><strong>Preview in 3D</strong><small>See it before you order</small></span>
-              </div>
-              <div class="sh-float sh-float--bottom" aria-hidden="true">
-                <span class="sh-float-icon">
-                  <svg viewBox="0 0 24 24"><path d="M4 21V9l8-6 8 6v12" /><path d="M9 21v-6h6v6" /><path d="M9.5 10.5a2.5 2.5 0 0 1 5 0c0 1.8-2.5 3-2.5 3s-2.5-1.2-2.5-3z" /></svg>
-                </span>
-                <span><strong>Support local florists</strong><small>Real shops. Real people.</small></span>
-              </div>
-            </div>
-          </article>
-        </div>
-
-        <div v-if="slides.length > 1" class="sh-controls">
-          <button v-if="play.show_arrows" type="button" class="sh-arrow" aria-label="Previous slide" @click="goManual(active - 1)">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
-          </button>
-          <div v-if="play.show_dots" class="sh-dots">
-            <button
-              v-for="(s, i) in slides"
-              :key="s.id"
-              type="button"
-              :class="{ on: i === active }"
-              :aria-label="`Show slide ${i + 1}`"
-              :aria-current="i === active"
-              @click="goManual(i)"
-            ></button>
+            <ul class="sh-points">
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>Made by real local shops</li>
+              <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>Design it in 3D first</li>
+            </ul>
           </div>
-          <button v-if="play.show_arrows" type="button" class="sh-arrow" aria-label="Next slide" @click="goManual(active + 1)">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-          </button>
         </div>
+      </article>
+    </div>
+
+    <div class="sh-float" aria-hidden="true">
+      <span class="sh-float-icon">
+        <svg viewBox="0 0 24 24"><path d="M4 21V9l8-6 8 6v12" /><path d="M9 21v-6h6v6" /><path d="M9.5 10.5a2.5 2.5 0 0 1 5 0c0 1.8-2.5 3-2.5 3s-2.5-1.2-2.5-3z" /></svg>
+      </span>
+      <span><strong>Support local florists</strong><small>Real shops. Real people.</small></span>
+    </div>
+
+    <div v-if="slides.length > 1" class="sh-controls">
+      <button v-if="play.show_arrows" type="button" class="sh-arrow" aria-label="Previous slide" @click="goManual(active - 1)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+      </button>
+      <div v-if="play.show_dots" class="sh-dots">
+        <button
+          v-for="(s, i) in slides"
+          :key="s.id"
+          type="button"
+          :class="{ on: i === active }"
+          :aria-label="`Show slide ${i + 1}`"
+          :aria-current="i === active"
+          @click="goManual(i)"
+        ></button>
+      </div>
+      <button v-if="play.show_arrows" type="button" class="sh-arrow" aria-label="Next slide" @click="goManual(active + 1)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+      </button>
     </div>
   </section>
 </template>
@@ -111,7 +98,7 @@ const FALLBACK = {
   id: "default",
   title: "Bespoke florals, built by you",
   subtitle: "Create your perfect bouquet with fresh flowers, customizable designs, and trusted local shops.",
-  image_url: "https://images.unsplash.com/photo-1487070183336-b863922373d4?w=1600&h=1280&fit=crop&q=80",
+  image_url: "https://images.unsplash.com/photo-1487070183336-b863922373d4?w=2000&h=1000&fit=crop&q=80",
   button_label: "Shop now",
 };
 const slides = computed(() => (props.banners.length ? props.banners : [FALLBACK]));
@@ -163,31 +150,13 @@ onBeforeUnmount(() => clearInterval(timer));
   box-sizing: border-box;
 }
 
-/* Full width: the card runs edge to edge, its content lines up with the page */
+/* Full width, the photo fills it; the copy lines up with the page */
 .sh {
   --sh-inline: max(var(--gutter), calc((100% - 1240px) / 2));
-}
-
-/* One rounded card: copy on a soft mint panel, the photo framed on the right */
-.sh-card {
   position: relative;
   overflow: hidden;
-  border-block: 1px solid var(--line-soft);
-  background: linear-gradient(120deg, #e6f2ea 0%, var(--paper) 55%, #f6ece6 100%);
+  background: var(--ivory-deep);
   isolation: isolate;
-}
-
-.sh-deco {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-.sh-deco circle {
-  fill: rgba(77, 177, 115, 0.07);
 }
 
 .sh-track {
@@ -196,24 +165,54 @@ onBeforeUnmount(() => clearInterval(timer));
 }
 
 .sh-slide {
-  display: grid;
+  position: relative;
+  display: flex;
   flex: 0 0 100%;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
   align-items: center;
-  gap: clamp(24px, 4vw, 56px);
   min-width: 0;
-  padding: clamp(32px, 4vw, 64px) var(--sh-inline) clamp(64px, 6vw, 84px);
+  min-height: clamp(460px, 42vw, 640px);
+}
+
+.sh-img {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A light shade on the far left only, so the photo stays bright */
+.sh-shade {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, rgba(38, 45, 57, 0.28) 0%, rgba(38, 45, 57, 0) 45%);
+}
+
+.sh-inner {
+  width: 100%;
+  padding: clamp(32px, 4vw, 56px) var(--sh-inline) clamp(72px, 7vw, 96px);
+}
+
+/* The copy on its own white card over the photo */
+.sh-copy {
+  max-width: 520px;
+  padding: clamp(24px, 3vw, 40px);
+  border-radius: 28px;
+  background: rgba(250, 251, 250, 0.94);
+  box-shadow: 0 30px 70px -36px rgba(38, 45, 57, 0.6);
+  backdrop-filter: blur(10px);
 }
 
 .sh-eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin: 0 0 18px;
-  padding: 7px 14px 7px 10px;
-  border: 1px solid rgba(46, 122, 79, 0.18);
+  margin: 0 0 16px;
+  padding: 6px 14px 6px 10px;
   border-radius: 999px;
-  background: rgba(250, 251, 250, 0.75);
+  background: #e9f5ed;
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -229,9 +228,9 @@ onBeforeUnmount(() => clearInterval(timer));
 }
 
 .sh-title {
-  margin: 0 0 18px;
+  margin: 0 0 16px;
   font-family: var(--font-display);
-  font-size: clamp(42px, 5vw, 72px);
+  font-size: clamp(40px, 4.4vw, 64px);
   font-weight: 500;
   line-height: 0.98;
   letter-spacing: -0.015em;
@@ -246,31 +245,31 @@ onBeforeUnmount(() => clearInterval(timer));
 }
 
 .sh-sub {
-  max-width: 440px;
-  margin: 0 0 28px;
-  font-size: 15.5px;
-  line-height: 1.7;
+  max-width: 420px;
+  margin: 0 0 24px;
+  font-size: 15px;
+  line-height: 1.65;
   color: var(--ink-soft);
 }
 
 .sh-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .sh-btn {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  min-height: 52px;
-  padding: 0 26px;
+  min-height: 50px;
+  padding: 0 24px;
   border-radius: 999px;
   font-family: var(--font-sans);
   font-size: 14.5px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 .sh-btn svg {
@@ -286,7 +285,6 @@ onBeforeUnmount(() => clearInterval(timer));
   border: 1px solid var(--ink);
   background: var(--ink);
   color: var(--paper);
-  box-shadow: 0 14px 28px -16px rgba(38, 45, 57, 0.6);
 }
 
 .sh-btn--solid:hover {
@@ -308,7 +306,7 @@ onBeforeUnmount(() => clearInterval(timer));
   display: flex;
   flex-wrap: wrap;
   gap: 8px 20px;
-  margin: 26px 0 0;
+  margin: 22px 0 0;
   padding: 0;
   list-style: none;
   font-size: 13px;
@@ -331,48 +329,17 @@ onBeforeUnmount(() => clearInterval(timer));
   stroke-linejoin: round;
 }
 
-/* The photo, framed with an arched top */
-.sh-media {
-  position: relative;
-  padding: 12px 0;
-}
-
-.sh-frame {
-  overflow: hidden;
-  aspect-ratio: 5 / 4;
-  border-radius: 220px 220px 28px 28px;
-  background: var(--ivory-deep);
-  box-shadow: 0 30px 60px -36px rgba(38, 45, 57, 0.55);
-}
-
-.sh-img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 .sh-float {
   position: absolute;
+  right: var(--sh-inline);
+  bottom: 28px;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 16px 12px 12px;
-  border: 1px solid var(--line-soft);
   border-radius: 16px;
-  background: rgba(250, 251, 250, 0.96);
-  box-shadow: 0 18px 36px -20px rgba(38, 45, 57, 0.45);
-  backdrop-filter: blur(6px);
-}
-
-.sh-float--top {
-  top: 18%;
-  left: -28px;
-}
-
-.sh-float--bottom {
-  right: 0;
-  bottom: 4px;
+  background: rgba(250, 251, 250, 0.95);
+  box-shadow: 0 18px 36px -20px rgba(38, 45, 57, 0.5);
 }
 
 .sh-float-icon {
@@ -383,11 +350,6 @@ onBeforeUnmount(() => clearInterval(timer));
   border-radius: 12px;
   background: #e9f5ed;
   color: var(--leaf-deep);
-}
-
-.sh-float-icon--leaf {
-  background: var(--ink);
-  color: var(--leaf-light);
 }
 
 .sh-float-icon svg {
@@ -416,32 +378,37 @@ onBeforeUnmount(() => clearInterval(timer));
   color: var(--ink-soft);
 }
 
-/* Slide controls, bottom left under the copy */
+/* Slide controls on a small pill at the bottom centre */
 .sh-controls {
   position: absolute;
-  bottom: clamp(16px, 2vw, 24px);
-  left: var(--sh-inline);
+  bottom: 24px;
+  left: 50%;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(250, 251, 250, 0.92);
+  box-shadow: 0 12px 28px -16px rgba(38, 45, 57, 0.5);
+  transform: translateX(-50%);
 }
 
 .sh-arrow {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   padding: 0;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 50%;
-  background: var(--paper);
+  background: transparent;
   color: var(--ink);
   cursor: pointer;
-  transition: border-color 0.2s ease;
+  transition: background 0.2s ease;
 }
 
 .sh-arrow:hover {
-  border-color: var(--ink);
+  background: var(--ivory);
 }
 
 .sh-arrow svg {
@@ -456,7 +423,7 @@ onBeforeUnmount(() => clearInterval(timer));
 
 .sh-dots {
   display: flex;
-  gap: 4px;
+  gap: 2px;
 }
 
 /* 24px tap target around each dot */
@@ -498,45 +465,44 @@ onBeforeUnmount(() => clearInterval(timer));
   outline-offset: 3px;
 }
 
-@media (max-width: 900px) {
+/* Phones: the photo on top at full width, the card overlapping its bottom */
+@media (max-width: 760px) {
   .sh-slide {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
+    flex-direction: column;
+    align-items: stretch;
+    min-height: 0;
   }
 
-  .sh-media {
-    order: -1;
-    padding: 0;
+  .sh-img {
+    position: relative;
+    z-index: 0;
+    height: 300px;
   }
 
-  .sh-frame {
-    aspect-ratio: 16 / 10;
-    border-radius: 24px;
-  }
-
-  .sh-float--top {
-    display: none;
-  }
-
-  .sh-float--bottom {
-    right: 12px;
-    bottom: 12px;
-  }
-
-  .sh-title {
-    margin-top: 16px;
-  }
-}
-
-@media (max-width: 560px) {
+  .sh-shade,
   .sh-float,
   .sh-points {
     display: none;
   }
 
+  .sh-inner {
+    margin-top: -48px;
+    padding: 0 var(--gutter) 72px;
+  }
+
+  .sh-copy {
+    position: relative;
+    max-width: none;
+    background: var(--paper);
+  }
+
   .sh-btn {
     flex: 1 1 auto;
     justify-content: center;
+  }
+
+  .sh-controls {
+    bottom: 16px;
   }
 }
 
