@@ -147,8 +147,14 @@ const addToCart = async (payload) => {
 const updateCartItem = async (itemId, updates) => {
   const response = await cartService.updateCartItem(itemId, updates);
   if (response?.success) {
-    syncItems(response.data?.items || response.data?.cart?.items || items.value);
-    if (!response.data?.items && !response.data?.cart?.items) {
+    const data = response.data;
+    if (data?.items || data?.cart?.items) {
+      syncItems(data.items || data.cart.items);
+    } else if (data?.id != null && items.value.some((item) => item.id === data.id)) {
+      // The server sends back just the updated line: merge it in place, so the
+      // cart never flashes the old quantity and needs no second request
+      syncItems(items.value.map((item) => (item.id === data.id ? { ...item, ...data } : item)));
+    } else {
       await refreshCart();
     }
   }

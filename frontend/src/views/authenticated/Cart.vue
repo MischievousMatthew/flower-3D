@@ -617,7 +617,9 @@ const goToProfile = () => {
 const hydrateCartItems = (sourceItems = []) => {
   cartItems.value = sourceItems.map((item) => ({
     id: item.id,
-    quantity: item.quantity,
+    // A quantity the shopper just changed and isn't saved yet wins over the
+    // server's copy, so a background refresh never flicks it back
+    quantity: pendingUpdates.value[item.id] ?? item.quantity,
     price: parseFloat(item.price || 0),
     color: item.color,
     size: item.size,
@@ -827,20 +829,32 @@ const handleQuantityInput = (itemId, event) => {
   scheduleQuantityUpdate(itemId, qty);
 };
 
+// pendingUpdates[id] holds the newest quantity the shopper picked until the
+// server has it; quick clicks are sent as one request once they stop
 const scheduleQuantityUpdate = (itemId, quantity) => {
   clearTimeout(updateTimeouts.value[itemId]);
-  pendingUpdates.value[itemId] = true;
+  pendingUpdates.value[itemId] = quantity;
   updateTimeouts.value[itemId] = setTimeout(async () => {
+    delete updateTimeouts.value[itemId];
+    let failed = false;
     try {
       await cartStore.updateCartItem(itemId, quantity);
-      await loadCart(false);
     } catch {
-      await loadCart(false);
-      toast.error("Failed to update quantity");
-    } finally {
-      delete pendingUpdates.value[itemId];
+      failed = true;
     }
-  }, 500);
+    if (failed) toast.error("Failed to update quantity");
+    // A newer change for this item is already on its way; it settles the number
+    if (pendingUpdates.value[itemId] !== quantity) return;
+    delete pendingUpdates.value[itemId];
+    if (failed) {
+      await loadCart(false);
+      return;
+    }
+    // Show what the server actually saved (it may have capped it to the stock)
+    const saved = cartStore.items.value.find((i) => i.id === itemId);
+    const local = cartItems.value.find((i) => i.id === itemId);
+    if (saved && local) local.quantity = saved.quantity;
+  }, 400);
 };
 
 // ── Other actions ─────────────────────────────────────────────
