@@ -36,7 +36,7 @@
 
     <div class="inv-layout">
       <!-- Stock table -->
-      <section ref="tableCard" class="sp-card inv-table-card" aria-label="Stock levels">
+      <section ref="tableCard" class="sp-card inv-table-card" data-inv-table aria-label="Stock levels">
         <div class="sp-toolbar inv-toolbar">
           <div class="sp-seg" role="tablist" aria-label="Filter by stock">
             <button v-for="f in FILTERS" :key="f.key" type="button" role="tab" :aria-selected="filter === f.key" :class="{ on: filter === f.key }" @click="filter = f.key">
@@ -58,7 +58,7 @@
           <p>{{ products.length ? (filter === "all" ? "No products match your search." : "No products in this group right now.") : "Add a product and its stock shows up here." }}</p>
         </div>
         <ul v-else class="inv-rows">
-          <li v-for="p in rows" :key="p.id" class="inv-row" :class="{ focus: historyFor?.id === p.id }">
+          <li v-for="p in rows" :key="p.id" class="inv-row" :data-change="`stock_${p.id}`" :class="{ focus: historyFor?.id === p.id, pending: pending[p.id] }">
             <img v-if="p.image" :src="p.image" :alt="p.name" class="sp-thumb" loading="lazy" />
             <span v-else class="sp-thumb blank" v-html="ICONS.image"></span>
             <div class="inv-main">
@@ -68,18 +68,23 @@
                 <span v-if="p.status !== 'active'" class="sp-chip slate">{{ p.status === "draft" ? "Draft" : "Archived" }}</span>
               </div>
               <div class="inv-meter" :title="meterTitle(p)">
-                <span :class="p.stock_state" :style="{ width: `${meter(p)}%` }"></span>
+                <span :class="p.stock_state" :style="{ width: `${meter({ ...p, stock: shown(p) })}%` }"></span>
                 <i v-if="p.min_stock" :style="{ left: `${minMark(p)}%` }"></i>
               </div>
               <div class="inv-sub">
-                <span><strong>{{ p.stock }}</strong> in stock</span>
+                <span>
+                  <strong>{{ shown(p) }}</strong> in stock
+                  <em v-if="pending[p.id]" class="inv-pending" :class="pending[p.id] > 0 ? 'up' : 'down'" :title="`Was ${p.stock}. Not saved yet`">
+                    {{ pending[p.id] > 0 ? "+" : "−" }}{{ Math.abs(pending[p.id]) }} not saved
+                  </em>
+                </span>
                 <span>Alert at {{ p.min_stock ?? 0 }}</span>
                 <span v-if="p.max_stock">Max {{ p.max_stock }}</span>
               </div>
             </div>
             <div class="inv-quick" role="group" :aria-label="`Quick change for ${p.name}`">
-              <button type="button" class="sp-icon-btn" :disabled="p.stock <= 0 || quickBusy === p.id" :aria-label="`Remove one ${p.name}`" @click="quick(p, -1)"><span v-html="ICONS.minus"></span></button>
-              <button type="button" class="sp-icon-btn" :disabled="quickBusy === p.id" :aria-label="`Add one ${p.name}`" @click="quick(p, 1)"><span v-html="ICONS.plus"></span></button>
+              <button type="button" class="sp-icon-btn" :disabled="shown(p) <= 0 || savingStock" :aria-label="`Remove one ${p.name}`" @click="quick(p, -1)"><span v-html="ICONS.minus"></span></button>
+              <button type="button" class="sp-icon-btn" :disabled="savingStock" :aria-label="`Add one ${p.name}`" @click="quick(p, 1)"><span v-html="ICONS.plus"></span></button>
             </div>
             <div class="inv-actions">
               <button type="button" class="sp-btn sp-btn-dark sp-btn-sm" @click="openAdjust(p)">Adjust</button>
@@ -211,6 +216,7 @@ import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage, money, useVendorCatalog } from "../../../components/vendor/shop/useVendorCatalog";
+import { useUnsavedChanges } from "../../../composables/useUnsavedChanges";
 import "../../../components/vendor/shop/shop.css";
 
 const { products, reasons, error, load, replace } = useVendorCatalog();
@@ -245,7 +251,6 @@ const showAll = () => {
 const history = ref(null);
 const historyError = ref("");
 const historyFor = ref(null);
-const quickBusy = ref(null);
 
 const counts = computed(() => {
   const list = products.value ?? [];
@@ -343,19 +348,59 @@ async function submitAdjust() {
     adjBusy.value = false;
   }
 }
-async function quick(p, delta) {
-  if (quickBusy.value) return;
-  quickBusy.value = p.id;
+// − / + add up per product until Save in the bar at the bottom
+// (more = restocked, fewer = sold in store, as the quick buttons always meant)
+const pending = reactive({}); // product id → change not saved yet
+const savingStock = ref(false);
+const shown = (p) => p.stock + (pending[p.id] || 0);
+
+function quick(p, delta) {
+  if (savingStock.value || shown(p) + delta < 0) return;
+  const next = (pending[p.id] || 0) + delta;
+  if (next) pending[p.id] = next;
+  else delete pending[p.id];
+}
+
+async function saveStock() {
+  if (savingStock.value) return;
+  savingStock.value = true;
+  let saved = 0;
   try {
-    await sendAdjust(p, delta > 0
-      ? { mode: "add", quantity: 1, reason: "restock" }
-      : { mode: "remove", quantity: 1, reason: "sold_offline" });
-  } catch (e) {
-    toast.error(apiMessage(e, "Couldn't update the stock."));
+    for (const [id, delta] of Object.entries(pending)) {
+      const p = products.value?.find((x) => String(x.id) === id);
+      if (!p) {
+        delete pending[id];
+        continue;
+      }
+      try {
+        await sendAdjust(p, delta > 0
+          ? { mode: "add", quantity: delta, reason: "restock" }
+          : { mode: "remove", quantity: -delta, reason: "sold_offline" });
+        delete pending[id];
+        saved++;
+      } catch (e) {
+        // This one stays unsaved; the rest carry on
+        toast.error(`${p.name}: ${apiMessage(e, "couldn't update the stock.")}`);
+      }
+    }
+    if (saved) toast.success(saved === 1 ? "Stock updated." : `Stock updated for ${saved} products.`);
   } finally {
-    quickBusy.value = null;
+    savingStock.value = false;
   }
 }
+
+const { markClean } = useUnsavedChanges({
+  fields: () =>
+    Object.entries(pending).map(([id, delta]) => {
+      const p = products.value?.find((x) => String(x.id) === id);
+      return { key: `stock_${id}`, label: `${p?.name ?? "Product"} (${delta > 0 ? "+" : "−"}${Math.abs(delta)})`, value: delta, fallback: "[data-inv-table]" };
+    }),
+  save: saveStock,
+  discard: () => Object.keys(pending).forEach((id) => delete pending[id]),
+  saving: savingStock,
+});
+// Nothing is waiting when the page opens; anything pressed after that counts
+onMounted(markClean);
 
 // Alert levels
 const leveling = ref(null);
@@ -489,6 +534,27 @@ onMounted(() => {
 .inv-quick {
   display: flex;
   gap: 4px;
+}
+/* A − / + change waiting for Save */
+.inv-row.pending {
+  background: var(--v-amber-soft);
+}
+.inv-pending {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-style: normal;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.inv-pending.up {
+  background: var(--v-green-soft);
+  color: var(--v-green-text);
+}
+.inv-pending.down {
+  background: var(--v-red-soft);
+  color: var(--v-red-text);
 }
 .inv-quick .sp-icon-btn:disabled {
   opacity: 0.4;
