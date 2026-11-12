@@ -63,12 +63,6 @@
           @clear="clearSearch"
           @pick="onSearchPick"
         />
-        <ul class="shop-quick" aria-label="Quick links">
-          <li><button type="button" @click="showOnSale">Sale</button></li>
-          <li><button type="button" @click="onViewAll('best')">Best sellers</button></li>
-          <li><button type="button" @click="openDesigner">3D designer</button></li>
-          <li><button type="button" @click="scrollToSection('flower-shops')">Shops near you</button></li>
-        </ul>
       </div>
 
       <!-- 2. Hero and promotions (Admin → Website, Promotion Management) -->
@@ -1413,43 +1407,14 @@ onUnmounted(() => {
   padding-bottom: 14px;
 }
 
+/* The search bar on its own, centred */
+.shop-searchbar {
+  justify-content: center;
+}
+
 .shop-searchbar :deep(.ss) {
   flex: 1 1 420px;
-  max-width: 620px;
-}
-
-.shop-quick {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-left: auto;
-}
-
-.shop-quick button {
-  min-height: 40px;
-  padding: 0 14px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
-}
-
-.shop-quick button:hover {
-  border-color: var(--line);
-  background: var(--paper);
-}
-
-.shop-quick li:first-child button {
-  color: #b4332a;
-}
-
-.shop-quick button:focus-visible {
-  outline: 2px solid var(--leaf);
-  outline-offset: 2px;
+  max-width: 720px;
 }
 
 .shop-announce {
@@ -1700,18 +1665,6 @@ onUnmounted(() => {
     gap: 14px;
   }
 
-  .shop-quick {
-    margin-left: 0;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .shop-quick button {
-    flex: none;
-    border-color: var(--line);
-    background: var(--paper);
-  }
 }
 
 @media (max-width: 640px) {
