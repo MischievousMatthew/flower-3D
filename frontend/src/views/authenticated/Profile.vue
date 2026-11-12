@@ -323,21 +323,30 @@
       </main>
     </div>
 
-    <!-- ── Save bar while editing ────────────────────────────────────────── -->
+    <!-- ── Save bar while editing: the same bar as Flowers you love ──────── -->
     <Transition name="pf-bar">
-      <div v-if="isEditing" class="pf-savebar" role="region" aria-label="Save your changes">
-        <div class="pf-savebar__inner">
-          <p>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4Z" /></svg>
-            You're editing your profile.
-          </p>
-          <div class="pf-savebar__actions">
-            <button type="button" class="pf-btn pf-btn--quiet" :disabled="isSaving" @click="cancelEdit">Cancel</button>
-            <button type="button" class="pf-btn pf-btn--primary" :disabled="isSaving" @click="saveProfile">
-              {{ isSaving ? "Saving..." : "Save changes" }}
+      <div v-if="isEditing" class="pf-bar" :class="{ clean: !changes.length }" role="region" aria-label="Unsaved changes">
+        <span class="pf-bar__title">{{ changes.length ? "Unsaved changes" : "No changes yet" }}</span>
+        <div v-if="changes.length" class="pf-bar__view">
+          <span class="pf-bar__count" aria-live="polite">
+            View changes
+            <small>{{ changeAt >= 0 ? `${changeAt + 1} of ${changes.length}` : `${changes.length}` }}</small>
+          </span>
+          <div class="pf-bar__arrows">
+            <button type="button" aria-label="Go to the previous change" title="Previous change" @click="goToChange(-1)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 15l-5-5-5 5" /></svg>
+            </button>
+            <button type="button" aria-label="Go to the next change" title="Next change" @click="goToChange(1)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" /></svg>
             </button>
           </div>
         </div>
+        <span class="pf-bar__sep" aria-hidden="true"></span>
+        <button type="button" class="pf-bar__btn" :disabled="isSaving" @click="discardEdit">{{ changes.length ? "Discard" : "Cancel" }}</button>
+        <span class="pf-bar__sep" aria-hidden="true"></span>
+        <button type="button" class="pf-bar__btn pf-bar__btn--save" :disabled="isSaving || !changes.length" @click="saveProfile">
+          {{ isSaving ? "Saving…" : "Save" }}
+        </button>
       </div>
     </Transition>
 
@@ -833,9 +842,65 @@ const toggleEditMode = () => {
     pinStreetHint.value = "";
     postalNeedsTyping.value = editData.latitude !== null && !editData.postal_code;
     rememberValidPin(); // the saved pin is where a rejected pin snaps back to
+    editStart.value = JSON.stringify(editData);
   }
   isEditing.value = !isEditing.value;
   renderLocationMap();
+};
+
+// ── Unsaved changes: which fields differ, and jumping between them ───
+// (the same as Flowers you love)
+const editStart = ref(""); // editData when editing began
+const CHANGE_FIELDS = [
+  { keys: ["name"], el: "pf-name" },
+  { keys: ["surname"], el: "pf-surname" },
+  { keys: ["username"], el: "pf-username" },
+  { keys: ["contact_number"], el: "pf-number" },
+  { keys: ["date_of_birth"], el: "pf-dob" },
+  { keys: ["gender"], el: "pf-gender" },
+  { keys: ["nationality"], el: "pf-nationality" },
+  { keys: ["latitude", "longitude", "city", "region"], el: "map" },
+  { keys: ["address"], el: "pf-street" },
+  { keys: ["postal_code"], el: "pf-postal" },
+];
+const changes = computed(() => {
+  if (!isEditing.value || !editStart.value) return [];
+  const before = JSON.parse(editStart.value);
+  const same = (a, b) => String(a ?? "") === String(b ?? "");
+  return CHANGE_FIELDS.filter((f) => f.keys.some((k) => !same(editData[k], before[k])));
+});
+const changeAt = ref(-1);
+let flashed = null;
+let flashTimer = 0;
+watch(() => changes.value.map((f) => f.el).join(), () => (changeAt.value = -1));
+
+function goToChange(step) {
+  const list = changes.value;
+  if (!list.length) return;
+  const now = changeAt.value < list.length ? changeAt.value : -1;
+  const next = now < 0 ? (step > 0 ? 0 : list.length - 1) : (now + step + list.length) % list.length;
+  changeAt.value = next;
+  // A postal code filled in from the pin has no box of its own: show the map
+  const map = locationMapEl.value?.closest(".pf-map");
+  const target = list[next].el === "map" ? map : document.getElementById(list[next].el)?.closest(".pf-field") || map;
+  if (!target) return;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  target.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+  // Highlight it for a moment, so it's clear which part changed
+  flashed?.classList.remove("pf-flash");
+  clearTimeout(flashTimer);
+  requestAnimationFrame(() => {
+    target.classList.add("pf-flash");
+    flashed = target;
+    flashTimer = setTimeout(() => target.classList.remove("pf-flash"), 1800);
+  });
+}
+
+/** Discard (or Cancel when nothing changed): back to what's saved */
+const discardEdit = () => {
+  const hadChanges = changes.value.length > 0;
+  cancelEdit();
+  if (hadChanges) toast.info("Changes discarded.");
 };
 
 const cancelEdit = () => {
@@ -2080,65 +2145,176 @@ onMounted(async () => {
   outline-offset: 3px;
 }
 
-/* ── Save bar ─────────────────────────────────────────────── */
-/* A snackbar, like the site's other messages: floating at the bottom centre */
-.pf-savebar {
+/* ── Save bar: the same as Flowers you love ───────────────── */
+.pf-bar {
   position: fixed;
+  z-index: 950;
   left: 50%;
   bottom: calc(24px + env(safe-area-inset-bottom));
-  z-index: 900;
-  width: min(560px, calc(100vw - 32px));
-  padding: 10px 10px 10px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 6px 6px 6px 18px;
   border: 1px solid rgba(54, 63, 78, 0.12);
   border-radius: 14px;
   background: #ffffff;
+  color: var(--ink, #363f4e);
   box-shadow: 0 12px 32px rgba(30, 39, 57, 0.16), 0 2px 6px rgba(30, 39, 57, 0.08);
+  font-family: var(--font-sans, "Poppins", system-ui, sans-serif);
   transform: translateX(-50%);
-}
-
-.pf-savebar__inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
 }
 
 /* While it shows, other snackbars stack above it instead of covering it */
 :global(body.pf-saving-open .sb-host) {
-  bottom: calc(100px + env(safe-area-inset-bottom)) !important;
+  bottom: calc(96px + env(safe-area-inset-bottom)) !important;
 }
 
-.pf-savebar p {
-  display: flex;
+.pf-bar__title {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--ink-soft);
   font-size: 14px;
+  font-weight: 600;
 }
 
-.pf-savebar p svg {
-  width: 17px;
-  height: 17px;
+.pf-bar__title::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d18a1c; /* waiting to be saved */
+}
+
+.pf-bar.clean .pf-bar__title {
+  color: var(--ink-soft, #5f6776);
+  font-weight: 500;
+}
+
+.pf-bar.clean .pf-bar__title::before {
+  background: rgba(54, 63, 78, 0.25);
+}
+
+.pf-bar__view {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 6px;
+}
+
+.pf-bar__count {
+  display: grid;
+  line-height: 1.2;
+  color: var(--ink-soft, #5f6776);
+  font-size: 12.5px;
+  text-align: right;
+}
+
+.pf-bar__count small {
+  color: var(--ink, #363f4e);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pf-bar__arrows {
+  display: grid;
+}
+
+.pf-bar__arrows button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink, #363f4e);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pf-bar__arrows button:hover {
+  background: rgba(54, 63, 78, 0.07);
+  color: var(--leaf-deep, #2e7a4f);
+}
+
+.pf-bar__arrows svg {
+  width: 22px;
+  height: 22px;
   fill: none;
-  stroke: var(--leaf-deep);
-  stroke-width: 1.8;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-.pf-savebar__actions {
-  display: flex;
-  gap: 8px;
+.pf-bar__sep {
+  width: 1px;
+  height: 24px;
+  background: rgba(54, 63, 78, 0.14);
+}
+
+.pf-bar__btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink-soft, #5f6776);
+  font: 600 13.5px var(--font-sans, "Poppins", system-ui, sans-serif);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pf-bar__btn:hover:not(:disabled) {
+  background: rgba(54, 63, 78, 0.07);
+  color: var(--ink, #363f4e);
+}
+
+.pf-bar__btn--save {
+  background: var(--ink, #363f4e);
+  color: #ffffff;
+}
+
+.pf-bar__btn--save:hover:not(:disabled) {
+  background: var(--leaf-deep, #2e7a4f);
+  color: #ffffff;
+}
+
+.pf-bar__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pf-bar :is(button):focus-visible {
+  outline: 2px solid var(--leaf, #4db173);
+  outline-offset: 2px;
 }
 
 .pf-bar-enter-active,
 .pf-bar-leave-active {
-  transition: transform 0.25s ease, opacity 0.25s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .pf-bar-enter-from,
 .pf-bar-leave-to {
   opacity: 0;
-  transform: translate(-50%, 16px);
+  transform: translate(-50%, 14px);
+}
+
+/* The field "View changes" jumped to, highlighted for a moment */
+.pf-field,
+.pf-map {
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.pf-flash {
+  border-radius: 12px;
+  background: rgba(77, 177, 115, 0.08);
+  box-shadow: 0 0 0 8px rgba(77, 177, 115, 0.08), 0 0 0 9px rgba(77, 177, 115, 0.35);
 }
 
 /* ── Two-step setup ───────────────────────────────────────── */
@@ -2381,16 +2557,8 @@ onMounted(async () => {
     grid-column: 2;
   }
 
-  .pf-savebar p {
+  .pf-bar__count {
     display: none;
-  }
-
-  .pf-savebar__actions {
-    width: 100%;
-  }
-
-  .pf-savebar__actions .pf-btn {
-    flex: 1;
   }
 }
 
@@ -2401,6 +2569,8 @@ onMounted(async () => {
 
   .pf-bar-enter-active,
   .pf-bar-leave-active,
+  .pf-field,
+  .pf-map,
   .pf-meter__track span,
   .pf-switch span,
   .pf-switch span::after {
