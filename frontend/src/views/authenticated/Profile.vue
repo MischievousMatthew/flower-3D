@@ -326,7 +326,7 @@
     <!-- ── Save bar while editing ────────────────────────────────────────── -->
     <Transition name="pf-bar">
       <div v-if="isEditing" class="pf-savebar" role="region" aria-label="Save your changes">
-        <div class="pf-wrap pf-savebar__inner">
+        <div class="pf-savebar__inner">
           <p>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4Z" /></svg>
             You're editing your profile.
@@ -385,7 +385,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
+import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -729,6 +729,9 @@ const user = reactive({
 });
 
 const isEditing = ref(false);
+// The save snackbar is showing: other snackbars move up above it
+watch(isEditing, (on) => document.body.classList.toggle("pf-saving-open", on));
+onBeforeUnmount(() => document.body.classList.remove("pf-saving-open"));
 const isLoading = ref(false);
 const isSaving = ref(false);
 const navHeaderRef = ref(null);
@@ -2078,25 +2081,31 @@ onMounted(async () => {
 }
 
 /* ── Save bar ─────────────────────────────────────────────── */
+/* A snackbar, like the site's other messages: floating at the bottom centre */
 .pf-savebar {
   position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
   z-index: 900;
-  padding: 14px 0 calc(14px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 -12px 30px -20px rgba(54, 63, 78, 0.35);
+  width: min(560px, calc(100vw - 32px));
+  padding: 10px 10px 10px 16px;
+  border: 1px solid rgba(54, 63, 78, 0.12);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(30, 39, 57, 0.16), 0 2px 6px rgba(30, 39, 57, 0.08);
+  transform: translateX(-50%);
 }
 
 .pf-savebar__inner {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+/* While it shows, other snackbars stack above it instead of covering it */
+:global(body.pf-saving-open .sb-host) {
+  bottom: calc(100px + env(safe-area-inset-bottom)) !important;
 }
 
 .pf-savebar p {
@@ -2129,7 +2138,7 @@ onMounted(async () => {
 .pf-bar-enter-from,
 .pf-bar-leave-to {
   opacity: 0;
-  transform: translateY(100%);
+  transform: translate(-50%, 16px);
 }
 
 /* ── Two-step setup ───────────────────────────────────────── */
