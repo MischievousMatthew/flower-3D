@@ -215,55 +215,116 @@
         <!-- ── Visit and delivery ─────────────────────────────────────── -->
         <section id="sf-visit" class="sf-section" aria-labelledby="sf-visit-title">
           <div class="bc-container">
+            <header class="bc-sec-head">
+              <div>
+                <p class="bc-sec-eyebrow">Visit &amp; delivery</p>
+                <h2 id="sf-visit-title" class="bc-sec-title">Find <em>the shop</em></h2>
+              </div>
+            </header>
+
             <div class="sf-visit" :class="{ 'no-map': !hasStorePin }">
+              <!-- The map, with the shop's address card floating on it -->
               <div v-if="hasStorePin" class="sf-map-frame">
                 <div ref="locationMapEl" class="sf-map" role="region" :aria-label="`Map showing ${vendor.store_name}`"></div>
+                <div class="sf-map-card">
+                  <span class="sf-map-logo" aria-hidden="true">
+                    <img v-if="vendor.store_logo_path && !logoFailed" :src="vendor.store_logo_path" alt="" />
+                    <template v-else>{{ storeInitial }}</template>
+                  </span>
+                  <span class="sf-map-text">
+                    <strong>{{ vendor.store_name }}</strong>
+                    <small>{{ vendor.store_address || "Address not provided" }}</small>
+                  </span>
+                  <a :href="directionsUrl" target="_blank" rel="noopener" class="sf-map-go" aria-label="Get directions (opens Google Maps)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 21 3l-8 18-2-8z" /></svg>
+                  </a>
+                </div>
               </div>
 
               <div class="sf-visit-copy">
-                <p class="bc-sec-eyebrow">Visit &amp; delivery</p>
-                <h2 id="sf-visit-title" class="sf-visit-title">Find <em>the shop</em></h2>
-                <p class="sf-address">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z" /><circle cx="12" cy="10" r="2.2" /></svg>
-                  {{ vendor.store_address || "Address not provided" }}
-                </p>
-                <p v-if="!hasStorePin" class="sf-muted">This shop hasn't pinned its location on the map yet.</p>
+                <!-- Where -->
+                <div class="sf-where">
+                  <span class="sf-row-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z" /><circle cx="12" cy="10" r="2.2" /></svg>
+                  </span>
+                  <div>
+                    <small>Address</small>
+                    <p>{{ vendor.store_address || "Address not provided" }}</p>
+                    <p v-if="!hasStorePin" class="sf-muted">This shop hasn't pinned its location on the map yet.</p>
+                  </div>
+                </div>
                 <div v-if="hasStorePin" class="sf-visit-actions">
-                  <a :href="directionsUrl" target="_blank" rel="noopener" class="sf-btn sf-btn--primary">Get directions</a>
+                  <a :href="directionsUrl" target="_blank" rel="noopener" class="sf-btn sf-btn--primary">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 21 3l-8 18-2-8z" /></svg>
+                    Get directions
+                  </a>
                   <a :href="openMapUrl" target="_blank" rel="noopener" class="sf-btn sf-btn--ghost-dark">Open in Google Maps</a>
                 </div>
 
-                <dl class="sf-details">
-                  <div>
-                    <dt>Opening hours</dt>
-                    <dd>{{ vendor.operating_hours || "Not listed" }}</dd>
-                  </div>
-                  <div>
-                    <dt>Delivers to</dt>
-                    <dd>{{ parsedServiceAreas.length ? parsedServiceAreas.join(", ") : "Not listed" }}</dd>
-                  </div>
-                  <div v-if="vendor.same_day_delivery">
-                    <dt>Same-day cutoff</dt>
-                    <dd>Order by {{ parsedCutoffTimes }} <span class="sf-muted">Subject to courier availability.</span></dd>
-                  </div>
-                  <div v-if="vendor.lead_time">
-                    <dt>Lead time</dt>
-                    <dd>{{ vendor.lead_time }}</dd>
-                  </div>
-                  <div v-if="vendor.cancellation_policy">
-                    <dt>Cancellations</dt>
-                    <dd>{{ vendor.cancellation_policy }}</dd>
-                  </div>
-                </dl>
-
-                <ul v-if="contactLinks.length" class="sf-contact">
-                  <li v-for="link in contactLinks" :key="link.label">
-                    <a :href="link.href" class="sf-contact-link" :target="link.external ? '_blank' : null" :rel="link.external ? 'noopener' : null">
-                      <span class="sf-contact-label">{{ link.label }}</span>
-                      {{ link.text }}
-                    </a>
+                <!-- Hours, delivery and policies, each a tile with an icon -->
+                <ul class="sf-info">
+                  <li>
+                    <span class="sf-row-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></span>
+                    <div>
+                      <small>Opening hours</small>
+                      <p>{{ vendor.operating_hours || "Not listed" }}</p>
+                    </div>
+                  </li>
+                  <li>
+                    <span class="sf-row-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h11v10H3z" /><path d="M14 10h4l3 3v3h-7" /><circle cx="7" cy="17" r="2" /><circle cx="17" cy="17" r="2" /></svg></span>
+                    <div>
+                      <small>Lead time</small>
+                      <p>{{ vendor.lead_time || "Not listed" }}</p>
+                    </div>
+                  </li>
+                  <li v-if="vendor.same_day_delivery" class="wide">
+                    <span class="sf-row-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></svg></span>
+                    <div>
+                      <small>Same-day cutoff</small>
+                      <p>Order by {{ parsedCutoffTimes }}</p>
+                      <p class="sf-muted">Subject to courier availability.</p>
+                    </div>
+                  </li>
+                  <li class="wide">
+                    <span class="sf-row-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg></span>
+                    <div>
+                      <small>Delivers to</small>
+                      <ul v-if="parsedServiceAreas.length" class="sf-areas">
+                        <li v-for="area in parsedServiceAreas" :key="area">{{ area }}</li>
+                      </ul>
+                      <p v-else>Not listed</p>
+                    </div>
+                  </li>
+                  <li v-if="vendor.cancellation_policy" class="wide">
+                    <span class="sf-row-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z" /><path d="M14 3v5h5M10 13h6M10 17h4" /></svg></span>
+                    <div>
+                      <small>Cancellations</small>
+                      <p>{{ vendor.cancellation_policy }}</p>
+                    </div>
                   </li>
                 </ul>
+
+                <!-- Contact: one row each, tap to call, email or open -->
+                <div v-if="contactLinks.length" class="sf-contact">
+                  <small class="sf-contact-head">Contact the shop</small>
+                  <a
+                    v-for="link in contactLinks"
+                    :key="link.label"
+                    :href="link.href"
+                    class="sf-contact-link"
+                    :target="link.external ? '_blank' : null"
+                    :rel="link.external ? 'noopener' : null"
+                  >
+                    <span class="sf-contact-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path v-for="(d, i) in CONTACT_ICONS[link.label]" :key="i" :d="d" /></svg>
+                    </span>
+                    <span class="sf-contact-text">
+                      <small>{{ link.label }}</small>
+                      <span>{{ link.text }}</span>
+                    </span>
+                    <svg class="sf-contact-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -327,9 +388,6 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import api from "../../plugins/axios";
@@ -428,6 +486,14 @@ const contactLinks = computed(() => {
   ].filter(Boolean);
 });
 
+// Icons for the contact rows
+const CONTACT_ICONS = {
+  Phone: ["M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"],
+  Email: ["M3 6h18v12H3z", "m3 7 9 6 9-6"],
+  Facebook: ["M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v7h4v-7h3l1-4h-4V8a1 1 0 0 1 1-1z"],
+  Instagram: ["M4 8a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z", "M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z", "M17 7h.01"],
+};
+
 const peso = (n) => `₱${Number(n || 0).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`;
 const words = (s) => String(s).replace(/[-_]/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 
@@ -449,14 +515,13 @@ const openMapUrl = computed(() =>
 
 const locationMapEl = ref(null);
 let locationMap = null;
-const storeMarkerIcon = L.icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
+// The shop's pin: a green drop with a small shop inside
+const storeMarkerIcon = L.divIcon({
+  className: "",
+  html: '<span class="sf-pin"><svg viewBox="0 0 24 24"><path d="M4 21V10l8-6 8 6v11" /><path d="M9 21v-6h6v6" /></svg></span>',
+  iconSize: [44, 44],
+  iconAnchor: [22, 53], // the drop's point, after turning it 45°
+  popupAnchor: [0, -50],
 });
 
 const renderLocationMap = async () => {
@@ -469,7 +534,8 @@ const renderLocationMap = async () => {
     maxZoom: 19,
     attribution: "© OpenStreetMap contributors",
   }).addTo(locationMap);
-  L.marker(position, { icon: storeMarkerIcon }).addTo(locationMap).bindPopup(vendor.value.store_name || "Shop location");
+  L.marker(position, { icon: storeMarkerIcon, title: vendor.value.store_name || "Shop location" }).addTo(locationMap);
+  locationMap.panBy([0, 50], { animate: false }); // keep the pin clear of the address card
 };
 
 onBeforeUnmount(() => {
@@ -1269,65 +1335,207 @@ onMounted(async () => {
 /* ── Visit ─────────────────────────────────────────────────────────── */
 .sf-visit {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-  overflow: hidden;
-  border: 1px solid var(--line-soft);
-  border-radius: 28px;
-  background: var(--paper);
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: stretch;
 }
 
 .sf-visit.no-map {
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* The map in its own rounded frame, the address card floating on it */
 .sf-map-frame {
-  min-height: 420px;
+  position: relative;
+  min-height: 460px;
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  border-radius: 28px;
   background: var(--ivory-deep);
+  isolation: isolate;
 }
 
 .sf-map {
-  width: 100%;
-  height: 100%;
-  min-height: 420px;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 
+.sf-map-frame :deep(.leaflet-control-zoom) {
+  overflow: hidden;
+  margin: 16px 0 0 16px;
+  border: 0;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px -10px rgba(38, 45, 57, 0.45);
+}
+
+.sf-map-frame :deep(.leaflet-control-zoom a) {
+  width: 36px;
+  height: 36px;
+  border-color: var(--line-soft);
+  color: var(--ink);
+  font: 500 18px/36px var(--font-sans);
+}
+
+.sf-map-frame :deep(.sf-pin) {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--paper);
+  border-radius: 50% 50% 50% 4px;
+  background: var(--leaf-deep);
+  box-shadow: 0 10px 20px -8px rgba(38, 45, 57, 0.6);
+  transform: rotate(-45deg);
+}
+
+.sf-map-frame :deep(.sf-pin svg) {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--paper);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: rotate(45deg);
+}
+
+.sf-map-card {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 12px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  background: rgba(250, 251, 250, 0.96);
+  box-shadow: 0 16px 36px -20px rgba(38, 45, 57, 0.55);
+  backdrop-filter: blur(8px);
+}
+
+.sf-map-logo {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #e9f5ed;
+  color: var(--leaf-deep);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-style: italic;
+}
+
+.sf-map-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sf-map-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sf-map-text strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf-map-text small {
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf-map-go {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--paper);
+  transition: background 0.2s ease;
+}
+
+.sf-map-go:hover {
+  background: var(--leaf-deep);
+}
+
+.sf-map-go svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* The details */
 .sf-visit-copy {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: clamp(24px, 3.5vw, 44px);
+  gap: 16px;
+  padding: clamp(20px, 2.6vw, 30px);
+  border: 1px solid var(--line-soft);
+  border-radius: 28px;
+  background: var(--paper);
 }
 
-.sf-visit-copy .bc-sec-eyebrow {
-  margin: 0;
-}
-
-.sf-visit-title {
-  font-family: var(--font-display);
-  font-size: clamp(30px, 3vw, 40px);
-  font-weight: 500;
-  line-height: 1.05;
-}
-
-.sf-visit-title em {
-  color: var(--leaf-deep);
-}
-
-.sf-address {
+.sf-where {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 15px;
-  line-height: 1.55;
+  gap: 14px;
+}
+
+.sf-where small,
+.sf-info small,
+.sf-contact-head {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.sf-where p {
+  font-size: 15.5px;
+  font-weight: 500;
+  line-height: 1.5;
   color: var(--ink);
 }
 
-.sf-address svg {
+.sf-where .sf-muted {
+  margin-top: 4px;
+  font-weight: 400;
+}
+
+.sf-row-icon {
+  display: grid;
   flex: none;
-  width: 18px;
-  height: 18px;
-  margin-top: 2px;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #e9f5ed;
   color: var(--leaf-deep);
+}
+
+.sf-row-icon svg {
+  width: 20px;
+  height: 20px;
 }
 
 .sf-visit-actions {
@@ -1336,34 +1544,54 @@ onMounted(async () => {
   gap: 10px;
 }
 
-.sf-details {
+.sf-info {
   display: grid;
-  gap: 0;
-  margin-top: 6px;
-  border-top: 1px solid var(--line-soft);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.sf-details > div {
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
+.sf-info > li {
+  display: flex;
   gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--line-soft);
+  min-width: 0;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--ivory);
 }
 
-.sf-details dt {
-  font-size: 13px;
-  color: var(--ink-soft);
+.sf-info > li.wide {
+  grid-column: 1 / -1;
 }
 
-.sf-details dd {
+.sf-info > li > div {
+  min-width: 0;
+}
+
+.sf-info p {
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.5;
   color: var(--ink);
+  overflow-wrap: anywhere;
 }
 
-.sf-details dd .sf-muted {
-  display: block;
+.sf-info .sf-muted {
+  margin-top: 2px;
+}
+
+.sf-areas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.sf-areas li {
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: 12.5px;
+  color: var(--ink);
 }
 
 .sf-muted {
@@ -1372,35 +1600,68 @@ onMounted(async () => {
 }
 
 .sf-contact {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 8px;
 }
 
 .sf-contact-link {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 16px;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 12px 8px 8px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 16px;
   color: var(--ink);
-  font-size: 13.5px;
   text-decoration: none;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .sf-contact-link:hover {
-  border-color: var(--ink);
+  border-color: var(--leaf-deep);
+  background: #f3f9f5;
 }
 
-.sf-contact-label {
+.sf-contact-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.sf-contact-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sf-contact-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.sf-contact-text small {
   font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--leaf-deep);
+  color: var(--ink-soft);
+}
+
+.sf-contact-text span {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf-contact-arrow {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--ink-soft);
 }
 
 /* ── Past work ─────────────────────────────────────────────────────── */
@@ -1595,9 +1856,8 @@ onMounted(async () => {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .sf-map-frame,
-  .sf-map {
-    min-height: 280px;
+  .sf-map-frame {
+    min-height: 320px;
   }
 }
 
@@ -1625,9 +1885,12 @@ onMounted(async () => {
     gap: 6px;
   }
 
-  .sf-details > div {
+  .sf-info {
     grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
+  }
+
+  .sf-visit-actions .sf-btn {
+    flex: 1 1 auto;
   }
 
   .sf-sort span {
