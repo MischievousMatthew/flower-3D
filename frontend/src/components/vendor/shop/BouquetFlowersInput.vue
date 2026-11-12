@@ -294,12 +294,14 @@ const remove = (index) => emit("update:modelValue", props.modelValue.filter((_, 
   list-style: none;
 }
 
+/* One field under another, full width, so every label and placeholder fits;
+   the remove button sits in the top-right corner */
 .bf-row {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) 84px 124px 44px;
-  gap: 8px;
-  align-items: end;
-  padding: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
   border: 1px solid var(--v-border);
   border-radius: 12px;
   background: var(--v-subtle, transparent);
@@ -325,7 +327,7 @@ const remove = (index) => emit("update:modelValue", props.modelValue.filter((_, 
 
 .bf-count .fx-input,
 .bf-cost .fx-input {
-  text-align: right;
+  text-align: left;
   font-variant-numeric: tabular-nums;
 }
 
@@ -359,8 +361,15 @@ const remove = (index) => emit("update:modelValue", props.modelValue.filter((_, 
   margin-top: 6px;
 }
 
-.bf-row.bf-row-wrap {
-  grid-template-columns: minmax(0, 1fr) 96px 44px;
+/* The first field leaves room for the remove button beside it */
+.bf-row > .bf-field:first-of-type {
+  margin-right: 48px;
+}
+
+.bf-row > .bf-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
 }
 
 .bf-row.linked {
@@ -525,34 +534,4 @@ const remove = (index) => emit("update:modelValue", props.modelValue.filter((_, 
   font-size: 12px;
 }
 
-/* Narrow: flower and colour on top, pieces / cost / remove below */
-@media (max-width: 720px) {
-  .bf-row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px;
-  }
-
-  .bf-flower {
-    grid-column: 1 / 2;
-  }
-
-  .bf-color {
-    grid-column: 2 / -1;
-  }
-
-  .bf-count {
-    grid-column: 1 / 2;
-  }
-
-  .bf-cost {
-    grid-column: 2 / 3;
-  }
-
-  .bf-row.bf-row-wrap {
-    grid-template-columns: minmax(0, 1fr) 88px 44px;
-  }
-
-  .bf-row-wrap .bf-count {
-    grid-column: auto;
-  }
-}
 </style>

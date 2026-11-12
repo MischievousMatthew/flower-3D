@@ -1242,9 +1242,10 @@ const formatSize = (bytes) =>
   border-radius: 12px;
 }
 
+/* One box under another so the placeholders fit */
 .cz-stock-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
 }
 
