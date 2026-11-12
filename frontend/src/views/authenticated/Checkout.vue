@@ -375,9 +375,10 @@
             <dl class="co-totals">
               <div><dt>Subtotal</dt><dd>₱{{ formatPrice(checkoutOriginalTotal) }}</dd></div>
               <div v-if="checkoutTotalSavings > 0" class="save"><dt>Discount</dt><dd>−₱{{ formatPrice(checkoutTotalSavings) }}</dd></div>
-              <div><dt>Delivery fee</dt><dd class="free">{{ deliveryFee > 0 ? `₱${formatPrice(deliveryFee)}` : "Free" }}</dd></div>
+              <div><dt>Delivery fee</dt><dd v-if="deliveryFee > 0">₱{{ formatPrice(deliveryFee) }}</dd><dd v-else class="by-shop">Set by the shop</dd></div>
               <div class="grand"><dt>Total amount</dt><dd>₱{{ formatPrice(totalAmount) }}</dd></div>
             </dl>
+            <p v-if="!(deliveryFee > 0)" class="co-delivery-note">Each shop books its own third-party courier, so the shop sets the delivery fee. It isn't included in this total.</p>
 
             <div class="co-actions co-actions--final">
               <button type="button" class="co-back" :disabled="isProcessing" @click="goToStep(2)">
@@ -418,9 +419,10 @@
           <dl class="co-totals co-totals--side">
             <div><dt>Subtotal</dt><dd>₱{{ formatPrice(checkoutOriginalTotal) }}</dd></div>
             <div v-if="checkoutTotalSavings > 0" class="save"><dt>Discount</dt><dd>−₱{{ formatPrice(checkoutTotalSavings) }}</dd></div>
-            <div><dt>Delivery fee</dt><dd class="free">{{ deliveryFee > 0 ? `₱${formatPrice(deliveryFee)}` : "Free" }}</dd></div>
+            <div><dt>Delivery fee</dt><dd v-if="deliveryFee > 0">₱{{ formatPrice(deliveryFee) }}</dd><dd v-else class="by-shop">Set by the shop</dd></div>
             <div class="grand"><dt>Total</dt><dd>₱{{ formatPrice(totalAmount) }}</dd></div>
           </dl>
+          <p v-if="!(deliveryFee > 0)" class="co-delivery-note">Each shop books its own third-party courier, so the shop sets the delivery fee. It isn't included in this total.</p>
           <p v-if="selectedDate" class="co-sum-date">
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></svg>
             Delivery on <strong>{{ formatSelectedDate }}</strong>
@@ -2569,9 +2571,16 @@ onMounted(async () => {
   color: var(--co-red);
 }
 
-.co-totals .free {
-  color: var(--leaf-deep);
-  font-weight: 600;
+.co-totals .by-shop {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.co-delivery-note {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.55;
 }
 
 .co-totals .grand {
