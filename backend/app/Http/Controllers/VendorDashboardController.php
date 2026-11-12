@@ -26,12 +26,12 @@ class VendorDashboardController extends Controller
 {
     use ResolvesOwner;
 
-    private const RANGES = ['7d', '30d', 'month', 'year'];
+    private const RANGES = ['today', 'week', 'month', 'year'];
 
     public function overview(Request $request, SubscriptionAccessService $access): JsonResponse
     {
         $data = $request->validate(['range' => 'nullable|in:' . implode(',', self::RANGES)]);
-        $range = $data['range'] ?? '30d';
+        $range = $data['range'] ?? 'month';
         $vendorId = $this->resolveOwnerId($request);
         $user = $request->user();
 
@@ -53,7 +53,8 @@ class VendorDashboardController extends Controller
         if ($can('orders')) {
             $result['sales'] = $this->sales($vendorId, $from, $to, $prevFrom, $prevTo);
             $result['orders'] = $this->orders($vendorId, $from, $to);
-            $result['chart'] = $this->chart($vendorId, $from, $to, $range === 'year' ? 'month' : 'day');
+            $unit = match ($range) { 'today' => 'hour', 'year' => 'month', default => 'day' };
+            $result['chart'] = $this->chart($vendorId, $from, $to, $unit, $range === 'week');
             $result['top_flowers'] = $this->topFlowers($vendorId, $from, $to);
         }
         if ($can('products')) {
@@ -124,16 +125,23 @@ class VendorDashboardController extends Controller
         ];
     }
 
-    private function chart(int $vendorId, Carbon $from, Carbon $to, string $unit): array
+    private function chart(int $vendorId, Carbon $from, Carbon $to, string $unit, bool $weekdays = false): array
     {
-        $format = $unit === 'month' ? 'Y-m' : 'Y-m-d';
+        $format = match ($unit) { 'month' => 'Y-m', 'hour' => 'Y-m-d H', default => 'Y-m-d' };
         $orders = $this->salesQuery($vendorId, $from, $to)->get(['total_amount', 'created_at']);
+        // Hours stop at the current one, so the line doesn't run on into the evening
+        $end = $unit === 'hour' ? now() : $to;
 
         $buckets = [];
-        foreach (CarbonPeriod::create($from->copy()->startOf($unit), "1 {$unit}", $to) as $date) {
+        foreach (CarbonPeriod::create($from->copy()->startOf($unit), "1 {$unit}", $end) as $date) {
             $buckets[$date->format($format)] = [
                 'key' => $date->format($format),
-                'label' => $unit === 'month' ? $date->format('M') : $date->format('M j'),
+                'label' => match (true) {
+                    $unit === 'month' => $date->format('M'),
+                    $unit === 'hour' => $date->format('g A'),
+                    $weekdays => $date->format('D, M j'),
+                    default => $date->format('M j'),
+                },
                 'sales' => 0.0,
                 'orders' => 0,
             ];
@@ -322,17 +330,19 @@ class VendorDashboardController extends Controller
     {
         $now = now();
         [$from, $to] = match ($range) {
-            '7d' => [$now->copy()->subDays(6)->startOfDay(), $now->copy()->endOfDay()],
-            'month' => [$now->copy()->startOfMonth(), $now->copy()->endOfDay()],
+            'today' => [$now->copy()->startOfDay(), $now->copy()->endOfDay()],
+            'week' => [$now->copy()->startOfWeek(Carbon::MONDAY), $now->copy()->endOfDay()],
             'year' => [$now->copy()->startOfYear(), $now->copy()->endOfDay()],
-            default => [$now->copy()->subDays(29)->startOfDay(), $now->copy()->endOfDay()],
+            default => [$now->copy()->startOfMonth(), $now->copy()->endOfDay()],
         };
 
-        // The same stretch of time just before, to compare against.
+        // The same stretch of the period before, up to the same moment:
+        // yesterday until this time, last week until this day, and so on.
         [$prevFrom, $prevTo] = match ($range) {
-            'month' => [$from->copy()->subMonthNoOverflow(), $now->copy()->subMonthNoOverflow()->endOfDay()],
+            'today' => [$from->copy()->subDay(), $now->copy()->subDay()],
+            'week' => [$from->copy()->subWeek(), $now->copy()->subWeek()->endOfDay()],
             'year' => [$from->copy()->subYear(), $now->copy()->subYear()->endOfDay()],
-            default => [$from->copy()->subDays((int) ceil($from->diffInDays($to))), $from->copy()->subSecond()],
+            default => [$from->copy()->subMonthNoOverflow(), $now->copy()->subMonthNoOverflow()->endOfDay()],
         };
 
         return [$from, $to, $prevFrom, $prevTo];

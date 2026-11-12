@@ -94,7 +94,7 @@
           <div class="card-head">
             <div>
               <h2>Sales</h2>
-              <p>{{ data?.chart?.unit === "month" ? "Per month" : "Per day" }}, paid or completed orders</p>
+              <p>{{ CHART_UNIT[data?.chart?.unit] ?? "Per day" }}, paid or completed orders</p>
             </div>
             <div v-if="data?.chart" class="chart-total">
               <strong>{{ money(data.sales.total) }}</strong>
@@ -301,11 +301,12 @@ const router = useRouter();
 const { vendorProfile } = useVendorProfile({ autoFetch: true, showToast: false });
 
 const RANGES = [
-  { value: "7d", label: "7 days" },
-  { value: "30d", label: "30 days" },
-  { value: "month", label: "This month" },
-  { value: "year", label: "This year" },
+  { value: "today", label: "Today", vs: "yesterday at this time" },
+  { value: "week", label: "This week", vs: "last week up to the same day" },
+  { value: "month", label: "This month", vs: "last month up to the same day" },
+  { value: "year", label: "This year", vs: "last year up to the same day" },
 ];
+const CHART_UNIT = { hour: "Per hour", day: "Per day", month: "Per month" };
 const MODULE_NAME = { orders: "Orders", products: "Products", finance: "Finance" };
 const PLAN_STATUS = { active: "Active", trial: "Free trial", inactive: "Inactive", none: "No plan" };
 const LIMIT_LABEL = { warehouses: "Warehouses", staff_employees: "Staff", products: "Products" };
@@ -337,7 +338,7 @@ const ACTIONS = [
   { label: "Help & support", icon: "help", tone: "slate", to: { name: "VendorSupport" } },
 ];
 
-const range = ref("30d");
+const range = ref("month");
 const data = ref(null);
 const error = ref("");
 const hover = ref(null);
@@ -347,11 +348,14 @@ let requestSeq = 0;
 // Small presentational pieces
 const Trend = defineComponent({
   props: { value: { type: Number, default: null } },
-  setup: (props) => () =>
-    props.value === null
-      ? h("span", { class: "trend new" }, "New")
-      : h("span", { class: ["trend", props.value > 0 ? "up" : props.value < 0 ? "down" : "flat"] },
-          `${props.value > 0 ? "▲" : props.value < 0 ? "▼" : "•"} ${Math.abs(props.value)}%`),
+  setup: (props) => () => {
+    const vs = RANGES.find((r) => r.value === range.value)?.vs;
+    const title = vs ? `Compared with ${vs}` : undefined;
+    return props.value === null
+      ? h("span", { class: "trend new", title }, "New")
+      : h("span", { class: ["trend", props.value > 0 ? "up" : props.value < 0 ? "down" : "flat"], title },
+          `${props.value > 0 ? "▲" : props.value < 0 ? "▼" : "•"} ${Math.abs(props.value)}%`);
+  },
 });
 const LockedNote = defineComponent({
   props: { module: String, block: Boolean },
@@ -413,7 +417,7 @@ const rangeText = computed(() => {
   const opts = { month: "short", day: "numeric" };
   const from = new Date(`${data.value.from}T00:00:00`).toLocaleDateString("en-PH", opts);
   const to = new Date(`${data.value.to}T00:00:00`).toLocaleDateString("en-PH", opts);
-  return `${from} – ${to}`;
+  return range.value === "today" ? `today, ${from}` : from === to ? from : `${from} – ${to}`;
 });
 
 function go(action) {
