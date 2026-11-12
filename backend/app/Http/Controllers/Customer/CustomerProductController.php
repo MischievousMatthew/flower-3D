@@ -31,7 +31,7 @@ class CustomerProductController extends Controller
         'owner_ids'     => 'nullable|string|max:2000',
         // Words typed into the Shop page search (name, category, colour, flower type)
         'search'        => 'nullable|string|max:100',
-        'sort_by'       => 'nullable|string|in:created_at_desc,price_low,price_high,name_asc,name_desc,popular_desc',
+        'sort_by'       => 'nullable|string|in:created_at_desc,price_low,price_high,name_asc,name_desc,popular_desc,rating_desc',
         'page'          => 'nullable|integer|min:1',
         'per_page'      => 'nullable|integer|min:1|max:100',
     ];
@@ -135,6 +135,12 @@ class CustomerProductController extends Controller
                 $query->orderByRaw('CASE id ' . collect($bestIds)->map(fn ($id, $i) => 'WHEN ' . (int) $id . ' THEN ' . $i)->implode(' ') . ' END');
             } elseif ($sortBy === 'popular_desc') {
                 $query->orderByRaw($this->soldCountSubquery() . ' DESC')
+                    ->orderBy('created_at', 'desc');
+            } elseif ($sortBy === 'rating_desc') {
+                // Top rated: highest average of visible reviews, then most reviews; unrated last
+                $reviews = 'FROM product_reviews r WHERE r.product_id = products.id AND r.hidden_at IS NULL';
+                $query->orderByRaw("COALESCE((SELECT AVG(r.rating) $reviews), 0) DESC")
+                    ->orderByRaw("(SELECT COUNT(*) $reviews) DESC")
                     ->orderBy('created_at', 'desc');
             } else {
                 $sortMap = [

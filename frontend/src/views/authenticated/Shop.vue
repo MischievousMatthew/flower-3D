@@ -49,103 +49,112 @@
       </div>
     </div>
 
-    <!-- Announcements, then the hero slideshow (Admin → Website) -->
+    <main>
+    <!-- 1. Search (the navbar above has the logo, links, cart and account) -->
     <div class="shop-top">
+      <div class="bc-container shop-searchbar">
+        <ShopSearch
+          v-model="searchInput"
+          class="shop-searchbar-field"
+          :flowers="searchFlowers"
+          :occasions="searchOccasions"
+          :colors="searchColors"
+          @submit="searchAndShow"
+          @clear="clearSearch"
+          @pick="onSearchPick"
+        />
+        <ul class="shop-quick" aria-label="Quick links">
+          <li><button type="button" @click="showOnSale">Sale</button></li>
+          <li><button type="button" @click="onViewAll('best')">Best sellers</button></li>
+          <li><button type="button" @click="openDesigner">3D designer</button></li>
+          <li><button type="button" @click="scrollToSection('flower-shops')">Shops near you</button></li>
+        </ul>
+      </div>
+
+      <!-- 2. Hero and promotions (Admin → Website, Promotion Management) -->
       <div v-if="site.announcements.length" class="bc-container shop-announce">
         <AnnouncementBar />
       </div>
       <ShopHero :banners="site.banners" :settings="site.slideshow" @shop="scrollToSection('products')" @design="openDesigner" />
       <DesignerShopPicker :open="designerPickerOpen" @close="designerPickerOpen = false" @choose="designWithShop" @browse="browseFlowerShops" />
     </div>
-
+    <ShopPromotions :promotions="site.promotions" @sale="showOnSale" @design="openDesigner" />
     <ShopTrustStrip variant="top" />
 
-    <ShopOccasions
+    <!-- 3. Shop by category: flower types, occasions, colors, arrangements -->
+    <ShopCategories
       id="occasions"
-      :occasions="filterOptions.occasions"
+      :options="filterOptions"
       :images="occasionImages"
-      :active="selectedFilters.occasion.length === 1 ? selectedFilters.occasion[0] : null"
+      :type-images="typeImages"
+      :active="selectedFilters"
       :loading="!filterOptionsLoaded"
-      :promotions="site.promotions"
-      @pick="shopByOccasion"
-      @browse="scrollToSection('products')"
+      @pick="onCategoryPick"
     />
 
-    <!-- In bloom this month: the admin's seasonal picks (Admin → Website → Featured) -->
-    <FeaturedPicks
-      v-if="featuredProducts.length"
-      :products="featuredProducts"
+    <!-- 4. Featured collections (tabs) -->
+    <FeaturedCollections
+      id="collections"
+      :featured="featuredProducts"
+      :owner-ids="nearMe ? nearMe.ownerIds : null"
       :adding-id="addingToCartProductId"
       @open="openProductModal"
       @add="addToCartDirect"
-      @buy="buyNowDirect"
-      @vendor="selectVendorById"
-      @browse="scrollToSection('products')"
+      @view-all="onViewAll"
     />
-    <!-- Top sellers (when there are enough) and every flower, with the bouquet finder beside them -->
-    <section class="shop-picks" aria-label="Flowers">
-      <div class="bc-container shop-picks-grid">
-        <div class="shop-picks-main">
-          <template v-if="loadingBest || showTopSelling">
-          <div class="shop-row-head">
-            <h2>Top Selling Flowers</h2>
-            <button type="button" class="shop-row-all" @click="viewAllPopular">View all <span aria-hidden="true">→</span></button>
-          </div>
-          <div v-if="loadingBest" class="top-grid" aria-label="Loading top sellers">
-            <span v-for="n in 5" :key="n" class="bc-skeleton top-skel"></span>
-          </div>
-          <div v-else class="top-grid">
-            <!-- The best sellers (the admin sets how many), most sold first -->
-            <ShopProductTile
-              v-for="product in topSelling"
-              :key="`top-${product.id}`"
-              :product="product"
-              context-tag="best_seller"
-              :adding="addingToCartProductId === product.id"
-              @open="openProductModal"
-              @add="addToCartDirect"
-            />
-          </div>
-          </template>
 
-          <!-- Everything; filters from occasions, the finder, search and admin links land here -->
-          <section id="products" class="fresh" :class="{ first: !loadingBest && !showTopSelling }" aria-labelledby="fresh-title">
-            <div class="shop-row-head">
-              <h2 id="fresh-title">{{ selectedFilters.bestSellers ? "Best sellers" : selectedFilters.onSale ? "Flowers on sale" : "Fresh Flowers" }}</h2>
-              <span class="fresh-count" v-if="!isLoading">{{ pagination.total }} {{ pagination.total === 1 ? "flower" : "flowers" }}</span>
-            </div>
-            <div class="fresh-tools">
-              <!-- Suggestions as you type: flowers, flower names, occasions, colours;
-                   popular searches and recently viewed when it's empty -->
-              <ShopSearch
-                v-model="searchInput"
-                :flowers="searchFlowers"
-                :occasions="searchOccasions"
-                :colors="searchColors"
-                @submit="applySearch"
-                @clear="clearSearch"
-                @pick="onSearchPick"
-              />
+    <!-- 5. Every flower: filters, sorting and pages -->
+    <section id="products" class="cat" aria-labelledby="cat-title">
+      <div class="bc-container">
+        <header class="bc-sec-head">
+          <div>
+            <p class="bc-sec-eyebrow">Shop all flowers</p>
+            <h2 id="cat-title" class="bc-sec-title">{{ catalogTitle }}</h2>
+          </div>
+          <p class="cat-count" aria-live="polite">{{ !isLoading || products.length ? rangeText : "" }}</p>
+        </header>
+
+        <div class="cat-layout">
+          <ShopFilters
+            class="cat-filters"
+            :options="filterOptions"
+            :filters="selectedFilters"
+            :active-count="activeFilterChips.length"
+            :total="pagination.total || 0"
+            :open="filtersOpen"
+            @toggle="toggleFilter"
+            @flag="setFlag"
+            @price="setPrice"
+            @clear="clearAllFilters"
+            @close="filtersOpen = false"
+          />
+
+          <div class="cat-main">
+            <div class="cat-tools">
+              <button type="button" class="cat-filter-btn" :aria-expanded="filtersOpen" @click="filtersOpen = true">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
+                Filters<span v-if="activeFilterChips.length" class="cat-filter-n">{{ activeFilterChips.length }}</span>
+              </button>
+              <ul v-if="activeFilterChips.length" class="fresh-chips" aria-label="Filters in use">
+                <li v-for="chip in activeFilterChips" :key="chip.key">
+                  <button type="button" class="fresh-chip" :aria-label="`Remove filter ${chip.label}`" @click="removeFilterChip(chip)">
+                    {{ chip.label }} <span aria-hidden="true">✕</span>
+                  </button>
+                </li>
+                <li><button type="button" class="fresh-clear" @click="clearAllFilters">Clear all</button></li>
+              </ul>
               <label class="fresh-sort">
-                <span>Sort</span>
+                <span>Sort by</span>
                 <select v-model="sortBy" aria-label="Sort flowers" @change="onSortChange">
                   <option v-for="option in SORT_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
                 </select>
               </label>
             </div>
-            <ul v-if="activeFilterChips.length" class="fresh-chips" aria-label="Filters">
-              <li v-for="chip in activeFilterChips" :key="chip.key">
-                <button type="button" class="fresh-chip" :aria-label="`Remove filter ${chip.label}`" @click="removeFilterChip(chip)">
-                  {{ chip.label }} <span aria-hidden="true">✕</span>
-                </button>
-              </li>
-              <li><button type="button" class="fresh-clear" @click="clearAllFilters">Clear all</button></li>
-            </ul>
 
             <div v-if="isLoading && !products.length" class="fresh-grid" aria-label="Loading flowers">
-              <span v-for="n in 8" :key="n" class="bc-skeleton fresh-skel"></span>
+              <span v-for="n in 9" :key="n" class="bc-skeleton fresh-skel"></span>
             </div>
-            <div v-else-if="products.length" class="fresh-grid">
+            <div v-else-if="products.length" class="fresh-grid" :class="{ dim: isLoading }" :aria-busy="isLoading">
               <ShopProductTile
                 v-for="product in products"
                 :key="`fresh-${product.id}`"
@@ -155,25 +164,24 @@
                 @add="addToCartDirect"
               />
             </div>
-            <p v-else class="shop-empty-line">
-              {{
-                activeSearch
-                  ? `No flowers match "${activeSearch}". Try another word or clear the search.`
-                  : selectedFilters.onSale && activeFilterChips.length === 1
-                    ? "No flowers are on sale right now. Check back soon, or remove \"On sale\" to see every flower."
-                  : activeFilterChips.length
-                    ? "Nothing matches these filters yet. Try removing one."
-                    : "Flowers show up here as shops add them."
-              }}
-            </p>
+            <div v-else class="cat-empty">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 1 1 0 5zM16.5 12a2.5 2.5 0 1 1 5 0 2.5 2.5 0 1 1-5 0zM12 16.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 1 1 0-5zM7.5 12a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0z" /><circle cx="12" cy="12" r="2" /></svg>
+              <p>{{ emptyText }}</p>
+              <button v-if="activeFilterChips.length" type="button" class="bc-btn bc-btn--dark" @click="clearAllFilters">Clear filters</button>
+            </div>
 
-            <!-- Flowers come a grid's worth at a time; the end says so -->
-            <ShowMore v-if="products.length" tone="customer" :has-more="pagination.current_page < pagination.last_page" :loading="isLoading" :shown="products.length" :total="pagination.total || 0" done-text="You've seen every flower here" @more="loadMoreProducts" />
-          </section>
+            <ShopPagination :page="pagination.current_page" :last="pagination.last_page" @go="goToPage" />
+          </div>
         </div>
+      </div>
+    </section>
 
+    <!-- 6. Build your own bouquet (3D designer), with the bouquet finder beside it -->
+    <section class="build" aria-label="Build your own bouquet">
+      <div class="bc-container build-grid">
+        <DesignerBanner @design="openDesigner" @shops="scrollToSection('flower-shops')" />
         <BouquetFinder
-          class="shop-picks-finder"
+          class="build-finder"
           :occasions="filterOptions.occasions"
           :colors="filterOptions.colors"
           :adding-id="addingToCartProductId"
@@ -184,7 +192,7 @@
       </div>
     </section>
 
-    <!-- Every pinned shop on a map, then the shops themselves -->
+    <!-- 7. Flower shops around you: the map, then the shops -->
     <ShopMap v-model:page-filter="nearMeOnly" @visit="goToStorefront" @range="onShopRange" />
     <section class="shop-stores" aria-label="Flower shops list">
       <div class="bc-container">
@@ -207,7 +215,9 @@
 
     <!-- Journal (Admin → Website → Journal) -->
     <JournalTeaser :articles="site.articles" />
+    </main>
 
+    <!-- 8. Footer: about, support, policies, contact -->
     <SiteFooter />
 
   </div>
@@ -218,7 +228,6 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import api from "../../plugins/axios.js";
-import ShowMore from "../../components/common/ShowMore.vue";
 import NavHeader from "../../layouts/NavHeader.vue";
 import productService from "../../services/productService.js";
 import { useCart } from "../../composables/useCart";
@@ -227,13 +236,17 @@ import { toast } from "@/utils/snackbar";
 import AnnouncementBar from "../../components/site/AnnouncementBar.vue";
 import ShopHero from "../../components/shop/ShopHero.vue";
 import ShopTrustStrip from "../../components/shop/ShopTrustStrip.vue";
-import ShopOccasions from "../../components/shop/ShopOccasions.vue";
+import ShopPromotions from "../../components/shop/ShopPromotions.vue";
+import ShopCategories from "../../components/shop/ShopCategories.vue";
+import FeaturedCollections from "../../components/shop/FeaturedCollections.vue";
+import ShopFilters from "../../components/shop/ShopFilters.vue";
+import ShopPagination from "../../components/shop/ShopPagination.vue";
+import DesignerBanner from "../../components/shop/DesignerBanner.vue";
 import ShopProductTile from "../../components/shop/ShopProductTile.vue";
 import ShopSearch from "../../components/shop/ShopSearch.vue";
 import BouquetFinder from "../../components/shop/BouquetFinder.vue";
 import FeaturedShops from "../../components/shop/FeaturedShops.vue";
 import DesignerShopPicker from "../../components/shop/DesignerShopPicker.vue";
-import FeaturedPicks from "../../components/shop/FeaturedPicks.vue";
 import { rememberProduct } from "../../utils/productPreview.js";
 import ShopMap from "../../components/shop/ShopMap.vue";
 import JournalTeaser from "../../components/site/JournalTeaser.vue";
@@ -277,33 +290,6 @@ const fetchPopular = async () => {
     loadingPopular.value = false;
   }
 };
-// Top Selling Flowers: the best sellers only (products that actually sold),
-// most sold first. How many count as best sellers is set by the admin
-// (Content → Product tags); the row shows the first few, "View all" the rest.
-const bestSellers = ref([]);
-const loadingBest = ref(true);
-const fetchBestSellers = async () => {
-  try {
-    const { data } = await api.get("customer/products", {
-      params: {
-        page: 1,
-        per_page: 100,
-        best_sellers: 1,
-        sort_by: "popular_desc",
-        in_stock_only: 1,
-        ...(nearMe.value ? { owner_ids: idsParam(nearMe.value.ownerIds) } : {}),
-      },
-    });
-    const list = Array.isArray(data?.data?.data) ? data.data.data : [];
-    bestSellers.value = list.filter((p) => isShopVisibleProduct(p) && Number(p.sold_count) > 0);
-  } catch {
-    bestSellers.value = [];
-  } finally {
-    loadingBest.value = false;
-  }
-};
-const topSelling = computed(() => bestSellers.value.slice(0, 5));
-const showTopSelling = computed(() => topSelling.value.length > 0);
 const productImage = (p) => p.primary_image?.image_url || p.images?.[0]?.image_url || null;
 const occasionImages = computed(() => {
   const images = {};
@@ -311,6 +297,24 @@ const occasionImages = computed(() => {
     const image = productImage(product);
     if (!image) continue;
     for (const tag of product.occasion_tags || []) images[tag] ??= image;
+  }
+  return images;
+});
+// A photo for each flower type and arrangement tile, a different one per tile where possible
+const typeImages = computed(() => {
+  const images = {};
+  const used = new Set();
+  for (const unique of [true, false]) {
+    for (const product of popularProducts.value) {
+      const image = productImage(product);
+      if (!image) continue;
+      for (const [kind, value] of [["flowerType", product.flower_type], ["category", product.category]]) {
+        const key = `${kind}:${value}`;
+        if (!value || images[key] || (unique && used.has(image))) continue;
+        images[key] = image;
+        used.add(image);
+      }
+    }
   }
   return images;
 });
@@ -335,6 +339,7 @@ const sortBy = ref("created_at_desc");
 const SORT_OPTIONS = [
   { value: "created_at_desc", label: "Newest" },
   { value: "popular_desc", label: "Most popular" },
+  { value: "rating_desc", label: "Top rated" },
   { value: "price_low", label: "Price: low to high" },
   { value: "price_high", label: "Price: high to low" },
   { value: "name_asc", label: "Name: A to Z" },
@@ -397,6 +402,7 @@ const selectedFilters = ref({
   occasion: [],
   season: [],
   variety: [],
+  flowerType: [],
   inStockOnly: true,
   onSale: false, // "Sales" in the navbar: only flowers selling below their price
   bestSellers: false, // "View all" on Top Selling Flowers
@@ -547,6 +553,8 @@ const buildQueryParams = () => {
     p.color = selectedFilters.value.color.join(",");
   if (selectedFilters.value.variety.length)
     p.variety = selectedFilters.value.variety.join(",");
+  if (selectedFilters.value.flowerType.length)
+    p.flower_type = selectedFilters.value.flowerType.join(",");
   if (selectedFilters.value.season.length)
     p.season = selectedFilters.value.season.join(",");
   if (selectedFilters.value.occasion.length)
@@ -565,17 +573,11 @@ const buildQueryParams = () => {
 };
 
 // ── Products ──────────────────────────────────────────────────────────────
-// Set by loadMoreProducts so the next page adds to the list instead of replacing it
-let appendNextPage = false;
-const loadMoreProducts = async () => {
-  if (pagination.value.current_page >= pagination.value.last_page) return;
-  pagination.value.current_page++;
-  appendNextPage = true;
-  try {
-    await fetchProducts();
-  } finally {
-    appendNextPage = false;
-  }
+// Numbered pages: each page replaces the grid, then the grid's top comes into view
+const goToPage = async (page) => {
+  pagination.value.current_page = page;
+  document.getElementById("products")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  await fetchProducts();
 };
 
 // The filters in use, as removable chips above Fresh Flowers
@@ -585,13 +587,14 @@ const activeFilterChips = computed(() => {
   const chips = [
     ...f.occasion.map((v) => ({ key: `occasion-${v}`, type: "occasion", value: v, label: v })),
     ...f.category.map((v) => ({ key: `category-${v}`, type: "category", value: v, label: site.categories.find((c) => c.value === v)?.label || label(v) })),
+    ...f.flowerType.map((v) => ({ key: `flowerType-${v}`, type: "flowerType", value: v, label: filterOptions.value.labels?.flower_types?.[v] || label(v) })),
     ...f.color.map((v) => ({ key: `color-${v}`, type: "color", value: v, label: label(v) })),
   ];
   if (nearMe.value) chips.unshift({ key: "near-me", type: "near-me", label: `Within ${nearMe.value.km} km of you` });
   if (activeSearch.value) chips.unshift({ key: "search", type: "search", label: `"${activeSearch.value}"` });
   if (f.onSale) chips.unshift({ key: "sale", type: "sale", label: "On sale" });
   if (f.bestSellers) chips.unshift({ key: "best", type: "best", label: "Best sellers" });
-  if (f.priceMin !== null || (f.priceMax !== null && f.priceMax !== Math.round(filterOptions.value.price_range?.max ?? -1))) {
+  if (f.priceMin !== null || f.priceMax !== null) {
     const min = f.priceMin !== null ? `₱${f.priceMin}` : "";
     const max = f.priceMax !== null ? `₱${f.priceMax}` : "";
     chips.push({ key: "price", type: "price", label: min && max ? `${min} – ${max}` : min ? `From ${min}` : `Up to ${max}` });
@@ -658,7 +661,7 @@ const fetchProducts = async () => {
         const page = (
           Array.isArray(r.data.data.data) ? r.data.data.data : []
         ).filter(isShopVisibleProduct);
-        products.value = appendNextPage ? [...products.value, ...page.filter((p) => !products.value.some((q) => q.id === p.id))] : page;
+        products.value = page;
         pagination.value = {
           current_page: r.data.data.current_page,
           last_page: r.data.data.last_page,
@@ -680,9 +683,6 @@ const fetchFilterOptions = async () => {
     const r = await productService.getFilterOptions();
     if (r.success) {
       filterOptions.value = r.data;
-      if (r.data.price_range) {
-        selectedFilters.value.priceMax = Math.round(r.data.price_range.max);
-      }
     }
   } catch (e) {
   } finally {
@@ -702,7 +702,10 @@ const clearAllFilters = () => {
     occasion: [],
     season: [],
     variety: [],
+    flowerType: [],
     inStockOnly: true,
+    onSale: false,
+    bestSellers: false,
   };
   pagination.value.current_page = 1;
   clearTimeout(searchTimer);
@@ -784,7 +787,6 @@ watch(nearMeKey, (now, before) => {
   pagination.value.current_page = 1;
   fetchProducts();
   fetchPopular();
-  fetchBestSellers();
 });
 // The shops list doesn't narrow to the circle; it only re-sorts once the distances are known
 const shopOrderKey = computed(() => Object.entries(shopDistances.value).sort((a, b) => a[1] - b[1]).map(([id]) => id).join());
@@ -918,7 +920,7 @@ const closeAuthModal = () => {
   pendingAction.value = null;
   clearPendingActionFromStorage();
 };
-const SECTION_ALIASES = { sale: "products" };
+const SECTION_ALIASES = { sale: "products", categories: "occasions" };
 const scrollToSection = (id) => {
   // "Sales": the flower grid, showing only what's on sale
   if (id === "sale") return showOnSale();
@@ -963,14 +965,74 @@ watch(
   },
 );
 
-// "View all" on Top Selling: the full list, most popular first
-const viewAllPopular = () => {
-  selectedFilters.value.bestSellers = true;
-  sortBy.value = "popular_desc";
+// "View all" on a featured collection: the full catalog in that order
+const onViewAll = (view) => {
+  selectedFilters.value.bestSellers = view === "best";
+  sortBy.value = { best: "popular_desc", new: "created_at_desc", trending: "popular_desc", top: "rating_desc" }[view] || sortBy.value;
   pagination.value.current_page = 1;
   fetchProducts();
   scrollToSection("products");
 };
+
+// ── Catalog filters ─────────────────────────────────────────────────────
+const filtersOpen = ref(false);
+watch(filtersOpen, (open) => {
+  document.body.style.overflow = open ? "hidden" : "";
+});
+const refetchFromFirstPage = () => {
+  pagination.value.current_page = 1;
+  fetchProducts();
+};
+const toggleFilter = (type, value) => {
+  const list = selectedFilters.value[type] || [];
+  selectedFilters.value[type] = list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+  refetchFromFirstPage();
+};
+const setFlag = (name, on) => {
+  selectedFilters.value[name] = on;
+  refetchFromFirstPage();
+};
+const setPrice = (min, max) => {
+  const f = selectedFilters.value;
+  // The same budget again switches it off
+  const same = f.priceMin === min && f.priceMax === max;
+  f.priceMin = same ? null : min;
+  f.priceMax = same ? null : max;
+  refetchFromFirstPage();
+};
+// A category tile: show only that one (again to show everything)
+const onCategoryPick = ({ type, value }) => {
+  const f = selectedFilters.value;
+  const only = f[type].length === 1 && f[type][0] === value;
+  f[type] = only ? [] : [value];
+  refetchFromFirstPage();
+  if (!only) scrollToSection("products");
+};
+// The search bar at the top: Enter shows the results
+const searchAndShow = () => {
+  applySearch();
+  scrollToSection("products");
+};
+const catalogTitle = computed(() => {
+  const f = selectedFilters.value;
+  if (activeSearch.value) return `Results for "${activeSearch.value}"`;
+  if (f.bestSellers) return "Best sellers";
+  if (f.onSale) return "Flowers on sale";
+  return "Every flower, one place";
+});
+const rangeText = computed(() => {
+  const { current_page: page, per_page: per, total } = pagination.value;
+  if (!total) return "No flowers";
+  const from = (page - 1) * per + 1;
+  const to = Math.min(total, from + products.value.length - 1);
+  return `Showing ${from}–${to} of ${total} ${total === 1 ? "flower" : "flowers"}`;
+});
+const emptyText = computed(() => {
+  if (activeSearch.value) return `No flowers match "${activeSearch.value}". Try another word or clear the search.`;
+  if (selectedFilters.value.onSale && activeFilterChips.value.length === 1) return 'No flowers are on sale right now. Check back soon, or remove "On sale" to see every flower.';
+  if (activeFilterChips.value.length) return "Nothing matches these filters yet. Try removing one.";
+  return "Flowers show up here as shops add them.";
+});
 
 // "See all matches" from the bouquet finder: same filters on the full list
 const showFinderMatches = ({ occasion, color, priceMin, priceMax }) => {
@@ -1095,9 +1157,9 @@ onMounted(async () => {
     router.replace({ query: rest });
   }
   const fromContentLink = applyContentLink(route.query);
-  await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors(), fetchFeatured(), fetchPopular(), fetchBestSellers()]);
+  await Promise.all([fetchFilterOptions(), fetchProducts(), fetchVendors(), fetchFeatured(), fetchPopular()]);
   if (fromContentLink) setTimeout(() => document.getElementById("products")?.scrollIntoView({ behavior: "smooth" }), 50);
-  else if (route.query.section === "occasions") setTimeout(() => scrollToSection("occasions"), 50);
+  else if (typeof route.query.section === "string") setTimeout(() => scrollToSection(route.query.section), 50);
   if (isAuthenticated.value) {
     await loadCart();
   } else {
@@ -1105,7 +1167,7 @@ onMounted(async () => {
   }
 });
 onUnmounted(() => {
-  document.body.style.overflow = "auto";
+  document.body.style.overflow = "";
 });
 </script>
 
@@ -1157,9 +1219,6 @@ onUnmounted(() => {
   border-color: var(--ink);
 }
 
-.shop-head h2 {
-  font-size: clamp(32px, 3.4vw, 46px);
-}
 
 /* Anchored sections clear the fixed header */
 #vendors,
@@ -1168,15 +1227,7 @@ onUnmounted(() => {
   scroll-margin-top: 110px;
 }
 
-.shop-empty-line {
-  padding: 32px 0;
-  color: var(--ink-soft);
-  font-size: 15px;
-}
 
-.shop-categories {
-  padding: clamp(24px, 3vw, 40px) 0;
-}
 
 .products-grid {
   display: grid;
@@ -1344,77 +1395,149 @@ onUnmounted(() => {
   }
 }
 
-/* ── Redesigned top of the shop ─────────────────────────────────────── */
+/* ── 1. Search bar under the navbar ─────────────────────────────────── */
 .shop-top {
   padding-top: var(--shop-nav-h, 96px);
 }
 
+.shop-searchbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.shop-searchbar :deep(.ss) {
+  flex: 1 1 420px;
+  max-width: 620px;
+}
+
+.shop-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.shop-quick button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.shop-quick button:hover {
+  border-color: var(--line);
+  background: var(--paper);
+}
+
+.shop-quick li:first-child button {
+  color: #b4332a;
+}
+
+.shop-quick button:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
 .shop-announce {
-  padding-top: 12px;
   padding-bottom: 12px;
 }
 
-.shop-picks {
-  margin-top: 30px;
+/* Anchored sections clear the fixed header */
+#collections,
+#flower-shops {
+  scroll-margin-top: 110px;
 }
 
-.shop-picks-grid {
+/* ── 5. Catalog ─────────────────────────────────────────────────────── */
+.cat {
+  margin-top: clamp(56px, 6vw, 88px);
+}
+
+.cat-count {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.cat-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 26px;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 28px;
   align-items: start;
 }
 
-.shop-row-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
+/* Wide screens: the filter column stays in view while the flowers scroll */
+@media (min-width: 1025px) {
+  .cat-filters {
+    position: sticky;
+    top: 110px;
+  }
+
+  .cat-filters :deep(.sf) {
+    max-height: calc(100vh - 130px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
 }
 
-.shop-row-head h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 500;
-  color: var(--ink);
-}
-
-.shop-row-all {
-  padding: 0;
-  border: 0;
-  background: none;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--leaf-deep);
-  cursor: pointer;
-}
-
-.top-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.top-skel {
-  height: 250px;
-  border-radius: 12px;
-}
-
-.shop-stores {
-  padding: 8px 0 clamp(28px, 4vw, 48px);
-}
-
-.fresh-tools {
+.cat-tools {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 14px;
-  margin: -4px 0 16px;
+  margin-bottom: 18px;
 }
 
-.fresh-sort select:focus-visible {
+.cat-filter-btn {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.cat-filter-btn svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.cat-filter-n {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--leaf-deep);
+  color: var(--paper);
+  font-size: 11px;
+}
+
+.cat-filter-btn:focus-visible,
+.fresh-chip:focus-visible,
+.fresh-clear:focus-visible {
   outline: 2px solid var(--leaf);
   outline-offset: 2px;
 }
@@ -1433,7 +1556,7 @@ onUnmounted(() => {
   padding: 0 36px 0 14px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: #fff
+  background: var(--paper)
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23363f4e' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
     no-repeat right 12px center / 16px;
   color: var(--ink);
@@ -1444,57 +1567,9 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-/* The full store list and everything after it sit lower on the page */
-.shop-picks + * {
-  margin-top: clamp(40px, 5vw, 64px);
-}
-
-.shop-picks-finder {
-  position: sticky;
-  top: 110px;
-}
-
-@media (max-width: 1180px) {
-  .shop-picks-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .shop-picks-finder {
-    position: static;
-  }
-}
-
-@media (max-width: 960px) {
-  .top-grid {
-    display: flex;
-    overflow-x: auto;
-    scrollbar-width: thin;
-  }
-
-  .top-grid > * {
-    flex: 0 0 190px;
-  }
-}
-
-/* Fresh Flowers: the browse area, cards a size up from Top Selling */
-.fresh {
-  margin-top: 36px;
-  scroll-margin-top: 110px;
-}
-
-.fresh.first {
-  margin-top: 0;
-}
-
-@media (max-width: 640px) {
-  .fresh-sort {
-    margin-left: 0;
-  }
-}
-
-.fresh-count {
-  font-size: 12.5px;
-  color: var(--ink-soft);
+.fresh-sort select:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
 }
 
 .fresh-chips {
@@ -1502,14 +1577,13 @@ onUnmounted(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin: -4px 0 16px;
 }
 
 .fresh-chip {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 32px;
+  min-height: 34px;
   padding: 0 12px;
   border: 1px solid rgba(77, 177, 115, 0.35);
   border-radius: 999px;
@@ -1539,47 +1613,121 @@ onUnmounted(() => {
 
 .fresh-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 20px;
+  transition: opacity 0.2s ease;
+}
+
+/* A new page on its way: the current one fades a little */
+.fresh-grid.dim {
+  opacity: 0.55;
 }
 
 .fresh-skel {
-  height: 300px;
-  border-radius: 12px;
+  height: 340px;
+  border-radius: 14px;
 }
 
-.fresh-more {
-  display: flex;
-  justify-content: center;
-  margin-top: 24px;
+.cat-empty {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 56px 20px;
+  border: 1px dashed var(--line);
+  border-radius: 20px;
+  text-align: center;
 }
 
-.fresh-more-btn {
-  height: 44px;
-  padding: 0 26px;
-  border: 1px solid var(--leaf-deep);
-  border-radius: 999px;
-  background: var(--paper);
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--leaf-deep);
-  cursor: pointer;
+.cat-empty svg {
+  width: 40px;
+  height: 40px;
+  fill: none;
+  stroke: var(--leaf);
+  stroke-width: 1.3;
 }
 
-.fresh-more-btn:hover:not(:disabled) {
-  background: #e9f5ed;
+.cat-empty p {
+  max-width: 44ch;
+  font-size: 14.5px;
+  color: var(--ink-soft);
 }
 
-@media (max-width: 960px) {
+/* ── 6. Build your own bouquet ──────────────────────────────────────── */
+.build {
+  padding: clamp(56px, 6vw, 88px) 0 0;
+}
+
+.build-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 22px;
+  align-items: stretch;
+}
+
+/* ── 7. Shops ───────────────────────────────────────────────────────── */
+.build + * {
+  margin-top: clamp(56px, 6vw, 88px);
+}
+
+.shop-stores {
+  padding: 8px 0 clamp(28px, 4vw, 48px);
+}
+
+@media (max-width: 1180px) {
+  .build-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .cat-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+
+  .cat-filter-btn {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 860px) {
   .fresh-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .shop-quick {
+    margin-left: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .shop-quick button {
+    flex: none;
+    border-color: var(--line);
+    background: var(--paper);
   }
 }
 
 @media (max-width: 640px) {
+  .fresh-sort {
+    margin-left: auto;
+  }
+
+  .fresh-sort span {
+    display: none;
+  }
+
+  .fresh-chips {
+    order: 3;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
   .fresh-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    transition: none;
   }
 }
 </style>

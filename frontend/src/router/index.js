@@ -52,6 +52,12 @@ const routes = [
         meta: { public: true, preservePublicPath: true },
       },
       {
+        // About us and the store policies (footer links use #about, #returns…)
+        path: "policies",
+        component: () => import("../views/guest/Policies.vue"),
+        meta: { public: true, preservePublicPath: true },
+      },
+      {
         path: "journal/:slug",
         component: () => import("../views/guest/JournalArticle.vue"),
         meta: { public: true, preservePublicPath: true },

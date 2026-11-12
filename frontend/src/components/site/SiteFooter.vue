@@ -11,22 +11,44 @@
         </ul>
       </div>
 
-      <div v-if="hasContact" class="footer-col">
+      <div class="footer-col">
+        <h2>About</h2>
+        <ul>
+          <li><router-link to="/policies#about">About us</router-link></li>
+          <li><router-link to="/shop">Shop</router-link></li>
+          <li><router-link to="/journal">Journal</router-link></li>
+          <li><router-link :to="{ name: 'Vendor_Register' }">Sell on {{ settings.site_name || "BloomCraft" }}</router-link></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h2>Customer support</h2>
+        <ul>
+          <li><router-link :to="{ name: 'CustomerSupport' }">Help &amp; support</router-link></li>
+          <li><router-link :to="{ name: 'OrderTracking' }">Track my order</router-link></li>
+          <li><router-link :to="{ name: 'Chat' }">Message a shop</router-link></li>
+          <li><router-link to="/policies#returns">Returns &amp; refunds</router-link></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h2>Policies</h2>
+        <ul>
+          <li><router-link to="/policies#delivery">Delivery</router-link></li>
+          <li><router-link to="/policies#payments">Payments</router-link></li>
+          <li><router-link to="/policies#privacy">Privacy</router-link></li>
+          <li><router-link to="/policies#terms">Terms of use</router-link></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
         <h2>Contact us</h2>
         <ul>
           <li v-if="settings.contact_email"><a :href="`mailto:${settings.contact_email}`">{{ settings.contact_email }}</a></li>
           <li v-if="settings.contact_phone"><a :href="`tel:${settings.contact_phone.replace(/\s+/g, '')}`">{{ settings.contact_phone }}</a></li>
           <li v-if="settings.address">{{ settings.address }}</li>
           <li v-if="settings.business_hours">{{ settings.business_hours }}</li>
-        </ul>
-      </div>
-
-      <div class="footer-col">
-        <h2>Explore</h2>
-        <ul>
-          <li><router-link to="/shop">Shop</router-link></li>
-          <li><router-link to="/journal">Journal</router-link></li>
-          <li><router-link :to="{ name: 'Vendor_Register' }">Sell on {{ settings.site_name || "BloomCraft" }}</router-link></li>
+          <li v-if="!hasContact"><router-link :to="{ name: 'CustomerSupport' }">Send us a message</router-link></li>
         </ul>
       </div>
     </div>
@@ -62,7 +84,7 @@ const year = new Date().getFullYear();
 }
 .footer-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.5fr) repeat(auto-fit, minmax(150px, 1fr));
   gap: 40px;
 }
 .footer-name {
@@ -127,9 +149,14 @@ const year = new Date().getFullYear();
 .footer-bottom p {
   margin: 0;
 }
+@media (max-width: 960px) {
+  .footer-brand {
+    grid-column: 1 / -1;
+  }
+}
 @media (max-width: 760px) {
   .footer-grid {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 28px;
   }
 }

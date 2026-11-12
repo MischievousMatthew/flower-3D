@@ -31,10 +31,10 @@
       <!-- Signed in: the shop's own navbar -->
       <template v-else>
         <router-link to="/shop" @click="closeMobileMenu">Shop</router-link>
-        <a href="#occasions" @click.prevent="navigateTo('occasions')"
-          >Occasions</a
-        >
+        <a href="#occasions" @click.prevent="navigateTo('occasions')">Categories</a>
+        <a href="#collections" @click.prevent="navigateTo('collections')">Collections</a>
         <a href="#sale" @click.prevent="navigateTo('sale')">Sales</a>
+        <a href="#flower-shops" @click.prevent="navigateTo('flower-shops')">Shops near you</a>
       </template>
     </div>
 
