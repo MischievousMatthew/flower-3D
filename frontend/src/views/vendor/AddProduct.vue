@@ -59,18 +59,18 @@
             <div><h2>Basics</h2><p>What it is and what makes it special.</p></div>
           </header>
           <div class="sp-grid-2">
-            <label class="sp-field sp-span-all">
+            <label data-change="product_name" class="sp-field sp-span-all">
               <span>Product name</span>
               <input v-model="form.product_name" class="sp-input" :class="{ invalid: errors.product_name }" maxlength="255" placeholder="e.g. Sunny Day Tulip Bouquet" @input="clear('product_name')" />
               <small v-if="errors.product_name" class="sp-error">{{ errors.product_name }}</small>
             </label>
-            <label class="sp-field sp-span-all">
+            <label data-change="description" class="sp-field sp-span-all">
               <span>Description</span>
               <textarea v-model="form.description" class="sp-textarea" :class="{ invalid: errors.description }" rows="4" maxlength="3000" placeholder="Flowers used, size, the feeling it gives…" @input="clear('description')"></textarea>
               <small v-if="errors.description" class="sp-error">{{ errors.description }}</small>
               <small v-else>{{ form.description.length }}/3000</small>
             </label>
-            <div class="sp-field">
+            <div data-change="color" class="sp-field">
               <span class="sp-label">Colour</span>
               <div class="ap-colors" role="radiogroup" aria-label="Colour">
                 <button
@@ -89,12 +89,12 @@
               <small v-if="errors.color" class="sp-error">{{ errors.color }}</small>
               <small v-else>{{ colorLabel || "Pick the main colour" }}</small>
             </div>
-            <label v-if="form.color === 'other'" class="sp-field">
+            <label data-change="color_other" v-if="form.color === 'other'" class="sp-field">
               <span>Which colour?</span>
               <input v-model="form.color_other" class="sp-input" :class="{ invalid: errors.color_other }" maxlength="100" placeholder="e.g. Burgundy, Lavender" @input="clear('color_other')" />
               <small v-if="errors.color_other" class="sp-error">{{ errors.color_other }}</small>
             </label>
-            <label class="sp-field">
+            <label data-change="sku" class="sp-field">
               <span>SKU</span>
               <div class="ap-inline">
                 <input v-model="form.sku" class="sp-input" :class="{ invalid: errors.sku }" maxlength="255" placeholder="e.g. TULIP-YEL-001" @input="clear('sku')" />
@@ -112,7 +112,7 @@
             <span class="ap-num">{{ steps.organize ? "✓" : 3 }}</span>
             <div><h2>Category &amp; occasions</h2><p>How customers find it when they browse or shop for an event.</p></div>
           </header>
-          <div class="sp-field">
+          <div data-change="category" class="sp-field">
             <span class="sp-label">Category</span>
             <div class="ap-chips">
               <button
@@ -127,7 +127,7 @@
             </div>
             <small v-if="errors.category" class="sp-error">{{ errors.category }}</small>
           </div>
-          <div class="sp-field ap-gap">
+          <div data-change="flower_type" class="sp-field ap-gap">
             <span class="sp-label">Flower type</span>
             <div class="ap-type-grid">
               <button
@@ -145,7 +145,7 @@
             </div>
             <small v-if="errors.flower_type" class="sp-error">{{ errors.flower_type }}</small>
           </div>
-          <div class="sp-field ap-gap">
+          <div data-change="occasion_tags" class="sp-field ap-gap">
             <span class="sp-label">
               Occasions <em class="ap-count" :class="{ full: form.occasion_tags.length === 2 }">{{ form.occasion_tags.length }}/2</em>
             </span>
@@ -175,12 +175,12 @@
             <div><h2>Price</h2><p>What it costs you and what customers pay.</p></div>
           </header>
           <div class="sp-grid-2">
-            <label class="sp-field">
+            <label data-change="selling_price" class="sp-field">
               <span>Selling price</span>
               <div class="ap-money"><i>₱</i><input v-model.number="form.selling_price" type="number" min="0" step="0.01" class="sp-input" :class="{ invalid: errors.selling_price }" placeholder="0.00" @input="clear('selling_price')" /></div>
               <small v-if="errors.selling_price" class="sp-error">{{ errors.selling_price }}</small>
             </label>
-            <label class="sp-field">
+            <label data-change="purchase_price" class="sp-field">
               <span>Your cost</span>
               <div class="ap-money"><i>₱</i><input v-model.number="form.purchase_price" type="number" min="0" step="0.01" class="sp-input" :class="{ invalid: errors.purchase_price }" placeholder="0.00" @input="clear('purchase_price')" /></div>
               <small v-if="errors.purchase_price" class="sp-error">{{ errors.purchase_price }}</small>
@@ -192,12 +192,12 @@
             <span v-if="form.purchase_price > 0">{{ Math.round((profit / form.selling_price) * 100) }}% margin</span>
           </div>
 
-          <label class="ap-switch-row">
+          <label data-change="has_discount" class="ap-switch-row">
             <span class="sp-switch"><input v-model="form.has_discount" type="checkbox" @change="!form.has_discount && (form.discount_price = null)" /><span></span></span>
             <span><strong>Put it on sale</strong><small>Shows the regular price crossed out. You can schedule dates later from Products or Promotions.</small></span>
           </label>
           <div v-if="form.has_discount" class="sp-grid-2 ap-gap">
-            <label class="sp-field">
+            <label data-change="discount_price" class="sp-field">
               <span>Sale price</span>
               <div class="ap-money"><i>₱</i><input v-model.number="form.discount_price" type="number" min="0" step="0.01" class="sp-input" :class="{ invalid: errors.discount_price }" placeholder="0.00" @input="clear('discount_price')" /></div>
               <small v-if="errors.discount_price" class="sp-error">{{ errors.discount_price }}</small>
@@ -215,7 +215,7 @@
             <span class="ap-num">{{ steps.stock ? "✓" : 5 }}</span>
             <div><h2>Stock &amp; how it's sold</h2><p>How many you have and how customers buy it.</p></div>
           </header>
-          <div class="ap-sell-grid" role="radiogroup" aria-label="How it's sold">
+          <div data-change="selling_type" class="ap-sell-grid" role="radiogroup" aria-label="How it's sold">
             <button
               v-for="s in SELLING"
               :key="s.value"
@@ -232,27 +232,27 @@
             </button>
           </div>
           <div class="sp-grid-3 ap-gap">
-            <label class="sp-field">
+            <label data-change="quantity_in_stock" class="sp-field">
               <span>In stock</span>
               <input v-model.number="form.quantity_in_stock" type="number" min="0" step="1" class="sp-input" :class="{ invalid: errors.quantity_in_stock }" @input="clear('quantity_in_stock')" />
               <small v-if="errors.quantity_in_stock" class="sp-error">{{ errors.quantity_in_stock }}</small>
             </label>
-            <label class="sp-field">
+            <label data-change="min_stock_level" class="sp-field">
               <span>Warn me at</span>
               <input v-model.number="form.min_stock_level" type="number" min="0" step="1" class="sp-input" :class="{ invalid: errors.min_stock_level }" @input="clear('min_stock_level')" />
               <small>Low-stock alert</small>
             </label>
-            <label class="sp-field">
+            <label data-change="max_stock_level" class="sp-field">
               <span>Maximum <small>(optional)</small></span>
               <input v-model.number="form.max_stock_level" type="number" :min="form.min_stock_level || 0" step="1" class="sp-input" />
             </label>
-            <label class="sp-field">
+            <label data-change="season" class="sp-field">
               <span>Season</span>
               <select v-model="form.season" class="sp-select">
                 <option v-for="s in SEASONS" :key="s.value" :value="s.value">{{ s.label }}</option>
               </select>
             </label>
-            <label class="sp-field">
+            <label data-change="preparation_days" class="sp-field">
               <span>Preparation time</span>
               <select v-model.number="form.preparation_days" class="sp-select">
                 <option :value="0">Ready the same day</option>
@@ -269,23 +269,23 @@
             <div><h2>Care &amp; extras <em class="ap-optional">optional</em></h2><p>Handling, a 3D model, and where you source it.</p></div>
           </header>
           <div class="ap-toggles">
-            <label class="ap-switch-row">
+            <label data-change="is_fragile" class="ap-switch-row">
               <span class="sp-switch"><input v-model="form.is_fragile" type="checkbox" /><span></span></span>
               <span><strong>Fragile</strong><small>Couriers are told to handle with care</small></span>
             </label>
-            <label class="ap-switch-row">
+            <label data-change="requires_refrigeration" class="ap-switch-row">
               <span class="sp-switch"><input v-model="form.requires_refrigeration" type="checkbox" /><span></span></span>
               <span><strong>Keep cool</strong><small>Needs refrigeration until delivery</small></span>
             </label>
           </div>
           <div class="sp-grid-2 ap-gap">
-            <label class="sp-field sp-span-all">
+            <label data-change="care_instructions" class="sp-field sp-span-all">
               <span>Care instructions</span>
               <textarea v-model="form.care_instructions" class="sp-textarea" rows="2" placeholder="Trim stems at an angle, change water every two days…"></textarea>
             </label>
           </div>
 
-          <div class="ap-model" :class="{ has: modelFile }" @dragover.prevent @drop.prevent="onModelDrop">
+          <div data-change="model_file" class="ap-model" :class="{ has: modelFile }" @dragover.prevent @drop.prevent="onModelDrop">
             <span class="ap-model-icon" v-html="ICONS.cube"></span>
             <div class="ap-model-text">
               <strong>{{ modelFile ? modelFile.name : "3D model" }}</strong>
@@ -305,10 +305,10 @@
           <details class="ap-more">
             <summary>Supplier &amp; notes</summary>
             <div class="sp-grid-3 ap-gap">
-              <label class="sp-field"><span>Supplier</span><input v-model="form.supplier_name" class="sp-input" maxlength="255" placeholder="e.g. Dangwa Wholesale" /></label>
-              <label class="sp-field"><span>Supplier contact</span><input v-model="form.supplier_contact" class="sp-input" maxlength="100" placeholder="Phone or email" /></label>
-              <label class="sp-field"><span>Supplier's code</span><input v-model="form.supplier_sku" class="sp-input" maxlength="255" /></label>
-              <label class="sp-field sp-span-all"><span>Private notes</span><textarea v-model="form.notes" class="sp-textarea" rows="2" placeholder="Only you and your staff see this"></textarea></label>
+              <label data-change="supplier_name" class="sp-field"><span>Supplier</span><input v-model="form.supplier_name" class="sp-input" maxlength="255" placeholder="e.g. Dangwa Wholesale" /></label>
+              <label data-change="supplier_contact" class="sp-field"><span>Supplier contact</span><input v-model="form.supplier_contact" class="sp-input" maxlength="100" placeholder="Phone or email" /></label>
+              <label data-change="supplier_sku" class="sp-field"><span>Supplier's code</span><input v-model="form.supplier_sku" class="sp-input" maxlength="255" /></label>
+              <label data-change="notes" class="sp-field sp-span-all"><span>Private notes</span><textarea v-model="form.notes" class="sp-textarea" rows="2" placeholder="Only you and your staff see this"></textarea></label>
             </div>
           </details>
         </section>
@@ -363,7 +363,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
-import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
 import ShopLayout from "../../components/vendor/shop/ShopLayout.vue";
@@ -372,6 +372,7 @@ import { apiMessage, money, useVendorCatalog } from "../../components/vendor/sho
 import { useProductTaxonomies } from "../../composables/useProductTaxonomies";
 import { useSubscriptionAccess } from "../../composables/useSubscriptionAccess";
 import { SUBSCRIPTION_MODULES } from "../../constants/subscriptionModules";
+import { useUnsavedChanges } from "../../composables/useUnsavedChanges";
 import "../../components/vendor/shop/shop.css";
 
 const route = useRoute();
@@ -449,7 +450,7 @@ const errors = reactive({});
 const submitting = ref(null);
 const dropping = ref(false);
 const dragFrom = ref(null);
-let saved = false;
+const saved = ref(false);
 
 // ── Derived ───────────────────────────────────────────────────────────────
 const profit = computed(() => (Number(form.selling_price) || 0) - (Number(form.purchase_price) || 0));
@@ -472,7 +473,38 @@ const steps = computed(() => ({
   stock: Number.isInteger(Number(form.quantity_in_stock)) && Number(form.quantity_in_stock) >= 0,
 }));
 const progress = computed(() => (Object.values(steps.value).filter(Boolean).length / CHECKLIST.length) * 100);
-const touched = computed(() => images.value.length > 0 || JSON.stringify(form) !== JSON.stringify({ ...blank(), selling_type: form.selling_type }));
+
+// What View changes steps through, in page order; each falls back to its step card
+const FIELD_LABELS = [
+  ["ap-basics", { product_name: "Product name", description: "Description", color: "Colour", color_other: "Colour name", sku: "SKU" }],
+  ["ap-organize", { category: "Category", flower_type: "Flower type", occasion_tags: "Occasions" }],
+  ["ap-price", { selling_price: "Selling price", purchase_price: "Your cost", has_discount: "On sale", discount_price: "Sale price" }],
+  ["ap-stock", { selling_type: "How it's sold", quantity_in_stock: "In stock", min_stock_level: "Warn me at", max_stock_level: "Maximum stock", season: "Season", preparation_days: "Preparation time" }],
+  ["ap-extra", { is_fragile: "Fragile", requires_refrigeration: "Keep refrigerated", care_instructions: "Care instructions", supplier_name: "Supplier", supplier_contact: "Supplier contact", supplier_sku: "Supplier's code", notes: "Private notes" }],
+];
+const { markClean } = useUnsavedChanges({
+  fields: () => [
+    { key: "images", label: "Photos", value: images.value.map((img) => img.url), target: "#ap-photos" },
+    ...FIELD_LABELS.flatMap(([section, labels]) =>
+      Object.entries(labels).map(([key, label]) => ({ key, label, value: form[key], fallback: `#${section}` })),
+    ),
+    { key: "model_file", label: "3D model", value: modelFile.value?.name ?? null, fallback: "#ap-extra" },
+  ],
+  // A new product is kept as a draft from the bar; Publish stays at the top
+  save: () => submit("draft"),
+  discard: () => discardAll(),
+  saving: () => !!submitting.value,
+  saveLabel: "Save as draft",
+  enabled: () => !saved.value,
+});
+
+function discardAll() {
+  images.value.forEach((img) => URL.revokeObjectURL(img.url));
+  images.value = [];
+  modelFile.value = null;
+  Object.assign(form, blank(), { selling_type: form.selling_type, occasion_tags: [] });
+  Object.keys(errors).forEach((k) => delete errors[k]);
+}
 
 // ── Inputs ────────────────────────────────────────────────────────────────
 const clear = (key) => delete errors[key];
@@ -630,7 +662,7 @@ async function submit(status) {
     if (modelFile.value) fd.append("model_file", modelFile.value, modelFile.value.name);
 
     const { data } = await api.post("vendor/products", fd);
-    saved = true;
+    saved.value = true;
     toast.success(status === "draft" ? "Saved as a draft." : `${form.product_name} is live in your shop.`);
     reloadCatalog();
     router.push({ name: "VendorProducts" });
@@ -646,26 +678,16 @@ async function submit(status) {
   }
 }
 
-onBeforeRouteLeave(() => {
-  if (saved || !touched.value) return true;
-  return window.confirm("Leave without saving this product?");
-});
-const beforeUnload = (e) => {
-  if (!saved && touched.value) {
-    e.preventDefault();
-    e.returnValue = "";
-  }
-};
 
 onMounted(() => {
   // "Add flower" on the 3D Bouquets page opens this form preset for the customizer
   if (["per_piece_customizable", "per_piece", "bouquet"].includes(route.query.selling_type)) {
     form.selling_type = route.query.selling_type;
   }
-  window.addEventListener("beforeunload", beforeUnload);
+  // The preset type isn't an edit
+  markClean();
 });
 onBeforeUnmount(() => {
-  window.removeEventListener("beforeunload", beforeUnload);
   images.value.forEach((img) => URL.revokeObjectURL(img.url));
 });
 </script>

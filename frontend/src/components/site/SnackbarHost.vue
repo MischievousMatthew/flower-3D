@@ -78,7 +78,8 @@ onBeforeUnmount(() => observer?.disconnect());
   position: fixed;
   z-index: 10000;
   left: 50%;
-  bottom: 24px;
+  /* Above the unsaved-changes bar while it shows */
+  bottom: calc(24px + var(--bc-unsaved-offset, 0px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -231,7 +232,7 @@ onBeforeUnmount(() => observer?.disconnect());
 }
 @media (max-width: 640px) {
   .sb-host {
-    bottom: 16px;
+    bottom: calc(16px + var(--bc-unsaved-offset, 0px));
   }
 }
 @media (prefers-reduced-motion: reduce) {

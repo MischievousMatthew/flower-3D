@@ -26,7 +26,7 @@
     </div>
 
     <div v-else-if="presets" class="bp-grid">
-      <article v-for="p in presets" :key="p.key" :ref="(el) => (cards[p.key] = el)" class="sp-card bp-card" :class="{ off: !p.enabled }">
+      <article v-for="p in presets" :key="p.key" :ref="(el) => (cards[p.key] = el)" :data-change="p.key" class="sp-card bp-card" :class="{ off: !p.enabled }">
         <header class="bp-card-head">
           <span class="bp-icon" v-html="OCCASION_ICONS[occasionIcon(p)] || OCCASION_ICONS.flower"></span>
           <div class="bp-title">
@@ -156,6 +156,7 @@ import api from "../../../plugins/axios";
 import { OCCASION_ICON_KEYS, designParts, occasionIcon, sizeName } from "../../../constants/bouquetPresets";
 import { OCCASION_ICONS } from "../../../constants/occasionIcons";
 import { DESIGNS } from "../../../utils/bouquetDesigns/index.js";
+import { useUnsavedChanges } from "../../../composables/useUnsavedChanges";
 import "./shop.css";
 
 const props = defineProps({
@@ -184,7 +185,19 @@ const errors = reactive({});
 const cards = {};
 
 const snapshot = () => JSON.stringify(presets.value ?? []);
-const dirty = computed(() => !!presets.value && snapshot() !== saved.value);
+// One change per occasion card; a removed occasion points back at the list
+const { markClean, dirty } = useUnsavedChanges({
+  fields: () =>
+    (presets.value ?? []).map((p) => ({
+      key: p.key,
+      label: p.label || "New occasion",
+      value: EDITABLE.map((f) => (f === "base_price" ? Number(p.base_price || 0) : p[f])),
+      fallback: "#cz-panel-presets",
+    })),
+  save: () => save(),
+  discard: () => discard(),
+  saving,
+});
 const enabledCount = computed(() => presets.value?.filter((p) => p.enabled).length ?? 0);
 const customCount = computed(() => presets.value?.filter((p) => p.custom).length ?? 0);
 
@@ -208,6 +221,7 @@ function clearErrors() {
 function setPresets(list) {
   presets.value = list.map((p) => ({ ...p, sizes: [...p.sizes], base_price: Number(p.base_price || 0) || "" }));
   saved.value = snapshot();
+  markClean();
   emit("count", enabledCount.value);
 }
 

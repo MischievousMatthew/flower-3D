@@ -483,6 +483,7 @@ import VendorSidebar from "../../layouts/Sidebar/VendorSidebar.vue";
 import ShopLayout from "../../components/vendor/shop/ShopLayout.vue";
 import BouquetPresetsPanel from "../../components/vendor/shop/BouquetPresetsPanel.vue";
 import { toast } from "@/utils/snackbar";
+import { guardUnsaved } from "../../composables/useUnsavedChanges";
 import { MAX_PATTERN_SIZE, MAX_PATTERN_WORD, MIN_PATTERN_SIZE, cleanPatternSize, patternPreview } from "../../utils/wrapperPatterns.js";
 import "../../styles/bloomcraft.css";
 
@@ -652,6 +653,8 @@ async function loadFlowers() {
 
 function switchTab(key) {
   if (activeTab.value === key) return;
+  // Leaving Occasions & sizes with unsaved edits waits for save or discard
+  if (!guardUnsaved(() => switchTab(key))) return;
   activeTab.value = key;
   confirmingId.value = null;
   resetForm();

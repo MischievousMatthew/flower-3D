@@ -19,7 +19,7 @@
 
       <template v-else-if="form">
         <!-- Taking orders -->
-        <section class="sp-card ss-status" :class="{ paused: !form.preferences.accepting_orders }">
+        <section class="sp-card ss-status" data-change="accepting_orders" :class="{ paused: !form.preferences.accepting_orders }">
           <label class="ss-status-row">
             <span class="sp-stat-icon" :class="form.preferences.accepting_orders ? 'tone-green' : 'tone-amber'" v-html="form.preferences.accepting_orders ? ICONS.play : ICONS.pause"></span>
             <span class="ss-status-text">
@@ -29,12 +29,12 @@
             <span class="sp-switch"><input v-model="form.preferences.accepting_orders" type="checkbox" aria-label="Taking new orders" /><span></span></span>
           </label>
           <div v-if="!form.preferences.accepting_orders" class="sp-grid-2 ss-away">
-            <label class="sp-field sp-span-all">
+            <label class="sp-field sp-span-all" data-change="away_message">
               <span>Message for customers</span>
               <input v-model="form.preferences.away_message" class="sp-input" maxlength="200" placeholder="e.g. We're on a short break and back soon. Thank you!" />
               <small>Shown when someone tries to check out. {{ (form.preferences.away_message || "").length }}/200</small>
             </label>
-            <label class="sp-field">
+            <label class="sp-field" data-change="back_on">
               <span>Back on (optional)</span>
               <input v-model="form.preferences.back_on" type="date" class="sp-input" :min="tomorrow" :class="{ invalid: errors['preferences.back_on'] }" />
               <small v-if="errors['preferences.back_on']" class="sp-error">{{ errors["preferences.back_on"] }}</small>
@@ -49,13 +49,13 @@
           <section class="sp-card">
             <div class="sp-card-head"><div><h2>Delivery options</h2><p>You deliver every order yourself. Fees are worked out per order at checkout.</p></div></div>
             <div class="ss-rows">
-              <label class="ss-row">
+              <label class="ss-row" data-change="same_day_delivery">
                 <span class="ss-row-text"><b>Same-day delivery</b><small>{{ sameDayHint }}</small></span>
                 <span class="sp-switch"><input v-model="form.same_day_delivery" type="checkbox" aria-label="Same-day delivery" /><span></span></span>
               </label>
             </div>
             <div class="sp-grid-2">
-              <label class="sp-field">
+              <label class="sp-field" data-change="lead_time_days">
                 <span>Preparation time</span>
                 <select v-model.number="form.lead_time_days" class="sp-select">
                   <option :value="0">Ready the same day</option>
@@ -63,19 +63,19 @@
                 </select>
                 <small>Earliest date customers can pick: {{ earliestText }}</small>
               </label>
-              <label class="sp-field">
+              <label class="sp-field" data-change="max_orders_per_day">
                 <span>Orders per day</span>
                 <input v-model.number="form.max_orders_per_day" type="number" min="1" max="500" class="sp-input" :class="{ invalid: errors.max_orders_per_day }" />
                 <small v-if="errors.max_orders_per_day" class="sp-error">{{ errors.max_orders_per_day }}</small>
                 <small v-else>A day is shown as fully booked after this many.</small>
               </label>
-              <div class="sp-field sp-span-all">
+              <div class="sp-field sp-span-all" data-change="service_areas">
                 <span>Areas you deliver to</span>
                 <ServiceAreaPicker v-model="form.service_areas" />
                 <small v-if="errors.service_areas" class="sp-error">{{ errors.service_areas }}</small>
                 <small v-else>Pick a whole province or just the cities you cover.</small>
               </div>
-              <label class="sp-field sp-span-all">
+              <label class="sp-field sp-span-all" data-change="cancellation_policy">
                 <span>Cancellation &amp; refund policy</span>
                 <textarea v-model="form.cancellation_policy" class="sp-textarea" rows="4" maxlength="1000" :class="{ invalid: errors.cancellation_policy }" placeholder="e.g. Free cancellation up to 24 hours before delivery. Custom bouquets can't be refunded once prepared."></textarea>
                 <small v-if="errors.cancellation_policy" class="sp-error">{{ errors.cancellation_policy }}</small>
@@ -128,7 +128,7 @@
                   <span class="ss-row-text"><b>E-wallet (GCash, Maya)</b><small>{{ settings.payment_details_completed ? "On. Paid online through PayMongo." : "Add your payout details to your profile to turn this on." }}</small></span>
                   <span class="sp-chip" :class="settings.payment_details_completed ? 'green' : 'slate'">{{ settings.payment_details_completed ? "On" : "Off" }}</span>
                 </div>
-                <label class="ss-row" :class="{ disabled: !settings.payment_details_completed && form.preferences.accept_cod }">
+                <label class="ss-row" data-change="accept_cod" :class="{ disabled: !settings.payment_details_completed && form.preferences.accept_cod }">
                   <span class="ss-row-text"><b>Cash on delivery</b><small>Customers pay your rider in cash.</small></span>
                   <span class="sp-switch"><input v-model="form.preferences.accept_cod" type="checkbox" aria-label="Cash on delivery" :disabled="!settings.payment_details_completed && form.preferences.accept_cod" /><span></span></span>
                 </label>
@@ -166,7 +166,7 @@
             <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="copyFirst">Copy first open day to all</button>
           </div>
           <ul class="ss-hours">
-            <li v-for="d in week" :key="d.day" :class="{ closed: !d.open }">
+            <li v-for="d in week" :key="d.day" :data-change="`hours_${d.day}`" :class="{ closed: !d.open }">
               <label class="ss-hours-day">
                 <span class="sp-switch"><input v-model="d.open" type="checkbox" :aria-label="`Open on ${d.day}`" /><span></span></span>
                 <strong>{{ d.day }}</strong>
@@ -189,7 +189,6 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { onBeforeRouteLeave } from "vue-router";
 import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
@@ -200,6 +199,7 @@ import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { hoursText, schedulesFrom, to12, weekFrom, weekFromText } from "../../../components/vendor/shop/businessHours";
 import { longDate } from "../../../components/vendor/account/accountUi";
 import { ACCENT_PRESETS, useVendorTheme } from "../../../composables/useVendorTheme";
+import { useUnsavedChanges } from "../../../composables/useUnsavedChanges";
 import "../../../components/vendor/shop/shop.css";
 import "../../../components/vendor/account/account.css";
 
@@ -213,15 +213,38 @@ const week = ref([]);
 const loadError = ref("");
 const saving = ref(false);
 const errors = reactive({});
-let snapshot = "";
 
 const closed = ref(null);
 const closedError = ref("");
 const closedBusy = ref(false);
 const newClosed = reactive({ date: "", reason: "" });
 
-const state = () => JSON.stringify([form.value, week.value]);
-const dirty = computed(() => !!form.value && state() !== snapshot);
+// What View changes steps through, in page order. The message and date only
+// show while orders are paused; otherwise they point at that card.
+const STATUS = '[data-change~="accepting_orders"]';
+const { markClean, dirty } = useUnsavedChanges({
+  fields: () => {
+    const f = form.value;
+    if (!f) return [];
+    const p = f.preferences;
+    return [
+      { key: "accepting_orders", label: "Taking new orders", value: p.accepting_orders },
+      { key: "away_message", label: "Message for customers", value: p.away_message, fallback: STATUS },
+      { key: "back_on", label: "Back on", value: p.back_on, fallback: STATUS },
+      { key: "same_day_delivery", label: "Same-day delivery", value: f.same_day_delivery },
+      { key: "lead_time_days", label: "Preparation time", value: f.lead_time_days },
+      { key: "max_orders_per_day", label: "Orders per day", value: f.max_orders_per_day },
+      { key: "service_areas", label: "Areas you deliver to", value: f.service_areas },
+      { key: "cancellation_policy", label: "Cancellation & refund policy", value: f.cancellation_policy },
+      { key: "accept_cod", label: "Cash on delivery", value: p.accept_cod },
+      ...week.value.map((d) => ({ key: `hours_${d.day}`, label: `${d.day} hours`, value: [d.open, d.opening_time, d.closing_time] })),
+    ];
+  },
+  save: () => save(),
+  discard: () => reset(),
+  saving,
+  saveLabel: "Save changes",
+});
 
 const addDays = (iso, n) => {
   const d = new Date(`${iso}T00:00:00`);
@@ -255,7 +278,7 @@ function apply(data) {
     preferences: { ...data.preferences, away_message: data.preferences.away_message ?? "", back_on: data.preferences.back_on ?? "" },
   };
   week.value = data.operating_schedules?.length ? weekFrom(data.operating_schedules) : weekFromText(data.operating_hours);
-  snapshot = state();
+  markClean();
 }
 
 async function load() {
@@ -357,11 +380,6 @@ async function removeClosed(c) {
     closedBusy.value = false;
   }
 }
-
-onBeforeRouteLeave(() => {
-  if (dirty.value && !saving.value) return window.confirm("You have unsaved shop settings. Leave without saving?");
-  return true;
-});
 
 onMounted(() => {
   load();

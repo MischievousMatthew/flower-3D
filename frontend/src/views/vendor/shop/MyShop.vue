@@ -24,12 +24,12 @@
           <section class="sp-card">
             <div class="sp-card-head"><div><h2>Shop profile</h2><p>The name and story on your storefront.</p></div></div>
             <div class="sp-grid-2">
-              <label class="sp-field sp-span-all">
+              <label class="sp-field sp-span-all" data-change="store_name">
                 <span>Shop name</span>
                 <input v-model.trim="form.store_name" class="sp-input" :class="{ invalid: errors.store_name }" maxlength="255" required />
                 <small v-if="errors.store_name" class="sp-error">{{ errors.store_name }}</small>
               </label>
-              <label class="sp-field sp-span-all">
+              <label class="sp-field sp-span-all" data-change="store_description">
                 <span>About your shop</span>
                 <textarea v-model="form.store_description" class="sp-textarea" maxlength="1000" rows="4" placeholder="What you're known for, the flowers you love working with, how you deliver…"></textarea>
                 <small>{{ (form.store_description || "").length }}/1000</small>
@@ -41,7 +41,7 @@
           <section class="sp-card">
             <div class="sp-card-head"><div><h2>Contact</h2><p>How customers reach you.</p></div></div>
             <div class="sp-grid-2">
-              <label class="sp-field">
+              <label class="sp-field" data-change="contact_number">
                 <span>Phone</span>
                 <input v-model.trim="form.contact_number" v-phone type="tel" class="sp-input" :class="{ invalid: errors.contact_number }" required />
                 <small v-if="errors.contact_number" class="sp-error">{{ errors.contact_number }}</small>
@@ -51,12 +51,12 @@
                 <input :value="form.email" class="sp-input" disabled />
                 <small>Change it from your profile</small>
               </label>
-              <label class="sp-field">
+              <label class="sp-field" data-change="facebook_page">
                 <span>Facebook page</span>
                 <input v-model.trim="form.facebook_page" class="sp-input" :class="{ invalid: errors.facebook_page }" type="url" placeholder="https://facebook.com/yourshop" />
                 <small v-if="errors.facebook_page" class="sp-error">{{ errors.facebook_page }}</small>
               </label>
-              <label class="sp-field">
+              <label class="sp-field" data-change="instagram_page">
                 <span>Instagram</span>
                 <input v-model.trim="form.instagram_page" class="sp-input" :class="{ invalid: errors.instagram_page }" type="url" placeholder="https://instagram.com/yourshop" />
                 <small v-if="errors.instagram_page" class="sp-error">{{ errors.instagram_page }}</small>
@@ -73,24 +73,24 @@
               </button>
             </div>
             <div class="sp-grid-2">
-              <label class="sp-field sp-span-all">
+              <label class="sp-field sp-span-all" data-change="store_street">
                 <span>Street / Blk &amp; Lot</span>
                 <input v-model.trim="form.store_street" class="sp-input" :class="{ invalid: errors.store_street }" maxlength="255" placeholder="e.g. Blk 5 Lot 12, Mabini St., Brgy. San Agustin" autocomplete="address-line1" />
                 <small v-if="errors.store_street" class="sp-error">{{ errors.store_street }}</small>
                 <small v-else>So customers and riders can find your door</small>
               </label>
-              <label class="sp-field sp-span-all">
+              <label class="sp-field sp-span-all" data-change="store_address">
                 <span>City / Province</span>
                 <input v-model.trim="form.store_address" class="sp-input" :class="{ invalid: errors.store_address }" maxlength="500" placeholder="e.g. Trece Martires, Cavite" autocomplete="address-level2" required />
                 <small v-if="errors.store_address" class="sp-error">{{ errors.store_address }}</small>
               </label>
-              <div class="sp-field sp-span-all">
+              <div class="sp-field sp-span-all" data-change="service_areas">
                 <span>Areas you deliver to</span>
                 <ServiceAreaPicker v-model="form.service_areas" />
                 <small v-if="errors.service_areas" class="sp-error">{{ errors.service_areas }}</small>
                 <small v-else>Pick a whole province or just the cities you cover.</small>
               </div>
-              <div class="sp-field sp-span-all">
+              <div class="sp-field sp-span-all" data-change="pin">
                 <div class="pin-row">
                   <span class="pin-icon" v-html="ICONS.pin"></span>
                   <span v-if="hasPin" class="pin-text">Your shop is pinned on the map, used to work out delivery fees.</span>
@@ -157,7 +157,6 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
-import { onBeforeRouteLeave } from "vue-router";
 import { toast } from "@/utils/snackbar";
 import api from "../../../plugins/axios";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
@@ -166,6 +165,7 @@ import { joinServiceAreas, parseServiceAreas } from "../../../constants/serviceA
 import { SHOP_ICONS as ICONS } from "../../../components/vendor/shop/shopIcons";
 import { apiMessage } from "../../../components/vendor/shop/useVendorCatalog";
 import { useVendorProfile } from "../../../composables/useVendorProfile";
+import { useUnsavedChanges } from "../../../composables/useUnsavedChanges";
 import { hoursText as describeHours, openNow as isOpenNow, weekFrom, weekFromText } from "../../../components/vendor/shop/businessHours";
 import "../../../components/vendor/shop/shop.css";
 import { PHONE_MESSAGE, isPhone } from "../../../utils/phone";
@@ -183,10 +183,31 @@ const uploading = ref(null);
 const locating = ref(false);
 const locateError = ref("");
 const errors = reactive({});
-let snapshot = "";
 
-const state = () => JSON.stringify([form.value, week.value]);
-const dirty = computed(() => !!form.value && state() !== snapshot);
+// What View changes steps through, in page order
+const LABELS = {
+  store_name: "Shop name",
+  store_description: "About your shop",
+  contact_number: "Phone",
+  facebook_page: "Facebook page",
+  instagram_page: "Instagram",
+  store_street: "Street / Blk & Lot",
+  store_address: "City / Province",
+  service_areas: "Areas you deliver to",
+};
+const { markClean, dirty } = useUnsavedChanges({
+  fields: () =>
+    form.value
+      ? [
+          ...Object.entries(LABELS).map(([key, label]) => ({ key, label, value: form.value[key] })),
+          { key: "pin", label: "Map pin", value: [form.value.store_latitude, form.value.store_longitude] },
+        ]
+      : [],
+  save: () => save(),
+  discard: () => reset(),
+  saving,
+  saveLabel: "Save changes",
+});
 
 function apply(data) {
   shop.value = data;
@@ -194,7 +215,7 @@ function apply(data) {
   week.value = weekFrom(data.operating_schedules);
   // Older shops only have the text version of their hours (e.g. "Everyday: 8:00 AM – 5:00 PM")
   if (!data.operating_schedules?.length) week.value = weekFromText(data.operating_hours);
-  snapshot = state();
+  markClean();
 }
 
 async function fetch() {
@@ -320,13 +341,6 @@ const initials = computed(() =>
 );
 const hoursText = computed(() => describeHours(week.value));
 const openNow = computed(() => isOpenNow(week.value));
-
-onBeforeRouteLeave(() => {
-  if (dirty.value && !saving.value) {
-    return window.confirm("You have unsaved changes to your shop. Leave without saving?");
-  }
-  return true;
-});
 
 onMounted(fetch);
 </script>

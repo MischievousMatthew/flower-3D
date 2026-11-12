@@ -5,6 +5,7 @@
   <SessionExpiredModal />
   <!-- Messages for everything (at most two at a time) -->
   <SnackbarHost />
+  <UnsavedChangesBar />
 </template>
 
 <script setup>
@@ -13,6 +14,7 @@ import CheckoutPausedModal from "./components/site/CheckoutPausedModal.vue";
 import SessionReplacedModal from "./components/site/SessionReplacedModal.vue";
 import SessionExpiredModal from "./components/site/SessionExpiredModal.vue";
 import SnackbarHost from "./components/site/SnackbarHost.vue";
+import UnsavedChangesBar from "./components/vendor/UnsavedChangesBar.vue";
 import { startSessionWatch } from "./composables/useSessionWatch";
 import { useRoute } from "vue-router";
 import { useAuth } from "./composables/useAuth";
