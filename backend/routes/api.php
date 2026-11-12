@@ -310,6 +310,7 @@ Route::middleware('token.auth')->group(function () {
     Route::prefix('checkout')->group(function () {
         Route::post('/initialize',      [CheckoutController::class, 'initializeCheckout']);
         Route::post('/create-order',    [CheckoutController::class, 'createOrder']);
+        Route::post('/delivery-area',   [CheckoutController::class, 'deliveryArea']);
         Route::get('/orders/{orderId}', [CheckoutController::class, 'getOrder']);
         Route::post('/orders/{orderId}/abandon-payment', [CheckoutController::class, 'abandonPayment'])
             ->whereNumber('orderId');
@@ -548,6 +549,7 @@ Route::middleware('token.auth')->group(function () {
         Route::prefix('fulfillment')->middleware('subscription.module:orders')->group(function () {
             Route::get('/orders',      [VendorFulfillmentController::class, 'orders']);
             Route::get('/orders/{id}', [VendorFulfillmentController::class, 'show'])->whereNumber('id');
+            Route::post('/orders/{id}/approve-area', [VendorFulfillmentController::class, 'approveArea'])->whereNumber('id');
             Route::get('/schedule',    [VendorFulfillmentController::class, 'schedule']);
         });
         Route::get('/fulfillment/calendar', [VendorFulfillmentController::class, 'calendar'])->middleware('subscription.module:calendar');

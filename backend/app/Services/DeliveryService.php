@@ -84,6 +84,7 @@ class DeliveryService
             // ── 3. Validate the sequential prerequisite ────────────────────────
             //   e.g. you cannot scan "To Ship" if the order is still "Pending"
             $this->assertSequentialScan($delivery, $targetStatus);
+            $this->assertAreaApproved($delivery, $targetStatus);
             $this->assertPhotoBeforeDelivery($delivery, $targetStatus);
 
             // ── 4. Apply the transition ────────────────────────────────────────
@@ -171,6 +172,7 @@ class DeliveryService
                 "Invalid transition: {$delivery->status} → {$targetStatus}"
             );
         }
+        $this->assertAreaApproved($delivery, $targetStatus);
         $this->assertPhotoBeforeDelivery($delivery, $targetStatus);
 
         return DB::transaction(function () use ($delivery, $targetStatus, $recordScanContext) {
@@ -228,6 +230,21 @@ class DeliveryService
 
             return $delivery->fresh(['order', 'logs.scanner']);
         });
+    }
+
+    /**
+     * An order to an address outside the shop's delivery areas goes no
+     * further than Ordered until the shop approves delivering it.
+     */
+    public function assertAreaApproved(Delivery $delivery, string $targetStatus): void
+    {
+        if (in_array($targetStatus, ['pending', 'cancelled'], true)) {
+            return;
+        }
+        $order = $delivery->relationLoaded('order') ? $delivery->order : Order::find($delivery->order_id);
+        if ($order?->awaitingAreaApproval()) {
+            throw new RuntimeException('This order is outside your delivery areas. Approve delivering it, or cancel it, before it goes any further.');
+        }
     }
 
     /**

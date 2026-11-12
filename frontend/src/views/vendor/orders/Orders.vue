@@ -103,6 +103,8 @@
                 <span class="meta-date" :class="{ late: isLate(o), soon: isSoon(o) }">
                   <span v-html="ICONS.truck"></span>{{ dayLabel(o.delivery_date) }}
                 </span>
+                <span v-if="o.outside_area && !o.outside_area.approved && o.status === 'pending'" class="sp-chip amber" title="The address is outside your delivery areas. Open the order to approve or cancel it.">Outside your areas · approve?</span>
+                <span v-else-if="o.outside_area" class="sp-chip slate" title="You approved delivering outside your areas">Outside your areas</span>
                 <span v-if="o.status === 'to_ship' && !o.photo_url" class="sp-chip amber">Needs a photo</span>
                 <span v-else-if="o.photo_url && ['to_processed', 'to_ship'].includes(o.status)" class="sp-chip teal">Photo taken</span>
                 <span v-if="isLate(o)" class="sp-chip red">Late</span>

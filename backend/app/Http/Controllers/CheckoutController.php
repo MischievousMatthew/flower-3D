@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use App\Models\BouquetCustomizationOption;
 use App\Models\Order;
 use App\Support\BouquetPresets;
+use App\Support\DeliveryArea;
 use App\Models\PayMongoWebhookEvent;
 use App\Models\Cart;
 use App\Models\Product;
@@ -25,6 +26,25 @@ class CheckoutController extends Controller
 {
     /** The payment PayMongo reported when confirmPaidCheckoutSession() last saw a paid session */
     private ?array $confirmedPayment = null;
+
+    /**
+     * POST /api/checkout/delivery-area  { vendor_id, address }
+     * Checkout step 1: is this address inside the shop's delivery areas?
+     */
+    public function deliveryArea(Request $request)
+    {
+        $data = $request->validate([
+            'vendor_id' => 'required|integer',
+            'address' => 'nullable|string|max:500',
+        ]);
+        $vendorUser = \App\Models\User::find($data['vendor_id']);
+        $shop = $vendorUser ? VendorApplication::findApprovedForVendorUser($vendorUser) : null;
+        if (! $shop) {
+            return response()->json(['success' => false, 'message' => 'Shop not found.'], 404);
+        }
+
+        return response()->json(['success' => true, 'data' => DeliveryArea::check($shop, $data['address'] ?? '', $request->user())]);
+    }
 
     /**
      * Initialize checkout - now returns vendor delivery fee (no tax)
@@ -235,6 +255,9 @@ class CheckoutController extends Controller
                     'cutoff_time_today' => $vendorApplication?->cutoffTimeForDate(Carbon::now(VendorApplication::RESERVATION_TIMEZONE)),
                     'timezone' => VendorApplication::RESERVATION_TIMEZONE,
                 ],
+                // Whether the profile address is inside the shop's delivery areas
+                // (checkout step 1 checks again when the address is edited)
+                'delivery_area' => DeliveryArea::check($vendorApplication, $user->address, $user),
                 'items' => $items,
                 'delivery_type' => 'standard',
                 'payment_methods' => [
@@ -453,6 +476,24 @@ class CheckoutController extends Controller
                 ], 422);
             }
 
+            // Outside the shop's delivery areas: the shop approves it first, and
+            // it's paid on delivery so a declined order never needs a refund
+            $area = DeliveryArea::check($vendor, $request->delivery_address, $user);
+            if (! $area['covered']) {
+                if (! $vendor->shopPreferences()['accept_cod']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "This address is outside {$vendor->store_name}'s delivery areas, and the shop only takes online payment, so it can't take this order. Try an address inside its areas.",
+                    ], 422);
+                }
+                if ($paymentMethod !== 'cod') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "This address is outside {$vendor->store_name}'s delivery areas, so the order is paid cash on delivery once the shop approves it.",
+                    ], 422);
+                }
+            }
+
             $settings = VendorApplication::buildReservationSettings($vendorUser, $vendor);
             $nowInPh = Carbon::now($settings['timezone']);
             $todayInPh = $nowInPh->copy()->startOfDay();
@@ -580,6 +621,7 @@ class CheckoutController extends Controller
                     'payment_method' => $paymentMethod,
                     'payment_status' => 'unpaid',
                     'delivery_address' => $request->delivery_address,
+                    'outside_area' => ! $area['covered'],
                     'delivery_contact_name' => $user->name,
                     'delivery_contact_number' => $request->contact_number,
                     'delivery_notes' => $request->delivery_notes ?? '',

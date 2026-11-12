@@ -157,6 +157,15 @@
               </div>
             </div>
 
+            <!-- Outside the shop's delivery areas: the shop approves it first -->
+            <p v-if="order.outside_area && order.status === 'pending'" class="ot-case-note" :class="order.outside_area.approved ? 'blue' : 'amber'" role="status">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
+              <template v-if="order.outside_area.approved">{{ order.store_name || "The shop" }} approved delivering to your address. Your order goes ahead as usual.</template>
+              <template v-else>
+                Your address is outside {{ order.store_name || "the shop" }}'s delivery areas. They need to approve delivering it before your order goes out. If they can't, they'll cancel it and you won't be charged.
+              </template>
+            </p>
+
             <!-- Return / refund in progress -->
             <p v-if="caseIsOpen(order)" class="ot-case-note" :class="order.return_case.next_actor === 'customer' ? 'amber' : 'blue'">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9" /><path d="M3 5v7h7" /></svg>

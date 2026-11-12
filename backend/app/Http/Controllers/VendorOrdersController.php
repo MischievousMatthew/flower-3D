@@ -720,6 +720,16 @@ class VendorOrdersController extends Controller
 
             if ($newStatus === 'cancelled') {
                 $cancelledOrder = app(VendorFinanceService::class)->cancelPendingOrder($order);
+                // Declined because the address is outside the shop's delivery areas: tell the customer why
+                if ($order->awaitingAreaApproval()) {
+                    app(\App\Services\NotificationService::class)->notify(
+                        [$order->user_id],
+                        'order',
+                        'Your order was cancelled',
+                        "{$order->store_name} can't deliver order {$order->order_number} to your address, because it's outside their delivery areas. Nothing was charged.",
+                        '/customer/orders',
+                    );
+                }
                 if ($cancelledOrder->reservation_date) {
                     ReservationAvailabilityCache::updateForDate(
                         $cancelledOrder->vendor_id,

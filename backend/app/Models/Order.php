@@ -28,6 +28,8 @@ class Order extends Model
         'total_amount',
         'delivery_type',
         'delivery_address',
+        'outside_area',
+        'area_approved_at',
         'delivery_contact_name',
         'delivery_contact_number',
         'paymongo_payment_intent_id',
@@ -59,8 +61,16 @@ class Order extends Model
         'stock_restored_at' => 'datetime',
         'delivered_at'      => 'datetime',
         'cancelled_at'      => 'datetime',
+        'outside_area'      => 'boolean',
+        'area_approved_at'  => 'datetime',
         'reservation_date'  => 'date',
     ];
+
+    /** Outside the shop's delivery areas and not approved yet: it can't go any further */
+    public function awaitingAreaApproval(): bool
+    {
+        return (bool) $this->outside_area && $this->area_approved_at === null;
+    }
 
     const DELIVERY_STATUSES = [
         'pending',

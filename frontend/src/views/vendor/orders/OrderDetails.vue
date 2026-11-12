@@ -27,6 +27,24 @@
     <template v-else-if="order">
       <div v-if="order.blocked_reason" class="sp-banner warn"><span v-html="ICONS.lock"></span>{{ order.blocked_reason }}</div>
 
+      <!-- Outside the shop's delivery areas: deliver anyway, or cancel -->
+      <section v-if="awaitingArea" class="sp-card od-area" role="status" aria-labelledby="od-area-title">
+        <span class="od-area-icon" v-html="ICONS.pin"></span>
+        <div class="od-area-text">
+          <h2 id="od-area-title">Outside your delivery areas</h2>
+          <p>
+            <template v-if="order.address">{{ order.address }} isn't</template><template v-else>This address isn't</template>
+            in the areas you deliver to. Approve it to deliver anyway, or cancel the order. It's cash on delivery, so nothing needs refunding.
+          </p>
+        </div>
+        <div class="od-area-actions">
+          <button type="button" class="sp-btn sp-btn-ghost" :disabled="approving" @click="acting = { to: 'cancelled', label: 'Cancel order' }">Cancel order</button>
+          <button type="button" class="sp-btn sp-btn-primary" :disabled="approving" @click="approveArea">
+            <span v-html="ICONS.check"></span>{{ approving ? "Approving…" : "Approve delivery" }}
+          </button>
+        </div>
+      </section>
+
       <!-- A checkout the customer never paid for: read-only, nothing to do -->
       <section v-if="order.unpaid_checkout" class="sp-card od-unpaid" role="status">
         <span class="od-unpaid-icon" v-html="ICONS.alert"></span>
@@ -193,6 +211,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../../plugins/axios";
+import { toast } from "@/utils/snackbar";
 import ShopLayout from "../../../components/vendor/shop/ShopLayout.vue";
 import OrderActionModal from "../../../components/vendor/orders/OrderActionModal.vue";
 import Order3DModal from "../../../components/vendor/orders/Order3DModal.vue";
@@ -244,6 +263,23 @@ async function load() {
     order.value = data.data;
   } catch (e) {
     error.value = apiMessage(e, "Couldn't load this order.");
+  }
+}
+
+// Outside the delivery areas and not approved yet: the shop decides first
+const awaitingArea = computed(() => !!order.value?.outside_area && !order.value.outside_area.approved && order.value.status === "pending");
+const approving = ref(false);
+async function approveArea() {
+  if (approving.value) return;
+  approving.value = true;
+  try {
+    const { data } = await api.post(`vendor/fulfillment/orders/${orderId}/approve-area`);
+    toast.success(data.message);
+    await load();
+  } catch (e) {
+    toast.error(apiMessage(e, "Couldn't approve this order."));
+  } finally {
+    approving.value = false;
   }
 }
 
@@ -696,6 +732,52 @@ onMounted(() => {
 .od-unpaid-icon :deep(svg) {
   width: 18px;
   height: 18px;
+}
+
+/* Outside the delivery areas */
+.od-area {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  border-color: var(--v-amber-text);
+  background: var(--v-amber-soft);
+}
+.od-area-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--v-surface);
+  color: var(--v-amber-text);
+}
+.od-area-icon :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+.od-area-text {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.od-area-text h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v-text);
+}
+.od-area-text p {
+  margin: 0;
+  max-width: 72ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--v-text-2);
+}
+.od-area-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* Delivery */

@@ -8,6 +8,7 @@ use App\Models\OrderRequest;
 use App\Models\VendorApplication;
 use App\Models\VendorClosedDate;
 use App\Services\CustomerRecords;
+use App\Services\NotificationService;
 use App\Services\ReturnCaseService;
 use App\Traits\ResolvesOwner;
 use Carbon\Carbon;
@@ -95,6 +96,36 @@ class VendorFulfillmentController extends Controller
             'counts' => $counts,
             'meta' => ['total' => $total, 'page' => $page, 'per_page' => $perPage, 'last_page' => max(1, (int) ceil($total / $perPage))],
         ]);
+    }
+
+    /**
+     * POST /vendor/fulfillment/orders/{id}/approve-area
+     * The shop agrees to deliver an order outside its delivery areas; the
+     * order then carries on as usual and the customer is told.
+     */
+    public function approveArea(Request $request, int $id): JsonResponse
+    {
+        $order = $this->visibleOrders($this->resolveOwnerId($request))->whereKey($id)->first();
+        if (! $order) {
+            return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+        }
+        if (! $order->awaitingAreaApproval()) {
+            return response()->json(['success' => false, 'message' => 'This order doesn\'t need approval.'], 422);
+        }
+        if ($order->status !== 'pending') {
+            return response()->json(['success' => false, 'message' => 'Only orders that are still Pending can be approved.'], 422);
+        }
+
+        $order->update(['area_approved_at' => now()]);
+        app(NotificationService::class)->notify(
+            [$order->user_id],
+            'order',
+            'Your order is approved for delivery',
+            "{$order->store_name} will deliver order {$order->order_number} to your address, even though it's outside their usual delivery areas.",
+            '/customer/orders',
+        );
+
+        return response()->json(['success' => true, 'message' => 'Approved. You can start preparing this order.']);
     }
 
     /** GET /vendor/fulfillment/orders/{id} */
@@ -405,7 +436,9 @@ class VendorFulfillmentController extends Controller
         $customer = $order->delivery_contact_name
             ?: trim(($order->user?->name ?? '') . ' ' . ($order->user?->surname ?? '')) ?: 'Customer';
 
-        $next = ($caseOpen || $onlineUnpaid) ? [] : (self::NEXT[$status] ?? []);
+        // Outside the shop's delivery areas: approve delivering it (or cancel) first
+        $awaitingArea = $status === 'pending' && $order->awaitingAreaApproval();
+        $next = ($caseOpen || $onlineUnpaid || $awaitingArea) ? [] : (self::NEXT[$status] ?? []);
         $canCancel = $status === 'pending' && ! $caseOpen
             && ! ($order->payment_method !== 'cod' && $order->payment_status === 'paid');
 
@@ -436,9 +469,12 @@ class VendorFulfillmentController extends Controller
             'photo_url' => $order->delivery?->photo_url,
             'next' => $next,
             'can_cancel' => $canCancel,
+            // null: inside the areas. Otherwise whether the shop approved delivering it
+            'outside_area' => $order->outside_area ? ['approved' => $order->area_approved_at !== null, 'approved_at' => $order->area_approved_at?->toIso8601String()] : null,
             'blocked_reason' => $caseOpen ? 'A return or refund is open on this order. Settle it first.'
                 : ($onlineUnpaid ? 'Waiting for the online payment to be confirmed.' : null),
-            'needs_action' => ! empty($next) && in_array($status, ['pending', 'to_processed', 'to_ship'], true)
+            'needs_action' => $awaitingArea
+                || ! empty($next) && in_array($status, ['pending', 'to_processed', 'to_ship'], true)
                 || ($caseSummary['next_actor'] ?? null) === 'vendor',
             'created_at' => $order->created_at?->toIso8601String(),
         ];

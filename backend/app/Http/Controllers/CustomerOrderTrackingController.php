@@ -256,6 +256,8 @@ class CustomerOrderTrackingController extends Controller
             'delivery_fee' => (float) ($order->delivery_fee ?? 0),
             'total_amount' => (float) ($order->total_amount ?? 0),
             'delivery_address' => $order->delivery_address,
+            // Outside the shop's delivery areas: waiting for the shop to approve (null when inside)
+            'outside_area' => $order->outside_area ? ['approved' => $order->area_approved_at !== null] : null,
             'delivery_contact_name' => $order->delivery_contact_name,
             'delivery_contact_number' => $order->delivery_contact_number,
             'store_name' => $storeName,

@@ -98,6 +98,20 @@
               </label>
               <p v-if="touched.address && !addressOk" class="co-error" role="alert">Add the full address so the shop can find it.</p>
 
+              <!-- Outside the shop's delivery areas: the shop approves it first -->
+              <div v-else-if="outsideArea" class="co-note co-note--warn" role="status" aria-live="polite">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z" /><path d="M12 7v3.5M12 13h.01" /></svg>
+                <div>
+                  <strong>This address is outside {{ storeName }}'s delivery areas</strong>
+                  <span v-if="areaList">They deliver to {{ areaList }}.</span>
+                  <span v-if="codAvailable">
+                    You can still order. {{ storeName }} needs to approve delivering it first, before your order goes out, and you'll pay cash on delivery.
+                    If they can't deliver here, they'll cancel it and you won't be charged.
+                  </span>
+                  <span v-else>{{ storeName }} only takes online payment, so it can't take orders outside its areas. Use an address inside them.</span>
+                </div>
+              </div>
+
               <h3 class="co-mt">Contact number</h3>
               <label class="co-field co-field--icon">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></svg>
@@ -233,6 +247,7 @@
               <div>
                 <strong>Pay the rider when it arrives</strong>
                 <span>Have ₱{{ formatPrice(totalAmount) }} ready, and keep your phone on so the rider can reach you.</span>
+                <span v-if="outsideArea">Your address is outside {{ storeName }}'s delivery areas, so cash on delivery is the only option. The shop approves delivering it first.</span>
               </div>
             </div>
             <div v-else-if="payChoice" class="co-note">
@@ -660,12 +675,46 @@ const initials = computed(() =>
 const itemCount = computed(() => (checkoutData.value.items || []).reduce((n, item) => n + Number(item.quantity || 0), 0));
 const deliveryFee = computed(() => Number(checkoutData.value.summary?.delivery_fee || 0));
 
+// ── Delivery areas: is this address one the shop delivers to? ──
+// Checked by the server (it reads the places on the shop's list from the
+// address); checked again as the address is edited.
+const area = ref(null); // { covered, restricted, areas, found }
+let areaFor = null; // the address `area` is for
+let areaTimer = 0;
+let areaSeq = 0;
+const outsideArea = computed(() => !!area.value && !area.value.covered);
+const storeName = computed(() => checkoutData.value.vendor?.store_name || "The shop");
+const areaList = computed(() => {
+  const list = area.value?.areas ?? [];
+  return list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}` : list[0] || "";
+});
+const codAvailable = computed(() => availablePaymentMethods.value.some((m) => m.type === "cod"));
+async function checkArea(address) {
+  const seq = ++areaSeq;
+  try {
+    const { data } = await api.post("checkout/delivery-area", { vendor_id: checkoutData.value.vendor?.id, address });
+    if (seq !== areaSeq) return;
+    area.value = data.data;
+    areaFor = address;
+  } catch {
+    // Keep the last answer; the order is checked again when it's placed
+  }
+}
+watch(deliveryAddress, (address) => {
+  clearTimeout(areaTimer);
+  const text = address.trim();
+  if (!checkoutData.value.vendor?.id || text === areaFor || text.length < 8) return;
+  areaTimer = setTimeout(() => checkArea(text), 450);
+});
+onBeforeUnmount(() => clearTimeout(areaTimer));
+
 // ── Payment: GCash and Maya (both through PayMongo) or cash on delivery ──
 const payChoice = ref(null); // "gcash" | "paymaya" | "cod"
 const payOptions = computed(() => {
   const types = availablePaymentMethods.value.map((m) => m.type);
   const list = [];
-  if (types.includes("ewallet")) {
+  // Outside the shop's delivery areas: cash on delivery only (nothing to refund if the shop declines)
+  if (types.includes("ewallet") && !outsideArea.value) {
     list.push({ key: "gcash", mark: "G", name: "GCash", desc: "Pay with your GCash wallet on PayMongo's secure page" });
     list.push({ key: "paymaya", mark: "M", name: "Maya", desc: "Pay with your Maya wallet on PayMongo's secure page" });
   }
@@ -678,6 +727,10 @@ const chosenPayName = computed(() => payOptions.value.find((o) => o.key === payC
 // The order still says "ewallet" or "cod"; the wallet goes along as ewallet_type
 watch(payChoice, (choice) => {
   if (choice) selectedPaymentMethod.value = choice === "cod" ? "cod" : "ewallet";
+});
+// The address moved outside the areas: a wallet picked before isn't on offer now
+watch(payOptions, (list) => {
+  if (payChoice.value && !list.some((o) => o.key === payChoice.value)) syncPayChoice();
 });
 function syncPayChoice(saved = null) {
   const keys = payOptions.value.map((o) => o.key);
@@ -1000,6 +1053,7 @@ function deliveryReady() {
   if (!addressOk.value) return toast.warning("Add your delivery address first."), false;
   if (!contactOk.value) return toast.warning("Add a contact number the rider can call."), false;
   if (!selectedDate.value) return toast.warning("Pick a delivery date first."), false;
+  if (outsideArea.value && !codAvailable.value) return toast.warning(`${storeName.value} can't deliver to this address. Use one inside its delivery areas.`), false;
   return true;
 }
 
@@ -1184,6 +1238,9 @@ async function loadCheckoutData() {
         selectedPaymentMethod.value = availablePaymentMethods.value[0].type;
       }
     }
+    // The profile address was already checked against the shop's delivery areas
+    area.value = checkoutData.value.delivery_area ?? null;
+    areaFor = String(checkoutData.value.user?.address || "").trim();
     deliveryAddress.value = checkoutData.value.user?.address || "";
     contactNumber.value = checkoutData.value.user?.contact_number || "";
     syncPayChoice();
@@ -2276,6 +2333,21 @@ onMounted(async () => {
 
 .co-note span {
   color: var(--ink-soft);
+}
+
+/* Outside the shop's delivery areas */
+.co-note--warn {
+  margin-top: 12px;
+  border: 1px solid rgba(209, 138, 28, 0.28);
+  background: rgba(209, 138, 28, 0.08);
+}
+
+.co-note--warn svg {
+  color: #b7791f;
+}
+
+.co-note--warn div {
+  gap: 4px;
 }
 
 .co-optin {
