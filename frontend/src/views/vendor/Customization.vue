@@ -370,25 +370,6 @@
             <span class="cz-counter">{{ form.description.length }}/500</span>
           </label>
 
-          <!-- What it uses up from stock when a customer orders a bouquet with it -->
-          <div v-if="usesStock" class="cz-field cz-stock">
-            <span class="cz-label">Uses from stock <small>(optional)</small></span>
-            <div class="cz-stock-row">
-              <select v-model="form.stockProductId" class="cz-input" aria-label="Material it uses up">
-                <option value="">Nothing: don't count it</option>
-                <option v-for="m in materials" :key="m.id" :value="m.id">{{ m.name }} · {{ m.stock }} {{ m.unit || "pcs" }} in stock</option>
-              </select>
-              <label v-if="form.stockProductId" class="cz-stock-per">
-                <input v-model="form.stockPerUse" class="cz-input" type="number" min="1" max="1000" step="1" inputmode="numeric" :aria-label="`${stockUnit} per bouquet`" />
-                <span>{{ stockUnit }} per bouquet</span>
-              </label>
-            </div>
-            <span v-if="errors.stock_per_use" class="cz-error">{{ errors.stock_per_use }}</span>
-            <span v-else class="cz-hint">
-              When a customer orders a custom bouquet with this {{ current.singular }}, that many are taken from the material's stock.
-            </span>
-          </div>
-
           <div class="cz-form-actions">
             <button v-if="editingId" type="button" class="cz-btn cz-btn-ghost" :disabled="saving" @click="resetForm">
               Cancel
@@ -607,24 +588,8 @@ const form = reactive({
   limitType: "words",
   limit: "",
   sizes: [{ label: "Small", price: "" }],
-  // The material it uses up (a wrapper's sheets) and how many per bouquet
-  stockProductId: "",
-  stockPerUse: 1,
 });
 const hexInput = ref("D3B18F");
-
-// Wrappers, ribbons and fillers can use up a material in stock
-const STOCK_TABS = ["wrapper", "ribbon", "filler"];
-const usesStock = computed(() => STOCK_TABS.includes(activeTab.value));
-const materials = ref([]);
-api
-  .get("vendor/products/linkable-flowers")
-  .then(({ data }) => (materials.value = data.data ?? []))
-  .catch(() => {}); // linking just isn't offered then
-const stockUnit = computed(() => {
-  const unit = materials.value.find((m) => m.id === Number(form.stockProductId))?.unit || "piece";
-  return /s$/i.test(unit) ? unit : `${unit}s`;
-});
 const hsl = reactive({ h: 0, s: 0, l: 0 });
 
 const current = computed(() => TYPE_CONFIG[activeTab.value] || TYPE_CONFIG.wrapper);
@@ -805,8 +770,6 @@ function setPrint(key) {
 
 function resetForm() {
   editingId.value = null;
-  form.stockProductId = "";
-  form.stockPerUse = 1;
   form.pattern = "none";
   form.patternText = "";
   form.patternSize = 100;
@@ -834,8 +797,6 @@ function startEdit(item) {
   form.description = item.description || "";
   form.price = Number(item.price) ? String(item.price) : "";
   form.modelUrl = item.model_url || null;
-  form.stockProductId = item.stock_product_id || "";
-  form.stockPerUse = item.stock_per_use || 1;
   if (item.color_hex) setColorFromHex(item.color_hex);
   if (item.type === "wrapper") {
     form.pattern = item.pattern || "none";
@@ -928,9 +889,6 @@ function validate() {
   if (current.value.hasColor && !/^#[0-9a-f]{6}$/i.test(form.color)) errors.color_hex = "Enter a 6-digit hex code.";
   if (activeTab.value === "wrapper" && form.pattern === "words" && !form.patternText.trim()) errors.pattern_text = "Type the word to print, like love.";
   if (current.value.hasModel && !form.modelFile && !form.modelUrl) errors.model_file = `Upload a 3D model for this ${current.value.singular}.`;
-  if (usesStock.value && form.stockProductId && !(Number.isInteger(Number(form.stockPerUse)) && Number(form.stockPerUse) >= 1)) {
-    errors.stock_per_use = "Enter how many it uses per bouquet (1 or more).";
-  }
   return !Object.keys(errors).length;
 }
 
@@ -960,10 +918,6 @@ async function submitForm() {
     }
   }
   if (form.modelFile) payload.append("model_file", form.modelFile);
-  if (usesStock.value) {
-    payload.append("stock_product_id", form.stockProductId ? String(form.stockProductId) : "");
-    payload.append("stock_per_use", String(Number(form.stockPerUse) || 1));
-  }
 
   saving.value = true;
   uploadProgress.value = 0;
@@ -1192,31 +1146,6 @@ const formatSize = (bytes) =>
 .cz-label small {
   color: var(--v-faint);
   font-weight: 400;
-}
-
-/* Uses from stock: the material and how many per bouquet */
-.cz-stock-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.cz-stock-row > select {
-  flex: 1 1 220px;
-}
-
-.cz-stock-per {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-  color: var(--v-text-2);
-  font-size: 13px;
-}
-
-.cz-stock-per .cz-input {
-  width: 80px;
-  text-align: right;
 }
 
 .cz-input {

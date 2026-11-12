@@ -100,7 +100,7 @@
       </div>
       <template v-else>
         <div class="st-head" aria-hidden="true">
-          <span></span><span>Item</span><span>On hand</span><span>Minimum · target</span><span>Coming &amp; use</span><span>Order</span><span></span>
+          <span></span><span>Item</span><span>On hand</span><span>Pack</span><span>Minimum · target</span><span>Coming &amp; use</span><span>Order</span><span></span>
         </div>
         <ul class="st-rows">
           <li v-for="it in visible" :key="it.id" class="st-row" :class="`s-${it.state}`">
@@ -123,6 +123,17 @@
               <small v-if="it.pack_size" class="st-packs">{{ packText(it, it.on_hand) }}</small>
               <span class="st-level" role="img" :aria-label="levelLabel(it)"><span :style="{ width: `${levelPct(it)}%` }"></span><i v-if="it.min && it.target" :style="{ left: `${(it.min / it.target) * 100}%` }"></i></span>
               <small :class="`st-state ${it.state}`">{{ STATE_TEXT[it.state] }}</small>
+            </span>
+            <!-- Bought in packs: how many of its unit one pack holds (e.g. 50 sheets per roll) -->
+            <span class="st-pack">
+              <template v-if="it.pack_size">
+                <b>{{ it.pack_size.toLocaleString("en-PH") }} <small>{{ plural(unitOf(it), it.pack_size) }}</small></b>
+                <small>per {{ it.pack_unit }}</small>
+              </template>
+              <button v-else-if="canEdit('inventory_products') && it.kind !== 'flowers'" type="button" class="st-pack-set" @click="openLevels(it, true)">
+                Set {{ plural(unitOf(it), 2) }} per pack
+              </button>
+              <small v-else class="muted">Single {{ unitOf(it) }}</small>
             </span>
             <span class="st-levels">
               <b v-if="it.min">{{ it.min.toLocaleString("en-PH") }}<template v-if="it.target"> · {{ it.target.toLocaleString("en-PH") }}</template></b>
@@ -262,6 +273,14 @@
                 <input v-model="lv.pack_size" class="sp-input" :class="{ invalid: lv.errors.pack_size }" type="number" min="2" step="1" inputmode="numeric" placeholder="e.g. 50" />
                 <small v-if="lv.errors.pack_size" class="sp-error">{{ lv.errors.pack_size }}</small>
                 <small v-else class="sp-hint">Measure one {{ lv.pack_unit }} once: its length ÷ one {{ lv.unit || "piece" }}.</small>
+              </label>
+              <label v-if="lvConvert" class="st-convert sp-span-all">
+                <input v-model="lv.convert" type="checkbox" />
+                <span>
+                  Change the <b>{{ lvConvert.from.toLocaleString("en-PH") }} {{ plural(lv.pack_unit, lvConvert.from) }}</b> on hand into
+                  <b>{{ lvConvert.to.toLocaleString("en-PH") }} {{ plural(lv.unit || "piece", lvConvert.to) }}</b>
+                  <small>Saved as a stock count in the history.</small>
+                </span>
               </label>
               <label class="sp-field sp-span-all">
                 <span class="sp-label">Kind of stock</span>
@@ -560,9 +579,25 @@ async function saveAdjust() {
 }
 
 // ─── Levels ───
-function openLevels(it) {
-  lv.value = { item: it, min: it.min, target: it.target ?? "", lead: it.lead_days ?? "", unit: it.unit ?? "", pack_unit: it.pack_unit ?? "", pack_size: it.pack_size ?? "", kind: it.kind, used: it.used_30d > 0, errors: {}, error: "", busy: false };
+function openLevels(it, settingPack = false) {
+  lv.value = { item: it, min: it.min, target: it.target ?? "", lead: it.lead_days ?? "", unit: it.unit ?? "", pack_unit: it.pack_unit ?? "", pack_size: it.pack_size ?? "", kind: it.kind, used: it.used_30d > 0, convert: true, errors: {}, error: "", busy: false };
+  // Something counted in rolls so far: suggest counting sheets, bought in rolls
+  if (settingPack && !it.pack_size && PACK_HINTS.includes(String(it.unit || "").toLowerCase())) {
+    lv.value.pack_unit = String(it.unit).toLowerCase();
+    lv.value.unit = it.kind === "wrapping" ? "sheet" : "piece";
+  }
 }
+/**
+ * Switching from counting packs to counting what's in them: the stock on hand
+ * was counted in the old unit (50 rolls), so it can be changed to the new one
+ * (50 × 50 = 2,500 sheets) in the same save.
+ */
+const lvConvert = computed(() => {
+  const l = lv.value;
+  if (!l || l.item.pack_size || !l.pack_unit || !(Number(l.pack_size) >= 2) || !l.item.on_hand) return null;
+  if (String(l.item.unit || "").toLowerCase() !== String(l.pack_unit).toLowerCase()) return null;
+  return { from: l.item.on_hand, to: l.item.on_hand * Number(l.pack_size) };
+});
 async function saveLevels() {
   const l = lv.value;
   l.errors = {};
@@ -586,6 +621,16 @@ async function saveLevels() {
       pack_size: l.pack_unit ? Number(l.pack_size) : null,
       stock_kind: l.kind,
     });
+    // 50 rolls on hand become 2,500 sheets
+    if (lvConvert.value && l.convert) {
+      await inventoryStockService.adjust(l.item.id, {
+        mode: "set",
+        quantity: lvConvert.value.to,
+        reason: "count",
+        note: `Counted in ${plural(l.unit || "piece", 2)} now: ${lvConvert.value.from} ${plural(l.pack_unit, lvConvert.value.from)} × ${l.pack_size}`,
+      });
+      loadHistory();
+    }
     toast.success(`Levels saved for ${l.item.name}.`);
     lv.value = null;
     load();
@@ -755,7 +800,7 @@ onMounted(() => {
 .st-head,
 .st-row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1.5fr) minmax(130px, 0.9fr) minmax(110px, 0.7fr) minmax(0, 1.1fr) minmax(0, 1fr) auto;
+  grid-template-columns: 28px minmax(0, 1.5fr) minmax(130px, 0.9fr) minmax(96px, 0.6fr) minmax(110px, 0.7fr) minmax(0, 1.1fr) minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
   padding: 12px 12px;
@@ -1049,6 +1094,70 @@ onMounted(() => {
   flex: 1;
   justify-content: center;
 }
+/* Turning the rolls on hand into sheets when the pack is first set */
+.st-convert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--v-blue-soft, var(--v-subtle));
+  color: var(--v-text-2);
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.st-convert input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--bc-accent, var(--v-green-text));
+}
+.st-convert b {
+  color: var(--v-text);
+}
+.st-convert small {
+  display: block;
+  color: var(--v-muted);
+  font-size: 12px;
+}
+/* Pack column: "50 sheets per roll", or a button to set it */
+.st-pack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.st-pack b {
+  color: var(--v-text);
+  font-variant-numeric: tabular-nums;
+}
+.st-pack b small,
+.st-pack > small {
+  color: var(--v-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.st-pack-set {
+  justify-self: start;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px dashed var(--v-border-strong);
+  border-radius: 8px;
+  background: none;
+  color: var(--v-text-2);
+  font: 500 12px "Poppins", sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.st-pack-set:hover {
+  border-color: var(--bc-accent, var(--v-green-text));
+  color: var(--v-text);
+}
+.st-pack-set:focus-visible {
+  outline: 2px solid var(--bc-accent, var(--v-green-text));
+  outline-offset: 2px;
+}
 /* "≈ 1 roll + 45 sheets" under the on-hand count */
 .st-packs {
   color: var(--v-muted);
@@ -1068,6 +1177,7 @@ onMounted(() => {
   }
   .st-row > .st-item { grid-column: 2 / -1; }
   .st-row > .st-onhand { grid-column: 2; }
+  .st-row > .st-pack { grid-column: 3; }
   .st-row > .st-levels { grid-column: 3; }
   .st-row > .st-flow { grid-column: 2; }
   .st-row > .st-suggest { grid-column: 3; }
