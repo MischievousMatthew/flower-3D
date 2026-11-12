@@ -185,10 +185,10 @@
                   type="button"
                   role="radio"
                   class="pd-color"
-                  :class="{ on: chosenColor === c.name }"
+                  :class="{ on: chosenColor === c.name, out: c.stock === 0 }"
                   :aria-checked="chosenColor === c.name"
-                  :aria-label="c.name"
-                  :title="c.name"
+                  :aria-label="c.stock === 0 ? `${c.name}, sold out` : c.name"
+                  :title="c.stock === 0 ? `${c.name} · sold out` : c.stock != null ? `${c.name} · ${c.stock} left` : c.name"
                   @click="chosenColor = c.name"
                 >
                   <i :style="{ background: swatchFor(c.name, c.hex) }" aria-hidden="true"></i>
@@ -230,7 +230,7 @@
 
             <!-- Availability -->
             <p class="pd-avail">
-              <ProductTag :tag="stockTag(product.quantity_in_stock)" />
+              <ProductTag :tag="stockTag(chosenStock)" />
               <strong v-if="availability.title">{{ availability.title }}</strong>
               <span v-if="availability.note">{{ availability.note }}</span>
             </p>
@@ -549,8 +549,15 @@ const onSale = computed(
 );
 const price = computed(() => (onSale.value ? Number(product.value.discount_price) : Number(product.value?.selling_price || 0)));
 const savePercent = computed(() => Math.round((1 - price.value / Number(product.value.selling_price)) * 100));
-const soldOut = computed(() => Number(product.value?.quantity_in_stock || 0) <= 0);
-const maxQty = computed(() => Math.max(1, Number(product.value?.quantity_in_stock || 1)));
+// Stock of what's being bought: the chosen flower colour's own count when the
+// shop counts each colour, else the whole product's stock
+const colorStock = (c) => (c && c.stock != null ? Number(c.stock) : null);
+const chosenStock = computed(() => {
+  const c = colorOptions.value.find((o) => o.name === chosenColor.value);
+  return colorStock(c) ?? Number(product.value?.quantity_in_stock || 0);
+});
+const soldOut = computed(() => chosenStock.value <= 0);
+const maxQty = computed(() => Math.max(1, chosenStock.value || 1));
 const prepDays = computed(() => Number(product.value?.preparation_days || 0));
 const categoryLabel = computed(() => {
   const value = product.value?.category;
@@ -582,12 +589,21 @@ const colorOptions = computed(() => (Array.isArray(product.value?.color_options)
 const chosenColor = ref(null);
 const composition = computed(() => (Array.isArray(product.value?.composition) ? product.value.composition : []));
 const totalStems = computed(() => composition.value.reduce((sum, f) => sum + Number(f.count || 0), 0));
-/** Starts on the product's own colour if it's one of the choices, else the first */
+/** Starts on the product's own colour if it's one of the choices (and not sold out), else the first in stock */
 function pickDefaultColor() {
   const list = colorOptions.value;
   const own = String(product.value?.color || "").toLowerCase();
-  chosenColor.value = list.find((c) => c.name.toLowerCase() === own)?.name || list[0]?.name || null;
+  const inStock = (c) => colorStock(c) == null || colorStock(c) > 0;
+  chosenColor.value =
+    list.find((c) => c.name.toLowerCase() === own && inStock(c))?.name ||
+    list.find(inStock)?.name ||
+    list[0]?.name ||
+    null;
 }
+// Switching colour keeps the quantity within that colour's stock
+watch(chosenColor, () => {
+  if (qty.value > maxQty.value) qty.value = maxQty.value;
+});
 /** The colour that goes with the order: the one picked, else the product's own */
 const orderColor = () => chosenColor.value || product.value?.color || null;
 
@@ -596,8 +612,11 @@ const pageTags = computed(() => (product.value?.tags || []).filter((t) => t !== 
 
 // Next to the stock tag: how many, and whether it's made to order
 const availability = computed(() => {
-  const stock = Number(product.value?.quantity_in_stock || 0);
-  if (stock <= 0) return { title: "", note: "Check back soon, or ask the shop." };
+  const stock = chosenStock.value;
+  if (stock <= 0) {
+    const others = colorOptions.value.some((c) => c.name !== chosenColor.value && (colorStock(c) ?? 1) > 0);
+    return { title: "", note: others ? `${chosenColor.value} is sold out. Pick another colour.` : "Check back soon, or ask the shop." };
+  }
   const days = prepDays.value;
   const ready = days > 0 ? `Made to order · ready in ${days} ${days === 1 ? "day" : "days"}` : "";
   if (stock <= LOW_STOCK) return { title: `Only ${stock} left`, note: ready };
@@ -616,7 +635,7 @@ const specs = computed(() => {
     { label: "Preparation", value: prepDays.value ? `${prepDays.value} ${prepDays.value === 1 ? "day" : "days"}` : "Ready to send" },
     { label: "Stays fresh", value: p.freshness_days ? `About ${p.freshness_days} days` : "—" },
     { label: "Shop", value: p.vendor_name || "—" },
-    { label: "Availability", value: soldOut.value ? "Sold out" : `${p.quantity_in_stock} in stock` },
+    { label: "Availability", value: soldOut.value ? "Sold out" : `${chosenStock.value} in stock${colorOptions.value.some((c) => c.stock != null) && chosenColor.value ? ` (${chosenColor.value})` : ""}` },
   ];
 });
 
@@ -1522,6 +1541,24 @@ watch(
 .pd-color.on {
   border-color: var(--ink);
   box-shadow: 0 0 0 1px var(--ink);
+}
+
+/* A sold-out colour: faded, with a line through it */
+.pd-color.out {
+  position: relative;
+}
+
+.pd-color.out i {
+  opacity: 0.4;
+}
+
+.pd-color.out::after {
+  content: "";
+  position: absolute;
+  width: 34px;
+  height: 1.5px;
+  background: var(--ink-soft, #5f6776);
+  transform: rotate(-45deg);
 }
 
 /* What's inside: one line per flower, the count on the right */

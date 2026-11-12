@@ -125,45 +125,12 @@
                     errors.flower_type
                   }}</span>
                 </div>
-                <div class="form-group">
-                  <label class="form-label">Color *</label>
-                  <select
-                    v-model="formData.color"
-                    class="form-select"
-                    :class="{ 'is-invalid': errors.color }"
-                    @change="handleColorChange"
-                    required
-                  >
-                    <option value="">Select color</option>
-                    <option value="white">White</option>
-                    <option value="yellow">Yellow</option>
-                    <option value="red">Red</option>
-                    <option value="pink">Pink</option>
-                    <option value="purple">Purple</option>
-                    <option value="orange">Orange</option>
-                    <option value="blue">Blue</option>
-                    <option value="green">Green</option>
-                    <option value="cream">Cream</option>
-                    <option value="other">Other</option>
-                  </select>
-                  <span v-if="errors.color" class="error-text">{{
-                    errors.color
-                  }}</span>
-                </div>
-                <div class="form-group" v-if="formData.color === 'other'">
-                  <label class="form-label">Specify Color *</label>
-                  <input
-                    v-model="formData.color_other"
-                    type="text"
-                    placeholder="e.g., Burgundy, Lavender"
-                    class="form-input"
-                    :class="{ 'is-invalid': errors.color_other }"
-                    @input="clearError('color_other')"
-                    required
+                <div class="form-group full-width" data-field="color">
+                  <FlowerColorPicker
+                    :model-value="formData.colors"
+                    :error="errors.color || errors.color_other || errors.color_options || ''"
+                    @update:model-value="setColors"
                   />
-                  <span v-if="errors.color_other" class="error-text">{{
-                    errors.color_other
-                  }}</span>
                 </div>
               </div>
             </div>
@@ -307,6 +274,13 @@
             <div class="form-section">
               <h2 class="section-title">Stock Management</h2>
               <div class="form-grid">
+                <div v-if="multiColor" class="form-group full-width" data-field="color_stock">
+                  <ColorStockInputs
+                    :model-value="formData.colors"
+                    :error="errors.color_stock || ''"
+                    @update:model-value="setColors"
+                  />
+                </div>
                 <div class="form-group">
                   <label class="form-label">Quantity in Stock *</label>
                   <input
@@ -316,13 +290,14 @@
                     placeholder="0"
                     class="form-input"
                     :class="{ 'is-invalid': errors.quantity_in_stock }"
+                    :readonly="multiColor"
                     @input="clearError('quantity_in_stock')"
                     required
                   />
                   <span v-if="errors.quantity_in_stock" class="error-text">{{
                     errors.quantity_in_stock
                   }}</span>
-                  <span class="hint-text">Current available units</span>
+                  <span class="hint-text">{{ multiColor ? "The total of the colours above" : "Current available units" }}</span>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Minimum Stock Level *</label>
@@ -677,6 +652,9 @@ import {
 import { toast } from "@/utils/snackbar";
 import api from "../../../../plugins/axios";
 import { useProductTaxonomies } from "../../../../composables/useProductTaxonomies";
+import FlowerColorPicker from "../../../../components/vendor/shop/FlowerColorPicker.vue";
+import ColorStockInputs from "../../../../components/vendor/shop/ColorStockInputs.vue";
+import { colorFields, colorProblem, countsPerColor, totalOf } from "../../../../utils/flowerColors.js";
 
 const { taxonomies, withCurrent } = useProductTaxonomies();
 
@@ -706,6 +684,7 @@ const formData = reactive({
   flower_type: "",
   color: "",
   color_other: "",
+  colors: [], // [{ value, name, quantity }]: every flower colour, the first is the main one
   purchase_price: 0,
   selling_price: 0,
   has_discount: false,
@@ -754,12 +733,22 @@ const discountPercentage = computed(() => {
 
 const calculateProfit = () => {}; // triggered by @input — computed handles the rest
 
-const handleColorChange = () => {
-  clearError("color");
-  if (formData.color !== "other") {
-    formData.color_other = "";
-    clearError("color_other");
+// Two or more flower colours: each has its own stock, and the total is their sum
+const multiColor = computed(() => countsPerColor(formData.colors));
+const setColors = (list) => {
+  // Going from one colour to two: the stock entered so far belongs to the first
+  if (countsPerColor(list) && !countsPerColor(formData.colors) && list[0]) {
+    list = list.map((c, i) => (i === 0 ? { ...c, quantity: Number(formData.quantity_in_stock) || 0 } : c));
   }
+  // Back to one colour: its count becomes the product's stock
+  if (list.length === 1 && countsPerColor(formData.colors)) {
+    formData.quantity_in_stock = Number(list[0].quantity) || 0;
+  }
+  formData.colors = list;
+  formData.color = list[0]?.value || "";
+  formData.color_other = list[0]?.value === "other" ? String(list[0].name || "") : "";
+  if (countsPerColor(list)) formData.quantity_in_stock = totalOf(list);
+  ["color", "color_other", "color_stock", "color_options", "quantity_in_stock"].forEach(clearError);
 };
 
 const handleDiscountToggle = () => {
@@ -926,13 +915,12 @@ const validateForm = () => {
     }
   }
 
-  if (
-    formData.color === "other" &&
-    (!formData.color_other || !formData.color_other.trim())
-  ) {
-    errors.color_other = "Please specify the color";
+  const colorIssue = colorProblem(formData.colors);
+  if (colorIssue) {
+    const key = colorIssue.startsWith("Enter how many") ? "color_stock" : "color";
+    errors[key] = colorIssue;
     isValid = false;
-    if (!firstError) firstError = "color_other";
+    if (!firstError || firstError === "color") firstError = key;
   }
 
   const selling = parseFloat(formData.selling_price) || 0;
@@ -1063,6 +1051,9 @@ const submitProduct = async () => {
         submitData.append(key, value.toString());
       }
     });
+
+    // Flower colours, with a stock count per colour when there are 2 or more
+    submitData.append("color_options", colorFields(formData.colors).color_options);
 
     // owner_id
     submitData.append("owner_id", user.value.id.toString());

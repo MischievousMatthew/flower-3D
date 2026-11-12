@@ -40,7 +40,7 @@ class CartController extends Controller
                         'is_available' => $cartItem->is_available,
                         'is_low_stock' => $cartItem->is_low_stock,
                         'stock_status' => $cartItem->stock_status,
-                        'product' => $cartItem->product ? $this->sanitizeProductData($cartItem->product) : null,
+                        'product' => $cartItem->product ? $this->sanitizeProductData($cartItem->product, $cartItem->color) : null,
                         'created_at' => $cartItem->created_at,
                         'updated_at' => $cartItem->updated_at,
                     ];
@@ -165,11 +165,11 @@ class CartController extends Controller
                 $request->merge(['customizations' => $extras['customizations']]);
             }
 
-            if (!$isCustomBouquet && $product->quantity_in_stock < $request->quantity) {
+            if (!$isCustomBouquet && $product->stockFor($request->color) < $request->quantity) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Insufficient stock. Only ' . $product->quantity_in_stock . ' items available.',
-                    'max_quantity' => $product->quantity_in_stock
+                    'message' => 'Insufficient stock. Only ' . $product->stockFor($request->color) . ' items available' . ($request->color ? ' in ' . $request->color : '') . '.',
+                    'max_quantity' => $product->stockFor($request->color)
                 ], 400);
             }
 
@@ -190,8 +190,8 @@ class CartController extends Controller
 
             if ($existingCartItem) {
                 $newQuantity = $existingCartItem->quantity + $request->quantity;
-                if ($product->quantity_in_stock < $newQuantity) {
-                    $availableQuantity = $product->quantity_in_stock - $existingCartItem->quantity;
+                if ($product->stockFor($request->color) < $newQuantity) {
+                    $availableQuantity = max(0, $product->stockFor($request->color) - $existingCartItem->quantity);
                     return response()->json([
                         'success' => false,
                         'message' => 'Cannot add more. You already have ' . $existingCartItem->quantity . ' in cart. Can add up to ' . $availableQuantity . ' more.',
@@ -232,7 +232,7 @@ class CartController extends Controller
                     'size' => $cartItem->size,
                     'notes' => $cartItem->notes,
                     'customizations' => $cartItem->customizations,
-                    'product' => $cartItem->product ? $this->sanitizeProductData($cartItem->product) : null,
+                    'product' => $cartItem->product ? $this->sanitizeProductData($cartItem->product, $cartItem->color) : null,
                 ],
                 'message' => 'Item added to cart successfully'
             ]);
@@ -315,11 +315,11 @@ class CartController extends Controller
                 $request->merge(['customizations' => $extras['customizations']]);
             }
 
-            if (!$isCustomBouquet && $product->quantity_in_stock < $request->quantity) {
+            if (!$isCustomBouquet && $product->stockFor($cartItem->color) < $request->quantity) {
                 return response()->json([
                     'success'=>false,
-                    'message'=>'Insufficient stock. Only '.$product->quantity_in_stock.' items available.',
-                    'max_quantity'=>$product->quantity_in_stock
+                    'message'=>'Insufficient stock. Only '.$product->stockFor($cartItem->color).' items available'.($cartItem->color ? ' in '.$cartItem->color : '').'.',
+                    'max_quantity'=>$product->stockFor($cartItem->color)
                 ],400);
             }
 
@@ -346,7 +346,7 @@ class CartController extends Controller
                     'size' => $cartItem->size,
                     'notes' => $cartItem->notes,
                     'customizations' => $cartItem->customizations,
-                    'product' => $cartItem->product ? $this->sanitizeProductData($cartItem->product) : null,
+                    'product' => $cartItem->product ? $this->sanitizeProductData($cartItem->product, $cartItem->color) : null,
                 ],
                 'message'=>'Cart item updated successfully'
             ]);
@@ -451,7 +451,7 @@ class CartController extends Controller
                         'product_name'=>$item->product?->product_name,
                         'reason'=>$this->getUnavailabilityReason($item),
                         'requested_quantity'=>$item->quantity,
-                        'available_quantity'=>$item->product?->quantity_in_stock,
+                        'available_quantity'=>$item->product?->stockFor($item->color),
                     ];
                 }
             }
@@ -480,15 +480,15 @@ class CartController extends Controller
     {
         if(!$cartItem->product) return 'Product not found';
         if($cartItem->product->approval_status !== 'approved') return 'Product not approved';
-        if($cartItem->product->quantity_in_stock===0) return 'Out of stock';
-        if($cartItem->product->quantity_in_stock<$cartItem->quantity) return 'Insufficient stock';
+        if($cartItem->product->stockFor($cartItem->color)===0) return 'Out of stock';
+        if($cartItem->product->stockFor($cartItem->color)<$cartItem->quantity) return 'Insufficient stock';
         return 'Unknown reason';
     }
 
     /**
      * Sanitize product data
      */
-     private function sanitizeProductData($product)
+     private function sanitizeProductData($product, ?string $color = null)
     {
         // Get vendor application info for store name
         $vendorStoreName = null;
@@ -519,7 +519,8 @@ class CartController extends Controller
             'weight' => $product->weight ?? null,
             'selling_price' => (float)$product->selling_price,
             'discount_price' => $product->discount_price ? (float)$product->discount_price : null,
-            'quantity_in_stock' => $product->quantity_in_stock,
+            // For a cart line: the stock of the flower colour it was added in
+            'quantity_in_stock' => $product->stockFor($color),
             'min_stock_level' => $product->min_stock_level,
             'care_instructions' => $product->care_instructions ?? null,
             'freshness_days' => $product->freshness_days ?? null,

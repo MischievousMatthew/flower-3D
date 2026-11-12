@@ -40,8 +40,132 @@ class Product extends Model
         return $this->hasMany(ProductReport::class);
     }
 
+    // ── Stock per flower colour ─────────────────────────────────────────────
+    // A product sold in several flower colours keeps a count for each one in
+    // color_options: [{name, value?, hex?, quantity}]. quantity_in_stock is then
+    // always the sum of those counts.
+
+    /** True when the shop keeps a separate count for each colour */
+    public function tracksColorStock(): bool
+    {
+        return collect(is_array($this->color_options) ? $this->color_options : [])
+            ->contains(fn ($c) => is_array($c) && isset($c['quantity']) && is_numeric($c['quantity']));
+    }
+
+    /** Index of a colour in color_options (case-insensitive name), or null */
+    public function colorIndex(?string $color): ?int
+    {
+        $wanted = mb_strtolower(trim((string) $color));
+        if ($wanted === '' || ! is_array($this->color_options)) {
+            return null;
+        }
+        foreach (array_values($this->color_options) as $i => $c) {
+            if (is_array($c) && mb_strtolower(trim((string) ($c['name'] ?? ''))) === $wanted) {
+                return $i;
+            }
+        }
+        return null;
+    }
+
+    /** How many a customer can buy in this colour (the whole stock when colours aren't counted separately) */
+    public function stockFor(?string $color): int
+    {
+        if ($this->tracksColorStock()) {
+            $i = $this->colorIndex($color);
+            if ($i !== null) {
+                return max(0, (int) (array_values($this->color_options)[$i]['quantity'] ?? 0));
+            }
+        }
+        return max(0, (int) $this->quantity_in_stock);
+    }
+
+    /**
+     * Takes $qty off the shelf, from $color's own count when colours are
+     * counted. Locks the row, so call it inside a transaction. Returns the
+     * product, or null when there isn't enough (nothing is changed then).
+     */
+    public static function takeStock(int $productId, int $qty, ?string $color = null): ?self
+    {
+        $product = static::query()->whereKey($productId)->lockForUpdate()->first();
+        if (! $product || $qty <= 0) {
+            return $product;
+        }
+        if ($product->stockFor($color) < $qty || (int) $product->quantity_in_stock < $qty) {
+            return null;
+        }
+        $product->shiftStock(-$qty, $color);
+        return $product;
+    }
+
+    /** Puts $qty back (a cancelled or unpaid order), on $color's own count when colours are counted */
+    public static function putBackStock(int $productId, int $qty, ?string $color = null): void
+    {
+        $product = static::withTrashed()->whereKey($productId)->lockForUpdate()->first();
+        if ($product && $qty > 0) {
+            $product->shiftStock($qty, $color);
+        }
+    }
+
+    /** Changes the stock by $delta, on one colour when it is a counted colour, and saves */
+    private function shiftStock(int $delta, ?string $color): void
+    {
+        $i = $this->tracksColorStock() ? $this->colorIndex($color) : null;
+        if ($i !== null) {
+            $options = array_values($this->color_options);
+            $options[$i]['quantity'] = max(0, (int) ($options[$i]['quantity'] ?? 0) + $delta);
+            $this->color_options = $options; // the saving hook sets the total from the colours
+        } else {
+            $this->quantity_in_stock = max(0, (int) $this->quantity_in_stock + $delta);
+        }
+        $this->save();
+    }
+
+    /**
+     * Keeps the colour counts and the total in step on every save:
+     * - colours changed (the product form, an order for one colour): total = their sum
+     * - only the total changed (inventory − / +, receiving, warehouse batches):
+     *   a drop comes off the colours with the most first, a rise goes to the first colour
+     */
+    private function syncColorStock(): void
+    {
+        if (! $this->tracksColorStock()) {
+            return;
+        }
+        $options = array_values(array_filter($this->color_options, 'is_array'));
+        foreach ($options as &$c) {
+            $c['quantity'] = max(0, (int) ($c['quantity'] ?? 0));
+        }
+        unset($c);
+        $sum = array_sum(array_column($options, 'quantity'));
+
+        if (! $this->isDirty('color_options') && $this->isDirty('quantity_in_stock')) {
+            $diff = max(0, (int) $this->quantity_in_stock) - $sum;
+            if ($diff > 0) {
+                $options[0]['quantity'] += $diff;
+            } elseif ($diff < 0) {
+                $order = array_keys($options);
+                usort($order, fn ($a, $b) => $options[$b]['quantity'] <=> $options[$a]['quantity']);
+                $left = -$diff;
+                foreach ($order as $i) {
+                    $take = min($left, $options[$i]['quantity']);
+                    $options[$i]['quantity'] -= $take;
+                    $left -= $take;
+                    if ($left <= 0) {
+                        break;
+                    }
+                }
+            }
+            $sum = array_sum(array_column($options, 'quantity'));
+        }
+
+        $this->color_options = $options;
+        $this->quantity_in_stock = $sum;
+    }
+
     protected static function booted(): void
     {
+        static::saving(fn (Product $product) => $product->syncColorStock());
+
         // Low-stock alert: tell the shop owner once, when stock drops to or
         // below the minimum (not again until it has been refilled above it)
         static::updated(function (Product $product) {
@@ -136,7 +260,7 @@ class Product extends Model
         'care_instructions',
         'occasion_tags',
         'notes',
-        'color_options', // [{name, hex}] colours the customer can pick
+        'color_options', // [{name, value?, hex?, quantity?}] colours the customer can pick, each with its own stock
         'composition',   // [{flower, color?, count}] flowers in the bouquet
 
         // Status

@@ -634,7 +634,8 @@ class OrderService
             'notes'                 => $batch['notes'] ?? "Auto-received from Order {$order->order_number}",
         ]);
 
-        $product->increment('quantity_in_stock', $qty);
+        // Through the model, so a product counted per flower colour keeps its colours in step
+        Product::putBackStock($product->id, $qty);
         $item->update(['received_qty' => (int) $item->received_qty + $qty]);
 
         return $created;

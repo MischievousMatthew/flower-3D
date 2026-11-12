@@ -717,13 +717,18 @@ SQL;
         return $this->tagService ??= app(\App\Services\ProductTags::class);
     }
 
-    /** Colours to pick from: [{name, hex}], from names or {name, hex} entries */
+    /**
+     * Colours to pick from: [{name, hex, stock}], from names or {name, hex, quantity?}
+     * entries. stock is that colour's own count, or null when colours share one stock.
+     */
     private function colorOptions($raw): array
     {
         return collect(is_array($raw) ? $raw : [])
-            ->map(fn ($c) => is_array($c) ? ['name' => trim((string) ($c['name'] ?? '')), 'hex' => $c['hex'] ?? null] : ['name' => trim((string) $c), 'hex' => null])
+            ->map(fn ($c) => is_array($c)
+                ? ['name' => trim((string) ($c['name'] ?? '')), 'hex' => $c['hex'] ?? null, 'stock' => isset($c['quantity']) && is_numeric($c['quantity']) ? max(0, (int) $c['quantity']) : null]
+                : ['name' => trim((string) $c), 'hex' => null, 'stock' => null])
             ->filter(fn ($c) => $c['name'] !== '')
-            ->map(fn ($c) => ['name' => $c['name'], 'hex' => is_string($c['hex']) && preg_match('/^#[0-9a-f]{3,8}$/i', $c['hex']) ? $c['hex'] : null])
+            ->map(fn ($c) => ['name' => $c['name'], 'hex' => is_string($c['hex']) && preg_match('/^#[0-9a-f]{3,8}$/i', $c['hex']) ? $c['hex'] : null, 'stock' => $c['stock']])
             ->unique(fn ($c) => mb_strtolower($c['name']))
             ->values()
             ->all();

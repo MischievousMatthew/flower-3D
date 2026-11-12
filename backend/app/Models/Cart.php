@@ -58,7 +58,7 @@ class Cart extends Model
     {
         return $this->product && 
                $this->product->status === 'active' &&
-               $this->product->quantity_in_stock >= $this->quantity;
+               $this->product->stockFor($this->color) >= $this->quantity;
     }
 
     // Check if product is low stock
@@ -72,9 +72,10 @@ class Cart extends Model
     {
         if (!$this->product) return 'unavailable';
         
-        if ($this->product->quantity_in_stock === 0) {
+        $stock = $this->product->stockFor($this->color);
+        if ($stock === 0) {
             return 'out_of_stock';
-        } elseif ($this->product->quantity_in_stock < $this->quantity) {
+        } elseif ($stock < $this->quantity) {
             return 'insufficient_stock';
         } elseif ($this->isLowStock) {
             return 'low_stock';

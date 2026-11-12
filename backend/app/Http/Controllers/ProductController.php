@@ -222,10 +222,16 @@ class ProductController extends Controller
                 return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
             }
 
+            $colorStock = $this->colorStockFromRequest($request);
+            if (isset($colorStock['errors'])) {
+                return response()->json(['success' => false, 'errors' => $colorStock['errors']], 422);
+            }
+
             // ── Strip file keys from validated data so they don't hit Product::create ──
             $data = collect($validator->validated())
                 ->except(['images', 'model_file'])
                 ->toArray();
+            $data = array_merge($data, $colorStock['attributes'] ?? []);
 
             $data['owner_id'] = $ownerId;
 
@@ -275,6 +281,80 @@ class ProductController extends Controller
                 'debug'    => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
+    }
+
+    /**
+     * The flower colours from the product form: color_options as JSON
+     * [{name, value, hex?, quantity}]. Two or more colours are kept with a
+     * count each, and the stock becomes their sum; one colour or none clears
+     * the list (the product's single colour and stock fields are used then).
+     * Returns null when the form didn't send it, ['errors' => …] or ['attributes' => …].
+     */
+    private function colorStockFromRequest(Request $request): ?array
+    {
+        if (! $request->has('color_options')) {
+            return null;
+        }
+        $fail = fn (string $message) => ['errors' => ['color_options' => [$message]]];
+
+        $raw = $request->input('color_options');
+        if (is_string($raw)) {
+            $raw = trim($raw) === '' ? [] : json_decode($raw, true);
+        }
+        if ($raw !== null && ! is_array($raw)) {
+            return $fail('Pick the flower colours again.');
+        }
+
+        $allowed = ['white', 'yellow', 'red', 'pink', 'purple', 'orange', 'blue', 'green', 'cream', 'other'];
+        $list = [];
+        $seen = [];
+        foreach ($raw ?? [] as $c) {
+            if (! is_array($c)) {
+                continue;
+            }
+            $value = strtolower(trim((string) ($c['value'] ?? '')));
+            if (! in_array($value, $allowed, true)) {
+                return $fail('Choose the colours from the list.');
+            }
+            $name = trim((string) ($c['name'] ?? ''));
+            if ($value !== 'other') {
+                $name = ucfirst($value);
+            }
+            if ($name === '') {
+                return $fail('Name the colour you picked as Other.');
+            }
+            if (mb_strlen($name) > 100) {
+                return $fail('Colour names can be up to 100 characters.');
+            }
+            $key = mb_strtolower($name);
+            if (isset($seen[$key])) {
+                return $fail("{$name} is picked twice. Each colour can be picked once.");
+            }
+            $seen[$key] = true;
+
+            $qty = $c['quantity'] ?? null;
+            if (! is_numeric($qty) || (int) $qty < 0 || (float) $qty != (int) $qty || (int) $qty > 1000000) {
+                return $fail("Enter how many {$name} flowers you have (0 or more).");
+            }
+            $hex = is_string($c['hex'] ?? null) && preg_match('/^#[0-9a-f]{3,8}$/i', $c['hex']) ? $c['hex'] : null;
+
+            $list[] = ['name' => $name, 'value' => $value, 'hex' => $hex, 'quantity' => (int) $qty];
+        }
+
+        if (count($list) > 10) {
+            return $fail('Pick up to 10 colours.');
+        }
+        if (count($list) < 2) {
+            return ['attributes' => ['color_options' => null]];
+        }
+
+        $first = $list[0];
+        return ['attributes' => [
+            'color_options'     => $list,
+            'color'             => $first['value'],
+            'color_other'       => $first['value'] === 'other' ? $first['name'] : null,
+            'quantity_in_stock' => array_sum(array_column($list, 'quantity')),
+        ]];
     }
 
     public function update(Request $request, $id)
@@ -360,9 +440,15 @@ class ProductController extends Controller
                 return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
             }
 
+            $colorStock = $this->colorStockFromRequest($request);
+            if (isset($colorStock['errors'])) {
+                return response()->json(['success' => false, 'errors' => $colorStock['errors']], 422);
+            }
+
             $data = collect($request->all())
-                ->except(['images', 'model_file', 'removed_image_ids', 'owner_id', '_method'])
+                ->except(['images', 'model_file', 'removed_image_ids', 'owner_id', '_method', 'color_options'])
                 ->toArray();
+            $data = array_merge($data, $colorStock['attributes'] ?? []);
 
             $hasDiscount   = isset($data['has_discount']) && in_array($data['has_discount'], [1, '1', true, 'true'], true);
             $discountPrice = null;

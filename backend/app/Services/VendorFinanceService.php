@@ -49,13 +49,8 @@ class VendorFinanceService
                 return;
             }
 
-            $quantities = $locked->items
-                ->filter(fn ($item) => $item->product_id)
-                ->groupBy('product_id')
-                ->map(fn ($items) => (int) $items->sum('quantity'))
-                ->sortKeys();
-            foreach ($quantities as $productId => $quantity) {
-                Product::withTrashed()->whereKey($productId)->increment('quantity_in_stock', $quantity);
+            foreach ($this->stockLines($locked->items) as [$productId, $color, $quantity]) {
+                Product::putBackStock($productId, $quantity, $color);
             }
 
             $locked->update(['stock_restored_at' => now()]);
@@ -98,16 +93,8 @@ class VendorFinanceService
             }
 
             if ($lockedOrder->stock_deducted_at && ! $lockedOrder->stock_restored_at) {
-                $quantities = $lockedOrder->items
-                    ->filter(fn ($item) => $item->product_id)
-                    ->groupBy('product_id')
-                    ->map(fn ($items) => (int) $items->sum('quantity'));
-
-                foreach ($quantities as $productId => $quantity) {
-                    $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
-                    if ($product) {
-                        $product->increment('quantity_in_stock', $quantity);
-                    }
+                foreach ($this->stockLines($lockedOrder->items) as [$productId, $color, $quantity]) {
+                    Product::putBackStock($productId, $quantity, $color);
                 }
             }
 
@@ -338,38 +325,43 @@ class VendorFinanceService
         // Load items if not already loaded
         $items = $order->relationLoaded('items') ? $order->items : $order->items()->get();
 
-        $quantities = $items
-            ->filter(fn ($item) => $item->product_id)
-            ->groupBy('product_id')
-            ->map(fn ($items) => (int) $items->sum('quantity'));
-
         // Lock in id order so two checkouts of the same products can't deadlock
-        foreach ($quantities->sortKeys() as $productId => $quantity) {
-            $product = Product::query()->whereKey($productId)->lockForUpdate()->first();
-            if (! $product) {
-                throw new \App\Exceptions\OutOfStockException('This item', 0);
-            }
-
-            // Only takes stock that is there: when two people check out the last
-            // ones at once, one gets them and the other is told, never below zero
-            $taken = Product::query()
-                ->whereKey($productId)
-                ->where('quantity_in_stock', '>=', $quantity)
-                ->decrement('quantity_in_stock', $quantity);
+        foreach ($this->stockLines($items) as [$productId, $color, $quantity]) {
+            // Only takes stock that is there (the row is locked): when two people
+            // check out the last ones at once, one gets them and the other is told
+            $taken = Product::takeStock($productId, $quantity, $color);
 
             if (! $taken) {
-                throw new \App\Exceptions\OutOfStockException(
-                    $product->product_name ?? 'This item',
-                    max(0, (int) $product->quantity_in_stock),
-                );
+                $product = Product::query()->find($productId);
+                $name = $product?->product_name ?? 'This item';
+                if ($product && $color && $product->tracksColorStock() && $product->colorIndex($color) !== null) {
+                    $name .= " ({$color})";
+                }
+                throw new \App\Exceptions\OutOfStockException($name, $product ? $product->stockFor($color) : 0);
             }
 
             Log::info('Stock deducted', [
                 'product_id' => $productId,
+                'color'      => $color,
                 'qty'        => $quantity,
                 'order_id'   => $order->id,
             ]);
         }
+    }
+
+    /**
+     * An order's items as stock lines [product id, colour, quantity]: one per
+     * product and flower colour, in product id order (a steady lock order).
+     */
+    private function stockLines($items): array
+    {
+        return collect($items)
+            ->filter(fn ($item) => $item->product_id)
+            ->groupBy(fn ($item) => $item->product_id . '|' . mb_strtolower(trim((string) $item->color)))
+            ->map(fn ($group) => [(int) $group->first()->product_id, trim((string) $group->first()->color) ?: null, (int) $group->sum('quantity')])
+            ->sortBy(fn ($line) => sprintf('%012d|%s', $line[0], (string) $line[1]))
+            ->values()
+            ->all();
     }
 
     /**

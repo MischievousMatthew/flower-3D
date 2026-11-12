@@ -82,17 +82,12 @@
                     <option v-for="t in withCurrent(taxonomies.flower_types, form.flower_type)" :key="t.value" :value="t.value">{{ t.label }}</option>
                   </select>
                 </label>
-                <label class="sp-field">
-                  <span>Colour</span>
-                  <select v-model="form.color" class="sp-select">
-                    <option value="">Not set</option>
-                    <option v-for="c in COLORS" :key="c" :value="c">{{ titleCase(c) }}</option>
-                  </select>
-                </label>
-                <label v-if="form.color === 'other'" class="sp-field">
-                  <span>Which colour?</span>
-                  <input v-model.trim="form.color_other" class="sp-input" maxlength="100" />
-                </label>
+                <div class="sp-field sp-span-all">
+                  <FlowerColorPicker v-model="form.colors" :error="errors.color || errors.color_options || ''" />
+                </div>
+                <div v-if="form.colors.length >= 2" class="sp-field sp-span-all">
+                  <ColorStockInputs v-model="form.colors" :error="errors.color_stock || ''" />
+                </div>
                 <label class="sp-field">
                   <span>Sold as</span>
                   <select v-model="form.selling_type" class="sp-select">
@@ -234,13 +229,15 @@ import api from "../../../plugins/axios";
 import { useProductTaxonomies } from "../../../composables/useProductTaxonomies";
 import { SHOP_ICONS as ICONS } from "./shopIcons";
 import { apiMessage, money, titleCase } from "./useVendorCatalog";
+import FlowerColorPicker from "./FlowerColorPicker.vue";
+import ColorStockInputs from "./ColorStockInputs.vue";
+import { colorFields, colorProblem, colorsFromProduct } from "../../../utils/flowerColors.js";
 
 const props = defineProps({ productId: { type: Number, default: null } });
 const emit = defineEmits(["close", "saved"]);
 
 const { taxonomies, withCurrent } = useProductTaxonomies();
 
-const COLORS = ["white", "yellow", "red", "pink", "purple", "orange", "blue", "green", "cream", "other"];
 const SEASONS = [
   { value: "all-year", label: "All year round" },
   { value: "spring", label: "Spring" },
@@ -289,8 +286,7 @@ async function fetch() {
       sku: p.sku ?? "",
       category: p.category ?? "",
       flower_type: p.flower_type ?? "",
-      color: p.color ?? "",
-      color_other: p.color_other ?? "",
+      colors: colorsFromProduct(p), // every flower colour, the first is the main one
       selling_type: p.selling_type ?? "per_piece",
       season: p.season ?? "all-year",
       selling_price: Number(p.selling_price ?? 0),
@@ -386,6 +382,8 @@ function validate() {
   if (!form.value.product_name) errors.product_name = "Give the product a name.";
   if (!(Number(form.value.selling_price) > 0)) errors.selling_price = "Set a selling price above ₱0.";
   if (photoCount.value === 0) errors.images = "Keep at least one photo.";
+  const colorIssue = form.value.colors.length ? colorProblem(form.value.colors) : "";
+  if (colorIssue) errors[colorIssue.startsWith("Enter how many") ? "color_stock" : "color"] = colorIssue;
   return Object.keys(errors).length === 0;
 }
 
@@ -396,9 +394,13 @@ async function save() {
     const fd = new FormData();
     fd.append("_method", "PUT");
     for (const [key, value] of Object.entries(form.value)) {
-      if (key === "occasion_tags") continue;
+      if (key === "occasion_tags" || key === "colors") continue;
       if (typeof value === "boolean") fd.append(key, value ? "1" : "0");
       else fd.append(key, value ?? "");
+    }
+    // Flower colours (and a stock count per colour when there are 2 or more)
+    if (form.value.colors.length) {
+      for (const [key, value] of Object.entries(colorFields(form.value.colors))) fd.append(key, String(value));
     }
     if (form.value.occasion_tags.length) form.value.occasion_tags.forEach((t) => fd.append("occasion_tags[]", t));
     else fd.append("occasion_tags", "");

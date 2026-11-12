@@ -67,30 +67,9 @@
               <small v-if="errors.description" class="sp-error">{{ errors.description }}</small>
               <small v-else>{{ form.description.length }}/3000</small>
             </label>
-            <div data-change="color" class="sp-field">
-              <span class="sp-label">Colour</span>
-              <div class="ap-colors" role="radiogroup" aria-label="Colour">
-                <button
-                  v-for="c in COLORS"
-                  :key="c.value"
-                  type="button"
-                  role="radio"
-                  class="ap-swatch"
-                  :class="{ on: form.color === c.value }"
-                  :aria-checked="form.color === c.value"
-                  :title="c.label"
-                  :style="{ '--sw': c.hex }"
-                  @click="setColor(c.value)"
-                ><span class="sr-only">{{ c.label }}</span></button>
-              </div>
-              <small v-if="errors.color" class="sp-error">{{ errors.color }}</small>
-              <small v-else>{{ colorLabel || "Pick the main colour" }}</small>
+            <div data-change="colors" class="sp-field sp-span-all">
+              <FlowerColorPicker :model-value="form.colors" :error="errors.color || ''" @update:model-value="setColors" />
             </div>
-            <label data-change="color_other" v-if="form.color === 'other'" class="sp-field">
-              <span>Which colour?</span>
-              <input v-model="form.color_other" class="sp-input" :class="{ invalid: errors.color_other }" maxlength="100" placeholder="e.g. Burgundy, Lavender" @input="clear('color_other')" />
-              <small v-if="errors.color_other" class="sp-error">{{ errors.color_other }}</small>
-            </label>
             <label data-change="sku" class="sp-field">
               <span>SKU</span>
               <div class="ap-inline">
@@ -228,11 +207,24 @@
               <span>{{ s.hint }}</span>
             </button>
           </div>
+          <div v-if="multiColor" data-change="colors" class="ap-gap">
+            <ColorStockInputs :model-value="form.colors" :error="errors.color_stock || ''" @update:model-value="setColors" />
+          </div>
           <div class="sp-grid-3 ap-gap">
             <label data-change="quantity_in_stock" class="sp-field">
               <span>In stock</span>
-              <input v-model.number="form.quantity_in_stock" type="number" min="0" step="1" class="sp-input" :class="{ invalid: errors.quantity_in_stock }" @input="clear('quantity_in_stock')" />
+              <input
+                v-model.number="form.quantity_in_stock"
+                type="number"
+                min="0"
+                step="1"
+                class="sp-input"
+                :class="{ invalid: errors.quantity_in_stock }"
+                :readonly="multiColor"
+                @input="clear('quantity_in_stock')"
+              />
               <small v-if="errors.quantity_in_stock" class="sp-error">{{ errors.quantity_in_stock }}</small>
+              <small v-else-if="multiColor">The total of the colours above</small>
             </label>
             <label data-change="min_stock_level" class="sp-field">
               <span>Warn me at</span>
@@ -371,24 +363,15 @@ import { useSubscriptionAccess } from "../../composables/useSubscriptionAccess";
 import { SUBSCRIPTION_MODULES } from "../../constants/subscriptionModules";
 import { useUnsavedChanges } from "../../composables/useUnsavedChanges";
 import "../../components/vendor/shop/shop.css";
+import FlowerColorPicker from "../../components/vendor/shop/FlowerColorPicker.vue";
+import ColorStockInputs from "../../components/vendor/shop/ColorStockInputs.vue";
+import { colorFields, colorProblem, countsPerColor, totalOf } from "../../utils/flowerColors.js";
 
 const route = useRoute();
 const router = useRouter();
 const { taxonomies, withCurrent } = useProductTaxonomies();
 const { load: reloadCatalog } = useVendorCatalog();
 
-const COLORS = [
-  { value: "white", label: "White", hex: "#ffffff" },
-  { value: "cream", label: "Cream", hex: "#f5ecd7" },
-  { value: "yellow", label: "Yellow", hex: "#f6d743" },
-  { value: "orange", label: "Orange", hex: "#f6943b" },
-  { value: "red", label: "Red", hex: "#d63031" },
-  { value: "pink", label: "Pink", hex: "#f78fb3" },
-  { value: "purple", label: "Purple", hex: "#8e5bd6" },
-  { value: "blue", label: "Blue", hex: "#4a90e2" },
-  { value: "green", label: "Green", hex: "#4caf50" },
-  { value: "other", label: "Other", hex: "conic-gradient(#f78fb3, #f6d743, #4a90e2, #8e5bd6, #f78fb3)" },
-];
 const SEASONS = [
   { value: "all-year", label: "All year round" },
   { value: "spring", label: "Spring" },
@@ -417,6 +400,7 @@ const blank = () => ({
   flower_type: "",
   color: "",
   color_other: "",
+  colors: [], // [{ value, name, quantity }]: every flower colour, the first is the main one
   purchase_price: null,
   selling_price: null,
   has_discount: false,
@@ -456,15 +440,12 @@ const salePercent = computed(() => {
   const sale = Number(form.discount_price) || 0;
   return form.has_discount && price > 0 && sale > 0 && sale < price ? Math.round((1 - sale / price) * 100) : 0;
 });
-const colorLabel = computed(() =>
-  form.color === "other" ? form.color_other || "Other" : COLORS.find((c) => c.value === form.color)?.label,
-);
 // 3D-customizable flowers are used inside custom bouquets, not listed by occasion
 const needsOccasion = computed(() => form.selling_type !== "per_piece_customizable");
 const categoryLabel = computed(() => taxonomies.categories.find((c) => c.value === form.category)?.label);
 const steps = computed(() => ({
   photos: images.value.length > 0,
-  basics: !!(form.product_name.trim() && form.description.trim() && form.sku.trim() && form.color && (form.color !== "other" || form.color_other.trim())),
+  basics: !!(form.product_name.trim() && form.description.trim() && form.sku.trim() && !colorProblem(form.colors.slice(0, 1)) && !form.colors.some((c) => c.value === "other" && !String(c.name || "").trim())),
   organize: !!(form.category && form.flower_type && (form.occasion_tags.length || !needsOccasion.value)),
   price: Number(form.selling_price) > 0 && Number(form.purchase_price) >= 0 && form.purchase_price !== null && profit.value > 0 && (!form.has_discount || salePercent.value > 0),
   stock: Number.isInteger(Number(form.quantity_in_stock)) && Number(form.quantity_in_stock) >= 0,
@@ -473,7 +454,7 @@ const progress = computed(() => (Object.values(steps.value).filter(Boolean).leng
 
 // What View changes steps through, in page order; each falls back to its step card
 const FIELD_LABELS = [
-  ["ap-basics", { product_name: "Product name", description: "Description", color: "Colour", color_other: "Colour name", sku: "SKU" }],
+  ["ap-basics", { product_name: "Product name", description: "Description", colors: "Flower colours", sku: "SKU" }],
   ["ap-organize", { category: "Category", flower_type: "Flower type", occasion_tags: "Occasions" }],
   ["ap-price", { selling_price: "Selling price", purchase_price: "Your cost", has_discount: "On sale", discount_price: "Sale price" }],
   ["ap-stock", { selling_type: "How it's sold", quantity_in_stock: "In stock", min_stock_level: "Warn me at", max_stock_level: "Maximum stock", season: "Season", preparation_days: "Preparation time" }],
@@ -505,10 +486,24 @@ function discardAll() {
 
 // ── Inputs ────────────────────────────────────────────────────────────────
 const clear = (key) => delete errors[key];
-function setColor(value) {
-  form.color = value;
-  if (value !== "other") form.color_other = "";
+// Two or more flower colours: each has its own stock, and the total is their sum
+const multiColor = computed(() => countsPerColor(form.colors));
+function setColors(list) {
+  // Going from one colour to two: the stock entered so far belongs to the first
+  if (countsPerColor(list) && !countsPerColor(form.colors) && list[0]) {
+    list = list.map((c, i) => (i === 0 ? { ...c, quantity: Number(form.quantity_in_stock) || 0 } : c));
+  }
+  // Back to one colour: its count becomes the product's stock
+  if (list.length === 1 && countsPerColor(form.colors)) {
+    form.quantity_in_stock = Number(list[0].quantity) || 0;
+  }
+  form.colors = list;
+  form.color = list[0]?.value || "";
+  form.color_other = list[0]?.value === "other" ? String(list[0].name || "") : "";
+  if (countsPerColor(list)) form.quantity_in_stock = totalOf(list);
   clear("color");
+  clear("color_stock");
+  clear("quantity_in_stock");
 }
 function toggleOccasion(value) {
   const i = form.occasion_tags.indexOf(value);
@@ -614,8 +609,11 @@ function validate(status) {
   // The server needs these for drafts too, so check them either way
   if (!form.description.trim()) e.description = "Add a short description.";
   if (!form.sku.trim()) e.sku = "Add a SKU, or press Generate.";
-  if (!form.color) e.color = "Pick a colour.";
-  else if (form.color === "other" && !form.color_other.trim()) e.color_other = "Name the colour.";
+  const colorIssue = colorProblem(form.colors);
+  if (colorIssue) {
+    if (colorIssue.startsWith("Enter how many")) e.color_stock = colorIssue;
+    else e.color = colorIssue;
+  }
   if (!form.category) e.category = "Pick a category.";
   if (!form.flower_type) e.flower_type = "Pick a flower type.";
   if (!(Number(form.selling_price) > 0)) e.selling_price = "Set a selling price.";
@@ -629,7 +627,7 @@ function validate(status) {
   if (first) {
     toast.error(e[first]);
     const anchor = {
-      images: "ap-photos", product_name: "ap-basics", description: "ap-basics", sku: "ap-basics", color: "ap-basics", color_other: "ap-basics",
+      images: "ap-photos", product_name: "ap-basics", description: "ap-basics", sku: "ap-basics", color: "ap-basics", color_stock: "ap-stock",
       category: "ap-organize", flower_type: "ap-organize", occasion_tags: "ap-organize",
       selling_price: "ap-price", purchase_price: "ap-price", discount_price: "ap-price", quantity_in_stock: "ap-stock",
     }[first];
@@ -646,11 +644,11 @@ async function submit(status) {
     const fields = {
       ...form,
       status,
-      color_other: form.color === "other" ? form.color_other : "",
+      ...colorFields(form.colors),
       discount_price: form.has_discount ? form.discount_price : "",
     };
     for (const [key, value] of Object.entries(fields)) {
-      if (key === "occasion_tags") continue;
+      if (key === "occasion_tags" || key === "colors") continue;
       if (typeof value === "boolean") fd.append(key, value ? "1" : "0");
       else if (value !== null && value !== undefined && value !== "") fd.append(key, String(value).trim());
     }
