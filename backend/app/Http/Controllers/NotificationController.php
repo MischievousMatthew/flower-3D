@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\UserNotification;
+use App\Services\AnnouncementNotices;
 use App\Services\VendorNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -63,12 +64,20 @@ class NotificationController extends Controller
         return response()->json(['success' => true, 'unread' => 0]);
     }
 
-    /** Vendors: turn new shop events into notifications first */
+    /**
+     * Fill the inbox first: vendors get new shop events, customers get the
+     * announcements showing on the shop right now.
+     */
     private function syncShop(Request $request): void
     {
         $user = $request->user();
-        if ($user instanceof User && $user->isVendor()) {
+        if (! $user instanceof User) {
+            return;
+        }
+        if ($user->isVendor()) {
             app(VendorNotificationService::class)->sync($user);
+        } elseif ($user->isCustomer()) {
+            app(AnnouncementNotices::class)->deliver($user);
         }
     }
 

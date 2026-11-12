@@ -6,6 +6,8 @@ export function notificationTarget(link) {
   if (!link.startsWith("route:")) return link;
   const [name, qs] = link.slice(6).split("?");
   const query = Object.fromEntries(new URLSearchParams(qs ?? ""));
+  // A shop's page is opened by its id in the history state, not the address
+  if (name === "VendorStorefront" && query.storeId) return { name, state: { storeId: String(query.storeId) } };
   return { name, query };
 }
 

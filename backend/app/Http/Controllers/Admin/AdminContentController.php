@@ -12,6 +12,7 @@ use App\Models\ProductTaxonomy;
 use App\Models\SiteBanner;
 use App\Models\SiteSetting;
 use App\Models\VendorApplication;
+use App\Services\AnnouncementNotices;
 use App\Support\VendorDirectory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -334,7 +335,13 @@ class AdminContentController extends Controller
         // Announcements are a slim text bar, so only promotions take a picture
         $image = $item->kind === Announcement::PROMOTION ? $request->file('image') : null;
 
-        return $this->saveWithImage($item, $image, 'image', 'site_promotions', 'Saved.');
+        $response = $this->saveWithImage($item, $image, 'image', 'site_promotions', 'Saved.');
+        // Customers' notifications follow the edit (or lose it once it's switched off)
+        if ($response->isSuccessful()) {
+            app(AnnouncementNotices::class)->refresh($item);
+        }
+
+        return $response;
     }
 
     /**
@@ -458,7 +465,13 @@ class AdminContentController extends Controller
 
     public function deleteAnnouncement(int $id): JsonResponse
     {
-        return $this->deleteWithImage(Announcement::find($id), 'image_path');
+        $item = Announcement::find($id);
+        $response = $this->deleteWithImage($item, 'image_path');
+        if ($item && $response->isSuccessful()) {
+            app(AnnouncementNotices::class)->refresh($item, deleted: true);
+        }
+
+        return $response;
     }
 
     /**

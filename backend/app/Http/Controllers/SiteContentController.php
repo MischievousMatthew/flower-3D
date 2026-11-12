@@ -8,6 +8,9 @@ use App\Models\Product;
 use App\Models\ProductTaxonomy;
 use App\Models\SiteBanner;
 use App\Models\SiteSetting;
+use App\Models\User;
+use App\Services\AccountSuspensionService;
+use App\Support\SingleSession;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -21,8 +24,10 @@ class SiteContentController extends Controller
     /**
      * GET /api/site/home
      */
-    public function home(): JsonResponse
+    public function home(Request $request): JsonResponse
     {
+        // The announcement bar is for signed-in customers only, not guests
+        $forCustomer = $this->viewerIsCustomer($request);
         $publicFields = ['id', 'title', 'message', 'promo_code', 'image_url', 'link_label', 'link_type', 'link_value', 'tone', 'ends_at'];
         $showing = Announcement::showing()->orderBy('sort_order')->get();
 
@@ -32,7 +37,7 @@ class SiteContentController extends Controller
                 'banners' => SiteBanner::showing()->orderBy('sort_order')->get([
                     'id', 'eyebrow', 'title', 'subtitle', 'image_url', 'button_label', 'link_type', 'link_value',
                 ]),
-                'announcements' => $showing->where('kind', Announcement::ANNOUNCEMENT)->map->only($publicFields)->values(),
+                'announcements' => $forCustomer ? $showing->where('kind', Announcement::ANNOUNCEMENT)->map->only($publicFields)->values() : [],
                 'promotions' => $showing->where('kind', Announcement::PROMOTION)->map->only($publicFields)->values(),
                 // One post from each of up to three categories (see Article::teasers)
                 'articles' => Article::teasers(3)
@@ -44,6 +49,24 @@ class SiteContentController extends Controller
                 'announcement_bar' => SiteSetting::announcementBar(),
             ],
         ]);
+    }
+
+    /**
+     * This page is public, so there's no sign-in check in front of it: a
+     * working customer sign-in is looked up here, the way TokenAuth does it.
+     */
+    private function viewerIsCustomer(Request $request): bool
+    {
+        $token = trim((string) $request->bearerToken());
+        if ($token === '') {
+            return false;
+        }
+        $user = User::query()->where('api_token', hash('sha256', $token))->first();
+
+        return $user instanceof User
+            && $user->isCustomer()
+            && ! AccountSuspensionService::isBlocked($user)
+            && ! SingleSession::isExpired($user);
     }
 
     /**

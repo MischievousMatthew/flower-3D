@@ -58,11 +58,18 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useSiteContent } from "../../composables/useSiteContent";
+import { useAuth } from "../../composables/useAuth";
 import { ANNOUNCEMENT_ICONS as ICONS } from "../../constants/announcementTones";
 
 /** Announcements from Admin → Promotion Management, one at a time; dismissals are remembered */
 const router = useRouter();
-const { site, followLink } = useSiteContent();
+const { site, followLink, reload } = useSiteContent();
+
+// Signed-in customers only: guests (and vendors browsing the shop) don't get the bar.
+// The server leaves announcements out for them too; signing in or out fetches again.
+const { user } = useAuth();
+const isCustomer = computed(() => !!user.value && (!user.value.role || user.value.role === "customer"));
+watch(isCustomer, () => reload());
 const STORAGE_KEY = "bc_dismissed_announcements";
 const DAY = 86_400_000;
 
@@ -111,7 +118,8 @@ const isHidden = (id) => {
   if (play.value.dismiss_for === "forever") return true;
   return Date.now() - entry.at < Number(play.value.dismiss_for) * DAY;
 };
-const visible = computed(() => (props.items ?? site.announcements).filter((a) => !isHidden(a.id)));
+// The admin preview always shows its items; the live bar only for customers
+const visible = computed(() => (props.items ?? (isCustomer.value ? site.announcements : [])).filter((a) => !isHidden(a.id)));
 const position = computed(() => index.value % Math.max(visible.value.length, 1));
 const current = computed(() => visible.value[position.value] ?? null);
 const tone = computed(() => (ICONS[current.value?.tone] ? current.value.tone : "brand"));
