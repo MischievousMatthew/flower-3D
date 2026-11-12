@@ -403,7 +403,7 @@
               <span class="summary-muted">Set by the shop</span>
             </div>
             <p class="delivery-note">
-              Each shop books its own third-party courier, so the shop sets the delivery fee for your order.
+              Each shop books its own third-party courier and bills you the delivery fee separately.
             </p>
           </div>
 

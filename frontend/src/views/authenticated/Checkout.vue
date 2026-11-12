@@ -378,7 +378,7 @@
               <div><dt>Delivery fee</dt><dd v-if="deliveryFee > 0">₱{{ formatPrice(deliveryFee) }}</dd><dd v-else class="by-shop">Set by the shop</dd></div>
               <div class="grand"><dt>Total amount</dt><dd>₱{{ formatPrice(totalAmount) }}</dd></div>
             </dl>
-            <p v-if="!(deliveryFee > 0)" class="co-delivery-note">Each shop books its own third-party courier, so the shop sets the delivery fee. It isn't included in this total.</p>
+            <p v-if="!(deliveryFee > 0)" class="co-delivery-note">Each shop books its own third-party courier and bills you the delivery fee separately, so it isn't included in this total.</p>
 
             <div class="co-actions co-actions--final">
               <button type="button" class="co-back" :disabled="isProcessing" @click="goToStep(2)">
@@ -422,7 +422,7 @@
             <div><dt>Delivery fee</dt><dd v-if="deliveryFee > 0">₱{{ formatPrice(deliveryFee) }}</dd><dd v-else class="by-shop">Set by the shop</dd></div>
             <div class="grand"><dt>Total</dt><dd>₱{{ formatPrice(totalAmount) }}</dd></div>
           </dl>
-          <p v-if="!(deliveryFee > 0)" class="co-delivery-note">Each shop books its own third-party courier, so the shop sets the delivery fee. It isn't included in this total.</p>
+          <p v-if="!(deliveryFee > 0)" class="co-delivery-note">Each shop books its own third-party courier and bills you the delivery fee separately, so it isn't included in this total.</p>
           <p v-if="selectedDate" class="co-sum-date">
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></svg>
             Delivery on <strong>{{ formatSelectedDate }}</strong>
