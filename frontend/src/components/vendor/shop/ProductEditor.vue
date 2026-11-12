@@ -85,7 +85,7 @@
                 <div class="sp-field sp-span-all">
                   <FlowerColorPicker v-model="form.colors" :error="errors.color || errors.color_options || ''" />
                 </div>
-                <div v-if="form.colors.length >= 2" class="sp-field sp-span-all">
+                <div v-if="form.colors.length >= 2 && !linkedBouquet" class="sp-field sp-span-all">
                   <ColorStockInputs v-model="form.colors" :error="errors.color_stock || ''" />
                 </div>
                 <label class="sp-field">
@@ -97,7 +97,7 @@
                   </select>
                 </label>
                 <div v-if="form.selling_type === 'bouquet'" class="sp-field sp-span-all">
-                  <BouquetFlowersInput v-model="form.composition" :error="errors.composition || ''" :cost-value="form.purchase_price" @use-cost="(v) => (form.purchase_price = v)" />
+                  <BouquetFlowersInput v-model="form.composition" :flowers="linkableFlowers" :error="errors.composition || ''" :cost-value="form.purchase_price" @use-cost="(v) => (form.purchase_price = v)" />
                 </div>
                 <label class="sp-field">
                   <span>Season</span>
@@ -236,7 +236,7 @@ import FlowerColorPicker from "./FlowerColorPicker.vue";
 import ColorStockInputs from "./ColorStockInputs.vue";
 import { colorFields, colorProblem, colorsFromProduct } from "../../../utils/flowerColors.js";
 import BouquetFlowersInput from "./BouquetFlowersInput.vue";
-import { compositionField, compositionFromProduct, compositionProblem } from "../../../utils/bouquetComposition.js";
+import { compositionField, compositionFromProduct, compositionProblem, hasLinks } from "../../../utils/bouquetComposition.js";
 
 const props = defineProps({ productId: { type: Number, default: null } });
 const emit = defineEmits(["close", "saved"]);
@@ -277,9 +277,17 @@ const margin = computed(() => {
 const withCurrentList = (list, current) =>
   current.reduce((acc, value) => withCurrent(acc, value), list);
 
+// The shop's single flowers a bouquet's flowers can be linked to (not this product itself)
+const linkableFlowers = ref([]);
+const linkedBouquet = computed(() => !!form.value && form.value.selling_type === "bouquet" && hasLinks(form.value.composition));
+
 async function fetch() {
   loadError.value = "";
   form.value = null;
+  api
+    .get("vendor/products/linkable-flowers")
+    .then(({ data }) => (linkableFlowers.value = (data.data ?? []).filter((f) => f.id !== Number(props.productId))))
+    .catch(() => (linkableFlowers.value = []));
   try {
     const { data } = await api.get(`vendor/products/${props.productId}`);
     const p = data.data;
@@ -388,8 +396,10 @@ function validate() {
   if (!form.value.product_name) errors.product_name = "Give the product a name.";
   if (!(Number(form.value.selling_price) > 0)) errors.selling_price = "Set a selling price above ₱0.";
   if (photoCount.value === 0) errors.images = "Keep at least one photo.";
+  // Colour counts don't apply to a bouquet whose stock comes from linked flowers
   const colorIssue = form.value.colors.length ? colorProblem(form.value.colors) : "";
-  if (colorIssue) errors[colorIssue.startsWith("Enter how many") ? "color_stock" : "color"] = colorIssue;
+  const skipCounts = linkedBouquet.value && colorIssue.startsWith("Enter how many");
+  if (colorIssue && !skipCounts) errors[colorIssue.startsWith("Enter how many") ? "color_stock" : "color"] = colorIssue;
   const flowersIssue = form.value.selling_type === "bouquet" ? compositionProblem(form.value.composition) : "";
   if (flowersIssue) errors.composition = flowersIssue;
   return Object.keys(errors).length === 0;

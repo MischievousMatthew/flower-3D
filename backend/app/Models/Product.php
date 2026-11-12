@@ -162,9 +162,144 @@ class Product extends Model
         $this->quantity_in_stock = $sum;
     }
 
+    // ── Bouquets made from linked single flowers ────────────────────────────
+    // A bouquet's composition rows can carry product_id: a single-flower
+    // product of the same shop. A bouquet with linked flowers has no stock of
+    // its own: it can sell as many as its flowers make (stock ÷ pieces, the
+    // lowest of them), and selling one takes those pieces from the flowers.
+
+    public const LINKED_STOCK_MESSAGE = "This bouquet's stock comes from its linked flowers. Change the flowers' stock instead.";
+
+    /** The linked rows of a bouquet: [[product_id, colour|null, pieces], …] */
+    public function linkedFlowers(): array
+    {
+        if ($this->selling_type !== 'bouquet' || ! is_array($this->composition)) {
+            return [];
+        }
+        $rows = [];
+        foreach ($this->composition as $f) {
+            $id = is_array($f) ? (int) ($f['product_id'] ?? 0) : 0;
+            $count = is_array($f) ? (int) ($f['count'] ?? 0) : 0;
+            if ($id > 0 && $count > 0 && $id !== (int) $this->id) {
+                $color = trim((string) ($f['color'] ?? ''));
+                $rows[] = [$id, $color !== '' ? $color : null, $count];
+            }
+        }
+        return $rows;
+    }
+
+    public function isLinkedBouquet(): bool
+    {
+        return $this->linkedFlowers() !== [];
+    }
+
+    /** How many this bouquet can make from its linked flowers' stock, or null when none of them exists */
+    public function stockFromFlowers(): ?int
+    {
+        $rows = $this->linkedFlowers();
+        if (! $rows) {
+            return null;
+        }
+        $flowers = static::query()
+            ->whereIn('id', array_unique(array_column($rows, 0)))
+            ->where('owner_id', $this->owner_id)
+            ->get()
+            ->keyBy('id');
+        $make = null;
+        foreach ($rows as [$id, $color, $count]) {
+            $flower = $flowers->get($id);
+            if (! $flower) {
+                continue; // a deleted flower no longer limits the bouquet
+            }
+            $can = intdiv($flower->stockFor($color), $count);
+            $make = $make === null ? $can : min($make, $can);
+        }
+        return $make;
+    }
+
+    /** A linked bouquet's stock always follows its flowers; its colours are choices without counts */
+    private function syncBouquetStock(): void
+    {
+        if (! $this->isLinkedBouquet()) {
+            return;
+        }
+        if (is_array($this->color_options) && $this->tracksColorStock()) {
+            $this->color_options = array_map(
+                fn ($c) => is_array($c) ? array_diff_key($c, ['quantity' => true]) : $c,
+                $this->color_options,
+            );
+        }
+        $make = $this->stockFromFlowers();
+        if ($make !== null) {
+            $this->quantity_in_stock = $make;
+        }
+    }
+
+    /** After a flower's stock changes, the bouquets made from it follow */
+    private function refreshLinkedBouquets(): void
+    {
+        if ($this->selling_type === 'bouquet' || ! $this->owner_id) {
+            return;
+        }
+        static::query()
+            ->where('owner_id', $this->owner_id)
+            ->where('selling_type', 'bouquet')
+            ->whereNotNull('composition')
+            ->get()
+            ->filter(fn (Product $b) => in_array((int) $this->id, array_column($b->linkedFlowers(), 0), true))
+            ->each(function (Product $b) {
+                $make = $b->stockFromFlowers();
+                if ($make !== null && $make !== (int) $b->quantity_in_stock) {
+                    $b->quantity_in_stock = $make;
+                    $b->save();
+                }
+            });
+    }
+
+    /**
+     * What a set of order lines takes off the shelves: a linked bouquet becomes
+     * its flowers (pieces × quantity, in the row's colour), anything else stays
+     * itself. Lines for the same product and colour are added up, in product
+     * id order (a steady lock order). Each line: [product_id, colour|null, quantity, for]
+     * where `for` is the bouquet's id when the stems are for a bouquet.
+     */
+    public static function stockPlan(array $lines): array
+    {
+        $products = static::withTrashed()->whereIn('id', array_unique(array_column($lines, 0)))->get()->keyBy('id');
+        $plan = [];
+        $add = function (int $id, ?string $color, int $qty, ?int $for) use (&$plan) {
+            $key = $id . '|' . mb_strtolower((string) $color);
+            $plan[$key] ??= [$id, $color, 0, $for];
+            $plan[$key][2] += $qty;
+        };
+        foreach ($lines as [$id, $color, $qty]) {
+            $product = $products->get($id);
+            $flowers = $product ? $product->linkedFlowers() : [];
+            if ($flowers) {
+                foreach ($flowers as [$flowerId, $flowerColor, $pieces]) {
+                    $add($flowerId, $flowerColor, $pieces * $qty, (int) $product->id);
+                }
+            } else {
+                $add($id, $color, $qty, null);
+            }
+        }
+        $plan = array_values($plan);
+        usort($plan, fn ($a, $b) => [$a[0], (string) $a[1]] <=> [$b[0], (string) $b[1]]);
+        return $plan;
+    }
+
     protected static function booted(): void
     {
-        static::saving(fn (Product $product) => $product->syncColorStock());
+        static::saving(function (Product $product) {
+            $product->syncColorStock();
+            $product->syncBouquetStock();
+        });
+        static::saved(function (Product $product) {
+            if ($product->wasChanged('quantity_in_stock') || $product->wasChanged('color_options') || $product->wasRecentlyCreated) {
+                $product->refreshLinkedBouquets();
+            }
+        });
+        static::deleted(fn (Product $product) => $product->refreshLinkedBouquets());
 
         // Low-stock alert: tell the shop owner once, when stock drops to or
         // below the minimum (not again until it has been refilled above it)

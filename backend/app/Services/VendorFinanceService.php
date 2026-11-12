@@ -49,7 +49,7 @@ class VendorFinanceService
                 return;
             }
 
-            foreach ($this->stockLines($locked->items) as [$productId, $color, $quantity]) {
+            foreach ($this->takenLines($locked) as [$productId, $color, $quantity]) {
                 Product::putBackStock($productId, $quantity, $color);
             }
 
@@ -93,7 +93,7 @@ class VendorFinanceService
             }
 
             if ($lockedOrder->stock_deducted_at && ! $lockedOrder->stock_restored_at) {
-                foreach ($this->stockLines($lockedOrder->items) as [$productId, $color, $quantity]) {
+                foreach ($this->takenLines($lockedOrder) as [$productId, $color, $quantity]) {
                     Product::putBackStock($productId, $quantity, $color);
                 }
             }
@@ -325,13 +325,20 @@ class VendorFinanceService
         // Load items if not already loaded
         $items = $order->relationLoaded('items') ? $order->items : $order->items()->get();
 
-        // Lock in id order so two checkouts of the same products can't deadlock
-        foreach ($this->stockLines($items) as [$productId, $color, $quantity]) {
+        // A bouquet made from linked flowers takes those flowers, not itself.
+        // Lock in id order so two checkouts of the same products can't deadlock.
+        $plan = Product::stockPlan($this->stockLines($items));
+        foreach ($plan as [$productId, $color, $quantity, $forBouquet]) {
             // Only takes stock that is there (the row is locked): when two people
             // check out the last ones at once, one gets them and the other is told
             $taken = Product::takeStock($productId, $quantity, $color);
 
             if (! $taken) {
+                // Short of stems: name the bouquet and how many of it can still be made
+                $bouquet = $forBouquet ? Product::query()->find($forBouquet) : null;
+                if ($bouquet) {
+                    throw new \App\Exceptions\OutOfStockException($bouquet->product_name, max(0, (int) $bouquet->stockFromFlowers()));
+                }
                 $product = Product::query()->find($productId);
                 $name = $product?->product_name ?? 'This item';
                 if ($product && $color && $product->tracksColorStock() && $product->colorIndex($color) !== null) {
@@ -341,12 +348,39 @@ class VendorFinanceService
             }
 
             Log::info('Stock deducted', [
-                'product_id' => $productId,
-                'color'      => $color,
-                'qty'        => $quantity,
-                'order_id'   => $order->id,
+                'product_id'  => $productId,
+                'color'       => $color,
+                'qty'         => $quantity,
+                'for_bouquet' => $forBouquet,
+                'order_id'    => $order->id,
             ]);
         }
+
+        // Remember exactly what was taken, to put the same back if it's cancelled
+        if (self::ordersKeepStockLines()) {
+            DB::table('orders')->where('id', $order->id)->update([
+                'stock_lines' => json_encode(array_map(fn ($l) => [$l[0], $l[1], $l[2]], $plan)),
+            ]);
+        }
+    }
+
+    /** What an order took off the shelves: what it recorded, else (older orders) its items */
+    private function takenLines(Order $order): array
+    {
+        $saved = self::ordersKeepStockLines() ? DB::table('orders')->where('id', $order->id)->value('stock_lines') : null;
+        $lines = is_string($saved) ? json_decode($saved, true) : null;
+        if (is_array($lines)) {
+            return array_map(fn ($l) => [(int) $l[0], $l[1] ?? null, (int) $l[2]], array_filter($lines, 'is_array'));
+        }
+
+        return $this->stockLines($order->items);
+    }
+
+    private static ?bool $hasStockLines = null;
+
+    private static function ordersKeepStockLines(): bool
+    {
+        return self::$hasStockLines ??= \Illuminate\Support\Facades\Schema::hasColumn('orders', 'stock_lines');
     }
 
     /**

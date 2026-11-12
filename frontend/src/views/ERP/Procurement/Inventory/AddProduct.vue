@@ -274,7 +274,7 @@
             <div class="form-section">
               <h2 class="section-title">Stock Management</h2>
               <div class="form-grid">
-                <div v-if="multiColor" class="form-group full-width" data-field="color_stock">
+                <div v-if="colorCounts" class="form-group full-width" data-field="color_stock">
                   <ColorStockInputs
                     :model-value="formData.colors"
                     :error="errors.color_stock || ''"
@@ -290,14 +290,14 @@
                     placeholder="0"
                     class="form-input"
                     :class="{ 'is-invalid': errors.quantity_in_stock }"
-                    :readonly="multiColor"
+                    :readonly="colorCounts || fromLinks !== null"
                     @input="clearError('quantity_in_stock')"
                     required
                   />
                   <span v-if="errors.quantity_in_stock" class="error-text">{{
                     errors.quantity_in_stock
                   }}</span>
-                  <span class="hint-text">{{ multiColor ? "The total of the colours above" : "Current available units" }}</span>
+                  <span class="hint-text">{{ fromLinks !== null ? "From the linked flowers" : colorCounts ? "The total of the colours above" : "Current available units" }}</span>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Minimum Stock Level *</label>
@@ -394,6 +394,7 @@
                 <div v-if="formData.selling_type === 'bouquet'" class="form-group full-width" data-field="composition">
                   <BouquetFlowersInput
                     v-model="formData.composition"
+                    :flowers="linkableFlowers"
                     :error="errors.composition || ''"
                     :cost-value="formData.purchase_price"
                     @use-cost="(v) => { formData.purchase_price = v; clearError('purchase_price'); }"
@@ -650,7 +651,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from "vue";
+import { ref, computed, onMounted, reactive, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../../../composables/useAuth";
 import {
@@ -665,7 +666,7 @@ import FlowerColorPicker from "../../../../components/vendor/shop/FlowerColorPic
 import ColorStockInputs from "../../../../components/vendor/shop/ColorStockInputs.vue";
 import { colorFields, colorProblem, countsPerColor, totalOf } from "../../../../utils/flowerColors.js";
 import BouquetFlowersInput from "../../../../components/vendor/shop/BouquetFlowersInput.vue";
-import { compositionField, compositionProblem } from "../../../../utils/bouquetComposition.js";
+import { compositionField, compositionProblem, stockFromLinks } from "../../../../utils/bouquetComposition.js";
 
 const { taxonomies, withCurrent } = useProductTaxonomies();
 
@@ -747,6 +748,22 @@ const calculateProfit = () => {}; // triggered by @input — computed handles th
 
 // Two or more flower colours: each has its own stock, and the total is their sum
 const multiColor = computed(() => countsPerColor(formData.colors));
+
+// A bouquet whose flowers are linked to single flowers in stock: its stock is
+// what those flowers make, so colour counts and the stock box don't apply
+const linkableFlowers = ref([]);
+api
+  .get("procurement/inventory/products/linkable-flowers")
+  .then(({ data }) => (linkableFlowers.value = data.data ?? []))
+  .catch(() => {}); // linking just isn't offered then
+const fromLinks = computed(() =>
+  formData.selling_type === "bouquet" ? stockFromLinks(formData.composition, linkableFlowers.value) : null,
+);
+const colorCounts = computed(() => multiColor.value && fromLinks.value === null);
+watch(fromLinks, (make) => {
+  if (make !== null) formData.quantity_in_stock = make;
+  else if (multiColor.value) formData.quantity_in_stock = totalOf(formData.colors);
+});
 const setColors = (list) => {
   // Going from one colour to two: the stock entered so far belongs to the first
   if (countsPerColor(list) && !countsPerColor(formData.colors) && list[0]) {
@@ -759,7 +776,7 @@ const setColors = (list) => {
   formData.colors = list;
   formData.color = list[0]?.value || "";
   formData.color_other = list[0]?.value === "other" ? String(list[0].name || "") : "";
-  if (countsPerColor(list)) formData.quantity_in_stock = totalOf(list);
+  if (countsPerColor(list) && fromLinks.value === null) formData.quantity_in_stock = totalOf(list);
   ["color", "color_other", "color_stock", "color_options", "quantity_in_stock"].forEach(clearError);
 };
 
@@ -928,7 +945,8 @@ const validateForm = () => {
   }
 
   const colorIssue = colorProblem(formData.colors);
-  if (colorIssue) {
+  // Colour counts don't apply to a bouquet whose stock comes from linked flowers
+  if (colorIssue && !(fromLinks.value !== null && colorIssue.startsWith("Enter how many"))) {
     const key = colorIssue.startsWith("Enter how many") ? "color_stock" : "color";
     errors[key] = colorIssue;
     isValid = false;

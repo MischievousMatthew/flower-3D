@@ -277,6 +277,9 @@ class InventoryStockService
     {
         return DB::transaction(function () use ($product, $mode, $qty, $reason, $note, $actor) {
             $product = Product::whereKey($product->id)->lockForUpdate()->firstOrFail();
+            if ($product->isLinkedBouquet()) {
+                throw new \RuntimeException(Product::LINKED_STOCK_MESSAGE);
+            }
             $before = (int) $product->quantity_in_stock;
             $after = match ($mode) {
                 'add'    => $before + $qty,

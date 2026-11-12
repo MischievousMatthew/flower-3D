@@ -480,6 +480,7 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/products/draft',      [ProductController::class, 'draftProducts']);
             Route::get('/draft-products',      [ProductController::class, 'draftProducts']);
             Route::get('/products/inactive',   [ProductController::class, 'inactiveProducts']);
+            Route::get('/products/linkable-flowers', [ProductController::class, 'linkableFlowers']);
             Route::get('/inactive-products',   [ProductController::class, 'inactiveProducts']);
             Route::post('/products',           [ProductController::class, 'store'])->middleware('resource.limit:products');
             Route::get('/products/{id}',       [ProductController::class, 'show']);
@@ -895,6 +896,7 @@ Route::middleware('token.auth')->group(function () {
             Route::get('/products/draft',    [ProductController::class, 'draftProducts']);
             Route::get('/draft-products',    [ProductController::class, 'draftProducts']);
             Route::get('/products/inactive', [ProductController::class, 'inactiveProducts']);
+            Route::get('/products/linkable-flowers', [ProductController::class, 'linkableFlowers']);
             Route::get('/inactive-products', [ProductController::class, 'inactiveProducts']);
             Route::get('/products/search',   [ProductController::class, 'searchForWarehouse']);
             Route::get('/products/{id}',     [ProductController::class, 'show']);

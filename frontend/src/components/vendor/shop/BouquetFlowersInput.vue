@@ -10,10 +10,28 @@
     <p class="bf-help">
       List each flower, how many pieces go into one bouquet, and what you paid for one piece (your buying cost, not your
       selling price). Procurement uses this to know how many stems to buy. Customers never see the costs.
+      <template v-if="flowers">
+        Link a flower to one of your single flowers to share its stock: the bouquet can then sell as many as its flowers
+        make, and selling one takes the pieces from them.
+      </template>
     </p>
 
     <ul v-if="modelValue.length" class="bf-list">
-      <li v-for="(row, i) in modelValue" :key="i" class="bf-row">
+      <li v-for="(row, i) in modelValue" :key="i" class="bf-row" :class="{ linked: !!row.product_id }">
+        <label v-if="flowers" class="bf-field bf-link">
+          <span>Take from stock <small>(optional)</small></span>
+          <select
+            :value="row.product_id || ''"
+            class="fx-input"
+            :aria-label="`Link ${row.flower || 'this flower'} to a single flower in stock`"
+            @change="setLink(i, $event.target.value)"
+          >
+            <option value="">Not linked: just a note</option>
+            <option v-for="f in flowers" :key="f.id" :value="f.id">
+              {{ f.name }}{{ f.color && !f.colors?.length ? ` (${f.color})` : "" }} · {{ f.stock }} in stock
+            </option>
+          </select>
+        </label>
         <label class="bf-field bf-flower">
           <span>Flower</span>
           <input
@@ -32,7 +50,7 @@
             :value="row.color"
             class="fx-input"
             maxlength="40"
-            list="bf-color-names"
+            :list="linkedColors(row).length ? `bf-colors-${i}` : 'bf-color-names'"
             placeholder="e.g. Red"
             @input="update(i, { color: $event.target.value })"
           />
@@ -75,8 +93,21 @@
         <small v-if="rowCost(row) !== null" class="bf-line">
           {{ row.count }} × {{ peso(row.cost) }} = <b>{{ peso(rowCost(row)) }}</b>
         </small>
+        <small v-if="linkOf(row)" class="bf-line bf-line-link">
+          Each bouquet takes {{ row.count }} from <b>{{ linkOf(row).name }}</b>
+          ({{ flowerStockFor(linkOf(row), row.color) }} {{ linkedColors(row).length && row.color ? `${row.color} ` : "" }}in stock)
+          · enough for <b>{{ Math.floor(flowerStockFor(linkOf(row), row.color) / Math.max(1, Number(row.count) || 1)) }}</b>
+        </small>
+        <datalist v-if="linkedColors(row).length" :id="`bf-colors-${i}`">
+          <option v-for="c in linkedColors(row)" :key="c.name" :value="c.name" />
+        </datalist>
       </li>
     </ul>
+
+    <p v-if="linkedMake !== null" class="bf-linked-note" role="status">
+      Stock comes from the linked flowers: <b>{{ linkedMake }} {{ linkedMake === 1 ? "bouquet" : "bouquets" }}</b> can be made now.
+      Selling one takes its pieces from those flowers.
+    </p>
 
     <div v-if="cost > 0" class="bf-sum">
       <span>Flowers cost <b>{{ peso(cost) }}</b> per bouquet<template v-if="unpriced"> · {{ unpriced }} {{ unpriced === 1 ? "flower has" : "flowers have" }} no cost yet</template></span>
@@ -108,11 +139,13 @@
 <script setup>
 import { computed } from "vue";
 import { FLOWER_COLORS } from "../../../utils/flowerColors.js";
-import { flowersCost, rowCost } from "../../../utils/bouquetComposition.js";
+import { flowerStockFor, flowersCost, rowCost, stockFromLinks } from "../../../utils/bouquetComposition.js";
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
   error: { type: String, default: "" },
+  // The shop's single flowers a row can be linked to (linkable-flowers); null hides linking
+  flowers: { type: Array, default: null },
   // The product's own "your cost" field; when given, a button offers to fill it with the flowers' cost
   costValue: { type: [Number, String, null], default: undefined },
 });
@@ -133,7 +166,26 @@ const stems = computed(() => props.modelValue.reduce((sum, r) => sum + (Number(r
 
 const update = (index, patch) =>
   emit("update:modelValue", props.modelValue.map((r, i) => (i === index ? { ...r, ...patch } : r)));
-const add = () => emit("update:modelValue", [...props.modelValue, { flower: "", color: "", count: 1, cost: "" }]);
+const add = () => emit("update:modelValue", [...props.modelValue, { flower: "", color: "", count: 1, cost: "", product_id: null }]);
+
+// ── Linking a row to a single flower in stock ──
+const linkOf = (row) => (row.product_id && props.flowers ? props.flowers.find((f) => f.id === Number(row.product_id)) : null);
+const linkedColors = (row) => linkOf(row)?.colors || [];
+const linkedMake = computed(() => stockFromLinks(props.modelValue, props.flowers));
+
+/** Linking fills in what's still empty: the flower's name, its colour and what it cost */
+function setLink(index, value) {
+  const id = value ? Number(value) : null;
+  const row = props.modelValue[index];
+  const flower = id ? props.flowers?.find((f) => f.id === id) : null;
+  const patch = { product_id: id };
+  if (flower) {
+    if (!String(row.flower || "").trim()) patch.flower = flower.name;
+    if (!String(row.color || "").trim()) patch.color = flower.colors?.length ? flower.colors[0].name : flower.color || "";
+    if ((row.cost === "" || row.cost == null) && flower.cost != null) patch.cost = flower.cost;
+  }
+  update(index, patch);
+}
 const remove = (index) => emit("update:modelValue", props.modelValue.filter((_, i) => i !== index));
 </script>
 
@@ -232,6 +284,32 @@ const remove = (index) => emit("update:modelValue", props.modelValue.filter((_, 
 
 .bf-peso .fx-input {
   padding-left: 24px;
+}
+
+.bf-link {
+  grid-column: 1 / -1;
+}
+
+.bf-row.linked {
+  border-color: color-mix(in srgb, var(--bc-accent, #4db173) 45%, var(--v-border));
+}
+
+.bf-line-link {
+  color: var(--v-text-2, var(--v-text));
+}
+
+.bf-linked-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--v-blue-soft, var(--v-subtle));
+  color: var(--v-text-2, var(--v-text));
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.bf-linked-note b {
+  color: var(--v-text);
 }
 
 .bf-line {

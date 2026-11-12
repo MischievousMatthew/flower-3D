@@ -50,6 +50,40 @@ class ProductController extends Controller
         return null;
     }
 
+    /**
+     * GET …/products/linkable-flowers: the shop's single flowers a bouquet's
+     * flowers can be linked to (anything that isn't a bouquet), with their stock
+     * and cost so the form can show how many bouquets they make.
+     */
+    public function linkableFlowers(Request $request)
+    {
+        if ($response = $this->requireInventoryProductAccess($request, 'view')) {
+            return $response;
+        }
+        $ownerId = $this->resolveOwnerId($request);
+        $flowers = Product::query()
+            ->where('owner_id', $ownerId)
+            ->where(fn ($q) => $q->whereNull('selling_type')->orWhere('selling_type', '!=', 'bouquet'))
+            ->where('status', '!=', 'discontinued')
+            ->orderBy('product_name')
+            ->get(['id', 'product_name', 'sku', 'color', 'color_other', 'color_options', 'quantity_in_stock', 'purchase_price', 'stock_unit'])
+            ->map(fn (Product $p) => [
+                'id'       => $p->id,
+                'name'     => $p->product_name,
+                'sku'      => $p->sku,
+                'color'    => $p->color === 'other' ? $p->color_other : ($p->color ? ucfirst($p->color) : null),
+                // Its colours with their own stock, when it counts each colour
+                'colors'   => $p->tracksColorStock()
+                    ? collect($p->color_options)->filter(fn ($c) => is_array($c))->map(fn ($c) => ['name' => $c['name'] ?? '', 'stock' => (int) ($c['quantity'] ?? 0)])->values()
+                    : [],
+                'stock'    => (int) $p->quantity_in_stock,
+                'cost'     => $p->getRawOriginal('purchase_price') !== null ? (float) $p->getRawOriginal('purchase_price') : null,
+                'unit'     => $p->stock_unit,
+            ]);
+
+        return response()->json(['success' => true, 'data' => $flowers]);
+    }
+
     public function myProducts(Request $request)
     {
         try {
@@ -226,7 +260,7 @@ class ProductController extends Controller
             if (isset($colorStock['errors'])) {
                 return response()->json(['success' => false, 'errors' => $colorStock['errors']], 422);
             }
-            $composition = $this->compositionFromRequest($request, $request->input('selling_type'));
+            $composition = $this->compositionFromRequest($request, $request->input('selling_type'), (int) $ownerId);
             if (isset($composition['errors'])) {
                 return response()->json(['success' => false, 'errors' => $composition['errors']], 422);
             }
@@ -368,7 +402,7 @@ class ProductController extends Controller
      * for bouquets; anything else clears it. Returns null when not sent,
      * ['errors' => …] or ['attributes' => ['composition' => …]].
      */
-    private function compositionFromRequest(Request $request, ?string $sellingType): ?array
+    private function compositionFromRequest(Request $request, ?string $sellingType, ?int $ownerId = null, ?int $selfId = null): ?array
     {
         if (! $request->has('composition')) {
             return null;
@@ -411,15 +445,38 @@ class ProductController extends Controller
             if ($cost !== null && $cost !== '' && (! is_numeric($cost) || (float) $cost < 0 || (float) $cost > 1000000)) {
                 return $fail("Enter what one {$flower} cost you (₱0 or more).");
             }
+            // Optionally linked to one of the shop's single flowers: the bouquet's
+            // stock then comes from it, and selling one takes these pieces from it
+            $link = is_numeric($row['product_id'] ?? null) ? (int) $row['product_id'] : 0;
             $list[] = [
-                'flower' => $flower,
-                'color'  => $color !== '' ? $color : null,
-                'count'  => (int) $count,
-                'cost'   => $cost === null || $cost === '' ? null : round((float) $cost, 2),
+                'flower'     => $flower,
+                'color'      => $color !== '' ? $color : null,
+                'count'      => (int) $count,
+                'cost'       => $cost === null || $cost === '' ? null : round((float) $cost, 2),
+                'product_id' => $link > 0 ? $link : null,
             ];
         }
         if (count($list) > 30) {
             return $fail('A bouquet can list up to 30 flowers.');
+        }
+
+        // Linked flowers must be this shop's own single flowers (not a bouquet, not itself)
+        $ids = array_values(array_unique(array_filter(array_column($list, 'product_id'))));
+        if ($ids) {
+            $flowers = Product::query()
+                ->whereIn('id', $ids)
+                ->when($ownerId, fn ($q) => $q->where('owner_id', $ownerId))
+                ->get(['id', 'selling_type'])
+                ->keyBy('id');
+            foreach ($ids as $id) {
+                $flower = $flowers->get($id);
+                if (! $flower || $id === $selfId) {
+                    return $fail('Link each flower to one of your own single flowers.');
+                }
+                if ($flower->selling_type === 'bouquet') {
+                    return $fail('A bouquet can\'t be linked as a flower of another bouquet.');
+                }
+            }
         }
 
         return ['attributes' => ['composition' => $list ?: null]];
@@ -512,7 +569,7 @@ class ProductController extends Controller
             if (isset($colorStock['errors'])) {
                 return response()->json(['success' => false, 'errors' => $colorStock['errors']], 422);
             }
-            $composition = $this->compositionFromRequest($request, $request->input('selling_type') ?: $product->selling_type);
+            $composition = $this->compositionFromRequest($request, $request->input('selling_type') ?: $product->selling_type, (int) $ownerId, (int) $product->id);
             if (isset($composition['errors'])) {
                 return response()->json(['success' => false, 'errors' => $composition['errors']], 422);
             }
@@ -665,6 +722,9 @@ class ProductController extends Controller
 
             $ownerId = $this->resolveOwnerId($request);
             $product = Product::where('id', $id)->where('owner_id', $ownerId)->firstOrFail();
+            if ($product->isLinkedBouquet()) {
+                return response()->json(['success' => false, 'message' => Product::LINKED_STOCK_MESSAGE], 422);
+            }
 
             $data = $request->validate(['quantity_in_stock' => 'required|integer|min:0']);
 

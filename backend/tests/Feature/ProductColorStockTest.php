@@ -31,6 +31,7 @@ class ProductColorStockTest extends TestCase
             $t->string('color')->nullable();
             $t->string('color_other')->nullable();
             $t->json('color_options')->nullable();
+            $t->json('composition')->nullable();
             $t->decimal('selling_price', 12, 2)->default(0);
             $t->decimal('purchase_price', 12, 2)->nullable();
             $t->integer('quantity_in_stock')->default(0);
@@ -126,6 +127,99 @@ class ProductColorStockTest extends TestCase
         DB::transaction(fn () => $this->assertNull(Product::takeStock($p->id, 4)));
     }
 
+    private function flower(string $name, int $stock, array $colors = []): Product
+    {
+        return Product::forceCreate([
+            'owner_id' => 1, 'product_name' => $name, 'sku' => 'F-' . fake()->unique()->numerify('####'),
+            'color' => 'red', 'selling_price' => 50, 'purchase_price' => 15, 'quantity_in_stock' => $stock,
+            'min_stock_level' => 0, 'selling_type' => 'per_piece', 'status' => 'active', 'color_options' => $colors ?: null,
+        ]);
+    }
+
+    private function bouquet(array $composition, int $ownStock = 50): Product
+    {
+        return Product::forceCreate([
+            'owner_id' => 1, 'product_name' => 'Rose bouquet', 'sku' => 'B-' . fake()->unique()->numerify('####'),
+            'color' => 'red', 'selling_price' => 900, 'purchase_price' => 300, 'quantity_in_stock' => $ownStock,
+            'min_stock_level' => 0, 'selling_type' => 'bouquet', 'status' => 'active', 'composition' => $composition,
+        ]);
+    }
+
+    public function test_a_linked_bouquets_stock_comes_from_its_flowers(): void
+    {
+        $rose = $this->flower('Red rose', 100);
+        $fern = $this->flower('Leatherleaf', 9);
+        $b = $this->bouquet([
+            ['flower' => 'Rose', 'count' => 12, 'product_id' => $rose->id],
+            ['flower' => 'Leatherleaf', 'count' => 2, 'product_id' => $fern->id],
+            ['flower' => 'Ribbon', 'count' => 1], // not linked: doesn't limit it
+        ]);
+
+        // 100 ÷ 12 = 8, 9 ÷ 2 = 4: the lowest wins, its own 50 is ignored
+        $this->assertSame(4, (int) $b->fresh()->quantity_in_stock);
+
+        // The flowers' stock changes: the bouquet follows
+        $fern->update(['quantity_in_stock' => 40]);
+        $this->assertSame(8, (int) $b->fresh()->quantity_in_stock);
+        $rose->update(['quantity_in_stock' => 11]);
+        $this->assertSame(0, (int) $b->fresh()->quantity_in_stock);
+    }
+
+    public function test_selling_a_linked_bouquet_takes_its_flowers(): void
+    {
+        $rose = $this->flower('Red rose', 100);
+        $plain = $this->flower('Tulip', 10);
+        $b = $this->bouquet([['flower' => 'Rose', 'count' => 12, 'product_id' => $rose->id]]);
+
+        // 2 bouquets and 3 tulips: 24 roses and 3 tulips, the bouquet itself isn't taken
+        $plan = Product::stockPlan([[$b->id, null, 2], [$plain->id, null, 3]]);
+        $this->assertSame([[$rose->id, null, 24, $b->id], [$plain->id, null, 3, null]], $plan);
+
+        DB::transaction(function () use ($plan) {
+            foreach ($plan as [$id, $color, $qty]) {
+                $this->assertNotNull(Product::takeStock($id, $qty, $color));
+            }
+        });
+        $this->assertSame(76, (int) $rose->fresh()->quantity_in_stock);
+        $this->assertSame(6, (int) $b->fresh()->quantity_in_stock, '76 ÷ 12');
+
+        // Not enough roses for 7 more: nothing is taken
+        DB::transaction(fn () => $this->assertNull(Product::takeStock($rose->id, 7 * 12)));
+        $this->assertSame(76, (int) $rose->fresh()->quantity_in_stock);
+
+        // Cancelled: the roses go back and the bouquet follows
+        DB::transaction(fn () => Product::putBackStock($rose->id, 24));
+        $this->assertSame(100, (int) $rose->fresh()->quantity_in_stock);
+        $this->assertSame(8, (int) $b->fresh()->quantity_in_stock);
+    }
+
+    public function test_a_linked_flower_counted_per_colour_uses_that_colours_stock(): void
+    {
+        $rose = $this->flower('Rose', 0, [['name' => 'Red', 'value' => 'red', 'quantity' => 30], ['name' => 'Pink', 'value' => 'pink', 'quantity' => 6]]);
+        $b = $this->bouquet([['flower' => 'Rose', 'color' => 'Pink', 'count' => 3, 'product_id' => $rose->id]]);
+        $this->assertSame(2, (int) $b->fresh()->quantity_in_stock, '6 pink ÷ 3');
+
+        $plan = Product::stockPlan([[$b->id, null, 2]]);
+        DB::transaction(fn () => Product::takeStock($plan[0][0], $plan[0][2], $plan[0][1]));
+        $this->assertSame([['Red' => 30, 'Pink' => 0], 30], $this->counts($rose));
+        $this->assertSame(0, (int) $b->fresh()->quantity_in_stock);
+    }
+
+    public function test_links_must_be_the_shops_own_single_flowers(): void
+    {
+        $rose = $this->flower('Red rose', 100);
+        $other = $this->bouquet([['flower' => 'Rose', 'count' => 1]]);
+        $method = new \ReflectionMethod(ProductController::class, 'compositionFromRequest');
+        $method->setAccessible(true);
+        $read = fn ($rows, $owner = 1) => $method->invoke(app(ProductController::class), Request::create('/', 'POST', ['composition' => json_encode($rows)]), 'bouquet', $owner, 999);
+
+        $ok = $read([['flower' => 'Rose', 'count' => 12, 'product_id' => $rose->id]]);
+        $this->assertSame($rose->id, $ok['attributes']['composition'][0]['product_id']);
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Rose', 'count' => 12, 'product_id' => $rose->id]], 2), "another shop's flower");
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Rose', 'count' => 1, 'product_id' => $other->id]]), 'a bouquet');
+        $this->assertArrayHasKey('errors', $read([['flower' => 'Rose', 'count' => 1, 'product_id' => 999]]), 'itself');
+    }
+
     public function test_a_bouquets_flowers_are_checked(): void
     {
         $method = new \ReflectionMethod(ProductController::class, 'compositionFromRequest');
@@ -135,8 +229,8 @@ class ProductColorStockTest extends TestCase
 
         $ok = $read([['flower' => ' Rose ', 'color' => 'Red', 'count' => '12', 'cost' => '15.5'], ['flower' => '', 'color' => '', 'count' => ''], ['flower' => "Baby's breath", 'count' => 5, 'cost' => '']]);
         $this->assertSame([
-            ['flower' => 'Rose', 'color' => 'Red', 'count' => 12, 'cost' => 15.5],
-            ['flower' => "Baby's breath", 'color' => null, 'count' => 5, 'cost' => null],
+            ['flower' => 'Rose', 'color' => 'Red', 'count' => 12, 'cost' => 15.5, 'product_id' => null],
+            ['flower' => "Baby's breath", 'color' => null, 'count' => 5, 'cost' => null, 'product_id' => null],
         ], $ok['attributes']['composition'], 'empty rows are skipped; the cost per piece is optional');
         $this->assertArrayHasKey('errors', $read([['flower' => 'Rose', 'count' => 2, 'cost' => -1]]));
         $this->assertArrayHasKey('errors', $read([['flower' => 'Rose', 'count' => 2, 'cost' => 'a lot']]));

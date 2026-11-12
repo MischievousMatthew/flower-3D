@@ -133,6 +133,9 @@ class VendorCatalogController extends Controller
             if (! $product) {
                 return null;
             }
+            if ($product->isLinkedBouquet()) {
+                return ['error' => Product::LINKED_STOCK_MESSAGE];
+            }
 
             $before = (int) $product->quantity_in_stock;
             $after = match ($data['mode']) {
@@ -301,6 +304,8 @@ class VendorCatalogController extends Controller
             'sale_source' => $sale === null ? null : ($usesPromotion ? 'promotion' : 'own'),
             'promotion_name' => $usesPromotion ? $promotion['promotion']->name : null,
             'stock' => $stock,
+            // A bouquet whose stock comes from its linked flowers (can't be changed by hand)
+            'stock_from_flowers' => $p->isLinkedBouquet(),
             'min_stock' => $min,
             'max_stock' => $p->max_stock_level !== null ? (int) $p->max_stock_level : null,
             'stock_state' => $stock <= 0 ? 'out' : ($min !== null && $min > 0 && $stock <= $min ? 'low' : 'ok'),

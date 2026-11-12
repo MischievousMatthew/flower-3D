@@ -15,7 +15,33 @@ export const compositionFromProduct = (p) =>
     color: f.color || "",
     count: Number(f.count) || 1,
     cost: f.cost ?? "",
+    product_id: f.product_id ?? null, // linked single flower (shares its stock)
   }));
+
+/** How many of a linked flower a row can use: its colour's own stock when it counts colours */
+export const flowerStockFor = (flower, color) => {
+  if (!flower) return 0;
+  const c = (flower.colors || []).find((x) => String(x.name).toLowerCase() === String(color || "").trim().toLowerCase());
+  return c ? Number(c.stock) || 0 : Number(flower.stock) || 0;
+};
+
+/**
+ * The bouquets the linked flowers make (the lowest stock ÷ pieces), or null
+ * when no row is linked. `flowers` is the linkable-flowers list.
+ */
+export function stockFromLinks(rows, flowers) {
+  let make = null;
+  for (const r of rows || []) {
+    if (!r.product_id || !(Number(r.count) > 0)) continue;
+    const flower = (flowers || []).find((f) => f.id === Number(r.product_id));
+    if (!flower) continue;
+    const can = Math.floor(flowerStockFor(flower, r.color) / Number(r.count));
+    make = make === null ? can : Math.min(make, can);
+  }
+  return make;
+}
+
+export const hasLinks = (rows) => (rows || []).some((r) => r.product_id);
 
 /** What one row's flowers cost to buy (null when it has no cost) */
 export const rowCost = (r) => (hasCost(r) && Number(r.count) > 0 ? Number(r.cost) * Number(r.count) : null);
@@ -33,6 +59,7 @@ export const compositionField = (rows) =>
         color: String(r.color || "").trim() || null,
         count: Math.floor(Number(r.count)),
         cost: hasCost(r) ? Math.round(Number(r.cost) * 100) / 100 : null,
+        product_id: r.product_id ? Number(r.product_id) : null,
       })),
   );
 

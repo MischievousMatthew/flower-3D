@@ -208,9 +208,9 @@
             </button>
           </div>
           <div v-if="form.selling_type === 'bouquet'" data-change="composition" class="ap-gap">
-            <BouquetFlowersInput v-model="form.composition" :error="errors.composition || ''" :cost-value="form.purchase_price" @update:model-value="clear('composition')" @use-cost="(v) => { form.purchase_price = v; clear('purchase_price'); }" />
+            <BouquetFlowersInput v-model="form.composition" :flowers="linkableFlowers" :error="errors.composition || ''" :cost-value="form.purchase_price" @update:model-value="clear('composition')" @use-cost="(v) => { form.purchase_price = v; clear('purchase_price'); }" />
           </div>
-          <div v-if="multiColor" data-change="colors" class="ap-gap">
+          <div v-if="colorCounts" data-change="colors" class="ap-gap">
             <ColorStockInputs :model-value="form.colors" :error="errors.color_stock || ''" @update:model-value="setColors" />
           </div>
           <div class="sp-grid-3 ap-gap">
@@ -223,11 +223,12 @@
                 step="1"
                 class="sp-input"
                 :class="{ invalid: errors.quantity_in_stock }"
-                :readonly="multiColor"
+                :readonly="colorCounts || fromLinks !== null"
                 @input="clear('quantity_in_stock')"
               />
               <small v-if="errors.quantity_in_stock" class="sp-error">{{ errors.quantity_in_stock }}</small>
-              <small v-else-if="multiColor">The total of the colours above</small>
+              <small v-else-if="fromLinks !== null">From the linked flowers</small>
+              <small v-else-if="colorCounts">The total of the colours above</small>
             </label>
             <label data-change="min_stock_level" class="sp-field">
               <span>Warn me at</span>
@@ -354,7 +355,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
@@ -370,7 +371,7 @@ import FlowerColorPicker from "../../components/vendor/shop/FlowerColorPicker.vu
 import ColorStockInputs from "../../components/vendor/shop/ColorStockInputs.vue";
 import { colorFields, colorProblem, countsPerColor, totalOf } from "../../utils/flowerColors.js";
 import BouquetFlowersInput from "../../components/vendor/shop/BouquetFlowersInput.vue";
-import { compositionField, compositionProblem } from "../../utils/bouquetComposition.js";
+import { compositionField, compositionProblem, stockFromLinks } from "../../utils/bouquetComposition.js";
 
 const route = useRoute();
 const router = useRouter();
@@ -494,6 +495,22 @@ function discardAll() {
 const clear = (key) => delete errors[key];
 // Two or more flower colours: each has its own stock, and the total is their sum
 const multiColor = computed(() => countsPerColor(form.colors));
+
+// A bouquet whose flowers are linked to single flowers in stock: its stock is
+// what those flowers make, so colour counts and the In stock box don't apply
+const linkableFlowers = ref([]);
+api
+  .get("vendor/products/linkable-flowers")
+  .then(({ data }) => (linkableFlowers.value = data.data ?? []))
+  .catch(() => {}); // linking just isn't offered then
+const fromLinks = computed(() =>
+  form.selling_type === "bouquet" ? stockFromLinks(form.composition, linkableFlowers.value) : null,
+);
+const colorCounts = computed(() => multiColor.value && fromLinks.value === null);
+watch(fromLinks, (make) => {
+  if (make !== null) form.quantity_in_stock = make;
+  else if (multiColor.value) form.quantity_in_stock = totalOf(form.colors);
+});
 function setColors(list) {
   // Going from one colour to two: the stock entered so far belongs to the first
   if (countsPerColor(list) && !countsPerColor(form.colors) && list[0]) {
@@ -506,7 +523,7 @@ function setColors(list) {
   form.colors = list;
   form.color = list[0]?.value || "";
   form.color_other = list[0]?.value === "other" ? String(list[0].name || "") : "";
-  if (countsPerColor(list)) form.quantity_in_stock = totalOf(list);
+  if (countsPerColor(list) && fromLinks.value === null) form.quantity_in_stock = totalOf(list);
   clear("color");
   clear("color_stock");
   clear("quantity_in_stock");
@@ -617,7 +634,8 @@ function validate(status) {
   if (!form.sku.trim()) e.sku = "Add a SKU, or press Generate.";
   const colorIssue = colorProblem(form.colors);
   if (colorIssue) {
-    if (colorIssue.startsWith("Enter how many")) e.color_stock = colorIssue;
+    // Colour counts don't apply to a bouquet whose stock comes from linked flowers
+    if (colorIssue.startsWith("Enter how many")) { if (fromLinks.value === null) e.color_stock = colorIssue; }
     else e.color = colorIssue;
   }
   if (!form.category) e.category = "Pick a category.";

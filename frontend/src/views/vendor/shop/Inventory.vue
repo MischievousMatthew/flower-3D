@@ -82,12 +82,13 @@
                 <span v-if="p.max_stock">Max {{ p.max_stock }}</span>
               </div>
             </div>
-            <div class="inv-quick" role="group" :aria-label="`Quick change for ${p.name}`">
+            <p v-if="p.stock_from_flowers" class="inv-linked">Stock comes from its linked flowers. Change the flowers' stock instead.</p>
+            <div v-else class="inv-quick" role="group" :aria-label="`Quick change for ${p.name}`">
               <button type="button" class="sp-icon-btn" :disabled="shown(p) <= 0 || savingStock" :aria-label="`Remove one ${p.name}`" @click="quick(p, -1)"><span v-html="ICONS.minus"></span></button>
               <button type="button" class="sp-icon-btn" :disabled="savingStock" :aria-label="`Add one ${p.name}`" @click="quick(p, 1)"><span v-html="ICONS.plus"></span></button>
             </div>
             <div class="inv-actions">
-              <button type="button" class="sp-btn sp-btn-dark sp-btn-sm" @click="openAdjust(p)">Adjust</button>
+              <button v-if="!p.stock_from_flowers" type="button" class="sp-btn sp-btn-dark sp-btn-sm" @click="openAdjust(p)">Adjust</button>
               <button type="button" class="sp-btn sp-btn-ghost sp-btn-sm" @click="openLevels(p)">Alerts</button>
               <button type="button" class="sp-icon-btn" :class="{ on: historyFor?.id === p.id }" :aria-label="`History for ${p.name}`" @click="showHistory(p)"><span v-html="ICONS.history"></span></button>
             </div>
@@ -534,6 +535,14 @@ onMounted(() => {
 .inv-quick {
   display: flex;
   gap: 4px;
+}
+/* A bouquet whose stock comes from its linked flowers: no − / + */
+.inv-linked {
+  max-width: 180px;
+  margin: 0;
+  color: var(--v-muted);
+  font-size: 12px;
+  line-height: 1.4;
 }
 /* A − / + change waiting for Save */
 .inv-row.pending {
