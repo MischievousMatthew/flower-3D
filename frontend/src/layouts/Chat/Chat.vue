@@ -400,7 +400,7 @@
                       type="button"
                       class="msg-card"
                       :aria-label="`${item.message.meta.name}. Open the product`"
-                      @click="router.push({ name: 'ProductDetails', params: { id: String(item.message.meta.product_id) } })"
+                      @click="router.push(productRoute(item.message.meta.product_id))"
                     >
                       <span class="msg-card-img" aria-hidden="true">
                         <img v-if="item.message.meta.image" :src="item.message.meta.image" alt="" loading="lazy" />
@@ -437,7 +437,7 @@
                       type="button"
                       class="msg-card"
                       :aria-label="`Question about ${item.message.meta.name}. Open the product`"
-                      @click="router.push({ name: 'ProductDetails', params: { id: String(item.message.meta.product_id) } })"
+                      @click="router.push(productRoute(item.message.meta.product_id))"
                     >
                       <span class="msg-card-img" aria-hidden="true">
                         <img v-if="item.message.meta.image" :src="item.message.meta.image" alt="" loading="lazy" />
@@ -699,6 +699,7 @@
 </template>
 
 <script setup>
+import { productRoute } from "../../utils/productLink.js";
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";

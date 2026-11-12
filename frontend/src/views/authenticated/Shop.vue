@@ -224,6 +224,7 @@
 </template>
 
 <script setup>
+import { productRoute } from "../../utils/productLink.js";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
@@ -1079,7 +1080,7 @@ const shopByOccasion = (occasion) => {
 // ── Modal ─────────────────────────────────────────────────────────────────
 const openProductModal = (product) => {
   rememberProduct(product);
-  router.push({ name: "ProductDetails", params: { id: String(product.id) } });
+  router.push(productRoute(product.id));
 };
 const closeModal = () => {
   showProductModal.value = false;

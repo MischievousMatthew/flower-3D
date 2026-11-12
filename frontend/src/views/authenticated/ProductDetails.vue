@@ -465,6 +465,7 @@
 </template>
 
 <script setup>
+import { productIdFromCode, productRoute } from "../../utils/productLink.js";
 import { computed, defineAsyncComponent, h, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import api from "../../plugins/axios.js";
@@ -961,14 +962,27 @@ function goToStore() {
 
 function openProduct(item) {
   rememberProduct(item);
-  router.push({ name: "ProductDetails", params: { id: String(item.id) } });
+  router.push(productRoute(item.id));
 }
 
+// The address holds a code, not the product number (see utils/productLink.js)
 watch(
   () => route.params.id,
-  (id) => {
-    if (!id) return;
+  (param) => {
+    if (!param) return;
+    const id = productIdFromCode(param);
+    // An old link with the plain number: swap it for the code, keeping the page
+    if (id && String(param) === String(id)) {
+      router.replace({ ...productRoute(id), query: route.query, hash: route.hash });
+      return;
+    }
     window.scrollTo({ top: 0 });
+    if (!id) {
+      product.value = null;
+      loading.value = false;
+      loadingRelated.value = false;
+      return;
+    }
     load(id);
   },
   { immediate: true },

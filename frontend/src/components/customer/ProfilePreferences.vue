@@ -223,7 +223,7 @@
             <p>{{ o.body }}</p>
             <div class="pp-offer__foot">
               <span v-if="o.promotion" class="pp-promo" :class="{ ended: !o.promotion.running }">{{ o.promotion.label }} · {{ o.promotion.name }}{{ o.promotion.running ? ` · until ${shortDay(o.promotion.ends_at)}` : " · ended" }}</span>
-              <router-link v-if="o.product_id" :to="{ name: 'ProductDetails', params: { id: String(o.product_id) } }" class="pp-link">View product</router-link>
+              <router-link v-if="o.product_id" :to="productRoute(o.product_id)" class="pp-link">View product</router-link>
               <button v-if="!isMuted(o.vendor_id)" type="button" class="pp-link muted" :disabled="busy === `m${o.vendor_id}`" @click="mute(o.vendor_id, true)">Stop offers from {{ o.shop }}</button>
             </div>
           </li>
@@ -268,6 +268,7 @@
 </template>
 
 <script setup>
+import { productRoute } from "../../utils/productLink.js";
 import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { toast } from "@/utils/snackbar";
 import api from "../../plugins/axios";
