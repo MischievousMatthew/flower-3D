@@ -866,17 +866,20 @@ defineExpose({ build, el: rootEl });
 }
 
 /* 2. Occasion and size */
+/* Fits the window: both questions and both rows of choices always show */
 .sc-pick {
   display: grid;
   align-content: center;
-  gap: 10px;
-  padding: 0 7%;
+  gap: clamp(6px, 1.2vw, 10px);
+  padding: 4% 7%;
 }
 
 .sc-q {
+  margin: 0;
   color: var(--ink);
   font-family: var(--font-display);
-  font-size: clamp(17px, 2vw, 22px);
+  font-size: clamp(16px, 1.8vw, 21px);
+  line-height: 1.2;
 }
 
 .sc-occasions,
@@ -884,7 +887,7 @@ defineExpose({ build, el: rootEl });
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 8px;
+  margin: 0 0 clamp(2px, 0.8vw, 8px);
 }
 
 .sc-occ,
@@ -892,8 +895,8 @@ defineExpose({ build, el: rootEl });
   position: relative;
   display: grid;
   justify-items: center;
-  gap: 6px;
-  padding: 12px 6px;
+  gap: 4px;
+  padding: clamp(8px, 1.2vw, 12px) 6px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: #ffffff;
@@ -931,11 +934,13 @@ defineExpose({ build, el: rootEl });
   font-size: 11px;
 }
 
+/* Plain numbers: the display font draws 3, 6 and 12 in an old style */
 .sc-size b {
   color: var(--ink);
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-size: clamp(17px, 1.8vw, 20px);
+  font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
   line-height: 1;
 }
 
