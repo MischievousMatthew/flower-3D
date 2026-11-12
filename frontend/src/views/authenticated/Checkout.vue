@@ -74,7 +74,15 @@
                 <router-link :to="{ name: 'Profile' }" class="co-link">Edit in profile</router-link>
               </div>
               <div class="co-person">
-                <span class="co-avatar" aria-hidden="true">{{ initials }}</span>
+                <span class="co-avatar" :class="{ 'has-photo': showPhoto }" aria-hidden="true">
+                  <img
+                    v-if="showPhoto"
+                    :src="checkoutData.user.profile_picture"
+                    alt=""
+                    @error="photoFailed = true"
+                  />
+                  <template v-else>{{ initials }}</template>
+                </span>
                 <div>
                   <strong>{{ checkoutData.user?.name || "Your name" }}</strong>
                   <span>{{ checkoutData.user?.email }}</span>
@@ -684,6 +692,10 @@ const contactOk = computed(() => {
   const digits = contactNumber.value.replace(/\D/g, "");
   return digits.length >= 10 && digits.length <= 13;
 });
+// The customer's profile photo; initials when there's none or it fails to load
+const photoFailed = ref(false);
+const showPhoto = computed(() => !!checkoutData.value.user?.profile_picture && !photoFailed.value);
+
 const initials = computed(() =>
   String(checkoutData.value.user?.name || "?")
     .split(/\s+/)
@@ -1874,6 +1886,17 @@ onMounted(async () => {
   color: #ffffff;
   font-size: 14px;
   font-weight: 600;
+}
+
+.co-avatar.has-photo {
+  overflow: hidden;
+  background: var(--ivory-deep, #e4eae5);
+}
+
+.co-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .co-person div {

@@ -306,6 +306,8 @@ class CheckoutController extends Controller
                     'email' => $user->email,
                     'contact_number' => $user->contact_number,
                     'address' => $user->address,
+                    // Profile photo URL, or null so the page shows initials
+                    'profile_picture' => $user->profile_picture ? $user->avatar_url : null,
                 ],
                 'vendor' => [
                     'id' => $vendorId,
